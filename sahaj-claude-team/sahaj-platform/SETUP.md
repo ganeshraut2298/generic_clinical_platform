@@ -27,44 +27,41 @@ node scripts/setup/check-env.mjs
    ```
    This creates roles `sahaj_migrator` (owns tables, runs Flyway) and `sahaj_app` (used by the app, cannot bypass row-level security), databases `sahaj_dev` and `sahaj_test`, and schemas `platform, patient, opd, ipd, hra, billing`. It is safe to run again. Tables come later from Flyway migrations.
 
-## 3. Start the local Git repository
+## 3. Put the project in your working folder and start Git
 
-```bash
+Use `D:\generi_clinical_platform` as the project root: copy the **contents** of this `sahaj-platform` folder into it, so `CLAUDE.md`, `.claude\`, `docs\` and `scripts\` sit directly in `D:\generi_clinical_platform`. Keep your `.env` there too (Git ignores it).
+
+```powershell
+cd D:\generi_clinical_platform
 git init -b main
 git add .
-git commit -m "chore: SAH-0 Claude Code team, rules, mockup and database setup"
+git commit -m "chore: Sahaj Claude Code team, rules, mockup and database setup"
 ```
-No GitHub for now. Agents cannot push, merge or add remotes.
 
-## 4. Open in Claude Code
+## 4. Open Claude Code
 
-1. Install Claude Code and run `claude` in this folder.
-2. **Accept the workspace trust prompt.** Without it the agents still run, but their guard hooks are skipped.
-3. Type `/agents` — you should see 8 agents: business-analyst, solution-architect, db-engineer, java-developer, angular-developer, qa-engineer, code-reviewer, security-reviewer.
+```powershell
+cd D:\generi_clinical_platform
+claude
+```
+1. **Accept the workspace trust prompt.** Without it the guard hooks do not run.
+2. The session starts as the **tech-lead** agent (set in `.claude/settings.json`). Type `/agents` — you should see 9 agents.
 
-## 5. First story: SAH-0, the project scaffold
+## 5. Build the project with the agents
 
-`docs/approvals.md` already approves SAH-0 stories and contract (it has no screens). Tell the main session:
+Follow `docs/process/playbook.md` from SAH-1 to SAH-32. Your first message:
 
-> Act as tech lead. Create branch feature/SAH-0-scaffold. Ask the java-developer to create the Spring Boot 3 (Java 17, Maven) app in backend/ with modules platform, patient, opd, ipd, hra, billing, Spring Modulith, Flyway, profiles dev and test reading SAHAJ_DB_URL / SAHAJ_TEST_DB_URL. Ask the db-engineer for the first migration: platform.tenant and platform.app_user with row-level security. Ask the angular-developer to create the Angular app in frontend/ with Angular Material, the theme from docs/design/tokens.md and the app shell (sidebar, header) from the mockup. Then QA, then both reviewers. Stop for my approval before any merge.
+> Start SAH-1.
 
-## 6. Every feature after that
+For every story you do only four things: approve `stories`, approve `contract`, answer escalations, approve and run the `merge`. The playbook shows the exact lines and commands.
 
-1. Pick a screen from `docs/design/screen-map.md` (Phase 1).
-2. Tell the main session: *"Act as tech lead. Start SAH-12 for the mockup screen 'Appointments'. Run the business-analyst."*
-3. Read `docs/stories/SAH-12.md`. If correct, add to `docs/approvals.md`: `| SAH-12 | stories | APPROVED | Aarti | <date> |`, then say *"continue"*.
-4. Read `docs/api/<module>.yaml`. If correct, add `| SAH-12 | contract | APPROVED | ... |`, then *"continue"*.
-5. The tech lead runs DB → developers → QA → reviewers and shows you the reports.
-6. If you are happy: add `| SAH-12 | merge | APPROVED | ... |`, then
-   `git switch main && git merge --no-ff feature/SAH-12-appointments`.
+## 6. Check that the guards work (optional, 2 minutes)
 
-## 7. Check that the guards work
-
-- Ask the angular-developer to edit `backend/pom.xml` → blocked (ownership).
-- On a story without `contract · APPROVED`, ask the java-developer to write code → blocked (workflow).
-- Write a story without `Mockup screen:` → `node scripts/validate.mjs docs` fails.
+- Ask: "Have the angular-developer edit backend/pom.xml" → blocked (ownership).
+- Before approving a contract, ask the tech-lead to start the java-developer → blocked (workflow).
+- A story file without `Mockup screen:` → `node scripts/validate.mjs docs` fails.
 - Ask the code-reviewer to create a file → it has no write tools.
 
 ## Changing the design
 
-Only humans change `docs/design/mockup/sahaj-mockup.html` and `docs/design/screen-map.md`. Update the mockup first, then start the story. HRA screens are not in the mockup yet.
+Only humans change `docs/design/mockup/sahaj-mockup.html` and `docs/design/screen-map.md`. Update the mockup first, then start or resume the story. HRA screens are not in the mockup yet.

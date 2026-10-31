@@ -1,4 +1,5 @@
 {
+  "agent": "tech-lead",
   "permissions": {
     "allow": [
       "Bash(node scripts/validate.mjs *)",

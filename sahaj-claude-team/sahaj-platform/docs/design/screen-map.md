@@ -4,6 +4,9 @@ Phase 1 = build now. Later = shown in the mockup but depends on a deferred servi
 
 | Mockup screen (how to open) | Module | Phase | Notes |
 |---|---|---|---|
+| Foundation (no screen) | platform | 1 | Scaffold, tenancy, security, audit: stories with no UI |
+| Start screen and sign-in (opening screen of the mockup) | platform | 1 | Choose clinic and role; real login replaces the demo role switcher |
+| App shell (sidebar, header, Simple/Advanced, light/dark, language) | platform | 1 | Layout every screen sits in |
 | Today (sidebar → Today) | opd | 1 | Day summary per role |
 | Queue (sidebar → Queue) | opd | 1 | Token queue, consult flow, Doctor App is the consultation step |
 | Appointments (sidebar → Appointments) | opd | 1 | Front-desk workspace, slots, booking rules |

@@ -29,14 +29,14 @@ Targets: 10,000 OPD clinics and 100 IPD hospitals. All patient data stays in Ind
 | `backend/` (everything else) | java-developer |
 | `frontend/` (except `frontend/e2e/`) | angular-developer |
 | `frontend/e2e/`, `backend/src/test/java/**/it/`, `docs/test-plans/` | qa-engineer |
-| `docs/reviews/`, `docs/handoffs/` | main session (tech lead) |
+| `docs/handoffs/`, `docs/reviews/`, `docs/decisions/` | tech-lead (the main session) |
 | `CLAUDE.md`, `.claude/`, `scripts/`, `docs/design/`, `docs/approvals.md`, `.env` | humans only |
 
-code-reviewer and security-reviewer are read-only.
+code-reviewer and security-reviewer are read-only. **tech-lead** is the main session (set in `.claude/settings.json`): it drives every story through the agents and escalates complex decisions to the human. The backlog and order of work: `docs/process/playbook.md`.
 
 ## Process per story (details: `docs/process/workflow.md`)
 
-1. Tech lead creates the branch `feature/SAH-<n>-<slug>` from `main`.
+1. tech-lead creates the branch `feature/SAH-<n>-<slug>` from `main`.
 2. business-analyst → requirement + stories (skill: requirement-analysis). **Human approves `stories`.**
 3. solution-architect → ADR if needed + API contract. **Human approves `contract`.**
 4. db-engineer → design note + Flyway migration (skill: database-migration).
