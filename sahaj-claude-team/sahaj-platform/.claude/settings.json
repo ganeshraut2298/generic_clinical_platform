@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/validate.mjs *)",
+      "Bash(mvn -f backend/pom.xml *)",
+      "Bash(mvn -q -f backend/pom.xml *)",
+      "Bash(mvn -B -q -f backend/pom.xml *)",
+      "Bash(npm --prefix frontend *)",
+      "Bash(npx --prefix frontend playwright test*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git switch -c feature/*)",
+      "Bash(git switch -c fix/*)",
+      "Bash(git add *)"
+    ],
+    "ask": [
+      "Bash(git commit*)",
+      "Bash(git switch *)",
+      "Bash(npm install*)",
+      "Bash(npm --prefix frontend install*)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(git rebase*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git remote*)",
+      "Bash(rm -rf *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(psql *)",
+      "Bash(node scripts/setup/*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/secrets/**)",
+      "Edit(./CLAUDE.md)",
+      "Edit(./.claude/**)",
+      "Edit(./scripts/**)",
+      "Edit(./docs/design/**)",
+      "Edit(./docs/approvals.md)",
+      "Write(./CLAUDE.md)",
+      "Write(./.claude/**)",
+      "Write(./scripts/**)",
+      "Write(./docs/design/**)",
+      "Write(./docs/approvals.md)"
+    ]
+  }
+}

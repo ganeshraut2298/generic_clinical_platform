@@ -1,0 +1,21 @@
+# build
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/test-results/
+frontend/playwright-report/
+# env and secrets
+.env
+.env.*
+**/secrets/
+# Claude Code local state
+.claude/locks/
+.claude/settings.local.json
+CLAUDE.local.md
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.iml
+!.env.example
