@@ -1,0 +1,11 @@
+# Sahaj backend configuration.
+# Every value here is an environment variable with a non-secret default (ADR-001 D5).
+# No secret, password or connection string is set here or anywhere else in the scaffold.
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: sahaj-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
