@@ -1,0 +1,256 @@
+:host {
+  display: block;
+}
+
+.wfb {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.palette {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: start;
+}
+
+.pal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  text-align: left;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+
+  small {
+    display: block;
+    font-weight: 500;
+    color: var(--ink-3);
+    font-size: 0.72rem;
+  }
+  &[disabled] {
+    opacity: 0.42;
+    cursor: default;
+  }
+  &:hover:not([disabled]) {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+  }
+}
+
+.canvas {
+  position: relative;
+  padding: 20px 160px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 420px;
+  background-color: var(--surface);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.wfbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+.cap {
+  font-size: 0.8rem;
+}
+
+.nodes {
+  list-style: none;
+  margin: 0;
+  padding: 12px 0 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 30px;
+}
+.nwrap {
+  display: flex;
+  align-items: center;
+}
+
+.node {
+  position: relative;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  min-width: 122px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--dur-2),
+    box-shadow var(--dur-2);
+
+  b {
+    font-size: 0.86rem;
+  }
+  small {
+    font-size: 0.72rem;
+    color: var(--ink-3);
+  }
+  &.active {
+    border-color: var(--pri);
+    box-shadow: 0 0 0 4px var(--pri-soft);
+  }
+  &.new {
+    animation: popin 0.45s var(--ease);
+  }
+}
+
+.marker {
+  display: none;
+  position: absolute;
+  top: -24px;
+  left: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--pri);
+  color: var(--pri-ink);
+  white-space: nowrap;
+}
+.node.active .marker {
+  display: block;
+}
+
+.nctl {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+  align-items: center;
+
+  button,
+  .lockc {
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    border-radius: 7px;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    color: var(--ink-2);
+    padding: 0;
+  }
+  button[disabled] {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .lockc {
+    color: var(--ink-3);
+  }
+}
+
+.conn {
+  width: 22px;
+  height: 2px;
+  background: var(--ink-3);
+  opacity: 0.5;
+  position: relative;
+  margin: 0 3px;
+  flex: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -4px;
+    border-left: 6px solid var(--ink-3);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  &.new {
+    animation: draw 0.45s var(--ease);
+    transform-origin: left;
+  }
+}
+
+.tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.74rem;
+  padding: 6px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-1);
+  z-index: 5;
+}
+.node:hover .tip,
+.node:focus-within .tip {
+  opacity: 1;
+}
+
+.wfch {
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  width: 140px;
+}
+
+@keyframes popin {
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (max-width: 980px) {
+  .wfb {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .palette {
+    flex-direction: row;
+    flex-wrap: wrap;
+    .eyebrow {
+      width: 100%;
+    }
+  }
+  .pal {
+    flex: 1 1 150px;
+  }
+}
+
+@media (max-width: 620px) {
+  .canvas {
+    padding-right: 20px;
+  }
+  .wfch {
+    display: none;
+  }
+}

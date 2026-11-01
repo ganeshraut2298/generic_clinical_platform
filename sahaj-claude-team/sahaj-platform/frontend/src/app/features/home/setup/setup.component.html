@@ -1,0 +1,152 @@
+<section
+  class="lp-sect"
+  id="setup"
+  tabindex="-1"
+  aria-labelledby="h-setup"
+  appInView
+  (inViewChange)="inView.set($event)"
+>
+  <app-section-head
+    headingId="h-setup"
+    eyebrow="Clinic setup"
+    heading="Your clinic. Your workflow. Ready in 15 minutes."
+    lead="Pick your clinic type, add your team and choose a workflow template. Most steps are a single choice."
+  />
+
+  <div class="setup">
+    <ol class="ssteps surf" aria-label="Setup steps">
+      @for (step of steps; track step; let i = $index) {
+        <li>
+          <button
+            type="button"
+            class="sst"
+            [class.done]="i < current()"
+            [class.cur]="i === current()"
+            [attr.aria-current]="i === current() ? 'step' : null"
+            (click)="go(i)"
+          >
+            <span class="wn">
+              @if (i < current()) {
+                <app-icon name="check" [size]="13" />
+              } @else {
+                {{ i + 1 }}
+              }
+            </span>
+            {{ step }}
+          </button>
+        </li>
+      }
+    </ol>
+
+    <div class="spanel surf">
+      <div class="prog">
+        <div
+          class="meter"
+          role="progressbar"
+          aria-label="Setup progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="percent()"
+        >
+          <i [style.width.%]="percent()"></i>
+        </div>
+        <b class="num">{{ percent() }}%</b>
+      </div>
+
+      @if (current() >= done) {
+        <div class="ready sbody">
+          <span class="bigcheck"><app-icon name="check" [size]="30" /></span>
+          <h3>Your clinic workspace is ready.</h3>
+          <p class="muted">Staff logins are on their way on WhatsApp.</p>
+        </div>
+      } @else {
+        <div class="sbody" aria-live="polite">
+          <span class="eyebrow">Step {{ current() + 1 }} of {{ done }}</span>
+          <h3 class="step-title">{{ steps[current()] }}</h3>
+          <div class="step-rows">
+            @switch (current()) {
+              @case (0) {
+                <div class="opt-grid">
+                  @for (type of clinicTypes; track type; let i = $index) {
+                    <div class="optt" [class.sel]="i === 0">
+                      <b>{{ type }}</b>
+                      <small class="faint">{{ i === 0 ? 'Selected' : 'Template' }}</small>
+                    </div>
+                  }
+                </div>
+              }
+              @case (1) {
+                @for (person of team; track person.name) {
+                  <div class="mrow">
+                    <b class="grow">{{ person.name }}</b>
+                    <span class="muted">{{ person.detail }}</span>
+                  </div>
+                }
+              }
+              @case (2) {
+                <div class="mrow col">
+                  <b>General practice OPD</b>
+                  <div class="mflow">
+                    @for (stage of stages; track stage; let i = $index) {
+                      @if (i > 0) {
+                        <span class="marr"><app-icon name="arrow" [size]="13" /></span>
+                      }
+                      <div class="mnode">{{ stage }}</div>
+                    }
+                  </div>
+                </div>
+              }
+              @case (3) {
+                @for (owner of owners; track owner.task) {
+                  <div class="mrow">
+                    <b class="grow">{{ owner.task }}</b>
+                    <span class="muted">{{ owner.who }}</span>
+                  </div>
+                }
+              }
+              @case (4) {
+                @for (rule of rules; track rule) {
+                  <div class="mrow">
+                    <b class="grow">{{ rule }}</b>
+                    <span class="sw on"><span class="sr-only">On</span></span>
+                  </div>
+                }
+              }
+              @case (5) {
+                <div class="mflow">
+                  @for (stage of stages; track stage; let i = $index) {
+                    @if (i > 0) {
+                      <span class="marr"><app-icon name="arrow" [size]="13" /></span>
+                    }
+                    <div class="mnode" [class.act]="i === 3">{{ stage }}</div>
+                  }
+                </div>
+                <div class="notice good">
+                  <app-icon name="check" [size]="16" />
+                  <span>A sample patient passed every step. No step is missing an owner.</span>
+                </div>
+              }
+              @case (6) {
+                <div class="mrow">
+                  <span class="liveurl"
+                    ><app-icon name="lock" [size]="14" /> https://shreesai.sahaj.in</span
+                  >
+                </div>
+                <div class="row end"><span class="fake-btn">Activate clinic</span></div>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <div class="row foot">
+        <span class="faint note">Every choice can be changed later in Clinic setup.</span>
+        <button mat-button type="button" (click)="replay()">
+          <app-icon name="clock" [size]="14" /> Replay
+        </button>
+      </div>
+    </div>
+
+    <div class="schar"><app-character person="meera" pose="tablet" /></div>
+  </div>
+</section>

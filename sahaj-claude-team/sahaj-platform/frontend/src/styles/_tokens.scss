@@ -1,0 +1,157 @@
+// Design tokens from docs/design/tokens.md and the mockup.
+// Light is the default. Dark is switched on with data-theme="dark" on the root element.
+// The clinic brand colour is chosen with data-brand="teal|green|maroon" (blue is the default).
+
+:root {
+  color-scheme: light;
+
+  --font-display: 'Figtree', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Figtree', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+
+  --r: 18px;
+  --r-sm: 12px;
+  --r-pill: 999px;
+
+  --bg: #ebf1f8;
+  --bg-grad: linear-gradient(90deg, #e0eaf6 0%, #e7eff8 14%, #eaf1f8 28%, #ebf1f8 46%, #ebf1f8 100%);
+  --surface: #ffffff;
+  --surface-2: #f4f7fb;
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-hi: rgba(255, 255, 255, 0.88);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --line: rgba(16, 42, 84, 0.12);
+  --line-2: rgba(16, 42, 84, 0.06);
+  --ink: #0f1f3a;
+  --ink-2: #43546f;
+  --ink-3: #66778f;
+  --pri: #1f5bc8;
+  --pri-ink: #ffffff;
+  --pri-soft: rgba(31, 91, 200, 0.11);
+  --pri-text: #1a4ca6;
+  --sec: #0e8a7e;
+  --sec-soft: rgba(14, 138, 126, 0.12);
+  --good: #15804c;
+  --good-soft: rgba(21, 128, 76, 0.12);
+  --warn: #965a00;
+  --warn-soft: rgba(214, 140, 10, 0.16);
+  --crit: #c23131;
+  --crit-soft: rgba(194, 49, 49, 0.11);
+  --muted-soft: rgba(16, 42, 84, 0.06);
+  --scrim: rgba(8, 20, 44, 0.4);
+  --shadow: 0 14px 34px -16px rgba(20, 50, 110, 0.3), 0 2px 6px -2px rgba(20, 50, 110, 0.08);
+  --shadow-sm: 0 1px 2px rgba(16, 42, 84, 0.06), 0 10px 26px -18px rgba(16, 42, 84, 0.22);
+  --paper: #fffdf8;
+  --paper-ink: #1b2433;
+  --paper-line: #d8dfe9;
+  --paper-accent: #1d4f9e;
+  --paper-soft: #5b6575;
+
+  --dur-1: 0.18s;
+  --dur-2: 0.36s;
+  --dur-3: 0.6s;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0a1322;
+  --bg-grad: linear-gradient(90deg, #0d1a2e 0%, #0b1627 14%, #0a1424 28%, #0a1322 46%, #0a1322 100%);
+  --surface: #101b2e;
+  --surface-2: #0d1727;
+  --glass: rgba(16, 28, 50, 0.58);
+  --glass-hi: rgba(22, 38, 66, 0.92);
+  --glass-edge: rgba(170, 200, 245, 0.14);
+  --line: rgba(190, 210, 245, 0.13);
+  --line-2: rgba(190, 210, 245, 0.06);
+  --ink: #e6edf8;
+  --ink-2: #a8b7cf;
+  --ink-3: #8496b1;
+  --pri: #6e9ef2;
+  --pri-ink: #071531;
+  --pri-soft: rgba(110, 158, 242, 0.17);
+  --pri-text: #a2c1f8;
+  --sec: #44c7b7;
+  --sec-soft: rgba(68, 199, 183, 0.16);
+  --good: #52c98c;
+  --good-soft: rgba(82, 201, 140, 0.16);
+  --warn: #f1b24c;
+  --warn-soft: rgba(241, 178, 76, 0.16);
+  --crit: #ff8080;
+  --crit-soft: rgba(255, 128, 128, 0.15);
+  --muted-soft: rgba(190, 210, 245, 0.07);
+  --scrim: rgba(0, 0, 0, 0.58);
+  --shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.7);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 30px -20px rgba(0, 0, 0, 0.7);
+}
+
+// Brand themes: only the primary colour changes.
+:root[data-brand='teal'] {
+  --pri: #0b8782;
+  --pri-ink: #ffffff;
+  --pri-soft: rgba(11, 135, 130, 0.12);
+  --pri-text: #07625e;
+}
+:root[data-brand='green'] {
+  --pri: #1b8048;
+  --pri-ink: #ffffff;
+  --pri-soft: rgba(27, 128, 72, 0.12);
+  --pri-text: #14653a;
+}
+:root[data-brand='maroon'] {
+  --pri: #a3304b;
+  --pri-ink: #ffffff;
+  --pri-soft: rgba(163, 48, 75, 0.11);
+  --pri-text: #86243c;
+}
+:root[data-brand='teal'][data-theme='dark'] {
+  --pri: #2fb6ae;
+  --pri-ink: #03201f;
+  --pri-soft: rgba(47, 182, 174, 0.17);
+  --pri-text: #72d9d2;
+}
+:root[data-brand='green'][data-theme='dark'] {
+  --pri: #4cc485;
+  --pri-ink: #04210f;
+  --pri-soft: rgba(76, 196, 133, 0.17);
+  --pri-text: #86dcae;
+}
+:root[data-brand='maroon'][data-theme='dark'] {
+  --pri: #f08aa3;
+  --pri-ink: #2a0610;
+  --pri-soft: rgba(240, 138, 163, 0.16);
+  --pri-text: #f6b2c3;
+}
+
+// Map the Sahaj tokens onto the Angular Material (M3) system variables, so every Material
+// control follows the light/dark theme and the clinic brand colour.
+:root {
+  --mat-sys-primary: var(--pri);
+  --mat-sys-on-primary: var(--pri-ink);
+  --mat-sys-primary-container: var(--pri-soft);
+  --mat-sys-on-primary-container: var(--pri-text);
+  --mat-sys-secondary: var(--sec);
+  --mat-sys-secondary-container: var(--sec-soft);
+  --mat-sys-on-secondary-container: var(--sec);
+  --mat-sys-error: var(--crit);
+  --mat-sys-error-container: var(--crit-soft);
+  --mat-sys-on-error-container: var(--crit);
+  --mat-sys-background: var(--bg);
+  --mat-sys-on-background: var(--ink);
+  --mat-sys-surface: var(--bg);
+  --mat-sys-on-surface: var(--ink);
+  --mat-sys-on-surface-variant: var(--ink-2);
+  --mat-sys-surface-variant: var(--muted-soft);
+  --mat-sys-surface-container-lowest: var(--surface);
+  --mat-sys-surface-container-low: var(--surface);
+  --mat-sys-surface-container: var(--surface);
+  --mat-sys-surface-container-high: var(--surface);
+  --mat-sys-surface-container-highest: var(--surface-2);
+  --mat-sys-outline: var(--ink-3);
+  --mat-sys-outline-variant: var(--line);
+  --mat-sys-scrim: var(--scrim);
+  --mat-sys-corner-extra-large: 22px;
+  --mat-sys-corner-large: var(--r);
+  --mat-sys-corner-medium: var(--r-sm);
+}

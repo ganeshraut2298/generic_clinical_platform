@@ -1,0 +1,52 @@
+:host {
+  display: block;
+}
+
+.ch {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.fig {
+  animation: bob 4.6s ease-in-out infinite;
+  animation-play-state: var(--scene-anim, running);
+}
+.eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 5.2s infinite;
+  animation-play-state: var(--scene-anim, running);
+}
+.arm {
+  transform-box: view-box;
+  transform-origin: 104px 130px;
+  animation: gesture 2.6s ease-in-out infinite;
+  animation-play-state: var(--scene-anim, running);
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes blink {
+  0%,
+  95%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes gesture {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-7deg);
+  }
+}

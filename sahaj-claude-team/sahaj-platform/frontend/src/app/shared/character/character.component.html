@@ -1,0 +1,181 @@
+@let ch = c();
+<svg
+  class="ch"
+  viewBox="0 0 150 186"
+  focusable="false"
+  [style.transform]="flip() ? 'scaleX(-1)' : null"
+>
+  <g class="fig" [style.animation-delay.s]="delay()">
+    @switch (ch.hs) {
+      @case ('bun') {
+        <circle cx="70" cy="22" r="11" [attr.fill]="ch.hair" />
+      }
+      @case ('long') {
+        <path d="M46 44C40 72 42 100 50 116L90 116C98 100 100 72 94 44Z" [attr.fill]="ch.hair" />
+      }
+      @case ('bob') {
+        <path d="M46 42C43 62 45 76 51 82L89 82C95 76 97 62 94 42Z" [attr.fill]="ch.hair" />
+      }
+      @case ('braid') {
+        <path d="M47 44C44 60 46 72 50 78L90 78C94 72 96 60 93 44Z" [attr.fill]="ch.hair" />
+      }
+    }
+    <rect x="62" y="74" width="16" height="32" rx="6" [attr.fill]="ch.skinD" />
+    <path
+      d="M24 186C24 132 38 104 70 102C102 104 116 132 116 186Z"
+      [attr.fill]="ch.top"
+    />
+    <path
+      d="M70 102C102 104 116 132 116 186L95 186C97 144 88 114 70 102Z"
+      [attr.fill]="ch.topD"
+    />
+    @if (ch.coat) {
+      <path d="M60 104L70 130L80 104Z" [attr.fill]="ch.inner" />
+      <path
+        d="M60 104L67 152M80 104L73 152"
+        fill="none"
+        stroke-linecap="round"
+        stroke-width="2"
+        [attr.stroke]="ch.topD"
+      />
+    }
+    @if (ch.steth) {
+      <path
+        d="M58 106C53 132 62 146 70 146C78 146 87 132 82 106"
+        fill="none"
+        stroke-linecap="round"
+        stroke-width="2.6"
+        stroke="#3b4656"
+      />
+      <circle cx="70" cy="150" r="5" fill="#9aa6b6" stroke="#3b4656" stroke-width="1.5" />
+    }
+    @if (ch.vneck) {
+      <path d="M60 103L70 118L80 103Z" [attr.fill]="ch.skinD" />
+    }
+    @if (ch.collar) {
+      <path d="M60 104L70 124L80 104Z" [attr.fill]="ch.inner" />
+      <path
+        d="M60 104L68 152M80 104L72 152"
+        fill="none"
+        stroke-linecap="round"
+        stroke-width="2"
+        stroke="#18243b"
+      />
+    }
+    @if (ch.dupatta) {
+      <path d="M28 158C48 126 90 112 114 130L114 146C92 128 54 138 34 170Z" [attr.fill]="ch.dupatta" />
+    }
+    @if (ch.badge) {
+      <rect
+        x="88"
+        y="134"
+        width="14"
+        height="18"
+        rx="2"
+        fill="#ffffff"
+        stroke-width="1"
+        [attr.stroke]="ch.topD"
+      />
+      <rect x="91" y="142" width="8" height="2" rx="1" [attr.fill]="ch.topD" />
+    }
+    @if (ch.hs === 'braid') {
+      <path
+        d="M88 66C96 84 96 108 92 128"
+        fill="none"
+        stroke-linecap="round"
+        stroke-width="8"
+        [attr.stroke]="ch.hair"
+      />
+    }
+
+    <ellipse cx="49" cy="56" rx="3.5" ry="5" [attr.fill]="ch.skinD" />
+    <ellipse cx="91" cy="56" rx="3.5" ry="5" [attr.fill]="ch.skinD" />
+    <ellipse cx="70" cy="54" rx="21" ry="24" [attr.fill]="ch.skin" />
+    @if (ch.hs === 'short') {
+      <path
+        d="M48 52C45 30 57 25 70 25C84 25 95 31 92 52C88 41 80 35 70 36C60 35 52 41 48 52Z"
+        [attr.fill]="ch.hair"
+      />
+    } @else {
+      <path
+        d="M48 56C43 31 60 23 72 25C87 27 97 37 92 58C88 45 80 37 66 39C58 41 52 47 48 56Z"
+        [attr.fill]="ch.hair"
+      />
+    }
+    <path
+      d="M58 49Q62 47 66 49M74 49Q78 47 82 49"
+      fill="none"
+      stroke-linecap="round"
+      stroke-width="1.8"
+      [attr.stroke]="ch.hair"
+    />
+    <ellipse class="eye" cx="62" cy="56" rx="2.2" ry="2.6" fill="#1f1a17" />
+    <ellipse class="eye" cx="78" cy="56" rx="2.2" ry="2.6" fill="#1f1a17" />
+    <path
+      d="M70 58Q72.5 63 69 64"
+      fill="none"
+      stroke-linecap="round"
+      stroke-width="1.4"
+      [attr.stroke]="ch.skinD"
+    />
+    <path
+      d="M63 68Q70 73 77 68"
+      fill="none"
+      stroke-linecap="round"
+      stroke-width="1.8"
+      stroke="#7a3f2e"
+    />
+
+    @if (pose() === 'point') {
+      <g class="arm">
+        <path
+          d="M104 130C118 122 128 108 132 96"
+          fill="none"
+          stroke-linecap="round"
+          stroke-width="14"
+          [attr.stroke]="ch.top"
+        />
+        <circle cx="133" cy="93" r="6.5" [attr.fill]="ch.skin" />
+      </g>
+    }
+    @if (hasObject()) {
+      <path
+        d="M34 162C40 152 46 148 52 148M106 162C100 152 94 148 88 148"
+        fill="none"
+        stroke-linecap="round"
+        stroke-width="13"
+        [attr.stroke]="ch.top"
+      />
+      @switch (pose()) {
+        @case ('tablet') {
+          <rect x="47" y="124" width="46" height="32" rx="4" fill="#22324a" />
+          <rect x="50" y="127" width="40" height="26" rx="2" fill="#dbe8fb" />
+          <path
+            d="M54 133h22M54 139h30M54 145h16"
+            fill="none"
+            stroke-linecap="round"
+            stroke-width="2"
+            stroke="#7e9cc8"
+          />
+        }
+        @case ('file') {
+          <path d="M50 126h16l3 4h21v28H50Z" fill="#d19b3f" />
+          <rect x="50" y="131" width="40" height="27" rx="1" fill="#e8bd62" />
+        }
+        @case ('clip') {
+          <rect x="50" y="122" width="40" height="36" rx="3" fill="#f5f1e8" stroke="#c9bfa9" />
+          <rect x="62" y="119" width="16" height="6" rx="2" fill="#8a96a8" />
+          <path
+            d="M55 133h28M55 140h22M55 147h26"
+            fill="none"
+            stroke-linecap="round"
+            stroke-width="2"
+            stroke="#b3b9c4"
+          />
+        }
+      }
+      <circle cx="51" cy="147" r="5.5" [attr.fill]="ch.skin" />
+      <circle cx="89" cy="147" r="5.5" [attr.fill]="ch.skin" />
+    }
+  </g>
+</svg>

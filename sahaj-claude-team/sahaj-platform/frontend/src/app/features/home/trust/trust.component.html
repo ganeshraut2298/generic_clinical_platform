@@ -1,0 +1,119 @@
+<section
+  class="lp-sect"
+  id="trust"
+  tabindex="-1"
+  aria-labelledby="h-trust"
+  appInView
+  (inViewChange)="inView.set($event)"
+>
+  <app-section-head
+    headingId="h-trust"
+    eyebrow="Trust and control"
+    heading="Built for responsible clinical operations."
+    lead="Signed records, access by role and a full history of changes."
+  />
+
+  <div class="trust3">
+    <div class="tpanel surf">
+      <div class="row top">
+        <div>
+          <b>Signed clinical note</b>
+          <small class="faint block">Locked once signed</small>
+        </div>
+        <div class="tch"><app-character person="meera" /></div>
+      </div>
+      <div class="paperx">
+        <div class="fr"><small>Patient</small><b>Sunita Patil · 42 F · T-19</b></div>
+        <div class="fr"><small>Diagnosis</small><b>Acute viral fever</b></div>
+        <svg class="sig" viewBox="0 0 130 44" aria-hidden="true">
+          <path
+            d="M8 32C18 10 28 10 30 28S42 40 50 22 64 8 68 26 82 38 94 20 110 16 122 30"
+            fill="none"
+            stroke="var(--paper-ink)"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div class="stamp">
+          <app-icon name="lock" [size]="12" /> Signed by Dr. Meera Kulkarni · 24 Oct, 11:42
+        </div>
+      </div>
+      <p class="faint small">Edits after signing create a new version. The old one is kept.</p>
+    </div>
+
+    <div class="tpanel surf">
+      <div class="row top">
+        <div>
+          <b>Access by role</b>
+          <small class="faint block">Set by the owner, enforced on every screen</small>
+        </div>
+        <div class="tch"><app-character person="kiran" /></div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="pmt">
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Area</span></th>
+              @for (role of roles; track role) {
+                <th scope="col">{{ role }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows; track row.name) {
+              <tr>
+                <td>{{ row.name }}</td>
+                @for (cell of row.access; track $index) {
+                  <td>
+                    @switch (cell) {
+                      @case ('full') {
+                        <span class="okc"><app-icon name="check" [size]="13" /><span class="sr-only">Allowed</span></span>
+                      }
+                      @case ('view') {
+                        <span class="faint">View</span>
+                      }
+                      @case ('limit') {
+                        <span class="flipc">
+                          <span class="a"><app-icon name="lock" [size]="13" /></span>
+                          <span class="b">≤10%</span>
+                          <span class="sr-only">Up to 10%</span>
+                        </span>
+                      }
+                      @default {
+                        <span class="noc"><app-icon name="lock" [size]="13" /><span class="sr-only">Locked</span></span>
+                      }
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="faint small">
+        Billing staff were allowed discounts up to 10%. The change is in the history.
+      </p>
+    </div>
+
+    <div class="tpanel surf">
+      <b>History of every change</b>
+      <small class="faint block pull-up">Who did what, and when</small>
+      <ol class="audit">
+        @for (entry of audit; track entry.time) {
+          <li>
+            <span class="num faint">{{ entry.time }}</span>
+            <span
+              ><b>{{ entry.who }}</b> {{ entry.what }}</span
+            >
+          </li>
+        }
+      </ol>
+    </div>
+  </div>
+
+  <div class="tpoints">
+    @for (point of points; track point.text) {
+      <div><app-icon [name]="point.icon" [size]="16" /><span>{{ point.text }}</span></div>
+    }
+  </div>
+</section>

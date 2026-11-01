@@ -36,7 +36,7 @@ const id = (branch.match(/^(?:feature|fix)\/(SAH-\d+)/) || [])[1];
 if (!id && agent !== 'tech-lead') block(`Blocked: switch to a story branch first (feature/SAH-<n>-<slug>). Current branch: '${branch || 'no git repo'}'. Ask the tech lead.`);
 const approvals = fs.existsSync(path.join(root, 'docs/approvals.md')) ? fs.readFileSync(path.join(root, 'docs/approvals.md'), 'utf8') : '';
 const approved = what => new RegExp(`^\\|\\s*${id}\\s*\\|\\s*${what}\\s*\\|\\s*APPROVED`, 'mi').test(approvals);
-const NEED = { 'solution-architect': ['stories'], 'db-engineer': ['stories', 'contract'], 'java-developer': ['stories', 'contract'], 'angular-developer': ['stories', 'contract'], 'qa-engineer': ['stories', 'contract'] };
+const NEED = {}; // DEC-001: merge-only gate, 31 Oct 2026
 for (const what of (id ? NEED[agent] : null) || []) if (!approved(what)) block(`Blocked: ${id} ${what} not approved yet. A human must add "| ${id} | ${what} | APPROVED | <name> | <date> |" to docs/approvals.md before ${agent} starts.`);
 
 // 3. Area lock: one writer at a time, stale after 2 hours

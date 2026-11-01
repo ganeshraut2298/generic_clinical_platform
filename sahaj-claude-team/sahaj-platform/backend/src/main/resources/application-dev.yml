@@ -1,0 +1,10 @@
+# Profile dev: the local sahaj_dev database. Passwords come from the environment only.
+spring:
+  datasource:
+    url: ${SAHAJ_DB_URL:jdbc:postgresql://localhost:5432/sahaj_dev}
+    username: sahaj_app
+    password: ${SAHAJ_DB_APP_PASSWORD}
+  flyway:
+    url: ${SAHAJ_DB_URL:jdbc:postgresql://localhost:5432/sahaj_dev}
+    user: sahaj_migrator
+    password: ${SAHAJ_DB_MIGRATOR_PASSWORD}

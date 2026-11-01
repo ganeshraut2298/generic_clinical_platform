@@ -95,4 +95,40 @@ staff screens arrive at SAH-32 and Health Risk Assessment stays blocked until yo
 
 ## Decision
 
-_Awaiting the human._
+**HRA means Human Resource management.** Decided by Ganesh, 31 Oct 2026.
+
+This is not Option A, B or C as written above. It settles the question by correcting the premise:
+Health Risk Assessment was never what HRA meant in this product.
+
+What follows:
+
+- The `hra` module keeps its name, package `com.sahaj.hra` and schema `hra`, and holds **human
+  resource management**: staff, shifts, roster, leave types with balances and approval, attendance
+  and holidays — exactly what the mockup's "Staff, timings and leave (HRA)" screen shows.
+- **No seventh module.** The six modules in `CLAUDE.md` stand as they are.
+- **Health Risk Assessment is not part of Sahaj.** `CLAUDE.md`'s opening line ("with Health Risk
+  Assessment (HRA)") is factually wrong and should read Human Resource management.
+- The mockup's label was right all along. The tech-lead's DEC-004 "gap 2" and this file's framing
+  were both wrong, and both are retracted.
+
+### Effect on the playbook
+
+Two stories collapse into one. In the old numbering, SAH-30 "Staff and leave" and SAH-31 "HRA
+questionnaires and risk scores" describe the same module under two names. There is nothing to build
+for questionnaires or risk scores.
+
+- One story: **HR management** — staff, shifts and roster, leave types and approval, attendance,
+  holidays. Mockup screen: Staff and leave.
+- The "blocked until you add HRA screens to the mockup" note is removed. The screens exist.
+
+Net: Stage A gains 2 stories (DEC-004), Stage G loses 1. **33 stories**, before any split of the
+admin-portal story.
+
+### Files the human owns and may want to correct
+
+- `CLAUDE.md` — line 3: Health Risk Assessment → Human Resource management.
+- `docs/design/screen-map.md` — replace the HRA row with the Staff and leave row; the mockup label
+  needs no change.
+- `docs/process/playbook.md` — merge the two Stage G stories into one.
+
+None of these block development. The tech-lead treats this decision as the authority from now on.

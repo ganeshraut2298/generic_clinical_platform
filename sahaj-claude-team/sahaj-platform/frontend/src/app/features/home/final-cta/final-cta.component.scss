@@ -1,0 +1,101 @@
+:host {
+  display: block;
+}
+
+.final {
+  padding: 48px 24px 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+
+  h2 {
+    font-size: clamp(1.6rem, 3vw, 2.3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    max-width: 720px;
+    line-height: 1.18;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.team-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 780px;
+  margin-top: 6px;
+  padding-top: 44px;
+
+  app-character {
+    width: 150px;
+    margin: 0 -10px;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.flowline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22px;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+}
+.fl-n {
+  position: absolute;
+  top: -22px;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.lane {
+  position: absolute;
+  inset: 0;
+  animation: lane 10s linear infinite;
+  animation-play-state: var(--scene-anim, running);
+
+  i {
+    position: absolute;
+    left: 0;
+    top: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--pri);
+    box-shadow: 0 0 0 4px var(--pri-soft);
+  }
+}
+
+@keyframes lane {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 620px) {
+  .team-row app-character {
+    width: 84px;
+    margin: 0 -8px;
+  }
+  .fl-n {
+    display: none;
+  }
+}

@@ -1,0 +1,184 @@
+openapi: 3.1.0
+info:
+  title: Sahaj OPD API
+  version: 0.1.0
+  description: Phase 1 contract, SAH-7. Reads are for any logged-in clinic user; writes are owner only (403 otherwise). Errors are RFC 9457 application/problem+json.
+servers:
+  - url: /api/v1/opd
+security:
+  - bearer: []
+paths:
+  /services:
+    get:
+      tags: [SAH-7]
+      parameters:
+        - { name: active, in: query, schema: { type: boolean } }
+      responses:
+        '200': { description: Fee list, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Service' } } } } }
+    post:
+      tags: [SAH-7]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Service' } } }
+      responses:
+        '201': { description: Added, content: { application/json: { schema: { $ref: '#/components/schemas/Service' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /services/{id}:
+    patch:
+      tags: [SAH-7]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ServiceUpdate' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/Service' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /fee-settings:
+    get:
+      tags: [SAH-7]
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/FeeSettings' } } } }
+    put:
+      tags: [SAH-7]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/FeeSettings' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/FeeSettings' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /medicines:
+    get:
+      tags: [SAH-7]
+      description: Global read-only list. This clinic's favourites come first.
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: favouritesOnly, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Medicine' } }
+                  total: { type: integer }
+  /medicine-favourites/{medicineId}:
+    parameters:
+      - { name: medicineId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [SAH-7]
+      responses:
+        '204': { description: Marked }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [SAH-7]
+      responses:
+        '204': { description: Unmarked }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /diagnoses:
+    get:
+      tags: [SAH-7]
+      description: Global read-only ICD-10 list.
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, required: [code, name], properties: { code: { type: string }, name: { type: string }, specialty: { type: string } } }
+  /case-paper-settings:
+    get:
+      tags: [SAH-7]
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/CasePaperSettings' } } } }
+    put:
+      tags: [SAH-7]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CasePaperSettings' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/CasePaperSettings' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            properties:
+              type: { type: string }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              fieldErrors:
+                type: array
+                items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+  schemas:
+    Service:
+      type: object
+      required: [name, category, priceRupees]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        category: { type: string, enum: [Consultation, Procedure, Nursing, Lab, Radiology, Dental, Package] }
+        priceRupees: { type: integer, minimum: 0 }
+        active: { type: boolean, default: true }
+    ServiceUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        category: { type: string, enum: [Consultation, Procedure, Nursing, Lab, Radiology, Dental, Package] }
+        priceRupees: { type: integer, minimum: 0 }
+        active: { type: boolean }
+    FeeSettings:
+      type: object
+      required: [feeTiming, followUpDays, followUpFee, discountLimits, upiOnBill]
+      properties:
+        feeTiming: { type: string, enum: [before, after, split] }
+        followUpDays: { type: integer, minimum: 1, maximum: 30 }
+        followUpFee: { type: string, enum: [free, half, full] }
+        discountLimits: { type: object, description: Percent by role, additionalProperties: { type: integer, minimum: 0, maximum: 100 } }
+        upiOnBill: { type: boolean }
+    Medicine:
+      type: object
+      required: [id, name, favourite]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        form: { type: string }
+        schedule: { type: string }
+        usualDose: { type: string }
+        favourite: { type: boolean }
+    CasePaperSettings:
+      type: object
+      required: [size, preprinted, caps, sections]
+      properties:
+        size: { type: string, enum: [A5, A4] }
+        secondLanguage: { type: [string, 'null'], enum: [mr, hi, null] }
+        preprinted: { type: boolean }
+        caps: { type: boolean }
+        sections:
+          type: object
+          description: Section key to on or off. rx is always on.
+          additionalProperties: { type: boolean }

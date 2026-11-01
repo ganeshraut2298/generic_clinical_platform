@@ -1,11 +1,57 @@
 # Sahaj backend configuration.
 # Every value here is an environment variable with a non-secret default (ADR-001 D5).
-# No secret, password or connection string is set here or anywhere else in the scaffold.
+# No secret, password or connection string is set here or anywhere else in the code base.
+# Database settings live in application-dev.yml and application-test.yml.
 server:
   port: ${SERVER_PORT:8080}
+  tomcat:
+    remoteip:
+      # Forwarded headers are IGNORED unless both are set for a known reverse proxy. The rate limit
+      # on the public enquiry endpoint keys on the connection address; by default a client cannot
+      # change it with X-Forwarded-For. Behind a proxy, set SAHAJ_REMOTE_IP_HEADER=X-Forwarded-For
+      # and SAHAJ_TRUSTED_PROXIES to a regex of the proxy addresses (for example 10\.0\.0\.\d{1,3}).
+      # The header is then honoured only when the direct peer matches, and read from the right.
+      remote-ip-header: ${SAHAJ_REMOTE_IP_HEADER:}
+      internal-proxies: ${SAHAJ_TRUSTED_PROXIES:}
 
 spring:
   application:
     name: sahaj-backend
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    # The request pool. It always connects as sahaj_app (no table owner, no row level security bypass).
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${SAHAJ_DB_POOL_SIZE:10}
+  flyway:
+    # Flyway runs as sahaj_migrator on its own connection; it never shares the request pool.
+    # Schemas are created by scripts/setup/create-database.mjs, not by Flyway.
+    locations: classpath:db/migration
+    schemas: platform
+    default-schema: platform
+    create-schemas: false
+    clean-disabled: true
+
+logging:
+  level:
+    # Spring MVC prints "Resolved [exception]" at DEBUG, and that text can carry a submitted value
+    # (a mobile number in a bad request). Keep it at INFO even if the root level is raised.
+    org.springframework.web.servlet: INFO
+  pattern:
+    # requestId and tenantId come from RequestLogContextFilter's MDC; they are never a patient name,
+    # mobile number or clinical value, so they are safe to print on every line.
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [requestId=%X{requestId:-},tenantId=%X{tenantId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [requestId=%X{requestId:-},tenantId=%X{tenantId:-}] %logger{36} - %msg%n"
+
+# Sahaj settings
+sahaj:
+  public-enquiry-limit:
+    max-requests: ${SAHAJ_ENQUIRY_LIMIT_MAX:5}
+    window: ${SAHAJ_ENQUIRY_LIMIT_WINDOW:1h}
+  jwt:
+    # SAH-3 access tokens. A secret, so it has no default: set SAHAJ_JWT_SECRET (32+ characters) in
+    # the environment, never in code.
+    secret: ${SAHAJ_JWT_SECRET}
+    access-token-minutes: ${SAHAJ_JWT_ACCESS_MINUTES:15}
+    selection-token-minutes: ${SAHAJ_JWT_SELECTION_MINUTES:5}

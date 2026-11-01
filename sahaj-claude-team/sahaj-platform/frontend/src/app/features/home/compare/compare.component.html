@@ -1,0 +1,251 @@
+<section class="lp-sect" id="compare" tabindex="-1" aria-labelledby="h-compare">
+  <app-section-head
+    headingId="h-compare"
+    eyebrow="Compare"
+    heading="How does your current setup compare?"
+    lead="Pick what you use today and adjust the numbers to your clinic. You'll see the difference in features, cost over three years, follow-ups brought back and doctor time saved."
+  />
+
+  <div class="calc">
+    <div class="calc-in surf">
+      <div class="field">
+        <span class="label" id="today-label">What do you use today?</span>
+        <div class="cmpopts" role="group" aria-labelledby="today-label">
+          @for (key of presetKeys; track key) {
+            <button
+              type="button"
+              class="cmpopt"
+              [attr.aria-pressed]="state().preset === key"
+              (click)="choosePreset(key)"
+            >
+              <b>{{ presets[key].label }}</b>
+              <small>{{ presets[key].note }}</small>
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="sliders">
+        @for (def of mainSliders; track def.key) {
+          <div class="sl">
+            <div class="sl-h">
+              <span [id]="'sl-' + def.key">{{ def.label }}</span>
+              <output class="num">{{ sliderLabel(def) }}</output>
+            </div>
+            <mat-slider [min]="def.min" [max]="def.max" [step]="def.step">
+              <input
+                matSliderThumb
+                [attr.aria-labelledby]="'sl-' + def.key"
+                [value]="sliderValue(def.key)"
+                (valueChange)="setSlider(def.key, $event)"
+              />
+            </mat-slider>
+          </div>
+        }
+        <mat-form-field appearance="outline">
+          <mat-label>Software cost today</mat-label>
+          <span matTextPrefix class="prefix">₹&nbsp;</span>
+          <input
+            matInput
+            class="num"
+            inputmode="numeric"
+            autocomplete="off"
+            [value]="spendText()"
+            (input)="setMoney('spend', $any($event.target).value)"
+          />
+          <mat-hint>per month, all doctors</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>WhatsApp and SMS today</mat-label>
+          <span matTextPrefix class="prefix">₹&nbsp;</span>
+          <input
+            matInput
+            class="num"
+            inputmode="numeric"
+            autocomplete="off"
+            [value]="msgText()"
+            (input)="setMoney('msg', $any($event.target).value)"
+          />
+          <mat-hint>per month</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <details class="assume">
+        <summary><app-icon name="sliders" [size]="15" /> Assumptions you can change</summary>
+        <div class="sliders assume-body">
+          @for (def of assumptionSliders; track def.key) {
+            <div class="sl">
+              <div class="sl-h">
+                <span [id]="'sl-' + def.key">{{ def.label }}</span>
+                <output class="num">{{ sliderLabel(def) }}</output>
+              </div>
+              <mat-slider [min]="def.min" [max]="def.max" [step]="def.step">
+                <input
+                  matSliderThumb
+                  [attr.aria-labelledby]="'sl-' + def.key"
+                  [value]="sliderValue(def.key)"
+                  (valueChange)="setSlider(def.key, $event)"
+                />
+              </mat-slider>
+            </div>
+          }
+        </div>
+      </details>
+
+      <div class="row between">
+        <b>Feature by feature</b>
+        <span class="faint hint">
+          @if (state().edited) {
+            <span class="pill p-teal">Adjusted by you</span>
+          } @else {
+            Typical for this kind of software. Click a row to match yours.
+          }
+        </span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="cmptbl">
+          <thead>
+            <tr>
+              <th scope="col">Feature</th>
+              <th scope="col">Your software</th>
+              <th scope="col">Sahaj</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows; track row.feature.key) {
+              @if (row.heading; as heading) {
+                <tr class="grp">
+                  <th colspan="3" scope="colgroup">{{ heading }}</th>
+                </tr>
+              }
+              <tr>
+                <td>{{ row.feature.label }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="tri"
+                    [class]="'tri ' + levelClass(levelOf(row.feature.key))"
+                    [attr.aria-label]="
+                      row.feature.label +
+                      ' in your software: ' +
+                      levelLabels[levelOf(row.feature.key)] +
+                      '. Click to change.'
+                    "
+                    (click)="cycle(row.feature.key)"
+                  >
+                    @switch (levelOf(row.feature.key)) {
+                      @case (2) {
+                        <app-icon name="check" [size]="13" />
+                      }
+                      @case (1) {
+                        <span aria-hidden="true">~</span>
+                      }
+                      @default {
+                        <app-icon name="x" [size]="12" />
+                      }
+                    }
+                    {{ levelLabels[levelOf(row.feature.key)] }}
+                  </button>
+                </td>
+                <td>
+                  <span class="tri t2 static"><app-icon name="check" [size]="13" /> Yes</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <aside class="calc-out surf" aria-live="polite" aria-label="Your clinic with Sahaj">
+      <span class="eyebrow">Your clinic with Sahaj</span>
+      @switch (headline().kind) {
+        @case ('custom') {
+          <p class="big-line">
+            Clinics with {{ state().doctors }} doctors are on a <em>custom plan</em>.
+          </p>
+          <p class="muted">The first year is still free. Ask us for a quote.</p>
+        }
+        @case ('save') {
+          <p class="big-line">
+            You save <em class="num">{{ inr(nums().cur3 - (nums().sah3 ?? 0)) }}</em> over 3 years
+          </p>
+          <p class="muted">
+            and get {{ nums().gaps.length }}
+            {{ nums().gaps.length === 1 ? 'feature' : 'features' }} you don't have today.
+          </p>
+        }
+        @default {
+          <p class="big-line"><em>₹0</em> in your first year</p>
+          <p class="muted">
+            then ₹1,999 a year for {{ nums().gaps.length }} more
+            {{ nums().gaps.length === 1 ? 'feature' : 'features' }} than
+            {{ state().preset === 'paper' ? 'paper' : 'today' }}.
+          </p>
+        }
+      }
+
+      <div class="cbars">
+        <div class="cb-h"><span>Features (of {{ featureCount }})</span></div>
+        <div class="cbar">
+          <span>Today</span>
+          <div class="track"><i class="cur" [style.width.%]="(nums().yours / featureCount) * 100"></i></div>
+          <b class="num">{{ yoursLabel() }}</b>
+        </div>
+        <div class="cbar">
+          <span>Sahaj</span>
+          <div class="track"><i style="width: 100%"></i></div>
+          <b class="num">{{ featureCount }}</b>
+        </div>
+        <div class="cb-h second"><span>Cost over 3 years</span></div>
+        <div class="cbar">
+          <span>Today</span>
+          <div class="track"><i class="cur" [style.width.%]="(nums().cur3 / maxCost()) * 100"></i></div>
+          <b class="num">{{ inr(nums().cur3) }}</b>
+        </div>
+        <div class="cbar">
+          <span>Sahaj</span>
+          <div class="track">
+            <i [style.width.%]="nums().sah3 !== null ? (nums().sah3! / maxCost()) * 100 : 0"></i>
+          </div>
+          <b class="num">{{ nums().sah3 !== null ? inr(nums().sah3!) : 'Quote' }}</b>
+        </div>
+      </div>
+
+      <div class="ctiles">
+        <div class="ctile">
+          <span class="serif-num num">{{ indian(nums().back) }}</span>
+          <small>follow-up visits back a year</small>
+          <small class="faint">worth about {{ inr(nums().val) }}</small>
+        </div>
+        <div class="ctile">
+          <span class="serif-num num">{{ indian(nums().hrs) }} h</span>
+          <small>doctor time saved a month</small>
+          <small class="faint">writing instead of typing</small>
+        </div>
+      </div>
+
+      @if (nums().gaps.length > 0) {
+        <div>
+          <span class="eyebrow">What you would add</span>
+          <ul class="ticks adds">
+            @for (gap of gapsShown(); track gap.key) {
+              <li><app-icon name="check" [size]="15" /><span>{{ gap.label }}</span></li>
+            }
+          </ul>
+          @if (nums().gaps.length > 5) {
+            <p class="faint more">and {{ nums().gaps.length - 5 }} more</p>
+          }
+        </div>
+      }
+
+      <a mat-flat-button class="btn-lg" routerLink="/login" [queryParams]="{ mode: 'signup' }">
+        Start free for 1 year <app-icon name="arrow" [size]="17" />
+      </a>
+      <p class="faint estimate">
+        Estimates from the numbers you enter. Follow-up recovery and writing time are assumptions
+        you can change. Sahaj cost: ₹0 in year 1, ₹1,999 in years 2 and 3 (up to 2 doctors).
+      </p>
+    </aside>
+  </div>
+</section>

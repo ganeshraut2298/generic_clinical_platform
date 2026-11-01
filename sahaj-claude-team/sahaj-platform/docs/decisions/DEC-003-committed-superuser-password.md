@@ -145,20 +145,32 @@ soft reset of that single commit is enough.
    ```
    `origin/main`'s copy already has `PG_SUPERUSER_PASSWORD=change-me`. Then add the two variables the
    SAH-1 backend reads: `SERVER_PORT=8080` and `SPRING_PROFILES_ACTIVE=dev`.
-4. **Rewrite the one unpushed commit** so the value leaves history:
+4. **Rewrite the one unpushed commit** so the value leaves history.
+
+   **REVISED 31 Oct 2026.** The earlier version of this step used
+   `git branch -f feature/SAH-1-project-scaffold main`, which was only safe while the feature branch
+   had no commits of its own. It now has one — `9dc8f04 feat: SAH-1 project scaffold` — so
+   `branch -f` would **throw the whole scaffold away**. Use the rebase below instead.
+
    ```
    git -C D:\generi_clinical_platform switch main
    git -C D:\generi_clinical_platform reset --soft origin/main
-   git -C D:\generi_clinical_platform checkout origin/main -- sahaj-claude-team/sahaj-platform/.env.example
-   # re-add SERVER_PORT / SPRING_PROFILES_ACTIVE to .env.example, then:
+   git -C D:\generi_clinical_platform restore --source=origin/main --staged --worktree -- sahaj-claude-team/sahaj-platform/.env.example
+   # .env.example is now the clean placeholder version. Add the two variables the backend reads:
+   #   SERVER_PORT=8080
+   #   SPRING_PROFILES_ACTIVE=dev
+   # and leave PG_SUPERUSER_PASSWORD=change-me as it is. Then:
+   git -C D:\generi_clinical_platform add -A
    git -C D:\generi_clinical_platform commit -m "chore: tech-lead role, playbook and setup updates"
-   git -C D:\generi_clinical_platform branch -f feature/SAH-1-project-scaffold main
-   git -C D:\generi_clinical_platform switch feature/SAH-1-project-scaffold
+   git -C D:\generi_clinical_platform rebase --onto main 3f59573 feature/SAH-1-project-scaffold
    ```
-   The `branch -f` is safe: `feature/SAH-1-project-scaffold` has **no commits of its own** yet — all
-   SAH-1 work is still uncommitted in the working tree and follows the worktree, not the branch.
-   History rewriting, resets and branch deletion are denied to the tech-lead, so these are the
-   human's to run.
+
+   The rebase replays `9dc8f04` onto the rewritten `main`, so the scaffold survives and the old
+   commit holding the password becomes unreachable. History rewriting, resets and branch deletion
+   are denied to the tech-lead, so these are the human's to run.
+
+   Anything stacked on `feature/SAH-1-project-scaffold` later (for example
+   `feature/SAH-2-...`) needs the same `--onto` treatment, so doing this sooner is cheaper.
 5. **Verify:** `git log --all -S "<the old value>" --oneline` should return nothing.
 
 ### Secret-scan gate — also approved

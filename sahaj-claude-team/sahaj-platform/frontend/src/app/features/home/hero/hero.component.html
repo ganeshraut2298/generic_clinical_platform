@@ -1,0 +1,69 @@
+<section class="lp-hero" aria-labelledby="h-hero" appInView (inViewChange)="inView.set($event)">
+  <div class="hero-t">
+    <span class="pill p-teal">Free for your first year</span>
+    <h1 class="display" id="h-hero">
+      Clinic software that works the way <em>your OPD</em> already runs.
+    </h1>
+    <p class="lede">
+      Configure your workflow, assign responsibilities, and manage your patients from appointment to
+      follow-up, without complicated setup.
+    </p>
+    <div class="actions">
+      <a
+        mat-flat-button
+        class="btn-lg"
+        routerLink="/login"
+        [queryParams]="{ mode: 'signup' }"
+      >
+        Start Free
+        <app-icon name="arrow" [size]="17" />
+      </a>
+      <button mat-stroked-button class="btn-lg btn-sec" type="button" (click)="scroll.section('setup')">
+        See How It Works
+      </button>
+    </div>
+  </div>
+
+  <div class="hstage" [class.playing]="playing()" aria-hidden="true">
+    <div class="hpanel surf">
+      <div class="winbar"><i></i><i></i><i></i><b>Clinic setup assistant</b></div>
+      <div class="hbody">
+        @for (row of summary; track row.label; let i = $index) {
+          <div class="arow">
+            <span>{{ row.label }}</span>
+            <b>{{ row.value }}</b>
+            <span class="tickc" [class.on]="step() >= i + 1"><app-icon name="check" [size]="13" /></span>
+          </div>
+        }
+        <div class="eyebrow flowhead">Your OPD workflow</div>
+        <div class="mflow">
+          @for (node of flow; track node.stage; let i = $index) {
+            @if (i > 0) {
+              <span class="marr" [class.on]="step() >= i + 4"><app-icon name="arrow" [size]="13" /></span>
+            }
+            <div class="mnode" [class.on]="step() >= i + 4">
+              {{ node.stage }}<small>{{ node.owner }}</small>
+            </div>
+          }
+        </div>
+        <div class="hfoot">
+          <span class="pill p-good" [class.on]="step() >= 9">
+            <app-icon name="check" [size]="12" /> Workflow ready
+          </span>
+          <span class="open" [class.pressed]="playing() && step() === 10">
+            Open patient dashboard <app-icon name="arrow" [size]="14" />
+          </span>
+        </div>
+        <div class="qmini" [class.on]="step() >= 10">
+          <span class="tokchip">T-19</span>
+          <b>Sunita Patil · 42 F</b>
+          <span class="pill p-sec">Check-in</span>
+        </div>
+      </div>
+    </div>
+    <div class="hch left"><app-character person="pooja" pose="point" /></div>
+    <div class="hch right" [class.on]="step() >= 9">
+      <app-character person="meera" pose="tablet" [delay]="0.8" />
+    </div>
+  </div>
+</section>

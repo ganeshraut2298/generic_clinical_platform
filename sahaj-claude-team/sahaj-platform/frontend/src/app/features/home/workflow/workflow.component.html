@@ -1,0 +1,100 @@
+<section
+  class="lp-sect"
+  id="workflow"
+  tabindex="-1"
+  aria-labelledby="h-workflow"
+  appInView
+  (inViewChange)="inView.set($event)"
+>
+  <app-section-head
+    headingId="h-workflow"
+    eyebrow="Workflow builder"
+    heading="Build the workflow that matches your practice."
+    lead="Add, remove and reorder stages without writing code. Every stage has an owner and its own rules. Consultation is always required."
+  />
+
+  <div class="wfb">
+    <div class="palette surf">
+      <span class="eyebrow">Add a stage</span>
+      @for (key of palette; track key) {
+        <button type="button" class="pal" [disabled]="has(key)" (click)="add(key)">
+          <app-icon name="plus" [size]="14" />
+          <span>{{ stages[key].name }}<small>{{ stages[key].owner }}</small></span>
+        </button>
+      }
+    </div>
+
+    <div class="canvas surf">
+      <div class="wfbar">
+        <div>
+          <b>General practice · New visit</b>
+          <div class="faint cap" aria-live="polite">{{ caption() }}</div>
+        </div>
+        <button mat-stroked-button class="btn-sec" type="button" (click)="preview()">
+          <app-icon name="users" [size]="15" /> Preview with a sample patient
+        </button>
+      </div>
+
+      <ol class="nodes" aria-label="Stages of the workflow, in order">
+        @for (key of workflow(); track key; let i = $index; let first = $first; let last = $last) {
+          <li class="nwrap">
+            @if (!first) {
+              <span class="conn" [class.new]="key === justAdded()" aria-hidden="true"></span>
+            }
+            <div
+              class="node"
+              tabindex="0"
+              [class.active]="i === activeIndex()"
+              [class.new]="key === justAdded()"
+              [attr.aria-describedby]="'tip-' + key"
+            >
+              <span class="marker" aria-hidden="true">Sunita · T-19</span>
+              <b>{{ stages[key].name }}</b>
+              <small>{{ stages[key].owner }}</small>
+              <span class="tip" role="tooltip" [id]="'tip-' + key">
+                {{ stages[key].owner }} · {{ stages[key].rule }}
+              </span>
+              <span class="nctl">
+                <button
+                  type="button"
+                  [attr.data-focus]="'move-' + key + '--1'"
+                  [attr.aria-label]="'Move ' + stages[key].name + ' earlier'"
+                  [disabled]="first"
+                  (click)="move(key, -1)"
+                >
+                  <app-icon name="back" [size]="12" />
+                </button>
+                <button
+                  type="button"
+                  [attr.data-focus]="'move-' + key + '-1'"
+                  [attr.aria-label]="'Move ' + stages[key].name + ' later'"
+                  [disabled]="last"
+                  (click)="move(key, 1)"
+                >
+                  <app-icon name="arrow" [size]="12" />
+                </button>
+                @if (key === 'consult') {
+                  <span class="lockc" title="Required"
+                    ><app-icon name="lock" [size]="12" /><span class="sr-only">Required step</span></span
+                  >
+                } @else {
+                  <button
+                    type="button"
+                    [attr.aria-label]="'Remove ' + stages[key].name"
+                    (click)="remove(key)"
+                  >
+                    <app-icon name="x" [size]="12" />
+                  </button>
+                }
+              </span>
+            </div>
+          </li>
+        }
+      </ol>
+
+      <div class="wfch" aria-hidden="true">
+        <app-character person="kiran" pose="point" [flip]="true" />
+      </div>
+    </div>
+  </div>
+</section>
