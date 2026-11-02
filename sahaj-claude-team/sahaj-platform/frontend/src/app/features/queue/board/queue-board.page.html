@@ -1,0 +1,90 @@
+<div class="pagehead">
+  <div>
+    <h1>Queue</h1>
+    <p class="lead">Move a token forward with the button on its card as the patient moves through the clinic.</p>
+  </div>
+  <div class="actions">
+    <mat-button-toggle-group class="seg" aria-label="Filter" [value]="myOnly()">
+      <mat-button-toggle [value]="false" (click)="setMyOnly(false)">Everyone</mat-button-toggle>
+      <mat-button-toggle [value]="true" (click)="setMyOnly(true)">My tasks</mat-button-toggle>
+    </mat-button-toggle-group>
+    @if (canCreateToken()) {
+      <button mat-flat-button type="button" (click)="openNewToken()">
+        <app-icon name="plus" [size]="17" /> New token
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading()) {
+  <p class="muted" aria-busy="true">Loading the queue</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+  </div>
+} @else {
+  <div class="board-wrap">
+    <div class="board">
+      @for (col of columns(); track col.stage) {
+        <section class="col surf" [class.legacy]="col.legacy" [attr.aria-label]="col.label">
+          <div class="col-h">
+            <span class="pill" [class]="stagePillClass(col.stage)">{{ col.label }}</span>
+            @if (col.legacy) {
+              <span class="faint" style="font-size: 0.72rem">Removed in v{{ liveVersion() }} · finishing on the earlier version</span>
+            }
+            <span class="n num">{{ col.visits.length }}</span>
+          </div>
+          <div class="colbody" [class.is-empty]="!col.visits.length">
+            @if (col.visits.length) {
+              @for (visit of col.visits; track visit.id) {
+                <article class="qcard">
+                  <div class="qtop">
+                    <span class="tk">T-{{ visit.tokenNo }}</span>
+                    <span class="pill" [class.p-teal]="visit.visitType === 'NEW'" [class.p-sec]="visit.visitType === 'FOLLOW_UP'">
+                      {{ visitTypeLabel(visit.visitType) }}
+                    </span>
+                    @if (visit.stage !== 'DONE') {
+                      <span class="w"><app-icon name="clock" [size]="13" />{{ minutesOf(visit) }} min</span>
+                    }
+                  </div>
+                  <div class="qname">{{ visit.patientName }} <span>{{ visit.age }} {{ visit.sex }}</span></div>
+                  <div class="qdoc">{{ visit.doctorName }}</div>
+                  @if (visit.stage !== 'DONE') {
+                    <div class="qfee faint">Fee {{ formatInr(visit.feePaise / 100) }}</div>
+                  }
+                  @if (placeholderStages.includes(visit.stage)) {
+                    <div class="qnote faint">Opens in a later update</div>
+                  }
+                  @if (visit.stage !== 'DONE') {
+                    <div class="qact">
+                      @if (canMove(visit) && nextStageLabel(visit); as label) {
+                        <button mat-stroked-button type="button" [disabled]="movingId() === visit.id" (click)="moveToNext(visit)">
+                          Move to {{ label }}
+                        </button>
+                      }
+                      @if (canMoveBack() && earlierStagesOf(visit).length) {
+                        <button mat-icon-button type="button" [matMenuTriggerFor]="back" aria-label="Move back">
+                          <app-icon name="back" [size]="15" />
+                        </button>
+                        <mat-menu #back="matMenu">
+                          @for (stage of earlierStagesOf(visit); track stage) {
+                            <button mat-menu-item type="button" (click)="moveBack(visit, stage)">
+                              Move back to {{ stageLabels[stage] }}
+                            </button>
+                          }
+                        </mat-menu>
+                      }
+                    </div>
+                  }
+                </article>
+              }
+            } @else {
+              <div class="empty">No patients</div>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  </div>
+}

@@ -47,6 +47,14 @@ public final class Problems {
         return problem;
     }
 
+    /** SAH-3: the per-mobile OTP resend cooldown, distinct from the network-wide {@link #tooManyRequests}. */
+    public static ProblemDetail otpResendTooSoon(long retryAfterSeconds) {
+        ProblemDetail problem = of(HttpStatus.TOO_MANY_REQUESTS, "rate-limit", "Too many requests",
+                "Wait before requesting another code for this number.");
+        problem.setProperty("retryAfterSeconds", retryAfterSeconds);
+        return problem;
+    }
+
     /** SAH-3 AC3: 5 wrong codes lock the mobile for 15 minutes. */
     public static ProblemDetail locked(String detail, long retryAfterSeconds) {
         ProblemDetail problem = of(HttpStatus.LOCKED, "otp-locked", "Too many wrong codes", detail);

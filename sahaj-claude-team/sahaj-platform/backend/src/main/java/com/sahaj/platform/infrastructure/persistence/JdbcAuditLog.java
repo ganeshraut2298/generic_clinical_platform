@@ -45,8 +45,8 @@ public class JdbcAuditLog implements AuditLog {
                 .param("action", action)
                 .param("entityType", entityType)
                 .param("entityId", entityId == null ? null : entityId.toString())
-                .param("before", toJson(AuditSanitizer.sanitize(before)))
-                .param("after", toJson(AuditSanitizer.sanitize(after)))
+                .param("before", toJson(AuditSanitizer.sanitize(entityType, before)))
+                .param("after", toJson(AuditSanitizer.sanitize(entityType, after)))
                 .update();
     }
 

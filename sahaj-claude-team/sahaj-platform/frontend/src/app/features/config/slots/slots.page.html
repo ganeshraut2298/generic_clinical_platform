@@ -1,0 +1,226 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading appointments and slots</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else {
+  <div class="grid2 even">
+    @for (doctor of doctors(); track doctor.id) {
+      <section class="panel surf">
+        <div class="panel-h">
+          <div class="row" style="flex-wrap: nowrap">
+            <div class="av">{{ doctor.name.charAt(0) }}</div>
+            <div>
+              <h2>{{ doctor.name }}</h2>
+              <small class="faint">{{ doctor.doctor?.specialty }}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Slot length</span>
+          <div class="seg" role="group" aria-label="Slot length">
+            @for (n of slotLengthOptions; track n) {
+              <button
+                type="button"
+                [attr.aria-pressed]="settingsFor(doctor.id).slotMinutes === n"
+                [disabled]="!canEditSlots() || savingDoctorId() === doctor.id"
+                (click)="setSlotLength(doctor, n)"
+              >
+                {{ n }} min
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">OPD sessions</span>
+          @for (session of settingsFor(doctor.id).sessions; track $index) {
+            <div class="row sessrow">
+              <span class="muted" style="width: 64px">{{ $index ? 'Evening' : 'Morning' }}</span>
+              <input
+                type="time"
+                class="input tm"
+                [value]="session.startTime"
+                [attr.aria-label]="($index ? 'Evening' : 'Morning') + ' session start'"
+                [disabled]="!canEditSlots()"
+                (change)="setSessionTime(doctor, $index, 'startTime', $any($event.target).value)"
+              />
+              <span class="faint">to</span>
+              <input
+                type="time"
+                class="input tm"
+                [value]="session.endTime"
+                [attr.aria-label]="($index ? 'Evening' : 'Morning') + ' session end'"
+                [disabled]="!canEditSlots()"
+                (change)="setSessionTime(doctor, $index, 'endTime', $any($event.target).value)"
+              />
+              @if (settingsFor(doctor.id).sessions.length > 1) {
+                <button type="button" class="xbtn" aria-label="Remove session" [disabled]="!canEditSlots()" (click)="removeSession(doctor, $index)">
+                  <app-icon name="x" [size]="14" />
+                </button>
+              }
+            </div>
+          }
+          @if (settingsFor(doctor.id).sessions.length < 2) {
+            <div>
+              <button mat-stroked-button class="sm" type="button" [disabled]="!canEditSlots()" (click)="addSession(doctor)">
+                <app-icon name="plus" [size]="13" /> Add evening session
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="field">
+          <span class="field-label">Working days</span>
+          <div class="days" role="group" aria-label="Working days">
+            @for (day of workingDayOptions; track day.value) {
+              <button
+                class="dayb"
+                type="button"
+                [attr.aria-pressed]="settingsFor(doctor.id).workingDays.includes(day.value)"
+                [disabled]="!canEditSlots()"
+                (click)="toggleWorkingDay(doctor, day.value)"
+              >
+                {{ day.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Keep slots free for walk-ins</span>
+          <div class="seg" role="group" aria-label="Walk-in reserve">
+            @for (opt of walkInOptions; track opt.value) {
+              <button
+                type="button"
+                [attr.aria-pressed]="settingsFor(doctor.id).walkInEveryNth === opt.value"
+                [disabled]="!canEditSlots()"
+                (click)="setWalkIn(doctor, opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <label [attr.for]="'mo-' + doctor.id">Most online bookings a day</label>
+          <input
+            [id]="'mo-' + doctor.id"
+            type="number"
+            min="0"
+            max="200"
+            class="input num"
+            style="max-width: 120px"
+            [value]="settingsFor(doctor.id).maxOnlinePerDay"
+            [disabled]="!canEditSlots()"
+            (change)="setMaxOnline(doctor, $any($event.target))"
+          />
+        </div>
+
+        @if (daySummary(doctor); as summary) {
+          <div class="notice info">
+            <app-icon name="calendar" [size]="16" />
+            <span>{{ summary.total }} slots a day, {{ summary.walkIn }} kept for walk-ins, {{ summary.bookable }} bookable.</span>
+          </div>
+        } @else {
+          <div class="notice info">
+            <app-icon name="calendar" [size]="16" />
+            <span>No working day is set in the next week.</span>
+          </div>
+        }
+      </section>
+    } @empty {
+      <div class="empty">No doctors added yet. Add a doctor in Team and access.</div>
+    }
+
+    <section class="panel surf" style="grid-column: 1 / -1">
+      <div>
+        <h2>Booking rules for the clinic</h2>
+        <small class="faint">Apply to every doctor. Only the owner can change them.</small>
+      </div>
+      <div class="grid2 even" style="gap: 4px 28px">
+        <div>
+          <div class="rulerow">
+            <span>Online booking closes before the slot</span>
+            <div class="stepper">
+              <button type="button" aria-label="Less" [disabled]="!canEditRules()" (click)="stepRule('closeBeforeHours', -1, 0, 48)">−</button>
+              <span class="num">{{ bookingRules().closeBeforeHours }} h</span>
+              <button type="button" aria-label="More" [disabled]="!canEditRules()" (click)="stepRule('closeBeforeHours', 1, 0, 48)">+</button>
+            </div>
+          </div>
+          <div class="rulerow">
+            <span>WhatsApp reminder before the slot</span>
+            <div class="stepper">
+              <button type="button" aria-label="Less" [disabled]="!canEditRules()" (click)="stepRule('remindBeforeHours', -1, 0, 48)">−</button>
+              <span class="num">{{ bookingRules().remindBeforeHours }} h</span>
+              <button type="button" aria-label="More" [disabled]="!canEditRules()" (click)="stepRule('remindBeforeHours', 1, 0, 48)">+</button>
+            </div>
+          </div>
+          <div class="rulerow">
+            <span>Mark as no-show when this late</span>
+            <div class="stepper">
+              <button type="button" aria-label="Less" [disabled]="!canEditRules()" (click)="stepRule('noShowAfterMinutes', -5, 0, 180)">−</button>
+              <span class="num">{{ bookingRules().noShowAfterMinutes }} min</span>
+              <button type="button" aria-label="More" [disabled]="!canEditRules()" (click)="stepRule('noShowAfterMinutes', 5, 0, 180)">+</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="rulerow">
+            <span>
+              Follow-up patients get priority
+              <small class="faint">Their slots are held before new patients can book them</small>
+            </span>
+            <button
+              type="button"
+              class="sw"
+              role="switch"
+              [attr.aria-checked]="bookingRules().followPriority"
+              aria-label="Follow-up patients get priority"
+              [disabled]="!canEditRules()"
+              (click)="toggleRule('followPriority')"
+            ></button>
+          </div>
+          <div class="rulerow">
+            <span>
+              Patients can book on WhatsApp
+              <small class="faint">From the clinic's WhatsApp number. Stored only — no WhatsApp channel yet.</small>
+            </span>
+            <button
+              type="button"
+              class="sw"
+              role="switch"
+              [attr.aria-checked]="bookingRules().selfBook"
+              aria-label="Patients can book on WhatsApp"
+              [disabled]="!canEditRules()"
+              (click)="toggleRule('selfBook')"
+            ></button>
+          </div>
+          <div class="rulerow">
+            <span>
+              Allow two patients in one slot
+              <small class="faint">For emergencies; only the owner can do it</small>
+            </span>
+            <button
+              type="button"
+              class="sw"
+              role="switch"
+              [attr.aria-checked]="bookingRules().overbook"
+              aria-label="Allow two patients in one slot"
+              [disabled]="!canEditRules()"
+              (click)="toggleRule('overbook')"
+            ></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+}

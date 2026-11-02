@@ -225,13 +225,17 @@ class AuditTrailIT extends BaseIntegrationTest {
     void tenantBCannotWriteAnAuditRowForTenantA() throws Exception {
         createTenant(tenantA, userA, nameA);
         createTenant(tenantB, userB, uniqueName("Audit Clinic B"));
+        // V2026_11_01_1007 (docs/database/SAH-1.md, "Column-level INSERT on audit_event") restricts
+        // sahaj_app's INSERT on audit_event to six columns; tenant_id is not one of them, so naming
+        // it now fails on the column privilege (42501 "permission denied") before row level
+        // security is even reached. Still proves the forgery is refused; just a different message.
         assertThatThrownBy(() -> db().inTenant(tenantB, c -> {
             DbAccess.execute(c, "insert into platform.audit_event (tenant_id, action, entity_type) values (?::uuid, 'FORGED', 'TENANT')",
                     tenantA.toString());
             return null;
         })).isInstanceOfSatisfying(SQLException.class, e -> {
             assertThat(e.getSQLState()).isEqualTo("42501");
-            assertThat(e.getMessage()).contains("row-level security");
+            assertThat(e.getMessage()).contains("permission denied");
         });
     }
 

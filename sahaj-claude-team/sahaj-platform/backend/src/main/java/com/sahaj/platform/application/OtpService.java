@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,9 +45,19 @@ public class OtpService {
         this.clock = clock;
     }
 
+    /**
+     * LOCAL DEMO ONLY. When true (set only in application-dev.yml), no code is sent or stored and
+     * any 6-digit code is accepted at verify. Never enable outside a local machine.
+     */
+    @Value("${sahaj.otp.dev-bypass:false}")
+    private boolean devBypass;
+
     /** Sends a fresh code and returns the resend countdown, in seconds. */
     @Transactional
     public int request(String mobile) {
+        if (devBypass) {
+            return (int) RESEND_THROTTLE.toSeconds();
+        }
         Instant now = clock.instant();
         Optional<OtpChallenge> latest = repository.findLatestByMobile(mobile);
         if (latest.isPresent()) {
@@ -66,9 +77,16 @@ public class OtpService {
         return (int) RESEND_THROTTLE.toSeconds();
     }
 
-    /** Confirms the code. Throws when it is wrong, expired, already used, or the mobile is locked. */
-    @Transactional
+    /**
+     * Confirms the code. Throws when it is wrong, expired, already used, or the mobile is locked.
+     * The two OTP exceptions must not roll the transaction back: a wrong code has to keep its
+     * failed-attempt count (and the lock) or the 5-attempt limit would never take effect.
+     */
+    @Transactional(noRollbackFor = {OtpInvalidException.class, OtpLockedException.class})
     public void verify(String mobile, String code) {
+        if (devBypass) {
+            return;
+        }
         Instant now = clock.instant();
         OtpChallenge challenge = repository.findLatestByMobile(mobile)
                 .orElseThrow(() -> new OtpInvalidException("No code was sent to this number."));

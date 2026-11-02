@@ -162,14 +162,17 @@ class TenantBindingTransactionManagerTest {
     }
 
     @Test
-    void aFullTenantPrincipalTakesPriorityOverTheNarrowerSources() throws SQLException {
+    void aFullTenantPrincipalBindsBothTheTenantAndTheUser() throws SQLException {
         UUID tenant = UUID.randomUUID();
         UUID user = UUID.randomUUID();
 
         TestTenantSecurity.runAs(TestTenantSecurity.authentication(tenant, user),
                 () -> transactions.executeWithoutResult(status -> { }));
 
-        verify(connection, never()).prepareStatement("select set_config('app.user_id', ?, true)");
+        verify(connection).prepareStatement(BIND_SQL);
+        verify(connection).prepareStatement("select set_config('app.user_id', ?, true)");
+        verify(bindStatement).setString(1, tenant.toString());
+        verify(bindStatement).setString(1, user.toString());
     }
 
     @Test

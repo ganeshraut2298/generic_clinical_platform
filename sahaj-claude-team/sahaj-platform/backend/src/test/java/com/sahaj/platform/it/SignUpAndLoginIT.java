@@ -63,8 +63,14 @@ class SignUpAndLoginIT extends AuthFlowTestSupport {
     @Test
     void loginResponseShapeIsAppWithAFreshSessionAndNoClinicChoice() throws Exception {
         String mobile = uniqueMobile();
-        signUp(mobile);
+        Session signUpSession = signUp(mobile);
+        // Sign-up alone does not finish the setup wizard; without this, an OWNER's next login
+        // still comes back SETUP (docs/database/SAH-4.md), which is not what this test is about.
+        completeSetup(signUpSession.tenantId());
 
+        // Sign-up just requested a code for this mobile; the 30 second resend throttle
+        // (OtpService.RESEND_THROTTLE) is still running, so age the challenge out first.
+        ageOutLatestChallenge(mobile);
         String code = requestOtpAndCaptureCode(mobile, "LOGIN");
         mvc.perform(post(AUTH + "/otp/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -99,8 +105,15 @@ class SignUpAndLoginIT extends AuthFlowTestSupport {
     void aRemovedMembershipCannotLogInAndGets403() throws Exception {
         String mobile = uniqueMobile();
         Session signUpSession = signUp(mobile);
+        // platform.guard_last_owner() refuses to deactivate the clinic's only active owner, so add
+        // a second active owner first (SAH-6 AC10 backstop in V2026_11_01_1023). The membership's
+        // user_id is a foreign key to platform.app_user, so the second owner must be a real,
+        // signed-up person, not just any UUID.
+        Session secondOwner = signUp(uniqueMobile());
+        addMembership(signUpSession.tenantId(), secondOwner.userId(), "OWNER");
         setMembershipStatus(signUpSession.tenantId(), signUpSession.userId(), "REMOVED");
 
+        ageOutLatestChallenge(mobile);
         String code = requestOtpAndCaptureCode(mobile, "LOGIN");
         mvc.perform(post(AUTH + "/otp/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -114,8 +127,12 @@ class SignUpAndLoginIT extends AuthFlowTestSupport {
     void anInactiveMembershipCannotLogInEither() throws Exception {
         String mobile = uniqueMobile();
         Session signUpSession = signUp(mobile);
+        // Same last-owner backstop as above: give the clinic a second active owner first.
+        Session secondOwner = signUp(uniqueMobile());
+        addMembership(signUpSession.tenantId(), secondOwner.userId(), "OWNER");
         setMembershipStatus(signUpSession.tenantId(), signUpSession.userId(), "INACTIVE");
 
+        ageOutLatestChallenge(mobile);
         String code = requestOtpAndCaptureCode(mobile, "LOGIN");
         mvc.perform(post(AUTH + "/otp/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -129,7 +146,13 @@ class SignUpAndLoginIT extends AuthFlowTestSupport {
     void signingUpAgainOnAMobileThatAlreadyHasAClinicLogsInInsteadOfCreatingAnother() throws Exception {
         String mobile = uniqueMobile();
         Session firstSignUp = signUp(mobile);
+        // Sign-up alone does not finish the setup wizard; without this, the owner's next login
+        // still comes back SETUP (docs/database/SAH-4.md) rather than APP.
+        completeSetup(firstSignUp.tenantId());
 
+        // signUp() already requested a code for this mobile; past the 30 second resend throttle
+        // before asking for another one.
+        ageOutLatestChallenge(mobile);
         String code = requestOtpAndCaptureCode(mobile, "SIGNUP");
         var result = mvc.perform(post(AUTH + "/otp/verify")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -206,6 +229,7 @@ class SignUpAndLoginIT extends AuthFlowTestSupport {
         Session signUpSession = signUp(mobile);
         UUID tenantId = signUpSession.tenantId();
         String maskedTail = "••••••" + mobile.substring(mobile.length() - 4);
+        ageOutLatestChallenge(mobile);
 
         db().inTenant(tenantId, c -> {
             assertThat(DbAccess.text(c, "select after_json ->> 'mobile' from platform.audit_event where action = 'SIGN_UP' and tenant_id = ?::uuid",

@@ -21,9 +21,9 @@ describe('App', () => {
     expect(paths).toEqual(['', 'login', 'setup', 'app', 'admin', '**']);
     expect(routes[0].loadChildren).toBeDefined();
     expect(routes[1].loadComponent).toBeDefined();
-    expect(routes[2].loadComponent).toBeDefined();
+    expect(routes[2].loadChildren).toBeDefined();
     expect(routes[2].canActivate).toBeDefined();
-    expect(routes[3].loadComponent).toBeDefined();
+    expect(routes[3].loadChildren).toBeDefined();
     expect(routes[3].canActivate).toBeDefined();
     expect(routes[4].loadComponent).toBeDefined();
   });

@@ -1,0 +1,65 @@
+@use '../config-common';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.srow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+
+  &.off {
+    opacity: 0.62;
+  }
+  .d small {
+    display: block;
+    color: var(--ink-3);
+    font-size: 0.78rem;
+  }
+}
+
+.flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  .fs {
+    padding: 7px 11px;
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 0.82rem;
+    font-weight: 600;
+
+    small {
+      display: block;
+      font-weight: 500;
+      color: var(--ink-3);
+      font-size: 0.72rem;
+    }
+  }
+  .ar {
+    color: var(--ink-3);
+  }
+}
+
+@media (max-width: 720px) {
+  .srow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

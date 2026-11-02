@@ -8,5 +8,6 @@ public enum MembershipRole {
     NURSE,
     FRONT_DESK,
     BILLING,
-    PHARMACIST
+    PHARMACIST,
+    COUNSELLOR
 }

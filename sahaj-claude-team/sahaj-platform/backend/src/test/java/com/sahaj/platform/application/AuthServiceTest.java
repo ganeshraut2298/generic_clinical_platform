@@ -101,6 +101,7 @@ class AuthServiceTest {
         Membership membership = new Membership(UUID.randomUUID(), tenantId, user.id(), MembershipRole.OWNER, MembershipStatus.ACTIVE);
         when(ops.findUserByMobile(MOBILE)).thenReturn(Optional.of(user));
         when(ops.listMemberships(user.id())).thenReturn(List.of(membership));
+        when(ops.isSetupComplete(tenantId)).thenReturn(true);
         when(tokenService.issueAccessToken(user.id(), tenantId, "OWNER"))
                 .thenReturn(new TokenService.AccessToken("jwt", 900));
 
@@ -108,6 +109,38 @@ class AuthServiceTest {
 
         assertThat(outcome.next()).isEqualTo(VerifyOutcome.Next.APP);
         verify(ops).finalizeLogin(eq(tenantId), eq(user.id()), eq(membership.id()), eq(MOBILE), anyString(), any());
+    }
+
+    @Test
+    void anOwnerWhoHasNotFinishedSetupReturnsToSetupInsteadOfTheApp() {
+        AppUser user = new AppUser(UUID.randomUUID(), MOBILE, "Owner");
+        UUID tenantId = UUID.randomUUID();
+        Membership membership = new Membership(UUID.randomUUID(), tenantId, user.id(), MembershipRole.OWNER, MembershipStatus.ACTIVE);
+        when(ops.findUserByMobile(MOBILE)).thenReturn(Optional.of(user));
+        when(ops.listMemberships(user.id())).thenReturn(List.of(membership));
+        when(ops.isSetupComplete(tenantId)).thenReturn(false);
+        when(tokenService.issueAccessToken(user.id(), tenantId, "OWNER"))
+                .thenReturn(new TokenService.AccessToken("jwt", 900));
+
+        VerifyOutcome outcome = service.verify(MOBILE, "123456", AuthMode.LOGIN, null);
+
+        assertThat(outcome.next()).isEqualTo(VerifyOutcome.Next.SETUP);
+    }
+
+    @Test
+    void aNonOwnerLogsStraightInWithoutCheckingSetup() {
+        AppUser user = new AppUser(UUID.randomUUID(), MOBILE, "Nurse");
+        UUID tenantId = UUID.randomUUID();
+        Membership membership = new Membership(UUID.randomUUID(), tenantId, user.id(), MembershipRole.NURSE, MembershipStatus.ACTIVE);
+        when(ops.findUserByMobile(MOBILE)).thenReturn(Optional.of(user));
+        when(ops.listMemberships(user.id())).thenReturn(List.of(membership));
+        when(tokenService.issueAccessToken(user.id(), tenantId, "NURSE"))
+                .thenReturn(new TokenService.AccessToken("jwt", 900));
+
+        VerifyOutcome outcome = service.verify(MOBILE, "123456", AuthMode.LOGIN, null);
+
+        assertThat(outcome.next()).isEqualTo(VerifyOutcome.Next.APP);
+        verify(ops, never()).isSetupComplete(any());
     }
 
     @Test

@@ -1,0 +1,91 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="adt">
+  <div class="sheet-h">
+    <div>
+      <h2 id="adt">{{ appointment().patientName }}</h2>
+      <p class="muted" style="font-size: 0.86rem">
+        @if (appointment().age !== undefined) {
+          {{ appointment().age }} {{ appointment().sex }} ·
+        }
+        <span class="num">{{ appointment().mobile }}</span>
+      </p>
+    </div>
+    <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    <div class="list">
+      <div class="li">
+        <div class="main"><small>When</small><b>{{ data.whenLabel }}</b></div>
+      </div>
+      <div class="li">
+        <div class="main"><small>Doctor</small><b>{{ appointment().doctorName }}</b></div>
+      </div>
+      <div class="li">
+        <div class="main">
+          <small>Visit</small>
+          <b>
+            {{ visitTypeLabels[appointment().visitType] }}
+            @if (appointment().note) { · {{ appointment().note }} }
+          </b>
+        </div>
+      </div>
+      <div class="li">
+        <div class="main"><small>Booked through</small><b>{{ sourceLabels[appointment().source] }}</b></div>
+      </div>
+      <div class="li">
+        <div class="main"><small>Status</small><b>{{ statusText() }}</b></div>
+      </div>
+    </div>
+
+    @if (appointment().visitType === 'FOLLOW_UP' && appointment().status === 'BOOKED') {
+      <div class="notice good">
+        <app-icon name="check" [size]="16" />
+        <span>Follow-up visit. The follow-up fee rule is checked when the token is created.</span>
+      </div>
+    }
+
+    @if (confirmingCancel()) {
+      <div class="notice warn">
+        <app-icon name="alert" [size]="16" />
+        <span>Cancel this appointment? The slot opens for booking again.</span>
+      </div>
+    }
+
+    @if (actionError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="sheet-f">
+    @if (confirmingCancel()) {
+      <button mat-stroked-button type="button" [disabled]="busy()" (click)="keepAppointment()">Keep appointment</button>
+      <button mat-flat-button type="button" class="danger" [disabled]="busy()" (click)="confirmCancel()">Cancel appointment</button>
+    } @else if (appointment().status === 'BOOKED') {
+      @if (canManage()) {
+        <button mat-stroked-button type="button" [disabled]="busy()" (click)="startCancel()">Cancel</button>
+        <button mat-stroked-button type="button" [disabled]="busy()" (click)="markNoShow()">Mark no-show</button>
+        <button mat-stroked-button type="button" disabled title="Needs WhatsApp (not in this phase)">
+          <app-icon name="msg" [size]="14" /> {{ data.isToday ? 'Remind' : 'Send reminder' }}
+        </button>
+        @if (data.isToday) {
+          <button mat-flat-button type="button" [disabled]="busy()" (click)="createToken()">
+            <app-icon name="plus" [size]="15" /> Create token
+          </button>
+        }
+      } @else {
+        <button mat-stroked-button type="button" (click)="close()">Close</button>
+      }
+    } @else if (appointment().status === 'ARRIVED') {
+      <button mat-flat-button type="button" (click)="openQueue()">
+        Open queue <app-icon name="arrow" [size]="15" />
+      </button>
+    } @else {
+      <button mat-stroked-button type="button" (click)="close()">Close</button>
+    }
+  </div>
+</div>

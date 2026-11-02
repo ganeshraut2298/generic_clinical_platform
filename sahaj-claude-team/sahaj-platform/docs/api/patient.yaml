@@ -1,0 +1,149 @@
+openapi: 3.1.0
+info:
+  title: Sahaj Patient API
+  version: 0.1.0
+  description: Phase 1 contract, SAH-8. Reads are for any clinic role; writes are OWNER/FRONT_DESK (403 otherwise). Errors are RFC 9457 application/problem+json.
+servers:
+  - url: /api/v1/patient
+security:
+  - bearer: []
+paths:
+  /patients:
+    get:
+      tags: [SAH-8]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: filter, in: query, schema: { type: string, enum: [all, new, due, missed, chronic, overdue, lapsed, kids, seniors], default: all } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PatientSummary' } }
+                  total: { type: integer }
+    post:
+      tags: [SAH-8]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PatientCreate' } } }
+      responses:
+        '201': { description: Registered, content: { application/json: { schema: { $ref: '#/components/schemas/Patient' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /patients/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-8]
+      responses:
+        '200': { description: Patient, content: { application/json: { schema: { $ref: '#/components/schemas/Patient' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [SAH-8]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PatientUpdate' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/Patient' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /patients/{id}/family:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-8]
+      responses:
+        '200': { description: Family, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PatientSummary' } } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /patients/merge:
+    post:
+      tags: [SAH-8]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [keepId, mergeId], properties: { keepId: { type: string, format: uuid }, mergeId: { type: string, format: uuid } } } } }
+      responses:
+        '200': { description: Merged, content: { application/json: { schema: { $ref: '#/components/schemas/Patient' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            properties:
+              type: { type: string }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              fieldErrors:
+                type: array
+                items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+  schemas:
+    PatientSummary:
+      type: object
+      required: [id, uhid, name, age, sex, mobile]
+      properties:
+        id: { type: string, format: uuid }
+        uhid: { type: string }
+        name: { type: string }
+        age: { type: integer, minimum: 0, maximum: 120 }
+        sex: { type: string, enum: [F, M, O] }
+        mobile: { type: string }
+        chronic: { type: [string, 'null'] }
+        lastVisitAt: { type: [string, 'null'], format: date-time, description: Always null until SAH-9 exists. }
+    PatientCreate:
+      type: object
+      required: [name, age, sex, mobile]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        age: { type: integer, minimum: 0, maximum: 120 }
+        sex: { type: string, enum: [F, M, O] }
+        mobile: { type: string, pattern: '^[6-9][0-9]{9}$' }
+        area: { type: [string, 'null'] }
+        language: { type: string, enum: [mr, hi, en], default: mr }
+        allergy: { type: [string, 'null'] }
+        chronic: { type: [string, 'null'] }
+        abhaLinked: { type: boolean, default: false }
+    PatientUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        age: { type: integer, minimum: 0, maximum: 120 }
+        sex: { type: string, enum: [F, M, O] }
+        area: { type: [string, 'null'] }
+        language: { type: string, enum: [mr, hi, en] }
+        allergy: { type: [string, 'null'] }
+        chronic: { type: [string, 'null'] }
+        abhaLinked: { type: boolean }
+    Patient:
+      type: object
+      required: [id, uhid, name, age, sex, mobile, language, abhaLinked, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        uhid: { type: string }
+        name: { type: string }
+        age: { type: integer }
+        sex: { type: string, enum: [F, M, O] }
+        mobile: { type: string }
+        area: { type: [string, 'null'] }
+        language: { type: string, enum: [mr, hi, en] }
+        allergy: { type: [string, 'null'] }
+        chronic: { type: [string, 'null'] }
+        abhaLinked: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        possibleDuplicateOfId: { type: [string, 'null'], format: uuid, description: Set when a likely duplicate was found at creation. }

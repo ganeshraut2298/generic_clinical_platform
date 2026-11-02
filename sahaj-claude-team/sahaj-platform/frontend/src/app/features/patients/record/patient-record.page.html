@@ -1,0 +1,119 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading patient</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+    <button mat-stroked-button type="button" (click)="back()">
+      <app-icon name="chevL" [size]="15" /> All patients
+    </button>
+  </section>
+} @else if (patient(); as p) {
+  <div class="pagehead">
+    <button mat-stroked-button type="button" (click)="back()">
+      <app-icon name="chevL" [size]="15" /> All patients
+    </button>
+    <div class="row">
+      <button mat-stroked-button type="button" (click)="printComingSoon()">
+        <app-icon name="print" [size]="15" /> Print history
+      </button>
+      @if (canWrite()) {
+        <button mat-stroked-button type="button" (click)="editComingSoon()">Edit details</button>
+      }
+    </div>
+  </div>
+
+  <section class="panel surf pthead">
+    <div class="av xl" [class.f]="p.sex === 'F'">{{ initials(p.name) }}</div>
+    <div class="pti">
+      <h1>{{ p.name }}</h1>
+      <div class="ptmeta">
+        <span>{{ p.age }} yrs · {{ p.sex === 'F' ? 'Female' : p.sex === 'M' ? 'Male' : 'Other' }}</span>
+        <span class="num">{{ p.uhid }}</span>
+        <span class="num">{{ p.mobile }}</span>
+        @if (p.area) {
+          <span>{{ p.area }}</span>
+        }
+        <span>Messages in {{ languageLabels[p.language] }}</span>
+        <span class="pill" [class.p-good]="p.abhaLinked" [class.p-wait]="!p.abhaLinked">
+          ABHA {{ p.abhaLinked ? 'linked' : 'not linked' }}
+        </span>
+      </div>
+      @if (p.allergy || p.chronic) {
+        <div class="row tags">
+          @if (p.allergy) {
+            <span class="pill p-crit">
+              <app-icon name="alert" [size]="12" /> Allergy: {{ p.allergy }}
+            </span>
+          }
+          @if (p.chronic) {
+            <span class="pill p-warn">Long-term: {{ p.chronic }}</span>
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel surf">
+      <div class="panel-h">
+        <div class="seg">
+          <button type="button" [attr.aria-pressed]="tab() === 'visits'" (click)="setTab('visits')">
+            Visits (0)
+          </button>
+          <button type="button" [attr.aria-pressed]="tab() === 'bills'" (click)="setTab('bills')">
+            Bills
+          </button>
+        </div>
+      </div>
+      @if (tab() === 'bills') {
+        <div class="empty">No bills yet. There have been no visits.</div>
+      } @else {
+        <div class="empty">No visits yet.</div>
+      }
+    </section>
+
+    <div class="page">
+      <section class="panel surf">
+        <h2>Summary</h2>
+        <div class="ptstats">
+          <div><span class="eyebrow">Visits</span><b class="num">0</b><small>No visits yet</small></div>
+          <div><span class="eyebrow">Last visit</span><b>No visits yet</b></div>
+          <div><span class="eyebrow">Follow-ups kept</span><b class="num">—</b><small>None set yet</small></div>
+        </div>
+      </section>
+
+      <section class="panel surf">
+        <div class="panel-h">
+          <h2>Family</h2>
+          <span class="faint">Same mobile {{ p.mobile }}</span>
+        </div>
+        @if (family().length) {
+          <div class="list">
+            @for (member of family(); track member.id) {
+              <button type="button" class="li famrow" (click)="openFamilyMemberRecord(member)">
+                <span class="av sm" [class.f]="member.sex === 'F'">{{ initials(member.name) }}</span>
+                <div class="main">
+                  <b>{{ member.name }}</b>
+                  <small>{{ member.age }} {{ member.sex }} · {{ member.uhid }}</small>
+                </div>
+                <app-icon name="chevR" [size]="15" />
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="faint">No other family members on this number.</div>
+        }
+        @if (canWrite()) {
+          <button mat-stroked-button type="button" class="addfam" (click)="openFamilyMember(p.mobile)">
+            <app-icon name="plus" [size]="13" /> Add family member
+          </button>
+        }
+      </section>
+    </div>
+  </div>
+}

@@ -164,6 +164,32 @@ abstract class AuthFlowTestSupport extends BaseIntegrationTest {
         }
     }
 
+    /**
+     * Marks the clinic's setup wizard as complete (SAH-4's {@code platform.setup_progress.completed_at}),
+     * the way {@code setup/complete} would. Until this is set, the owner's login always comes back
+     * {@code next = SETUP} (docs/database/SAH-4.md "For java-developer: the login/mid-setup
+     * signal"), even on a mobile that has already signed up once: sign-up itself does not finish
+     * setup. Tests that only care about the sign-up/log-in routing, not the wizard, call this to
+     * get a clinic an OWNER can log in to and land on {@code APP}.
+     */
+    protected void completeSetup(UUID tenantId) throws SQLException {
+        try (Connection connection = db().app()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement bind = connection.prepareStatement("select set_config('app.tenant_id', ?, false)")) {
+                bind.setString(1, tenantId.toString());
+                bind.execute();
+            }
+            try (PreparedStatement insert = connection.prepareStatement(
+                    "insert into platform.setup_progress (tenant_id, current_step, completed_at) "
+                            + "values (?::uuid, 5, now()) "
+                            + "on conflict (tenant_id) do update set completed_at = now()")) {
+                insert.setString(1, tenantId.toString());
+                insert.executeUpdate();
+            }
+            connection.commit();
+        }
+    }
+
     /** Pushes the newest OTP challenge for this mobile far enough into the past to be expired and resendable. */
     protected void ageOutLatestChallenge(String mobile) throws SQLException {
         try (Connection connection = db().app()) {

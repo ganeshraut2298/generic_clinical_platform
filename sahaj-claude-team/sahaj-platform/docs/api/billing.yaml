@@ -1,0 +1,199 @@
+openapi: 3.1.0
+info:
+  title: Sahaj Billing API
+  version: 0.1.0
+  description: Phase 1 contract, SAH-10. Reads are for any clinic role; most writes are OWNER/FRONT_DESK (403 otherwise); refund is OWNER only. Errors are RFC 9457 application/problem+json.
+servers:
+  - url: /api/v1/billing
+security:
+  - bearer: []
+paths:
+  /counter:
+    get:
+      tags: [SAH-10]
+      responses:
+        '200':
+          description: The counter's lists
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [awaiting, dues, paidToday]
+                properties:
+                  awaiting: { type: array, items: { $ref: '#/components/schemas/BillSummary' } }
+                  dues: { type: array, items: { $ref: '#/components/schemas/BillSummary' } }
+                  paidToday: { type: array, items: { $ref: '#/components/schemas/BillSummary' } }
+  /bills/{visitId}:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-10]
+      responses:
+        '200': { description: Bill, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /bills/{visitId}/items:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-10]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [serviceId, qty], properties: { serviceId: { type: string, format: uuid }, qty: { type: integer, minimum: 1, maximum: 20, default: 1 } } } } }
+      responses:
+        '200': { description: Item added, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /bills/{visitId}/items/{itemId}:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [SAH-10]
+      responses:
+        '200': { description: Item removed, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /bills/{visitId}/discount:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [SAH-10]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [percent], properties: { percent: { type: integer, minimum: 0, maximum: 100 }, reason: { type: [string, 'null'] } } } } }
+      responses:
+        '200': { description: Discount set, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /bills/{visitId}/payments:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-10]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PaymentCreate' } } }
+      responses:
+        '200': { description: Payment recorded, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /bills/{visitId}/refund:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-10]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [amountPaise, mode, reason], properties: { amountPaise: { type: integer, minimum: 1 }, mode: { $ref: '#/components/schemas/PaymentMode' }, reason: { type: string, minLength: 1 } } } } }
+      responses:
+        '200': { description: Refund recorded, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /day-closing:
+    post:
+      tags: [SAH-10]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [countedCashPaise], properties: { countedCashPaise: { type: integer, minimum: 0 }, note: { type: [string, 'null'] } } } } }
+      responses:
+        '201': { description: Closed, content: { application/json: { schema: { $ref: '#/components/schemas/DayClosing' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            properties:
+              type: { type: string }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              fieldErrors:
+                type: array
+                items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+  schemas:
+    PaymentMode:
+      type: string
+      enum: [CASH, UPI, CARD]
+    PaymentCreate:
+      type: object
+      required: [mode, amountPaise]
+      properties:
+        mode: { $ref: '#/components/schemas/PaymentMode' }
+        amountPaise: { type: integer, minimum: 1 }
+        reference: { type: [string, 'null'] }
+    BillItem:
+      type: object
+      required: [id, name, amountPaise, qty, removable]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        amountPaise: { type: integer }
+        qty: { type: integer }
+        removable: { type: boolean, description: False for the consultation line. }
+    Payment:
+      type: object
+      required: [id, mode, amountPaise, recordedByName, recordedAt]
+      properties:
+        id: { type: string, format: uuid }
+        mode: { $ref: '#/components/schemas/PaymentMode' }
+        amountPaise: { type: integer, description: Negative for a refund. }
+        reference: { type: [string, 'null'] }
+        recordedByName: { type: string }
+        recordedAt: { type: string, format: date-time }
+    Bill:
+      type: object
+      required: [visitId, tokenNo, patientName, age, sex, doctorName, visitType, items, subtotalPaise, discountPercent, discountPaise, totalPaise, paidPaise, balancePaise, payments, canCollect, discountLimitPercent]
+      properties:
+        visitId: { type: string, format: uuid }
+        tokenNo: { type: integer }
+        patientName: { type: string }
+        age: { type: integer }
+        sex: { type: string, enum: [F, M, O] }
+        doctorName: { type: string }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP] }
+        items: { type: array, items: { $ref: '#/components/schemas/BillItem' } }
+        subtotalPaise: { type: integer }
+        discountPercent: { type: integer }
+        discountReason: { type: [string, 'null'] }
+        discountPaise: { type: integer }
+        totalPaise: { type: integer }
+        paidPaise: { type: integer }
+        balancePaise: { type: integer }
+        payments: { type: array, items: { $ref: '#/components/schemas/Payment' } }
+        canCollect: { type: boolean, description: Whether the signed-in user may edit items, discount or collect payment. }
+        discountLimitPercent: { type: integer, description: The signed-in role's maximum discount percent. }
+    BillSummary:
+      type: object
+      required: [visitId, tokenNo, patientName, totalPaise, balancePaise]
+      properties:
+        visitId: { type: string, format: uuid }
+        tokenNo: { type: integer }
+        patientName: { type: string }
+        doctorName: { type: string }
+        totalPaise: { type: integer }
+        balancePaise: { type: integer }
+    DayClosing:
+      type: object
+      required: [businessDate, countedCashPaise, expectedCashPaise, diffPaise, closedByName, closedAt]
+      properties:
+        businessDate: { type: string, format: date }
+        countedCashPaise: { type: integer }
+        expectedCashPaise: { type: integer }
+        diffPaise: { type: integer }
+        note: { type: [string, 'null'] }
+        closedByName: { type: string }
+        closedAt: { type: string, format: date-time }

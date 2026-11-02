@@ -23,9 +23,19 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
 
     private static final String SCHEMAS = "('platform','patient','opd','ipd','hra','billing')";
 
-    /** Tables that are on purpose without row level security (documented in docs/database/SAH-1.md). */
+    /**
+     * Tables that are on purpose without row level security: no tenant_id, global/reference data or
+     * person-keyed data recorded before any tenant exists. Documented in docs/database/SAH-1.md
+     * (app_user, sales_enquiry, flyway_schema_history), SAH-3.md (otp_challenge, consent_record),
+     * SAH-4.md (tenant_slug, the RLS-free mirror of tenant.slug for cross-tenant lookups), SAH-6.md
+     * (role_permission_default, a global reference grid) and SAH-7.md (specialty, specialty_template,
+     * opd.medicine, opd.diagnosis, all global reference/catalog data, SELECT only for sahaj_app).
+     */
     private static final Set<String> NO_RLS_BY_DESIGN = Set.of(
-            "platform.app_user", "platform.sales_enquiry", "platform.flyway_schema_history");
+            "platform.app_user", "platform.sales_enquiry", "platform.flyway_schema_history",
+            "platform.otp_challenge", "platform.consent_record", "platform.tenant_slug",
+            "platform.role_permission_default", "platform.specialty", "platform.specialty_template",
+            "opd.medicine", "opd.diagnosis");
 
     // ---- row level security on every tenant table ----
 
@@ -87,6 +97,19 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
                 .contains("platform.app_user", "platform.sales_enquiry");
     }
 
+    /**
+     * Policies that, by design (DEC-007, docs/database/SAH-3.md "The login-lookup default"), are
+     * keyed on {@code platform.current_user_id()} instead of {@code platform.current_tenant()}.
+     * They let a signed-in-but-not-yet-tenant-bound user find their own memberships and their own
+     * refresh tokens across every tenant, so clinic selection and sign-out-everywhere work before
+     * (or across) any one tenant is bound. Each is an exact {@code user_id = current_user_id()}
+     * match with no "unset means all" branch, so it is not an escape hatch.
+     */
+    private static final Set<String> USER_ID_SCOPED_BY_DESIGN = Set.of(
+            "platform.membership.p_membership_self_read",
+            "platform.refresh_token.p_refresh_token_self_read",
+            "platform.refresh_token.p_refresh_token_self_revoke");
+
     @Test
     void everyPolicyAppliesToSahajAppOnlyAndIsBuiltOnTheBoundTenantWithNoEscape() throws Exception {
         Map<String, List<String>> commandsByTable = new LinkedHashMap<>();
@@ -116,11 +139,18 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
                     String cmd = rs.getString("cmd");
                     boolean readsRows = !cmd.equals("a"); // a = INSERT has no USING expression
                     boolean writesRows = !cmd.equals("r") && !cmd.equals("d"); // r = SELECT, d = DELETE have no CHECK
-                    if (readsRows && !qual.contains("current_tenant()")) {
-                        problems.add(name + " USING does not use platform.current_tenant(): " + qual);
-                    }
-                    if (writesRows && !chk.contains("current_tenant()")) {
-                        problems.add(name + " WITH CHECK does not use platform.current_tenant(): " + chk);
+                    boolean userIdScopedByDesign = USER_ID_SCOPED_BY_DESIGN.contains(name);
+                    if (userIdScopedByDesign) {
+                        if (!qual.contains("current_user_id()") && !chk.contains("current_user_id()")) {
+                            problems.add(name + " is documented as user-id scoped but uses neither USING nor WITH CHECK on platform.current_user_id(): qual=" + qual + " chk=" + chk);
+                        }
+                    } else {
+                        if (readsRows && !qual.contains("current_tenant()")) {
+                            problems.add(name + " USING does not use platform.current_tenant(): " + qual);
+                        }
+                        if (writesRows && !chk.contains("current_tenant()")) {
+                            problems.add(name + " WITH CHECK does not use platform.current_tenant(): " + chk);
+                        }
                     }
                     for (String expression : List.of(qual, chk)) {
                         if (expression.contains("coalesce") || expression.contains("true") || expression.contains(" or ")
@@ -142,11 +172,17 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
 
     @Test
     void sahajAppHasExactlyTheDocumentedPrivilegesOnEachPlatformTable() throws Exception {
+        // audit_event's INSERT is column-level only (V2026_11_01_1007, docs/database/SAH-1.md
+        // "Column-level INSERT on audit_event"): revoke-all then
+        // `grant insert (actor_user_id, action, entity_type, entity_id, before_json, after_json)`.
+        // has_table_privilege('sahaj_app','platform.audit_event','INSERT') is therefore false even
+        // though the app can insert rows; the table-level check below only covers SELECT/UPDATE/etc,
+        // and the column-level check further down covers INSERT on audit_event specifically.
         Map<String, Set<String>> expected = new LinkedHashMap<>();
         expected.put("platform.tenant", Set.of("SELECT", "INSERT", "UPDATE"));
         expected.put("platform.app_user", Set.of("SELECT", "INSERT", "UPDATE"));
         expected.put("platform.membership", Set.of("SELECT", "INSERT", "UPDATE"));
-        expected.put("platform.audit_event", Set.of("SELECT", "INSERT"));
+        expected.put("platform.audit_event", Set.of("SELECT"));
         expected.put("platform.sales_enquiry", Set.of("INSERT"));
         List<String> all = List.of("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER");
 
@@ -164,6 +200,28 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
             }));
             return null;
         });
+
+        // audit_event's INSERT: column-level, exactly the six columns JdbcAuditLog writes.
+        Set<String> insertableColumns = Set.of("actor_user_id", "action", "entity_type", "entity_id", "before_json", "after_json");
+        Set<String> notInsertableColumns = Set.of("id", "tenant_id", "at");
+        db().asApp(c -> {
+            for (String column : insertableColumns) {
+                boolean has = Boolean.parseBoolean(DbAccess.text(c,
+                        "select has_column_privilege('sahaj_app', 'platform.audit_event', ?::text, 'INSERT')::text", column));
+                if (!has) {
+                    problems.add("platform.audit_event." + column + " INSERT: sahaj_app has=false expected=true");
+                }
+            }
+            for (String column : notInsertableColumns) {
+                boolean has = Boolean.parseBoolean(DbAccess.text(c,
+                        "select has_column_privilege('sahaj_app', 'platform.audit_event', ?::text, 'INSERT')::text", column));
+                if (has) {
+                    problems.add("platform.audit_event." + column + " INSERT: sahaj_app has=true expected=false");
+                }
+            }
+            return null;
+        });
+
         assertThat(problems).isEmpty();
     }
 

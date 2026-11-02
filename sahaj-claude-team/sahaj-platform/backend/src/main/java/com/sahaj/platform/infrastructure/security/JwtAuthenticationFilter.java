@@ -48,10 +48,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             CachedActiveMembershipChecker checker = activeMembershipChecker.getIfAvailable();
             String token = header.substring(BEARER_PREFIX.length());
             tokens.parseAccessToken(token).ifPresent(claims -> {
-                if (checker != null && checker.isActive(claims.tenantId(), claims.userId())) {
-                    TenantPrincipal principal = new TenantPrincipal(claims.userId(), claims.tenantId());
-                    SecurityContextHolder.getContext().setAuthentication(new TenantAuthentication(principal,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + claims.role()))));
+                if (checker == null) {
+                    return;
+                }
+                // The membership check runs in its own transaction, and the tenant is bound to the
+                // database from the thread's authentication when that transaction begins. So the
+                // signed-token authentication must be in place first; otherwise row level security
+                // sees no tenant, finds no membership and every request answers 401.
+                TenantPrincipal principal = new TenantPrincipal(claims.userId(), claims.tenantId());
+                SecurityContextHolder.getContext().setAuthentication(new TenantAuthentication(principal,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + claims.role()))));
+                if (!checker.isActive(claims.tenantId(), claims.userId())) {
+                    SecurityContextHolder.clearContext();
                 }
             });
         }

@@ -8,6 +8,112 @@ servers:
 security:
   - bearer: []
 paths:
+  /doctor-slots:
+    get:
+      tags: [SAH-11]
+      responses:
+        '200': { description: Per-doctor slot settings, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/DoctorSlotSettings' } } } } }
+  /doctor-slots/{doctorMembershipId}:
+    parameters:
+      - { name: doctorMembershipId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [SAH-11]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DoctorSlotSettings' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/DoctorSlotSettings' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /booking-rules:
+    get:
+      tags: [SAH-11]
+      responses:
+        '200': { description: Rules, content: { application/json: { schema: { $ref: '#/components/schemas/BookingRules' } } } }
+    put:
+      tags: [SAH-11]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BookingRules' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/BookingRules' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /appointments:
+    get:
+      tags: [SAH-11]
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: doctorMembershipId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Appointments, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
+    post:
+      tags: [SAH-11]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentCreate' } } }
+      responses:
+        '201': { description: Booked, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /appointments/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [SAH-11]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [CANCELLED, NOSHOW] } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /appointments/{id}/token:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-11]
+      responses:
+        '200': { description: Token issued, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /visits/today:
+    get:
+      tags: [SAH-9]
+      parameters:
+        - { name: mine, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200': { description: Today's visits, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Visit' } } } } }
+  /visits:
+    post:
+      tags: [SAH-9]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VisitCreate' } } }
+      responses:
+        '201': { description: Token issued, content: { application/json: { schema: { $ref: '#/components/schemas/Visit' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /visits/{id}/stage:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [SAH-9]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [stage], properties: { stage: { $ref: '#/components/schemas/VisitStage' } } } } }
+      responses:
+        '200': { description: Moved, content: { application/json: { schema: { $ref: '#/components/schemas/Visit' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /services:
     get:
       tags: [SAH-7]
@@ -115,6 +221,37 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/CasePaperSettings' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /workflow/draft:
+    get:
+      tags: [SAH-12]
+      responses:
+        '200': { description: The draft, or a fresh copy of the current published version if no draft was ever saved, content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowSteps' } } } }
+    put:
+      tags: [SAH-12]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowSteps' } } }
+      responses:
+        '200': { description: Draft saved, content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowSteps' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /workflow/current:
+    get:
+      tags: [SAH-12]
+      responses:
+        '200': { description: The current published version (lazily created with defaults if none exists), content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowVersion' } } } }
+  /workflow/versions:
+    get:
+      tags: [SAH-12]
+      responses:
+        '200': { description: Publish history, newest first, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WorkflowVersion' } } } } }
+  /workflow/publish:
+    post:
+      tags: [SAH-12]
+      responses:
+        '200': { description: Draft published as the new current version, content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowVersion' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -135,6 +272,112 @@ components:
                 type: array
                 items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
   schemas:
+    DoctorSlotSettings:
+      type: object
+      required: [doctorMembershipId, slotMinutes, workingDays, walkInEveryNth, maxOnlinePerDay, sessions]
+      properties:
+        doctorMembershipId: { type: string, format: uuid }
+        slotMinutes: { type: integer, minimum: 5, maximum: 60 }
+        workingDays: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: 0=Sunday..6=Saturday. }
+        walkInEveryNth: { type: integer, minimum: 0, description: 0 means no slots are reserved for walk-ins. }
+        maxOnlinePerDay: { type: integer, minimum: 0 }
+        sessions: { type: array, maxItems: 2, items: { type: object, required: [startTime, endTime], properties: { startTime: { type: string }, endTime: { type: string } } } }
+    BookingRules:
+      type: object
+      required: [closeBeforeHours, remindBeforeHours, noShowAfterMinutes, followPriority, selfBook, overbook]
+      properties:
+        closeBeforeHours: { type: integer, minimum: 0, maximum: 48 }
+        remindBeforeHours: { type: integer, minimum: 0, maximum: 48, description: Stored only; no notification channel yet. }
+        noShowAfterMinutes: { type: integer, minimum: 0, maximum: 180 }
+        followPriority: { type: boolean }
+        selfBook: { type: boolean, description: Stored only; no patient-facing booking channel yet. }
+        overbook: { type: boolean }
+    AppointmentCreate:
+      type: object
+      required: [patientId, doctorMembershipId, apptDate, apptTime, visitType, source]
+      properties:
+        patientId: { type: string, format: uuid }
+        doctorMembershipId: { type: string, format: uuid }
+        apptDate: { type: string, format: date }
+        apptTime: { type: string }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP] }
+        source: { type: string, enum: [PHONE, WHATSAPP, FRONT_DESK] }
+        note: { type: [string, 'null'] }
+    Appointment:
+      type: object
+      required: [id, patientId, patientName, doctorMembershipId, doctorName, apptDate, apptTime, status, visitType, source]
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        age: { type: integer }
+        sex: { type: string, enum: [F, M, O] }
+        mobile: { type: string }
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        apptDate: { type: string, format: date }
+        apptTime: { type: string }
+        status: { type: string, enum: [BOOKED, ARRIVED, NOSHOW, CANCELLED] }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP] }
+        source: { type: string, enum: [PHONE, WHATSAPP, FRONT_DESK] }
+        note: { type: [string, 'null'] }
+        visitId: { type: [string, 'null'], format: uuid }
+        tokenNo: { type: [integer, 'null'] }
+    VisitStage:
+      type: string
+      enum: [WAITING, VITALS, WITH_DOCTOR, COUNSEL, BILLING, DONE]
+    VisitCreate:
+      type: object
+      required: [patientId, doctorMembershipId]
+      properties:
+        patientId: { type: string, format: uuid }
+        doctorMembershipId: { type: string, format: uuid }
+    Visit:
+      type: object
+      required: [id, tokenNo, patientId, patientName, age, sex, doctorMembershipId, doctorName, visitType, stage, feePaise, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        tokenNo: { type: integer }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        age: { type: integer }
+        sex: { type: string, enum: [F, M, O] }
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP] }
+        stage: { $ref: '#/components/schemas/VisitStage' }
+        feePaise: { type: integer }
+        createdAt: { type: string, format: date-time }
+    WorkflowStepKey:
+      type: string
+      enum: [token, queue, vitals, consult, counsel, casepaper, billing, followup]
+    WorkflowStepOwner:
+      type: string
+      enum: [FRONT_DESK, NURSE, DOCTOR, OWNER]
+      description: A role code. Omitted for steps with no owner (queue, casepaper, followup).
+    WorkflowStep:
+      type: object
+      required: [key, on]
+      properties:
+        key: { $ref: '#/components/schemas/WorkflowStepKey' }
+        on: { type: boolean, description: "token/queue/consult/billing are always true; rejected with 400 otherwise." }
+        owner: { $ref: '#/components/schemas/WorkflowStepOwner' }
+    WorkflowSteps:
+      type: object
+      required: [steps]
+      properties:
+        steps:
+          type: array
+          description: Fixed display/flow order - token first, consult before counsel and billing, casepaper/followup after consult. 8 entries, one per WorkflowStepKey.
+          items: { $ref: '#/components/schemas/WorkflowStep' }
+    WorkflowVersion:
+      type: object
+      required: [versionNo, steps, publishedAt]
+      properties:
+        versionNo: { type: integer }
+        steps: { type: array, items: { $ref: '#/components/schemas/WorkflowStep' } }
+        publishedAt: { type: string, format: date-time }
+        publishedByName: { type: string }
     Service:
       type: object
       required: [name, category, priceRupees]
@@ -158,7 +401,7 @@ components:
         feeTiming: { type: string, enum: [before, after, split] }
         followUpDays: { type: integer, minimum: 1, maximum: 30 }
         followUpFee: { type: string, enum: [free, half, full] }
-        discountLimits: { type: object, description: Percent by role, additionalProperties: { type: integer, minimum: 0, maximum: 100 } }
+        discountLimits: { type: object, description: 'Percent by role. Keys are Role values: OWNER, FRONT_DESK, NURSE, BILLING. A role with no key has no discount right.', additionalProperties: { type: integer, minimum: 0, maximum: 100 } }
         upiOnBill: { type: boolean }
     Medicine:
       type: object
@@ -180,5 +423,5 @@ components:
         caps: { type: boolean }
         sections:
           type: object
-          description: Section key to on or off. rx is always on.
+          description: 'Section key to on or off. Keys: complaints, vitals, history, exam, diagnosis, inv, rx, advice, next. rx is always on.'
           additionalProperties: { type: boolean }

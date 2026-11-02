@@ -1,0 +1,119 @@
+<div class="pagehead">
+  <div>
+    <h1>Appointments</h1>
+    <p class="lead">Walk-ins stay the default. Appointments fill the rest, and become tokens when the patient arrives.</p>
+  </div>
+  <div class="actions">
+    <a mat-stroked-button routerLink="/app/config/slots">
+      <app-icon name="sliders" [size]="15" /> Slot settings
+    </a>
+  </div>
+</div>
+
+<div class="aptool surf">
+  <div class="seg" role="group" aria-label="Day">
+    <button type="button" [attr.aria-pressed]="dayOffset() === 0" (click)="setDay(0)">Today</button>
+    <button type="button" [attr.aria-pressed]="dayOffset() === 1" (click)="setDay(1)">Tomorrow</button>
+  </div>
+  <div class="seg" role="group" aria-label="Doctor">
+    <button type="button" [attr.aria-pressed]="doctorFilter() === 'all'" (click)="setDoctorFilter('all')">
+      All doctors
+    </button>
+    @for (doctor of doctors(); track doctor.id) {
+      <button type="button" [attr.aria-pressed]="doctorFilter() === doctor.id" (click)="setDoctorFilter(doctor.id)">
+        {{ doctor.name }}
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading()) {
+  <p class="muted" aria-busy="true">Loading appointments</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+  </div>
+} @else {
+  <div class="apstats">
+    <div class="aps surf"><span class="num booked">{{ stats().booked }}</span><small>Booked</small></div>
+    <div class="aps surf"><span class="num arrived">{{ stats().arrived }}</span><small>Arrived</small></div>
+    <div class="aps surf"><span class="num noshow">{{ stats().noShow }}</span><small>No-show</small></div>
+    <div class="aps surf"><span class="num free">{{ stats().free }}</span><small>Free slots</small></div>
+    <div class="aps surf"><span class="num walk">{{ stats().walkIn }}</span><small>Kept for walk-ins</small></div>
+  </div>
+
+  <div class="aprules">
+    @for (chip of ruleChips(); track chip) {
+      <span class="pill">{{ chip }}</span>
+    }
+    <a class="linkbtn" routerLink="/app/config/slots">Change rules</a>
+  </div>
+
+  @if (doctorsError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  <div class="apcols" [style.grid-template-columns]="'repeat(' + columns().length + ', minmax(0, 1fr))'">
+    @for (col of columns(); track col.doctor.id) {
+      <section class="apcol surf">
+        <div class="apch">
+          <div class="avatar">{{ col.doctor.name.charAt(0) }}</div>
+          <div class="apch-t">
+            <b>{{ col.doctor.name }}</b>
+            <small class="faint">{{ col.settings.slotMinutes }}-minute slots</small>
+          </div>
+        </div>
+        @if (col.slots === null) {
+          <div class="empty">{{ col.doctor.name }} doesn't see patients this day.</div>
+        } @else {
+          <div class="slots">
+            @for (slot of col.slots; track slot.time) {
+              @if (col.appointmentByTime.get(slot.time); as appt) {
+                <div class="slot2 booked">
+                  <span class="st num">{{ formatClockLabel(slot.time) }}</span>
+                  <button type="button" class="apcard" (click)="openDetail(appt)">
+                    <b>{{ appt.patientName }}</b>
+                    <small>{{ appt.age }} {{ appt.sex }} · {{ visitTypeLabel(appt.visitType) }}{{ appt.note ? ' · ' + appt.note : '' }}</small>
+                  </button>
+                  <span class="pill" [class]="appointmentDisplayPillClass(displayStatusOf(appt))">
+                    {{ displayStatusLabel(appt) }}
+                  </span>
+                  @if (canCreateTokenFor(appt)) {
+                    <button mat-stroked-button type="button" class="sm" (click)="createTokenFrom(appt)">Create token</button>
+                  }
+                </div>
+              } @else if (slot.walkIn) {
+                <div class="slot2 walk">
+                  <span class="st num">{{ formatClockLabel(slot.time) }}</span>
+                  <span>Kept for walk-ins</span>
+                  @if (canManage()) {
+                    <button type="button" class="linkbtn" (click)="openBook(col.doctor, slot.time)">Book anyway</button>
+                  }
+                </div>
+              } @else {
+                <div class="slot2 free">
+                  <span class="st num">{{ formatClockLabel(slot.time) }}</span>
+                  @if (canManage()) {
+                    <button type="button" class="freebtn" (click)="openBook(col.doctor, slot.time)">
+                      <app-icon name="plus" [size]="13" /> Book this slot
+                    </button>
+                  } @else {
+                    <span class="faint">Free</span>
+                  }
+                </div>
+              }
+            } @empty {
+              <div class="empty">No slots configured for this doctor.</div>
+            }
+          </div>
+        }
+      </section>
+    } @empty {
+      <div class="empty">No doctors to show. Add a doctor in Clinic setup.</div>
+    }
+  </div>
+}

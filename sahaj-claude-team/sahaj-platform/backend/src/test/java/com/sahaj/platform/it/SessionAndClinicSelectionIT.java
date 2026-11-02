@@ -29,6 +29,10 @@ class SessionAndClinicSelectionIT extends AuthFlowTestSupport {
         UUID tenantB = UUID.randomUUID();
         createTenant(tenantB, UUID.randomUUID(), uniqueName("Second clinic"));
         addMembership(tenantB, signUp.userId(), "DOCTOR");
+        // signUp() above already requested a code for this mobile; callers request another one for
+        // LOGIN right away, so push the 30 second resend throttle (OtpService.RESEND_THROTTLE) out
+        // of the way here, once, for every test that uses this fixture.
+        ageOutLatestChallenge(mobile);
         return new TwoClinicUser(mobile, signUp.userId(), signUp.tenantId(), tenantB);
     }
 

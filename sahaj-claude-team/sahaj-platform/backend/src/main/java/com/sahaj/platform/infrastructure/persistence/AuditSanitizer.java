@@ -30,6 +30,15 @@ import java.util.regex.Pattern;
  * data - redacting it would defeat the point of an audit entry such as {@code TENANT_RENAMED}. Only
  * markers that name a *person* are redacted: {@code patientName}, {@code ownerName}, {@code fullName},
  * {@code contactName}, {@code staffName} and {@code doctorName}.
+ *
+ * <p>For {@code entityType PATIENT} (SAH-8) and {@code entityType VISIT} (SAH-9) a bare {@code name}
+ * is a patient's own name, not a clinic's business name, so it is redacted too:
+ * {@link #sanitize(String, Map)} adds {@code name} to the full-redact markers only for those entity
+ * types, so a patient record's or a visit's audit snapshot never carries the person's name in
+ * clear, only the entity id. {@code patientName} and {@code doctorName} are redacted for every
+ * entity type regardless (see {@code FULL_REDACT_MARKERS} below): {@code VisitService} does not put
+ * either into a visit's audit snapshot in the first place, only {@code patientId} and
+ * {@code doctorMembershipId}, but this is the second line of defence CLAUDE.md asks for.
  */
 final class AuditSanitizer {
 
@@ -39,6 +48,9 @@ final class AuditSanitizer {
     private static final Set<String> FULL_REDACT_MARKERS = Set.of(
             "otp", "pin", "password", "secret", "token", "notes",
             "patientname", "ownername", "fullname", "contactname", "staffname", "doctorname");
+
+    /** Entity types whose bare {@code name} field names a person, not a clinic's own business name. */
+    private static final Set<String> ENTITY_TYPES_WHERE_NAME_IS_A_PERSON = Set.of("PATIENT", "VISIT", "APPOINTMENT");
 
     /** Values here are numbers that keep their last four digits for an auditor to recognise the row. */
     private static final Set<String> MASK_MARKERS = Set.of("mobile", "phone", "whatsapp", "abha");
@@ -50,11 +62,25 @@ final class AuditSanitizer {
     }
 
     static Map<String, Object> sanitize(Map<String, Object> values) {
+        return sanitize(null, values);
+    }
+
+    /**
+     * @param entityType the kind of record the snapshot describes, for example {@code PATIENT}; may
+     *                   be null, in which case a bare {@code name} is treated as a business name
+     */
+    static Map<String, Object> sanitize(String entityType, Map<String, Object> values) {
         if (values == null) {
             return null;
         }
+        Set<String> fullRedactMarkers = FULL_REDACT_MARKERS;
+        if (entityType != null && ENTITY_TYPES_WHERE_NAME_IS_A_PERSON.contains(entityType.toUpperCase(Locale.ROOT))) {
+            fullRedactMarkers = new java.util.HashSet<>(FULL_REDACT_MARKERS);
+            fullRedactMarkers.add("name");
+        }
         Map<String, Object> result = new LinkedHashMap<>();
-        values.forEach((key, value) -> result.put(key, sanitizeValue(normalizeKey(key), value)));
+        Set<String> markers = fullRedactMarkers;
+        values.forEach((key, value) -> result.put(key, sanitizeValue(normalizeKey(key), value, markers)));
         return result;
     }
 
@@ -66,21 +92,24 @@ final class AuditSanitizer {
     }
 
     @SuppressWarnings("unchecked")
-    private static Object sanitizeValue(String normalizedKey, Object value) {
+    private static Object sanitizeValue(String normalizedKey, Object value, Set<String> fullRedactMarkers) {
         if (value == null) {
             return null;
         }
-        if (containsAny(normalizedKey, FULL_REDACT_MARKERS)) {
+        if (containsAny(normalizedKey, fullRedactMarkers)) {
             return REDACTED;
         }
         if (containsAny(normalizedKey, MASK_MARKERS)) {
             return value instanceof String string ? maskMobile(string) : value;
         }
         if (value instanceof Map<?, ?> nested) {
-            return sanitize((Map<String, Object>) nested);
+            Map<String, Object> result = new LinkedHashMap<>();
+            ((Map<String, Object>) nested).forEach((key, nestedValue) ->
+                    result.put(key, sanitizeValue(normalizeKey(key), nestedValue, fullRedactMarkers)));
+            return result;
         }
         if (value instanceof List<?> list) {
-            return sanitizeList(list);
+            return sanitizeList(list, fullRedactMarkers);
         }
         if (value instanceof String string) {
             return maskEmbeddedDigitRuns(string);
@@ -89,13 +118,16 @@ final class AuditSanitizer {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Object> sanitizeList(List<?> list) {
+    private static List<Object> sanitizeList(List<?> list, Set<String> fullRedactMarkers) {
         List<Object> out = new ArrayList<>();
         for (Object item : list) {
             if (item instanceof Map<?, ?> map) {
-                out.add(sanitize((Map<String, Object>) map));
+                Map<String, Object> result = new LinkedHashMap<>();
+                ((Map<String, Object>) map).forEach((key, value) ->
+                        result.put(key, sanitizeValue(normalizeKey(key), value, fullRedactMarkers)));
+                out.add(result);
             } else if (item instanceof List<?> nestedList) {
-                out.add(sanitizeList(nestedList));
+                out.add(sanitizeList(nestedList, fullRedactMarkers));
             } else if (item instanceof String string) {
                 out.add(maskEmbeddedDigitRuns(string));
             } else {

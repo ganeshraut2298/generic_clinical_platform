@@ -132,6 +132,17 @@ class OtpServiceTest {
         assertThatThrownBy(() -> service.verify(MOBILE, "123456")).isInstanceOf(OtpInvalidException.class);
     }
 
+    /** Mocks cannot see a rollback; against a real database a rolled-back wrong code never counted. */
+    @Test
+    void wrongCodeAndLockDoNotRollBackTheFailedAttemptCount() throws NoSuchMethodException {
+        org.springframework.transaction.annotation.Transactional transactional = OtpService.class
+                .getMethod("verify", String.class, String.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.noRollbackFor()).contains(OtpInvalidException.class, OtpLockedException.class);
+    }
+
     private OtpChallenge challenge(Instant lastSentAt, int failedCount, Instant lockedUntil, Instant consumedAt) {
         return new OtpChallenge(UUID.randomUUID(), MOBILE, "hashed", now.plus(Duration.ofMinutes(4)), failedCount,
                 lockedUntil, lastSentAt, consumedAt);

@@ -1,0 +1,72 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sheet-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 18px 0;
+
+  h2 {
+    font-size: 1.1rem;
+  }
+}
+
+.sheet-b {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px 18px;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+
+  .field-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+}
+
+mat-slide-toggle {
+  margin: 6px 0 4px;
+}
+
+.notice.err {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  font-size: 0.84rem;
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.sheet-f {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}

@@ -169,9 +169,9 @@ paths:
   /team:
     get:
       tags: [SAH-6]
+      description: Readable by any signed-in clinic user (the Fees and Case paper pages need doctor names, fees and registration numbers). Writes are owner-only.
       responses:
         '200': { description: Team, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TeamMember' } } } } }
-        '403': { $ref: '#/components/responses/Problem' }
     post:
       tags: [SAH-6]
       requestBody:
@@ -227,6 +227,7 @@ paths:
   /role-permissions:
     get:
       tags: [SAH-6]
+      description: Any signed-in clinic user may read the matrix (non-owners see it view-only, as in the mockup). Only the owner may change it.
       responses:
         '200': { description: Matrix, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RolePermission' } } } } }
         '403': { $ref: '#/components/responses/Problem' }
@@ -314,7 +315,7 @@ components:
       type: object
       required: [type, title, status]
       properties:
-        type: { type: string, examples: ['https://sahaj.in/problems/plan-limit'] }
+        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), under https://sahaj.in/problems/.', examples: ['https://sahaj.in/problems/plan-limit'] }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
@@ -326,7 +327,7 @@ components:
     Mobile: { type: string, pattern: '^[6-9][0-9]{9}$' }
     AuthMode: { type: string, enum: [LOGIN, SIGNUP] }
     Brand: { type: string, enum: [blue, teal, green, maroon, custom] }
-    Role: { type: string, enum: [OWNER, DOCTOR, VISITING_DOCTOR, NURSE, FRONT_DESK, BILLING, PHARMACIST] }
+    Role: { type: string, enum: [OWNER, DOCTOR, VISITING_DOCTOR, NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR] }
     SalesEnquiry:
       type: object
       required: [name, mobile, source]
@@ -405,7 +406,7 @@ components:
         percent: { type: integer }
         checks:
           type: array
-          items: { type: object, required: [key, label, done], properties: { key: { type: string }, label: { type: string }, why: { type: string }, done: { type: boolean }, optional: { type: boolean } } }
+          items: { type: object, required: [key, label, done], properties: { key: { type: string }, label: { type: string }, why: { type: string }, done: { type: boolean }, optional: { type: boolean }, section: { type: string, description: 'Clinic setup section for the Fix link: overview, profile, specialty, team, fees, paper.' }, anchor: { type: string, description: Panel id inside that section, for scrolling. } } }
         lastChange: { $ref: '#/components/schemas/AuditEvent' }
     Preferences:
       type: object
@@ -416,9 +417,10 @@ components:
         sidebarCollapsed: { type: boolean }
     Me:
       type: object
-      required: [userId, name, role, clinic, menu, preferences]
+      required: [userId, membershipId, name, role, clinic, menu, preferences]
       properties:
         userId: { type: string, format: uuid }
+        membershipId: { type: string, format: uuid, description: The signed-in user's membership id in this clinic. Matches TeamMember.id. }
         name: { type: string }
         role: { $ref: '#/components/schemas/Role' }
         clinic:
@@ -440,7 +442,7 @@ components:
       type: object
       required: [id, name, mobileMasked, role, status]
       properties:
-        id: { type: string, format: uuid }
+        id: { type: string, format: uuid, description: The membership id (not the user id). Team calls are keyed on it. The signed-in user's own membership id is returned by GET /me as membershipId. }
         name: { type: string }
         mobileMasked: { type: string, examples: ['••••••7410'] }
         role: { $ref: '#/components/schemas/Role' }

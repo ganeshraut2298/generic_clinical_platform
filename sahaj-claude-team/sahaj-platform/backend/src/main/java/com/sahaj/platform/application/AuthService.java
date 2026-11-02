@@ -148,12 +148,16 @@ public class AuthService {
     private VerifyOutcome finalizeSession(UUID userId, UUID tenantId, Membership membership, String mobile) {
         String rawRefreshToken = newOpaqueToken(tenantId);
         Instant refreshExpiresAt = clock.instant().plus(REFRESH_TOKEN_TTL);
-        scope.runAsTenant(userId, tenantId, () -> {
+        boolean setupComplete = scope.runAsTenant(userId, tenantId, () -> {
             ops.finalizeLogin(tenantId, userId, membership.id(), mobile, hash(rawRefreshToken), refreshExpiresAt);
-            return null;
+            // SAH-4: only an OWNER can be mid-setup; every other role is created by "Create my
+            // clinic" itself, so by the time they can log in, setup is already complete.
+            return membership.role() != MembershipRole.OWNER || ops.isSetupComplete(tenantId);
         });
         TokenService.AccessToken accessToken = tokenService.issueAccessToken(userId, tenantId, membership.role().name());
-        return VerifyOutcome.app(accessToken, rawRefreshToken, refreshExpiresAt);
+        return setupComplete
+                ? VerifyOutcome.app(accessToken, rawRefreshToken, refreshExpiresAt)
+                : VerifyOutcome.setup(accessToken, rawRefreshToken, refreshExpiresAt);
     }
 
     private UUID parseTenantPrefix(String rawToken) {

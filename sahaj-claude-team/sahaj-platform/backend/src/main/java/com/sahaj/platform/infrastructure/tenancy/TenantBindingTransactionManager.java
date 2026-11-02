@@ -23,8 +23,9 @@ import org.springframework.transaction.TransactionDefinition;
  * <p>Right after a transaction begins, this runs {@code set_config('app.tenant_id', ?, true)},
  * which is the same as {@code SET LOCAL app.tenant_id}: the value lives only inside that
  * transaction and PostgreSQL discards it at commit or rollback, so a pooled connection can never
- * carry one clinic's identity into the next request. The value comes from the authenticated
- * {@link TenantPrincipal} only. It is passed as a bind parameter, never concatenated.
+ * carry one clinic's identity into the next request. A logged-in clinic session binds
+ * {@code app.tenant_id} and {@code app.user_id} together (SAH-5: per-user preference rows need
+ * both). The values come from the authenticated {@link TenantPrincipal} only. It is passed as a bind parameter, never concatenated.
  *
  * <p>When nobody is logged in as a clinic user, nothing is set. The row level security policies
  * read the missing setting as NULL, so every tenant table then returns no rows and accepts no
@@ -65,7 +66,9 @@ public class TenantBindingTransactionManager extends DataSourceTransactionManage
         try {
             Optional<TenantPrincipal> principal = CurrentTenant.principal();
             if (principal.isPresent()) {
+                // SAH-5: platform.user_preference row level security needs both settings.
                 bind(BIND_TENANT_SQL, principal.get().tenantId());
+                bind(BIND_USER_SQL, principal.get().userId());
                 return;
             }
             Optional<UUID> verifiedUserId = CurrentVerifiedUser.userId();

@@ -1,0 +1,311 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading your team</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else {
+  <section class="panel surf" id="f-docs">
+    <div class="panel-h">
+      <h2>Doctors</h2>
+      @if (isOwner()) {
+        <button mat-stroked-button type="button" (click)="openAdd('VISITING_DOCTOR')">
+          <app-icon name="plus" [size]="14" /> Add visiting doctor
+        </button>
+      }
+    </div>
+    <div class="list">
+      @for (doctor of doctors(); track doctor.id) {
+        <div class="li docrow" [class.dim]="doctor.status !== 'ACTIVE'">
+          <span class="av">{{ initials(doctor.name) }}</span>
+          <div class="main">
+            <b>{{ doctor.name }}</b>
+            <small>
+              {{ roleLabels[doctor.role] }}
+              @if (doctor.doctor?.degree) { · {{ doctor.doctor?.degree }} }
+              @if (doctor.doctor?.specialty) { · {{ doctor.doctor?.specialty }} }
+              · {{ doctor.mobileMasked }}
+              @if (doctor.status !== 'ACTIVE') { · cannot sign in }
+            </small>
+          </div>
+          <mat-form-field
+            appearance="outline"
+            subscriptSizing="dynamic"
+            class="reg"
+            [class.miss]="!doctor.doctor?.registrationNo"
+          >
+            <mat-label>Registration no.</mat-label>
+            <input
+              matInput
+              placeholder="e.g. MMC 2012/03/4567"
+              [value]="doctor.doctor?.registrationNo ?? ''"
+              [disabled]="!isOwner()"
+              (change)="saveRegistration(doctor, $any($event.target).value)"
+            />
+          </mat-form-field>
+          @if (doctor.role !== 'OWNER') {
+            @if (isOwner()) {
+              <button
+                type="button"
+                class="sw"
+                role="switch"
+                [attr.aria-checked]="doctor.status === 'ACTIVE'"
+                [attr.aria-label]="doctor.name + ' can sign in'"
+                [disabled]="!canSwitch(doctor) || busyId() === doctor.id"
+                (click)="setActive(doctor, doctor.status !== 'ACTIVE')"
+              ></button>
+            } @else {
+              <span class="pill" [class.p-good]="doctor.status === 'ACTIVE'" [class.p-wait]="doctor.status !== 'ACTIVE'">
+                {{ doctor.status === 'ACTIVE' ? 'Active' : 'Switched off' }}
+              </span>
+            }
+          }
+        </div>
+      } @empty {
+        <div class="empty">No doctors added yet.</div>
+      }
+    </div>
+    <div class="notice teal">
+      <app-icon name="print" [size]="16" />
+      <span>
+        The registration number prints under the doctor's name on every case paper, as medical
+        council rules require.
+      </span>
+    </div>
+  </section>
+
+  @if (addOpen()) {
+    <section class="panel surf" aria-labelledby="add-title">
+      <h2 id="add-title">Add staff</h2>
+      <form class="addstaff" [formGroup]="addForm" (ngSubmit)="submitAdd()" novalidate>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" placeholder="Full name" autocomplete="off" />
+          @if (nameError; as error) {
+            <mat-error>{{ error }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Mobile</mat-label>
+          <input
+            matInput
+            class="num"
+            formControlName="mobile"
+            inputmode="numeric"
+            maxlength="10"
+            placeholder="10 digits"
+            autocomplete="off"
+          />
+          @if (mobileError; as error) {
+            <mat-error>{{ error }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Role</mat-label>
+          <mat-select formControlName="role">
+            @for (role of roles; track role) {
+              <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        @if (addingDoctor) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Registration no.</mat-label>
+            <input matInput formControlName="registrationNo" placeholder="e.g. MMC 2012/03/4567" autocomplete="off" />
+          </mat-form-field>
+        }
+        @if (addError(); as message) {
+          <div class="notice err" role="alert">
+            <app-icon name="alert" [size]="16" />
+            <span>{{ message }}</span>
+          </div>
+        }
+        <div class="row">
+          <button mat-flat-button type="submit" [disabled]="adding()">Add and send login</button>
+          <button mat-stroked-button type="button" (click)="cancelAdd()">Cancel</button>
+        </div>
+      </form>
+    </section>
+  }
+
+  <div class="grid2">
+    <section class="panel surf" id="f-staff">
+      <div class="panel-h">
+        <h2>Staff</h2>
+        @if (isOwner()) {
+          <button mat-stroked-button type="button" (click)="openAdd()">
+            <app-icon name="plus" [size]="14" /> Add staff
+          </button>
+        }
+      </div>
+      <div class="list">
+        @for (member of staff(); track member.id) {
+          <div class="li" [class.dim]="member.status !== 'ACTIVE'">
+            <span class="av">{{ initials(member.name) }}</span>
+            <div class="main">
+              <b>{{ member.name }}</b>
+              <small>
+                {{ roleLabels[member.role] }} · <span class="num">{{ member.mobileMasked }}</span>
+                @if (member.status === 'ACTIVE') {
+                  · Last login {{ formatLastLogin(member.lastLoginAt) }}
+                } @else {
+                  · cannot sign in
+                }
+              </small>
+            </div>
+            @if (isOwner()) {
+              @if (confirmRemoveId() === member.id) {
+                <span class="confirm" role="alert">
+                  Remove access?
+                  <button mat-flat-button type="button" [disabled]="busyId() === member.id" (click)="confirmRemove(member)">Remove</button>
+                  <button mat-stroked-button type="button" (click)="cancelRemove()">Keep</button>
+                </span>
+              } @else {
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rolesel">
+                  <mat-label>Role</mat-label>
+                  <mat-select
+                    [value]="member.role"
+                    [disabled]="!canSwitch(member) || busyId() === member.id"
+                    (selectionChange)="changeRole(member, $event.value)"
+                  >
+                    @for (role of roles; track role) {
+                      <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <button
+                  type="button"
+                  class="sw"
+                  role="switch"
+                  [attr.aria-checked]="member.status === 'ACTIVE'"
+                  [attr.aria-label]="member.name + ' can sign in'"
+                  [disabled]="!canSwitch(member) || busyId() === member.id"
+                  (click)="setActive(member, member.status !== 'ACTIVE')"
+                ></button>
+                @if (canSwitch(member)) {
+                  <button mat-button type="button" [attr.aria-label]="'Remove access for ' + member.name" (click)="askRemove(member)">
+                    Remove access
+                  </button>
+                }
+              }
+            } @else {
+              <span class="pill" [class.p-good]="member.status === 'ACTIVE'" [class.p-wait]="member.status !== 'ACTIVE'">
+                {{ member.status === 'ACTIVE' ? 'Active' : 'Switched off' }}
+              </span>
+            }
+          </div>
+        } @empty {
+          <div class="empty">No staff added yet.</div>
+        }
+      </div>
+      <div class="faint note">
+        Switch a person off when they leave. Their past entries stay in the records under their
+        name.
+      </div>
+    </section>
+
+    <section class="panel surf" id="f-sec">
+      <div class="panel-h">
+        <h2>Shared computer safety</h2>
+        <span class="pill p-wait">Coming later</span>
+      </div>
+      <div class="rulerow">
+        <span>
+          Everyone signs in with their own 4-digit PIN
+          <small class="faint">One reception computer, many users. The PIN tells the system who is working.</small>
+        </span>
+      </div>
+      <div class="rulerow">
+        <span>Lock the screen when no one uses it for a few minutes</span>
+      </div>
+      <div class="rulerow">
+        <span>
+          OTP to the owner's phone for refunds and data export
+          <small class="faint">Even if someone knows the owner's PIN</small>
+        </span>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel surf" id="f-perm">
+    <div class="panel-h">
+      <div>
+        <h2>Who can do what</h2>
+        <small class="faint">
+          The owner can always do everything.
+          @if (isOwner()) { Tap a box to allow or stop an action. } @else { Only the owner can change these. }
+        </small>
+      </div>
+    </div>
+    @if (permissionsError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    } @else {
+      <div class="tbl-wrap">
+        <table class="pmx">
+          <thead>
+            <tr>
+              <th scope="col">Action</th>
+              @for (column of permissionColumns; track column.role) {
+                <th scope="col">{{ column.label }}</th>
+              }
+              <th scope="col">Owner</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of permissionRows; track row.key) {
+              <tr>
+                <th scope="row">{{ row.label }}</th>
+                @for (column of permissionColumns; track column.role) {
+                  <td>
+                    <button
+                      type="button"
+                      class="tick"
+                      [attr.aria-pressed]="isAllowed(column.role, row.key)"
+                      [attr.aria-label]="row.label + ' · ' + column.label"
+                      [disabled]="!isOwner() || savingPermissions()"
+                      (click)="togglePermission(column.role, row.key)"
+                    >
+                      @if (isAllowed(column.role, row.key)) {
+                        <app-icon name="check" [size]="13" />
+                      }
+                    </button>
+                  </td>
+                }
+                <td>
+                  <span class="tick on lock" title="The owner can always do this">
+                    <app-icon name="check" [size]="13" />
+                    <span class="sr-only">Always allowed</span>
+                  </span>
+                </td>
+              </tr>
+            }
+            <tr>
+              <th scope="row">Change clinic setup</th>
+              @for (column of permissionColumns; track column.role) {
+                <td>—</td>
+              }
+              <td>
+                <span class="tick on lock" title="The owner can always do this">
+                  <app-icon name="check" [size]="13" />
+                  <span class="sr-only">Always allowed</span>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="notice info">
+        <app-icon name="shield" [size]="16" />
+        <span>{{ permissionSummary() }}. Changes apply straight away.</span>
+      </div>
+    }
+  </section>
+}

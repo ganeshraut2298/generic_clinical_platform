@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { shellGuard } from './core/shell/shell.guard';
 
 export const routes: Routes = [
   {
@@ -17,15 +18,12 @@ export const routes: Routes = [
     path: 'setup',
     title: 'Set up your clinic · Sahaj',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/setup/setup-placeholder.page').then((m) => m.SetupPlaceholderPage),
+    loadChildren: () => import('./features/setup/setup.routes').then((m) => m.SETUP_ROUTES),
   },
   {
     path: 'app',
-    title: 'Today · Sahaj',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/app-shell/app-placeholder.page').then((m) => m.AppPlaceholderPage),
+    canActivate: [authGuard, shellGuard],
+    loadChildren: () => import('./features/shell/shell.routes').then((m) => m.SHELL_ROUTES),
   },
   {
     path: 'admin',

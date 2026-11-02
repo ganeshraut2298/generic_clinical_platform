@@ -10,7 +10,13 @@ import com.sahaj.platform.infrastructure.security.ProblemJsonWriter;
 import com.sahaj.platform.infrastructure.security.RequestLogContextFilter;
 import com.sahaj.platform.web.Problems;
 import java.time.Clock;
+import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.config.Customizer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -99,6 +105,26 @@ public class SecurityConfig {
         return new JwtAuthenticationFilter(tokenService, activeMembershipChecker);
     }
 
+    /**
+     * Browser calls from another origin (for example the Angular dev page on localhost:4200 calling
+     * this API on localhost:8080). Allowed origins come only from {@code sahaj.cors.allowed-origins};
+     * the default is empty, so no cross-origin call is allowed unless a profile sets it.
+     */
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${sahaj.cors.allowed-origins:}") List<String> allowedOrigins) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(allowedOrigins.stream().filter(o -> !o.isBlank()).toList());
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        config.setExposedHeaders(List.of("Retry-After", "X-Request-Id"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return source;
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, ProblemJsonWriter problemWriter,
                                              JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
@@ -110,6 +136,7 @@ public class SecurityConfig {
                 problemWriter.write(response, Problems.forbidden());
 
         http
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)

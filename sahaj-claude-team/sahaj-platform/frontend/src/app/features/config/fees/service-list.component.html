@@ -1,0 +1,138 @@
+<section class="panel surf" id="f-serv">
+  <div class="panel-h">
+    <div>
+      <h2>Service price list</h2>
+      <small class="faint">
+        The front desk picks from this list at billing. Prices cannot be typed by hand. A removed
+        service stays on past bills.
+      </small>
+    </div>
+    @if (removedCount() > 0) {
+      <button mat-stroked-button type="button" [attr.aria-pressed]="showRemoved()" (click)="toggleRemoved()">
+        {{ showRemoved() ? 'Hide removed services' : 'Show removed services (' + removedCount() + ')' }}
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="muted" aria-busy="true">Loading the price list</p>
+  } @else if (loadError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  } @else {
+    @if (rowError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+    <div class="servlist">
+      @for (service of visible(); track service.id ?? service.name) {
+        <div class="srv" [class.off]="service.active === false">
+          <input
+            class="input name"
+            [value]="service.name"
+            maxlength="120"
+            [disabled]="!isOwner() || service.active === false || busyId() === service.id"
+            [attr.aria-label]="'Name of ' + service.name"
+            (change)="rename(service, $any($event.target))"
+          />
+          <select
+            class="input cat"
+            [disabled]="!isOwner() || service.active === false || busyId() === service.id"
+            [attr.aria-label]="'Category of ' + service.name"
+            (change)="recategorise(service, $any($event.target).value)"
+          >
+            @for (category of categories; track category) {
+              <option [value]="category" [selected]="category === service.category">{{ category }}</option>
+            }
+          </select>
+          <span class="rs">
+            ₹<input
+              class="input num"
+              type="number"
+              min="0"
+              step="10"
+              [value]="service.priceRupees"
+              [disabled]="!isOwner() || service.active === false || busyId() === service.id"
+              [attr.aria-label]="'Price of ' + service.name"
+              (change)="reprice(service, $any($event.target))"
+            />
+          </span>
+          @if (isOwner()) {
+            @if (service.active === false) {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busyId() === service.id"
+                [attr.aria-label]="'Add ' + service.name + ' back'"
+                (click)="setActive(service, true)"
+              >
+                Add back
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="xbtn"
+                [disabled]="busyId() === service.id"
+                [attr.aria-label]="'Remove ' + service.name"
+                (click)="setActive(service, false)"
+              >
+                <app-icon name="x" [size]="14" />
+              </button>
+            }
+          }
+        </div>
+      } @empty {
+        <div class="empty">No services yet. Add the first one below.</div>
+      }
+    </div>
+
+    @if (isOwner()) {
+      <form class="srvadd" [formGroup]="addForm" (ngSubmit)="add()" novalidate>
+        <div class="f">
+          <input
+            class="input"
+            formControlName="name"
+            placeholder="New service, e.g. Suture removal"
+            aria-label="Service name"
+            maxlength="120"
+            autocomplete="off"
+          />
+          @if (nameError; as error) {
+            <small class="err-text" role="alert">{{ error }}</small>
+          }
+        </div>
+        <select class="input" formControlName="category" aria-label="Service category">
+          @for (category of categories; track category) {
+            <option [value]="category">{{ category }}</option>
+          }
+        </select>
+        <div class="f">
+          <input
+            class="input num"
+            type="number"
+            min="1"
+            formControlName="price"
+            placeholder="Price ₹"
+            aria-label="Service price"
+          />
+          @if (priceError; as error) {
+            <small class="err-text" role="alert">{{ error }}</small>
+          }
+        </div>
+        <button mat-flat-button type="submit" [disabled]="adding()">
+          <app-icon name="plus" [size]="15" /> Add service
+        </button>
+      </form>
+      @if (addError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    }
+  }
+</section>

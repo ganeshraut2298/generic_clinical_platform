@@ -1,0 +1,98 @@
+<div class="sheet-h">
+  <div>
+    <h2 id="pf-title">{{ data.familyMember ? 'Add family member' : 'New patient' }}</h2>
+    @if (data.familyMember) {
+      <p class="muted">Saved under the same mobile number, as part of this family.</p>
+    }
+  </div>
+  <button mat-icon-button type="button" (click)="close()" aria-label="Close">
+    <app-icon name="x" />
+  </button>
+</div>
+
+<form class="sheet-b" [formGroup]="form" (ngSubmit)="submit()" novalidate aria-labelledby="pf-title">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Full name</mat-label>
+    <input matInput formControlName="name" placeholder="e.g. Rohit Patil" autocomplete="off" />
+    @if (errorOf('name'); as error) {
+      <mat-error>{{ error }}</mat-error>
+    }
+  </mat-form-field>
+
+  <div class="row2">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Age</mat-label>
+      <input matInput class="num" formControlName="age" type="number" inputmode="numeric" placeholder="Years" min="0" max="120" />
+      @if (errorOf('age'); as error) {
+        <mat-error>{{ error }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="field">
+      <span id="pf-sex-label" class="field-label">Sex</span>
+      <mat-button-toggle-group class="seg" formControlName="sex" aria-labelledby="pf-sex-label">
+        <mat-button-toggle value="F">F</mat-button-toggle>
+        <mat-button-toggle value="M">M</mat-button-toggle>
+        <mat-button-toggle value="O">O</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+  </div>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Mobile</mat-label>
+    <input
+      matInput
+      class="num"
+      formControlName="mobile"
+      inputmode="numeric"
+      maxlength="10"
+      placeholder="10 digits"
+      autocomplete="off"
+    />
+    @if (errorOf('mobile'); as error) {
+      <mat-error>{{ error }}</mat-error>
+    }
+  </mat-form-field>
+
+  <div class="row2">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Area</mat-label>
+      <input matInput formControlName="area" placeholder="e.g. Kothrud" autocomplete="off" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Preferred language</mat-label>
+      <mat-select formControlName="language">
+        @for (lang of languages; track lang) {
+          <mat-option [value]="lang">{{ languageLabels[lang] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Allergy (if any)</mat-label>
+    <input matInput formControlName="allergy" placeholder="e.g. Penicillin" autocomplete="off" />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Long-term condition (if any)</mat-label>
+    <input matInput formControlName="chronic" placeholder="e.g. Diabetes" autocomplete="off" />
+  </mat-form-field>
+
+  <mat-slide-toggle formControlName="abhaLinked">ABHA linked</mat-slide-toggle>
+
+  @if (serverError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  <div class="sheet-f">
+    <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+    <button mat-flat-button type="submit" [disabled]="saving()">
+      {{ data.familyMember ? 'Add family member' : 'Register patient' }}
+    </button>
+  </div>
+</form>

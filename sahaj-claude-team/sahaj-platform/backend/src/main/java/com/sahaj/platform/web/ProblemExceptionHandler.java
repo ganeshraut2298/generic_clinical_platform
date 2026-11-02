@@ -1,14 +1,22 @@
 package com.sahaj.platform.web;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.sahaj.platform.api.ConflictException;
+import com.sahaj.platform.api.InvalidInputException;
 import com.sahaj.platform.api.NotFoundException;
 import com.sahaj.platform.application.AccessRefusedException;
 import com.sahaj.platform.application.ConsentRequiredException;
 import com.sahaj.platform.application.OtpInvalidException;
 import com.sahaj.platform.application.OtpLockedException;
 import com.sahaj.platform.application.OtpResendTooSoonException;
+import com.sahaj.platform.application.PlanLimitException;
 import com.sahaj.platform.application.RefreshInvalidException;
 import com.sahaj.platform.application.SelectionInvalidException;
+import com.sahaj.platform.application.SetupIncompleteException;
+import com.sahaj.platform.application.SetupStepInvalidException;
+import com.sahaj.platform.application.SlugTakenException;
+import com.sahaj.platform.application.TeamConflictException;
+import com.sahaj.platform.application.TeamInputInvalidException;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import java.net.URI;
@@ -145,6 +153,22 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(Problems.notFound(), new HttpHeaders());
     }
 
+    /** SAH-7: a clash with saved data (a service name or holiday date already used). */
+    @ExceptionHandler(ConflictException.class)
+    ResponseEntity<Object> handleConflict(ConflictException ex) {
+        return respond(Problems.of(HttpStatus.CONFLICT, ex.problemType(), ex.title(), ex.getMessage()),
+                new HttpHeaders());
+    }
+
+    /** SAH-7: a rule broken by a well formed request. The message is fixed text written by us, never the submitted value. */
+    @ExceptionHandler(InvalidInputException.class)
+    ResponseEntity<Object> handleInvalidInput(InvalidInputException ex) {
+        ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "validation", "Check the highlighted fields",
+                ex.getMessage());
+        problem.setProperty("fieldErrors", List.of(new Problems.FieldError(ex.field(), ex.getMessage())));
+        return respond(problem, new HttpHeaders());
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     ResponseEntity<Object> handleConstraintViolation(ConstraintViolationException ex) {
         List<Problems.FieldError> errors = new ArrayList<>();
@@ -177,7 +201,7 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(OtpResendTooSoonException.class)
     ResponseEntity<Object> handleOtpResendTooSoon(OtpResendTooSoonException ex) {
-        return respond(Problems.tooManyRequests(ex.retryAfterSeconds()), new HttpHeaders());
+        return respond(Problems.otpResendTooSoon(ex.retryAfterSeconds()), new HttpHeaders());
     }
 
     @ExceptionHandler(OtpInvalidException.class)
@@ -210,6 +234,49 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
                 new HttpHeaders());
     }
 
+    @ExceptionHandler(PlanLimitException.class)
+    ResponseEntity<Object> handlePlanLimit(PlanLimitException ex) {
+        return respond(Problems.of(HttpStatus.CONFLICT, "plan-limit", "Your plan limit was reached", ex.getMessage()),
+                new HttpHeaders());
+    }
+
+    @ExceptionHandler(SlugTakenException.class)
+    ResponseEntity<Object> handleSlugTaken(SlugTakenException ex) {
+        return respond(Problems.of(HttpStatus.CONFLICT, "slug-taken", "That web address was just taken",
+                ex.getMessage()), new HttpHeaders());
+    }
+
+    @ExceptionHandler(SetupIncompleteException.class)
+    ResponseEntity<Object> handleSetupIncomplete(SetupIncompleteException ex) {
+        return respond(Problems.of(HttpStatus.BAD_REQUEST, "setup-incomplete", "Finish every step first",
+                ex.getMessage()), new HttpHeaders());
+    }
+
+    @ExceptionHandler(SetupStepInvalidException.class)
+    ResponseEntity<Object> handleSetupStepInvalid(SetupStepInvalidException ex) {
+        return respond(Problems.of(HttpStatus.BAD_REQUEST, "validation", "Check the highlighted fields",
+                ex.getMessage()), new HttpHeaders());
+    }
+
+    @ExceptionHandler(TeamConflictException.class)
+    ResponseEntity<Object> handleTeamConflict(TeamConflictException ex) {
+        ProblemDetail problem = switch (ex.kind()) {
+            case LAST_OWNER -> Problems.of(HttpStatus.CONFLICT, "last-owner", "Your clinic needs an owner",
+                    "Your clinic must keep at least one active owner. Make someone else an owner first.");
+            case DUPLICATE_MOBILE -> Problems.of(HttpStatus.CONFLICT, "duplicate-mobile",
+                    "That person is already on your team", "This mobile number is already on your team.");
+            case CONCURRENT_CHANGE -> Problems.of(HttpStatus.CONFLICT, "concurrent-change",
+                    "The team just changed", "Someone changed the team at the same time. Try again.");
+        };
+        return respond(problem, new HttpHeaders());
+    }
+
+    @ExceptionHandler(TeamInputInvalidException.class)
+    ResponseEntity<Object> handleTeamInputInvalid(TeamInputInvalidException ex) {
+        return respond(Problems.of(HttpStatus.BAD_REQUEST, "validation", "Check the highlighted fields",
+                ex.getMessage()), new HttpHeaders());
+    }
+
     /** A signed-out visitor is told to sign in (401); a signed-in user without permission gets 403. */
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<Object> handleAccessDenied(AccessDeniedException ex) {
@@ -224,8 +291,39 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
         while (root.getCause() != null && root.getCause() != root) {
             root = root.getCause();
         }
-        log.error("Unhandled error type={} rootCause={}", ex.getClass().getName(), root.getClass().getName());
+        log.error("Unhandled error type={} rootCause={} sqlState={} dbError={} at={}", ex.getClass().getName(),
+                root.getClass().getName(), sqlState(root), primaryDbMessage(root), firstSahajFrame(ex));
         return respond(Problems.internal(), new HttpHeaders());
+    }
+
+    private static String sqlState(Throwable root) {
+        return root instanceof java.sql.SQLException sql ? sql.getSQLState() : "-";
+    }
+
+    /**
+     * Only the first line of a database error: the primary message ("relation x does not exist"). The
+     * detail lines of a constraint error can quote the row's values, so they are never logged.
+     */
+    private static String primaryDbMessage(Throwable root) {
+        if (!(root instanceof java.sql.SQLException) || root.getMessage() == null) {
+            return "-";
+        }
+        String message = root.getMessage();
+        int newline = message.indexOf('\n');
+        return newline < 0 ? message : message.substring(0, newline);
+    }
+
+    private static String firstSahajFrame(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            for (StackTraceElement frame : current.getStackTrace()) {
+                if (frame.getClassName().startsWith("com.sahaj.")) {
+                    return frame.getClassName() + ":" + frame.getLineNumber();
+                }
+            }
+            current = current.getCause() == current ? null : current.getCause();
+        }
+        return "-";
     }
 
     private static ResponseEntity<Object> respond(ProblemDetail problem, HttpHeaders headers) {

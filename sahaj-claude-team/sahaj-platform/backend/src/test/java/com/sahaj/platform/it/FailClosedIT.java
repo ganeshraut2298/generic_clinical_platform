@@ -102,16 +102,19 @@ class FailClosedIT extends BaseIntegrationTest {
     @Test
     void directInsertsWithNoTenantBoundAreRefusedByRowLevelSecurity() {
         UUID wanted = UUID.randomUUID();
+        // Spring wraps the PSQLException in a BadSqlGrammarException: the "row-level security"
+        // text is on the PostgreSQL cause, not the wrapper's own message, so check the full chain
+        // (the printed stack trace, which includes every "Caused by:" message).
         assertThatThrownBy(() -> runAs(signedInWithoutTenant(), () -> tx().executeWithoutResult(s ->
                 jdbc.sql("insert into platform.tenant (id, name) values (:id, 'No tenant bound')").param("id", wanted).update())))
                 .isInstanceOf(DataAccessException.class)
-                .hasMessageContaining("row-level security");
+                .hasStackTraceContaining("row-level security");
 
         // The same with no security context at all.
         assertThatThrownBy(() -> tx().executeWithoutResult(s ->
                 jdbc.sql("insert into platform.tenant (id, name) values (:id, 'No user at all')").param("id", UUID.randomUUID()).update()))
                 .isInstanceOf(DataAccessException.class)
-                .hasMessageContaining("row-level security");
+                .hasStackTraceContaining("row-level security");
     }
 
     @Test
@@ -134,9 +137,10 @@ class FailClosedIT extends BaseIntegrationTest {
     @Test
     void aDeleteWithNoTenantBoundIsRefused() {
         // sahaj_app has no DELETE privilege on tenant at all (a tenant is closed through status).
+        // Same wrapping as above: check the full chain, not just the wrapper's own message.
         assertThatThrownBy(() -> runAs(signedInWithoutTenant(), () -> tx().executeWithoutResult(s ->
                 jdbc.sql("delete from platform.tenant where id = :id").param("id", tenantA).update())))
                 .isInstanceOf(DataAccessException.class)
-                .hasMessageContaining("permission denied");
+                .hasStackTraceContaining("permission denied");
     }
 }

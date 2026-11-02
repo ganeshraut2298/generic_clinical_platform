@@ -87,6 +87,28 @@ class AuditSanitizerTest {
     }
 
     @Test
+    void redactsABarePatientNameOnlyForEntityTypePatient() {
+        Map<String, Object> patientResult = AuditSanitizer.sanitize("PATIENT",
+                Map.of("name", "Asha Rao", "mobile", "9123457410", "uhid", "PT-00001"));
+        Map<String, Object> tenantResult = AuditSanitizer.sanitize("TENANT", Map.of("name", "Sahaj Clinic"));
+
+        assertThat(patientResult.get("name")).isEqualTo(AuditSanitizer.REDACTED);
+        assertThat(patientResult.get("mobile")).isEqualTo("••••••7410");
+        assertThat(patientResult.get("uhid")).isEqualTo("PT-00001");
+        assertThat(tenantResult.get("name")).isEqualTo("Sahaj Clinic");
+    }
+
+    @Test
+    void redactsABareNameForEntityTypeVisitTooButKeepsThePatientId() {
+        Map<String, Object> visitResult = AuditSanitizer.sanitize("VISIT",
+                Map.of("name", "Asha Rao", "patientId", "p1", "stage", "WAITING"));
+
+        assertThat(visitResult.get("name")).isEqualTo(AuditSanitizer.REDACTED);
+        assertThat(visitResult.get("patientId")).isEqualTo("p1");
+        assertThat(visitResult.get("stage")).isEqualTo("WAITING");
+    }
+
+    @Test
     void walksListsOfListsAsWellAsListsOfMaps() {
         Map<String, Object> result = AuditSanitizer.sanitize(Map.of(
                 "rows", List.of(List.of("plain", "9123457410"), List.of(Map.of("mobile", "9000000001")))));

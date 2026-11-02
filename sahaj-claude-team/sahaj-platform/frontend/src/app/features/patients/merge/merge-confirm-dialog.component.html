@@ -1,0 +1,50 @@
+<div class="sheet-h">
+  <div>
+    <h2 id="merge-title">Merge duplicate records</h2>
+    <p class="muted">The second record was probably created with a spelling mistake at the front desk.</p>
+  </div>
+  <button mat-icon-button type="button" (click)="close()" aria-label="Close">
+    <app-icon name="x" />
+  </button>
+</div>
+
+<div class="sheet-b" aria-labelledby="merge-title">
+  <div class="dupg">
+    <div>
+      <span class="eyebrow">Keep</span>
+      <div class="dupc">
+        <b>{{ data.keep.name }}</b>
+        <small class="num">{{ data.keep.uhid }}</small>
+        <div class="rulerow"><span>Age</span><b>{{ data.keep.age }} {{ data.keep.sex }}</b></div>
+        <div class="rulerow"><span>Mobile</span><b class="num">{{ data.keep.mobile }}</b></div>
+      </div>
+    </div>
+    <div>
+      <span class="eyebrow">Merge into it</span>
+      <div class="dupc">
+        <b>{{ data.mergeInto.name }}</b>
+        <small class="num">{{ data.mergeInto.uhid }}</small>
+        <div class="rulerow"><span>Age</span><b>{{ data.mergeInto.age }} {{ data.mergeInto.sex }}</b></div>
+        <div class="rulerow"><span>Mobile</span><b class="num">{{ data.mergeInto.mobile }}</b></div>
+      </div>
+    </div>
+  </div>
+  <div class="notice info">
+    <app-icon name="history" [size]="16" />
+    <span>
+      {{ data.mergeInto.uhid }} moves onto {{ data.keep.uhid }}. The merge is logged and can be
+      reversed by the owner.
+    </span>
+  </div>
+  @if (error(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  }
+</div>
+
+<div class="sheet-f">
+  <button mat-stroked-button type="button" (click)="close()">Not the same person</button>
+  <button mat-flat-button type="button" [disabled]="merging()" (click)="confirm()">Merge records</button>
+</div>

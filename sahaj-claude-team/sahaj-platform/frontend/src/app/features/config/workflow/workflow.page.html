@@ -1,0 +1,110 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading the OPD workflow</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else {
+  @if (!isOwner()) {
+    <div class="notice info">
+      <app-icon name="lock" [size]="16" />
+      <span>Only the owner can change the OPD workflow. You can see the steps below.</span>
+    </div>
+  }
+  <div class="grid2" id="f-wf">
+    <section class="panel surf">
+      <div class="panel-h">
+        <div>
+          <h2>Steps for a new visit</h2>
+          <div class="faint" style="font-size: 0.82rem">
+            Switch steps on or off and choose who owns Vitals and Counselling. Locked steps are always on.
+          </div>
+        </div>
+      </div>
+      <div class="steps">
+        @for (key of stepOrder; track key) {
+          @if (stepFor(key); as step) {
+            <div class="srow" [class.off]="!step.on">
+              <div class="d">
+                <b>{{ stepMeta[key].label }}</b>
+                @if (stepMeta[key].fixed) {
+                  <app-icon name="lock" [size]="12" class="faint" />
+                }
+                <small>{{ stepMeta[key].description }}</small>
+              </div>
+              @if (stepMeta[key].hasOwner) {
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ownersel">
+                  <mat-label>Owner</mat-label>
+                  <mat-select
+                    [value]="step.owner"
+                    [disabled]="!isOwner() || stepMeta[key].fixed || saving()"
+                    [attr.aria-label]="'Owner of ' + stepMeta[key].label"
+                    (selectionChange)="setOwner(key, $event.value)"
+                  >
+                    @for (choice of ownerChoices; track choice.value) {
+                      <mat-option [value]="choice.value">{{ choice.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              } @else {
+                <span></span>
+              }
+              <button
+                type="button"
+                class="sw"
+                role="switch"
+                [attr.aria-checked]="step.on"
+                [attr.aria-label]="stepMeta[key].label + ' on or off'"
+                [disabled]="!isOwner() || stepMeta[key].fixed || saving()"
+                (click)="toggleStep(key)"
+              ></button>
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <div class="page" style="gap: 12px">
+      <section class="panel surf">
+        <div class="panel-h">
+          <h2>Flow preview</h2>
+          @if (current(); as c) {
+            <span class="pill" [class.p-warn]="dirty()" [class.p-good]="!dirty()">
+              {{ dirty() ? 'Draft · not published' : 'Live · v' + c.versionNo }}
+            </span>
+          }
+        </div>
+        <div class="flow">
+          @for (step of onSteps(); track step.key; let i = $index) {
+            @if (i) {
+              <span class="ar"><app-icon name="arrow" [size]="14" /></span>
+            }
+            <span class="fs">{{ stepMeta[step.key].label }}<small>{{ ownerLabel(step.owner) }}</small></span>
+          }
+        </div>
+        <div class="faint" style="font-size: 0.8rem">{{ onSteps().length }} steps · handled by {{ owners().join(', ') }}</div>
+        @if (current(); as c) {
+          <div class="notice info">
+            <app-icon name="clock" [size]="16" />
+            <span>Changes apply to new tokens only. Patients already in the OPD finish on v{{ c.versionNo }}.</span>
+          </div>
+        }
+        <div class="actions" style="justify-content: flex-end">
+          <button mat-stroked-button type="button" [disabled]="!dirty() || !isOwner() || saving()" (click)="discard()">
+            Discard
+          </button>
+          @if (current(); as c) {
+            <button mat-flat-button type="button" [disabled]="!dirty() || !isOwner() || publishing()" (click)="publish()">
+              Publish v{{ c.versionNo + 1 }}
+            </button>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+}

@@ -40,17 +40,20 @@ public class AuthTransactionalOps {
     private final TenantRepository tenantRepository;
     private final ConsentRecordRepository consentRecordRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SetupProgressRepository setupProgressRepository;
     private final AuditLog auditLog;
     private final Clock clock;
 
     public AuthTransactionalOps(AppUserRepository appUserRepository, MembershipRepository membershipRepository,
                                  TenantRepository tenantRepository, ConsentRecordRepository consentRecordRepository,
-                                 RefreshTokenRepository refreshTokenRepository, AuditLog auditLog, Clock clock) {
+                                 RefreshTokenRepository refreshTokenRepository,
+                                 SetupProgressRepository setupProgressRepository, AuditLog auditLog, Clock clock) {
         this.appUserRepository = appUserRepository;
         this.membershipRepository = membershipRepository;
         this.tenantRepository = tenantRepository;
         this.consentRecordRepository = consentRecordRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.setupProgressRepository = setupProgressRepository;
         this.auditLog = auditLog;
         this.clock = clock;
     }
@@ -78,10 +81,11 @@ public class AuthTransactionalOps {
                                       Instant refreshExpiresAt) {
         Instant now = clock.instant();
         Instant planEndsAt = now.atZone(ZoneOffset.UTC).plus(FREE_PLAN_DURATION).toInstant();
-        tenantRepository.insert(tenantId, NEW_TENANT_PLACEHOLDER_NAME, planEndsAt);
+        tenantRepository.insert(tenantId, NEW_TENANT_PLACEHOLDER_NAME, now, planEndsAt);
         appUserRepository.insert(userId, mobile, NEW_OWNER_PLACEHOLDER_NAME);
         UUID membershipId = UUID.randomUUID();
         membershipRepository.insert(membershipId, tenantId, userId, MembershipRole.OWNER, now);
+        setupProgressRepository.createInitial(tenantId);
         consentRecordRepository.insert(userId, termsVersion, privacyVersion, sourceIp);
         refreshTokenRepository.insert(tenantId, userId, refreshTokenHash, refreshExpiresAt);
         auditLog.record("SIGN_UP", "TENANT", tenantId, null,
@@ -96,6 +100,16 @@ public class AuthTransactionalOps {
         membershipRepository.touchLastLogin(membershipId, now);
         refreshTokenRepository.insert(tenantId, userId, refreshTokenHash, refreshExpiresAt);
         auditLog.record("SIGN_IN", "APP_USER", userId, null, Map.of("mobile", mobile, "tenantId", tenantId.toString()));
+    }
+
+    /**
+     * SAH-4: an owner who left the setup wizard partway through must return to it on their next
+     * login instead of opening the app (closes the gap SAH-3 left open). Needs {@code app.tenant_id}
+     * bound to this same tenant.
+     */
+    @Transactional
+    public boolean isSetupComplete(UUID tenantId) {
+        return setupProgressRepository.isComplete(tenantId);
     }
 
     /** AC15, step 1: revokes every refresh token for the user, across every tenant. */
@@ -133,8 +147,12 @@ public class AuthTransactionalOps {
         return appUserRepository.findById(userId);
     }
 
-    /** Needs {@code app.tenant_id} bound to {@code tenantId} ({@code runAsTenantOnly}); no audit. */
-    @Transactional
+    /**
+     * Needs {@code app.tenant_id} bound to {@code tenantId} ({@code runAsTenantOnly}); no audit.
+     * {@link RefreshInvalidException} must not roll back: when a rotated-out token is reused, the
+     * revoke of every session has to be saved even though the call then fails.
+     */
+    @Transactional(noRollbackFor = RefreshInvalidException.class)
     public RefreshRotationResult rotateRefreshToken(UUID tenantId, String oldTokenHash, String newTokenHash,
                                                       Instant newExpiresAt) {
         Instant now = clock.instant();

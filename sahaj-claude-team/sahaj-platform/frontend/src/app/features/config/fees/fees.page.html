@@ -1,0 +1,178 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading fees and billing</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else if (settings(); as s) {
+  <div class="grid2">
+    <section class="panel surf" id="f-fee">
+      <h2>Consultation fees</h2>
+      <div>
+        <span class="field-label" id="fee-timing-label">When is the fee collected?</span>
+        <mat-button-toggle-group
+          class="seg"
+          aria-labelledby="fee-timing-label"
+          [hideSingleSelectionIndicator]="true"
+          [value]="s.feeTiming"
+          [disabled]="!isOwner()"
+          (change)="setTiming($event.value)"
+        >
+          @for (timing of timings; track timing.value) {
+            <mat-button-toggle [value]="timing.value">{{ timing.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+        <div class="hint">{{ timingHint() }}</div>
+      </div>
+      <div class="list">
+        @for (doctor of doctors(); track doctor.id) {
+          <div class="li">
+            <div class="main">
+              <b>{{ doctor.name }}</b>
+              <small>
+                Follow-up within {{ s.followUpDays }} days:
+                {{ followUpAmount(s.followUpFee, doctor.doctor?.feeRupees ?? 0) }}
+              </small>
+            </div>
+            <span class="rs" title="New visit fee">
+              ₹<input
+                class="input num"
+                type="number"
+                min="0"
+                step="50"
+                [value]="doctor.doctor?.feeRupees ?? 0"
+                [disabled]="!isOwner() || savingDoctorId() === doctor.id"
+                [attr.aria-label]="doctor.name + ' new visit fee'"
+                (change)="saveDoctorFee(doctor, $any($event.target))"
+              />
+            </span>
+          </div>
+        } @empty {
+          <div class="empty">
+            {{ doctorsError() ?? 'No doctors added yet. Add a doctor in Team and access.' }}
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="panel surf" id="f-fu">
+      <h2>Follow-up rule</h2>
+      <div class="rulerow">
+        <span class="muted" id="fu-days-label">Valid for</span>
+        <div class="stepper" role="group" aria-labelledby="fu-days-label">
+          <button
+            type="button"
+            aria-label="Fewer days"
+            [disabled]="!isOwner() || s.followUpDays <= minDays"
+            (click)="stepDays(-1)"
+          >
+            −
+          </button>
+          <span class="num" aria-live="polite">{{ s.followUpDays }} days</span>
+          <button
+            type="button"
+            aria-label="More days"
+            [disabled]="!isOwner() || s.followUpDays >= maxDays"
+            (click)="stepDays(1)"
+          >
+            +
+          </button>
+        </div>
+      </div>
+      <div class="rulerow">
+        <span class="muted" id="fu-fee-label">Fee within the window</span>
+        <mat-button-toggle-group
+          class="seg"
+          aria-labelledby="fu-fee-label"
+          [hideSingleSelectionIndicator]="true"
+          [value]="s.followUpFee"
+          [disabled]="!isOwner()"
+          (change)="setFollowUpFee($event.value)"
+        >
+          @for (fee of followUpFees; track fee.value) {
+            <mat-button-toggle [value]="fee.value">{{ fee.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+      </div>
+      @if (example(); as ex) {
+        <div class="example" aria-live="polite">
+          <b>Example</b>
+          A patient sees {{ ex.doctor }} today, {{ ex.today }}. If they come back by
+          <b>{{ ex.until }}</b>, they pay <b>{{ ex.pays }}</b
+          >. From {{ ex.from }}, it is a new visit at {{ ex.newVisit }}.
+        </div>
+      } @else {
+        <div class="example">
+          <b>Example</b>
+          Set a doctor's new-visit fee to see how the follow-up rule works.
+        </div>
+      }
+      <div class="notice teal">
+        <app-icon name="print" [size]="16" />
+        <span>
+          Printed on the case paper. The front desk sees it automatically when the patient returns,
+          with no arguments at the counter.
+        </span>
+      </div>
+    </section>
+  </div>
+
+  <app-service-list />
+
+  <div class="grid2">
+    <section class="panel surf" id="f-disc">
+      <h2>Discount limits by role</h2>
+      @for (item of discountRoles; track item.role) {
+        <div class="limit">
+          <label [for]="'limit-' + item.role">
+            {{ item.label }}
+            <span class="faint small">
+              · {{ item.role === 'OWNER' ? 'no approval needed' : 'above this needs owner approval' }}
+            </span>
+          </label>
+          <span class="rs">
+            <input
+              class="input num"
+              type="number"
+              min="0"
+              max="100"
+              [id]="'limit-' + item.role"
+              [value]="limitOf(item.role)"
+              [disabled]="!isOwner()"
+              (change)="setLimit(item.role, $any($event.target))"
+            />%
+          </span>
+        </div>
+      }
+      <div class="faint small">Every discount needs a reason, and the reason shows in Revenue.</div>
+    </section>
+
+    <section class="panel surf" id="f-bill">
+      <h2>Bill format</h2>
+      <div class="rulerow">
+        <span>UPI QR printed on the bill</span>
+        <button
+          type="button"
+          class="sw"
+          role="switch"
+          aria-label="UPI QR on bill"
+          [attr.aria-checked]="s.upiOnBill"
+          [disabled]="!isOwner()"
+          (click)="toggleUpi()"
+        ></button>
+      </div>
+      <div class="rulerow">
+        <span>
+          Bills are never deleted, only cancelled with a reason
+          <small class="faint">Keeps the bill series unbroken for your CA</small>
+        </span>
+        <span class="pill p-good"><app-icon name="lock" [size]="12" /> Always on</span>
+      </div>
+    </section>
+  </div>
+}

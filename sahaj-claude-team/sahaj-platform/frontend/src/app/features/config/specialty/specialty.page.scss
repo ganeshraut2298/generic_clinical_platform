@@ -1,0 +1,49 @@
+@use '../config-common';
+
+.intro {
+  font-size: 0.82rem;
+  margin-top: 2px;
+}
+
+.specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.spec {
+  text-align: left;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--ink);
+
+  &[aria-pressed='true'] {
+    border: 2px solid var(--pri);
+    padding: 15px;
+  }
+  &:disabled {
+    cursor: not-allowed;
+  }
+  &:disabled:not([aria-pressed='true']) {
+    opacity: 0.6;
+  }
+  ul {
+    margin: 0;
+    padding-left: 16px;
+    color: var(--ink-2);
+    font-size: 0.8rem;
+  }
+}
+
+.spec-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
