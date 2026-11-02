@@ -1,0 +1,25 @@
+@use '@angular/material' as mat;
+@use './styles/tokens';
+@use './styles/primitives';
+
+// Custom M3 theme. The palettes are only the base; tokens.scss overrides the system
+// variables with the Sahaj colours, so light/dark and the clinic brand colour apply.
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: (
+        plain-family: 'Figtree, "Noto Sans Devanagari", system-ui, sans-serif',
+        brand-family: 'Figtree, "Noto Sans Devanagari", system-ui, sans-serif',
+        bold-weight: 700,
+        medium-weight: 600,
+        regular-weight: 400,
+      ),
+      density: 0,
+    )
+  );
+}

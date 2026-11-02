@@ -1,0 +1,112 @@
+@use '../config-common';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+// `.grid2`, `.panel`, `.rulerow`, `.stepper` and `.sw` come from `config-common` (`@use` above).
+// `.even` is only a naming hint used elsewhere in the mockup; no extra rule is needed for it.
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+}
+
+.sessrow {
+  flex-wrap: nowrap;
+}
+
+.tm {
+  min-width: 0;
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dayb {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 0.8rem;
+  min-height: 40px;
+
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 3px;
+
+  button {
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: var(--r-pill);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    min-height: 38px;
+
+    &[aria-pressed='true'] {
+      background: var(--pri-soft);
+      color: var(--pri-text);
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.notice.info {
+  background: var(--sec-soft);
+  color: var(--sec);
+}
+
+.notice.err {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.sm {
+  font-size: 0.8rem;
+}
+
+.empty {
+  color: var(--ink-3);
+  font-size: 0.86rem;
+  padding: 10px 0;
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 960px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}

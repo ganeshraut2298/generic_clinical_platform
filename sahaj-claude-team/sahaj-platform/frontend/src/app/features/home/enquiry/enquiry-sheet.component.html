@@ -1,0 +1,86 @@
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <div class="sheet-h">
+    <div>
+      <h2 mat-dialog-title id="enquiry-title">{{ copy.title }}</h2>
+      <p class="muted lead">{{ copy.lead }}</p>
+    </div>
+    <button mat-button type="button" class="close" aria-label="Close" (click)="close()">
+      <app-icon name="x" />
+    </button>
+  </div>
+
+  <mat-dialog-content class="sheet-b">
+    <mat-form-field appearance="outline">
+      <mat-label>Your name</mat-label>
+      <input
+        matInput
+        formControlName="name"
+        placeholder="Dr. full name"
+        autocomplete="name"
+        [attr.maxlength]="nameMax"
+        aria-required="true"
+      />
+      @if (errorOf('name'); as message) {
+        <mat-error>{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Clinic name and city</mat-label>
+      <input
+        matInput
+        formControlName="clinicCity"
+        placeholder="e.g. Shree Sai Family Clinic, Pune"
+        autocomplete="organization"
+        [attr.maxlength]="cityMax"
+      />
+      @if (errorOf('clinicCity'); as message) {
+        <mat-error>{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Mobile number</mat-label>
+      <span matTextPrefix class="prefix">+91&nbsp;</span>
+      <input
+        matInput
+        formControlName="mobile"
+        inputmode="numeric"
+        autocomplete="tel-national"
+        maxlength="11"
+        aria-required="true"
+      />
+      @if (errorOf('mobile'); as message) {
+        <mat-error>{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="field">
+      <span class="label" id="besttime-label">Best time to call</span>
+      <mat-button-toggle-group
+        class="seg"
+        formControlName="bestTime"
+        aria-labelledby="besttime-label"
+        hideSingleSelectionIndicator
+      >
+        @for (option of bestTimes; track option.value) {
+          <mat-button-toggle [value]="option.value">{{ option.label }}</mat-button-toggle>
+        }
+      </mat-button-toggle-group>
+    </div>
+
+    @if (failure(); as message) {
+      <div class="notice failure" role="alert">
+        <app-icon name="x" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="sheet-f">
+    <button mat-button type="button" (click)="close()">Cancel</button>
+    <button mat-flat-button type="submit" [disabled]="state() === 'sending'">
+      {{ state() === 'sending' ? 'Sending…' : 'Request a call' }}
+    </button>
+  </mat-dialog-actions>
+</form>

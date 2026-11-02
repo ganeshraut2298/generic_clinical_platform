@@ -1,0 +1,277 @@
+:host {
+  display: block;
+}
+
+.calc {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.calc-in {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.calc-out {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: calc(84px + env(safe-area-inset-top, 0px));
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.cmpopts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.cmpopt {
+  text-align: left;
+  padding: 12px 14px;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  small {
+    color: var(--ink-3);
+    font-size: 0.78rem;
+  }
+  &[aria-pressed='true'] {
+    border: 2px solid var(--pri);
+    padding: 11px 13px;
+    background: var(--pri-soft);
+  }
+}
+
+.sliders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+.sl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sl-h {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-2);
+
+  output {
+    color: var(--pri-text);
+    font-weight: 700;
+  }
+}
+.prefix {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.assume {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--glass-hi);
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-2);
+    min-height: 32px;
+  }
+}
+.assume-body {
+  margin-top: 12px;
+}
+
+.between {
+  justify-content: space-between;
+}
+.hint {
+  font-size: 0.78rem;
+}
+
+.cmptbl {
+  min-width: 460px;
+
+  td:first-child {
+    width: 56%;
+  }
+  tr.grp th {
+    padding-top: 14px;
+    color: var(--pri-text);
+  }
+}
+
+.tri {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  min-height: 32px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  min-width: 72px;
+
+  &.t2 {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+  &.t1 {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &.t0 {
+    background: var(--muted-soft);
+    color: var(--ink-3);
+  }
+}
+button.tri:hover {
+  border-color: var(--line);
+}
+
+.big-line {
+  font-weight: 700;
+  font-size: 1.55rem;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+
+  em {
+    font-style: normal;
+    color: var(--pri-text);
+  }
+}
+
+.cbars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cb-h {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-3);
+  font-weight: 600;
+
+  &.second {
+    margin-top: 6px;
+  }
+}
+.cbar {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 84px;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.84rem;
+
+  b {
+    text-align: right;
+  }
+}
+.track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--muted-soft);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--pri);
+    transition: width 0.3s ease;
+
+    &.cur {
+      background: var(--ink-3);
+    }
+  }
+}
+
+.ctiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.ctile {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--glass-hi);
+  border: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  small {
+    font-size: 0.8rem;
+    color: var(--ink-2);
+  }
+  small.faint {
+    color: var(--ink-3);
+  }
+}
+.serif-num {
+  font-weight: 700;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--pri-text);
+}
+
+.adds {
+  margin-top: 8px;
+}
+.more {
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+.estimate {
+  font-size: 0.74rem;
+}
+
+@media (max-width: 980px) {
+  .calc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .calc-out {
+    position: static;
+  }
+}
+
+@media (max-width: 620px) {
+  .cmpopts,
+  .sliders {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

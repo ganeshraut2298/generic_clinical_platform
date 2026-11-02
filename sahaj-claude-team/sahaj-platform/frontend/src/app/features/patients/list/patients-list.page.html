@@ -1,0 +1,135 @@
+<div class="pagehead">
+  <div>
+    <h1>Patients</h1>
+    <p class="lead">Every patient registered at the clinic, grouped by family under one mobile number.</p>
+  </div>
+  @if (canWrite()) {
+    <button mat-flat-button type="button" (click)="openNewPatient()">
+      <app-icon name="plus" [size]="16" /> New patient
+    </button>
+  }
+</div>
+
+<section class="kpis">
+  <div class="kpi surf">
+    <span class="eyebrow">Registered patients</span>
+    <span class="v num">{{ registeredCount().toLocaleString('en-IN') }}</span>
+  </div>
+  <div class="kpi surf">
+    <span class="eyebrow">Seen in the last 30 days</span>
+    <span class="v num">0</span>
+    <span class="s">Available once visits exist</span>
+  </div>
+  <div class="kpi surf">
+    <span class="eyebrow">Follow-ups pending</span>
+    <span class="v num">0</span>
+    <span class="s">Available once visits exist</span>
+  </div>
+  <div class="kpi surf">
+    <span class="eyebrow">Long-term care</span>
+    <span class="v num">0</span>
+    <span class="s">Available once visits exist</span>
+  </div>
+</section>
+
+@if (duplicatePair(); as pair) {
+  <div class="notice warn">
+    <app-icon name="users" [size]="16" />
+    <span class="flex1">
+      <b>Possible duplicate:</b> {{ pair.keep.name }} ({{ pair.keep.uhid }}) and {{ pair.mergeInto.name }}
+      ({{ pair.mergeInto.uhid }}) have the same mobile number, age and a similar name.
+    </span>
+    <button mat-stroked-button type="button" (click)="reviewAndMerge()">Review and merge</button>
+    <button mat-icon-button type="button" aria-label="Dismiss" (click)="dismissDuplicate()">
+      <app-icon name="x" [size]="14" />
+    </button>
+  </div>
+}
+
+<section class="panel surf">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search">
+    <mat-label>Search by name, mobile or patient ID</mat-label>
+    <input
+      matInput
+      type="search"
+      autocomplete="off"
+      [value]="query()"
+      (input)="onSearchInput($any($event.target).value)"
+    />
+  </mat-form-field>
+
+  <div class="chips">
+    @for (f of filters; track f.key) {
+      <button
+        type="button"
+        class="chipf"
+        [attr.aria-pressed]="activeFilter() === f.key"
+        (click)="selectFilter(f.key)"
+      >
+        {{ f.label }}
+        <span class="num">{{ (counts()[f.key] ?? 0).toLocaleString('en-IN') }}</span>
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="muted" aria-busy="true">Loading patients</p>
+  } @else if (loadError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  } @else if (items().length) {
+    <div class="list">
+      @for (patient of items(); track patient.id) {
+        <button type="button" class="li" (click)="openRecord(patient)">
+          <span class="av">{{ initials(patient.name) }}</span>
+          <div class="main">
+            <b>{{ patient.name }}</b>
+            <small>
+              {{ patient.age }} {{ patient.sex }} · {{ patient.uhid }} · {{ patient.mobile }}
+            </small>
+          </div>
+          @if (patient.chronic) {
+            <span class="pill p-warn">Long-term: {{ patient.chronic }}</span>
+          }
+          <span class="faint visit">No visits yet</span>
+          <app-icon name="chevR" [size]="16" />
+        </button>
+      }
+    </div>
+    <div class="pager">
+      <span class="faint">
+        Showing {{ page() * items().length + 1 }}–{{ page() * items().length + items().length }} of
+        {{ total().toLocaleString('en-IN') }}
+      </span>
+      <div class="row">
+        <button
+          mat-icon-button
+          type="button"
+          aria-label="Previous page"
+          [disabled]="page() === 0"
+          (click)="changePage(-1)"
+        >
+          <app-icon name="chevL" [size]="16" />
+        </button>
+        <button
+          mat-icon-button
+          type="button"
+          aria-label="Next page"
+          [disabled]="(page() + 1) * items().length >= total()"
+          (click)="changePage(1)"
+        >
+          <app-icon name="chevR" [size]="16" />
+        </button>
+      </div>
+    </div>
+  } @else {
+    <div class="empty">
+      No patient matches{{ query() ? ' "' + query() + '"' : '' }}.
+      @if (canWrite()) {
+        <button type="button" class="linkbtn" (click)="openNewPatient()">Register a new patient</button>.
+      }
+    </div>
+  }
+</section>

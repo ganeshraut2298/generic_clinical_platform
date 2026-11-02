@@ -1,0 +1,22 @@
+:host {
+  display: block;
+}
+
+.pubwrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-block: 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 72px;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 72px;
+  outline: none;
+  min-width: 0;
+}

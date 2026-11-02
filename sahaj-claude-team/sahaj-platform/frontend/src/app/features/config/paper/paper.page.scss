@@ -1,0 +1,184 @@
+@use '../config-common';
+
+.paper-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.intro {
+  font-size: 0.82rem;
+  margin-top: 2px;
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+
+  > span:first-child {
+    flex: 1;
+  }
+}
+
+// The paper itself always uses paper colours, in light and dark themes
+.paper-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--muted-soft);
+  overflow-x: auto;
+}
+
+.paper {
+  background: var(--paper);
+  color: var(--paper-ink);
+  width: 100%;
+  max-width: 420px;
+  padding: 22px 24px;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+
+  &.a4 {
+    max-width: 500px;
+  }
+}
+
+.lh {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 2px solid var(--paper-accent);
+  padding-bottom: 8px;
+
+  b {
+    font-size: 1rem;
+    color: var(--paper-accent);
+    letter-spacing: 0.02em;
+  }
+  small {
+    display: block;
+    color: var(--paper-soft);
+  }
+  .right {
+    text-align: right;
+  }
+  .docname {
+    font-size: 0.85rem;
+    color: var(--paper-ink);
+  }
+  &.prehd {
+    justify-content: center;
+    border: 1.5px dashed var(--paper-line);
+    color: var(--paper-soft);
+    font-size: 0.72rem;
+    min-height: 60px;
+    align-items: center;
+    border-radius: 6px;
+  }
+  &.plain {
+    border: 0;
+    padding-top: 0;
+  }
+}
+
+.pt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--paper-line);
+}
+
+.ps {
+  b {
+    display: block;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--paper-accent);
+  }
+  b i {
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--paper-soft);
+    font-weight: 500;
+    margin-left: 4px;
+  }
+}
+
+.rx {
+  font-size: 1.1rem;
+  color: var(--paper-accent);
+  font-weight: 700;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--paper-line);
+  padding-top: 8px;
+}
+
+.signblock {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.qr {
+  text-align: center;
+}
+
+.soft {
+  color: var(--paper-soft);
+}
+
+.tiny {
+  font-size: 0.62rem;
+}
+
+.sign {
+  text-align: right;
+  color: var(--paper-soft);
+  border-top: 1px solid var(--paper-line);
+  padding-top: 2px;
+  min-width: 80px;
+}
+
+@media (max-width: 1100px) {
+  .paper-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,145 @@
+<section
+  class="lp-sect"
+  id="journey"
+  tabindex="-1"
+  aria-labelledby="h-journey"
+  appInView
+  (inViewChange)="inView.set($event)"
+>
+  <app-section-head
+    headingId="h-journey"
+    eyebrow="Patient journey"
+    heading="One connected journey. From appointment to follow-up."
+    lead="Follow one visit through the clinic. Pick any stage to see the screen used there."
+  />
+
+  <div class="jrail-wrap">
+    <div class="jrail">
+      <span class="jline"></span>
+      <span class="jprog" [style.width.%]="(current() / last) * 86"></span>
+      <span class="jrec" [style.left.%]="((current() + 0.5) / stages.length) * 100" aria-hidden="true"
+        >Sunita · T-19</span
+      >
+      @for (stage of stages; track stage; let i = $index) {
+        <button
+          type="button"
+          class="jst"
+          [class.done]="i < current()"
+          [class.cur]="i === current()"
+          [attr.aria-current]="i === current() ? 'step' : null"
+          (click)="go(i)"
+        >
+          <span class="jd"></span>{{ stage }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="jdetail surf">
+    @for (shown of [current()]; track shown) {
+      <div class="jui">
+        <span class="eyebrow">{{ shown + 1 }} · {{ stages[shown] }}</span>
+        <div class="jbody">
+          @switch (shown) {
+            @case (0) {
+              <div class="bubble">
+                <span class="bline"><app-icon name="msg" [size]="14" /> <b>Shree Sai Family Clinic</b></span>
+                Appointment confirmed with Dr. Meera, Sat 24 Oct, 11:30 AM. Reply 1 to reschedule.
+              </div>
+              <div class="mflow">
+                @for (slot of slots; track slot) {
+                  <div class="mnode" [class.act]="slot === '11:30'">
+                    {{ slot }}<small>{{ slot === '11:30' ? 'Sunita' : 'Free' }}</small>
+                  </div>
+                }
+              </div>
+            }
+            @case (1) {
+              <div class="mockfield">
+                <span>+91</span><b class="num">98220 12345</b><app-icon name="search" [size]="15" />
+              </div>
+              <div class="mrow">
+                <b class="grow">Sunita Patil · 42 F</b><span class="pill p-good">Selected</span>
+              </div>
+              <div class="mrow"><b class="grow">Aarav Patil · 9 M</b><span class="faint">Son</span></div>
+              <div class="row between">
+                <span class="muted">Token issued</span><b class="bigtok">T-19</b>
+              </div>
+            }
+            @case (2) {
+              @for (row of queue; track row.token) {
+                <div class="mrow">
+                  <span class="tokchip">{{ row.token }}</span>
+                  <b class="grow">{{ row.name }}</b>
+                  <span [class]="'pill ' + row.pill">{{ row.state }}</span>
+                </div>
+              }
+              <div class="row end"><span class="fake-btn">Send in now</span></div>
+            }
+            @case (3) {
+              <div class="ink2">
+                <div class="paperx">
+                  <span class="eyebrow paper-eyebrow">Handwritten</span>
+                  <p class="hl" style="animation-delay: 0.2s">Fever × 3 days, body ache</p>
+                  <p class="hl" style="animation-delay: 1.1s">BP 128/82 &nbsp;P 92</p>
+                </div>
+                <div class="paperx">
+                  <div class="fr" style="animation-delay: 1.8s">
+                    <small>Complaint</small><b>Fever, 3 days; body ache</b>
+                  </div>
+                  <div class="fr" style="animation-delay: 2.2s">
+                    <small>Vitals</small><b>BP 128/82 · Pulse 92</b>
+                  </div>
+                </div>
+              </div>
+            }
+            @case (4) {
+              <div class="mrow">
+                <b class="grow">Diagnosis</b><span class="pill p-teal">Acute viral fever</span>
+              </div>
+              <div class="mrow">
+                <b class="grow">Paracetamol 650 mg</b><span class="num muted">1-0-1 · 5 days</span>
+              </div>
+              <div class="mrow">
+                <b class="grow">Cetirizine 10 mg</b><span class="num muted">0-0-1 · 5 days</span>
+              </div>
+              <div class="row between">
+                <span class="muted"><app-icon name="print" [size]="14" /> Printed with QR</span>
+                <app-qr-sample seed="jrx" [size]="52" />
+              </div>
+            }
+            @case (5) {
+              <div class="mrow">
+                <b class="grow">Consultation</b><span class="num">₹400</span>
+              </div>
+              <div class="mrow"><b class="grow">CBC test</b><span class="num">₹350</span></div>
+              <div class="row between">
+                <div class="upi">
+                  <app-qr-sample seed="jupi" [size]="56" />
+                  <div><b class="num">₹750</b><small>UPI</small></div>
+                </div>
+                <span class="pill p-good"><app-icon name="check" [size]="12" /> Paid</span>
+              </div>
+            }
+            @case (6) {
+              <div class="mrow">
+                <b class="grow">Next visit</b><span class="num">30 Oct · Dr. Meera</span>
+              </div>
+              <div class="mrow">
+                <b class="grow">Follow-up fee</b><span class="pill p-good">Free till 30 Oct</span>
+              </div>
+              <div class="bubble">
+                <span class="bline"><app-icon name="msg" [size]="14" /></span>
+                Reminder scheduled for 29 Oct, 10:00 AM: "Your follow-up with Dr. Meera is tomorrow."
+              </div>
+            }
+          }
+        </div>
+      </div>
+      <div class="jside">
+        <app-character [person]="narration[shown].person" [pose]="narration[shown].pose" />
+        <p class="muted">{{ narration[shown].text }}</p>
+      </div>
+    }
+  </div>
+</section>

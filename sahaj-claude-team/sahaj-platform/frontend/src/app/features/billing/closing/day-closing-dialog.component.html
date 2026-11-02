@@ -1,0 +1,84 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="clt">
+  @if (result(); as r) {
+    <div class="sheet-h">
+      <div>
+        <h2 id="clt">Day closed</h2>
+        <p class="muted" style="font-size: 0.86rem">Closed by {{ r.closedByName }}</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      <div class="list">
+        <div class="li">
+          <div class="main"><b>Cash counted</b></div>
+          <b class="num">{{ formatInr(r.countedCashPaise / 100) }}</b>
+        </div>
+        <div class="li">
+          <div class="main"><b>Expected cash</b></div>
+          <b class="num">{{ formatInr(r.expectedCashPaise / 100) }}</b>
+        </div>
+      </div>
+      <div class="notice" [class.good]="!r.diffPaise" [class.warn]="!!r.diffPaise">
+        <app-icon [name]="r.diffPaise ? 'alert' : 'check'" [size]="16" />
+        <span>
+          @if (r.diffPaise) {
+            {{ r.diffPaise > 0 ? 'Over' : 'Short' }} by {{ formatInr(Math.abs(r.diffPaise) / 100) }}
+            @if (r.note) {
+              · {{ r.note }}
+            }
+          } @else {
+            Matches the system.
+          }
+        </span>
+      </div>
+    </div>
+    <div class="sheet-f">
+      <button mat-flat-button type="button" (click)="close()">Done</button>
+    </div>
+  } @else {
+    <div class="sheet-h">
+      <div>
+        <h2 id="clt">Close the day</h2>
+        <p class="muted" style="font-size: 0.86rem">Count the cash drawer and match it with the system.</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Cash counted in the drawer</mat-label>
+        <span matTextPrefix>₹&nbsp;</span>
+        <input
+          matInput
+          inputmode="numeric"
+          [value]="countedCash()"
+          (input)="countedCash.set($any($event.target).value)"
+        />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Note (needed if the cash doesn't match)</mat-label>
+        <input
+          matInput
+          placeholder="e.g. ₹50 kept for change"
+          [value]="note()"
+          (input)="note.set($any($event.target).value)"
+        />
+      </mat-form-field>
+      @if (error(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    </div>
+    <div class="sheet-f">
+      <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+      <button mat-flat-button type="button" [disabled]="closing()" (click)="submit()">
+        <app-icon name="lock" [size]="15" /> Close the day
+      </button>
+    </div>
+  }
+</div>

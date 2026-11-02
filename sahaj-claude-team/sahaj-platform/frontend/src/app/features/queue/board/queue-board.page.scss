@@ -1,0 +1,144 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pagehead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  h1 {
+    font-size: 1.4rem;
+  }
+}
+
+.lead {
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  max-width: 54ch;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notice.err {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.board-wrap {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.board {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-width: max-content;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  width: 270px;
+  flex: none;
+
+  &.legacy {
+    border-style: dashed;
+  }
+}
+
+.col-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.colbody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+
+  &.is-empty {
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.empty {
+  color: var(--ink-3);
+  font-size: 0.84rem;
+  padding: 12px 0;
+}
+
+.qcard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.qtop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tk {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.w {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+.qname {
+  font-weight: 600;
+
+  span {
+    font-weight: 500;
+    color: var(--ink-3);
+    font-size: 0.82rem;
+  }
+}
+
+.qdoc,
+.qfee {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+
+.qnote {
+  font-size: 0.78rem;
+}
+
+.qact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}

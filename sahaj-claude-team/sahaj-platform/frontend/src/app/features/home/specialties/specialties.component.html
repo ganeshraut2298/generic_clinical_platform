@@ -1,0 +1,64 @@
+<section class="lp-sect" id="specialties" tabindex="-1" aria-labelledby="h-specialties">
+  <app-section-head
+    headingId="h-specialties"
+    eyebrow="Specialties"
+    heading="One platform. Different ways of practising medicine."
+    lead="Pick a specialty to see how the workflow changes. These are configurable templates on one platform, not separate apps."
+  />
+
+  <div class="spcards" role="group" aria-label="Specialty">
+    @for (entry of entries; track entry[0]) {
+      <button
+        type="button"
+        class="spc"
+        [attr.aria-pressed]="selected() === entry[0]"
+        (click)="selected.set(entry[0])"
+      >
+        <span class="row between">
+          <b>{{ entry[1].name }}</b>
+          @if (entry[1].soon) {
+            <span class="pill p-wait">Coming soon</span>
+          }
+        </span>
+        <small class="faint">{{ entry[1].description }}</small>
+      </button>
+    }
+  </div>
+
+  <div class="spprev surf" aria-live="polite">
+    <div class="row between">
+      <b>{{ specialty().name }} template</b>
+      <span class="faint note">Highlighted stages differ from general practice</span>
+    </div>
+    @for (current of [selected()]; track current) {
+      <div class="mflow">
+        @for (stage of specialty().flow; track stage; let i = $index) {
+          @if (i > 0) {
+            <span class="marr"><app-icon name="arrow" [size]="13" /></span>
+          }
+          <div class="mnode pop" [class.act]="differs(stage)" [style.animation-delay.s]="i * 0.07">
+            {{ stage }}
+          </div>
+        }
+      </div>
+    }
+    <div class="two">
+      <div class="mrow col">
+        <span class="eyebrow">Case paper adds</span>
+        <div class="strip">
+          @for (item of specialty().paper; track item) {
+            <span class="pill p-sec">{{ item }}</span>
+          }
+        </div>
+      </div>
+      <div class="mrow col">
+        <span class="eyebrow">Billing rule</span>
+        <b>{{ specialty().bill }}</b>
+      </div>
+    </div>
+    <p class="faint foot">
+      Same platform, same screens. A template changes the workflow, case paper and fee rules, not
+      the software.
+    </p>
+  </div>
+</section>

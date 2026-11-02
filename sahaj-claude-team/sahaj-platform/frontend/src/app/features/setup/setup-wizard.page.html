@@ -1,0 +1,304 @@
+@if (loading()) {
+  <main class="su-loading">
+    <p class="muted">Loading your setup…</p>
+  </main>
+} @else if (completing()) {
+  <main class="su-building surf">
+    <h1>Setting up your clinic</h1>
+    <p class="muted">This takes a few seconds.</p>
+    <div class="meter"><i style="width: 70%"></i></div>
+  </main>
+} @else {
+  <div class="su-wrap">
+    <header class="su-top">
+      <span class="brand-mark">Sahaj</span>
+      <button mat-stroked-button type="button" (click)="exitSetup()">Exit setup</button>
+    </header>
+
+    <div class="su-grid">
+      <aside class="su-rail surf">
+        <span class="eyebrow">Set up your clinic</span>
+        <ol class="su-steps">
+          @for (step of steps; track step.title; let i = $index) {
+            <li [class.done]="i + 1 < currentStep()" [class.cur]="i + 1 === currentStep()">
+              <span class="su-n">
+                @if (i + 1 < currentStep()) {
+                  <app-icon name="check" [size]="13" />
+                } @else {
+                  {{ i + 1 }}
+                }
+              </span>
+              <span>
+                <b>{{ step.title }}</b>
+                <small>{{ step.description }}</small>
+              </span>
+            </li>
+          }
+        </ol>
+        <div class="meter"><i [style.width.%]="progressPercent()"></i></div>
+        <span class="faint small">About {{ minutesLeft() }} minutes left. Everything can be changed later.</span>
+      </aside>
+
+      <section class="su-card surf">
+        @if (loadError()) {
+          <p class="notice">{{ loadError() }}</p>
+        }
+        <div>
+          <span class="eyebrow">Step {{ currentStep() }} of 5</span>
+          <h1>{{ stepHead().title }}</h1>
+          <p class="muted">{{ stepHead().subtitle }}</p>
+        </div>
+
+        @switch (currentStep()) {
+          @case (1) {
+            <form [formGroup]="clinicForm" class="grid-f">
+              <mat-form-field class="full">
+                <mat-label>Clinic name</mat-label>
+                <input matInput formControlName="name" maxlength="160" />
+              </mat-form-field>
+              <mat-form-field class="full">
+                <mat-label>Address</mat-label>
+                <input matInput formControlName="address" placeholder="Building, road, area" />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>City</mat-label>
+                <input matInput formControlName="city" />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>PIN code</mat-label>
+                <input matInput formControlName="pin" inputmode="numeric" maxlength="6" />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Clinic phone</mat-label>
+                <input matInput formControlName="phone" inputmode="numeric" />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Registration number (optional)</mat-label>
+                <input matInput formControlName="registrationNo" />
+              </mat-form-field>
+            </form>
+          }
+          @case (2) {
+            <form [formGroup]="specialtyForm">
+              <div class="su-specs">
+                @for (specialty of specialties; track specialty.code) {
+                  <button
+                    type="button"
+                    class="su-spec"
+                    [attr.aria-pressed]="specialtyForm.controls.code.value === specialty.code"
+                    (click)="selectSpecialty(specialty.code)"
+                  >
+                    <b>{{ specialty.name }}</b>
+                    <small>{{ specialty.summary }}</small>
+                  </button>
+                }
+              </div>
+              <div class="su-loads">
+                <span class="eyebrow">What we set up for {{ specialtyByCode(specialtyForm.controls.code.value).name.toLowerCase() }}</span>
+                <ul class="ticks">
+                  @for (line of specialtyByCode(specialtyForm.controls.code.value).loads; track line) {
+                    <li><app-icon name="check" [size]="15" /><span>{{ line }}</span></li>
+                  }
+                </ul>
+              </div>
+            </form>
+          }
+          @case (3) {
+            <form [formGroup]="teamForm">
+              <div class="eyebrow">Doctors · {{ doctors.length }} of {{ limits().doctors }}</div>
+              <div class="su-rows">
+                @for (doctor of doctors.controls; track $index; let i = $index) {
+                  <div class="su-row" [formGroup]="doctor">
+                    <mat-form-field>
+                      <mat-label>Doctor {{ i + 1 }} name</mat-label>
+                      <input matInput formControlName="name" placeholder="Dr. full name" />
+                    </mat-form-field>
+                    <mat-form-field>
+                      <mat-label>Specialty</mat-label>
+                      <input matInput formControlName="specialty" />
+                    </mat-form-field>
+                    <mat-form-field>
+                      <mat-label>Fee (₹)</mat-label>
+                      <input matInput type="number" formControlName="feeRupees" min="0" />
+                    </mat-form-field>
+                    @if (i === 0) {
+                      <span class="pill p-teal">Owner</span>
+                    } @else {
+                      <mat-form-field>
+                        <mat-label>Mobile</mat-label>
+                        <input matInput formControlName="mobile" inputmode="numeric" />
+                      </mat-form-field>
+                      <button mat-icon-button type="button" (click)="removeDoctor(i)" aria-label="Remove doctor">
+                        <app-icon name="x" [size]="14" />
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+              <button mat-stroked-button type="button" (click)="addDoctor()" [disabled]="atDoctorLimit() || atUserLimit()">
+                <app-icon name="plus" [size]="15" /> Add doctor
+              </button>
+
+              <div class="eyebrow" style="margin-top: 14px">Staff · {{ staff.length }}</div>
+              <div class="su-rows">
+                @for (member of staff.controls; track $index; let i = $index) {
+                  <div class="su-row" [formGroup]="member">
+                    <mat-form-field>
+                      <mat-label>Staff {{ i + 1 }} name</mat-label>
+                      <input matInput formControlName="name" />
+                    </mat-form-field>
+                    <mat-form-field>
+                      <mat-label>Role</mat-label>
+                      <mat-select formControlName="role">
+                        @for (role of staffRoles; track role) {
+                          <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field>
+                      <mat-label>Mobile</mat-label>
+                      <input matInput formControlName="mobile" inputmode="numeric" />
+                    </mat-form-field>
+                    <button mat-icon-button type="button" (click)="removeStaff(i)" aria-label="Remove staff">
+                      <app-icon name="x" [size]="14" />
+                    </button>
+                  </div>
+                } @empty {
+                  <p class="muted">Solo practice? You can add staff later.</p>
+                }
+              </div>
+              <button mat-stroked-button type="button" (click)="addStaff()" [disabled]="atUserLimit()">
+                <app-icon name="plus" [size]="15" /> Add staff
+              </button>
+              <p class="notice info">{{ totalUsers() }} of {{ limits().users }} users on the free year. Each person can log in with their own mobile number once the clinic is created.</p>
+            </form>
+          }
+          @case (4) {
+            <form [formGroup]="opdForm" class="su-qs">
+              <div class="su-q">
+                <div><b>When do you take the consultation fee?</b><small>Some clinics collect at the token, others after the doctor.</small></div>
+                <mat-button-toggle-group class="seg" formControlName="feeTiming">
+                  <mat-button-toggle value="before">At the token</mat-button-toggle>
+                  <mat-button-toggle value="after">After consultation</mat-button-toggle>
+                  <mat-button-toggle value="split">Split</mat-button-toggle>
+                </mat-button-toggle-group>
+              </div>
+              <div class="su-q">
+                <div><b>Do patients wait in a queue?</b><small>The front desk can still send a patient straight in when the doctor is free.</small></div>
+                <mat-button-toggle-group class="seg" formControlName="queue">
+                  <mat-button-toggle [value]="true">Yes, with tokens</mat-button-toggle>
+                  <mat-button-toggle [value]="false">No, straight in</mat-button-toggle>
+                </mat-button-toggle-group>
+              </div>
+              <div class="su-q">
+                <div><b>Does a nurse check vitals first?</b><small>BP, pulse, temperature and weight. Skipped for adult follow-ups.</small></div>
+                <mat-button-toggle-group class="seg" formControlName="vitals">
+                  <mat-button-toggle [value]="true">Yes</mat-button-toggle>
+                  <mat-button-toggle [value]="false">No</mat-button-toggle>
+                </mat-button-toggle-group>
+              </div>
+              <div class="su-q">
+                <div><b>How long is a follow-up valid?</b><small>Patients who return within this window pay the follow-up fee.</small></div>
+                <div class="row">
+                  <div class="stepper">
+                    <button type="button" (click)="adjustFollowUpDays(-1)" aria-label="Fewer days">−</button>
+                    <span class="num">{{ opdForm.controls.followUpDays.value }} days</span>
+                    <button type="button" (click)="adjustFollowUpDays(1)" aria-label="More days">+</button>
+                  </div>
+                  <mat-button-toggle-group class="seg" formControlName="followUpFee">
+                    <mat-button-toggle value="free">Free</mat-button-toggle>
+                    <mat-button-toggle value="half">50%</mat-button-toggle>
+                    <mat-button-toggle value="full">Full</mat-button-toggle>
+                  </mat-button-toggle-group>
+                </div>
+              </div>
+              <div class="su-loads">
+                <span class="eyebrow">Your OPD flow</span>
+                <div class="su-flow">
+                  <span class="fs">Token<small>Front desk</small></span>
+                  @if (opdForm.controls.queue.value) {
+                    <app-icon name="arrow" [size]="14" /><span class="fs">Queue<small>Front desk</small></span>
+                  }
+                  @if (opdForm.controls.vitals.value) {
+                    <app-icon name="arrow" [size]="14" /><span class="fs">Vitals<small>Nurse</small></span>
+                  }
+                  <app-icon name="arrow" [size]="14" /><span class="fs">Consultation<small>Doctor</small></span>
+                  <app-icon name="arrow" [size]="14" /><span class="fs">Case paper print<small>Front desk</small></span>
+                  <app-icon name="arrow" [size]="14" /><span class="fs">Billing<small>Front desk</small></span>
+                  <app-icon name="arrow" [size]="14" /><span class="fs">Follow-up<small>Reminder</small></span>
+                </div>
+              </div>
+            </form>
+          }
+          @case (5) {
+            <form [formGroup]="lookForm">
+              <div class="field" role="group" aria-label="Clinic colour">
+                <span class="eyebrow">Clinic colour</span>
+                <div class="su-swatches">
+                  @for (swatch of brandSwatches; track swatch.value) {
+                    <button
+                      type="button"
+                      class="su-swatch"
+                      [attr.aria-pressed]="lookForm.controls.brand.value === swatch.value"
+                      (click)="selectBrand(swatch.value)"
+                    >
+                      <i [style.background]="swatch.hex"></i>{{ swatch.label }}
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="field full">
+                <label for="su-slug">Web address</label>
+                <div class="su-slugrow">
+                  <span>https://</span>
+                  <input
+                    id="su-slug"
+                    class="input"
+                    [value]="lookForm.controls.slug.value"
+                    (input)="onSlugInput($any($event.target).value)"
+                    maxlength="24"
+                    spellcheck="false"
+                    autocomplete="off"
+                  />
+                  <span>.sahaj.in</span>
+                </div>
+              </div>
+              @if (slugChecking()) {
+                <span class="pill p-wait">Checking…</span>
+              } @else if (slugAvailable() === true) {
+                <span class="pill p-good">{{ lookForm.controls.slug.value }}.sahaj.in is available</span>
+              } @else if (slugAvailable() === false) {
+                <div class="row">
+                  <span class="pill p-crit">Already taken</span>
+                  @for (alt of slugAlternatives(); track alt) {
+                    <button mat-stroked-button type="button" (click)="useAlternative(alt)">{{ alt }}</button>
+                  }
+                </div>
+              } @else if (lookForm.controls.slug.value) {
+                <span class="pill p-warn">Use 3 to 24 lowercase letters, numbers or hyphens</span>
+              }
+              <div class="field" role="group" aria-label="Default language for staff screens">
+                <span class="eyebrow">Default language for staff screens</span>
+                <mat-button-toggle-group class="seg" formControlName="language">
+                  <mat-button-toggle value="en">English</mat-button-toggle>
+                  <mat-button-toggle value="mr">मराठी</mat-button-toggle>
+                  <mat-button-toggle value="hi">हिंदी</mat-button-toggle>
+                </mat-button-toggle-group>
+              </div>
+            </form>
+          }
+        }
+
+        <div class="su-foot">
+          <button mat-stroked-button type="button" (click)="back()" [disabled]="currentStep() === 1">
+            <app-icon name="back" [size]="16" /> Back
+          </button>
+          <button mat-flat-button type="button" (click)="continue()" [disabled]="saving()">
+            {{ currentStep() < 5 ? 'Continue' : 'Create my clinic' }}
+            <app-icon name="arrow" [size]="16" />
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+}

@@ -1,0 +1,107 @@
+<section
+  class="lp-sect"
+  id="pricing"
+  tabindex="-1"
+  aria-labelledby="h-pricing"
+  appInView
+  (inViewChange)="inView.set($event)"
+>
+  <app-section-head
+    headingId="h-pricing"
+    eyebrow="Pricing"
+    heading="Start small. Grow without changing your system."
+    lead="Your first year is free. Add doctors, staff and branches as you grow, on the same system and patient record."
+  />
+
+  <div class="grow surf">
+    <div>
+      <span class="eyebrow">Grow without changing your system</span>
+      <div class="sizes">
+        <mat-button-toggle-group
+          class="seg"
+          aria-label="Clinic size"
+          hideSingleSelectionIndicator
+          [value]="growIndex()"
+          (change)="chooseSize($event.value)"
+        >
+          @for (size of growth; track size.label; let i = $index) {
+            <mat-button-toggle [value]="i">{{ size.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+      </div>
+      <p class="muted grow-text">{{ grow().text }}. Plan: <b>{{ growPlanNames() }}</b>.</p>
+    </div>
+    <div class="ws-box" aria-hidden="true">
+      @for (branch of branches(); track branch.title + growIndex()) {
+        <div class="branch">
+          <b>{{ branch.title }}</b>
+          <div class="seats">
+            @for (i of seats(branch.doctors); track i) {
+              <span class="seat doc" [style.animation-delay.s]="i * 0.05">Dr</span>
+            }
+            @for (i of seats(branch.staff); track i) {
+              <span class="seat st" [style.animation-delay.s]="(branch.doctors + i) * 0.05"
+                ><app-icon name="user" [size]="13"
+              /></span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div>
+    <mat-button-toggle-group
+      class="seg"
+      aria-label="Billing period"
+      hideSingleSelectionIndicator
+      [value]="period()"
+      (change)="period.set($event.value)"
+    >
+      <mat-button-toggle value="yearly">Yearly · save 44%</mat-button-toggle>
+      <mat-button-toggle value="monthly">Monthly</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <div class="prices4">
+    @for (plan of plans; track plan.key) {
+      <article class="price surf" [class.match]="matches(plan)" [attr.aria-label]="plan.name + ' plan'">
+        <div>
+          <span class="eyebrow">{{ plan.eyebrow }}</span>
+          <h3>{{ plan.name }}</h3>
+        </div>
+        <div class="amt num" [class.quoted]="price(plan.key).quoted">
+          {{ price(plan.key).amount }} <small>{{ price(plan.key).per }}</small>
+        </div>
+        <p class="muted desc">{{ plan.description }}</p>
+        <ul class="ticks">
+          @for (point of plan.points; track point) {
+            <li><app-icon name="check" [size]="15" /><span>{{ point }}</span></li>
+          }
+        </ul>
+        @if (plan.cta.action === 'signup' && plan.key === 'pro') {
+          <a
+            mat-flat-button
+            class="cta"
+            routerLink="/login"
+            [queryParams]="{ mode: 'signup' }"
+            >{{ plan.cta.label }}</a
+          >
+        } @else if (plan.cta.action === 'signup') {
+          <a
+            mat-stroked-button
+            class="cta btn-sec"
+            routerLink="/login"
+            [queryParams]="{ mode: 'signup' }"
+            >{{ plan.cta.label }}</a
+          >
+        } @else {
+          <button mat-stroked-button class="cta btn-sec" type="button" (click)="contactSales()">
+            {{ plan.cta.label }}
+          </button>
+        }
+      </article>
+    }
+  </div>
+  <p class="faint note">{{ note }}</p>
+</section>

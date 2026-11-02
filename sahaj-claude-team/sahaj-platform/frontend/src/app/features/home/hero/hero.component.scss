@@ -1,0 +1,199 @@
+:host {
+  display: block;
+}
+
+.lp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 40px;
+  align-items: center;
+  padding-top: 20px;
+}
+
+.hero-t {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.display {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(2.1rem, 4.4vw, 3.3rem);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+
+  em {
+    font-style: normal;
+    color: var(--pri-text);
+  }
+}
+
+.lede {
+  font-size: 1.08rem;
+  color: var(--ink-2);
+  max-width: 56ch;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hstage {
+  position: relative;
+  padding: 20px 92px 64px 64px;
+}
+
+.hpanel {
+  position: relative;
+  z-index: 1;
+}
+
+.hbody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.arow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 0.86rem;
+
+  span:first-child {
+    color: var(--ink-3);
+    min-width: 92px;
+  }
+  b {
+    flex: 1;
+    font-weight: 600;
+    min-width: 0;
+  }
+}
+
+.tickc {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--good-soft);
+  color: var(--good);
+  flex: none;
+}
+
+.flowhead {
+  margin-top: 4px;
+}
+
+.hfoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px;
+  border-radius: 10px;
+  background: var(--pri);
+  color: var(--pri-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition:
+    transform var(--dur-1),
+    box-shadow var(--dur-1);
+
+  &.pressed {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 5px var(--pri-soft);
+  }
+}
+
+.qmini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--pri);
+  background: var(--pri-soft);
+  font-size: 0.86rem;
+
+  b {
+    flex: 1;
+  }
+}
+
+.hch {
+  position: absolute;
+  bottom: 0;
+  z-index: 2;
+  width: 150px;
+
+  &.left {
+    left: -6px;
+  }
+  &.right {
+    right: -6px;
+    width: 160px;
+  }
+}
+
+// While the scene plays, items that have not appeared yet are hidden.
+.arow .tickc,
+.mnode,
+.marr,
+.hfoot .pill,
+.qmini,
+.hch.right {
+  transition:
+    opacity var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.playing {
+  .tickc:not(.on),
+  .mnode:not(.on),
+  .marr:not(.on),
+  .hfoot .pill:not(.on),
+  .qmini:not(.on),
+  .hch.right:not(.on) {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (max-width: 980px) {
+  .lp-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .hstage {
+    padding: 8px 0 96px;
+  }
+  .hch.left {
+    width: 104px;
+    left: -4px;
+  }
+  .hch.right {
+    width: 104px;
+    right: -4px;
+  }
+}

@@ -1,0 +1,58 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading templates</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else {
+  <section class="panel surf" id="f-spec">
+    <div>
+      <h2>Start from your specialty</h2>
+      <div class="faint intro">
+        Each template loads a workflow, case paper, price list, Rx favourites and reminders. You can
+        change anything afterwards.
+      </div>
+    </div>
+    <div class="specs">
+      @for (specialty of specialties(); track specialty.code) {
+        <button
+          type="button"
+          class="spec"
+          [attr.aria-pressed]="inUse() === specialty.code"
+          [disabled]="!isOwner() || specialty.phase > 1 || applying() !== null"
+          (click)="apply(specialty)"
+        >
+          <span class="spec-h">
+            <b>{{ specialty.name }}</b>
+            @if (specialty.phase > 1) {
+              <span class="pill p-wait">Phase {{ specialty.phase }}</span>
+            } @else if (inUse() === specialty.code) {
+              <span class="pill p-teal"><app-icon name="check" [size]="12" /> In use</span>
+            }
+          </span>
+          @if (specialty.features?.length) {
+            <ul>
+              @for (feature of specialty.features; track feature) {
+                <li>{{ feature }}</li>
+              }
+            </ul>
+          }
+        </button>
+      } @empty {
+        <div class="empty">No templates are available.</div>
+      }
+    </div>
+    <div class="notice teal">
+      <app-icon name="shield" [size]="16" />
+      <span>
+        Applying a template keeps all patients, bills and history. It only adds services that are
+        missing and never deletes or changes your own.
+      </span>
+    </div>
+  </section>
+}

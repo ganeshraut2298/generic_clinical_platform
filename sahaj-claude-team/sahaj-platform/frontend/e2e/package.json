@@ -1,0 +1,14 @@
+{
+  "name": "sahaj-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright end-to-end tests for Sahaj. Owned by qa-engineer; kept apart from frontend/package.json.",
+  "scripts": {
+    "build:app": "npm --prefix .. run build",
+    "test": "npm run build:app && playwright test",
+    "test:only": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}

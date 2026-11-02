@@ -1,0 +1,74 @@
+<section
+  class="lp-sect"
+  id="roles"
+  tabindex="-1"
+  aria-labelledby="h-roles"
+  appInView
+  (inViewChange)="inView.set($event)"
+>
+  <app-section-head
+    headingId="h-roles"
+    eyebrow="Roles and responsibilities"
+    heading="Everyone knows what to do next."
+    lead="Each step of a visit goes to the right person. Each person sees only what their role allows."
+  />
+
+  <div class="visit surf">
+    <span class="tokchip">T-19</span>
+    <b>Sunita Patil · 42 F · New visit</b>
+    <span class="muted status" aria-live="polite">{{ status() }}</span>
+    <mat-button-toggle-group
+      class="seg"
+      aria-label="View as"
+      hideSingleSelectionIndicator
+      [value]="view()"
+      (change)="view.set($event.value)"
+    >
+      @for (option of viewOptions; track option.value) {
+        <mat-button-toggle [value]="option.value">{{ option.label }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+
+  @if (focused(); as member) {
+    <div class="notice info">
+      <app-icon name="lock" [size]="16" />
+      <span>{{ viewText[member] }}</span>
+    </div>
+  }
+
+  <div class="team">
+    @for (member of members; track member; let i = $index) {
+      <div class="member surf" [class.dim]="focused() && focused() !== member">
+        <div class="mtop">
+          <app-character [person]="member" [pose]="poses[member]" [delay]="i * 0.4" />
+          <div>
+            <b>{{ characters[member].name }}</b>
+            <small class="faint role">{{ characters[member].role }}</small>
+          </div>
+        </div>
+        <div class="perm">
+          @for (permission of permissions[member]; track permission[0]) {
+            <span [class.no]="!permission[1]">
+              <app-icon [name]="permission[1] ? 'check' : 'lock'" [size]="11" />
+              {{ permission[0] }}
+              <span class="sr-only">{{ permission[1] ? 'allowed' : 'locked' }}</span>
+            </span>
+          }
+        </div>
+        <div class="tasks">
+          @for (item of tasksOf(member); track item.index) {
+            <div class="task" [class.enter]="item.index === step()">
+              <span>{{ item.task }}</span>
+              <span class="pill" [class.p-good]="item.index < step()" [class.p-teal]="item.index >= step()">
+                {{ item.index < step() ? 'Done' : 'In progress' }}
+              </span>
+            </div>
+          } @empty {
+            <span class="faint waiting">Waiting for their step</span>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</section>

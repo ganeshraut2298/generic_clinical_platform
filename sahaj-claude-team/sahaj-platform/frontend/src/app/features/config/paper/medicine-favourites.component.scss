@@ -1,0 +1,59 @@
+@use '../config-common';
+
+:host {
+  display: block;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--ink-3);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ink);
+  }
+  &:focus-within {
+    outline: 2px solid var(--pri);
+    outline-offset: 1px;
+  }
+}
+
+.star {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-3);
+
+  &[aria-pressed='true'] {
+    color: var(--warn);
+
+    ::ng-deep svg {
+      fill: currentColor;
+    }
+  }
+  &:hover:not(:disabled) {
+    background: var(--muted-soft);
+  }
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.more {
+  align-self: flex-start;
+}

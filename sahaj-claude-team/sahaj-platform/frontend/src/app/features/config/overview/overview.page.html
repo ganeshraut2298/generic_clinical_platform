@@ -1,0 +1,133 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading your setup progress</p>
+  </section>
+} @else {
+  @if (!isOwner()) {
+    <div class="notice info">
+      <app-icon name="lock" [size]="16" />
+      <span>Only the owner sees setup progress and the change history. You can open any area below.</span>
+    </div>
+  } @else if (loadError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  } @else if (overview(); as o) {
+    <div class="hhero">
+      <section class="panel surf">
+        <div class="row top">
+          <div
+            class="ring"
+            role="img"
+            [attr.aria-label]="'Setup ' + o.percent + ' percent done'"
+            [style.--p]="o.percent"
+          >
+            <i class="num">{{ o.percent }}%</i>
+          </div>
+          <div>
+            <span class="eyebrow">Setup health</span>
+            <h2>
+              {{
+                counts().left
+                  ? counts().left + (counts().left > 1 ? ' things' : ' thing') + ' left to finish'
+                  : 'Your clinic is fully set up'
+              }}
+            </h2>
+            <p class="muted small">
+              {{ counts().done }} of {{ counts().required }} essentials done. Most take about a minute.
+            </p>
+            @if (o.lastChange; as last) {
+              <p class="faint small">
+                Last change: {{ describeAction(last.action) }}
+                @if (last.actorName) { by {{ last.actorName }} }
+                · {{ formatWhen(last.at) }}
+              </p>
+            }
+          </div>
+        </div>
+        <div class="chk">
+          @for (check of checks(); track check.key) {
+            <div class="ci" [class.done]="check.done">
+              <span class="cb">
+                @if (check.done) {
+                  <app-icon name="check" [size]="12" />
+                }
+              </span>
+              <div class="main">
+                <b>
+                  {{ check.label }}
+                  @if (check.optional) {
+                    <span class="faint opt">· optional</span>
+                  }
+                </b>
+                @if (check.why) {
+                  <small>{{ check.why }}</small>
+                }
+              </div>
+              @if (!check.done) {
+                @if (fixTarget(check); as target) {
+                  <a
+                    class="fix"
+                    [class.ghost]="check.optional"
+                    [routerLink]="['..', target.section]"
+                    [fragment]="target.fragment"
+                    [attr.aria-label]="(check.optional ? 'Add: ' : 'Fix: ') + check.label"
+                  >
+                    {{ check.optional ? 'Add' : 'Fix' }}
+                  </a>
+                }
+              }
+            </div>
+          } @empty {
+            <div class="empty">No checklist items yet.</div>
+          }
+        </div>
+      </section>
+
+      <section class="panel surf" id="f-audit">
+        <div class="panel-h">
+          <h2>Change history</h2>
+          <span class="faint small">Every change, who made it and when.</span>
+        </div>
+        <div class="audit">
+          @for (event of events(); track event.id) {
+            <div class="ai">
+              <span class="av"><app-icon name="history" [size]="16" /></span>
+              <div class="main">
+                <b>{{ describeAction(event.action) }}</b>
+                <small>
+                  {{ event.actorName ?? 'Someone' }} · {{ formatWhen(event.at) }}
+                  @if (event.entityType) { · {{ event.entityType }} }
+                </small>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty">No changes yet.</div>
+          }
+        </div>
+      </section>
+    </div>
+  }
+
+  <section>
+    <div class="panel-h tilehead">
+      <h2>All settings</h2>
+      <span class="faint small">Tap an area to change it</span>
+    </div>
+    <div class="tiles">
+      @for (tile of tiles; track tile.key) {
+        <a class="tile surf" [routerLink]="['..', tile.key]">
+          <span class="row between">
+            <span class="ti"><app-icon [name]="tile.icon" [size]="17" /></span>
+            @if (todo()[tile.key]; as count) {
+              <span class="pill p-warn">{{ count }} to do</span>
+            }
+          </span>
+          <b>{{ tile.label }}</b>
+          <small>{{ summaries()[tile.key] ?? (tile.built ? '' : 'Coming soon') }}</small>
+        </a>
+      }
+    </div>
+  </section>
+}

@@ -1,0 +1,158 @@
+<div class="shell" [class.collapsed]="collapsed()">
+  <aside class="sidebar" [class.open]="drawerOpen()" aria-label="Main navigation">
+    <div class="sidebar-head">
+      <div class="clinic-card" [attr.title]="clinicName()">
+        <span class="avatar">{{ clinicName().charAt(0) }}</span>
+        <span class="clinic-text">
+          <small>{{ 'shell.clinic' | t }}</small>
+          <b>{{ clinicName() }}</b>
+        </span>
+      </div>
+      <button
+        type="button"
+        class="iconbtn"
+        (click)="toggleCollapsed()"
+        [attr.aria-label]="collapsed() ? ('shell.expand' | t) : ('shell.collapse' | t)"
+        [attr.aria-expanded]="!collapsed()"
+      >
+        <app-icon [name]="collapsed() ? 'chevR' : 'chevL'" [size]="15" />
+      </button>
+    </div>
+
+    <div class="mode-toggle" role="group" aria-label="Menu mode">
+      <button type="button" [attr.aria-pressed]="menuMode() === 'simple'" (click)="setMenuMode('simple')">
+        {{ 'shell.simple' | t }}
+      </button>
+      <button type="button" [attr.aria-pressed]="menuMode() === 'advanced'" (click)="setMenuMode('advanced')">
+        {{ 'shell.advanced' | t }}
+      </button>
+    </div>
+
+    <label class="search-menu">
+      <app-icon name="search" [size]="15" />
+      <input
+        type="search"
+        autocomplete="off"
+        [attr.placeholder]="'shell.searchMenu' | t"
+        [attr.aria-label]="'shell.searchMenu' | t"
+        [ngModel]="navQuery()"
+        (ngModelChange)="navQuery.set($event)"
+      />
+    </label>
+
+    <nav class="nav" aria-label="Clinic navigation">
+      @if (navQuery().trim()) {
+        @for (item of searchResults(); track item.key) {
+          <a
+            class="nav-item"
+            routerLink="/app/{{ item.route }}"
+            routerLinkActive="active"
+            (click)="closeDrawer()"
+          >
+            <app-icon [name]="item.icon" [size]="17" />
+            <span class="label">{{ item.labelKey | t }}</span>
+          </a>
+        } @empty {
+          <div class="nav-empty">{{ 'shell.noMatches' | t }}</div>
+        }
+      } @else if (menuMode() === 'simple') {
+        @for (item of simpleItems(); track item.key) {
+          <a
+            class="nav-item"
+            routerLink="/app/{{ item.route }}"
+            routerLinkActive="active"
+            (click)="closeDrawer()"
+          >
+            <app-icon [name]="item.icon" [size]="17" />
+            <span class="label">{{ item.labelKey | t }}</span>
+          </a>
+        }
+      } @else {
+        @for (group of groupedItems(); track group.group) {
+          <div class="nav-group">
+            <button
+              type="button"
+              class="group-head"
+              (click)="toggleGroup(group.group)"
+              [attr.aria-expanded]="isGroupOpen(group.group)"
+            >
+              <span>{{ group.labelKey | t }}</span>
+              <app-icon name="chevD" [size]="13" />
+            </button>
+            @if (isGroupOpen(group.group)) {
+              @for (item of group.items; track item.key) {
+                <a
+                  class="nav-item"
+                  routerLink="/app/{{ item.route }}"
+                  routerLinkActive="active"
+                  (click)="closeDrawer()"
+                >
+                  <app-icon [name]="item.icon" [size]="17" />
+                  <span class="label">{{ item.labelKey | t }}</span>
+                </a>
+              }
+            }
+          </div>
+        }
+      }
+    </nav>
+
+    @if (planDaysLeft() !== undefined) {
+      <div class="plan-card">
+        <div class="row-sb">
+          <b>{{ 'shell.freeYear' | t }}</b>
+          <span class="num">{{ planDaysLeft() }} {{ 'shell.daysLeft' | t }}</span>
+        </div>
+        <div class="meter"><i [style.width.%]="planMeterPercent()"></i></div>
+      </div>
+    }
+  </aside>
+
+  @if (drawerOpen()) {
+    <button type="button" class="scrim" aria-label="Close menu" (click)="closeDrawer()"></button>
+  }
+
+  <div class="work">
+    <header class="topbar">
+      <button type="button" class="iconbtn hamburger" (click)="toggleDrawer()" [attr.aria-label]="'shell.openMenu' | t">
+        <app-icon name="menu" [size]="18" />
+      </button>
+      <div class="clinic-info">
+        <b>{{ clinicName() }}</b>
+        <span class="faint">{{ clinicArea() }}{{ clinicArea() ? ' · ' : '' }}{{ clock() }}</span>
+      </div>
+      <label class="search-mobile">
+        <app-icon name="search" [size]="15" />
+        <input type="search" inputmode="numeric" autocomplete="off" [attr.placeholder]="'shell.searchMobile' | t" [attr.aria-label]="'shell.searchMobile' | t" />
+      </label>
+      <button type="button" class="goto-btn" (click)="openGoTo()" [attr.aria-label]="'shell.goTo' | t">
+        <app-icon name="search" [size]="14" />
+        <span class="hide-sm">{{ 'shell.goTo' | t }}</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+      <label class="chip-select" [attr.title]="'shell.language' | t">
+        <select [ngModel]="language()" (ngModelChange)="setLanguage($event)" [attr.aria-label]="'shell.language' | t">
+          <option value="en">English</option>
+          <option value="mr">मराठी</option>
+          <option value="hi">हिंदी</option>
+        </select>
+      </label>
+      <button type="button" class="chip-select user-menu" [matMenuTriggerFor]="userMenu" [attr.title]="'shell.signedInAs' | t">
+        <span class="role-name">{{ userName() }}</span>
+        <small>{{ roleLabel() }}</small>
+      </button>
+      <mat-menu #userMenu="matMenu">
+        <button mat-menu-item type="button" (click)="logout()">{{ 'shell.logout' | t }}</button>
+      </mat-menu>
+      <button type="button" class="iconbtn" (click)="toggleTheme()" [attr.aria-label]="'shell.theme' | t">
+        <app-icon [name]="theme() === 'dark' ? 'sun' : 'moon'" [size]="17" />
+      </button>
+      <button type="button" class="iconbtn" (click)="logout()" aria-label="Log out">
+        <app-icon name="logout" [size]="17" />
+      </button>
+    </header>
+    <main class="page">
+      <router-outlet />
+    </main>
+  </div>
+</div>

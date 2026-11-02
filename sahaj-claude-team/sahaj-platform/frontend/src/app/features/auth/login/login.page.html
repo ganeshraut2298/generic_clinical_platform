@@ -1,0 +1,160 @@
+<div class="pubwrap tight">
+  <header class="lnav surf">
+    <div class="brand">
+      <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <div>
+        <b>Sahaj</b>
+        <small>Clinic software for India</small>
+      </div>
+    </div>
+    <div class="actions">
+      <a mat-button routerLink="/admin" title="Admin portal for the Sahaj team">
+        <app-icon name="shield" [size]="16" />
+        <span class="hide-sm">Admin portal</span>
+      </a>
+      <a mat-button routerLink="/">
+        <app-icon name="back" [size]="16" />
+        Home
+      </a>
+    </div>
+  </header>
+
+  <div class="auth">
+    <section class="auth-side">
+      <span class="pill p-teal">Free for your first year</span>
+      <h1 class="display-sm">{{ sideCopy().heading }}</h1>
+      <p class="lede">{{ sideCopy().lede }}</p>
+      <ul class="ticks">
+        @for (tick of sideTicks; track tick) {
+          <li><app-icon name="check" [size]="15" /><span>{{ tick }}</span></li>
+        }
+      </ul>
+    </section>
+
+    <section class="auth-card surf">
+      <mat-button-toggle-group
+        class="seg"
+        aria-label="Account"
+        [value]="authMode()"
+        (change)="setAuthMode($event.value)"
+      >
+        <mat-button-toggle value="LOGIN">Log in</mat-button-toggle>
+        <mat-button-toggle value="SIGNUP">New clinic</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <h2>{{ cardHeading() }}</h2>
+
+      @if (lockMessage()) {
+        <div class="notice crit" role="alert">
+          <app-icon name="lock" [size]="16" />
+          <span>{{ lockMessage() }}</span>
+        </div>
+      } @else if (step() === 'mobile') {
+        <form [formGroup]="mobileForm" (ngSubmit)="sendOtp()">
+          <mat-form-field class="field full">
+            <mat-label>Mobile number</mat-label>
+            <span matTextPrefix>+91&nbsp;</span>
+            <input
+              id="login-mobile"
+              matInput
+              [formControl]="mobileControl"
+              inputmode="numeric"
+              maxlength="10"
+              autocomplete="tel-national"
+              placeholder="98XXX XXXXX"
+            />
+            @if (mobileFieldError()) {
+              <mat-error>{{ mobileFieldError() }}</mat-error>
+            }
+          </mat-form-field>
+          @if (formError()) {
+            <div class="notice warn" role="alert"><span>{{ formError() }}</span></div>
+          }
+          <button mat-flat-button type="submit" class="btn-lg full" [disabled]="sending()">
+            Send OTP
+            <app-icon name="arrow" [size]="17" />
+          </button>
+        </form>
+      } @else if (step() === 'otp') {
+        <form [formGroup]="otpForm" (ngSubmit)="verify()">
+          <mat-form-field class="field full">
+            <mat-label>Enter the 6-digit code sent to +91 {{ maskedMobile() }}</mat-label>
+            <input
+              id="login-code"
+              matInput
+              class="num"
+              [formControl]="codeControl"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="······"
+            />
+            @if (codeFieldError()) {
+              <mat-error>{{ codeFieldError() }}</mat-error>
+            }
+          </mat-form-field>
+
+          @if (isSignup()) {
+            <mat-checkbox [formControl]="consentControl">
+              I agree to the Terms of Use and Privacy Policy ({{ termsVersion }}).
+            </mat-checkbox>
+          }
+
+          @if (formError()) {
+            <div class="notice warn" role="alert"><span>{{ formError() }}</span></div>
+          }
+
+          <button mat-flat-button type="submit" class="btn-lg full" [disabled]="sending()">
+            Verify and continue
+            <app-icon name="arrow" [size]="17" />
+          </button>
+
+          <div class="row otp-foot">
+            <button type="button" class="linkbtn" (click)="changeNumber()">Change number</button>
+            @if (resendSeconds() > 0) {
+              <span class="faint num">Resend code in {{ resendLabel() }}</span>
+            } @else {
+              <button type="button" class="linkbtn" (click)="resend()">Resend code</button>
+            }
+          </div>
+        </form>
+      } @else if (step() === 'chooseClinic') {
+        <p class="muted">This number belongs to more than one clinic. Choose one to continue.</p>
+        <ul class="clinic-list">
+          @for (choice of clinics(); track choice.tenantId) {
+            <li>
+              <button type="button" class="clinic-row" [disabled]="sending()" (click)="pickClinic(choice)">
+                <span class="clinic-name">{{ choice.name }}</span>
+                @if (choice.area) {
+                  <span class="faint">{{ choice.area }}</span>
+                }
+                <app-icon name="arrow" [size]="16" />
+              </button>
+            </li>
+          }
+        </ul>
+        @if (formError()) {
+          <div class="notice warn" role="alert"><span>{{ formError() }}</span></div>
+        }
+        <button type="button" class="linkbtn" (click)="changeNumber()">Change number</button>
+      } @else if (step() === 'notRegistered') {
+        <div class="notice warn" role="alert">
+          <app-icon name="msg" [size]="16" />
+          <span>{{ notRegisteredMessage }}</span>
+        </div>
+        <div class="row">
+          <button mat-stroked-button type="button" (click)="setAuthMode('SIGNUP')">
+            Sign up a new clinic
+          </button>
+          <button type="button" class="linkbtn" (click)="changeNumber()">Try another number</button>
+        </div>
+      }
+
+      <p class="faint fine-print">{{ consentLine }}</p>
+    </section>
+  </div>
+</div>

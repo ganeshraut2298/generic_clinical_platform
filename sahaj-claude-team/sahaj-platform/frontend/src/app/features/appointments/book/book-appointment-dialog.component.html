@@ -1,0 +1,133 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bat">
+  @if (booked(); as appointment) {
+    <div class="sheet-h">
+      <div>
+        <h2 id="bat">Appointment booked</h2>
+        <p class="muted" style="font-size: 0.86rem">{{ appointment.patientName }} is on the board now.</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      <div class="slip">
+        <div>
+          <small>When</small>
+          <div class="big">{{ formatClockLabel(appointment.apptTime) }}</div>
+        </div>
+        <div class="main">
+          <b>{{ appointment.patientName }}</b>
+          <small>{{ visitTypeLabels[appointment.visitType] }} · {{ data.doctorName }}</small>
+        </div>
+      </div>
+      <div class="notice good">
+        <app-icon name="check" [size]="16" />
+        <span>Booked through {{ appointment.source === 'FRONT_DESK' ? 'front desk' : appointment.source.toLowerCase() }}.</span>
+      </div>
+    </div>
+    <div class="sheet-f">
+      <button mat-flat-button type="button" (click)="close()">Done</button>
+    </div>
+  } @else {
+    <div class="sheet-h">
+      <div>
+        <h2 id="bat">Book appointment</h2>
+        <p class="muted" style="font-size: 0.86rem">
+          {{ data.doctorName }} · {{ formatClockLabel(data.apptTime) }}
+        </p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Mobile number</mat-label>
+        <input
+          matInput
+          inputmode="numeric"
+          maxlength="10"
+          autocomplete="off"
+          placeholder="98XXXXXXXX"
+          [value]="mobile()"
+          (input)="onMobileInput($any($event.target).value)"
+        />
+      </mat-form-field>
+
+      @if (searching()) {
+        <p class="muted" aria-busy="true">Searching</p>
+      } @else if (searchError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      } @else if (searched()) {
+        <div class="members">
+          @for (patient of results(); track patient.id) {
+            <button
+              type="button"
+              class="member"
+              [attr.aria-pressed]="selectedPatient()?.id === patient.id"
+              (click)="selectPatient(patient)"
+            >
+              <span class="av">{{ patient.name.charAt(0) }}</span>
+              <div class="main">
+                <b>{{ patient.name }}</b>
+                <small>{{ patient.age }} {{ patient.sex }}</small>
+              </div>
+            </button>
+          }
+          <button type="button" class="member" (click)="addPatient()">
+            <span class="av b"><app-icon name="plus" [size]="16" /></span>
+            <div class="main">
+              <b>Add {{ results().length ? 'family member' : 'new patient' }}</b>
+              <small>Opens the registration form.</small>
+            </div>
+          </button>
+        </div>
+      } @else {
+        <p class="faint" style="font-size: 0.84rem">Enter a 10-digit mobile number to search.</p>
+      }
+
+      <div class="field-block">
+        <span class="eyebrow">Visit type</span>
+        <div class="seg-wrap">
+          @for (type of visitTypes; track type) {
+            <button type="button" [attr.aria-pressed]="visitType() === type" (click)="setVisitType(type)">
+              {{ visitTypeLabels[type] }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="field-block">
+        <span class="eyebrow">Booked through</span>
+        <div class="seg-wrap">
+          @for (s of sources; track s.value) {
+            <button type="button" [attr.aria-pressed]="source() === s.value" (click)="setSource(s.value)">
+              {{ s.label }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Note (optional)</mat-label>
+        <input matInput autocomplete="off" [value]="note()" (input)="onNoteInput($any($event.target).value)" />
+      </mat-form-field>
+
+      @if (bookError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    </div>
+    <div class="sheet-f">
+      <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+      <button mat-flat-button type="button" [disabled]="!canBook()" (click)="book()">
+        <app-icon name="check" [size]="16" /> Book appointment
+      </button>
+    </div>
+  }
+</div>

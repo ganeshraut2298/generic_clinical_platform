@@ -1,0 +1,134 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ntt">
+  @if (issuedVisit(); as visit) {
+    <div class="sheet-h">
+      <div>
+        <h2 id="ntt">Token issued</h2>
+        <p class="muted" style="font-size: 0.86rem">{{ visit.patientName }} is on the board now.</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      <div class="slip">
+        <div>
+          <small>Token</small>
+          <div class="big num">T-{{ visit.tokenNo }}</div>
+        </div>
+        <div class="main">
+          <b>{{ visit.patientName }}</b>
+          <small>{{ visit.age }} {{ visit.sex }} · {{ visitTypeLabel(visit.visitType) }}</small>
+          <small>{{ visit.doctorName }}</small>
+        </div>
+      </div>
+      <div class="notice good">
+        <app-icon name="check" [size]="16" />
+        <span>Consultation fee: {{ visit.feePaise > 0 ? formatInr(visit.feePaise / 100) : 'Free' }}</span>
+      </div>
+    </div>
+    <div class="sheet-f">
+      <button mat-stroked-button type="button" (click)="issueAnother()">
+        <app-icon name="plus" [size]="16" /> Next token
+      </button>
+      <button mat-flat-button type="button" (click)="close()">Done</button>
+    </div>
+  } @else {
+    <div class="sheet-h">
+      <div>
+        <h2 id="ntt">New walk-in token</h2>
+        <p class="muted" style="font-size: 0.86rem">Search by mobile number, then choose a doctor.</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Mobile number</mat-label>
+        <input
+          matInput
+          inputmode="numeric"
+          maxlength="10"
+          autocomplete="off"
+          placeholder="98XXXXXXXX"
+          [value]="mobile()"
+          (input)="onMobileInput($any($event.target).value)"
+        />
+      </mat-form-field>
+
+      @if (searching()) {
+        <p class="muted" aria-busy="true">Searching</p>
+      } @else if (searchError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      } @else if (searched()) {
+        <div class="members">
+          @for (patient of results(); track patient.id) {
+            <button
+              type="button"
+              class="member"
+              [attr.aria-pressed]="selectedPatient()?.id === patient.id"
+              (click)="selectPatient(patient)"
+            >
+              <span class="av">{{ patient.name.charAt(0) }}</span>
+              <div class="main">
+                <b>{{ patient.name }}</b>
+                <small>{{ patient.age }} {{ patient.sex }}</small>
+              </div>
+            </button>
+          }
+          <button type="button" class="member" (click)="addPatient()">
+            <span class="av b"><app-icon name="plus" [size]="16" /></span>
+            <div class="main">
+              <b>Add {{ results().length ? 'family member' : 'new patient' }}</b>
+              <small>Opens the registration form.</small>
+            </div>
+          </button>
+        </div>
+      } @else {
+        <p class="faint" style="font-size: 0.84rem">Enter a 10-digit mobile number to search.</p>
+      }
+
+      <div class="field-block">
+        <span class="eyebrow">Doctor</span>
+        @if (doctorsLoading()) {
+          <p class="muted" aria-busy="true">Loading doctors</p>
+        } @else {
+          <div class="seg-wrap">
+            @for (doctor of doctors(); track doctor.id) {
+              <button
+                type="button"
+                class="docbtn"
+                [attr.aria-pressed]="selectedDoctorId() === doctor.id"
+                (click)="selectDoctor(doctor.id)"
+              >
+                {{ doctor.name }}
+                @if (doctor.doctor?.feeRupees !== undefined && doctor.doctor?.feeRupees !== null) {
+                  <small>{{ formatInr(doctor.doctor!.feeRupees!) }}</small>
+                }
+              </button>
+            }
+            @if (!doctors().length) {
+              <span class="faint">No active doctors. Add one in Clinic setup.</span>
+            }
+          </div>
+        }
+      </div>
+
+      @if (issueError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    </div>
+    <div class="sheet-f">
+      <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+      <button mat-flat-button type="button" [disabled]="!canIssue()" (click)="issue()">
+        <app-icon name="check" [size]="16" /> Issue token
+      </button>
+    </div>
+  }
+</div>

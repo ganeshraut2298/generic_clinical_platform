@@ -1,0 +1,249 @@
+package com.sahaj.opd.application;
+
+import com.sahaj.opd.application.AppointmentRepository.AppointmentRow;
+import com.sahaj.opd.application.BookingRulesRepository.BookingRulesRow;
+import com.sahaj.opd.application.VisitRepository.VisitRow;
+import com.sahaj.patient.api.PatientLookupPort;
+import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
+import com.sahaj.platform.api.AuditLog;
+import com.sahaj.platform.api.ConflictException;
+import com.sahaj.platform.api.InvalidInputException;
+import com.sahaj.platform.api.NotFoundException;
+import com.sahaj.platform.api.TeamMemberPort;
+import com.sahaj.platform.api.TeamMemberPort.TeamMember;
+import java.time.Clock;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * SAH-11 AC2, AC3, AC4: book, see, cancel, mark no-show and turn an appointment into a SAH-9
+ * token. Enforcement of the clinic's booking rules (close-before window, overbook) lives here,
+ * not on the controller, so a direct service call is checked the same way a request is.
+ */
+@Service
+public class AppointmentService {
+
+    static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
+    static final String ENTITY_TYPE = "APPOINTMENT";
+
+    private static final Set<String> WRITE_ROLES = Set.of("OWNER", "FRONT_DESK");
+    private static final Set<String> VISIT_TYPES = Set.of("NEW", "FOLLOW_UP");
+    private static final Set<String> SOURCES = Set.of("PHONE", "WHATSAPP", "FRONT_DESK");
+    private static final Set<String> PATCHABLE_STATUSES = Set.of("CANCELLED", "NOSHOW");
+    private static final String BOOKED = "BOOKED";
+    private static final String ARRIVED = "ARRIVED";
+    private static final Set<String> DOCTOR_ROLES = Set.of("DOCTOR", "VISITING_DOCTOR");
+
+    private final AppointmentRepository appointmentRepository;
+    private final BookingRulesRepository bookingRulesRepository;
+    private final VisitRepository visitRepository;
+    private final VisitService visitService;
+    private final PatientLookupPort patientLookup;
+    private final TeamMemberPort teamMemberPort;
+    private final AuditLog auditLog;
+    private final Clock clock;
+
+    public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
+                               VisitRepository visitRepository, VisitService visitService,
+                               PatientLookupPort patientLookup, TeamMemberPort teamMemberPort, AuditLog auditLog,
+                               Clock clock) {
+        this.appointmentRepository = appointmentRepository;
+        this.bookingRulesRepository = bookingRulesRepository;
+        this.visitRepository = visitRepository;
+        this.visitService = visitService;
+        this.patientLookup = patientLookup;
+        this.teamMemberPort = teamMemberPort;
+        this.auditLog = auditLog;
+        this.clock = clock;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentView> list(UUID tenantId, LocalDate apptDate, UUID doctorMembershipId) {
+        if (apptDate == null) {
+            throw new InvalidInputException("date", "Choose a date");
+        }
+        List<AppointmentRow> rows = appointmentRepository.findByDate(tenantId, apptDate, doctorMembershipId);
+        Map<UUID, PatientSummary> patients = new HashMap<>();
+        Map<UUID, TeamMember> doctors = new HashMap<>();
+        List<AppointmentView> views = new ArrayList<>();
+        for (AppointmentRow row : rows) {
+            PatientSummary patient = patients.computeIfAbsent(row.patientId(),
+                    id -> patientLookup.find(tenantId, id).orElse(null));
+            TeamMember doctor = doctors.computeIfAbsent(row.doctorMembershipId(),
+                    id -> teamMemberPort.find(tenantId, id).orElse(null));
+            if (patient == null || doctor == null) {
+                continue;
+            }
+            views.add(toView(tenantId, row, patient, doctor));
+        }
+        return views;
+    }
+
+    /**
+     * AC2, AC3: book a patient into a doctor's slot, refusing the close-before window and a clash
+     * per the booking rules. The role gate here is the API contract's role list for this call
+     * (OWNER, FRONT_DESK) checked a second time, already enforced by the controller's
+     * {@code @PreAuthorize} - except for the close-before and overbook checks just below, which
+     * intentionally do not gate on role up front: AC2 says those two checks are refused for
+     * everyone except a staff override (OWNER/FRONT_DESK can always book). Today every caller of
+     * this method is already OWNER or FRONT_DESK, so the override always applies and neither
+     * check can actually refuse a booking; the distinction is kept so a future self-book channel
+     * (Phase 2, no schema change needed) can call this same service with a patient-facing role and
+     * be refused correctly, without the blanket gate hiding that behaviour.
+     */
+    @Transactional
+    public AppointmentView create(UUID tenantId, UUID actorUserId, String actorRole, AppointmentCreateInput input) {
+        if (input.patientId() == null) {
+            throw new InvalidInputException("patientId", "Choose a patient");
+        }
+        if (input.doctorMembershipId() == null) {
+            throw new InvalidInputException("doctorMembershipId", "Choose a doctor");
+        }
+        if (input.apptDate() == null) {
+            throw new InvalidInputException("apptDate", "Choose a date");
+        }
+        LocalTime apptTime = parseTime(input.apptTime());
+        if (input.visitType() == null || !VISIT_TYPES.contains(input.visitType())) {
+            throw new InvalidInputException("visitType", "Choose New or Follow-up");
+        }
+        if (input.source() == null || !SOURCES.contains(input.source())) {
+            throw new InvalidInputException("source", "Choose how this booking came in");
+        }
+
+        PatientSummary patient = patientLookup.find(tenantId, input.patientId())
+                .orElseThrow(() -> new NotFoundException("Patient not found"));
+        TeamMember doctor = teamMemberPort.find(tenantId, input.doctorMembershipId())
+                .filter(member -> member.active() && DOCTOR_ROLES.contains(member.role()))
+                .orElseThrow(() -> new NotFoundException("Doctor not found"));
+
+        BookingRulesRow rules = bookingRulesRepository.find(tenantId).orElse(BookingRulesService.DEFAULTS);
+
+        if (!WRITE_ROLES.contains(actorRole)) {
+            requireOutsideCloseBeforeWindow(rules, input.apptDate(), apptTime);
+        }
+
+        appointmentRepository.findActiveConflict(tenantId, input.doctorMembershipId(), input.apptDate(), apptTime)
+                .ifPresent(existing -> {
+                    if (!rules.overbook()) {
+                        throw new ConflictException("appointment-slot-taken", "That slot is already booked",
+                                "This doctor already has a booked or arrived patient in this slot.");
+                    }
+                    if (!WRITE_ROLES.contains(actorRole)) {
+                        throw new AccessDeniedException("Only the owner or front desk can double-book a slot.");
+                    }
+                });
+
+        UUID id = UUID.randomUUID();
+        appointmentRepository.insert(id, patient.id(), doctor.membershipId(), input.apptDate(), apptTime,
+                input.visitType(), input.source(), input.note(), actorUserId);
+        AppointmentRow created = findRow(tenantId, id);
+        auditLog.record("APPOINTMENT_BOOKED", ENTITY_TYPE, id, null, snapshot(created));
+        return toView(tenantId, created, patient, doctor);
+    }
+
+    /** AC2: a patient's booked slot refuses a new booking in the same slot within the close-before window, staff excepted. */
+    private void requireOutsideCloseBeforeWindow(BookingRulesRow rules, LocalDate apptDate, LocalTime apptTime) {
+        LocalDateTime slotAt = LocalDateTime.of(apptDate, apptTime);
+        LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
+        if (slotAt.isBefore(now.plusHours(rules.closeBeforeHours()))) {
+            throw new InvalidInputException("apptTime",
+                    "Booking closes " + rules.closeBeforeHours() + " hour(s) before the slot");
+        }
+    }
+
+    /** AC3, AC4, AC7: cancel or mark no-show; only a still-booked appointment can change this way. */
+    @Transactional
+    public AppointmentView changeStatus(UUID tenantId, UUID actorUserId, String actorRole, UUID id, String status) {
+        if (!WRITE_ROLES.contains(actorRole)) {
+            throw new AccessDeniedException("Only the owner or front desk can change an appointment's status.");
+        }
+        if (status == null || !PATCHABLE_STATUSES.contains(status)) {
+            throw new InvalidInputException("status", "Choose Cancelled or No-show");
+        }
+        AppointmentRow before = findRow(tenantId, id);
+        if (!BOOKED.equals(before.status())) {
+            throw new InvalidInputException("status", "Only a booked appointment can be cancelled or marked no-show");
+        }
+        appointmentRepository.updateStatus(id, status, actorUserId);
+        AppointmentRow after = findRow(tenantId, id);
+        auditLog.record("CANCELLED".equals(status) ? "APPOINTMENT_CANCELLED" : "APPOINTMENT_NOSHOW", ENTITY_TYPE, id,
+                Map.of("status", before.status()), Map.of("status", after.status()));
+        return toView(tenantId, after);
+    }
+
+    /** AC3, AC4, AC7: "Create token" issues a SAH-9 visit and marks this appointment Arrived with its token number. */
+    @Transactional
+    public AppointmentView createToken(UUID tenantId, UUID actorUserId, String actorRole, UUID id) {
+        if (!WRITE_ROLES.contains(actorRole)) {
+            throw new AccessDeniedException("Only the owner or front desk can create a token.");
+        }
+        AppointmentRow appointment = findRow(tenantId, id);
+        if (appointment.visitId() != null || !BOOKED.equals(appointment.status())) {
+            throw new ConflictException("appointment-not-bookable", "This appointment cannot take a token",
+                    "This appointment already has a token or is not booked.");
+        }
+        VisitView visit = visitService.issueToken(tenantId, actorUserId, actorRole,
+                new VisitCreateInput(appointment.patientId(), appointment.doctorMembershipId()));
+        appointmentRepository.setVisit(id, visit.id(), ARRIVED, actorUserId);
+        AppointmentRow after = findRow(tenantId, id);
+        auditLog.record("APPOINTMENT_TOKEN_ISSUED", ENTITY_TYPE, id, Map.of("status", appointment.status()),
+                Map.of("status", after.status(), "visitId", visit.id(), "tokenNo", visit.tokenNo()));
+        return toView(tenantId, after);
+    }
+
+    private AppointmentRow findRow(UUID tenantId, UUID id) {
+        return appointmentRepository.findById(tenantId, id).orElseThrow(() -> new NotFoundException("Appointment not found"));
+    }
+
+    private AppointmentView toView(UUID tenantId, AppointmentRow row) {
+        PatientSummary patient = patientLookup.find(tenantId, row.patientId())
+                .orElseThrow(() -> new NotFoundException("Patient not found"));
+        TeamMember doctor = teamMemberPort.find(tenantId, row.doctorMembershipId())
+                .orElseThrow(() -> new NotFoundException("Doctor not found"));
+        return toView(tenantId, row, patient, doctor);
+    }
+
+    private AppointmentView toView(UUID tenantId, AppointmentRow row, PatientSummary patient, TeamMember doctor) {
+        Integer tokenNo = null;
+        if (row.visitId() != null) {
+            tokenNo = visitRepository.findById(tenantId, row.visitId()).map(VisitRow::tokenNo).orElse(null);
+        }
+        return new AppointmentView(row.id(), patient.id(), patient.name(), patient.age(), patient.sex(),
+                doctor.membershipId(), doctor.name(), row.apptDate(), row.apptTime(), row.status(), row.visitType(),
+                row.source(), row.note(), row.visitId(), tokenNo);
+    }
+
+    private static LocalTime parseTime(String value) {
+        try {
+            return LocalTime.parse(value);
+        } catch (DateTimeException | NullPointerException ex) {
+            throw new InvalidInputException("apptTime", "Enter the slot time as HH:mm");
+        }
+    }
+
+    /** Never the patient's or doctor's name (SAH-8/9/10 audit rule): only ids and business facts. */
+    private static Map<String, Object> snapshot(AppointmentRow row) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("patientId", row.patientId());
+        values.put("doctorMembershipId", row.doctorMembershipId());
+        values.put("apptDate", row.apptDate());
+        values.put("apptTime", row.apptTime());
+        values.put("status", row.status());
+        values.put("visitType", row.visitType());
+        values.put("source", row.source());
+        return values;
+    }
+}

@@ -1,0 +1,140 @@
+:host {
+  display: block;
+}
+
+.grow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+}
+.sizes {
+  margin-top: 10px;
+}
+.grow-text {
+  margin-top: 10px;
+}
+
+.ws-box {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.branch {
+  flex: 1;
+  min-width: 200px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: popin var(--dur-2) var(--ease);
+
+  b {
+    font-size: 0.84rem;
+  }
+}
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.seat {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  animation: popin 0.35s var(--ease) both;
+
+  &.doc {
+    background: var(--pri);
+    color: var(--pri-ink);
+  }
+  &.st {
+    background: var(--sec-soft);
+    color: var(--sec);
+  }
+}
+
+.prices4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.price {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition:
+    border-color var(--dur-2),
+    box-shadow var(--dur-2);
+
+  &.match {
+    border: 2px solid var(--pri);
+    padding: 21px;
+    box-shadow: 0 0 0 4px var(--pri-soft);
+  }
+}
+.amt {
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+
+  &.quoted {
+    font-size: 1.6rem;
+  }
+  small {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--ink-3);
+    letter-spacing: 0;
+  }
+}
+.desc {
+  font-size: 0.86rem;
+}
+.cta {
+  margin-top: auto;
+}
+.note {
+  font-size: 0.8rem;
+}
+
+@keyframes popin {
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1100px) {
+  .prices4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .grow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .prices4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

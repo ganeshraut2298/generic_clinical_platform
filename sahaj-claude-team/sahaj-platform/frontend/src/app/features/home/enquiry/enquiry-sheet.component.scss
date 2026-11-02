@@ -1,0 +1,75 @@
+:host {
+  display: block;
+}
+
+.sheet-h {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 14px 0 10px;
+
+  > div {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+h2 {
+  padding: 12px 0 0;
+  font-size: 1.2rem;
+}
+
+.lead {
+  font-size: 0.86rem;
+  margin: 4px 0 8px 24px;
+}
+
+.close {
+  --mat-button-text-horizontal-padding: 0;
+  min-width: 44px;
+  width: 44px;
+  margin-top: 8px;
+}
+
+.sheet-b {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px !important;
+}
+
+.prefix {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.failure {
+  background: var(--crit-soft);
+  color: var(--crit);
+  margin-top: 4px;
+}
+
+.sheet-f {
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}

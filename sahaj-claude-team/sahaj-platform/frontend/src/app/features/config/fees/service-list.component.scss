@@ -1,0 +1,62 @@
+@use '../config-common';
+
+:host {
+  display: block;
+}
+
+.servlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 4px 16px;
+}
+
+.srv {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+
+  .name {
+    flex: 1;
+    min-width: 140px;
+    font-weight: 600;
+  }
+  .cat {
+    width: 128px;
+  }
+  &.off .name {
+    text-decoration: line-through;
+  }
+}
+
+.srvadd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 140px auto;
+  gap: 8px;
+  align-items: start;
+
+  .f {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  button {
+    align-self: start;
+  }
+}
+
+.err-text {
+  color: var(--crit);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 720px) {
+  .servlist {
+    grid-template-columns: 1fr;
+  }
+  .srvadd {
+    grid-template-columns: 1fr;
+  }
+}

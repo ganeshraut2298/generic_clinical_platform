@@ -1,0 +1,367 @@
+<div class="pagehead">
+  <div>
+    <h1>Billing</h1>
+    <p class="lead">Items come from the visit. Fee rules, discount limits and service prices are set in Clinic setup.</p>
+  </div>
+  <div class="actions">
+    @if (canCloseDay()) {
+      <button mat-stroked-button type="button" (click)="openClosing()">
+        <app-icon name="lock" [size]="15" /> Close the day
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading()) {
+  <p class="muted" aria-busy="true">Loading the billing counter</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+  </div>
+} @else if (counter(); as c) {
+  <div class="grid2">
+    <section class="panel surf">
+      <div class="panel-h">
+        <h2>Awaiting payment</h2>
+        <span class="pill p-billing num">{{ c.awaiting.length }}</span>
+      </div>
+      <div class="list">
+        @for (p of rowsOf(c.awaiting); track p.visitId) {
+          <button
+            type="button"
+            class="li"
+            [attr.aria-current]="selectedVisitId() === p.visitId"
+            (click)="selectBill(p.visitId)"
+          >
+            <span class="tokchip">T-{{ p.tokenNo }}</span>
+            <div class="main">
+              <b>{{ p.patientName }}</b>
+              <small>{{ p.doctorName }}</small>
+            </div>
+            <b class="num">{{ formatInr(p.balancePaise / 100) }}</b>
+          </button>
+        } @empty {
+          <div class="empty">No bills waiting</div>
+        }
+      </div>
+
+      @if (c.dues.length) {
+        <div class="panel-h" style="margin-top: 6px">
+          <h2>Dues</h2>
+          <span class="pill p-warn num">{{ formatInr(sumBalance(c.dues) / 100) }}</span>
+        </div>
+        <div class="list">
+          @for (p of rowsOf(c.dues); track p.visitId) {
+            <button
+              type="button"
+              class="li"
+              [attr.aria-current]="selectedVisitId() === p.visitId"
+              (click)="selectBill(p.visitId)"
+            >
+              <span class="tokchip">T-{{ p.tokenNo }}</span>
+              <div class="main">
+                <b>{{ p.patientName }}</b>
+                <small>Balance due</small>
+              </div>
+              <b class="num">{{ formatInr(p.balancePaise / 100) }}</b>
+            </button>
+          }
+        </div>
+      }
+
+      <div class="panel-h" style="margin-top: 6px">
+        <h2>Paid today</h2>
+        <span class="faint num" style="font-size: 0.8rem">
+          {{ formatInr(sumTotal(c.paidToday) / 100) }}
+        </span>
+      </div>
+      <div class="list">
+        @for (p of rowsOf(c.paidToday); track p.visitId) {
+          <button
+            type="button"
+            class="li"
+            [attr.aria-current]="selectedVisitId() === p.visitId"
+            (click)="selectBill(p.visitId)"
+          >
+            <span class="tokchip">T-{{ p.tokenNo }}</span>
+            <div class="main">
+              <b>{{ p.patientName }}</b>
+              <small>{{ p.doctorName }}</small>
+            </div>
+            <span class="muted num">{{ formatInr(p.totalPaise / 100) }}</span>
+          </button>
+        } @empty {
+          <div class="empty">None yet</div>
+        }
+      </div>
+    </section>
+
+    <section class="panel surf">
+      @if (billLoading()) {
+        <p class="muted" aria-busy="true">Loading the bill</p>
+      } @else if (billError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      } @else if (!bill()) {
+        <div class="empty" style="padding: 40px">
+          Nothing to bill right now.
+          <br />
+          <span class="faint">{{ c.paidToday.length }} visits paid today</span>
+        </div>
+      } @else {
+        @let b = bill()!;
+        <div class="panel-h">
+          <div>
+            <span class="eyebrow">Bill</span>
+            <h2 style="margin-top: 4px">
+              T-{{ b.tokenNo }} · {{ b.patientName }}
+              <span class="faint" style="font-weight: 500; font-size: 0.88rem">{{ b.age }} {{ b.sex }}</span>
+            </h2>
+            <div class="muted" style="font-size: 0.82rem">{{ b.doctorName }} · {{ b.visitType === 'FOLLOW_UP' ? 'Follow-up' : 'New' }} visit</div>
+          </div>
+          @if (b.balancePaise === 0) {
+            <span class="pill p-good"><app-icon name="check" [size]="12" /> Settled</span>
+          } @else {
+            <span class="pill p-billing"><span class="dot"></span>Awaiting payment</span>
+          }
+        </div>
+
+        @if (!b.canCollect) {
+          <div class="notice info">
+            <app-icon name="lock" [size]="16" />
+            <span>{{ messageViewOnly }}</span>
+          </div>
+        }
+
+        @if (b.balancePaise === 0) {
+          <div class="rcpt">
+            <table class="rt">
+              <tbody>
+                @for (item of b.items; track item.id) {
+                  <tr>
+                    <td>{{ item.name }}{{ item.qty > 1 ? ' × ' + item.qty : '' }}</td>
+                    <td class="num">{{ formatInr((item.amountPaise * item.qty) / 100) }}</td>
+                  </tr>
+                }
+                @if (b.discountPaise) {
+                  <tr>
+                    <td>Discount {{ b.discountPercent }}%{{ b.discountReason ? ' · ' + b.discountReason : '' }}</td>
+                    <td class="num">− {{ formatInr(b.discountPaise / 100) }}</td>
+                  </tr>
+                }
+                <tr class="tot">
+                  <td>Total</td>
+                  <td class="num">{{ formatInr(b.totalPaise / 100) }}</td>
+                </tr>
+                @for (payment of b.payments; track payment.id) {
+                  <tr class="pay">
+                    <td>
+                      {{ payment.amountPaise < 0 ? 'Refund' : 'Paid' }} · {{ payment.mode }} · by
+                      {{ payment.recordedByName }}
+                    </td>
+                    <td class="num">
+                      {{ payment.amountPaise < 0 ? '− ' + formatInr(-payment.amountPaise / 100) : formatInr(payment.amountPaise / 100) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="actions" style="justify-content: flex-end">
+            @if (isOwner()) {
+              <button mat-stroked-button type="button" (click)="openRefund()">Refund</button>
+            } @else {
+              <span class="faint" style="font-size: 0.8rem">Refunds need the owner</span>
+            }
+          </div>
+        } @else {
+          <div class="lines">
+            @for (item of b.items; track item.id) {
+              <div class="line">
+                <div class="n">{{ item.name }}</div>
+                @if (item.removable && b.canCollect) {
+                  <span class="faint num">× {{ item.qty }}</span>
+                }
+                <span class="a">{{ formatInr((item.amountPaise * item.qty) / 100) }}</span>
+                @if (item.removable && b.canCollect) {
+                  <button class="xbtn" type="button" [attr.aria-label]="'Remove ' + item.name" (click)="removeItem(item.id)">
+                    <app-icon name="x" [size]="16" />
+                  </button>
+                } @else {
+                  <span style="width: 44px"></span>
+                }
+              </div>
+            }
+          </div>
+
+          @if (b.canCollect) {
+            <div class="addrow">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="svcfield">
+                <mat-label>Add a service</mat-label>
+                <mat-select [value]="addServiceId()" (selectionChange)="addServiceId.set($event.value)">
+                  @for (svc of services(); track svc.id) {
+                    <mat-option [value]="svc.id">{{ svc.name }} · {{ formatInr(svc.priceRupees) }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="qtyfield">
+                <mat-label>Qty</mat-label>
+                <input matInput type="number" min="1" max="20" [value]="addServiceQty()" (input)="addServiceQty.set(+$any($event.target).value || 1)" />
+              </mat-form-field>
+              <button mat-stroked-button type="button" [disabled]="!addServiceId()" (click)="addItem()">
+                <app-icon name="plus" [size]="16" /> Add
+              </button>
+            </div>
+          }
+
+          <div class="grid2 even" style="gap: 14px">
+            <div class="field">
+              <label for="disc">Discount %</label>
+              <div class="row" style="flex-wrap: nowrap">
+                <input
+                  id="disc"
+                  class="input num"
+                  style="max-width: 90px"
+                  inputmode="numeric"
+                  [value]="discountPercentInput()"
+                  [disabled]="!b.canCollect"
+                  (change)="setDiscountPercent($any($event.target).value); saveDiscount()"
+                  aria-describedby="discHelp"
+                />
+                <select
+                  class="input"
+                  aria-label="Discount reason"
+                  [value]="discountReason()"
+                  [disabled]="!b.canCollect || discountPercent() <= 0"
+                  (change)="discountReason.set($any($event.target).value); saveDiscount()"
+                >
+                  <option value="">{{ discountPercent() > 0 ? 'Choose a reason' : 'No discount' }}</option>
+                  @for (r of discountReasons; track r) {
+                    <option [value]="r">{{ r }}</option>
+                  }
+                </select>
+              </div>
+              <span class="faint" id="discHelp" style="font-size: 0.74rem">
+                Your limit: {{ b.discountLimitPercent >= 100 ? 'no limit' : b.discountLimitPercent + '%' }}
+              </span>
+            </div>
+
+            <div class="totals num">
+              <div><span class="muted">Subtotal</span><span>{{ formatInr(b.subtotalPaise / 100) }}</span></div>
+              <div><span class="muted">Discount</span><span>− {{ formatInr(b.discountPaise / 100) }}</span></div>
+              <div><span class="muted">Total</span><span>{{ formatInr(b.totalPaise / 100) }}</span></div>
+              @if (b.paidPaise) {
+                <div><span class="muted">Paid so far</span><span>− {{ formatInr(b.paidPaise / 100) }}</span></div>
+              }
+              <div class="grand"><span>Balance</span><span>{{ formatInr(b.balancePaise / 100) }}</span></div>
+            </div>
+          </div>
+
+          @if (b.canCollect) {
+            <div class="paybox">
+              <div class="row" style="justify-content: space-between">
+                <div class="seg" role="group" aria-label="Payment mode">
+                  @for (mode of paymentModes; track mode) {
+                    <button type="button" [attr.aria-pressed]="paymentMode() === mode" (click)="setPaymentMode(mode)">
+                      {{ mode === 'CASH' ? 'Cash' : mode === 'UPI' ? 'UPI' : 'Card' }}
+                    </button>
+                  }
+                </div>
+                <div class="field" style="flex-direction: row; align-items: center; gap: 8px">
+                  <label for="paynow" style="white-space: nowrap">Paying now</label>
+                  <div class="pre" style="width: 130px">
+                    <span>₹</span>
+                    <input
+                      id="paynow"
+                      class="input num"
+                      inputmode="numeric"
+                      [value]="paymentAmountInput() ?? b.balancePaise / 100"
+                      (input)="paymentAmountInput.set($any($event.target).value)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              @if (paymentMode() === 'UPI') {
+                <div class="upi">
+                  <div style="flex: 1">
+                    <b style="font-size: 1.05rem" class="num">{{ formatInr(paymentAmountPaise() / 100) }}</b>
+                    @if (upiMarkedReceived()) {
+                      <span class="pill p-good" style="margin-top: 6px"><app-icon name="check" [size]="12" /> Received</span>
+                    } @else {
+                      <button class="linkbtn" type="button" style="font-size: 0.78rem" (click)="markUpiReceived()">
+                        Mockup: mark as received
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+              @if (paymentMode() === 'CARD') {
+                <div class="field" style="flex-direction: row; align-items: center; gap: 8px">
+                  <label for="payslip" style="white-space: nowrap">Card slip number</label>
+                  <input
+                    id="payslip"
+                    class="input num"
+                    style="max-width: 150px"
+                    placeholder="Optional"
+                    [value]="paymentReference()"
+                    (input)="paymentReference.set($any($event.target).value)"
+                  />
+                </div>
+              }
+            </div>
+
+            @if (collectBlockedReason(); as reason) {
+              <ul class="errs">
+                <li><app-icon name="alert" [size]="13" /> {{ reason }}</li>
+              </ul>
+            }
+
+            <div class="actions" style="justify-content: flex-end">
+              <button mat-flat-button type="button" [disabled]="busy() || !!collectBlockedReason()" (click)="collect()">
+                <app-icon name="check" [size]="16" /> Collect {{ formatInr(paymentAmountPaise() / 100) }}
+              </button>
+            </div>
+          }
+        }
+
+        @if (refundOpen()) {
+          <div class="refundbox">
+            <h3>Refund for {{ b.patientName }}</h3>
+            <div class="field">
+              <label for="rfa">Amount to refund</label>
+              <div class="pre">
+                <span>₹</span>
+                <input id="rfa" class="input num" inputmode="numeric" [value]="refundAmountInput()" (input)="refundAmountInput.set($any($event.target).value)" />
+              </div>
+              <span class="faint" style="font-size: 0.76rem">Up to {{ formatInr(b.paidPaise / 100) }}</span>
+            </div>
+            <div class="field">
+              <label for="rfr">Reason</label>
+              <select id="rfr" class="input" [value]="refundReason()" (change)="refundReason.set($any($event.target).value)">
+                <option value="">Choose a reason</option>
+                @for (r of refundReasons; track r) {
+                  <option [value]="r">{{ r }}</option>
+                }
+              </select>
+            </div>
+            <div class="field">
+              <span class="field-label">Refund by</span>
+              <div class="seg" role="group" aria-label="Refund mode">
+                <button type="button" [attr.aria-pressed]="refundMode() === 'CASH'" (click)="refundMode.set('CASH')">Cash</button>
+                <button type="button" [attr.aria-pressed]="refundMode() === 'UPI'" (click)="refundMode.set('UPI')">UPI</button>
+              </div>
+            </div>
+            <div class="actions" style="justify-content: flex-end">
+              <button mat-stroked-button type="button" (click)="cancelRefund()">Cancel</button>
+              <button mat-flat-button type="button" [disabled]="busy()" (click)="submitRefund()">Refund</button>
+            </div>
+          </div>
+        }
+      }
+    </section>
+  </div>
+}

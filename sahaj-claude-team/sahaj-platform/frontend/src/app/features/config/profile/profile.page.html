@@ -1,0 +1,215 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading your clinic profile</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else {
+  <div class="grid2">
+    <section class="panel surf" id="f-name">
+      <h2>Clinic details</h2>
+      <form class="fields" [formGroup]="detailsForm" (ngSubmit)="saveDetails()" novalidate>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Clinic name</mat-label>
+          <input matInput formControlName="name" autocomplete="off" (change)="saveDetails()" />
+          @if (nameError; as error) {
+            <mat-error>{{ error }}</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Name in Marathi or Hindi</mat-label>
+          <input
+            matInput
+            formControlName="nameLocal"
+            placeholder="श्री साई फॅमिली क्लिनिक"
+            autocomplete="off"
+            (change)="saveDetails()"
+          />
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Address</mat-label>
+          <input matInput formControlName="address" autocomplete="off" (change)="saveDetails()" />
+        </mat-form-field>
+        <div class="two">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Clinic phone</mat-label>
+            <input
+              matInput
+              class="num"
+              formControlName="phone"
+              inputmode="tel"
+              autocomplete="off"
+              (change)="saveDetails()"
+            />
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>WhatsApp number</mat-label>
+            <input
+              matInput
+              class="num"
+              formControlName="whatsapp"
+              inputmode="tel"
+              autocomplete="off"
+              (change)="saveDetails()"
+            />
+          </mat-form-field>
+        </div>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Google Maps link</mat-label>
+          <input
+            matInput
+            formControlName="mapsUrl"
+            inputmode="url"
+            placeholder="Paste the share link from Google Maps"
+            autocomplete="off"
+            (change)="saveDetails()"
+          />
+          @if (mapsError; as error) {
+            <mat-error>{{ error }}</mat-error>
+          }
+        </mat-form-field>
+        <div class="row between">
+          <span class="muted">Clinic web address</span>
+          <b class="num">{{ webAddress() || '—' }}</b>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel surf" id="f-hol">
+      <div class="panel-h">
+        <div>
+          <h2>Holidays and closures</h2>
+          <small class="faint">
+            On a closed day, online booking stops, and patients who already booked get a WhatsApp
+            message the day before.
+          </small>
+        </div>
+      </div>
+      <div class="list">
+        @for (holiday of holidays(); track holiday.id ?? holiday.date) {
+          <div class="li">
+            <span class="hday num">{{ formatWeekdayDate(holiday.date) }}</span>
+            <div class="main">
+              <b>{{ holiday.name }}</b>
+            </div>
+            <span class="pill" [class.p-warn]="holiday.type === 'CLOSED'" [class.p-teal]="holiday.type !== 'CLOSED'">
+              {{ typeLabel(holiday.type) }}
+            </span>
+            @if (isOwner()) {
+              <button
+                type="button"
+                class="xbtn"
+                [attr.aria-label]="'Remove ' + holiday.name"
+                [disabled]="removingId() === holiday.id"
+                (click)="removeHoliday(holiday)"
+              >
+                <app-icon name="x" [size]="14" />
+              </button>
+            }
+          </div>
+        } @empty {
+          <div class="empty">No holidays added.</div>
+        }
+      </div>
+      @if (isOwner()) {
+        <form class="holadd" [formGroup]="holidayForm" (ngSubmit)="addHoliday()" novalidate>
+          <input
+            type="date"
+            class="input"
+            formControlName="date"
+            [min]="today"
+            aria-label="Holiday date"
+          />
+          <input
+            class="input"
+            formControlName="name"
+            placeholder="e.g. Gudi Padwa"
+            aria-label="Holiday name"
+            autocomplete="off"
+          />
+          <select class="input" formControlName="type" aria-label="Closure type">
+            @for (type of holidayTypes; track type.value) {
+              <option [value]="type.value">{{ type.label }}</option>
+            }
+          </select>
+          <button mat-flat-button type="submit" [disabled]="addingHoliday()">
+            <app-icon name="plus" [size]="15" /> Add
+          </button>
+        </form>
+        @if (holidayError(); as message) {
+          <div class="notice err" role="alert">
+            <app-icon name="alert" [size]="16" />
+            <span>{{ message }}</span>
+          </div>
+        }
+      }
+      <div class="faint note">
+        OPD timings and doctor leave switches will appear here once appointments are built.
+      </div>
+    </section>
+  </div>
+
+  <section class="panel surf" id="f-brand">
+    <div class="panel-h">
+      <div>
+        <h2>Brand colour</h2>
+        <small class="faint">
+          Used for buttons, links, the app header, the booking page and case paper headings. Logo
+          upload comes in a later release; your clinic's initials are used until then.
+        </small>
+      </div>
+    </div>
+    <div class="swatches" role="group" aria-label="Brand colour">
+      @for (preset of presets; track preset.value) {
+        <button
+          type="button"
+          class="swatch"
+          [attr.aria-pressed]="currentBrand() === preset.value"
+          [disabled]="!isOwner() || savingBrand()"
+          (click)="pickPreset(preset.value)"
+        >
+          <i [style.background]="preset.hex"></i>{{ preset.label }}
+        </button>
+      }
+      <button
+        type="button"
+        class="swatch"
+        [attr.aria-pressed]="currentBrand() === 'custom'"
+        [attr.aria-expanded]="customOpen()"
+        [disabled]="!isOwner()"
+        (click)="toggleCustom()"
+      >
+        <i class="wheel" [style.background]="profile()?.brandHex ?? null"></i>
+        {{ currentBrand() === 'custom' ? 'Custom · ' + (profile()?.brandHex ?? '').toUpperCase() : 'Custom colour' }}
+      </button>
+    </div>
+    @if (customOpen()) {
+      <div class="custom">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="hex">
+          <mat-label>Colour code</mat-label>
+          <span matTextPrefix>#&nbsp;</span>
+          <input
+            matInput
+            class="num"
+            [formControl]="customHex"
+            maxlength="7"
+            spellcheck="false"
+            autocomplete="off"
+            (keydown.enter)="useCustom()"
+          />
+          @if (hexError; as error) {
+            <mat-error>{{ error }}</mat-error>
+          }
+        </mat-form-field>
+        <button mat-flat-button type="button" [disabled]="!isOwner() || savingBrand()" (click)="useCustom()">
+          Use this colour
+        </button>
+      </div>
+    }
+  </section>
+}

@@ -1,0 +1,247 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading case paper settings</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else if (settings(); as s) {
+  <div class="paper-grid" id="f-paper">
+    <div class="left">
+      <section class="panel surf">
+        <div>
+          <h2>Printing</h2>
+          <div class="faint intro">
+            General practice · new visit. The Doctor App canvas uses the same layout.
+          </div>
+        </div>
+        <div>
+          <div class="rulerow">
+            <span id="size-label">
+              Paper size
+              <small class="faint">A5 fits the patient file</small>
+            </span>
+            <mat-button-toggle-group
+              class="seg"
+              aria-labelledby="size-label"
+              [hideSingleSelectionIndicator]="true"
+              [value]="s.size"
+              [disabled]="!isOwner()"
+              (change)="setSize($event.value)"
+            >
+              @for (size of sizes; track size) {
+                <mat-button-toggle [value]="size">{{ size }}</mat-button-toggle>
+              }
+            </mat-button-toggle-group>
+          </div>
+          <div class="rulerow">
+            <span id="lang-label">
+              Language
+              <small class="faint">Section labels and medicine timings</small>
+            </span>
+            <mat-button-toggle-group
+              class="seg"
+              aria-labelledby="lang-label"
+              [hideSingleSelectionIndicator]="true"
+              [value]="s.secondLanguage ?? ''"
+              [disabled]="!isOwner()"
+              (change)="setLanguage($event.value)"
+            >
+              @for (language of languages; track language.value) {
+                <mat-button-toggle [value]="language.value">{{ language.label }}</mat-button-toggle>
+              }
+            </mat-button-toggle-group>
+          </div>
+          <div class="rulerow">
+            <span>
+              I print on pre-printed letterhead
+              <small class="faint">The top 35 mm is left blank for your printed header</small>
+            </span>
+            <button
+              type="button"
+              class="sw"
+              role="switch"
+              aria-label="Pre-printed letterhead"
+              [attr.aria-checked]="s.preprinted"
+              [disabled]="!isOwner()"
+              (click)="togglePreprinted()"
+            ></button>
+          </div>
+          <div class="rulerow">
+            <span>
+              Medicine names in CAPITALS
+              <small class="faint">Easier for chemists and patients to read</small>
+            </span>
+            <button
+              type="button"
+              class="sw"
+              role="switch"
+              aria-label="Capital letters for medicines"
+              [attr.aria-checked]="s.caps"
+              [disabled]="!isOwner()"
+              (click)="toggleCaps()"
+            ></button>
+          </div>
+          <div class="rulerow">
+            <span>
+              Doctor's registration number
+              <small class="faint">Always printed, as medical council rules require</small>
+            </span>
+            <span class="pill p-good"><app-icon name="lock" [size]="12" /> Always on</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel surf">
+        <div>
+          <h2>Sections</h2>
+          <div class="faint intro">
+            Switched-off sections are hidden in the Doctor App too, so the doctor fills less.
+          </div>
+        </div>
+        <div class="sections">
+          @for (section of sectionList; track section.key) {
+            <div class="sec">
+              <span>{{ section.label }}</span>
+              @if (section.key === 'rx') {
+                <span class="pill p-good"><app-icon name="lock" [size]="12" /> Always on</span>
+              }
+              <button
+                type="button"
+                class="sw"
+                role="switch"
+                [attr.aria-label]="section.label"
+                [attr.aria-checked]="on(section.key)"
+                [disabled]="section.key === 'rx' || !isOwner()"
+                (click)="toggleSection(section.key)"
+              ></button>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+
+    <section class="panel surf">
+      <div class="panel-h">
+        <h2>Print preview</h2>
+        <span class="faint small">The patient takes this home in their file</span>
+      </div>
+      <div class="paper-wrap">
+        <div class="paper" [class.a4]="s.size === 'A4'" aria-label="Case paper preview" role="group">
+          @if (s.preprinted) {
+            <div class="lh prehd">Your pre-printed letterhead · 35 mm left blank</div>
+            <div class="lh plain">
+              <span></span>
+              <div class="right">
+                <b class="docname">{{ doctor()?.name ?? 'Doctor' }}</b>
+                <small>Reg. {{ doctor()?.doctor?.registrationNo || '—' }}</small>
+              </div>
+            </div>
+          } @else {
+            <div class="lh">
+              <div>
+                <b>{{ (profile()?.name ?? 'Your clinic').toUpperCase() }}</b>
+                @if (localName()) {
+                  <small>{{ localName() }}</small>
+                }
+                <small>
+                  {{ profile()?.address }}@if (profile()?.phone) { · {{ profile()?.phone }} }
+                </small>
+              </div>
+              <div class="right">
+                <b class="docname">{{ doctor()?.name ?? 'Doctor' }}</b>
+                @if (doctor()?.doctor?.degree) {
+                  <small>{{ doctor()?.doctor?.degree }}</small>
+                }
+                <small>Reg. {{ doctor()?.doctor?.registrationNo || '—' }}</small>
+              </div>
+            </div>
+          }
+          <div class="pt">
+            <span><b>Sample Patient</b>, 42 F</span>
+            <span>Token T-19</span>
+            <span>{{ today }}</span>
+          </div>
+          @if (on('complaints')) {
+            <div class="ps">
+              <b>Complaints@if (labels(); as l) {<i>{{ l.complaints }}</i>}</b>
+              Fever for 3 days, body ache, sore throat
+            </div>
+          }
+          @if (on('vitals')) {
+            <div class="ps">
+              <b>Vitals@if (labels(); as l) {<i>{{ l.vitals }}</i>}</b>
+              <span class="num">BP 128/82 · Pulse 92 · Temp 100.4°F · SpO2 98% · Wt 61 kg</span>
+            </div>
+          }
+          @if (on('history')) {
+            <div class="ps">
+              <b>Past history@if (labels(); as l) {<i>{{ l.history }}</i>}</b>
+              Hypothyroid, on Thyronorm 50 mcg
+            </div>
+          }
+          @if (on('exam')) {
+            <div class="ps">
+              <b>Examination@if (labels(); as l) {<i>{{ l.exam }}</i>}</b>
+              Throat congested, chest clear
+            </div>
+          }
+          @if (on('diagnosis')) {
+            <div class="ps">
+              <b>Diagnosis@if (labels(); as l) {<i>{{ l.diagnosis }}</i>}</b>
+              Acute viral fever
+            </div>
+          }
+          @if (on('inv')) {
+            <div class="ps">
+              <b>Investigations@if (labels(); as l) {<i>{{ l.inv }}</i>}</b>
+              CBC, Dengue NS1
+            </div>
+          }
+          <div class="ps">
+            <span class="rx">℞</span>
+            <div class="num">
+              1. {{ capitalise('Tab. Paracetamol 650 mg', s.caps) }} — 1-0-1 — 5 days — after food
+              @if (labels(); as l) { ({{ l.afterFood }}) }
+            </div>
+            <div class="num">
+              2. {{ capitalise('Tab. Cetirizine 10 mg', s.caps) }} — 0-0-1 — 5 days
+              @if (labels(); as l) { ({{ l.night }}) }
+            </div>
+            <div>3. {{ capitalise('ORS sachet', s.caps) }} in 1 litre water — as needed</div>
+          </div>
+          @if (on('advice')) {
+            <div class="ps">
+              <b>Advice@if (labels(); as l) {<i>{{ l.advice }}</i>}</b>
+              Rest and plenty of fluids@if (labels(); as l) { · {{ l.adviceText }} }
+            </div>
+          }
+          <div class="foot">
+            @if (on('next') && nextVisit(); as next) {
+              <div class="ps">
+                <b>Next visit@if (labels(); as l) {<i>{{ l.next }}</i>}</b>
+                <span class="num">{{ next.until }}</span>
+                <div class="soft">{{ next.rule }}</div>
+              </div>
+            } @else {
+              <span></span>
+            }
+            <div class="signblock">
+              <div class="qr">
+                <app-qr-sample seed="paper" [size]="64" />
+                <div class="soft tiny">Scan at next visit</div>
+              </div>
+              <div class="sign">Signature</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <app-medicine-favourites />
+}

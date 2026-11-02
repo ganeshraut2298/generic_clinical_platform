@@ -1,0 +1,89 @@
+<main class="page">
+  <div class="pagehead">
+    <div>
+      <h1>Clinic setup</h1>
+      <p class="muted">
+        Everything that decides how your OPD runs. Changes save as you make them, and each one is
+        logged with who made it.
+      </p>
+    </div>
+    <div class="row">
+      @if (viewOnly()) {
+        <span class="pill p-warn"><app-icon name="lock" [size]="13" /> View only</span>
+      }
+      @if (setupPercent() !== null) {
+        <a
+          class="pill pillbtn"
+          [class.p-good]="setupPercent() === 100"
+          [class.p-teal]="setupPercent() !== 100"
+          routerLink="home"
+        >
+          <app-icon name="check" [size]="13" /> Setup {{ setupPercent() }}% done
+        </a>
+      }
+    </div>
+  </div>
+
+  <div class="cfg">
+    <nav class="cfgnav surf" aria-label="Clinic setup sections">
+      <label class="search">
+        <app-icon name="search" [size]="15" />
+        <input
+          type="search"
+          autocomplete="off"
+          placeholder="Search settings"
+          aria-label="Search settings"
+          [value]="query()"
+          (input)="onQuery($event)"
+        />
+      </label>
+      @for (group of groups(); track group.name) {
+        <div class="grp">{{ group.name }}</div>
+        @for (section of group.sections; track section.key) {
+          <a class="ni" [routerLink]="section.key" routerLinkActive="active" ariaCurrentWhenActive="page">
+            <app-icon [name]="section.icon" [size]="16" />
+            <span>{{ section.label }}</span>
+          </a>
+        }
+      } @empty {
+        <div class="nores">No setting matches "{{ query() }}".</div>
+      }
+    </nav>
+
+    <div class="cfg-main">
+      @if (current(); as section) {
+        @if (section.key !== 'home') {
+        <section class="cfg-head surf">
+          <div class="ch-ic"><app-icon [name]="section.icon" [size]="20" /></div>
+          <div class="ch-t">
+            <h2>{{ section.label }}</h2>
+            <p class="muted">{{ section.what }}</p>
+            <div class="aff">
+              <span class="eyebrow">Affects</span>
+              @for (who of section.affects; track who) {
+                <span class="chip">{{ who }}</span>
+              }
+            </div>
+          </div>
+          @if (section.tips.length) {
+            <button type="button" class="tipbtn" [attr.aria-expanded]="tipsOpen()" (click)="toggleTips()">
+              {{ tipsOpen() ? 'Hide tips' : 'Show tips' }}
+            </button>
+          }
+        </section>
+        @if (tipsOpen() && section.tips.length) {
+          <div class="tipbox">
+            <b>What works in Indian clinics</b>
+            <ul>
+              @for (tip of section.tips; track tip) {
+                <li>{{ tip }}</li>
+              }
+            </ul>
+          </div>
+        }
+        }
+      }
+      <router-outlet />
+    </div>
+  </div>
+</main>

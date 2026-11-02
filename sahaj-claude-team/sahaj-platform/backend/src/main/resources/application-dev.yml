@@ -1,0 +1,24 @@
+# Profile dev: the local sahaj_dev database.
+# No secret, password or connection string is set here. Export SAHAJ_DB_APP_PASSWORD and
+# SAHAJ_DB_MIGRATOR_PASSWORD in the environment before starting the app; it fails fast otherwise.
+spring:
+  datasource:
+    url: ${SAHAJ_DB_URL:jdbc:postgresql://localhost:5432/sahaj_dev}
+    username: sahaj_app
+    password: ${SAHAJ_DB_APP_PASSWORD}
+  flyway:
+    url: ${SAHAJ_DB_URL:jdbc:postgresql://localhost:5432/sahaj_dev}
+    user: sahaj_migrator
+    password: ${SAHAJ_DB_MIGRATOR_PASSWORD}
+
+sahaj:
+  cors:
+    # The Angular dev page may call this API directly on port 8080.
+    allowed-origins: http://localhost:4200,http://127.0.0.1:4200
+  otp:
+    # LOCAL DEMO ONLY: skip real one-time codes. Any 6-digit code is accepted at verify.
+    # Remove this line to bring back the real code check.
+    dev-bypass: true
+  jwt:
+    # No default: export SAHAJ_JWT_SECRET (32+ characters) in the environment, never in code.
+    secret: ${SAHAJ_JWT_SECRET}

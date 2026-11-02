@@ -1,0 +1,15 @@
+@use '../config-common';
+
+.limit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}
+
+.small {
+  font-size: 0.8rem;
+}
