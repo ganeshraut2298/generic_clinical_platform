@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,8 +27,12 @@ public class AuthController {
 
     private final AuthService authService;
 
-    public AuthController(AuthService authService) {
+    private final boolean secureCookie;
+
+    public AuthController(AuthService authService,
+                           @Value("${sahaj.auth.refresh-cookie-secure:true}") boolean secureCookie) {
         this.authService = authService;
+        this.secureCookie = secureCookie;
     }
 
     @PostMapping("/otp/request")
@@ -68,14 +73,14 @@ public class AuthController {
                         HttpServletResponse httpResponse) {
         String rawRefreshToken = RefreshTokenCookie.read(httpRequest).orElse(null);
         authService.logout(principal.tenantId(), principal.userId(), rawRefreshToken);
-        RefreshTokenCookie.clear(httpResponse);
+        RefreshTokenCookie.clear(httpResponse, secureCookie);
     }
 
     @PostMapping("/logout-all")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logoutAll(@AuthenticationPrincipal TenantPrincipal principal, HttpServletResponse httpResponse) {
         authService.logoutAll(principal.userId());
-        RefreshTokenCookie.clear(httpResponse);
+        RefreshTokenCookie.clear(httpResponse, secureCookie);
     }
 
     private AuthResultResponse toResponse(VerifyOutcome outcome, HttpServletResponse httpResponse) {
@@ -97,9 +102,9 @@ public class AuthController {
         return clinics.stream().map(c -> new ClinicOptionResponse(c.tenantId(), c.name(), null)).toList();
     }
 
-    private static void writeRefreshCookie(HttpServletResponse response, String rawRefreshToken,
+    private void writeRefreshCookie(HttpServletResponse response, String rawRefreshToken,
                                              java.time.Instant expiresAt) {
         Duration maxAge = Duration.between(java.time.Instant.now(), expiresAt);
-        RefreshTokenCookie.write(response, rawRefreshToken, maxAge.isNegative() ? Duration.ZERO : maxAge);
+        RefreshTokenCookie.write(response, rawRefreshToken, maxAge.isNegative() ? Duration.ZERO : maxAge, secureCookie);
     }
 }

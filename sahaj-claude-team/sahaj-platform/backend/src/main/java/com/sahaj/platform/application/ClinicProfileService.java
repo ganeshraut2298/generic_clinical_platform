@@ -171,7 +171,7 @@ public class ClinicProfileService {
     private static String brandHex(String given) {
         String trimmed = given == null ? "" : given.trim();
         if (!HEX.matcher(trimmed).matches()) {
-            throw new InvalidInputException("brandHex", "Enter 6 characters, like 1F5BC8");
+            throw new InvalidInputException("brandHex", "Enter 6 characters, like #1F5BC8");
         }
         return trimmed.toLowerCase(Locale.ROOT);
     }

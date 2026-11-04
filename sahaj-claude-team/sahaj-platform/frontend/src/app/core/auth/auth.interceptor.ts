@@ -4,9 +4,17 @@ import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
-/** `/auth/*` calls are public or use their own cookie/token; never attach the access token. */
+const PUBLIC_AUTH_PATHS = ['/otp/request', '/otp/verify', '/select-clinic', '/refresh'];
+
+/** Genuinely public auth calls: no access token, no 401-refresh retry. `/logout` and
+ * `/logout-all` are authenticated and are not listed here, so they carry the Bearer token. */
 function isAuthEndpoint(req: HttpRequest<unknown>): boolean {
-  return req.url.includes('/platform/auth/');
+  const path = req.url.split('?')[0];
+  const index = path.indexOf('/platform/auth/');
+  if (index < 0) {
+    return false;
+  }
+  return PUBLIC_AUTH_PATHS.includes(path.slice(index + '/platform/auth'.length));
 }
 
 function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest<unknown> {

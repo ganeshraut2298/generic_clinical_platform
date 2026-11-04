@@ -15,6 +15,9 @@ sahaj:
   cors:
     # The Angular dev page may call this API directly on port 8080.
     allowed-origins: http://localhost:4200,http://127.0.0.1:4200
+  auth:
+    # Safari does not send a Secure cookie to http://localhost, so dev turns it off. Default is true.
+    refresh-cookie-secure: false
   otp:
     # LOCAL DEMO ONLY: skip real one-time codes. Any 6-digit code is accepted at verify.
     # Remove this line to bring back the real code check.

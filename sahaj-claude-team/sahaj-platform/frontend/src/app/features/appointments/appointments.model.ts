@@ -50,7 +50,6 @@ export interface Appointment {
   patientName: string;
   age?: number;
   sex?: AppointmentSex;
-  mobile?: string;
   doctorMembershipId: string;
   doctorName: string;
   apptDate: string;

@@ -70,6 +70,22 @@ class MeServiceTest {
     }
 
     @Test
+    void brandHexIsNullForAPresetBrand() {
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").clinic().brandHex()).isNull();
+    }
+
+    @Test
+    void brandHexComesFromTheProfileWhenTheBrandIsCustom() {
+        when(tenantRepository.findProfile(TENANT_ID))
+                .thenReturn(Optional.of(new TenantProfile("Sunrise Clinic", "custom", "FREE", null)));
+        when(clinicProfileRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                new ClinicProfileRepository.ProfileRow("Sunrise Clinic", null, null, "Pune", null, null, null, null,
+                        null, "sunrise", null, "custom", "#1f5bc8")));
+
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").clinic().brandHex()).isEqualTo("#1f5bc8");
+    }
+
+    @Test
     void aNurseNeverSeesBillingOrRevenue() {
         MeView view = service.getMe(TENANT_ID, USER_ID, "NURSE");
 

@@ -63,6 +63,9 @@ public class MeService {
         SetupProgress progress = setupProgressRepository.find(tenantId).orElse(new SetupProgress(1, java.util.Map.of(), null));
         UserPreference preferences = userPreferenceRepository.find(tenantId, userId).orElse(UserPreference.defaults());
         String area = clinicProfileRepository.findCity(tenantId).orElse(null);
+        String brandHex = "custom".equals(tenantProfile.brand())
+                ? clinicProfileRepository.find(tenantId).map(ClinicProfileRepository.ProfileRow::brandHex).orElse(null)
+                : null;
 
         boolean setupComplete = progress.isComplete();
         int setupPercent = setupComplete ? 100 : Math.min(100, Math.max(0, (progress.currentStep() - 1) * 20));
@@ -70,7 +73,7 @@ public class MeService {
                 : (int) Math.max(0, Duration.between(clock.instant(), tenantProfile.planEndsAt()).toDays());
 
         MeView.Clinic clinic = new MeView.Clinic(tenantProfile.name(), area, tenantProfile.brand(),
-                tenantProfile.plan(), planDaysLeft, setupComplete, setupPercent);
+                brandHex, tenantProfile.plan(), planDaysLeft, setupComplete, setupPercent);
         return new MeView(userId, member.id(), member.name(), role.name(), clinic,
                 NavigationPolicy.menuFor(role, preferences.menuMode()), preferences);
     }

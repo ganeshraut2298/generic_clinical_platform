@@ -15,7 +15,6 @@ const BOOKED: Appointment = {
   patientName: 'Rekha Shinde',
   age: 34,
   sex: 'F',
-  mobile: '98220 41187',
   doctorMembershipId: 'm-doc',
   doctorName: 'Dr. Asha Kulkarni',
   apptDate: '2026-10-24',

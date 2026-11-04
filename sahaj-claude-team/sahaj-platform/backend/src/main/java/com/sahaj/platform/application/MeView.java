@@ -8,7 +8,7 @@ import java.util.UUID;
 public record MeView(UUID userId, UUID membershipId, String name, String role, Clinic clinic, List<String> menu,
                       UserPreference preferences) {
 
-    public record Clinic(String name, String area, String brand, String plan, Integer planDaysLeft,
+    public record Clinic(String name, String area, String brand, String brandHex, String plan, Integer planDaysLeft,
                           boolean setupComplete, int setupPercent) {
     }
 }

@@ -83,6 +83,14 @@ public class SpecialtyService {
         return profileRepository.find(tenantId).orElseThrow(() -> new NotFoundException("Clinic profile not found"));
     }
 
+    /** Setup wizard (SAH-4): adds the template's starter prices for the specialty chosen in step 2. No owner check. */
+    @Transactional
+    public int seedStarterServices(UUID tenantId, UUID actorUserId, String code) {
+        return specialtyRepository.find(code)
+                .map(specialty -> servicesPort.addMissingServices(tenantId, actorUserId, templateServices(specialty)))
+                .orElse(0);
+    }
+
     private SpecialtyView toView(SpecialtyRow row) {
         List<String> features = new ArrayList<>();
         for (JsonNode feature : parse(row).path("features")) {

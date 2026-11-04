@@ -33,7 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** SAH-3: contract shape, error mapping and the refresh cookie behaviour of the auth endpoints. */
-@WebMvcTest(controllers = AuthController.class)
+@WebMvcTest(controllers = AuthController.class, properties = "sahaj.auth.refresh-cookie-secure=true")
 @Import(SecurityConfig.class)
 class AuthControllerTest {
 

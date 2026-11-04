@@ -43,6 +43,24 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
+  it('attaches the access token to logout and logout-all', () => {
+    for (const path of ['logout', 'logout-all']) {
+      http.post(`/api/v1/platform/auth/${path}`, null).subscribe();
+      const req = httpMock.expectOne(`/api/v1/platform/auth/${path}`);
+      expect(req.request.headers.get('Authorization')).toBe('Bearer token-1');
+      req.flush(null);
+    }
+  });
+
+  it('never attaches the token to select-clinic or refresh', () => {
+    for (const path of ['select-clinic', 'refresh']) {
+      http.post(`/api/v1/platform/auth/${path}`, {}).subscribe();
+      const req = httpMock.expectOne(`/api/v1/platform/auth/${path}`);
+      expect(req.request.headers.has('Authorization')).toBe(false);
+      req.flush({});
+    }
+  });
+
   it('retries once through refresh after a 401, then succeeds', () => {
     auth.accessToken.mockReturnValueOnce('token-1').mockReturnValue('token-2');
     auth.refresh.mockReturnValue(of(true));

@@ -65,7 +65,8 @@ class SetupServiceTest {
         opdDefaultsPort = mock(OpdDefaultsPort.class);
         auditLog = mock(AuditLog.class);
         service = new SetupService(progressRepository, clinicProfileRepository, doctorProfileRepository,
-                membershipRepository, appUserRepository, tenantRepository, opdDefaultsPort, auditLog, validator,
+                membershipRepository, appUserRepository, tenantRepository,
+                mock(TeamRepository.class), mock(SpecialtyService.class), opdDefaultsPort, auditLog, validator,
                 objectMapper, clock);
         when(progressRepository.find(TENANT_ID)).thenReturn(Optional.empty());
     }

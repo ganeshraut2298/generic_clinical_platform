@@ -21,12 +21,13 @@ public final class RefreshTokenCookie {
     private RefreshTokenCookie() {
     }
 
-    public static void write(HttpServletResponse response, String rawToken, Duration maxAge) {
-        response.addHeader(HttpHeaders.SET_COOKIE, build(rawToken, maxAge).toString());
+    /** {@code secure} is true everywhere except local dev, where Safari rejects Secure cookies on http. */
+    public static void write(HttpServletResponse response, String rawToken, Duration maxAge, boolean secure) {
+        response.addHeader(HttpHeaders.SET_COOKIE, build(rawToken, maxAge, secure).toString());
     }
 
-    public static void clear(HttpServletResponse response) {
-        response.addHeader(HttpHeaders.SET_COOKIE, build("", Duration.ZERO).toString());
+    public static void clear(HttpServletResponse response, boolean secure) {
+        response.addHeader(HttpHeaders.SET_COOKIE, build("", Duration.ZERO, secure).toString());
     }
 
     public static Optional<String> read(HttpServletRequest request) {
@@ -42,10 +43,10 @@ public final class RefreshTokenCookie {
         return Optional.empty();
     }
 
-    private static ResponseCookie build(String value, Duration maxAge) {
+    private static ResponseCookie build(String value, Duration maxAge, boolean secure) {
         return ResponseCookie.from(COOKIE_NAME, value)
                 .httpOnly(true)
-                .secure(true)
+                .secure(secure)
                 .sameSite("Strict")
                 .path(PATH)
                 .maxAge(maxAge)

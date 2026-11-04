@@ -41,7 +41,7 @@ class MeControllerTest {
 
     private static MeView aView() {
         return new MeView(USER_ID, UUID.randomUUID(), "Asha", "NURSE",
-                new MeView.Clinic("Sunrise Clinic", "Pune", "teal", "FREE", 120, true, 100),
+                new MeView.Clinic("Sunrise Clinic", "Pune", "teal", null, "FREE", 120, true, 100),
                 List.of("today", "queue", "patients"), UserPreference.defaults());
     }
 

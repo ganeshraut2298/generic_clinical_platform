@@ -48,6 +48,8 @@ public class SetupService {
     private final MembershipRepository membershipRepository;
     private final AppUserRepository appUserRepository;
     private final TenantRepository tenantRepository;
+    private final TeamRepository teamRepository;
+    private final SpecialtyService specialtyService;
     private final OpdDefaultsPort opdDefaultsPort;
     private final AuditLog auditLog;
     private final Validator validator;
@@ -57,6 +59,7 @@ public class SetupService {
     public SetupService(SetupProgressRepository progressRepository, ClinicProfileRepository clinicProfileRepository,
                          DoctorProfileRepository doctorProfileRepository, MembershipRepository membershipRepository,
                          AppUserRepository appUserRepository, TenantRepository tenantRepository,
+                         TeamRepository teamRepository, SpecialtyService specialtyService,
                          OpdDefaultsPort opdDefaultsPort, AuditLog auditLog, Validator validator,
                          ObjectMapper objectMapper, Clock clock) {
         this.progressRepository = progressRepository;
@@ -65,6 +68,8 @@ public class SetupService {
         this.membershipRepository = membershipRepository;
         this.appUserRepository = appUserRepository;
         this.tenantRepository = tenantRepository;
+        this.teamRepository = teamRepository;
+        this.specialtyService = specialtyService;
         this.opdDefaultsPort = opdDefaultsPort;
         this.auditLog = auditLog;
         this.validator = validator;
@@ -211,6 +216,8 @@ public class SetupService {
         clinicProfileRepository.upsert(tenantId, clinic.name(), clinic.address(), clinic.city(), clinic.pin(),
                 clinic.phone(), clinic.registrationNo(), specialty.code(), look.brand(), look.language());
 
+        specialtyService.seedStarterServices(tenantId, ownerUserId, specialty.code());
+
         saveDoctors(tenantId, ownerUserId, team.doctors());
         saveStaff(tenantId, team.staff());
 
@@ -231,6 +238,7 @@ public class SetupService {
                 membershipId = membershipRepository.findByTenantAndUser(tenantId, ownerUserId)
                         .map(Membership::id)
                         .orElseThrow(() -> new SetupIncompleteException("The clinic owner's membership was not found."));
+                teamRepository.update(membershipId, null, doctor.name(), ownerUserId);
             } else {
                 if (doctor.mobile() == null || doctor.mobile().isBlank()) {
                     throw new SetupStepInvalidException("Enter a 10-digit mobile number for the second doctor.");
