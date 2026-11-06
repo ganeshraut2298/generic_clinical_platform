@@ -20,6 +20,10 @@ public class JdbcBillItemRepository implements BillItemRepository {
             + " where tenant_id = :tenantId and bill_id = :billId order by created_at";
     private static final String FIND_BY_ID = SELECT
             + " where tenant_id = :tenantId and bill_id = :billId and id = :id";
+    private static final String FIND_BY_BILLS = """
+            select bill_id, name, amount_paise, qty from billing.bill_item
+            where tenant_id = :tenantId and bill_id in (:billIds)
+            """;
     private static final String INSERT = """
             insert into billing.bill_item (id, bill_id, service_id, name, amount_paise, qty, created_by)
             values (:id, :billId, :serviceId, :name, :amountPaise, :qty, :actor)
@@ -36,6 +40,17 @@ public class JdbcBillItemRepository implements BillItemRepository {
     public List<BillItemRow> findByBill(UUID tenantId, UUID billId) {
         return jdbc.sql(FIND_BY_BILL).param("tenantId", tenantId).param("billId", billId)
                 .query(JdbcBillItemRepository::map).list();
+    }
+
+    @Override
+    public List<BillItemOfBill> findByBills(UUID tenantId, java.util.Collection<UUID> billIds) {
+        if (billIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql(FIND_BY_BILLS).param("tenantId", tenantId).param("billIds", billIds)
+                .query((rs, rowNum) -> new BillItemOfBill(rs.getObject("bill_id", UUID.class), rs.getString("name"),
+                        rs.getLong("amount_paise"), rs.getInt("qty")))
+                .list();
     }
 
     @Override

@@ -44,7 +44,7 @@
   padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--glass-hi);
   color: var(--ink);
   font-weight: 600;
   font-size: 0.86rem;
@@ -56,7 +56,7 @@
     border: 1px solid var(--line);
 
     &.wheel {
-      background: conic-gradient(#e5484d, #f5a524, #30a46c, #0091ff, #8e4ec6, #e5484d);
+      background: conic-gradient(var(--crit), var(--warn), var(--good), var(--pri), var(--sec), var(--crit));
     }
   }
   &[aria-pressed='true'] {

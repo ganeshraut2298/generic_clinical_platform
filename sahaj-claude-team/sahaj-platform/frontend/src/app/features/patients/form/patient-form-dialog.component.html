@@ -82,6 +82,16 @@
 
   <mat-slide-toggle formControlName="abhaLinked">ABHA linked</mat-slide-toggle>
 
+  @if (showRecordsConsent()) {
+    <div class="consent">
+      <blockquote>"{{ consentText() }}"</blockquote>
+      <mat-checkbox [formControl]="consentRecords">The patient agreed to the consent line</mat-checkbox>
+      @if (showPromoConsent()) {
+        <mat-checkbox [formControl]="consentPromo">The patient agreed to promotional messages</mat-checkbox>
+      }
+    </div>
+  }
+
   @if (serverError(); as message) {
     <div class="notice err" role="alert">
       <app-icon name="alert" [size]="16" />

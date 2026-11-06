@@ -20,6 +20,11 @@ export const CONFIG_ROUTES: Routes = [
         loadComponent: () => import('./overview/overview.page').then((m) => m.OverviewPage),
       },
       {
+        path: 'modules',
+        title: 'Plan and modules · Sahaj',
+        loadComponent: () => import('./modules/modules.page').then((m) => m.ModulesPage),
+      },
+      {
         path: 'profile',
         title: 'Clinic profile · Sahaj',
         loadComponent: () => import('./profile/profile.page').then((m) => m.ProfilePage),
@@ -53,6 +58,41 @@ export const CONFIG_ROUTES: Routes = [
         path: 'workflow',
         title: 'OPD workflow · Sahaj',
         loadComponent: () => import('./workflow/workflow.page').then((m) => m.WorkflowPage),
+      },
+      {
+        path: 'rules',
+        title: 'Alerts and escalation · Sahaj',
+        loadComponent: () => import('./rules/rules.page').then((m) => m.RulesPage),
+      },
+      {
+        path: 'data',
+        title: 'Privacy, ABDM and backup · Sahaj',
+        loadComponent: () => import('./data/data.page').then((m) => m.DataPage),
+      },
+      {
+        path: 'ipbeds',
+        title: 'Wards, rooms and beds · Sahaj',
+        loadComponent: () => import('./ipd/ipbeds.page').then((m) => m.IpBedsPage),
+      },
+      {
+        path: 'iprates',
+        title: 'Bed categories and charges · Sahaj',
+        loadComponent: () => import('./ipd/iprates.page').then((m) => m.IpRatesPage),
+      },
+      {
+        path: 'ipadm',
+        title: 'Admission and deposits · Sahaj',
+        loadComponent: () => import('./ipd/ipadm.page').then((m) => m.IpAdmPage),
+      },
+      {
+        path: 'iper',
+        title: 'Emergency and triage · Sahaj',
+        loadComponent: () => import('./ipd/iper.page').then((m) => m.IpErPage),
+      },
+      {
+        path: 'ipdis',
+        title: 'Discharge · Sahaj',
+        loadComponent: () => import('./ipd/ipdis.page').then((m) => m.IpDisPage),
       },
       ...CONFIG_SECTIONS.filter((s) => !s.built).map((s) => ({
         path: s.key,

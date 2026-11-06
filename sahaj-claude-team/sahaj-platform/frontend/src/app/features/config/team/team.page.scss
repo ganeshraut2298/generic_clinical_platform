@@ -1,82 +1,4 @@
-:host {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-}
-
-.panel-h {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-
-  h2 {
-    font-size: 1.05rem;
-  }
-}
-
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  align-items: start;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-}
-
-.li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line-2);
-
-  &:last-child {
-    border-bottom: 0;
-  }
-  &.dim .main,
-  &.dim .av {
-    opacity: 0.55;
-  }
-}
-
-.av {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--pri-soft);
-  color: var(--pri-text);
-  font-weight: 600;
-  font-size: 0.78rem;
-}
-
-.main {
-  flex: 1;
-  min-width: 160px;
-  display: flex;
-  flex-direction: column;
-
-  small {
-    color: var(--ink-3);
-    font-size: 0.78rem;
-  }
-}
-
+// Team and access. Shared blocks: `_console.scss`.
 .reg {
   width: 220px;
 
@@ -92,32 +14,23 @@
 }
 
 .rolesel {
-  width: 160px;
+  width: 136px;
 }
 
-.empty,
-.note {
-  color: var(--ink-3);
-  font-size: 0.84rem;
-  padding: 6px 0;
-}
-
-.notice {
+// The role, the sign-in switch and Remove access sit together in one line under the name and
+// details (mockup staff row: avatar, name, then the controls), in line with the name.
+.acts {
+  flex: 1 1 100%;
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  font-size: 0.84rem;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: -4px;
+  padding-left: 48px;
+}
 
-  &.teal {
-    background: var(--pri-soft);
-    color: var(--pri-text);
-  }
-  &.err {
-    background: var(--crit-soft);
-    color: var(--crit);
-  }
+.nowrap {
+  white-space: nowrap;
 }
 
 .confirm {
@@ -127,62 +40,6 @@
   flex-wrap: wrap;
   font-weight: 600;
   font-size: 0.86rem;
-}
-
-// Switch, as in the mockup: a role="switch" button
-.sw {
-  position: relative;
-  flex: none;
-  width: 44px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: var(--line);
-  transition: background var(--dur-1) var(--ease);
-
-  // 44 px touch target without growing the visual track
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -9px -2px;
-  }
-  &::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--dur-1) var(--ease);
-  }
-  &[aria-checked='true'] {
-    background: var(--good);
-    &::after {
-      transform: translateX(18px);
-    }
-  }
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-}
-
-.rulerow {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line-2);
-  color: var(--ink-2);
-  font-size: 0.88rem;
-
-  small {
-    display: block;
-  }
-  &:last-child {
-    border-bottom: 0;
-  }
 }
 
 .addstaff {
@@ -222,8 +79,8 @@
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  border: 1.5px solid var(--line);
-  background: var(--surface);
+  border: 1.5px solid var(--field-line);
+  background: var(--glass-hi);
   color: var(--pri-ink);
 
   &[aria-pressed='true'] {
@@ -245,10 +102,4 @@
   width: 44px;
   height: 44px;
   place-items: center;
-}
-
-@media (max-width: 960px) {
-  .grid2 {
-    grid-template-columns: 1fr;
-  }
 }

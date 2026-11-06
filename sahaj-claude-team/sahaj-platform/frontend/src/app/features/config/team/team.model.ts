@@ -1,4 +1,5 @@
 import { Role } from '../../../core/platform/platform.model';
+import { TeamMemberPin } from '../../pin/pin.model';
 
 /** Types for the SAH-6 endpoints in `docs/api/platform.yaml`. No field is invented. */
 
@@ -20,6 +21,8 @@ export interface TeamMember {
   status: MemberStatus;
   lastLoginAt?: string | null;
   doctor?: DoctorDetails;
+  /** SAH-31. Filled for OWNER on every row and on the caller's own row; null otherwise. */
+  pin?: TeamMemberPin | null;
 }
 
 export interface TeamMemberCreate {

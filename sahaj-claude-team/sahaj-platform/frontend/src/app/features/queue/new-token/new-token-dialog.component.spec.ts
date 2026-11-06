@@ -123,6 +123,7 @@ describe('NewTokenDialogComponent', () => {
       visitType: 'NEW',
       stage: 'WAITING',
       feePaise: 40000,
+      workflowVersionNo: 1,
       createdAt: new Date().toISOString(),
     });
     fixture.detectChanges();

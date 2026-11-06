@@ -54,7 +54,7 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentCreate' } } }
       responses:
-        '201': { description: Booked, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '201': { description: 'Booked. 409 also covers a doctor who is not taking bookings that date because of approved leave (SAH-21, problem type doctor-unavailable, "This doctor is not taking bookings on that date.") besides a taken slot.', content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -92,7 +92,8 @@ paths:
         '200': { description: Today's visits, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Visit' } } } } }
   /visits:
     post:
-      tags: [SAH-9]
+      tags: [SAH-9, SAH-27]
+      description: 'Issues a token. visitType is FOLLOW_UP when the patient was last seen by the same doctor within the follow-up window of the fee settings (followUpDays), otherwise NEW; the fee follows followUpFee for FOLLOW_UP. SAH-27 (ADR-004): an IPD discharge with a follow-up to this doctor counts as being seen on the discharge instant, so a return within the window after discharge is FOLLOW_UP too. Issuing the token closes the oldest open follow-up (visit or discharge) of the same patient and doctor.'
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/VisitCreate' } } }
@@ -225,7 +226,7 @@ paths:
     get:
       tags: [SAH-12]
       responses:
-        '200': { description: The draft, or a fresh copy of the current published version if no draft was ever saved, content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowSteps' } } } }
+        '200': { description: 'The draft, or a fresh copy of the current published version if no draft was ever saved', content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowSteps' } } } }
     put:
       tags: [SAH-12]
       requestBody:
@@ -244,14 +245,84 @@ paths:
     get:
       tags: [SAH-12]
       responses:
-        '200': { description: Publish history, newest first, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WorkflowVersion' } } } } }
+        '200': { description: 'Publish history, newest first', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WorkflowVersion' } } } } }
+  /today-summary:
+    get:
+      tags: [SAH-15]
+      responses:
+        '200': { description: Today's OPD figures for the Today screen (Asia/Kolkata day), content: { application/json: { schema: { $ref: '#/components/schemas/TodaySummary' } } } }
+  /follow-ups:
+    get:
+      tags: [SAH-14]
+      parameters:
+        - { name: status, in: query, required: true, schema: { $ref: '#/components/schemas/FollowUpStatus' } }
+      responses:
+        '200': { description: 'Counts for all four tabs and the items for the requested status (at most 200 rows; oldest due date first, except RETURNED which is newest return first)', content: { application/json: { schema: { $ref: '#/components/schemas/FollowUpList' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
   /workflow/publish:
+    x-note-sah12: 'All /workflow/* operations also answer 401 (no or expired token). Publish answers 409 problem type workflow-conflict when another owner published first or there is nothing to publish; the client reloads the current version.'
     post:
       tags: [SAH-12]
       responses:
         '200': { description: Draft published as the new current version, content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowVersion' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /alert-rules:
+    get:
+      tags: [SAH-18]
+      responses:
+        '200': { description: 'Rules, suggestions and builder options', content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
+    post:
+      tags: [SAH-18]
+      description: OWNER only. Adds a rule, switched on. 409 if the same if/is/then exists.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AlertRuleInput' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /alert-rules/starter:
+    post:
+      tags: [SAH-18]
+      description: OWNER only. Saves the five starter rules for this clinic if they were never saved (does nothing if already saved, never brings back deleted rules). Lets the page switch or delete a starter rule, which has no id until saved.
+      responses:
+        '200': { description: 'Rules, now with ids', content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+  /alert-rules/suggestions/{index}:
+    parameters:
+      - { name: index, in: path, required: true, schema: { type: integer, minimum: 0 } }
+    post:
+      tags: [SAH-18]
+      description: OWNER only. Adds the suggestion with that index, as returned by GET.
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /alert-rules/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [SAH-18]
+      description: OWNER only. Switch a rule on or off.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [enabled], properties: { enabled: { type: boolean } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [SAH-18]
+      description: OWNER only.
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -334,10 +405,11 @@ components:
         doctorMembershipId: { type: string, format: uuid }
     Visit:
       type: object
-      required: [id, tokenNo, patientId, patientName, age, sex, doctorMembershipId, doctorName, visitType, stage, feePaise, createdAt]
+      required: [id, tokenNo, patientId, patientName, age, sex, doctorMembershipId, doctorName, visitType, stage, feePaise, createdAt, workflowVersionNo]
       properties:
         id: { type: string, format: uuid }
         tokenNo: { type: integer }
+        workflowVersionNo: { type: integer, description: 'The published workflow version this visit was issued under (SAH-12 fix). The board moves the card through THAT version''s steps, so the client reads the steps from GET /workflow/versions.' }
         patientId: { type: string, format: uuid }
         patientName: { type: string }
         age: { type: integer }
@@ -348,6 +420,84 @@ components:
         stage: { $ref: '#/components/schemas/VisitStage' }
         feePaise: { type: integer }
         createdAt: { type: string, format: date-time }
+    TodayTask:
+      type: object
+      required: [visitId, tokenNo, patientName, stage, doctorName, waitMinutes]
+      properties:
+        visitId: { type: string, format: uuid }
+        tokenNo: { type: integer }
+        patientName: { type: string }
+        stage: { $ref: '#/components/schemas/VisitStage' }
+        doctorName: { type: string }
+        waitMinutes: { type: integer, description: Minutes since the token was created. }
+    TodayDoctor:
+      type: object
+      required: [doctorMembershipId, doctorName, nextTokens]
+      properties:
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        nowWithDoctor:
+          type: [object, 'null']
+          description: The visit currently in With doctor for this doctor, or null for "Room free".
+          required: [visitId, tokenNo, patientName, age, sex, visitType]
+          properties:
+            visitId: { type: string, format: uuid }
+            tokenNo: { type: integer }
+            patientName: { type: string }
+            age: { type: integer }
+            sex: { type: string, enum: [F, M, O] }
+            visitType: { type: string, enum: [NEW, FOLLOW_UP] }
+        nextTokens: { type: array, items: { type: integer }, description: 'Token numbers in Waiting or Vitals for this doctor, oldest first.' }
+    TodaySummary:
+      type: object
+      required: [patientsTotal, newCount, followUpCount, waitingCount, inOpdCount, longestWaitMinutes, followUpsDue, followUpsReturned, followUpsMissed, doctors, myTasks]
+      properties:
+        patientsTotal: { type: integer }
+        newCount: { type: integer }
+        followUpCount: { type: integer }
+        waitingCount: { type: integer, description: Visits in Waiting or Vitals. }
+        inOpdCount: { type: integer, description: Visits not yet Done. }
+        longestWaitMinutes: { type: integer }
+        followUpsDue: { type: integer }
+        followUpsReturned: { type: integer, description: Follow-ups returned since the start of today (Asia/Kolkata). }
+        followUpsMissed: { type: integer }
+        doctors: { type: array, items: { $ref: '#/components/schemas/TodayDoctor' } }
+        myTasks: { type: array, items: { $ref: '#/components/schemas/TodayTask' }, description: Visits in a stage the signed-in role owns (same rule as the Queue's My tasks filter). }
+    FollowUpStatus:
+      type: string
+      enum: [DUE, MISSED, UPCOMING, RETURNED]
+      description: Computed from today's Asia/Kolkata date, never stored.
+    FollowUp:
+      type: object
+      description: 'SAH-14. SAH-27 (ADR-004): a follow-up comes either from an OPD visit (sourceVisitId set) or from an IPD discharge (sourceAdmissionId set); exactly one of the two is set. Both kinds are listed, counted, closed on the next visit with the same doctor and shown the same way (patient, mobile, doctor, due date, reason, status).'
+      required: [id, patientId, patientName, doctorMembershipId, doctorName, dueDate, reason, status, sourceVisitId, sourceAdmissionId]
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        mobile: { type: [string, 'null'], description: Shown on screen only; never logged. }
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        dueDate: { type: string, format: date }
+        reason: { type: string, description: 'The follow-up reason as stored. SAH-27 (OQ-27-10, ADR-004 review decision b): for a follow-up added by an IPD discharge (sourceAdmissionId set) the stored text is "Review after discharge · <reason for admission>"; roles outside the clinical set (OWNER, FRONT_DESK, NURSE, DOCTOR, VISITING_DOCTOR) see only "Review after discharge". Visit follow-ups are not masked.' }
+        status: { $ref: '#/components/schemas/FollowUpStatus' }
+        daysLate: { type: integer, description: 'Days past the due date; 0 unless status is MISSED.' }
+        sourceVisitId: { type: [string, 'null'], format: uuid, description: 'The visit that created it; null for a follow-up added by an IPD discharge (SAH-27).' }
+        sourceAdmissionId: { type: [string, 'null'], format: uuid, description: 'SAH-27. The IPD admission whose discharge added it; null for a visit follow-up. An opaque id: opd never reads IPD data with it.' }
+        returnedVisitId: { type: [string, 'null'], format: uuid }
+    FollowUpList:
+      type: object
+      required: [counts, items]
+      properties:
+        counts:
+          type: object
+          required: [due, missed, upcoming, returned]
+          properties:
+            due: { type: integer }
+            missed: { type: integer }
+            upcoming: { type: integer }
+            returned: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/FollowUp' } }
     WorkflowStepKey:
       type: string
       enum: [token, queue, vitals, consult, counsel, casepaper, billing, followup]
@@ -425,3 +575,41 @@ components:
           type: object
           description: 'Section key to on or off. Keys: complaints, vitals, history, exam, diagnosis, inv, rx, advice, next. rx is always on.'
           additionalProperties: { type: boolean }
+    AlertRuleInput:
+      type: object
+      required: [when, cond, then]
+      properties:
+        when: { type: string, enum: [Token, Vitals, Consultation, Billing, Case paper print, Discount, Follow-up] }
+        cond: { type: string, enum: [not done in 10 min, waiting over 30 min, waiting over 45 min, bill not paid, above role limit, missed by 2 days, unpaid at day closing] }
+        then: { type: string, enum: [Alert nurse, Alert owner, Flag red to the doctor, Block print, Needs owner approval, Send WhatsApp reminder, Move up in the queue] }
+    AlertRule:
+      type: object
+      required: [id, when, cond, then, enabled]
+      properties:
+        id: { type: [string, 'null'], format: uuid, description: Null while the starter rules are not yet saved. }
+        when: { type: string }
+        cond: { type: string }
+        then: { type: string }
+        enabled: { type: boolean }
+    AlertRuleSuggestion:
+      type: object
+      required: [index, when, cond, then, why]
+      properties:
+        index: { type: integer }
+        when: { type: string }
+        cond: { type: string }
+        then: { type: string }
+        why: { type: string }
+    AlertRules:
+      type: object
+      required: [rules, suggestions, options]
+      properties:
+        rules: { type: array, items: { $ref: '#/components/schemas/AlertRule' } }
+        suggestions: { type: array, items: { $ref: '#/components/schemas/AlertRuleSuggestion' }, description: Only suggestions not yet added. }
+        options:
+          type: object
+          required: [when, cond, then]
+          properties:
+            when: { type: array, items: { type: string } }
+            cond: { type: array, items: { type: string } }
+            then: { type: array, items: { type: string } }

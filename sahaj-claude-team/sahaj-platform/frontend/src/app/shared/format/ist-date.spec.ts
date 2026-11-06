@@ -1,4 +1,11 @@
-import { addDays, formatClockLabel, isoWeekday, istToday, nowMinutesIst } from './ist-date';
+import {
+  formatDisplayDateOfInstant,
+  addDays,
+  formatClockLabel,
+  isoWeekday,
+  istToday,
+  nowMinutesIst,
+} from './ist-date';
 
 describe('ist-date', () => {
   it('formats today as YYYY-MM-DD', () => {
@@ -24,5 +31,12 @@ describe('ist-date', () => {
     expect(formatClockLabel('00:00')).toBe('12:00 AM');
     expect(formatClockLabel('12:30')).toBe('12:30 PM');
     expect(formatClockLabel('18:05')).toBe('6:05 PM');
+  });
+
+  it('formats an instant as its IST day', () => {
+    expect(formatDisplayDateOfInstant('2026-10-24T19:00:00Z')).toBe('25 Oct 2026');
+    expect(formatDisplayDateOfInstant('2026-10-24T05:30:00Z')).toBe('24 Oct 2026');
+    expect(formatDisplayDateOfInstant(null)).toBe('');
+    expect(formatDisplayDateOfInstant('nope')).toBe('');
   });
 });

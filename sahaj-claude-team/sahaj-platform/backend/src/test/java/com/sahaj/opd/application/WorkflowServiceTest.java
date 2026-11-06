@@ -127,16 +127,22 @@ class WorkflowServiceTest {
     }
 
     @Test
-    void publishWithoutADraftOrWithAnUnchangedDraftIs400() {
+    void publishWithoutADraftOrWithAnUnchangedDraftIsAWorkflowConflict() {
         List<WorkflowStep> v1 = WorkflowRules.defaults(true);
         when(repository.findCurrent(TENANT_ID)).thenReturn(Optional.of(new VersionRow(1, v1, NOW, USER_ID)));
         when(repository.findDraft(TENANT_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.publish(TENANT_ID, USER_ID)).isInstanceOf(InvalidInputException.class);
+        assertWorkflowConflict();
 
         when(repository.findDraft(TENANT_ID)).thenReturn(Optional.of(new DraftRow(v1)));
-        assertThatThrownBy(() -> service.publish(TENANT_ID, USER_ID)).isInstanceOf(InvalidInputException.class);
+        assertWorkflowConflict();
         verify(repository, never()).insertVersionIfAbsent(any(), eq(2), any(), any());
+    }
+
+    private void assertWorkflowConflict() {
+        assertThatThrownBy(() -> service.publish(TENANT_ID, USER_ID))
+                .isInstanceOfSatisfying(ConflictException.class,
+                        ex -> assertThat(ex.problemType()).isEqualTo("workflow-conflict"));
     }
 
     @Test
@@ -147,7 +153,7 @@ class WorkflowServiceTest {
         when(repository.findDraft(TENANT_ID)).thenReturn(Optional.of(new DraftRow(saved)));
         when(repository.insertVersionIfAbsent(TENANT_ID, 2, saved, USER_ID)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.publish(TENANT_ID, USER_ID)).isInstanceOf(ConflictException.class);
+        assertWorkflowConflict();
     }
 
     @Test
@@ -173,6 +179,32 @@ class WorkflowServiceTest {
         assertInvalid(withStep(2, new WorkflowStepInput("queue", true, null)));
         assertInvalid(inputs(WorkflowRules.defaults(true)).subList(0, 7));
         assertInvalid(null);
+    }
+
+    @Test
+    void validationRequiresTheStepKeysInTheFixedOrder() {
+        List<WorkflowStepInput> swapped = new ArrayList<>(inputs(WorkflowRules.defaults(true)));
+        WorkflowStepInput queue = swapped.get(1);
+        swapped.set(1, swapped.get(3));
+        swapped.set(3, queue);
+        assertInvalid(swapped);
+
+        List<WorkflowStepInput> reversed = new ArrayList<>(inputs(WorkflowRules.defaults(true)));
+        java.util.Collections.reverse(reversed);
+        assertInvalid(reversed);
+
+        assertThat(WorkflowRules.validate(inputs(WorkflowRules.defaults(true)))).extracting(WorkflowStep::key)
+                .containsExactlyElementsOf(WorkflowRules.KEYS);
+    }
+
+    @Test
+    void validationRefusesAnOwnerOnAStepThatHasNone() {
+        for (int index : new int[] {0, 1, 3, 5, 6, 7}) {
+            String key = WorkflowRules.KEYS.get(index);
+            assertInvalid(withStep(index, new WorkflowStepInput(key, true, "NURSE")));
+        }
+        assertThat(WorkflowRules.validate(withStep(2, new WorkflowStepInput("vitals", true, null))).get(2).owner())
+                .isEqualTo("NURSE");
     }
 
     @Test

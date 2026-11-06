@@ -11,14 +11,17 @@ import com.sahaj.platform.api.OwnerGuard;
 import com.sahaj.platform.api.TeamMemberPort;
 import com.sahaj.platform.api.TeamMemberPort.TeamMember;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
@@ -58,11 +61,13 @@ public class VisitService {
     private final TeamMemberPort teamMemberPort;
     private final OwnerGuard ownerGuard;
     private final AuditLog auditLog;
+    private final FollowUpService followUpService;
     private final Clock clock;
 
     public VisitService(VisitRepository visitRepository, WorkflowService workflowService,
                          FeeSettingsRepository feeSettingsRepository, PatientLookupPort patientLookup,
-                         TeamMemberPort teamMemberPort, OwnerGuard ownerGuard, AuditLog auditLog, Clock clock) {
+                         TeamMemberPort teamMemberPort, OwnerGuard ownerGuard, AuditLog auditLog,
+                         FollowUpService followUpService, Clock clock) {
         this.visitRepository = visitRepository;
         this.workflowService = workflowService;
         this.feeSettingsRepository = feeSettingsRepository;
@@ -70,6 +75,7 @@ public class VisitService {
         this.teamMemberPort = teamMemberPort;
         this.ownerGuard = ownerGuard;
         this.auditLog = auditLog;
+        this.followUpService = followUpService;
         this.clock = clock;
     }
 
@@ -92,8 +98,9 @@ public class VisitService {
                 .orElseThrow(() -> new NotFoundException("Doctor not found"));
 
         FeeRow feeSettings = feeSettingsRepository.find(tenantId).orElse(FeeSettingsService.DEFAULTS);
-        String visitType = visitRepository.lastVisitAt(tenantId, patient.id(), doctor.membershipId())
-                .filter(last -> !last.plus(java.time.Duration.ofDays(feeSettings.followUpDays())).isBefore(clock.instant()))
+        // SAH-27 (ADR-004 D3): a discharge that added a follow-up for this doctor counts as being seen at that instant.
+        String visitType = lastSeenAt(tenantId, patient.id(), doctor.membershipId())
+                .filter(last -> !last.plus(Duration.ofDays(feeSettings.followUpDays())).isBefore(clock.instant()))
                 .map(last -> "FOLLOW_UP")
                 .orElse("NEW");
         long feePaise = feeFor(doctor.feePaise(), visitType, feeSettings.followUpFee());
@@ -106,6 +113,7 @@ public class VisitService {
         visitRepository.insert(id, patient.id(), doctor.membershipId(), visitType, firstStage, tokenNo, feePaise,
                 workflow.versionNo(), actorUserId);
         VisitRow created = findRow(tenantId, id);
+        followUpService.closeOnNewVisit(tenantId, actorUserId, patient.id(), doctor.membershipId(), id);
         auditLog.record("VISIT_CREATED", ENTITY_TYPE, id, null, snapshot(created));
         return toView(created, patient, doctor);
     }
@@ -115,13 +123,16 @@ public class VisitService {
     public List<VisitView> today(UUID tenantId, String actorRole, boolean mine) {
         Instant startOfToday = LocalDate.now(clock.withZone(INDIA)).atStartOfDay(INDIA).toInstant();
         List<VisitRow> rows = visitRepository.findSince(tenantId, startOfToday);
-        Set<String> ownedStages = mine ? ownedStages(actorRole, workflowService.currentSteps(tenantId)) : null;
+        // "Mine" follows each visit's own workflow version (the one it was issued under), like moveStage and the board.
+        Map<Integer, Set<String>> ownedByVersion = new HashMap<>();
 
         Map<UUID, PatientSummary> patients = new HashMap<>();
         Map<UUID, TeamMember> doctors = new HashMap<>();
         List<VisitView> views = new ArrayList<>();
         for (VisitRow row : rows) {
-            if (ownedStages != null && !ownedStages.contains(row.stage())) {
+            if (mine && !ownedByVersion.computeIfAbsent(row.workflowVersionNo(),
+                    versionNo -> ownedStages(actorRole, workflowService.stepsForVersion(tenantId, versionNo)))
+                    .contains(row.stage())) {
                 continue;
             }
             PatientSummary patient = patients.computeIfAbsent(row.patientId(),
@@ -173,6 +184,9 @@ public class VisitService {
         VisitRow after = findRow(tenantId, visitId);
         auditLog.record("VISIT_STAGE_MOVED", ENTITY_TYPE, visitId,
                 Map.of("stage", visit.stage()), Map.of("stage", after.stage()));
+        if (targetIndex > currentIndex && WITH_DOCTOR.equals(visit.stage()) && isOn(steps, "followup")) {
+            followUpService.createForConsultDone(tenantId, actorUserId, after);
+        }
 
         PatientSummary patient = patientLookup.find(tenantId, after.patientId())
                 .orElseThrow(() -> new NotFoundException("Patient not found"));
@@ -194,7 +208,7 @@ public class VisitService {
         if (MOVE_ANY_ROLES.contains(actorRole)) {
             return ALL_STAGES;
         }
-        Set<String> owned = new java.util.HashSet<>();
+        Set<String> owned = new HashSet<>();
         if (DOCTOR_ROLES.contains(actorRole)) {
             owned.add(WITH_DOCTOR);
         }
@@ -236,6 +250,19 @@ public class VisitService {
         return steps.stream().anyMatch(step -> step.key().equals(key) && step.on());
     }
 
+    /** The later of the patient's last visit with the doctor and the last discharge follow-up for the same doctor. */
+    private Optional<Instant> lastSeenAt(UUID tenantId, UUID patientId, UUID doctorMembershipId) {
+        Optional<Instant> visit = visitRepository.lastVisitAt(tenantId, patientId, doctorMembershipId);
+        Optional<Instant> discharge = followUpService.lastDischargeAt(tenantId, patientId, doctorMembershipId);
+        if (visit.isEmpty()) {
+            return discharge;
+        }
+        if (discharge.isPresent() && discharge.get().isAfter(visit.get())) {
+            return discharge;
+        }
+        return visit;
+    }
+
     private static long feeFor(long doctorFeePaise, String visitType, String followUpFee) {
         if (!"FOLLOW_UP".equals(visitType)) {
             return doctorFeePaise;
@@ -253,7 +280,8 @@ public class VisitService {
 
     private static VisitView toView(VisitRow row, PatientSummary patient, TeamMember doctor) {
         return new VisitView(row.id(), row.tokenNo(), patient.id(), patient.name(), patient.age(), patient.sex(),
-                doctor.membershipId(), doctor.name(), row.visitType(), row.stage(), row.feePaise(), row.createdAt());
+                doctor.membershipId(), doctor.name(), row.visitType(), row.stage(), row.feePaise(), row.createdAt(),
+                row.workflowVersionNo());
     }
 
     /** Never the patient's or doctor's name (SAH-8/SAH-9 audit rule): only ids and business facts. */

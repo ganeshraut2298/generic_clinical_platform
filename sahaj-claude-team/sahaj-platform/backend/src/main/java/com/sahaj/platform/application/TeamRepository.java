@@ -19,6 +19,12 @@ public interface TeamRepository {
     /** The member row of this person in the bound clinic. */
     Optional<TeamRow> findByUser(UUID tenantId, UUID userId);
 
+    /**
+     * The ACTIVE member row of this person in the bound clinic, one row by the unique key (tenant, user)
+     * (SAH-33 R8). A deactivated member is absent.
+     */
+    Optional<TeamRow> findActiveByUser(UUID tenantId, UUID userId);
+
     /** Locks the bound clinic's row until the transaction ends, so two adds cannot both pass the plan limit. */
     void lockTenant();
 

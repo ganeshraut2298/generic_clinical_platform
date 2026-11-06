@@ -128,3 +128,30 @@ export const DEFAULT_BOOKING_RULES: BookingRules = {
   selfBook: false,
   overbook: false,
 };
+
+const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * The booking-rule chips above the board. A number the server did not send is left out, so the
+ * page never prints "undefined" or "NaN".
+ */
+export function bookingRuleChips(r: Partial<BookingRules>): string[] {
+  const chips: string[] = [];
+  if (isCount(r.closeBeforeHours)) {
+    chips.push(`Booking closes ${r.closeBeforeHours} h before`);
+  }
+  if (isCount(r.remindBeforeHours)) {
+    chips.push(`WhatsApp reminder ${r.remindBeforeHours} h before`);
+  }
+  if (isCount(r.noShowAfterMinutes)) {
+    chips.push(`No-show after ${r.noShowAfterMinutes} min`);
+  }
+  if (r.followPriority) {
+    chips.push('Follow-ups get priority');
+  }
+  chips.push(r.selfBook ? 'Patients can book on WhatsApp' : 'Booking by staff only');
+  if (r.overbook) {
+    chips.push('Double booking allowed');
+  }
+  return chips;
+}

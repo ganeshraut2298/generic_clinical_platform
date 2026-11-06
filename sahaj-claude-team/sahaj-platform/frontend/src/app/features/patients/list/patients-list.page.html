@@ -1,14 +1,13 @@
-<div class="pagehead">
-  <div>
-    <h1>Patients</h1>
-    <p class="lead">Every patient registered at the clinic, grouped by family under one mobile number.</p>
-  </div>
+<app-page-head
+  title="Patients"
+  lead="Every patient registered at the clinic, grouped by family under one mobile number."
+>
   @if (canWrite()) {
     <button mat-flat-button type="button" (click)="openNewPatient()">
       <app-icon name="plus" [size]="16" /> New patient
     </button>
   }
-</div>
+</app-page-head>
 
 <section class="kpis">
   <div class="kpi surf">

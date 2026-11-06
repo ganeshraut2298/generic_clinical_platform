@@ -14,6 +14,8 @@ export interface ConfigSection {
   readonly affects: readonly string[];
   readonly tips: readonly string[];
   readonly built: boolean;
+  /** Shown only when the clinic's IPD state is trial, on or read-only (SAH-22). */
+  readonly requires?: 'ipd';
 }
 
 export const CONFIG_SECTIONS: readonly ConfigSection[] = [
@@ -25,6 +27,20 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = [
     what: 'How far your clinic is set up, what is left to finish, and the latest changes.',
     affects: [],
     tips: [],
+    built: true,
+  },
+  {
+    key: 'modules',
+    group: 'Start here',
+    label: 'Plan and modules',
+    icon: 'sliders',
+    what: 'Which modules your clinic uses, and how much of the menu each person sees.',
+    affects: ['Everyone'],
+    tips: [
+      'Start with OPD only. Switch on IPD or HRA when you actually need them, so staff see fewer menus.',
+      'Simple mode suits receptionists in their first weeks. Owners usually prefer Advanced.',
+      'Switching a module off never deletes data. Past records stay readable.',
+    ],
     built: true,
   },
   {
@@ -99,7 +115,7 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = [
     what: 'When something is late or missed: who gets told, and what gets blocked.',
     affects: ['Nurse', 'Front desk', 'Owner'],
     tips: [],
-    built: false,
+    built: true,
   },
   {
     key: 'paper',
@@ -122,6 +138,81 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = [
     built: true,
   },
   {
+    key: 'ipbeds',
+    group: 'In-patients (IPD)',
+    label: 'Wards, rooms and beds',
+    icon: 'home',
+    what: 'Your wards, optional rooms and every bed with its category. The bed board is built from this.',
+    affects: ['Front desk', 'Nurse'],
+    tips: [
+      'Name beds the way staff say them, for example 101-A, so nobody is confused at night.',
+      'Small nursing homes can switch rooms off and keep beds straight under each ward.',
+      'Block a bed for repair instead of deleting it. Its history stays.',
+    ],
+    built: true,
+    requires: 'ipd',
+  },
+  {
+    key: 'iprates',
+    group: 'In-patients (IPD)',
+    label: 'Bed categories and charges',
+    icon: 'wallet',
+    what: 'Daily bed charge per category, nursing and doctor visit charges, and when a bed day is counted.',
+    affects: ['Front desk', 'Owner'],
+    tips: [
+      'Counting the bed day at midnight is the most common practice in Indian nursing homes.',
+      'A higher rate on services for private rooms is usual; keep it simple, like ×1.25 and ×1.5.',
+      'Charges post automatically every day, so nobody has to remember to add them.',
+    ],
+    built: true,
+    requires: 'ipd',
+  },
+  {
+    key: 'ipadm',
+    group: 'In-patients (IPD)',
+    label: 'Admission and deposits',
+    icon: 'shield',
+    what: 'The minimum deposit for each kind of admission and bed category, and when to warn about the running bill.',
+    affects: ['Front desk', 'Owner'],
+    tips: [
+      'Set the base deposit for each admission type, then add an amount for private rooms and ICU.',
+      'Emergency patients can be admitted first and the deposit taken the same day.',
+      'Insurance and corporate patients do not need a deposit.',
+    ],
+    built: true,
+    requires: 'ipd',
+  },
+  {
+    key: 'iper',
+    group: 'In-patients (IPD)',
+    label: 'Emergency and triage',
+    icon: 'siren',
+    what: 'Triage levels, target time to a doctor, emergency bays and unknown-patient registration.',
+    affects: ['Nurse', 'Doctor'],
+    tips: [
+      '3 colours are enough for a small nursing home; hospitals use 5 levels.',
+      'Register an unconscious patient as "Unknown male, about 40" and merge details later.',
+      'A card is highlighted when its target time is passed. No message is sent to the duty doctor yet.',
+    ],
+    built: true,
+    requires: 'ipd',
+  },
+  {
+    key: 'ipdis',
+    group: 'In-patients (IPD)',
+    label: 'Discharge',
+    icon: 'door',
+    what: 'Discharge types, the summary template, the approval chain and the follow-up after discharge.',
+    affects: ['Doctor', 'Front desk', 'Nurse'],
+    tips: [
+      'The final bill waits until the doctor signs the summary, which avoids re-printing.',
+      'A free OPD review after discharge brings patients back and catches problems early.',
+      'Keep refunds of unused deposit with the owner or the accounts person.',
+    ],
+    built: true,
+    requires: 'ipd',
+  },
+  {
     key: 'whatsapp',
     group: 'Patients and data',
     label: 'WhatsApp messages',
@@ -139,7 +230,7 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = [
     what: 'Patient consent, ABDM links, record keeping, backup and the access log.',
     affects: ['Owner', 'Patients'],
     tips: [],
-    built: false,
+    built: true,
   },
 ];
 

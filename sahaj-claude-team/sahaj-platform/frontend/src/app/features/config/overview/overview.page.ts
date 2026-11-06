@@ -4,7 +4,8 @@ import { Observable, catchError, of } from 'rxjs';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { CONFIG_SECTIONS } from '../config-sections';
-import { describeAction, formatWhen, problemMessage } from '../config-format';
+import { IpdAccess } from '../ipd/ipd-access';
+import { describeAction, describeEntity, formatWhen, problemMessage } from '../config-format';
 import { OpdApi } from '../opd/opd.api';
 import { ClinicApi } from '../platform/clinic.api';
 import { AuditEvent, SetupOverview } from '../platform/clinic.model';
@@ -35,9 +36,11 @@ export class OverviewPage implements OnInit {
   private readonly opd = inject(OpdApi);
   private readonly team = inject(TeamApi);
   private readonly store = inject(ShellStore);
+  private readonly ipdAccess = inject(IpdAccess);
 
   protected readonly formatWhen = formatWhen;
   protected readonly describeAction = describeAction;
+  protected readonly describeEntity = describeEntity;
   protected readonly fixTarget = fixTarget;
 
   protected readonly overview = signal<SetupOverview | null>(null);
@@ -50,7 +53,9 @@ export class OverviewPage implements OnInit {
   protected readonly checks = computed(() => sortChecks(this.overview()?.checks ?? []));
   protected readonly counts = computed(() => summarise(this.overview()?.checks ?? []));
   protected readonly todo = computed(() => todoBySection(this.overview()?.checks ?? []));
-  protected readonly tiles = CONFIG_SECTIONS.filter((s) => s.key !== 'home');
+  protected readonly tiles = computed(() =>
+    CONFIG_SECTIONS.filter((s) => s.key !== 'home' && this.ipdAccess.visible(s)),
+  );
 
   ngOnInit(): void {
     this.loadTiles();

@@ -26,12 +26,10 @@ export const routes: Routes = [
     loadChildren: () => import('./features/shell/shell.routes').then((m) => m.SHELL_ROUTES),
   },
   {
+    // The Sahaj admin portal has its own sign-in, guard, token store and interceptor (ADR-003).
     path: 'admin',
     title: 'Admin portal · Sahaj',
-    loadComponent: () =>
-      import('./features/admin/admin-coming-soon/admin-coming-soon.page').then(
-        (m) => m.AdminComingSoonPage,
-      ),
+    loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },
   { path: '**', redirectTo: '' },
 ];

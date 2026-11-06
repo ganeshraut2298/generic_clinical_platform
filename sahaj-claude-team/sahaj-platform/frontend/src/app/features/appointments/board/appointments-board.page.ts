@@ -7,6 +7,8 @@ import { ShellStore } from '../../../core/shell/shell.store';
 import { addDays, formatClockLabel, istToday, nowMinutesIst } from '../../../shared/format/ist-date';
 import { ComputedSlot, computeSlots } from '../../../shared/scheduling/slot.util';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
+import { PageHeadComponent } from '../../../shared/ui/page-head.component';
 import { TeamApi } from '../../config/team/team.api';
 import { TeamMember, isDoctorRole } from '../../config/team/team.model';
 import {
@@ -21,6 +23,7 @@ import {
   BookingRules,
   DoctorSlotSettings,
   defaultSlotSettings,
+  bookingRuleChips,
 } from '../appointments.model';
 import { canManageAppointments } from '../appointments-role.util';
 import { AppointmentDetailDialogComponent, AppointmentDetailDialogData } from '../detail/appointment-detail-dialog.component';
@@ -45,7 +48,7 @@ const DIALOG_CONFIG = { panelClass: 'sheet-panel', width: '560px', maxWidth: '10
 @Component({
   selector: 'app-appointments-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, RouterLink, IconComponent],
+  imports: [MatButtonModule, RouterLink, IconComponent, PageHeadComponent, EmptyStateComponent],
   styleUrl: './appointments-board.page.scss',
   templateUrl: './appointments-board.page.html',
 })
@@ -134,19 +137,7 @@ export class AppointmentsBoardPage implements OnInit {
     if (!r) {
       return [];
     }
-    const chips = [
-      `Booking closes ${r.closeBeforeHours} h before`,
-      `WhatsApp reminder ${r.remindBeforeHours} h before`,
-      `No-show after ${r.noShowAfterMinutes} min`,
-    ];
-    if (r.followPriority) {
-      chips.push('Follow-ups get priority');
-    }
-    chips.push(r.selfBook ? 'Patients can book on WhatsApp' : 'Booking by staff only');
-    if (r.overbook) {
-      chips.push('Double booking allowed');
-    }
-    return chips;
+    return bookingRuleChips(r);
   });
 
   ngOnInit(): void {

@@ -10,6 +10,8 @@ import com.sahaj.platform.api.TeamMemberPort.TeamMember;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +56,26 @@ class VisitBillingAdapter implements VisitBillingPort {
         Instant startOfToday = LocalDate.now(clock.withZone(VisitService.INDIA))
                 .atStartOfDay(VisitService.INDIA).toInstant();
         return visitRepository.findSince(tenantId, startOfToday).stream().map(row -> toView(tenantId, row)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VisitForRevenue> between(UUID tenantId, Instant from, Instant to) {
+        return toRevenueViews(tenantId, visitRepository.findBetween(tenantId, from, to));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VisitForRevenue> findAll(UUID tenantId, Collection<UUID> ids) {
+        return toRevenueViews(tenantId, visitRepository.findByIds(tenantId, ids));
+    }
+
+    private List<VisitForRevenue> toRevenueViews(UUID tenantId, List<VisitRow> rows) {
+        Map<UUID, String> doctorNames = new HashMap<>();
+        return rows.stream().map(row -> new VisitForRevenue(row.id(), row.patientId(), row.doctorMembershipId(),
+                doctorNames.computeIfAbsent(row.doctorMembershipId(),
+                        id -> teamMemberPort.find(tenantId, id).map(TeamMember::name).orElse("Unknown")),
+                row.stage(), row.feePaise(), row.createdAt())).toList();
     }
 
     @Override

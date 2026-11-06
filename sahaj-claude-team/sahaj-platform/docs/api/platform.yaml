@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Sahaj platform API
   version: 0.1.0
-  description: Phase 1 contract, SAH-1 to SAH-7. The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json.
+  description: Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json.
 servers:
   - url: /api/v1/platform
 security:
@@ -148,6 +148,12 @@ paths:
   /setup/overview:
     get:
       tags: [SAH-7]
+      description: >-
+        OWNER only. SAH-31 proposal (ADR-010 D12, Q2; built only when the human accepts it): one more check,
+        key pin, label "Own PIN for each staff member", why "So medicine checks show who did them", done when
+        every ACTIVE member has a PIN set or locked, section team, anchor f-staff, optional true (it does not
+        change percent). The mockup line is "Own PIN login for each staff member", done when PIN sign-in is
+        switched on; PIN sign-in is not built.
       responses:
         '200': { description: Progress and last change, content: { application/json: { schema: { $ref: '#/components/schemas/SetupOverview' } } } }
         '403': { $ref: '#/components/responses/Problem' }
@@ -166,10 +172,117 @@ paths:
       responses:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } } }
         '400': { $ref: '#/components/responses/Problem' }
+  /me/pin:
+    get:
+      tags: [SAH-31]
+      summary: My PIN status
+      description: >-
+        The signed-in person's own staff PIN status in this clinic (ADR-010). Any clinic role with an ACTIVE
+        membership. The tenant and the person come from the session only. Never returns the PIN, the hash or the
+        full mobile number. Used by the Set PIN sheet, the own row of the Team list and the Verify sheet of the
+        pharmacist check (to show "Set my PIN" or the lock before the person types a PIN). Writes nothing.
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PinStatus' }
+              examples:
+                set: { value: { available: true, state: SET, setAt: '2026-11-06T05:35:00Z', lockedUntil: null, triesLeft: 5, notSetReason: null, mobileMasked: '••••••7410' } }
+                notSet: { value: { available: true, state: NOT_SET, setAt: null, lockedUntil: null, triesLeft: null, notSetReason: RESET_BY_OWNER, mobileMasked: '••••••7410' } }
+                locked: { value: { available: true, state: LOCKED, setAt: '2026-11-06T05:35:00Z', lockedUntil: '2026-11-06T05:50:00Z', triesLeft: 0, notSetReason: null, mobileMasked: '••••••7410' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
+    put:
+      tags: [SAH-31]
+      summary: Set, change or replace my PIN
+      x-required-role: any clinic role (own PIN only)
+      description: >-
+        Sets a first PIN, changes it, or replaces a forgotten or locked one (ADR-010 D7). Only the person
+        themselves: there is no way to set another person's PIN. Needs a one-time code sent to the person's own
+        mobile by POST /me/pin/code; no current PIN is asked. Check order, each step stops the request: rate limit
+        (10 set or change requests per 5 minutes per person, its own limit, not shared with PIN checks; ADR-010
+        D13 as built after review fix R1) 429 rate-limit "Too many PIN tries in
+        a short time. Try again in a few minutes." with retryAfterSeconds; SAHAJ_PIN_PEPPER missing 503
+        pin-unavailable "PIN checks are not available right now. Try again later."; body 400 problem type
+        validation with every field error together, in the order code, newPin, confirmPin: code missing or not 6
+        ASCII digits "Enter the 6-digit code."; newPin missing or not 4 ASCII digits "Enter a 4-digit PIN.";
+        newPin refused by the weak-PIN rules (four equal digits, a straight run up or down, ABAB or AABB, a year
+        1900 to 2099, 2580 or 0852, or any 4 consecutive digits of the person's own mobile number) "This PIN is
+        too easy to guess. Choose another one."; confirmPin not equal to newPin "The two PINs do not match.".
+        Then the code is checked (sign-in code rules; its failed count is kept even though this request fails):
+        no code sent 400 field code "Send a code first."; expired or already used 400 field code "That code has
+        expired. Request a new one."; wrong 400 field code "That code is not right."; 5 wrong codes 423
+        otp-locked "Too many wrong codes. Try again in 15 minutes." (never 401: the session is still valid). Then
+        one transaction: the new hash is stored, wrong tries, lock and switch-off reason are cleared, set time =
+        database time; audit PLATFORM_PIN_SET (no PIN before) or PLATFORM_PIN_CHANGED (ids and state only). Two
+        first saves at the same moment: one wins, the other 409 concurrent-change (retryable). 200 with the new
+        status. The PIN and the code are never logged, audited, stored in clear or echoed. Client: toast "Your PIN
+        is set." or "Your PIN is changed."; after a network failure re-read GET /me/pin (a used code cannot be
+        sent twice).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PinSetInput' }
+            examples:
+              set: { value: { code: '493017', newPin: '4821', confirmPin: '4821' } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/PinStatus' } } } }
+        '400':
+          description: validation (fieldErrors on code, newPin, confirmPin)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                weak: { value: { type: 'https://sahaj.in/problems/validation', title: Check the highlighted fields, status: 400, detail: Some fields are missing or not valid., fieldErrors: [ { field: newPin, message: This PIN is too easy to guess. Choose another one. } ] } }
+                wrongCode: { value: { type: 'https://sahaj.in/problems/validation', title: Check the highlighted fields, status: 400, detail: Some fields are missing or not valid., fieldErrors: [ { field: code, message: That code is not right. } ] } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
+        '409': { $ref: '#/components/responses/Problem', description: 'concurrent-change (retryable)' }
+        '423': { $ref: '#/components/responses/Problem', description: 'otp-locked' }
+        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
+        '503':
+          description: pin-unavailable
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                unavailable: { value: { type: 'https://sahaj.in/problems/pin-unavailable', title: PIN checks are off, status: 503, detail: PIN checks are not available right now. Try again later. } }
+  /me/pin/code:
+    post:
+      tags: [SAH-31]
+      summary: Send a code to my mobile to set my PIN
+      x-required-role: any clinic role (own mobile only)
+      description: >-
+        Sends a 6-digit one-time code to the signed-in person's own mobile number, read on the server from the
+        person's record (never from the request), through the sign-in code channel (ADR-010 D7). No body. Check
+        order: SAHAJ_PIN_PEPPER missing 503 pin-unavailable (no code is sent when the PIN cannot be saved); more
+        than 5 requests per person per hour 429 rate-limit; the sign-in code rules: a code sent less than 30
+        seconds ago 429 rate-limit "Wait before requesting another code for this number." with
+        retryAfterSeconds; the number locked after 5 wrong codes 423 otp-locked. 202 with the wait before a new
+        code and the masked number. Never returns or logs the code or the full number.
+      responses:
+        '202':
+          description: Code sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PinCodeSent' }
+              examples:
+                sent: { value: { resendAfterSeconds: 30, mobileMasked: '••••••7410' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
+        '423': { $ref: '#/components/responses/Problem', description: 'otp-locked' }
+        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
+        '503': { $ref: '#/components/responses/Problem', description: 'pin-unavailable' }
   /team:
     get:
       tags: [SAH-6]
-      description: Readable by any signed-in clinic user (the Fees and Case paper pages need doctor names, fees and registration numbers). Writes are owner-only.
+      description: >-
+        Readable by any signed-in clinic user (the Fees and Case paper pages need doctor names, fees and
+        registration numbers). Writes are owner-only. TeamMember.pin (SAH-31, ADR-010) is filled on every row
+        when the caller is OWNER and on the caller's own row for every other role; it is null on other people's
+        rows for non-owners (the PIN state of colleagues, especially a lock, is not shown to them).
       responses:
         '200': { description: Team, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TeamMember' } } } } }
     post:
@@ -224,6 +337,44 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /team/{id}/pin/reset:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [SAH-31]
+      summary: Reset a team member's PIN
+      x-required-role: OWNER
+      description: >-
+        Clears the PIN of a team member (membership id) so they must set a new one with a code sent to their own
+        mobile (ADR-010 D8). The owner never sees, chooses or receives a PIN. OWNER only (token role and the
+        membership re-read); every other role 403 forbidden "Only the clinic owner can do this.". No body.
+        Allowed for every member of the clinic, including the owner's own row and switched-off members, and
+        whether or not PINs can be checked (SAHAJ_PIN_PEPPER missing does not block a reset). A member of
+        another clinic or an unknown id 404 not-found. More than 30 resets per owner per hour 429 rate-limit.
+        PIN set or locked: the PIN is cleared with the reason RESET_BY_OWNER, wrong tries and lock cleared,
+        reset time (database) and the owner's user id stored; audit PLATFORM_PIN_RESET (membership id, state
+        before, state after; never a name or the hash). No PIN: nothing written (a repeat after a lost answer is
+        safe). 200 with the member as GET /team returns it (pin.state NOT_SET). Client: confirm sheet first;
+        toast "PIN reset for <name>.". Removing access (DELETE /team/{id}) also clears the PIN with the same
+        audit.
+      responses:
+        '200':
+          description: PIN cleared (or there was none)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamMember' }
+              examples:
+                reset: { value: { id: 3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10, name: Rahul Deshmukh, mobileMasked: '••••••3301', role: PHARMACIST, status: ACTIVE, lastLoginAt: '2026-11-06T04:10:00Z', pin: { state: NOT_SET, setAt: null, lockedUntil: null } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403':
+          description: forbidden
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                notOwner: { value: { type: 'https://sahaj.in/problems/forbidden', title: Not allowed, status: 403, detail: Only the clinic owner can do this. } }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found' }
+        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
   /role-permissions:
     get:
       tags: [SAH-6]
@@ -293,6 +444,20 @@ paths:
         '200': { description: Applied, content: { application/json: { schema: { $ref: '#/components/schemas/ClinicProfile' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /privacy:
+    get:
+      tags: [SAH-17]
+      responses:
+        '200': { description: Clinic privacy settings (defaults until first save), content: { application/json: { schema: { $ref: '#/components/schemas/PrivacySettings' } } } }
+    put:
+      tags: [SAH-17]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PrivacySettings' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/PrivacySettings' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /audit-events:
     get:
       tags: [SAH-7]
@@ -300,6 +465,41 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
         '200': { description: Latest first, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+  /modules:
+    get:
+      tags: [SAH-19]
+      responses:
+        '200': { description: Modules and menu mode figures for the signed-in user, content: { application/json: { schema: { $ref: '#/components/schemas/ModulesView' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /modules/ipd-request:
+    post:
+      tags: [SAH-19]
+      description: OWNER only. Records that the clinic asked for IPD. Idempotent while IPD is off (keeps the first time). 409 if IPD is already on, in trial or read-only.
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ModulesView' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /modules/ipd-trial:
+    post:
+      tags: [SAH-19]
+      deprecated: true
+      description: OWNER only (DEC-010, option 2, temporary until the Sahaj admin console exists). Starts a 30-day IPD trial when IPD is off. 409 if IPD is not off. Audited. Can be disabled by the property sahaj.modules.owner-ipd-trial=false (then 404). Deprecated by ADM-3 (ADR-003 D6) — once ADM-3 ships, the property is false in every profile including dev, so this answers 404 and IPD is switched on only from the admin portal (PATCH /api/v1/admin/clinics/{id}/modules). Removal of the endpoint and the property is a later clean-up (ADR-003 H8).
+      responses:
+        '200': { description: Trial started, content: { application/json: { schema: { $ref: '#/components/schemas/ModulesView' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /modules/hra:
+    put:
+      tags: [SAH-19]
+      description: OWNER only. Switch the HRA add-on on or off. Audited. Data is never deleted.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [on], properties: { on: { type: boolean } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ModulesView' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
@@ -311,11 +511,19 @@ components:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
   schemas:
+    PrivacySettings:
+      type: object
+      required: [consentRequired, promoConsent, recordCopy]
+      properties:
+        consentRequired: { type: boolean, default: true, description: Ask for consent at the first visit. }
+        promoConsent: { type: boolean, default: true, description: Separate yes for promotional messages. }
+        recordCopy: { type: boolean, default: true, description: Patients can ask for a copy of their records. }
+        hfrId: { type: [string, 'null'], maxLength: 32, description: Health Facility Registry ID. Stored only; no ABDM call is made. }
     Problem:
       type: object
       required: [type, title, status]
       properties:
-        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), under https://sahaj.in/problems/.', examples: ['https://sahaj.in/problems/plan-limit'] }
+        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), validation, forbidden, not-found, rate-limit, otp-locked, and for the staff PIN (SAH-31, ADR-010 D11) wrong-pin (403), pin-locked (403; the 5th wrong try that causes the first or second lock within 24 hours, or any try while locked), pin-not-set (409; no PIN, by notSetReason, and also the 5th wrong try that causes the third lock within 24 hours, which switches the PIN off: "Your PIN was switched off after too many wrong tries. Set a new one, then try again."), pin-unavailable (503), under https://sahaj.in/problems/. The PIN types are also answered by other modules that check a PIN through platform.api.StaffPinPort (ipd verify). SAH-32 (ADR-011 D7, PROPOSED): the second-nurse check of a high-alert dose (ipd POST /medicine-orders/{id}/doses) checks a colleague''s PIN through StaffPinPort.checkColleague and answers the same types with colleague texts and no names: wrong-pin "That PIN is not right." (no tries-left count, so a guesser is not told when to stop before a lock; the wrong try still counts on the colleague''s PIN; security review S4; the own-PIN answer keeps the count), pin-locked "The second nurse''s PIN is locked after 5 wrong tries. Choose another nurse, or try again at <h:mm AM/PM>.", pin-not-set "The second nurse has not set a PIN yet. Choose another nurse.", rate-limit (also when the caller has 5 failed colleague checks in 15 minutes or 10 in 24 hours), pin-unavailable; a client never reads GET /me/pin after such a pin-not-set.', examples: ['https://sahaj.in/problems/plan-limit'] }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
@@ -406,7 +614,7 @@ components:
         percent: { type: integer }
         checks:
           type: array
-          items: { type: object, required: [key, label, done], properties: { key: { type: string }, label: { type: string }, why: { type: string }, done: { type: boolean }, optional: { type: boolean }, section: { type: string, description: 'Clinic setup section for the Fix link: overview, profile, specialty, team, fees, paper.' }, anchor: { type: string, description: Panel id inside that section, for scrolling. } } }
+          items: { type: object, required: [key, label, done], properties: { key: { type: string }, label: { type: string }, why: { type: string }, done: { type: boolean }, optional: { type: boolean }, section: { type: string, description: 'Clinic setup section for the Fix link: overview, profile, specialty, team, fees, paper.' }, anchor: { type: string, description: 'Panel id inside that section, for scrolling.' } } }
         lastChange: { $ref: '#/components/schemas/AuditEvent' }
     Preferences:
       type: object
@@ -435,7 +643,22 @@ components:
             planDaysLeft: { type: integer }
             setupComplete: { type: boolean }
             setupPercent: { type: integer }
-        menu: { type: array, items: { type: string } }
+        menu:
+          type: array
+          items: { type: string }
+          description: >-
+            Menu keys in display order, from NavigationPolicy (role, menu mode, clinic modules). Module keys: ipd
+            (Beds and admissions) for OWNER, FRONT_DESK, NURSE, DOCTOR when IPD is Trial, On or Read-only (SAH-23),
+            and for PHARMACIST under the same condition, placed after today, where the page shows only the Safety
+            tab with the Pharmacist check tile and panel (SAH-31, ADR-009 D11; decided by the human, DEC-017 Q2);
+            emergency (Emergency, siren icon, /app/emergency) for OWNER, FRONT_DESK, NURSE in the advanced menu
+            only, when IPD is Trial or On (not Read-only), placed immediately before ipd, which is right after
+            followups when the role has it (SAH-28; mockup default roles; DOCTOR reaches the queue through the
+            Emergency tab of Beds and admissions, OQ-28-4); staff for every clinic role when HRA is on, before
+            config (SAH-20). The simple menu never has emergency. Items carry no badge counts here: the shell reads
+            a badge from the owning module's summary endpoint (emergency from GET /api/v1/ipd/emergency/summary;
+            ADR-005), so this response stays cacheable for the session. menuCounts of GET /modules count the same
+            keys.
         permissions: { type: array, items: { type: string } }
         preferences: { $ref: '#/components/schemas/Preferences' }
     TeamMember:
@@ -449,6 +672,61 @@ components:
         status: { type: string, enum: [ACTIVE, INACTIVE, REMOVED] }
         lastLoginAt: { type: [string, 'null'], format: date-time }
         doctor: { $ref: '#/components/schemas/DoctorDetails' }
+        pin:
+          oneOf:
+            - { $ref: '#/components/schemas/TeamMemberPin' }
+            - { type: 'null' }
+          description: 'SAH-31. Filled for OWNER on every row and for the caller''s own row; null otherwise (GET /team).'
+    TeamMemberPin:
+      type: object
+      description: >-
+        SAH-31, ADR-010 D12. Team list (panel Staff, f-staff), OWNER view: state SET the pill "PIN set" (good,
+        key icon; mockup); LOCKED the pill "PIN locked" (warn, key icon); NOT_SET the pill "No PIN yet" (muted),
+        in place of the mockup's "Send PIN link" button (WhatsApp is not in phase 1). OWNER also gets the ghost
+        button "Reset PIN" (key icon) on rows with SET or LOCKED, opening the confirm sheet "Reset PIN · <name>".
+        Own row, every role: the button "Set my PIN" (NOT_SET) or "Change my PIN" (SET, LOCKED) opening the Set
+        PIN sheet. Never the PIN or the hash.
+      required: [state, setAt, lockedUntil]
+      properties:
+        state: { $ref: '#/components/schemas/PinState' }
+        setAt: { type: [string, 'null'], format: date-time, description: 'When the current PIN was set; null when NOT_SET.' }
+        lockedUntil: { type: [string, 'null'], format: date-time, description: 'Set only when LOCKED.' }
+    PinState:
+      type: string
+      enum: [NOT_SET, SET, LOCKED]
+      description: 'LOCKED = a PIN is set and locked_until is in the future (5 wrong tries in a row; 15 minutes).'
+    PinStatus:
+      type: object
+      description: >-
+        SAH-31, ADR-010. The signed-in person's own PIN status. available false when SAHAJ_PIN_PEPPER is not set
+        (every PIN set and check then answers 503 pin-unavailable; the screens say "PIN checks are not available
+        right now. Try again later." and disable Save PIN and Verify order).
+      required: [available, state, setAt, lockedUntil, triesLeft, notSetReason, mobileMasked]
+      properties:
+        available: { type: boolean }
+        state: { $ref: '#/components/schemas/PinState' }
+        setAt: { type: [string, 'null'], format: date-time }
+        lockedUntil: { type: [string, 'null'], format: date-time, description: 'Set only when LOCKED; the screen shows it as "11:20 AM" (IST).' }
+        triesLeft: { type: [integer, 'null'], minimum: 0, maximum: 5, description: 'Wrong tries left before the lock: 5 minus the wrong tries in a row; 0 when LOCKED; null when NOT_SET.' }
+        notSetReason:
+          oneOf:
+            - { type: string, enum: [RESET_BY_OWNER, TOO_MANY_LOCKS] }
+            - { type: 'null' }
+          description: 'Why there is no PIN: null when never set (or when a PIN is set); RESET_BY_OWNER after an owner reset or removal of access; TOO_MANY_LOCKS after the third lock within 24 hours (the PIN check that caused it answered 409 pin-not-set, not pin-locked).'
+        mobileMasked: { type: string, examples: ['••••••7410'], description: 'Where the code for PUT /me/pin goes; last 4 digits only.' }
+    PinSetInput:
+      type: object
+      required: [code, newPin, confirmPin]
+      properties:
+        code: { type: [string, 'null'], maxLength: 16, description: 'The 6-digit one-time code from POST /me/pin/code. Exactly 6 ASCII digits, else 400 field code "Enter the 6-digit code.". Never logged or echoed.' }
+        newPin: { type: [string, 'null'], maxLength: 16, description: 'Exactly 4 ASCII digits (a string, so leading zeros survive), else "Enter a 4-digit PIN."; refused by the weak-PIN rules of ADR-010 D4 with "This PIN is too easy to guess. Choose another one.". Never logged, audited, stored in clear or echoed.' }
+        confirmPin: { type: [string, 'null'], maxLength: 16, description: 'Must equal newPin, else "The two PINs do not match.".' }
+    PinCodeSent:
+      type: object
+      required: [resendAfterSeconds, mobileMasked]
+      properties:
+        resendAfterSeconds: { type: integer, examples: [30] }
+        mobileMasked: { type: string, examples: ['••••••7410'] }
     DoctorDetails:
       type: object
       properties:
@@ -522,3 +800,29 @@ components:
         before: { type: [object, 'null'] }
         after: { type: [object, 'null'] }
         at: { type: string, format: date-time }
+    ModulesView:
+      type: object
+      required: [plan, ipd, hra, menuCounts, ipdTrialAvailable]
+      properties:
+        plan: { type: string, enum: [FREE, PRO], description: 'FREE is shown as "Free year".' }
+        ipd:
+          type: object
+          required: [state, requested]
+          properties:
+            state: { type: string, enum: [off, trial, on, readonly] }
+            trialEndsAt: { type: [string, 'null'], format: date-time }
+            requested: { type: boolean }
+            requestedAt: { type: [string, 'null'], format: date-time }
+        ipdTrialAvailable: { type: boolean, description: True when the owner may start the IPD trial (DEC-010 temporary switch is on and IPD is off). }
+        hra:
+          type: object
+          required: [on]
+          properties:
+            on: { type: boolean }
+        menuCounts:
+          type: object
+          description: Number of menu items the signed-in user's role gets in each menu mode.
+          required: [simple, advanced]
+          properties:
+            simple: { type: integer }
+            advanced: { type: integer }

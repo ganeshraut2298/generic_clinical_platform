@@ -105,6 +105,17 @@ public class BillingService {
         return new CounterView(awaiting, dues, paidToday);
     }
 
+    /**
+     * SAH-15: collected = net of today's payments (payments minus refunds, Asia/Kolkata day); pending = visits in
+     * the Billing stage with a balance above zero (the counter's "Awaiting payment").
+     */
+    @Transactional(readOnly = true)
+    public BillingTodaySummary todaySummary(UUID tenantId) {
+        long collected = paymentRepository.netSince(tenantId, startOfToday());
+        int pending = (int) counter(tenantId).awaiting().stream().filter(bill -> bill.balancePaise() > 0).count();
+        return new BillingTodaySummary(collected, pending);
+    }
+
     /** Any clinic role reads a bill (AC8); writers also see their own write rights on it. */
     @Transactional(readOnly = true)
     public BillView get(UUID tenantId, String actorRole, UUID visitId) {
@@ -296,15 +307,12 @@ public class BillingService {
         List<BillItemRow> items = bill == null ? List.of() : billItemRepository.findByBill(tenantId, bill.id());
         List<PaymentRow> payments = bill == null ? List.of() : paymentRepository.findByBill(tenantId, bill.id());
         long itemsTotal = items.stream().mapToLong(item -> item.amountPaise() * item.qty()).sum();
-        long subtotal = feePaise + itemsTotal;
         int discountPercent = bill == null ? 0 : bill.discountPercent();
         String discountReason = bill == null ? null : bill.discountReason();
-        long discountPaise = subtotal * discountPercent / 100;
-        long total = subtotal - discountPaise;
         long paid = payments.stream().mapToLong(PaymentRow::amountPaise).sum();
-        long balance = total - paid;
-        return new Totals(bill == null ? null : bill.id(), subtotal, discountPercent, discountReason, discountPaise,
-                total, paid, balance, items, payments);
+        BillMath math = BillMath.of(feePaise, itemsTotal, discountPercent, paid);
+        return new Totals(bill == null ? null : bill.id(), math.subtotalPaise(), discountPercent, discountReason,
+                math.discountPaise(), math.totalPaise(), paid, math.balancePaise(), items, payments);
     }
 
     private BillView toBillView(UUID tenantId, String actorRole, VisitForBilling visit) {

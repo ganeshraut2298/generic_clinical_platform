@@ -10,7 +10,7 @@
     </div>
   </section>
 } @else if (settings(); as s) {
-  <div class="grid2">
+  <div class="grid2 even">
     <section class="panel surf" id="f-fee">
       <h2>Consultation fees</h2>
       <div>
@@ -124,7 +124,7 @@
 
   <app-service-list />
 
-  <div class="grid2">
+  <div class="grid2 even">
     <section class="panel surf" id="f-disc">
       <h2>Discount limits by role</h2>
       @for (item of discountRoles; track item.role) {

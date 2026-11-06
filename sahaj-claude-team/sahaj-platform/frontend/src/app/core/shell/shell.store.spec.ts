@@ -65,6 +65,14 @@ describe('ShellStore', () => {
     expect(store.theme()).toBe('light');
   });
 
+  it('reloadMenu() updates the menu without clearing me', () => {
+    api.getMe.mockReturnValueOnce(of(ME)).mockReturnValueOnce(of({ ...ME, menu: ['today', 'staff'] }));
+    store.load().subscribe();
+    store.reloadMenu().subscribe();
+    expect(store.menu()).toEqual(['today', 'staff']);
+    expect(store.me()).not.toBeNull();
+  });
+
   it('clear() forces the next load() to call the server again', () => {
     api.getMe.mockReturnValue(of(ME));
     store.load().subscribe();

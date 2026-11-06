@@ -1,136 +1,27 @@
-:host {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.pagehead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-
-  h1 {
-    font-size: 1.4rem;
-  }
-}
-
-.lead {
-  color: var(--ink-2);
-  font-size: 0.9rem;
-  max-width: 54ch;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.notice.err {
-  background: var(--crit-soft);
-  color: var(--crit);
-}
-
+// Billing counter (mockup `.bill-list`, `.lines`, `.totals`, `.upi`). Shared blocks: `_console.scss`.
 .grid2 {
-  display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr);
-  gap: 14px;
-  align-items: start;
 
   &.even {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  min-width: 0;
-
-  h2 {
-    font-size: 1.05rem;
-  }
-}
-
-.panel-h {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-}
-
-.li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 0;
-  border: 0;
-  border-bottom: 1px solid var(--line-2);
-  background: transparent;
-  width: 100%;
-  text-align: left;
-  min-height: 44px;
-
-  &:last-child {
-    border-bottom: 0;
-  }
-  &:hover {
-    background: var(--muted-soft);
-  }
-  &[aria-current='true'] {
-    background: var(--pri-soft);
-  }
-}
-
-.main {
-  flex: 1;
-  min-width: 140px;
-  display: flex;
-  flex-direction: column;
-
-  small {
-    color: var(--ink-3);
-    font-size: 0.78rem;
-  }
-}
-
-.empty {
-  color: var(--ink-3);
-  font-size: 0.84rem;
-  padding: 6px 0;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  display: inline-block;
 }
 
 .lines {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 .line {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line-2);
+  padding: 8px 14px;
+  border-top: 1px solid var(--line-2);
+  background: var(--glass-hi);
 
   .n {
     flex: 1;
@@ -140,25 +31,8 @@
     font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
-  &:last-child {
-    border-bottom: 0;
-  }
-}
-
-.xbtn {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--ink-3);
-
-  &:hover {
-    background: var(--muted-soft);
-    color: var(--crit);
+  &:first-child {
+    border-top: 0;
   }
 }
 
@@ -176,47 +50,6 @@
 
 .qtyfield {
   width: 90px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  label {
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: var(--ink-2);
-  }
-}
-
-.field-label {
-  display: block;
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--ink-2);
-}
-
-.row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.input {
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--ink);
-  min-width: 0;
-
-  &:disabled {
-    opacity: 0.6;
-    background: var(--surface-2);
-  }
 }
 
 .pre {
@@ -263,42 +96,10 @@
   background: var(--surface-2);
 }
 
-.seg {
-  display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  border-radius: var(--r-sm);
-  background: var(--muted-soft);
-
-  button {
-    border: 0;
-    background: transparent;
-    padding: 8px 12px;
-    border-radius: 7px;
-    font-weight: 600;
-    font-size: 0.84rem;
-    min-height: 38px;
-
-    &[aria-pressed='true'] {
-      background: var(--surface);
-      box-shadow: var(--shadow-sm);
-      color: var(--pri-text);
-    }
-  }
-}
-
 .upi {
   display: flex;
   gap: 14px;
   align-items: center;
-}
-
-.linkbtn {
-  border: 0;
-  background: transparent;
-  color: var(--pri-text);
-  font-weight: 600;
-  padding: 0;
 }
 
 .errs {
@@ -357,12 +158,83 @@ table.rt {
   }
 }
 
-@media (max-width: 960px) {
-  .grid2 {
-    grid-template-columns: 1fr;
+@media (max-width: 1180px) {
+  .grid2,
+  .grid2.even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
-    &.even {
-      grid-template-columns: 1fr;
-    }
+// Spacing and sizes that were inline in the template.
+.list-head {
+  margin-top: 6px;
+}
+
+.roomy {
+  padding: 40px;
+}
+
+.bill-title {
+  margin-top: 4px;
+}
+
+.bill-age {
+  font-weight: 500;
+  font-size: 0.88rem;
+}
+
+.actions.end {
+  justify-content: flex-end;
+}
+
+.line-gap {
+  width: 44px;
+}
+
+.grid2.tight {
+  gap: 14px;
+}
+
+.row.nowrap {
+  flex-wrap: nowrap;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.disc-input {
+  max-width: 90px;
+}
+
+.slip-input {
+  max-width: 150px;
+}
+
+.field.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+
+  label {
+    white-space: nowrap;
+  }
+}
+
+.pre.paynow {
+  width: 130px;
+}
+
+.upi-main {
+  flex: 1;
+
+  b {
+    font-size: 1.05rem;
+  }
+  .pill {
+    margin-top: 6px;
+  }
+  .linkbtn {
+    font-size: 0.78rem;
   }
 }

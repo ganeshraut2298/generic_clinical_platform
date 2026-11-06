@@ -1,9 +1,14 @@
 package com.sahaj.platform.web;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.sahaj.platform.api.ClinicUser;
 import com.sahaj.platform.api.ConflictException;
+import com.sahaj.platform.api.ForbiddenException;
+import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidInputException;
+import com.sahaj.platform.api.ModuleOffException;
 import com.sahaj.platform.api.NotFoundException;
+import com.sahaj.platform.api.StaffPinException;
 import com.sahaj.platform.application.AccessRefusedException;
 import com.sahaj.platform.application.ConsentRequiredException;
 import com.sahaj.platform.application.OtpInvalidException;
@@ -38,8 +43,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -160,12 +168,50 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
                 new HttpHeaders());
     }
 
+    /** SAH-20: the clinic has not switched this add-on module on. */
+    @ExceptionHandler(ModuleOffException.class)
+    ResponseEntity<Object> handleModuleOff(ModuleOffException ex) {
+        return respond(Problems.of(HttpStatus.FORBIDDEN, "module-off", "Module is off", ex.getMessage()),
+                new HttpHeaders());
+    }
+
+    /** SAH-26: a business rule the signed-in person does not meet (for example owner approval for a dearer bed). */
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<Object> handleForbidden(ForbiddenException ex, WebRequest request) {
+        logRefused(ex.problemType(), request);
+        return respond(Problems.of(HttpStatus.FORBIDDEN, ex.problemType(), ex.title(), ex.getMessage()),
+                new HttpHeaders());
+    }
+
+    /** SAH-31 (ADR-010 D11): wrong-pin, pin-locked, pin-not-set, rate-limit, pin-unavailable. Fixed texts, no PIN. */
+    @ExceptionHandler(StaffPinException.class)
+    ResponseEntity<Object> handleStaffPin(StaffPinException ex) {
+        ProblemDetail problem = Problems.of(HttpStatusCode.valueOf(ex.status()), ex.slug(), ex.title(),
+                ex.getMessage());
+        if (ex.retryAfterSeconds() > 0) {
+            problem.setProperty("retryAfterSeconds", ex.retryAfterSeconds());
+        }
+        return respond(problem, new HttpHeaders());
+    }
+
     /** SAH-7: a rule broken by a well formed request. The message is fixed text written by us, never the submitted value. */
     @ExceptionHandler(InvalidInputException.class)
     ResponseEntity<Object> handleInvalidInput(InvalidInputException ex) {
         ProblemDetail problem = Problems.of(HttpStatus.BAD_REQUEST, "validation", "Check the highlighted fields",
                 ex.getMessage());
         problem.setProperty("fieldErrors", List.of(new Problems.FieldError(ex.field(), ex.getMessage())));
+        return respond(problem, new HttpHeaders());
+    }
+
+    /** SAH-28: several field errors together. The messages are fixed text written by us, never the submitted value. */
+    @ExceptionHandler(InvalidFieldsException.class)
+    ResponseEntity<Object> handleInvalidFields(InvalidFieldsException ex) {
+        List<Problems.FieldError> errors = new ArrayList<>();
+        ex.errors().forEach(error -> errors.add(new Problems.FieldError(error.field(), error.message())));
+        ProblemDetail problem = Problems.validation(errors);
+        if (ex.firstMessageAsDetail() && !errors.isEmpty()) {
+            problem.setDetail(errors.get(0).message());
+        }
         return respond(problem, new HttpHeaders());
     }
 
@@ -279,10 +325,41 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
 
     /** A signed-out visitor is told to sign in (401); a signed-in user without permission gets 403. */
     @ExceptionHandler(AccessDeniedException.class)
-    ResponseEntity<Object> handleAccessDenied(AccessDeniedException ex) {
+    ResponseEntity<Object> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
         boolean anonymous = SecurityContextHolder.getContext().getAuthentication() == null
                 || SecurityContextHolder.getContext().getAuthentication() instanceof AnonymousAuthenticationToken;
+        if (!anonymous) {
+            logRefused("access-denied", request);
+        }
         return respond(anonymous ? Problems.unauthorized() : Problems.forbidden(), new HttpHeaders());
+    }
+
+    /**
+     * Security review L2 (OWASP ASVS V7.2): a refused access is logged with who was refused and where. Only the
+     * problem type, the clinic and user ids and the controller method name are written: never the exception
+     * message, the request path or any id from it, and nothing about a patient.
+     */
+    private static void logRefused(String type, WebRequest request) {
+        String tenantId = "-";
+        String userId = "-";
+        try {
+            ClinicUser user = ClinicUser.current();
+            tenantId = String.valueOf(user.tenantId());
+            userId = String.valueOf(user.userId());
+        } catch (AuthenticationException notAClinicUser) {
+            // an admin or system caller: the ids stay "-"
+        }
+        log.warn("Access refused type={} tenantId={} userId={} handler={}", type, tenantId, userId,
+                handlerName(request));
+    }
+
+    private static String handlerName(WebRequest request) {
+        Object handler = request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE,
+                RequestAttributes.SCOPE_REQUEST);
+        if (handler instanceof HandlerMethod method) {
+            return method.getBeanType().getSimpleName() + "." + method.getMethod().getName();
+        }
+        return "-";
     }
 
     @ExceptionHandler(Exception.class)

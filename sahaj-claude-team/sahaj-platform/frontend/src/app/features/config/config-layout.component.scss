@@ -1,46 +1,30 @@
+// Clinic setup frame (mockup `.cfg`, `.cfgnav`, `.cfg-head`, `.tipbox`). Shared blocks: `_console.scss`.
 :host {
   display: block;
 }
 
-.page {
+.cfgpage {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  max-width: 1280px;
-  margin: 0 auto;
-}
-
-.pagehead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   gap: 12px;
-  flex-wrap: wrap;
-
-  h1 {
-    font-size: 1.5rem;
-  }
-  p {
-    margin-top: 4px;
-    max-width: 62ch;
-  }
 }
 
 .cfg {
   display: grid;
-  grid-template-columns: 250px 1fr;
-  gap: 16px;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 14px;
   align-items: start;
 }
 
 .cfgnav {
+  position: sticky;
+  top: 66px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  max-height: calc(100vh - 84px);
+  overflow: auto;
   padding: 10px;
-  position: sticky;
-  top: 12px;
 }
 
 .search {
@@ -51,8 +35,8 @@
   min-height: 44px;
   margin-bottom: 6px;
   border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
+  border-radius: 11px;
+  background: var(--glass-hi);
   color: var(--ink-3);
 
   input {
@@ -62,68 +46,73 @@
     outline: 0;
     background: transparent;
     color: var(--ink);
+    font-size: 0.84rem;
   }
   &:focus-within {
-    outline: 2px solid var(--pri);
-    outline-offset: 1px;
+    border-color: var(--pri);
+    box-shadow: 0 0 0 3px var(--pri-soft);
   }
 }
 
 .grp {
-  padding: 10px 8px 4px;
-  font-size: 0.7rem;
+  padding: 10px 9px 3px;
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 600;
+  letter-spacing: 0.07em;
+  font-weight: 700;
   color: var(--ink-3);
 }
 
 .ni {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-height: 44px;
-  padding: 0 10px;
-  border-radius: var(--r-sm);
+  padding: 0 9px;
+  border-radius: 10px;
   color: var(--ink-2);
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 
   &:hover {
     background: var(--muted-soft);
+    color: var(--ink);
   }
   &.active {
-    background: var(--pri-soft);
+    background: var(--glass-hi);
     color: var(--pri-text);
+    box-shadow: 0 3px 10px -6px var(--pri);
   }
 }
 
 .nores {
-  padding: 10px;
+  padding: 10px 8px;
   color: var(--ink-3);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .cfg-main {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
+
 }
 
 .cfg-head {
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  padding: 16px;
+  padding: 14px 16px;
 }
 
 .ch-ic {
   flex: none;
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  border-radius: 13px;
   display: grid;
   place-items: center;
   background: var(--pri-soft);
@@ -135,10 +124,15 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 
   h2 {
-    font-size: 1.15rem;
+    font-size: 1.12rem;
+  }
+  p {
+    color: var(--ink-2);
+    font-size: 0.85rem;
+    max-width: 62ch;
   }
 }
 
@@ -147,7 +141,7 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .chip {
@@ -164,34 +158,30 @@
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--ink-2);
+  background: var(--glass-hi);
+  color: var(--ink);
   font-weight: 600;
   font-size: 0.84rem;
 }
 
 .tipbox {
-  padding: 12px 16px;
-  border-radius: var(--r-sm);
-  background: var(--warn-soft);
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: linear-gradient(120deg, var(--sec-soft), transparent 80%);
+  border: 1px solid var(--line-2);
   color: var(--ink);
-  font-size: 0.86rem;
+  font-size: 0.83rem;
 
+  > b {
+    color: var(--sec);
+    font-size: 0.84rem;
+  }
   ul {
-    margin: 6px 0 0;
-    padding-left: 18px;
-    display: flex;
-    flex-direction: column;
+    margin: 7px 0 1px 18px;
+    padding: 0;
+    display: grid;
     gap: 4px;
-  }
-}
-
-@media (max-width: 860px) {
-  .cfg {
-    grid-template-columns: 1fr;
-  }
-  .cfgnav {
-    position: static;
+    color: var(--ink-2);
   }
 }
 
@@ -200,4 +190,14 @@
   padding: 0 14px;
   text-decoration: none;
   font-size: 0.8rem;
+}
+
+@media (max-width: 1000px) {
+  .cfg {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cfgnav {
+    position: static;
+    max-height: none;
+  }
 }

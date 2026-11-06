@@ -8,16 +8,21 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sahaj.platform.api.AuditLog;
+import com.sahaj.platform.api.ForbiddenException;
 import com.sahaj.platform.api.NotFoundException;
 import com.sahaj.platform.api.PlanLimits;
+import com.sahaj.platform.api.StaffPinException;
 import com.sahaj.platform.application.TeamRepository.TeamRow;
 import com.sahaj.platform.domain.AppUser;
 import com.sahaj.platform.domain.MembershipRole;
 import com.sahaj.platform.domain.MembershipStatus;
+import com.sahaj.platform.domain.PinState;
+import com.sahaj.platform.domain.StaffPinRow;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
@@ -46,6 +51,9 @@ class TeamServiceTest {
     private DoctorProfileRepository doctorProfileRepository;
     private RefreshTokenRepository refreshTokenRepository;
     private AuditLog auditLog;
+    private StaffPinRepository staffPinRepository;
+    private StaffPinOps staffPinOps;
+    private StaffPinLimits staffPinLimits;
     private TeamService service;
 
     @BeforeEach
@@ -55,8 +63,12 @@ class TeamServiceTest {
         doctorProfileRepository = mock(DoctorProfileRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
         auditLog = mock(AuditLog.class);
+        staffPinRepository = mock(StaffPinRepository.class);
+        staffPinOps = mock(StaffPinOps.class);
+        staffPinLimits = mock(StaffPinLimits.class);
         service = new TeamService(teamRepository, appUserRepository, doctorProfileRepository,
-                refreshTokenRepository, auditLog, Clock.fixed(NOW, ZoneOffset.UTC));
+                refreshTokenRepository, auditLog, staffPinRepository, staffPinOps, staffPinLimits,
+                Clock.fixed(NOW, ZoneOffset.UTC));
 
         when(teamRepository.findByUser(TENANT_ID, OWNER_USER))
                 .thenReturn(Optional.of(row(OWNER_MEMBERSHIP, OWNER_USER, "Asha", MembershipRole.OWNER,
@@ -77,7 +89,7 @@ class TeamServiceTest {
         when(teamRepository.findAll(TENANT_ID)).thenReturn(List.of(
                 row(OWNER_MEMBERSHIP, OWNER_USER, "Asha", MembershipRole.OWNER, MembershipStatus.ACTIVE)));
 
-        List<TeamMemberView> team = service.list(TENANT_ID);
+        List<TeamMemberView> team = service.list(TENANT_ID, OWNER_USER);
 
         assertThat(team).singleElement().satisfies(member -> {
             assertThat(member.mobileMasked()).isEqualTo("••••••7410");
@@ -313,6 +325,166 @@ class TeamServiceTest {
 
         verify(doctorProfileRepository).insert(doctorMembership, TENANT_ID, "General medicine", 30000L, "MBBS",
                 "MH-2026-1");
+    }
+
+    // ---- SAH-31: staff PIN on the team list, reset, removal (ADR-010 D8, D12) ----
+
+    private static StaffPinRow pin(UUID membershipId, String hash, Instant lockedUntil, String reason) {
+        return new StaffPinRow(membershipId, hash, 1, 0, lockedUntil, lockedUntil == null ? 0 : 1,
+                lockedUntil == null ? null : NOW.minusSeconds(60), hash == null ? null : NOW.minusSeconds(3600),
+                reason, null, 0L, NOW);
+    }
+
+    private void twoMembers() {
+        when(teamRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                row(OWNER_MEMBERSHIP, OWNER_USER, "Asha", MembershipRole.OWNER, MembershipStatus.ACTIVE),
+                row(NURSE_MEMBERSHIP, NURSE_USER, "Nisha", MembershipRole.NURSE, MembershipStatus.ACTIVE)));
+    }
+
+    @Test
+    void theOwnerSeesThePinStateOfEveryRowAndNeverTheHash() {
+        twoMembers();
+        when(staffPinRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                pin(OWNER_MEMBERSHIP, "$2a$12$" + "a".repeat(53), null, null),
+                pin(NURSE_MEMBERSHIP, "$2a$12$" + "b".repeat(53), NOW.plusSeconds(600), null)));
+
+        List<TeamMemberView> team = service.list(TENANT_ID, OWNER_USER);
+
+        assertThat(team.get(0).pin().state()).isEqualTo(PinState.SET);
+        assertThat(team.get(0).pin().setAt()).isEqualTo(NOW.minusSeconds(3600));
+        assertThat(team.get(0).pin().lockedUntil()).isNull();
+        assertThat(team.get(1).pin().state()).isEqualTo(PinState.LOCKED);
+        assertThat(team.get(1).pin().lockedUntil()).isEqualTo(NOW.plusSeconds(600));
+        assertThat(team.toString()).doesNotContain("$2a$");
+    }
+
+    @Test
+    void aPersonWithNoRowOrAnOffRowIsNotSet() {
+        twoMembers();
+        when(staffPinRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                pin(NURSE_MEMBERSHIP, null, null, "RESET_BY_OWNER")));
+
+        List<TeamMemberView> team = service.list(TENANT_ID, OWNER_USER);
+
+        assertThat(team.get(0).pin()).isEqualTo(new TeamMemberView.PinView(PinState.NOT_SET, null, null));
+        assertThat(team.get(1).pin()).isEqualTo(new TeamMemberView.PinView(PinState.NOT_SET, null, null));
+    }
+
+    @Test
+    void aLockInThePastIsJustSet() {
+        twoMembers();
+        when(staffPinRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                pin(NURSE_MEMBERSHIP, "$2a$12$" + "b".repeat(53), NOW.minusSeconds(5), null)));
+
+        TeamMemberView nurse = service.list(TENANT_ID, OWNER_USER).get(1);
+
+        assertThat(nurse.pin().state()).isEqualTo(PinState.SET);
+        assertThat(nurse.pin().lockedUntil()).isNull();
+    }
+
+    @Test
+    void anyoneElseSeesOnlyTheirOwnPinRow() {
+        twoMembers();
+        when(staffPinRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                pin(OWNER_MEMBERSHIP, "$2a$12$" + "a".repeat(53), NOW.plusSeconds(600), null),
+                pin(NURSE_MEMBERSHIP, "$2a$12$" + "b".repeat(53), null, null)));
+
+        List<TeamMemberView> team = service.list(TENANT_ID, NURSE_USER);
+
+        assertThat(team.get(0).pin()).as("the owner's lock is not shown to a nurse").isNull();
+        assertThat(team.get(1).pin().state()).isEqualTo(PinState.SET);
+    }
+
+    @Test
+    void aViewerWhoIsNotAnOwnerInTheDatabaseNeverSeesAnotherRowsPin() {
+        when(teamRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                row(OWNER_MEMBERSHIP, OWNER_USER, "Asha", MembershipRole.OWNER, MembershipStatus.ACTIVE),
+                row(NURSE_MEMBERSHIP, NURSE_USER, "Nisha", MembershipRole.DOCTOR, MembershipStatus.ACTIVE)));
+
+        assertThat(service.list(TENANT_ID, NURSE_USER).get(0).pin()).isNull();
+    }
+
+    @Test
+    void theOwnerResetsAPinAndGetsTheMemberBackAsNotSet() {
+        nurseExists(MembershipStatus.ACTIVE);
+        when(staffPinOps.clear(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP)).thenReturn(true);
+        when(staffPinRepository.find(TENANT_ID, NURSE_MEMBERSHIP, false))
+                .thenReturn(Optional.of(pin(NURSE_MEMBERSHIP, null, null, "RESET_BY_OWNER")));
+
+        TeamMemberView view = service.resetPin(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
+
+        verify(staffPinOps).clear(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
+        assertThat(view.id()).isEqualTo(NURSE_MEMBERSHIP);
+        assertThat(view.pin().state()).isEqualTo(PinState.NOT_SET);
+        assertThat(view.mobileMasked()).isEqualTo("••••••7410");
+    }
+
+    @Test
+    void aResetOfAMemberWithNoPinStillAnswersTheMember() {
+        nurseExists(MembershipStatus.INACTIVE);
+        when(staffPinOps.clear(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP)).thenReturn(false);
+
+        TeamMemberView view = service.resetPin(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
+
+        assertThat(view.pin().state()).isEqualTo(PinState.NOT_SET);
+    }
+
+    @Test
+    void onlyTheOwnerMayResetAPinAndTheRoleIsReadAgain() {
+        when(teamRepository.findByUser(TENANT_ID, NURSE_USER)).thenReturn(Optional.of(
+                row(NURSE_MEMBERSHIP, NURSE_USER, "Nisha", MembershipRole.NURSE, MembershipStatus.ACTIVE)));
+        when(teamRepository.findByUser(TENANT_ID, OWNER_USER)).thenReturn(Optional.of(
+                row(OWNER_MEMBERSHIP, OWNER_USER, "Asha", MembershipRole.OWNER, MembershipStatus.INACTIVE)));
+
+        for (UUID actor : new UUID[] {NURSE_USER, OWNER_USER, UUID.randomUUID()}) {
+            assertThatThrownBy(() -> service.resetPin(TENANT_ID, actor, NURSE_MEMBERSHIP))
+                    .isInstanceOfSatisfying(ForbiddenException.class, ex -> {
+                        assertThat(ex.problemType()).isEqualTo("forbidden");
+                        assertThat(ex.getMessage()).isEqualTo("Only the clinic owner can do this.");
+                    });
+        }
+        verify(staffPinOps, never()).clear(any(), any(), any());
+    }
+
+    @Test
+    void thirtyOneResetsAnHourAnswerRateLimit() {
+        nurseExists(MembershipStatus.ACTIVE);
+        when(staffPinLimits.resetWait(TENANT_ID, OWNER_USER)).thenReturn(120L);
+
+        assertThatThrownBy(() -> service.resetPin(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP))
+                .isInstanceOfSatisfying(StaffPinException.class, ex -> {
+                    assertThat(ex.slug()).isEqualTo("rate-limit");
+                    assertThat(ex.retryAfterSeconds()).isEqualTo(120L);
+                });
+        verify(staffPinOps, never()).clear(any(), any(), any());
+    }
+
+    @Test
+    void aMemberOfAnotherClinicCannotBeReset() {
+        when(teamRepository.findById(TENANT_ID, NURSE_MEMBERSHIP)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resetPin(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP))
+                .isInstanceOf(NotFoundException.class);
+        verify(staffPinOps, never()).clear(any(), any(), any());
+        verifyNoInteractions(staffPinLimits);
+    }
+
+    @Test
+    void removingAccessClearsThePinInTheSameTransaction() {
+        nurseExists(MembershipStatus.ACTIVE);
+
+        service.remove(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
+
+        verify(staffPinOps).clear(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
+    }
+
+    @Test
+    void switchingSomeoneOffKeepsTheirPin() {
+        nurseExists(MembershipStatus.ACTIVE);
+
+        service.deactivate(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
+
+        verify(staffPinOps, never()).clear(any(), any(), any());
     }
 
     @Test

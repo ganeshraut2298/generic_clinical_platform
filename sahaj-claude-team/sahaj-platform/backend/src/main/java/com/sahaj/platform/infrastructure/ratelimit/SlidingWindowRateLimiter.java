@@ -78,6 +78,27 @@ public class SlidingWindowRateLimiter {
         this.clock = clock;
     }
 
+    /**
+     * Says whether one more attempt would be allowed, without counting anything. A key the limiter has never seen is
+     * allowed and is not stored.
+     */
+    public Decision peek(String key) {
+        long now = clock.millis();
+        long windowMillis = window.toMillis();
+        Decision[] result = {new Decision(true, 0)};
+        hits.computeIfPresent(key, (k, deque) -> {
+            while (!deque.isEmpty() && now - deque.peekFirst() >= windowMillis) {
+                deque.pollFirst();
+            }
+            if (deque.size() >= maxRequests) {
+                long waitMillis = deque.peekFirst() + windowMillis - now;
+                result[0] = new Decision(false, Math.max(1, (waitMillis + 999) / 1000));
+            }
+            return deque;
+        });
+        return result[0];
+    }
+
     /** Counts one attempt for the key and says whether it may go ahead. */
     public Decision tryAcquire(String key) {
         long now = clock.millis();

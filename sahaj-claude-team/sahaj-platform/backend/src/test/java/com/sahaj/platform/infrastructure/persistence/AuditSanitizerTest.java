@@ -27,6 +27,55 @@ class AuditSanitizerTest {
     }
 
     @Test
+    void keepsThePinStateLabelOfTheStaffPinAuditRowsButNothingElseNamedLikeAPin() {
+        for (String label : new String[] {"SET", "LOCKED", "NOT_SET"}) {
+            assertThat(AuditSanitizer.sanitize("STAFF_PIN", Map.of("pinState", label))).containsEntry("pinState", label);
+        }
+        Map<String, Object> result = AuditSanitizer.sanitize("STAFF_PIN", Map.of(
+                "pin", "SET", "pinHash", "$2a$12$abc", "pinState2", "SET", "newPin", "4821"));
+        assertThat(result.values()).containsOnly(AuditSanitizer.REDACTED);
+        assertThat(AuditSanitizer.sanitize("STAFF_PIN", Map.of("pinState", "4821")))
+                .as("any other value under pinState is still replaced").containsEntry("pinState", AuditSanitizer.REDACTED);
+        assertThat(AuditSanitizer.sanitize("STAFF_PIN", Map.of("reason", "RESET_BY_OWNER", "lockCount", 2,
+                "lockedUntil", "2026-11-06T06:15:00Z", "membershipId", "3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10")))
+                .containsEntry("reason", "RESET_BY_OWNER").containsEntry("lockCount", 2)
+                .containsEntry("lockedUntil", "2026-11-06T06:15:00Z");
+    }
+
+    @Test
+    void keepsTheColleagueCheckAuditFieldsIdsAndTriesLeftIntact() {
+        // SAH-32: PLATFORM_PIN_COLLEAGUE_CHECK_FAILED holds ids and a number only; none of the keys may be redacted
+        Map<String, Object> result = AuditSanitizer.sanitize("STAFF_PIN", Map.of(
+                "membershipId", "3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10",
+                "checkedByMembershipId", "8a1e2c44-0b7d-4c19-8f55-6d3e9a7b2c01",
+                "triesLeft", 3));
+
+        assertThat(result).containsEntry("membershipId", "3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10")
+                .containsEntry("checkedByMembershipId", "8a1e2c44-0b7d-4c19-8f55-6d3e9a7b2c01")
+                .containsEntry("triesLeft", 3);
+    }
+
+    @Test
+    void anIdWhoseLastGroupIsTenOrMoreDigitsIsNotMaskedAsAMobileNumber() {
+        String id = "3f0c9a52-6a1e-4f7e-9d1b-123456789012";
+
+        Map<String, Object> result = AuditSanitizer.sanitize("STAFF_PIN", Map.of("membershipId", id,
+                "checkedByMembershipId", id.toUpperCase(java.util.Locale.ROOT), "ids", List.of(id)));
+
+        assertThat(result.get("membershipId")).isEqualTo(id);
+        assertThat(result.get("checkedByMembershipId")).isEqualTo(id.toUpperCase(java.util.Locale.ROOT));
+        assertThat(result.get("ids")).isEqualTo(List.of(id));
+    }
+
+    @Test
+    void aTenDigitRunInsideOtherTextIsStillMaskedEvenNextToAnId() {
+        Map<String, Object> result = AuditSanitizer.sanitize(Map.of("text", "call 9123457410 about "
+                + "3f0c9a52-6a1e-4f7e-9d1b-123456789012"));
+
+        assertThat(result.get("text").toString()).doesNotContain("9123457410").contains("••••••7410");
+    }
+
+    @Test
     void keepsOrdinaryValuesIncludingAFieldNamedCode() {
         Map<String, Object> result = AuditSanitizer.sanitize(Map.of("specialty", "gp", "code", "dental", "count", 3));
 
@@ -137,5 +186,69 @@ class AuditSanitizerTest {
                 .containsEntry("specialty", "gp")
                 .containsEntry("code", "dental")
                 .containsEntry("count", 3);
+    }
+
+    // ---- S2: clinical free text is redacted for every entity type ----
+
+    @Test
+    void redactsAllergyChronicDiagnosisComplaintClinicalAndHistoryTextsForEveryEntityType() {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("allergy", "Penicillin");
+        values.put("chronic", "Diabetes");
+        values.put("diagnosis", "Typhoid");
+        values.put("complaint", "Fever");
+        values.put("clinical", "Stable");
+        values.put("history", "Old MI");
+        for (String entityType : new String[] {null, "PATIENT", "VISIT", "TENANT", "IPD_ADMISSION", "SOMETHING_NEW"}) {
+            Map<String, Object> result = AuditSanitizer.sanitize(entityType, values);
+
+            assertThat(result.keySet()).as(String.valueOf(entityType)).containsExactlyElementsOf(values.keySet());
+            assertThat(result.values()).as(String.valueOf(entityType)).containsOnly(AuditSanitizer.REDACTED);
+        }
+    }
+
+    @Test
+    void redactsTheCamelCaseSnakeCaseAndSpacedVariantsOfThoseKeys() {
+        Map<String, Object> result = AuditSanitizer.sanitize("PATIENT", Map.of(
+                "allergyText", "Penicillin", "ALLERGY_TEXT", "Penicillin", "chronicConditions", "Diabetes",
+                "chronic-text", "Diabetes", "diagnosisText", "Typhoid", "chiefComplaint", "Fever",
+                "clinicalNotes", "Stable", "medicalHistory", "Old MI", "history_of_illness", "x",
+                "allergyBefore", "Sulfa"));
+
+        assertThat(result.values()).hasSize(10).containsOnly(AuditSanitizer.REDACTED);
+    }
+
+    @Test
+    void redactsTheTextsInsideNestedMapsAndLists() {
+        Map<String, Object> result = AuditSanitizer.sanitize("TENANT", Map.of(
+                "before", Map.of("allergy", "Penicillin", "id", "p1"),
+                "rows", List.of(Map.of("chronic", "Diabetes"), List.of(Map.of("diagnosis", "Typhoid")))));
+
+        assertThat(result.toString()).doesNotContain("Penicillin").doesNotContain("Diabetes")
+                .doesNotContain("Typhoid").contains("p1");
+    }
+
+    @Test
+    void keepsTheTwoRecordedFlagsOfThePatientAuditRowsWhenTheyAreTrueOrFalse() {
+        Map<String, Object> result = AuditSanitizer.sanitize("PATIENT", Map.of(
+                "allergyRecorded", true, "chronicRecorded", false, "age", 54));
+
+        assertThat(result).containsEntry("allergyRecorded", true).containsEntry("chronicRecorded", false)
+                .containsEntry("age", 54);
+    }
+
+    @Test
+    void aRecordedFlagHoldingTextIsStillRedactedAndNoOtherKeyWithTheWordGetsAFreePass() {
+        Map<String, Object> result = AuditSanitizer.sanitize("PATIENT", Map.of(
+                "allergyRecorded", "Penicillin", "chronicRecorded", "Diabetes", "allergyFlag", true,
+                "allergyRecordedText", true, "diagnosisRecorded", true));
+
+        assertThat(result.values()).containsOnly(AuditSanitizer.REDACTED);
+    }
+
+    @Test
+    void thePinStateExceptionStillWorksNextToTheNewKeys() {
+        assertThat(AuditSanitizer.sanitize("STAFF_PIN", Map.of("pinState", "LOCKED", "history", "x")))
+                .containsEntry("pinState", "LOCKED").containsEntry("history", AuditSanitizer.REDACTED);
     }
 }

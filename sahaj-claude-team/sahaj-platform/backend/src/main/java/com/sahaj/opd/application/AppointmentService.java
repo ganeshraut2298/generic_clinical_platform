@@ -53,19 +53,21 @@ public class AppointmentService {
     private final VisitService visitService;
     private final PatientLookupPort patientLookup;
     private final TeamMemberPort teamMemberPort;
+    private final DoctorBlockedDates blockedDates;
     private final AuditLog auditLog;
     private final Clock clock;
 
     public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
                                VisitRepository visitRepository, VisitService visitService,
-                               PatientLookupPort patientLookup, TeamMemberPort teamMemberPort, AuditLog auditLog,
-                               Clock clock) {
+                               PatientLookupPort patientLookup, TeamMemberPort teamMemberPort,
+                               DoctorBlockedDates blockedDates, AuditLog auditLog, Clock clock) {
         this.appointmentRepository = appointmentRepository;
         this.bookingRulesRepository = bookingRulesRepository;
         this.visitRepository = visitRepository;
         this.visitService = visitService;
         this.patientLookup = patientLookup;
         this.teamMemberPort = teamMemberPort;
+        this.blockedDates = blockedDates;
         this.auditLog = auditLog;
         this.clock = clock;
     }
@@ -129,12 +131,19 @@ public class AppointmentService {
                 .filter(member -> member.active() && DOCTOR_ROLES.contains(member.role()))
                 .orElseThrow(() -> new NotFoundException("Doctor not found"));
 
+        if (blockedDates.blocked(tenantId, doctor.membershipId(), input.apptDate(), input.apptDate())
+                .contains(input.apptDate())) {
+            throw new ConflictException("doctor-unavailable", "Doctor is not taking bookings that day",
+                    "This doctor is not taking bookings on that date.");
+        }
+
         BookingRulesRow rules = bookingRulesRepository.find(tenantId).orElse(BookingRulesService.DEFAULTS);
 
         if (!WRITE_ROLES.contains(actorRole)) {
             requireOutsideCloseBeforeWindow(rules, input.apptDate(), apptTime);
         }
 
+        appointmentRepository.lockSlot(tenantId, input.doctorMembershipId(), input.apptDate(), apptTime);
         appointmentRepository.findActiveConflict(tenantId, input.doctorMembershipId(), input.apptDate(), apptTime)
                 .ifPresent(existing -> {
                     if (!rules.overbook()) {

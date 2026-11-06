@@ -24,6 +24,8 @@ export interface Visit {
   stage: VisitStage;
   feePaise: number;
   createdAt: string;
+  /** The published workflow version the visit was issued under; its steps drive the card's moves. */
+  workflowVersionNo: number;
 }
 
 /** Mockup `STAGE_OF` labels, contract stage keys. */

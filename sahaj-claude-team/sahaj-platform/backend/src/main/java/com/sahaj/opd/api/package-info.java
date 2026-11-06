@@ -8,6 +8,9 @@
  * an interface in {@code com.sahaj.platform.api} that {@code opd} implements - a call in each
  * direction would be a module cycle, which {@code ModularityTests} refuses.
  *
+ * <p>SAH-27 (ADR-004) adds {@link com.sahaj.opd.api.FollowUpPort}: {@code ipd} adds the follow-up of a discharge in its
+ * own transaction and reads the OPD follow-up fee rule. {@code opd} never depends on {@code ipd}.
+ *
  * <p>SAH-10 adds {@link com.sahaj.opd.api.VisitBillingPort}, {@link com.sahaj.opd.api.ServiceLookupPort}
  * and {@link com.sahaj.opd.api.DiscountLimitPort}: {@code billing} reads a visit's billing detail,
  * the price list and the fee settings' discount limits through this package. This is the other

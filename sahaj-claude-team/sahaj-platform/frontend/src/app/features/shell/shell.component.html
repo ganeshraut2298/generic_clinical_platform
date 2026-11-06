@@ -13,6 +13,7 @@
         class="iconbtn"
         (click)="toggleCollapsed()"
         [attr.aria-label]="collapsed() ? ('shell.expand' | t) : ('shell.collapse' | t)"
+        [attr.title]="collapsed() ? ('shell.expand' | t) : ('shell.collapse' | t)"
         [attr.aria-expanded]="!collapsed()"
       >
         <app-icon [name]="collapsed() ? 'chevR' : 'chevL'" [size]="15" />
@@ -40,32 +41,38 @@
       />
     </label>
 
+    <ng-template #navLink let-item>
+      <a
+        class="nav-item"
+        routerLink="/app/{{ item.route }}"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        [attr.aria-label]="
+          badgeOf(item) > 0
+            ? (item.labelKey | t) + ', ' + badgeOf(item) + ' ' + ('nav.emergencyCount' | t)
+            : (item.labelKey | t)
+        "
+        [attr.title]="collapsed() ? (item.labelKey | t) : null"
+        (click)="closeDrawer()"
+      >
+        <app-icon [name]="item.icon" [size]="17" />
+        <span class="label">{{ item.labelKey | t }}</span>
+        @if (badgeOf(item) > 0) {
+          <span class="badge num" aria-hidden="true">{{ badgeOf(item) }}</span>
+        }
+      </a>
+    </ng-template>
+
     <nav class="nav" aria-label="Clinic navigation">
       @if (navQuery().trim()) {
         @for (item of searchResults(); track item.key) {
-          <a
-            class="nav-item"
-            routerLink="/app/{{ item.route }}"
-            routerLinkActive="active"
-            (click)="closeDrawer()"
-          >
-            <app-icon [name]="item.icon" [size]="17" />
-            <span class="label">{{ item.labelKey | t }}</span>
-          </a>
+          <ng-container [ngTemplateOutlet]="navLink" [ngTemplateOutletContext]="{ $implicit: item }" />
         } @empty {
           <div class="nav-empty">{{ 'shell.noMatches' | t }}</div>
         }
       } @else if (menuMode() === 'simple') {
         @for (item of simpleItems(); track item.key) {
-          <a
-            class="nav-item"
-            routerLink="/app/{{ item.route }}"
-            routerLinkActive="active"
-            (click)="closeDrawer()"
-          >
-            <app-icon [name]="item.icon" [size]="17" />
-            <span class="label">{{ item.labelKey | t }}</span>
-          </a>
+          <ng-container [ngTemplateOutlet]="navLink" [ngTemplateOutletContext]="{ $implicit: item }" />
         }
       } @else {
         @for (group of groupedItems(); track group.group) {
@@ -81,15 +88,7 @@
             </button>
             @if (isGroupOpen(group.group)) {
               @for (item of group.items; track item.key) {
-                <a
-                  class="nav-item"
-                  routerLink="/app/{{ item.route }}"
-                  routerLinkActive="active"
-                  (click)="closeDrawer()"
-                >
-                  <app-icon [name]="item.icon" [size]="17" />
-                  <span class="label">{{ item.labelKey | t }}</span>
-                </a>
+                <ng-container [ngTemplateOutlet]="navLink" [ngTemplateOutletContext]="{ $implicit: item }" />
               }
             }
           </div>
@@ -125,7 +124,7 @@
         <app-icon name="search" [size]="15" />
         <input type="search" inputmode="numeric" autocomplete="off" [attr.placeholder]="'shell.searchMobile' | t" [attr.aria-label]="'shell.searchMobile' | t" />
       </label>
-      <button type="button" class="goto-btn" (click)="openGoTo()" [attr.aria-label]="'shell.goTo' | t">
+      <button type="button" class="goto-btn" (click)="openGoTo()" [attr.aria-label]="'shell.goTo' | t" [attr.title]="'shell.goTo' | t">
         <app-icon name="search" [size]="14" />
         <span class="hide-sm">{{ 'shell.goTo' | t }}</span>
         <kbd>Ctrl K</kbd>
@@ -137,11 +136,16 @@
           <option value="hi">हिंदी</option>
         </select>
       </label>
-      <button type="button" class="chip-select user-menu" [matMenuTriggerFor]="userMenu" [attr.title]="'shell.signedInAs' | t">
-        <span class="role-name">{{ userName() }}</span>
-        <small>{{ roleLabel() }}</small>
+      <button type="button" #accountButton class="chip-select user-menu" [matMenuTriggerFor]="userMenu" [attr.title]="'shell.signedInAs' | t">
+        <span class="role-name">{{ chip().primary }}</span>
+        @if (chip().secondary) {
+          <small>{{ chip().secondary }}</small>
+        }
       </button>
       <mat-menu #userMenu="matMenu">
+        @if (showMyPin()) {
+          <button mat-menu-item type="button" data-act="my-pin" (click)="openMyPin()">My PIN</button>
+        }
         <button mat-menu-item type="button" (click)="logout()">{{ 'shell.logout' | t }}</button>
       </mat-menu>
       <button type="button" class="iconbtn" (click)="toggleTheme()" [attr.aria-label]="'shell.theme' | t">

@@ -23,11 +23,14 @@ public class MeService {
     private final ClinicProfileRepository clinicProfileRepository;
     private final SetupProgressRepository setupProgressRepository;
     private final UserPreferenceRepository userPreferenceRepository;
+    private final ModuleEntitlementRepository moduleEntitlementRepository;
     private final Clock clock;
 
     public MeService(TeamRepository teamRepository, TenantRepository tenantRepository,
                       ClinicProfileRepository clinicProfileRepository, SetupProgressRepository setupProgressRepository,
-                      UserPreferenceRepository userPreferenceRepository, Clock clock) {
+                      UserPreferenceRepository userPreferenceRepository,
+                      ModuleEntitlementRepository moduleEntitlementRepository, Clock clock) {
+        this.moduleEntitlementRepository = moduleEntitlementRepository;
         this.teamRepository = teamRepository;
         this.tenantRepository = tenantRepository;
         this.clinicProfileRepository = clinicProfileRepository;
@@ -74,7 +77,16 @@ public class MeService {
 
         MeView.Clinic clinic = new MeView.Clinic(tenantProfile.name(), area, tenantProfile.brand(),
                 brandHex, tenantProfile.plan(), planDaysLeft, setupComplete, setupPercent);
+        NavigationPolicy.ModuleFlags flags = moduleEntitlementRepository.find(tenantId)
+                .map(row -> flagsOf(row, ModuleEntitlements.effectiveIpdState(row, clock.instant())))
+                .orElse(new NavigationPolicy.ModuleFlags(false, false, false));
         return new MeView(userId, member.id(), member.name(), role.name(), clinic,
-                NavigationPolicy.menuFor(role, preferences.menuMode()), preferences);
+                NavigationPolicy.menuFor(role, preferences.menuMode(), flags), preferences);
+    }
+
+    /** SAH-28: IPD is writable (menu item Emergency) in Trial and On, not in Read-only. */
+    private static NavigationPolicy.ModuleFlags flagsOf(ModuleEntitlementRepository.EntitlementRow row, String state) {
+        return new NavigationPolicy.ModuleFlags(row.hraOn(), !"off".equals(state),
+                "trial".equals(state) || "on".equals(state));
     }
 }

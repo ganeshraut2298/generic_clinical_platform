@@ -1,82 +1,16 @@
-:host {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.pagehead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-
-  h1 {
-    font-size: 1.4rem;
-  }
-}
-
-.lead {
-  color: var(--ink-2);
-  font-size: 0.9rem;
-  max-width: 54ch;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+// Appointments workspace (mockup `.apstats`, `.slot2`). Shared blocks: `_console.scss`.
 .aptool {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 10px 14px;
   align-items: center;
-}
-
-.seg {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  padding: 3px;
-
-  button {
-    border: 0;
-    background: transparent;
-    padding: 6px 12px;
-    border-radius: var(--r-pill);
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: var(--ink-2);
-    min-height: 38px;
-
-    &[aria-pressed='true'] {
-      background: var(--pri-soft);
-      color: var(--pri-text);
-    }
-  }
-}
-
-.notice.err {
-  background: var(--crit-soft);
-  color: var(--crit);
-}
-
-// `.p-wait`, `.p-warn`, `.p-good`, `.p-sec` already exist in `_primitives.scss`; `.p-crit`
-// (NOSHOW/LATE) does not, so it is added here (same pattern as `patient-record.page.scss`).
-.p-crit {
-  background: var(--crit-soft);
-  color: var(--crit);
+  padding: 8px 12px;
 }
 
 .apstats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .aps {
@@ -84,15 +18,16 @@
   flex-direction: column;
   gap: 2px;
   align-items: center;
-  padding: 14px 10px;
+  padding: 10px;
 
   .num {
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 1.28rem;
+    font-weight: 600;
   }
   small {
     color: var(--ink-3);
-    font-size: 0.78rem;
+    font-size: 0.76rem;
   }
   .booked {
     color: var(--sec);
@@ -114,20 +49,15 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
 
-.linkbtn {
-  border: 0;
-  background: transparent;
-  color: var(--pri-text);
-  font-weight: 600;
-  font-size: 0.8rem;
-  padding: 0;
+  .linkbtn {
+    font-size: 0.8rem;
+  }
 }
 
 .apcols {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-items: start;
 }
 
@@ -135,7 +65,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px;
+  padding: 12px;
   min-width: 0;
 }
 
@@ -157,24 +87,6 @@
   }
 }
 
-.avatar {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--pri-soft);
-  color: var(--pri-text);
-  font-weight: 600;
-}
-
-.empty {
-  color: var(--ink-3);
-  font-size: 0.84rem;
-  padding: 10px 0;
-}
-
 .slots {
   display: flex;
   flex-direction: column;
@@ -186,9 +98,15 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border-radius: var(--r-sm);
+  border-radius: 11px;
   border: 1px solid var(--line-2);
+  background: var(--glass-hi);
 
+  &.free {
+    border-style: dashed;
+    border-color: var(--line);
+    background: transparent;
+  }
   &.walk {
     background: var(--muted-soft);
   }
@@ -196,10 +114,10 @@
 
 .st {
   flex: none;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   width: 64px;
-  color: var(--ink-2);
+  color: var(--ink-3);
 }
 
 .apcard {
@@ -211,6 +129,8 @@
   border: 0;
   background: transparent;
   text-align: left;
+  min-height: 44px;
+  justify-content: center;
 
   small {
     color: var(--ink-3);
@@ -228,30 +148,35 @@
   align-items: center;
   gap: 4px;
   justify-content: center;
-  border: 1px dashed var(--line);
+  border: 0;
   background: transparent;
   border-radius: var(--r-sm);
-  color: var(--pri-text);
+  color: var(--ink-3);
   font-weight: 600;
   font-size: 0.82rem;
-  min-height: 36px;
+  min-height: 44px;
 
   &:hover {
     background: var(--pri-soft);
+    color: var(--pri-text);
   }
 }
 
 .sm {
   font-size: 0.76rem;
-  min-height: 32px;
-  padding: 0 8px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 900px) {
   .apstats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .apcols {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .apstats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

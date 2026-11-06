@@ -1,3 +1,5 @@
+<p class="sr-only" role="status" aria-live="polite">{{ status() }}</p>
+
 @if (loading()) {
   <section class="panel surf" aria-busy="true">
     <p class="muted">Loading the OPD workflow</p>
@@ -8,6 +10,9 @@
       <app-icon name="alert" [size]="16" />
       <span>{{ message }}</span>
     </div>
+    <div class="actions">
+      <button mat-stroked-button type="button" (click)="retry()">Try again</button>
+    </div>
   </section>
 } @else {
   @if (!isOwner()) {
@@ -16,12 +21,12 @@
       <span>Only the owner can change the OPD workflow. You can see the steps below.</span>
     </div>
   }
-  <div class="grid2" id="f-wf">
+  <div class="grid2 even" id="f-wf">
     <section class="panel surf">
       <div class="panel-h">
         <div>
           <h2>Steps for a new visit</h2>
-          <div class="faint" style="font-size: 0.82rem">
+          <div class="faint t-sm">
             Switch steps on or off and choose who owns Vitals and Counselling. Locked steps are always on.
           </div>
         </div>
@@ -33,11 +38,12 @@
               <div class="d">
                 <b>{{ stepMeta[key].label }}</b>
                 @if (stepMeta[key].fixed) {
-                  <app-icon name="lock" [size]="12" class="faint" />
+                  <app-icon name="lock" [size]="12" class="faint" aria-hidden="true" />
+                  <span class="sr-only">Locked, always on</span>
                 }
                 <small>{{ stepMeta[key].description }}</small>
               </div>
-              @if (stepMeta[key].hasOwner) {
+              @if (ownerEditable(key)) {
                 <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ownersel">
                   <mat-label>Owner</mat-label>
                   <mat-select
@@ -52,7 +58,7 @@
                   </mat-select>
                 </mat-form-field>
               } @else {
-                <span></span>
+                <span class="owner-text">{{ ownerLabel(step) }}</span>
               }
               <button
                 type="button"
@@ -69,7 +75,7 @@
       </div>
     </section>
 
-    <div class="page" style="gap: 12px">
+    <div class="page">
       <section class="panel surf">
         <div class="panel-h">
           <h2>Flow preview</h2>
@@ -84,17 +90,19 @@
             @if (i) {
               <span class="ar"><app-icon name="arrow" [size]="14" /></span>
             }
-            <span class="fs">{{ stepMeta[step.key].label }}<small>{{ ownerLabel(step.owner) }}</small></span>
+            <span class="fs">{{ stepMeta[step.key].label }}@if (ownerLabel(step); as owner) {<small>{{ owner }}</small>}</span>
           }
         </div>
-        <div class="faint" style="font-size: 0.8rem">{{ onSteps().length }} steps · handled by {{ owners().join(', ') }}</div>
+        <div class="faint t-sm">
+          {{ onSteps().length }} steps{{ owners().length ? ' · handled by ' + owners().join(', ') : '' }}
+        </div>
         @if (current(); as c) {
           <div class="notice info">
             <app-icon name="clock" [size]="16" />
             <span>Changes apply to new tokens only. Patients already in the OPD finish on v{{ c.versionNo }}.</span>
           </div>
         }
-        <div class="actions" style="justify-content: flex-end">
+        <div class="actions actions-end">
           <button mat-stroked-button type="button" [disabled]="!dirty() || !isOwner() || saving()" (click)="discard()">
             Discard
           </button>

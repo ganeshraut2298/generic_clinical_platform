@@ -11,6 +11,9 @@
  * the team lookup {@code opd} and {@code billing} read a member's name, role and fee through
  * ({@link com.sahaj.platform.api.TeamMemberPort}), and the actor directory {@code billing} reads a
  * payment's or closing's "who" through (SAH-10: {@link com.sahaj.platform.api.ActorDirectoryPort}),
+ * and the staff PIN check {@code ipd} calls (SAH-31: {@link com.sahaj.platform.api.StaffPinPort},
+ * {@link com.sahaj.platform.api.PinCheck}, {@link com.sahaj.platform.api.StaffPinException}; SAH-32:
+ * {@link com.sahaj.platform.api.ColleaguePinCheck}),
  * so that dependencies between modules run one way only.
  *
  * <p>{@link org.springframework.modulith.NamedInterface} is what makes Spring Modulith actually

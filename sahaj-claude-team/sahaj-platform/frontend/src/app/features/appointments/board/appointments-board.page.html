@@ -1,14 +1,11 @@
-<div class="pagehead">
-  <div>
-    <h1>Appointments</h1>
-    <p class="lead">Walk-ins stay the default. Appointments fill the rest, and become tokens when the patient arrives.</p>
-  </div>
-  <div class="actions">
-    <a mat-stroked-button routerLink="/app/config/slots">
-      <app-icon name="sliders" [size]="15" /> Slot settings
-    </a>
-  </div>
-</div>
+<app-page-head
+  title="Appointments"
+  lead="Walk-ins stay the default. Appointments fill the rest, and become tokens when the patient arrives."
+>
+  <a mat-stroked-button routerLink="/app/config/slots">
+    <app-icon name="sliders" [size]="15" /> Slot settings
+  </a>
+</app-page-head>
 
 <div class="aptool surf">
   <div class="seg" role="group" aria-label="Day">
@@ -68,7 +65,7 @@
           </div>
         </div>
         @if (col.slots === null) {
-          <div class="empty">{{ col.doctor.name }} doesn't see patients this day.</div>
+          <app-empty>{{ col.doctor.name }} doesn't see patients this day.</app-empty>
         } @else {
           <div class="slots">
             @for (slot of col.slots; track slot.time) {
@@ -107,13 +104,13 @@
                 </div>
               }
             } @empty {
-              <div class="empty">No slots configured for this doctor.</div>
+              <app-empty>No slots configured for this doctor.</app-empty>
             }
           </div>
         }
       </section>
     } @empty {
-      <div class="empty">No doctors to show. Add a doctor in Clinic setup.</div>
+      <app-empty>No doctors to show. Add a doctor in Clinic setup.</app-empty>
     }
   </div>
 }

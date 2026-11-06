@@ -33,6 +33,15 @@
               @if (doctor.status !== 'ACTIVE') { · cannot sign in }
             </small>
           </div>
+          <app-pin-cell
+            [pin]="pinOf(doctor)"
+            [memberId]="doctor.id"
+            [memberName]="doctor.name"
+            [owner]="isOwner()"
+            [self]="isSelf(doctor)"
+            (resetPin)="resetPin(doctor)"
+            (ownPin)="setOwnPin(doctor)"
+          />
           <mat-form-field
             appearance="outline"
             subscriptSizing="dynamic"
@@ -133,7 +142,7 @@
     </section>
   }
 
-  <div class="grid2">
+  <div class="grid2 even">
     <section class="panel surf" id="f-staff">
       <div class="panel-h">
         <h2>Staff</h2>
@@ -152,12 +161,21 @@
               <small>
                 {{ roleLabels[member.role] }} · <span class="num">{{ member.mobileMasked }}</span>
                 @if (member.status === 'ACTIVE') {
-                  · Last login {{ formatLastLogin(member.lastLoginAt) }}
+                  · <span class="nowrap">Last login {{ formatLastLogin(member.lastLoginAt) }}</span>
                 } @else {
                   · cannot sign in
                 }
               </small>
             </div>
+            <app-pin-cell
+              [pin]="pinOf(member)"
+              [memberId]="member.id"
+              [memberName]="member.name"
+              [owner]="isOwner()"
+              [self]="isSelf(member)"
+              (resetPin)="resetPin(member)"
+              (ownPin)="setOwnPin(member)"
+            />
             @if (isOwner()) {
               @if (confirmRemoveId() === member.id) {
                 <span class="confirm" role="alert">
@@ -166,32 +184,34 @@
                   <button mat-stroked-button type="button" (click)="cancelRemove()">Keep</button>
                 </span>
               } @else {
-                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rolesel">
-                  <mat-label>Role</mat-label>
-                  <mat-select
-                    [value]="member.role"
+                <div class="acts">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rolesel">
+                    <mat-label>Role</mat-label>
+                    <mat-select
+                      [value]="member.role"
+                      [disabled]="!canSwitch(member) || busyId() === member.id"
+                      (selectionChange)="changeRole(member, $event.value)"
+                    >
+                      @for (role of roles; track role) {
+                        <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <button
+                    type="button"
+                    class="sw"
+                    role="switch"
+                    [attr.aria-checked]="member.status === 'ACTIVE'"
+                    [attr.aria-label]="member.name + ' can sign in'"
                     [disabled]="!canSwitch(member) || busyId() === member.id"
-                    (selectionChange)="changeRole(member, $event.value)"
-                  >
-                    @for (role of roles; track role) {
-                      <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <button
-                  type="button"
-                  class="sw"
-                  role="switch"
-                  [attr.aria-checked]="member.status === 'ACTIVE'"
-                  [attr.aria-label]="member.name + ' can sign in'"
-                  [disabled]="!canSwitch(member) || busyId() === member.id"
-                  (click)="setActive(member, member.status !== 'ACTIVE')"
-                ></button>
-                @if (canSwitch(member)) {
-                  <button mat-button type="button" [attr.aria-label]="'Remove access for ' + member.name" (click)="askRemove(member)">
-                    Remove access
-                  </button>
-                }
+                    (click)="setActive(member, member.status !== 'ACTIVE')"
+                  ></button>
+                  @if (canSwitch(member)) {
+                    <button mat-button type="button" [attr.aria-label]="'Remove access for ' + member.name" (click)="askRemove(member)">
+                      Remove access
+                    </button>
+                  }
+                </div>
               }
             } @else {
               <span class="pill" [class.p-good]="member.status === 'ACTIVE'" [class.p-wait]="member.status !== 'ACTIVE'">

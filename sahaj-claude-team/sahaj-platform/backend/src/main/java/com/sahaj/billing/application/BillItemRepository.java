@@ -1,5 +1,6 @@
 package com.sahaj.billing.application;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,12 @@ public interface BillItemRepository {
     Optional<BillItemRow> findById(UUID tenantId, UUID billId, UUID itemId);
 
     void delete(UUID tenantId, UUID id);
+
+    /** Every extra line on these bills (SAH-16 revenue). */
+    List<BillItemOfBill> findByBills(UUID tenantId, Collection<UUID> billIds);
+
+    record BillItemOfBill(UUID billId, String name, long amountPaise, int qty) {
+    }
 
     record BillItemRow(UUID id, UUID serviceId, String name, long amountPaise, int qty) {
     }

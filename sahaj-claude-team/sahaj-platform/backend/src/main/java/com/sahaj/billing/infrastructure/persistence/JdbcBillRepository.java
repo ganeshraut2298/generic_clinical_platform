@@ -3,6 +3,8 @@ package com.sahaj.billing.infrastructure.persistence;
 import com.sahaj.billing.application.BillRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -16,6 +18,7 @@ public class JdbcBillRepository implements BillRepository {
             select id, visit_id, discount_percent, discount_reason, version from billing.bill
             """;
     private static final String FIND_BY_VISIT = SELECT + " where tenant_id = :tenantId and visit_id = :visitId";
+    private static final String FIND_BY_VISITS = SELECT + " where tenant_id = :tenantId and visit_id in (:visitIds)";
     // Lets two concurrent first writes on the same visit race safely: whichever insert wins, the
     // other falls through to the select below and finds the same row (uq_bill_tenant_visit).
     private static final String INSERT_IF_ABSENT = """
@@ -40,6 +43,15 @@ public class JdbcBillRepository implements BillRepository {
     public Optional<BillRow> findByVisit(UUID tenantId, UUID visitId) {
         return jdbc.sql(FIND_BY_VISIT).param("tenantId", tenantId).param("visitId", visitId)
                 .query(JdbcBillRepository::map).optional();
+    }
+
+    @Override
+    public List<BillRow> findByVisits(UUID tenantId, Collection<UUID> visitIds) {
+        if (visitIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql(FIND_BY_VISITS).param("tenantId", tenantId).param("visitIds", visitIds)
+                .query(JdbcBillRepository::map).list();
     }
 
     @Override

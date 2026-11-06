@@ -5,7 +5,6 @@ import com.sahaj.opd.application.WorkflowRepository.VersionRow;
 import com.sahaj.platform.api.ActorDirectoryPort;
 import com.sahaj.platform.api.AuditLog;
 import com.sahaj.platform.api.ConflictException;
-import com.sahaj.platform.api.InvalidInputException;
 import com.sahaj.platform.api.OwnerGuard;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -73,11 +72,10 @@ public class WorkflowService {
     public WorkflowVersionView publish(UUID tenantId, UUID actorUserId) {
         ownerGuard.requireOwner(tenantId, actorUserId);
         VersionRow current = ensureCurrent(tenantId, actorUserId);
-        DraftRow draft = repository.findDraft(tenantId)
-                .orElseThrow(() -> new InvalidInputException("steps", "There is nothing to publish"));
+        DraftRow draft = repository.findDraft(tenantId).orElseThrow(WorkflowService::nothingToPublish);
         List<WorkflowStep> steps = WorkflowRules.validate(WorkflowRules.toInput(draft.steps()));
         if (steps.equals(current.steps())) {
-            throw new InvalidInputException("steps", "There is nothing to publish");
+            throw nothingToPublish();
         }
         int next = current.versionNo() + 1;
         if (!repository.insertVersionIfAbsent(tenantId, next, steps, actorUserId)) {
@@ -88,6 +86,15 @@ public class WorkflowService {
         auditLog.record("WORKFLOW_PUBLISHED", ENTITY_TYPE, tenantId, snapshot(current.versionNo(), current.steps()),
                 snapshot(next, steps));
         return toView(tenantId, published);
+    }
+
+    /**
+     * 409 {@code workflow-conflict} per {@code docs/api/opd.yaml}: no draft, or the draft equals the live version
+     * (which is also what the loser of a concurrent publish finds once the winner has committed).
+     */
+    private static ConflictException nothingToPublish() {
+        return new ConflictException("workflow-conflict", "Nothing to publish",
+                "There is nothing new to publish. Reload to see the current workflow.");
     }
 
     /**

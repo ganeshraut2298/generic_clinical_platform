@@ -47,7 +47,9 @@ final class AuditSanitizer {
     /** Values here are never safe even masked: replaced outright. */
     private static final Set<String> FULL_REDACT_MARKERS = Set.of(
             "otp", "pin", "password", "secret", "token", "notes",
-            "patientname", "ownername", "fullname", "contactname", "staffname", "doctorname");
+            "patientname", "ownername", "fullname", "contactname", "staffname", "doctorname",
+            // SAH-31 (security review S2): clinical free text, whatever the entity type and the spelling of the key.
+            "allergy", "chronic", "diagnosis", "complaint", "clinical", "history");
 
     /** Entity types whose bare {@code name} field names a person, not a clinic's own business name. */
     private static final Set<String> ENTITY_TYPES_WHERE_NAME_IS_A_PERSON = Set.of("PATIENT", "VISIT", "APPOINTMENT");
@@ -57,6 +59,8 @@ final class AuditSanitizer {
 
     private static final Pattern NOT_ALPHANUMERIC = Pattern.compile("[^a-z0-9]");
     private static final Pattern TEN_DIGIT_RUN = Pattern.compile("\\d{10}");
+    private static final Pattern UUID_TEXT = Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
     private AuditSanitizer() {
     }
@@ -95,6 +99,9 @@ final class AuditSanitizer {
     private static Object sanitizeValue(String normalizedKey, Object value, Set<String> fullRedactMarkers) {
         if (value == null) {
             return null;
+        }
+        if (isPinStateLabel(normalizedKey, value) || isRecordedFlag(normalizedKey, value)) {
+            return value;
         }
         if (containsAny(normalizedKey, fullRedactMarkers)) {
             return REDACTED;
@@ -137,6 +144,26 @@ final class AuditSanitizer {
         return out;
     }
 
+    /**
+     * SAH-31 (ADR-010 D10): the audit rows of the staff PIN carry {@code pinState} (one of three fixed labels). The
+     * key contains "pin", so it would be redacted like a PIN; this exact key with exactly one of the three labels is
+     * the only exception. A real PIN under any key, or any other value under this key, is still replaced.
+     */
+    private static boolean isPinStateLabel(String normalizedKey, Object value) {
+        return "pinstate".equals(normalizedKey) && value instanceof String label
+                && ("SET".equals(label) || "LOCKED".equals(label) || "NOT_SET".equals(label));
+    }
+
+    /**
+     * SAH-31 (security review S2): the patient audit rows say only whether an allergy or chronic text exists, as the
+     * two flags {@code allergyRecorded} and {@code chronicRecorded}. The keys contain "allergy" and "chronic", so they
+     * would be redacted; these two exact keys with a true or false value (never text) are the only other exception.
+     */
+    private static boolean isRecordedFlag(String normalizedKey, Object value) {
+        return ("allergyrecorded".equals(normalizedKey) || "chronicrecorded".equals(normalizedKey))
+                && value instanceof Boolean;
+    }
+
     private static boolean containsAny(String normalizedKey, Set<String> markers) {
         for (String marker : markers) {
             if (normalizedKey.contains(marker)) {
@@ -155,6 +182,11 @@ final class AuditSanitizer {
     }
 
     private static String maskEmbeddedDigitRuns(String value) {
+        if (UUID_TEXT.matcher(value).matches()) {
+            // SAH-32: the last group of an id is 12 hex characters and can be ten or more digits by chance; masking it
+            // would corrupt the very id an auditor needs (membershipId, checkedByMembershipId). An id is not a mobile.
+            return value;
+        }
         Matcher matcher = TEN_DIGIT_RUN.matcher(value);
         if (!matcher.find()) {
             return value;

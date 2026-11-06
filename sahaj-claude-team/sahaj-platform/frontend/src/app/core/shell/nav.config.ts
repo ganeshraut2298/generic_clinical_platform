@@ -23,6 +23,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: 'work',
     labelKey: 'nav.appointments',
   },
+  {
+    key: 'emergency',
+    icon: 'siren',
+    route: 'emergency',
+    group: 'work',
+    labelKey: 'nav.emergency',
+  },
+  { key: 'ipd', icon: 'bed', route: 'ipd', group: 'work', labelKey: 'nav.ipd' },
   { key: 'patients', icon: 'user', route: 'patients', group: 'pt', labelKey: 'nav.patients' },
   {
     key: 'followups',
@@ -33,6 +41,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { key: 'billing', icon: 'receipt', route: 'billing', group: 'money', labelKey: 'nav.billing' },
   { key: 'revenue', icon: 'wallet', route: 'revenue', group: 'money', labelKey: 'nav.revenue' },
+  { key: 'staff', icon: 'users', route: 'staff', group: 'clinic', labelKey: 'nav.staff' },
   { key: 'reports', icon: 'chart', route: 'reports', group: 'clinic', labelKey: 'nav.reports' },
   { key: 'config', icon: 'sliders', route: 'config', group: 'clinic', labelKey: 'nav.config' },
 ];
@@ -42,6 +51,7 @@ export const SIMPLE_MENU_KEYS: readonly string[] = [
   'today',
   'queue',
   'appointments',
+  'ipd',
   'patients',
   'billing',
   'config',

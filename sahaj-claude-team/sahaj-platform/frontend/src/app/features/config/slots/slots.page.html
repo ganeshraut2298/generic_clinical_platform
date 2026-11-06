@@ -14,7 +14,7 @@
     @for (doctor of doctors(); track doctor.id) {
       <section class="panel surf">
         <div class="panel-h">
-          <div class="row" style="flex-wrap: nowrap">
+          <div class="row nowrap">
             <div class="av">{{ doctor.name.charAt(0) }}</div>
             <div>
               <h2>{{ doctor.name }}</h2>
@@ -43,7 +43,7 @@
           <span class="field-label">OPD sessions</span>
           @for (session of settingsFor(doctor.id).sessions; track $index) {
             <div class="row sessrow">
-              <span class="muted" style="width: 64px">{{ $index ? 'Evening' : 'Morning' }}</span>
+              <span class="muted sesslabel">{{ $index ? 'Evening' : 'Morning' }}</span>
               <input
                 type="time"
                 class="input tm"
@@ -117,8 +117,7 @@
             type="number"
             min="0"
             max="200"
-            class="input num"
-            style="max-width: 120px"
+            class="input num maxinput"
             [value]="settingsFor(doctor.id).maxOnlinePerDay"
             [disabled]="!canEditSlots()"
             (change)="setMaxOnline(doctor, $any($event.target))"
@@ -141,12 +140,12 @@
       <div class="empty">No doctors added yet. Add a doctor in Team and access.</div>
     }
 
-    <section class="panel surf" style="grid-column: 1 / -1">
+    <section class="panel surf wide">
       <div>
         <h2>Booking rules for the clinic</h2>
         <small class="faint">Apply to every doctor. Only the owner can change them.</small>
       </div>
-      <div class="grid2 even" style="gap: 4px 28px">
+      <div class="grid2 even rules">
         <div>
           <div class="rulerow">
             <span>Online booking closes before the slot</span>

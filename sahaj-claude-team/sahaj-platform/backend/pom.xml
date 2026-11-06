@@ -140,6 +140,9 @@
         <configuration>
           <systemPropertyVariables>
             <spring.profiles.active>test</spring.profiles.active>
+            <!-- ADR-008 R9 / T13: the packaged jar the QA test opens. In the dev-tools profile the build directory
+                 and final name differ, so this resolves to that profile's jar. The test fails if it is missing. -->
+            <sahaj.packagedJar>${project.build.directory}/${project.build.finalName}.jar</sahaj.packagedJar>
           </systemPropertyVariables>
         </configuration>
         <executions>
@@ -153,5 +156,115 @@
       </plugin>
     </plugins>
   </build>
+
+  <!-- DEC-016 / ADR-008: the dev-only sample admin endpoint lives in a separate source set that is compiled
+       ONLY with -Pdev-tools. Without the profile the compiler never sees src/devtools. The profile also uses its
+       own build directory, so stale dev classes can never be packed into a production jar built from target/.
+       Never copy a jar built with this profile to a shared machine (its name and manifest identify it). -->
+  <profiles>
+    <profile>
+      <id>dev-tools</id>
+      <properties>
+        <!-- ADR-008 R7: nothing built with this profile reaches ~/.m2 or a remote repository under the production
+             coordinates. -->
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+      </properties>
+      <build>
+        <directory>${project.basedir}/target-devtools</directory>
+        <finalName>sahaj-backend-devtools-${project.version}</finalName>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.6.1</version>
+            <executions>
+              <execution>
+                <id>add-devtools-source</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>add-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>${project.basedir}/src/devtools/java</source>
+                  </sources>
+                </configuration>
+              </execution>
+              <execution>
+                <id>add-devtools-resource</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>add-resource</goal>
+                </goals>
+                <configuration>
+                  <resources>
+                    <resource>
+                      <directory>${project.basedir}/src/devtools/resources</directory>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+              <!-- Unit tests of the dev-tools classes cannot sit in src/test (it compiles without the profile). -->
+              <execution>
+                <id>add-devtools-test-source</id>
+                <phase>generate-test-sources</phase>
+                <goals>
+                  <goal>add-test-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>${project.basedir}/src/devtools/test/java</source>
+                  </sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- ADR-008 R7: spring-boot:build-image never uses the production image name; the localhost/ prefix keeps a
+               stray docker push away from a public registry. -->
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <configuration>
+              <image>
+                <name>localhost/sahaj-backend-devtools:${project.version}</name>
+                <publish>false</publish>
+              </image>
+            </configuration>
+          </plugin>
+          <!-- Identifies a dev-tools jar. spring-boot:repackage keeps the manifest entries of the plain jar. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <configuration>
+              <archive>
+                <manifestEntries>
+                  <Sahaj-Dev-Tools>true</Sahaj-Dev-Tools>
+                </manifestEntries>
+              </archive>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <systemPropertyVariables>
+                <sahaj.devtools>true</sahaj.devtools>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-failsafe-plugin</artifactId>
+            <configuration>
+              <systemPropertyVariables>
+                <sahaj.devtools>true</sahaj.devtools>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>

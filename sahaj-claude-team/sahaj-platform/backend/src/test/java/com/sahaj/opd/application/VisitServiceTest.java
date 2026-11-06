@@ -48,6 +48,7 @@ class VisitServiceTest {
     private TeamMemberPort teamMemberPort;
     private OwnerGuard ownerGuard;
     private AuditLog auditLog;
+    private FollowUpService followUpService;
     private VisitService service;
 
     @BeforeEach
@@ -59,12 +60,13 @@ class VisitServiceTest {
         teamMemberPort = mock(TeamMemberPort.class);
         ownerGuard = mock(OwnerGuard.class);
         auditLog = mock(AuditLog.class);
+        followUpService = mock(FollowUpService.class);
         service = new VisitService(visitRepository, workflowService, feeSettingsRepository, patientLookup,
-                teamMemberPort, ownerGuard, auditLog, CLOCK);
+                teamMemberPort, ownerGuard, auditLog, followUpService, CLOCK);
 
         when(feeSettingsRepository.find(TENANT_ID)).thenReturn(Optional.empty());
         when(patientLookup.find(TENANT_ID, PATIENT_ID))
-                .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F")));
+                .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F", "9000000001")));
         when(teamMemberPort.find(TENANT_ID, DOCTOR_ID))
                 .thenReturn(Optional.of(new TeamMember(DOCTOR_ID, "Dr Rao", "DOCTOR", true, 50000)));
         when(visitRepository.nextTokenNo()).thenReturn(1);
@@ -176,6 +178,125 @@ class VisitServiceTest {
         Map<String, Object> snapshot = captor.getValue();
         assertThat(snapshot).doesNotContainKey("name").doesNotContainKey("patientName")
                 .doesNotContainKey("doctorName").containsEntry("patientId", PATIENT_ID);
+    }
+
+    // --- SAH-27 a discharge counts as being seen (ADR-004 D3) ---
+
+    private void issueWithTheHalfFeeRuleAndExpect(String visitType, long feePaise) {
+        stubVitals(false);
+        when(feeSettingsRepository.find(TENANT_ID))
+                .thenReturn(Optional.of(new FeeRow("before", 7, "half", java.util.Map.of(), true)));
+        stubFindByIdEchoingTheRequestedId(visitType, "WITH_DOCTOR", feePaise);
+
+        service.issueToken(TENANT_ID, USER_ID, "OWNER", new VisitCreateInput(PATIENT_ID, DOCTOR_ID));
+
+        verify(visitRepository).insert(any(), eq(PATIENT_ID), eq(DOCTOR_ID), eq(visitType), any(), anyInt(),
+                eq(feePaise), anyInt(), eq(USER_ID));
+    }
+
+    @Test
+    void aReturnWithinTheWindowAfterADischargeIsFollowUpEvenWithNoEarlierVisit() {
+        when(followUpService.lastDischargeAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minus(java.time.Duration.ofDays(3))));
+
+        issueWithTheHalfFeeRuleAndExpect("FOLLOW_UP", 25000L);
+    }
+
+    @Test
+    void aReturnAfterTheWindowFromTheDischargeIsNewWithTheFullFee() {
+        when(followUpService.lastDischargeAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minus(java.time.Duration.ofDays(8))));
+
+        issueWithTheHalfFeeRuleAndExpect("NEW", 50000L);
+    }
+
+    @Test
+    void theLaterOfTheLastVisitAndTheDischargeStartsTheWindow() {
+        when(visitRepository.lastVisitAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minus(java.time.Duration.ofDays(30))));
+        when(followUpService.lastDischargeAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minusSeconds(3600)));
+
+        issueWithTheHalfFeeRuleAndExpect("FOLLOW_UP", 25000L);
+    }
+
+    @Test
+    void aRecentVisitStillCountsWhenTheDischargeIsOlder() {
+        when(visitRepository.lastVisitAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minusSeconds(3600)));
+        when(followUpService.lastDischargeAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minus(java.time.Duration.ofDays(30))));
+
+        issueWithTheHalfFeeRuleAndExpect("FOLLOW_UP", 25000L);
+    }
+
+    @Test
+    void neitherAVisitNorADischargeInTheWindowIsNew() {
+        when(visitRepository.lastVisitAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minus(java.time.Duration.ofDays(20))));
+        when(followUpService.lastDischargeAt(TENANT_ID, PATIENT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(CLOCK.instant().minus(java.time.Duration.ofDays(30))));
+
+        issueWithTheHalfFeeRuleAndExpect("NEW", 50000L);
+    }
+
+    // --- SAH-14 follow-up hooks ---
+
+    @Test
+    void issuingATokenClosesTheOldestOpenFollowUpForThePatientAndDoctor() {
+        stubVitals(false);
+        stubFindByIdEchoingTheRequestedId("NEW", "WITH_DOCTOR", 50000);
+
+        var visit = service.issueToken(TENANT_ID, USER_ID, "FRONT_DESK", new VisitCreateInput(PATIENT_ID, DOCTOR_ID));
+
+        verify(followUpService).closeOnNewVisit(TENANT_ID, USER_ID, PATIENT_ID, DOCTOR_ID, visit.id());
+    }
+
+    private void stubWithDoctorToBilling(VisitRow visit) {
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit))
+                .thenReturn(Optional.of(new VisitRow(visit.id(), PATIENT_ID, DOCTOR_ID, "NEW", "BILLING", 1,
+                        50000, visit.createdAt(), 1, visit.workflowVersionNo())));
+    }
+
+    @Test
+    void leavingTheDoctorStepForwardCreatesAFollowUpWhenTheVisitsOwnVersionHasItOn() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WITH_DOCTOR");
+        stubWithDoctorToBilling(visit);
+
+        service.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", visit.id(), "BILLING");
+
+        verify(followUpService).createForConsultDone(eq(TENANT_ID), eq(USER_ID), any(VisitRow.class));
+    }
+
+    @Test
+    void noFollowUpWhenTheFollowUpStepIsOffOnTheVisitsOwnVersion() {
+        List<WorkflowStep> off = WorkflowRules.defaults(false).stream()
+                .map(step -> step.key().equals("followup") ? new WorkflowStep("followup", false, null) : step)
+                .toList();
+        stubVitals(false);
+        // The visit is stamped with version 2 (follow-up off); the live version (1) has it on.
+        when(workflowService.stepsForVersion(TENANT_ID, 2)).thenReturn(off);
+        VisitRow visit = new VisitRow(UUID.randomUUID(), PATIENT_ID, DOCTOR_ID, "NEW", "WITH_DOCTOR", 1, 50000,
+                CLOCK.instant(), 0, 2);
+        stubWithDoctorToBilling(visit);
+
+        service.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", visit.id(), "BILLING");
+
+        verify(followUpService, never()).createForConsultDone(any(), any(), any());
+    }
+
+    @Test
+    void movingBackwardOrFromAnotherStageCreatesNoFollowUp() {
+        stubVitals(true);
+        VisitRow visit = visitAt("VITALS");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit))
+                .thenReturn(Optional.of(new VisitRow(visit.id(), PATIENT_ID, DOCTOR_ID, "NEW", "WITH_DOCTOR", 1,
+                        50000, CLOCK.instant(), 1)));
+
+        service.moveStage(TENANT_ID, USER_ID, "NURSE", visit.id(), "WITH_DOCTOR");
+
+        verify(followUpService, never()).createForConsultDone(any(), any(), any());
     }
 
     // --- Stage moves ---
@@ -390,6 +511,42 @@ class VisitServiceTest {
     }
 
     // --- Today / my tasks ---
+
+    @Test
+    void mineUsesEachVisitsOwnWorkflowVersionNotTheCurrentOne() {
+        // v1: the nurse owns vitals. v2 (current): the doctor owns vitals and counselling is on.
+        stubWorkflow(1, WorkflowRules.defaults(true));
+        List<WorkflowStep> v2 = List.of(new WorkflowStep("token", true, null), new WorkflowStep("queue", true, null),
+                new WorkflowStep("vitals", true, "DOCTOR"), new WorkflowStep("consult", true, null),
+                new WorkflowStep("counsel", true, "NURSE"), new WorkflowStep("casepaper", true, null),
+                new WorkflowStep("billing", true, null), new WorkflowStep("followup", true, null));
+        stubWorkflow(2, v2);
+        VisitRow oldVitals = visitAtVersion("VITALS", 1);
+        VisitRow newVitals = visitAtVersion("VITALS", 2);
+        VisitRow newCounsel = visitAtVersion("COUNSEL", 2);
+        when(visitRepository.findSince(eq(TENANT_ID), any()))
+                .thenReturn(List.of(oldVitals, newVitals, newCounsel));
+
+        List<VisitView> nurse = service.today(TENANT_ID, "NURSE", true);
+        List<VisitView> doctor = service.today(TENANT_ID, "DOCTOR", true);
+
+        // The v1 vitals card is the nurse's (v1 owner), the v2 one is not; the v2 counsel card is the nurse's.
+        assertThat(nurse).extracting(VisitView::id).containsExactly(oldVitals.id(), newCounsel.id());
+        // The doctor owns the v2 vitals card; the v1 vitals card is the nurse's under v1.
+        assertThat(doctor).extracting(VisitView::id).containsExactly(newVitals.id());
+    }
+
+    @Test
+    void mineReadsEachWorkflowVersionOnlyOnce() {
+        VisitRow first = visitAtVersion("VITALS", 1);
+        VisitRow second = visitAtVersion("VITALS", 1);
+        when(visitRepository.findSince(eq(TENANT_ID), any())).thenReturn(List.of(first, second));
+
+        assertThat(service.today(TENANT_ID, "NURSE", true)).hasSize(2);
+
+        org.mockito.Mockito.verify(workflowService, org.mockito.Mockito.times(1)).stepsForVersion(TENANT_ID, 1);
+        org.mockito.Mockito.verify(workflowService, org.mockito.Mockito.never()).currentSteps(any());
+    }
 
     @Test
     void todayFiltersToTheStagesTheRoleOwnsWhenMineIsTrue() {

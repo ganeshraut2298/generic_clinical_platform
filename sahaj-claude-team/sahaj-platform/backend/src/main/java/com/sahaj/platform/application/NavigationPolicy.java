@@ -1,6 +1,7 @@
 package com.sahaj.platform.application;
 
 import com.sahaj.platform.domain.MembershipRole;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,8 +12,10 @@ import java.util.Set;
  * The server stays the source of truth: {@code GET /me} returns exactly this list, and every
  * later API checks the role itself (AC1, AC11) - the menu is never the only protection.
  *
- * <p>Modules for now: OPD on, IPD and HRA off, so every key below is an OPD screen; there is
- * nothing yet to filter by module.
+ * <p>The base menu below is the OPD screens. SAH-20 adds the module-aware overload: when HRA is on,
+ * {@code staff} is added for every clinic role (before {@code config} when the role has it). The
+ * counts in {@code menuCounts} stay on the base menu. There is
+ * nothing else to filter by module yet.
  */
 public final class NavigationPolicy {
 
@@ -30,6 +33,17 @@ public final class NavigationPolicy {
     private static final List<String> SIMPLE_MENU_ORDER =
             List.of("today", "queue", "appointments", "patients", "billing", "config");
 
+    /**
+     * SAH-31 (ADR-009 D11, DEC-017 Q2): PHARMACIST also gets {@code ipd}, placed after {@code today}; the page shows
+     * only the Safety tab (that is a frontend matter).
+     */
+    private static final Set<MembershipRole> IPD_ROLES = Set.of(MembershipRole.OWNER, MembershipRole.FRONT_DESK,
+            MembershipRole.NURSE, MembershipRole.DOCTOR, MembershipRole.PHARMACIST);
+
+    /** SAH-28: who sees the menu item Emergency (mockup default menu; DOCTOR reaches the queue through the tab). */
+    private static final Set<MembershipRole> EMERGENCY_ROLES = Set.of(MembershipRole.OWNER, MembershipRole.FRONT_DESK,
+            MembershipRole.NURSE);
+
     private NavigationPolicy() {
     }
 
@@ -41,5 +55,45 @@ public final class NavigationPolicy {
         }
         Set<String> allowed = new LinkedHashSet<>(advanced);
         return SIMPLE_MENU_ORDER.stream().filter(allowed::contains).toList();
+    }
+
+    /** SAH-20: the base menu plus {@code staff} for every clinic role when the HRA add-on is on. */
+    public static List<String> menuFor(MembershipRole role, String menuMode, boolean hraOn) {
+        return menuFor(role, menuMode, new ModuleFlags(hraOn, false, false));
+    }
+
+    /**
+     * SAH-23: module-aware menu. {@code ipd} (Beds and admissions) is added for OWNER, FRONT_DESK, NURSE and
+     * DOCTOR (SAH-31: and PHARMACIST, after {@code today}) when IPD is not off: after {@code followups} in the advanced menu, before {@code config} in the
+     * simple one (mockup order); SAH-28 adds {@code emergency} right before {@code ipd} for OWNER, FRONT_DESK and NURSE
+     * in the advanced menu while IPD is Trial or On; then {@code staff} when HRA is on.
+     */
+    public static List<String> menuFor(MembershipRole role, String menuMode, ModuleFlags flags) {
+        List<String> menu = new ArrayList<>(menuFor(role, menuMode));
+        if (flags.ipdOn() && IPD_ROLES.contains(role) && !menu.contains("ipd")) {
+            int at = "simple".equals(menuMode) ? menu.indexOf("config") : menu.indexOf("followups") + 1;
+            if (at <= 0 && !"simple".equals(menuMode)) {
+                at = menu.indexOf("config");
+            }
+            menu.add(at < 0 ? menu.size() : at, "ipd");
+        }
+        // SAH-28: Emergency sits right before Beds and admissions, in the advanced menu only, and only while IPD can
+        // be written (Trial or On); in Read-only the item is not shown.
+        if (flags.ipdWritable() && !"simple".equals(menuMode) && EMERGENCY_ROLES.contains(role)
+                && menu.contains("ipd") && !menu.contains("emergency")) {
+            menu.add(menu.indexOf("ipd"), "emergency");
+        }
+        if (flags.hraOn() && !menu.contains("staff")) {
+            int at = menu.indexOf("config");
+            menu.add(at < 0 ? menu.size() : at, "staff");
+        }
+        return List.copyOf(menu);
+    }
+
+    /**
+     * Which add-on modules are switched on for the clinic; {@code ipdOn} is true for trial, on and read-only,
+     * {@code ipdWritable} (SAH-28) only for trial and on.
+     */
+    public record ModuleFlags(boolean hraOn, boolean ipdOn, boolean ipdWritable) {
     }
 }

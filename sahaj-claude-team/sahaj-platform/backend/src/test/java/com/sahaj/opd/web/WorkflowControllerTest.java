@@ -8,18 +8,21 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sahaj.opd.application.WorkflowService;
 import com.sahaj.opd.application.WorkflowStep;
 import com.sahaj.opd.application.WorkflowVersionView;
+import com.sahaj.platform.api.ConflictException;
 import com.sahaj.platform.api.InvalidInputException;
 import com.sahaj.platform.support.TestTenantSecurity;
 import com.sahaj.platform.web.security.SecurityConfig;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -114,6 +117,18 @@ class WorkflowControllerTest {
 
         mockMvc.perform(post(WORKFLOW + "/publish").with(as("OWNER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.versionNo").value(3));
+    }
+
+    @Test
+    void aPublishConflictIs409WithTheWorkflowConflictProblemType() throws Exception {
+        when(service.publish(TENANT_ID, USER_ID)).thenThrow(new ConflictException("workflow-conflict",
+                "Workflow changed", "The workflow was published by someone else. Reload and try again."));
+
+        mockMvc.perform(post(WORKFLOW + "/publish").with(as("OWNER")))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.type").value(Matchers.endsWith("workflow-conflict")));
     }
 
     @Test

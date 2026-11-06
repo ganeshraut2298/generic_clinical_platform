@@ -98,7 +98,7 @@
                 <b>{{ describeAction(event.action) }}</b>
                 <small>
                   {{ event.actorName ?? 'Someone' }} · {{ formatWhen(event.at) }}
-                  @if (event.entityType) { · {{ event.entityType }} }
+                  @if (event.entityType) { · {{ describeEntity(event.entityType) }} }
                 </small>
               </div>
             </div>
@@ -116,7 +116,7 @@
       <span class="faint small">Tap an area to change it</span>
     </div>
     <div class="tiles">
-      @for (tile of tiles; track tile.key) {
+      @for (tile of tiles(); track tile.key) {
         <a class="tile surf" [routerLink]="['..', tile.key]">
           <span class="row between">
             <span class="ti"><app-icon [name]="tile.icon" [size]="17" /></span>

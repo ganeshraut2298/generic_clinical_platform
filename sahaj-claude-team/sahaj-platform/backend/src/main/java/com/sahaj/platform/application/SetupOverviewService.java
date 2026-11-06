@@ -34,17 +34,20 @@ public class SetupOverviewService {
     private final ClinicProfileRepository profileRepository;
     private final HolidayRepository holidayRepository;
     private final OpdSetupStatus opdSetupStatus;
+    private final StaffPinRepository staffPinRepository;
     private final AuditEventRepository auditEventRepository;
     private final OwnerGuard ownerGuard;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public SetupOverviewService(ClinicProfileRepository profileRepository, HolidayRepository holidayRepository,
-                                 OpdSetupStatus opdSetupStatus, AuditEventRepository auditEventRepository,
+                                 OpdSetupStatus opdSetupStatus, StaffPinRepository staffPinRepository,
+                                 AuditEventRepository auditEventRepository,
                                  OwnerGuard ownerGuard, ObjectMapper objectMapper, Clock clock) {
         this.profileRepository = profileRepository;
         this.holidayRepository = holidayRepository;
         this.opdSetupStatus = opdSetupStatus;
+        this.staffPinRepository = staffPinRepository;
         this.auditEventRepository = auditEventRepository;
         this.ownerGuard = ownerGuard;
         this.objectMapper = objectMapper;
@@ -84,6 +87,9 @@ public class SetupOverviewService {
                 opd.hasFeeSettings(), false));
         checks.add(new Check("paper", "Case paper settings saved", "Sets the paper size, language and sections that print",
                 opd.hasCasePaperSettings(), false));
+        // SAH-31 (ADR-010 D12, Q2): optional, so the setup percent of OPD-only clinics does not change.
+        checks.add(new Check("pin", "Own PIN for each staff member", "So medicine checks show who did them",
+                staffPinRepository.countActiveMembersWithoutPin(tenantId) == 0, true));
 
         long required = checks.stream().filter(check -> !check.optional()).count();
         long done = checks.stream().filter(check -> !check.optional() && check.done()).count();

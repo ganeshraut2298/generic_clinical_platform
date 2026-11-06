@@ -1,6 +1,13 @@
 # Profile dev: the local sahaj_dev database.
 # No secret, password or connection string is set here. Export SAHAJ_DB_APP_PASSWORD and
 # SAHAJ_DB_MIGRATOR_PASSWORD in the environment before starting the app; it fails fast otherwise.
+server:
+  # Loopback only: the OTP dev-bypass below must not be reachable from other machines.
+  # The Angular dev proxy (frontend/proxy.conf.json) targets http://localhost:8080; localhost resolves
+  # to 127.0.0.1 (or ::1, which Node 20+ retries as IPv4), so it still works. If a proxy error shows
+  # ECONNREFUSED ::1, change that target to http://127.0.0.1:8080.
+  address: 127.0.0.1
+
 spring:
   datasource:
     url: ${SAHAJ_DB_URL:jdbc:postgresql://localhost:5432/sahaj_dev}
@@ -12,6 +19,9 @@ spring:
     password: ${SAHAJ_DB_MIGRATOR_PASSWORD}
 
 sahaj:
+  modules:
+    # DEC-010: the owner IPD trial is on for local work only; the base default is off.
+    owner-ipd-trial: true
   cors:
     # The Angular dev page may call this API directly on port 8080.
     allowed-origins: http://localhost:4200,http://127.0.0.1:4200
@@ -25,3 +35,8 @@ sahaj:
   jwt:
     # No default: export SAHAJ_JWT_SECRET (32+ characters) in the environment, never in code.
     secret: ${SAHAJ_JWT_SECRET}
+  admin:
+    totp:
+      # LOCAL DEMO ONLY (ADR-003 D5): any 6-digit code is accepted as the authenticator code from this machine.
+      # Used only when sahaj.admin.enabled=true. The password and recovery codes are always checked for real.
+      dev-bypass: true

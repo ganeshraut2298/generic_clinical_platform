@@ -35,6 +35,9 @@ public class PatientService {
     private static final Set<String> SEX_VALUES = Set.of("F", "M", "O");
     private static final Set<String> LANGUAGES = Set.of("mr", "hi", "en");
     private static final String DEFAULT_LANGUAGE = "mr";
+    /** The length limit of the allergy and the chronic text (cleanOptional, 400). */
+    private static final int CLINICAL_TEXT_MAX = 400;
+    private static final Set<String> PLACEHOLDERS = Set.of("none known", "not recorded", "unknown", "not known", "?");
 
     /** AC4: follow-up due/missed and check-up overdue need visit data that does not exist until SAH-9+. */
     private static final Set<String> FILTERS_NEEDING_VISIT_DATA = Set.of("due", "missed", "overdue", "lapsed");
@@ -42,10 +45,15 @@ public class PatientService {
             Set.of("all", "new", "due", "missed", "chronic", "overdue", "lapsed", "kids", "seniors");
 
     private final PatientRepository patientRepository;
+    private final ConsentRepository consentRepository;
+    private final RecordAccessRepository recordAccessRepository;
     private final AuditLog auditLog;
 
-    public PatientService(PatientRepository patientRepository, AuditLog auditLog) {
+    public PatientService(PatientRepository patientRepository, ConsentRepository consentRepository,
+                           RecordAccessRepository recordAccessRepository, AuditLog auditLog) {
         this.patientRepository = patientRepository;
+        this.consentRepository = consentRepository;
+        this.recordAccessRepository = recordAccessRepository;
         this.auditLog = auditLog;
     }
 
@@ -73,10 +81,14 @@ public class PatientService {
         String allergy = cleanOptional(input.allergy(), 400, "allergy");
         String chronic = cleanOptional(input.chronic(), 400, "chronic");
         boolean abhaLinked = Boolean.TRUE.equals(input.abhaLinked());
+        List<ConsentInput> consents = ConsentInput.validateAll(input.consents());
 
         UUID id = UUID.randomUUID();
         patientRepository.insert(id, name, age, sex, mobile, area, language, allergy, chronic, abhaLinked,
                 actorUserId);
+        for (ConsentInput consent : consents) {
+            consentRepository.insert(id, consent.kind(), consent.given(), actorUserId);
+        }
         PatientRow created = find0(tenantId, id);
         auditLog.record("PATIENT_REGISTERED", ENTITY_TYPE, id, null, snapshot(created));
 
@@ -87,6 +99,18 @@ public class PatientService {
     @Transactional(readOnly = true)
     public PatientView find(UUID tenantId, UUID id) {
         return toView(find0(tenantId, id), null);
+    }
+
+    /**
+     * SAH-17 AC7: a user opening a patient's file. Writes one {@code record_access} row (ids only)
+     * in this same transaction, so it is deliberately not read-only. Only the patient detail
+     * endpoint calls this; list, search, family and the lookups other modules use do not.
+     */
+    @Transactional
+    public PatientView open(UUID tenantId, UUID actorUserId, UUID id) {
+        PatientRow row = find0(tenantId, id);
+        recordAccessRepository.insert(id, actorUserId);
+        return toView(row, null);
     }
 
     /** AC6: the family sharing this mobile number, excluding merged-away records and the patient itself. */
@@ -142,8 +166,10 @@ public class PatientService {
         }
 
         Map<String, Object> keepBefore = snapshot(keep);
+        String allergy = combineClinicalText(keep.allergy(), merge.allergy());
+        String chronic = combineClinicalText(keep.chronic(), merge.chronic());
         patientRepository.update(keepId, merge.name(), merge.age(), merge.sex(), merge.area(), merge.language(),
-                merge.allergy(), merge.chronic(), merge.abhaLinked(), actorUserId);
+                allergy, chronic, merge.abhaLinked(), actorUserId);
         PatientRow keepAfter = find0(tenantId, keepId);
         auditLog.record("PATIENT_MERGED", ENTITY_TYPE, keepId, keepBefore, snapshot(keepAfter));
 
@@ -153,6 +179,41 @@ public class PatientService {
         auditLog.record("PATIENT_MERGED", ENTITY_TYPE, mergeId, mergeBefore, snapshot(mergeAfter));
 
         return toView(keepAfter, null);
+    }
+
+    /**
+     * Security review S4: the allergy or chronic text of a merge. A text is never lost: the kept record's text stays
+     * when the other one is empty, the other one is taken when the kept one is empty, and two different texts are
+     * combined (kept record first, joined with "; ", each part once whatever its case) within the 400-character limit
+     * of the field. A placeholder ("None known", "Not recorded", "Unknown", "Not known", "?") is dropped when the
+     * other text says something real, so a combined text never reads "None known; Peanuts". When both are only
+     * placeholders the kept record's wording stays.
+     */
+    static String combineClinicalText(String keepText, String mergeText) {
+        String kept = keepText == null || keepText.isBlank() ? null : keepText.trim();
+        String merged = mergeText == null || mergeText.isBlank() ? null : mergeText.trim();
+        if (merged == null) {
+            return kept;
+        }
+        if (kept == null) {
+            return merged;
+        }
+        if (kept.equalsIgnoreCase(merged)) {
+            return kept;
+        }
+        Map<String, String> real = new LinkedHashMap<>();
+        for (String part : (kept + ";" + merged).split(";")) {
+            String trimmed = part.trim();
+            String key = trimmed.toLowerCase(Locale.ROOT);
+            if (!trimmed.isEmpty() && !PLACEHOLDERS.contains(key)) {
+                real.putIfAbsent(key, trimmed);
+            }
+        }
+        if (real.isEmpty()) {
+            return kept;
+        }
+        String combined = String.join("; ", real.values());
+        return combined.length() > CLINICAL_TEXT_MAX ? combined.substring(0, CLINICAL_TEXT_MAX).trim() : combined;
     }
 
     private PatientRow find0(UUID tenantId, UUID id) {
@@ -262,8 +323,9 @@ public class PatientService {
         values.put("mobile", row.mobile());
         values.put("area", row.area());
         values.put("language", row.language());
-        values.put("allergy", row.allergy());
-        values.put("chronic", row.chronic());
+        // Security review S2: the audit trail says only whether the texts exist, never what they say.
+        values.put("allergyRecorded", row.allergy() != null && !row.allergy().isBlank());
+        values.put("chronicRecorded", row.chronic() != null && !row.chronic().isBlank());
         values.put("abhaLinked", row.abhaLinked());
         values.put("mergedIntoId", row.mergedIntoId());
         return values;

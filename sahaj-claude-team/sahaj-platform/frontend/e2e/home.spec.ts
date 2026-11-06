@@ -34,7 +34,11 @@ function watchErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(`console: ${m.text()}`);
+    if (m.type() !== 'error') return;
+    // The app asks for a silent session refresh at start. This e2e server has no API, so that one call
+    // answers 404 and the browser logs it as a resource error. Expected for a signed-out visitor.
+    if (m.location().url.includes('/api/v1/platform/auth/refresh')) return;
+    errors.push(`console: ${m.text()}`);
   });
   return errors;
 }
@@ -180,7 +184,7 @@ test.describe('Home page: navigation', () => {
     await openHome(page);
     await header(page).getByRole('link', { name: 'Start Free' }).click();
     await expect(page).toHaveURL(/\/login\?mode=signup$/);
-    await expect(page.getByText('Mode: New clinic')).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Account' }).getByRole('radio', { name: 'New clinic' })).toBeChecked();
   });
 
   test('hero Start Free opens /login?mode=signup', async ({ page }) => {
@@ -201,15 +205,18 @@ test.describe('Home page: navigation', () => {
     await openHome(page);
     await header(page).getByRole('link', { name: 'Log in' }).click();
     await expect(page).toHaveURL(/\/login\?mode=login$/);
-    await expect(page.getByText('Mode: Log in')).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Account' }).getByRole('radio', { name: 'Log in' })).toBeChecked();
   });
 
-  test('Admin portal shows Coming soon', async ({ page }) => {
+  test('Admin portal opens the admin sign-in (a signed-out visitor is redirected from /admin)', async ({ page }) => {
     await openHome(page);
+    // The link goes to /admin; the admin guard sends a visitor with no admin token to /admin/sign-in.
+    await expect(header(page).getByRole('link', { name: 'Admin portal' })).toHaveAttribute('href', '/admin');
     await header(page).getByRole('link', { name: 'Admin portal' }).click();
-    await expect(page).toHaveURL(/\/admin$/);
-    await expect(page.getByText('Coming soon', { exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Admin portal' })).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/sign-in$/);
+    await expect(page).toHaveTitle('Admin sign in · Sahaj');
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Back to website' })).toBeVisible();
   });
 });
 

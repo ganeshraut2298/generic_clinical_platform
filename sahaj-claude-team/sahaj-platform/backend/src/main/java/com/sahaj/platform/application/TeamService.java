@@ -1,14 +1,19 @@
 package com.sahaj.platform.application;
 
 import com.sahaj.platform.api.AuditLog;
+import com.sahaj.platform.api.ForbiddenException;
 import com.sahaj.platform.api.NotFoundException;
 import com.sahaj.platform.api.PlanLimits;
+import com.sahaj.platform.api.StaffPinException;
 import com.sahaj.platform.application.TeamRepository.TeamRow;
 import com.sahaj.platform.domain.AppUser;
 import com.sahaj.platform.domain.MembershipRole;
 import com.sahaj.platform.domain.MembershipStatus;
+import com.sahaj.platform.domain.PinState;
+import com.sahaj.platform.domain.StaffPinRow;
 import java.sql.SQLException;
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,23 +45,67 @@ public class TeamService {
     private final DoctorProfileRepository doctorProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuditLog auditLog;
+    private final StaffPinRepository staffPinRepository;
+    private final StaffPinOps staffPinOps;
+    private final StaffPinLimits staffPinLimits;
     private final Clock clock;
 
     public TeamService(TeamRepository teamRepository, AppUserRepository appUserRepository,
                         DoctorProfileRepository doctorProfileRepository,
-                        RefreshTokenRepository refreshTokenRepository, AuditLog auditLog, Clock clock) {
+                        RefreshTokenRepository refreshTokenRepository, AuditLog auditLog,
+                        StaffPinRepository staffPinRepository, StaffPinOps staffPinOps,
+                        StaffPinLimits staffPinLimits, Clock clock) {
         this.teamRepository = teamRepository;
         this.appUserRepository = appUserRepository;
         this.doctorProfileRepository = doctorProfileRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.auditLog = auditLog;
+        this.staffPinRepository = staffPinRepository;
+        this.staffPinOps = staffPinOps;
+        this.staffPinLimits = staffPinLimits;
         this.clock = clock;
     }
 
-    /** AC3, AC6: anyone signed in to the clinic may read the team; the mobile is masked. */
+    /**
+     * AC3, AC6: anyone signed in to the clinic may read the team; the mobile is masked. SAH-31 (ADR-010 D12): the PIN
+     * state is filled on every row for an active owner (membership read again, not the token) and on the caller's own
+     * row for everyone else; other people's PIN state, especially a lock, is not shown to non-owners.
+     */
     @Transactional(readOnly = true)
-    public List<TeamMemberView> list(UUID tenantId) {
-        return teamRepository.findAll(tenantId).stream().map(TeamService::toView).toList();
+    public List<TeamMemberView> list(UUID tenantId, UUID viewerUserId) {
+        List<TeamRow> rows = teamRepository.findAll(tenantId);
+        boolean viewerIsOwner = rows.stream().anyMatch(row -> row.userId().equals(viewerUserId)
+                && row.role() == MembershipRole.OWNER && row.status() == MembershipStatus.ACTIVE);
+        Map<UUID, StaffPinRow> pins = new HashMap<>();
+        staffPinRepository.findAll(tenantId).forEach(pin -> pins.put(pin.membershipId(), pin));
+        return rows.stream()
+                .map(row -> toView(row, viewerIsOwner || row.userId().equals(viewerUserId)
+                        ? pinViewOf(pins.get(row.id())) : null))
+                .toList();
+    }
+
+    /**
+     * SAH-31 (ADR-010 D8): the owner clears a member's PIN; they must set a new one with a code to their own mobile.
+     * The role in the token is not trusted: the owner's membership is read again. Nothing is written when there is
+     * no PIN, so a repeat after a lost answer is safe. Allowed for any member of the clinic, whether or not PIN checks
+     * are available (clearing is the safe direction).
+     */
+    @Transactional
+    public TeamMemberView resetPin(UUID tenantId, UUID actorUserId, UUID membershipId) {
+        boolean owner = teamRepository.findByUser(tenantId, actorUserId)
+                .map(row -> row.role() == MembershipRole.OWNER && row.status() == MembershipStatus.ACTIVE)
+                .orElse(false);
+        if (!owner) {
+            throw new ForbiddenException("forbidden", "Not allowed", "Only the clinic owner can do this.");
+        }
+        TeamRow row = find(tenantId, membershipId);
+        long wait = staffPinLimits.resetWait(tenantId, actorUserId);
+        if (wait > 0) {
+            throw StaffPinException.rateLimited(wait);
+        }
+        staffPinOps.clear(tenantId, actorUserId, membershipId);
+        StaffPinRow pin = staffPinRepository.find(tenantId, membershipId, false).orElse(null);
+        return toView(row, pinViewOf(pin));
     }
 
     /** AC1, AC4, AC7, AC8, AC12. */
@@ -169,7 +218,12 @@ public class TeamService {
             return;
         }
         requireNotLastOwner(tenantId, before);
-        guarded(() -> switchOff(tenantId, actorUserId, before, MembershipStatus.REMOVED, "TEAM_MEMBER_REMOVED"));
+        guarded(() -> {
+            TeamRow after = switchOff(tenantId, actorUserId, before, MembershipStatus.REMOVED, "TEAM_MEMBER_REMOVED");
+            // SAH-31 (ADR-010 D8): a person without access keeps no PIN; same statement and audit as an owner reset.
+            staffPinOps.clear(tenantId, actorUserId, before.id());
+            return after;
+        });
     }
 
     private TeamRow switchOff(UUID tenantId, UUID actorUserId, TeamRow before, MembershipStatus status,
@@ -238,13 +292,26 @@ public class TeamService {
         return role == MembershipRole.DOCTOR || role == MembershipRole.VISITING_DOCTOR;
     }
 
+    /** No row = never set. SET and LOCKED carry the set time; only LOCKED carries the end of the lock. */
+    private static TeamMemberView.PinView pinViewOf(StaffPinRow pin) {
+        if (pin == null || !pin.hasPin()) {
+            return new TeamMemberView.PinView(PinState.NOT_SET, null, null);
+        }
+        PinState state = pin.state();
+        return new TeamMemberView.PinView(state, pin.setAt(), state == PinState.LOCKED ? pin.lockedUntil() : null);
+    }
+
     private static TeamMemberView toView(TeamRow row) {
+        return toView(row, null);
+    }
+
+    private static TeamMemberView toView(TeamRow row, TeamMemberView.PinView pin) {
         TeamMemberView.DoctorView doctor = isDoctorRole(row.role())
                 ? new TeamMemberView.DoctorView(row.specialty(), row.degree(), row.registrationNo(),
                         (int) (row.feePaise() / 100))
                 : null;
         return new TeamMemberView(row.id(), row.name(), MobileMask.mask(row.mobile()), row.role(), row.status(),
-                row.lastLoginAt(), doctor);
+                row.lastLoginAt(), doctor, pin);
     }
 
     /** Audit values: the mobile is masked here, and AuditSanitizer masks it again as a second line of defence. */

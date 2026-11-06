@@ -30,6 +30,11 @@ export class TeamApi {
     return this.http.post<TeamMember>(`${this.baseUrl}/team/${id}/reactivate`, null);
   }
 
+  /** SAH-31, OWNER only. Clears the PIN (the owner never sees or sets one). 200 with the member. */
+  resetPin(id: string): Observable<TeamMember> {
+    return this.http.post<TeamMember>(`${this.baseUrl}/team/${id}/pin/reset`, null);
+  }
+
   remove(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/team/${id}`);
   }

@@ -82,7 +82,7 @@ describe('OverviewPage', () => {
   it('shows a tile for each area with a line from its own data and a to-do count', async () => {
     const el = await open('OWNER');
     const tiles = Array.from(el.querySelectorAll('.tile'));
-    expect(tiles.length).toBe(10);
+    expect(tiles.length).toBe(11);
     const fees = tiles.find((t) => t.textContent?.includes('Fees and billing'))!;
     expect(fees.textContent).toContain('1 to do');
     expect(fees.textContent).toContain('Fee after consultation');
@@ -93,6 +93,6 @@ describe('OverviewPage', () => {
     const el = await open('FRONT_DESK');
     expect(el.textContent).toContain('Only the owner sees setup progress');
     expect(el.querySelector('.ring')).toBeNull();
-    expect(el.querySelectorAll('.tile').length).toBe(10);
+    expect(el.querySelectorAll('.tile').length).toBe(11);
   });
 });

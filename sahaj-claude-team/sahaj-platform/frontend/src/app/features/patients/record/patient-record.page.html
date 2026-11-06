@@ -32,7 +32,9 @@
     <div class="pti">
       <h1>{{ p.name }}</h1>
       <div class="ptmeta">
-        <span>{{ p.age }} yrs · {{ p.sex === 'F' ? 'Female' : p.sex === 'M' ? 'Male' : 'Other' }}</span>
+        <span
+          >{{ p.age }} yrs · {{ p.sex === 'F' ? 'Female' : p.sex === 'M' ? 'Male' : 'Other' }}</span
+        >
         <span class="num">{{ p.uhid }}</span>
         <span class="num">{{ p.mobile }}</span>
         @if (p.area) {
@@ -81,11 +83,52 @@
       <section class="panel surf">
         <h2>Summary</h2>
         <div class="ptstats">
-          <div><span class="eyebrow">Visits</span><b class="num">0</b><small>No visits yet</small></div>
+          <div>
+            <span class="eyebrow">Visits</span><b class="num">0</b><small>No visits yet</small>
+          </div>
           <div><span class="eyebrow">Last visit</span><b>No visits yet</b></div>
-          <div><span class="eyebrow">Follow-ups kept</span><b class="num">—</b><small>None set yet</small></div>
+          <div>
+            <span class="eyebrow">Follow-ups kept</span><b class="num">—</b
+            ><small>None set yet</small>
+          </div>
         </div>
       </section>
+      @if (consentKinds().length) {
+        <section class="panel surf">
+          <h2>Consent</h2>
+          @for (item of consentKinds(); track item.kind) {
+            <div class="li consentrow">
+              <div class="main">
+                <span
+                  >{{ item.entry ? item.label + ': ' : item.label + ' · '
+                  }}{{ consentText(item.entry) }}</span
+                >
+              </div>
+              @if (canConsent()) {
+                @if (item.entry?.given) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="consentBusy()"
+                    (click)="record(item.kind, false)"
+                  >
+                    Withdraw
+                  </button>
+                } @else {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="consentBusy()"
+                    (click)="record(item.kind, true)"
+                  >
+                    Record consent
+                  </button>
+                }
+              }
+            </div>
+          }
+        </section>
+      }
 
       <section class="panel surf">
         <div class="panel-h">
@@ -96,7 +139,9 @@
           <div class="list">
             @for (member of family(); track member.id) {
               <button type="button" class="li famrow" (click)="openFamilyMemberRecord(member)">
-                <span class="av sm" [class.f]="member.sex === 'F'">{{ initials(member.name) }}</span>
+                <span class="av sm" [class.f]="member.sex === 'F'">{{
+                  initials(member.name)
+                }}</span>
                 <div class="main">
                   <b>{{ member.name }}</b>
                   <small>{{ member.age }} {{ member.sex }} · {{ member.uhid }}</small>
@@ -109,7 +154,12 @@
           <div class="faint">No other family members on this number.</div>
         }
         @if (canWrite()) {
-          <button mat-stroked-button type="button" class="addfam" (click)="openFamilyMember(p.mobile)">
+          <button
+            mat-stroked-button
+            type="button"
+            class="addfam"
+            (click)="openFamilyMember(p.mobile)"
+          >
             <app-icon name="plus" [size]="13" /> Add family member
           </button>
         }

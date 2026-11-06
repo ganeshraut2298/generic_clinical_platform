@@ -2,12 +2,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   HostListener,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
@@ -22,11 +27,14 @@ import {
   SIMPLE_MENU_KEYS,
   navItemByKey,
 } from '../../core/shell/nav.config';
+import { profileChip } from '../../core/shell/profile-chip';
 import { ShellStore } from '../../core/shell/shell.store';
 import { MenuMode, Theme } from '../../core/shell/shell.model';
 import { Language, ROLE_LABELS } from '../../core/platform/platform.model';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { formatIstDateTime } from '../../shared/format/ist-clock';
+import { EmergencyBadgeStore } from '../ipd/emergency/emergency-badge.store';
+import { SetPinSheetComponent } from '../pin/set-pin-sheet.component';
 import { GoToDialogComponent, GoToOption } from './go-to/go-to-dialog.component';
 
 interface NavGroupView {
@@ -45,6 +53,7 @@ interface NavGroupView {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    NgTemplateOutlet,
     MatMenuModule,
     RouterLink,
     RouterLinkActive,
@@ -62,6 +71,7 @@ export class ShellComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly emergencyBadge = inject(EmergencyBadgeStore);
 
   protected readonly roleLabels = ROLE_LABELS;
 
@@ -78,11 +88,12 @@ export class ShellComponent implements OnInit {
 
   protected readonly clinicName = computed(() => this.me()?.clinic.name ?? '');
   protected readonly clinicArea = computed(() => this.me()?.clinic.area ?? '');
-  protected readonly userName = computed(() => this.me()?.name ?? '');
   protected readonly roleLabel = computed(() => {
     const role = this.me()?.role;
     return role ? this.roleLabels[role] : '';
   });
+  /** Name over role; the role alone when the name is missing or is only the role word. */
+  protected readonly chip = computed(() => profileChip(this.me()?.name, this.roleLabel()));
   protected readonly planDaysLeft = computed(() => this.me()?.clinic.planDaysLeft);
   protected readonly planMeterPercent = computed(() => {
     const left = this.planDaysLeft();
@@ -120,6 +131,23 @@ export class ShellComponent implements OnInit {
       .filter((view) => view.items.length > 0);
   });
 
+  constructor() {
+    // The count on "Emergency" is read only while the server's menu has the key (ADR-005).
+    effect(() => {
+      if (this.store.menu().includes('emergency')) {
+        this.emergencyBadge.start();
+      } else {
+        this.emergencyBadge.stop();
+      }
+    });
+    this.destroyRef.onDestroy(() => this.emergencyBadge.stop());
+  }
+
+  /** Number on a menu item; only "Emergency" has one, and only above 0. */
+  protected badgeOf(item: NavItem): number {
+    return item.key === 'emergency' ? this.emergencyBadge.count() : 0;
+  }
+
   ngOnInit(): void {
     this.translate.use(this.language()).subscribe();
     const timer = setInterval(() => this.clock.set(formatIstDateTime(new Date())), 30_000);
@@ -138,12 +166,13 @@ export class ShellComponent implements OnInit {
     }
   }
 
+  /** The icon rail has no group headings to open, so every group stays open there. */
   protected isGroupOpen(group: NavItem['group']): boolean {
-    return this.collapsedGroups()[group] !== true;
+    return this.collapsed() || this.collapsedGroups()[group] !== true;
   }
 
   protected toggleGroup(group: NavItem['group']): void {
-    this.collapsedGroups.update((groups) => ({ ...groups, [group]: !(groups[group] !== true) }));
+    this.collapsedGroups.update((groups) => ({ ...groups, [group]: groups[group] !== true }));
   }
 
   protected toggleDrawer(): void {
@@ -194,6 +223,32 @@ export class ShellComponent implements OnInit {
           void this.router.navigate(['/app', item.route]);
         }
       });
+  }
+
+  /**
+   * SAH-31 (ADR-010 D12): a role without the Team page (no `config` menu item) sets or changes
+   * its own PIN from the account menu. The roles that have the page do it on their Team row.
+   */
+  protected readonly showMyPin = computed(() => !this.store.menu().includes('config'));
+
+  private readonly accountButton = viewChild<ElementRef<HTMLButtonElement>>('accountButton');
+
+  /**
+   * The menu item that opened the sheet is gone when the sheet closes, so the dialog has nothing to
+   * give the focus back to: the account button takes it (a11y: focus returns to where the user was).
+   */
+  protected openMyPin(): void {
+    this.dialog
+      .open(SetPinSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '520px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'sp-title',
+        restoreFocus: false,
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.accountButton()?.nativeElement.focus());
   }
 
   protected logout(): void {

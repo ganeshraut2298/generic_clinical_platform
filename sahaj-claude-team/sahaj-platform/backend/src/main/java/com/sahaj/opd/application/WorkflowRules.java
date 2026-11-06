@@ -30,18 +30,27 @@ final class WorkflowRules {
                 new WorkflowStep("followup", true, null));
     }
 
+    /**
+     * The submitted list must be exactly the eight steps in the fixed {@link #KEYS} order (which also
+     * keeps the token first and the case paper, counselling, billing and follow-up after the consultation).
+     * Only vitals and counselling take an owner; an owner on any other step is refused, not dropped.
+     */
     static List<WorkflowStep> validate(List<WorkflowStepInput> input) {
         if (input == null || input.size() != KEYS.size()) {
             throw new InvalidInputException("steps", "Send all 8 workflow steps");
         }
         List<WorkflowStep> steps = new ArrayList<>();
         Set<String> seen = new HashSet<>();
-        for (WorkflowStepInput item : input) {
+        for (int i = 0; i < input.size(); i++) {
+            WorkflowStepInput item = input.get(i);
             if (item == null || item.key() == null || !KEYS.contains(item.key())) {
                 throw new InvalidInputException("steps", "Each step needs a valid key");
             }
             if (!seen.add(item.key())) {
                 throw new InvalidInputException("steps", "Each step can appear only once");
+            }
+            if (!KEYS.get(i).equals(item.key())) {
+                throw new InvalidInputException("steps", "Steps must be in the standard order");
             }
             if (item.on() == null) {
                 throw new InvalidInputException("steps", "Choose on or off for every step");
@@ -52,13 +61,15 @@ final class WorkflowRules {
             }
             steps.add(new WorkflowStep(item.key(), item.on(), ownerFor(item)));
         }
-        requireOrder(steps);
         return steps;
     }
 
     private static String ownerFor(WorkflowStepInput item) {
         boolean hasOwnerSelector = "vitals".equals(item.key()) || "counsel".equals(item.key());
         if (!hasOwnerSelector) {
+            if (item.owner() != null) {
+                throw new InvalidInputException("steps", "Only the vitals and counselling steps have an owner");
+            }
             return null;
         }
         if (item.owner() == null) {
@@ -68,28 +79,6 @@ final class WorkflowRules {
             throw new InvalidInputException("steps", "Owner must be Front desk, Nurse, Doctor or Owner");
         }
         return item.owner();
-    }
-
-    private static void requireOrder(List<WorkflowStep> steps) {
-        int consult = indexOf(steps, "consult");
-        if (indexOf(steps, "token") != 0) {
-            throw new InvalidInputException("steps", "Token must be the first step");
-        }
-        if (indexOf(steps, "casepaper") < consult || indexOf(steps, "followup") < consult) {
-            throw new InvalidInputException("steps", "Case paper print and follow-up come after the consultation");
-        }
-        if (indexOf(steps, "counsel") < consult || indexOf(steps, "billing") < consult) {
-            throw new InvalidInputException("steps", "Counselling and billing come after the consultation");
-        }
-    }
-
-    private static int indexOf(List<WorkflowStep> steps, String key) {
-        for (int i = 0; i < steps.size(); i++) {
-            if (steps.get(i).key().equals(key)) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     static List<WorkflowStepInput> toInput(List<WorkflowStep> steps) {

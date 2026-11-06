@@ -1,20 +1,17 @@
-<div class="pagehead">
-  <div>
-    <h1>Queue</h1>
-    <p class="lead">Move a token forward with the button on its card as the patient moves through the clinic.</p>
-  </div>
-  <div class="actions">
-    <mat-button-toggle-group class="seg" aria-label="Filter" [value]="myOnly()">
-      <mat-button-toggle [value]="false" (click)="setMyOnly(false)">Everyone</mat-button-toggle>
-      <mat-button-toggle [value]="true" (click)="setMyOnly(true)">My tasks</mat-button-toggle>
-    </mat-button-toggle-group>
-    @if (canCreateToken()) {
-      <button mat-flat-button type="button" (click)="openNewToken()">
-        <app-icon name="plus" [size]="17" /> New token
-      </button>
-    }
-  </div>
-</div>
+<app-page-head
+  title="Queue"
+  lead="Move a token forward with the button on its card as the patient moves through the clinic."
+>
+  <mat-button-toggle-group class="seg" aria-label="Filter" [value]="myOnly()">
+    <mat-button-toggle [value]="false" (click)="setMyOnly(false)">Everyone</mat-button-toggle>
+    <mat-button-toggle [value]="true" (click)="setMyOnly(true)">My tasks</mat-button-toggle>
+  </mat-button-toggle-group>
+  @if (canCreateToken()) {
+    <button mat-flat-button type="button" (click)="openNewToken()">
+      <app-icon name="plus" [size]="17" /> New token
+    </button>
+  }
+</app-page-head>
 
 @if (loading()) {
   <p class="muted" aria-busy="true">Loading the queue</p>
@@ -31,7 +28,7 @@
           <div class="col-h">
             <span class="pill" [class]="stagePillClass(col.stage)">{{ col.label }}</span>
             @if (col.legacy) {
-              <span class="faint" style="font-size: 0.72rem">Removed in v{{ liveVersion() }} · finishing on the earlier version</span>
+              <span class="faint t-xs">Removed in v{{ liveVersion() }} · finishing on the earlier version</span>
             }
             <span class="n num">{{ col.visits.length }}</span>
           </div>
@@ -59,7 +56,7 @@
                   @if (visit.stage !== 'DONE') {
                     <div class="qact">
                       @if (canMove(visit) && nextStageLabel(visit); as label) {
-                        <button mat-stroked-button type="button" [disabled]="movingId() === visit.id" (click)="moveToNext(visit)">
+                        <button mat-stroked-button class="btn-sm" type="button" [disabled]="movingId() === visit.id" (click)="moveToNext(visit)">
                           Move to {{ label }}
                         </button>
                       }
@@ -80,7 +77,7 @@
                 </article>
               }
             } @else {
-              <div class="empty">No patients</div>
+              <app-empty>No patients</app-empty>
             }
           </div>
         </section>

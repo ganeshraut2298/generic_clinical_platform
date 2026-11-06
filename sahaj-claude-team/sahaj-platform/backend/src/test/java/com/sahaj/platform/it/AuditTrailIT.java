@@ -151,6 +151,62 @@ class AuditTrailIT extends BaseIntegrationTest {
         });
     }
 
+    /** SAH-31 security review S2: clinical free text is replaced under any key spelling and for any entity type. */
+    @Test
+    void clinicalTextKeysAreRedactedForEveryEntityTypeAndOnlyThePinStateLabelAndTheRecordedFlagsStayReadable() throws Exception {
+        createTenant(tenantA, userA, nameA);
+        String[] entityTypes = {"PATIENT", "VISIT", "ADMISSION", "TENANT", "SOMETHING_ELSE"};
+        for (String type : entityTypes) {
+            Map<String, Object> values = new java.util.LinkedHashMap<>();
+            values.put("allergy", "Penicillin rash");
+            values.put("Allergy_Text", "Sulfa rash");
+            values.put("chronic", "Diabetes");
+            values.put("diagnosis", "Dengue");
+            values.put("primaryDiagnosis", "Dengue shock");
+            values.put("chiefComplaint", "Fever for 3 days");
+            values.put("clinicalNotes", "Looks unwell");
+            values.put("medicalHistory", "Stroke 2019");
+            values.put("nested", Map.of("allergy", "Latex", "list", java.util.List.of(Map.of("diagnosis", "Asthma"))));
+            values.put("pinState", "LOCKED");
+            values.put("allergyRecorded", true);
+            values.put("chronicRecorded", false);
+            values.put("specialty", "General");
+            runAs(authA(), () -> tx().executeWithoutResult(s -> auditLog.record("S2_" + type, type, userA, values, values)));
+        }
+        db().inTenant(tenantA, c -> {
+            for (String type : entityTypes) {
+                for (String column : new String[] {"before_json", "after_json"}) {
+                    String raw = DbAccess.text(c, "select " + column + "::text from platform.audit_event where action = 'S2_" + type + "'");
+                    for (String text : new String[] {"Penicillin", "Sulfa", "Diabetes", "Dengue", "Fever", "unwell", "Stroke",
+                            "Latex", "Asthma"}) {
+                        assertThat(raw).as(type + " " + column + " must not hold " + text).doesNotContain(text);
+                    }
+                    String sql = "select " + column + " ->> '";
+                    String end = "' from platform.audit_event where action = 'S2_" + type + "'";
+                    for (String key : new String[] {"allergy", "Allergy_Text", "chronic", "diagnosis", "primaryDiagnosis",
+                            "chiefComplaint", "clinicalNotes", "medicalHistory"}) {
+                        assertThat(DbAccess.text(c, sql + key + end)).as(type + " " + key).isEqualTo("[redacted]");
+                    }
+                    assertThat(DbAccess.text(c, sql + "pinState" + end)).as("pinState still readable").isEqualTo("LOCKED");
+                    assertThat(DbAccess.text(c, sql + "allergyRecorded" + end)).isEqualTo("true");
+                    assertThat(DbAccess.text(c, sql + "chronicRecorded" + end)).isEqualTo("false");
+                    assertThat(DbAccess.text(c, sql + "specialty" + end)).isEqualTo("General");
+                }
+            }
+            return null;
+        });
+        // a text under the flag keys is still redacted, and so is a pinState that is not one of the three labels
+        runAs(authA(), () -> tx().executeWithoutResult(s -> auditLog.record("S2_FLAGS", "PATIENT", userA, null,
+                Map.of("allergyRecorded", "Penicillin", "pinState", "4827"))));
+        db().inTenant(tenantA, c -> {
+            assertThat(DbAccess.text(c, "select after_json ->> 'allergyRecorded' from platform.audit_event where action = 'S2_FLAGS'"))
+                    .isEqualTo("[redacted]");
+            assertThat(DbAccess.text(c, "select after_json ->> 'pinState' from platform.audit_event where action = 'S2_FLAGS'"))
+                    .isEqualTo("[redacted]");
+            return null;
+        });
+    }
+
     // ---- same transaction as the change ----
 
     @Test

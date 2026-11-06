@@ -1,6 +1,7 @@
 package com.sahaj.patient.application;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +20,9 @@ public interface PatientRepository {
 
     /** Another clinic's id, or any id at all, is simply absent. Returns a merged-away record too. */
     Optional<PatientRow> findById(UUID tenantId, UUID id);
+
+    /** SAH-24: several records in one query; unknown or other-clinic ids are absent. */
+    List<PatientRow> findByIds(UUID tenantId, Collection<UUID> ids);
 
     /** Every active (not merged-away) record sharing this mobile number, excluding {@code excludeId}. */
     List<PatientRow> findFamily(UUID tenantId, String mobile, UUID excludeId);

@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +30,7 @@ public class JdbcPatientRepository implements PatientRepository {
             where tenant_id = :tenantId
             """;
     private static final String FIND_BY_ID = SELECT + " and id = :id";
+    private static final String FIND_BY_IDS = SELECT + " and id in (:ids)";
     private static final String FIND_FAMILY = SELECT
             + " and mobile = :mobile and merged_into_id is null and id <> :excludeId order by created_at";
 
@@ -86,6 +88,12 @@ public class JdbcPatientRepository implements PatientRepository {
     public Optional<PatientRow> findById(UUID tenantId, UUID id) {
         return jdbc.sql(FIND_BY_ID).param("tenantId", tenantId).param("id", id)
                 .query(JdbcPatientRepository::map).optional();
+    }
+
+    @Override
+    public List<PatientRow> findByIds(UUID tenantId, Collection<UUID> ids) {
+        return jdbc.sql(FIND_BY_IDS).param("tenantId", tenantId).param("ids", ids)
+                .query(JdbcPatientRepository::map).list();
     }
 
     @Override

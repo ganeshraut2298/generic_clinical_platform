@@ -74,6 +74,34 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /patients/{id}/consents:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-17]
+      responses:
+        '200': { description: Latest consent state, content: { application/json: { schema: { $ref: '#/components/schemas/PatientConsentState' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [SAH-17]
+      description: Appends a consent row (agreed or withdrawn). Rows are never edited.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ConsentInput' } } }
+      responses:
+        '200': { description: Latest consent state, content: { application/json: { schema: { $ref: '#/components/schemas/PatientConsentState' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /record-access:
+    get:
+      tags: [SAH-17]
+      description: OWNER only. Latest patient-file opens, newest first. Names are resolved at read time and are never stored in the log.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 5 } }
+      responses:
+        '200': { description: Rows, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RecordAccess' } } } } }
+        '403': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -94,6 +122,38 @@ components:
                 type: array
                 items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
   schemas:
+    ConsentKind:
+      type: string
+      enum: [RECORDS, PROMOTIONAL]
+    ConsentInput:
+      type: object
+      required: [kind, given]
+      properties:
+        kind: { $ref: '#/components/schemas/ConsentKind' }
+        given: { type: boolean }
+    ConsentEntry:
+      type: object
+      required: [kind, given, recordedAt, recordedByName]
+      properties:
+        kind: { $ref: '#/components/schemas/ConsentKind' }
+        given: { type: boolean }
+        recordedAt: { type: string, format: date-time }
+        recordedByName: { type: string }
+    PatientConsentState:
+      type: object
+      required: [records, promotional]
+      description: Latest row per kind; null when never recorded.
+      properties:
+        records: { oneOf: [{ $ref: '#/components/schemas/ConsentEntry' }, { type: 'null' }] }
+        promotional: { oneOf: [{ $ref: '#/components/schemas/ConsentEntry' }, { type: 'null' }] }
+    RecordAccess:
+      type: object
+      required: [at, userName, patientId, patientName]
+      properties:
+        at: { type: string, format: date-time }
+        userName: { type: string }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
     PatientSummary:
       type: object
       required: [id, uhid, name, age, sex, mobile]
@@ -119,6 +179,10 @@ components:
         allergy: { type: [string, 'null'] }
         chronic: { type: [string, 'null'] }
         abhaLinked: { type: boolean, default: false }
+        consents:
+          type: array
+          description: Optional consent answers recorded with the new patient (SAH-17).
+          items: { $ref: '#/components/schemas/ConsentInput' }
     PatientUpdate:
       type: object
       properties:

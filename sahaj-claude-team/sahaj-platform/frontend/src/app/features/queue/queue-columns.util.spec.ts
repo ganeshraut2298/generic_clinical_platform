@@ -15,6 +15,7 @@ function visit(stage: VisitStage, id: string = stage): Visit {
     visitType: 'NEW',
     stage,
     feePaise: 0,
+    workflowVersionNo: 1,
     createdAt: '2026-11-02T04:00:00Z',
   };
 }

@@ -1,11 +1,5 @@
 @use '../config-common';
 
-:host {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
 .steps {
   display: flex;
   flex-direction: column;
@@ -19,7 +13,7 @@
   align-items: center;
   padding: 12px;
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: var(--glass-hi);
   border: 1px solid var(--line-2);
 
   &.off {
@@ -32,6 +26,19 @@
   }
 }
 
+.ownersel {
+  width: 100%;
+}
+
+.owner-text {
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+.actions-end {
+  justify-content: flex-end;
+}
+
 .flow {
   display: flex;
   align-items: center;
@@ -41,7 +48,7 @@
   .fs {
     padding: 7px 11px;
     border-radius: var(--r-sm);
-    background: var(--surface);
+    background: var(--glass-hi);
     border: 1px solid var(--line);
     font-size: 0.82rem;
     font-weight: 600;

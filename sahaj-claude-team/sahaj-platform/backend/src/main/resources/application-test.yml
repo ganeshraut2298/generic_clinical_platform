@@ -10,3 +10,8 @@ spring:
     user: sahaj_migrator
     password: ${SAHAJ_DB_MIGRATOR_PASSWORD}
     clean-disabled: false
+
+sahaj:
+  modules:
+    # DEC-010: on for integration tests; ModulesTrialSwitchOffIT turns it off in its own context.
+    owner-ipd-trial: true

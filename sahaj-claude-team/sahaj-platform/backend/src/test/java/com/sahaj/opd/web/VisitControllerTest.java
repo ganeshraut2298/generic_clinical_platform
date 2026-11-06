@@ -56,7 +56,7 @@ class VisitControllerTest {
 
     private static VisitView view(String stage, String visitType) {
         return new VisitView(VISIT_ID, 7, PATIENT_ID, "Asha Rao", 30, "F", DOCTOR_ID, "Dr Rao", visitType, stage,
-                50000, Instant.now());
+                50000, Instant.now(), 2);
     }
 
     @Test
@@ -72,7 +72,8 @@ class VisitControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].tokenNo").value(7))
                 .andExpect(jsonPath("$[0].patientName").value("Asha Rao"))
-                .andExpect(jsonPath("$[0].stage").value("VITALS"));
+                .andExpect(jsonPath("$[0].stage").value("VITALS"))
+                .andExpect(jsonPath("$[0].workflowVersionNo").value(2));
     }
 
     @Test
@@ -84,7 +85,8 @@ class VisitControllerTest {
                         .content("{\"patientId\":\"" + PATIENT_ID + "\",\"doctorMembershipId\":\"" + DOCTOR_ID + "\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.visitType").value("NEW"))
-                .andExpect(jsonPath("$.feePaise").value(50000));
+                .andExpect(jsonPath("$.feePaise").value(50000))
+                .andExpect(jsonPath("$.workflowVersionNo").value(2));
     }
 
     @Test
@@ -112,7 +114,8 @@ class VisitControllerTest {
         mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("OWNER")).contentType(JSON)
                         .content("{\"stage\":\"WITH_DOCTOR\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.stage").value("WITH_DOCTOR"));
+                .andExpect(jsonPath("$.stage").value("WITH_DOCTOR"))
+                .andExpect(jsonPath("$.workflowVersionNo").value(2));
     }
 
     @Test

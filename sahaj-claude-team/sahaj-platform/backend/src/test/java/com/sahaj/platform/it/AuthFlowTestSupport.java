@@ -32,10 +32,13 @@ abstract class AuthFlowTestSupport extends BaseIntegrationTest {
     @Autowired
     protected TokenService tokenService;
 
-    /** A mobile number that matches {@code ^[6-9][0-9]{9}$} and is unique enough not to collide within a run. */
+    /**
+     * A brand new mobile number that matches {@code ^[6-9][0-9]{9}$}: never returned twice in a run, never one of
+     * the fixed constants the tests use, and not already a user or one-time-code mobile in sahaj_test
+     * (see {@link TestMobiles}).
+     */
     static String uniqueMobile() {
-        long n = Math.abs(UUID.randomUUID().getLeastSignificantBits()) % 1_000_000_000L;
-        return "9" + String.format("%09d", n);
+        return TestMobiles.next();
     }
 
     /** Sends a request for a code and reads it back out of the one permitted log line, never a response. */

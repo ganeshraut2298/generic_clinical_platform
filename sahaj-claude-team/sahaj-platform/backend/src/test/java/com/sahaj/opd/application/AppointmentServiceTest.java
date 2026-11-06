@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.sahaj.opd.application.AppointmentRepository.AppointmentRow;
 import com.sahaj.opd.application.BookingRulesRepository.BookingRulesRow;
 import com.sahaj.opd.application.VisitRepository.VisitRow;
+import com.sahaj.opd.api.DoctorBlockedDatesPort;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
 import com.sahaj.platform.api.AuditLog;
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +50,7 @@ class AppointmentServiceTest {
     private VisitService visitService;
     private PatientLookupPort patientLookup;
     private TeamMemberPort teamMemberPort;
+    private DoctorBlockedDatesPort blockedPort;
     private AuditLog auditLog;
     private AppointmentService service;
 
@@ -59,12 +62,13 @@ class AppointmentServiceTest {
         visitService = mock(VisitService.class);
         patientLookup = mock(PatientLookupPort.class);
         teamMemberPort = mock(TeamMemberPort.class);
+        blockedPort = mock(DoctorBlockedDatesPort.class);
         auditLog = mock(AuditLog.class);
         service = new AppointmentService(appointmentRepository, bookingRulesRepository, visitRepository,
-                visitService, patientLookup, teamMemberPort, auditLog, CLOCK);
+                visitService, patientLookup, teamMemberPort, new DoctorBlockedDates(List.of(blockedPort)), auditLog, CLOCK);
 
         when(patientLookup.find(TENANT_ID, PATIENT_ID))
-                .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F")));
+                .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F", "9000000001")));
         when(teamMemberPort.find(TENANT_ID, DOCTOR_ID))
                 .thenReturn(Optional.of(new TeamMember(DOCTOR_ID, "Dr Rao", "DOCTOR", true, 50000)));
         when(bookingRulesRepository.find(TENANT_ID)).thenReturn(Optional.empty());
@@ -239,7 +243,7 @@ class AppointmentServiceTest {
         stubFindByIdBeforeThenAfter("BOOKED", null, "ARRIVED", visitId);
         when(visitService.issueToken(eq(TENANT_ID), eq(USER_ID), eq("FRONT_DESK"), any()))
                 .thenReturn(new VisitView(visitId, 9, PATIENT_ID, "Asha Rao", 30, "F", DOCTOR_ID, "Dr Rao", "NEW",
-                        "WITH_DOCTOR", 50000, CLOCK.instant()));
+                        "WITH_DOCTOR", 50000, CLOCK.instant(), 1));
         when(visitRepository.findById(TENANT_ID, visitId))
                 .thenReturn(Optional.of(new VisitRow(visitId, PATIENT_ID, DOCTOR_ID, "NEW", "WITH_DOCTOR", 9, 50000,
                         CLOCK.instant(), 0)));
@@ -268,5 +272,17 @@ class AppointmentServiceTest {
 
         assertThatThrownBy(() -> service.createToken(TENANT_ID, USER_ID, "OWNER", APPT_ID))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void aDateBlockedForTheDoctorRefusesTheBookingAndSavesNothing() {
+        LocalDate date = LocalDate.of(2026, 11, 1);
+        when(blockedPort.blockedDates(TENANT_ID, DOCTOR_ID, date, date)).thenReturn(java.util.Set.of(date));
+
+        assertThatThrownBy(() -> service.create(TENANT_ID, USER_ID, "FRONT_DESK", createInput(date, "12:00")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This doctor is not taking bookings on that date.");
+
+        verify(appointmentRepository, never()).insert(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

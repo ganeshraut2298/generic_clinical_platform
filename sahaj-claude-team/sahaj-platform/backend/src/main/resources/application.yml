@@ -27,7 +27,9 @@ spring:
   flyway:
     # Flyway runs as sahaj_migrator on its own connection; it never shares the request pool.
     # Schemas are created by scripts/setup/create-database.mjs, not by Flyway.
-    locations: classpath:db/migration
+    # db/guard holds the afterMigrate guard that fails the start when dev-tools objects exist in a database that is
+    # not sahaj_dev or sahaj_test (ADR-008 R3). Customizers that add db/dev-seed or db/dev-tools append to this list.
+    locations: classpath:db/migration,classpath:db/guard
     schemas: platform
     default-schema: platform
     create-schemas: false
@@ -55,3 +57,34 @@ sahaj:
     secret: ${SAHAJ_JWT_SECRET}
     access-token-minutes: ${SAHAJ_JWT_ACCESS_MINUTES:15}
     selection-token-minutes: ${SAHAJ_JWT_SELECTION_MINUTES:5}
+  pin:
+    # SAH-31 (ADR-010 D3) personal staff PIN. A secret, so no default and no value here: set SAHAJ_PIN_PEPPER in the
+    # environment to the Base64 of at least 32 random bytes (and different from SAHAJ_JWT_SECRET).
+    #   missing or blank: the app starts, staff PIN set and check answer 503 pin-unavailable (fail closed)
+    #   present but invalid: the app refuses to start
+    # Changing it later makes every stored PIN fail: everyone sets a new PIN (ADR-010 Q6).
+    pepper: ${SAHAJ_PIN_PEPPER:}
+  modules:
+    # TEMPORARY (DEC-010, SAH-19): lets the clinic owner start a 30-day IPD trial from Plan and modules
+    # until the Sahaj admin console exists. Off by default (security review M1); dev and test profiles turn it on. A false value returns 404.
+    owner-ipd-trial: ${SAHAJ_MODULES_OWNER_IPD_TRIAL:false}
+  admin:
+    # Sahaj admin portal (ADR-003, ADM-1). OFF by default: with enabled=false nothing of the admin realm
+    # exists (no chain, no controllers, no secrets needed) and the application behaves as before.
+    # Environment variables (the human keeps them in .env, never in source control):
+    #   SAHAJ_ADMIN_ENABLED          true to switch the admin realm on (needs the ADM-1 migrations applied)
+    #   SAHAJ_ADMIN_JWT_SECRET       32+ characters, MUST differ from SAHAJ_JWT_SECRET (signs admin tokens, keys token hashes)
+    #   SAHAJ_ADMIN_TOTP_KEY         Base64 of exactly 32 random bytes (AES-256-GCM key for authenticator secrets)
+    #   SAHAJ_ADMIN_ALLOWED_NETWORKS comma-separated CIDRs allowed to call /api/v1/admin/** (empty = allowed in dev only)
+    #   SAHAJ_ADMIN_SEED_EMAIL       dev profile only: dummy admin email
+    #   SAHAJ_ADMIN_SEED_PASSWORD    dev profile only: dummy admin password (12 to 64 characters, not containing the email name)
+    #   SAHAJ_ADMIN_SEED_NAME        dev profile only: dummy admin name (default Dev admin)
+    # With enabled=true and a secret missing, the app still starts and every /api/v1/admin request answers 503.
+    # The secrets, the TOTP key and the seed values are NOT listed below on purpose: Spring Boot binds the
+    # environment variables above straight to sahaj.admin.jwt-secret, sahaj.admin.totp-key and
+    # sahaj.admin.seed.email|password|name, so they need no default and no placeholder in this file.
+    enabled: ${SAHAJ_ADMIN_ENABLED:false}
+    allowed-networks: ${SAHAJ_ADMIN_ALLOWED_NETWORKS:}
+    totp:
+      # Accept any 6-digit code from a loopback address. Dev profile only; the app refuses to start otherwise.
+      dev-bypass: false

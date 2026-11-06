@@ -130,9 +130,14 @@ button {
   color: var(--pri-text);
 }
 .p-sec,
-.p-billing {
+.p-billing,
+.p-blue {
   background: var(--sec-soft);
   color: var(--sec);
+}
+.p-crit {
+  background: var(--crit-soft);
+  color: var(--crit);
 }
 .p-good {
   background: var(--good-soft);
@@ -165,6 +170,10 @@ button {
   background: var(--sec-soft);
   color: var(--sec);
 }
+.notice.crit {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
 
 // Lists and tables
 .ticks {
@@ -186,6 +195,10 @@ button {
   }
 }
 .tbl-wrap {
+  // position: relative makes the wrapper the containing block for any visually
+  // hidden (position: absolute) controls inside the table, so they cannot
+  // stretch the page sideways. overflow-x clips and scrolls the table itself.
+  position: relative;
   overflow-x: auto;
 }
 table {
@@ -287,14 +300,16 @@ td {
   --scene-anim: paused;
 }
 
-// Angular Material buttons, shaped like the mockup
+// Angular Material buttons, shaped like the mockup `.btn`: primary = filled, secondary = outlined on
+// glass, tertiary = text. Drawn 40 px (38 px in the console); Material's own 48 px touch target
+// keeps the hit area above 44 px.
 .mat-mdc-button-base {
   --mat-button-filled-container-shape: var(--r-sm);
   --mat-button-outlined-container-shape: var(--r-sm);
   --mat-button-text-container-shape: var(--r-sm);
-  --mat-button-filled-container-height: 44px;
-  --mat-button-outlined-container-height: 44px;
-  --mat-button-text-container-height: 44px;
+  --mat-button-filled-container-height: 40px;
+  --mat-button-outlined-container-height: 40px;
+  --mat-button-text-container-height: 40px;
   --mat-button-filled-container-color: var(--pri);
   --mat-button-filled-label-text-color: var(--pri-ink);
   --mat-button-filled-label-text-weight: 600;
@@ -311,6 +326,27 @@ td {
   --mat-button-text-horizontal-padding: 14px;
   white-space: nowrap;
 }
+.mat-mdc-unelevated-button.mat-mdc-button-base:not(:disabled) {
+  box-shadow: 0 8px 20px -10px var(--pri);
+}
+.mat-mdc-outlined-button.mat-mdc-button-base {
+  background: var(--glass-hi);
+}
+.mat-mdc-button-base.danger {
+  --mat-button-filled-container-color: var(--crit);
+  --mat-button-filled-label-text-color: var(--crit-ink);
+  box-shadow: 0 8px 20px -10px var(--crit);
+}
+.shell .mat-mdc-button-base {
+  --mat-button-filled-container-height: 38px;
+  --mat-button-outlined-container-height: 38px;
+  --mat-button-text-container-height: 38px;
+  --mat-button-filled-label-text-size: 0.84rem;
+  --mat-button-outlined-label-text-size: 0.84rem;
+  --mat-button-text-label-text-size: 0.84rem;
+  --mat-button-filled-horizontal-padding: 13px;
+  --mat-button-outlined-horizontal-padding: 13px;
+}
 .mat-mdc-button-base.btn-lg {
   --mat-button-filled-container-height: 50px;
   --mat-button-outlined-container-height: 50px;
@@ -318,6 +354,16 @@ td {
   --mat-button-outlined-label-text-size: 0.98rem;
   --mat-button-filled-horizontal-padding: 20px;
   --mat-button-outlined-horizontal-padding: 20px;
+}
+.mat-mdc-button-base.btn-sm {
+  --mat-button-filled-container-height: 32px;
+  --mat-button-outlined-container-height: 32px;
+  --mat-button-text-container-height: 32px;
+  --mat-button-filled-label-text-size: 0.77rem;
+  --mat-button-outlined-label-text-size: 0.77rem;
+  --mat-button-text-label-text-size: 0.77rem;
+  --mat-button-filled-horizontal-padding: 10px;
+  --mat-button-outlined-horizontal-padding: 10px;
 }
 .mat-mdc-button-base.btn-sec {
   background: var(--glass-hi);
@@ -329,11 +375,11 @@ td {
 
 // Segmented control (Material button toggle group)
 .mat-button-toggle-group.seg {
-  --mat-button-toggle-height: 38px;
+  --mat-button-toggle-height: 34px;
   --mat-button-toggle-shape: 9px;
   --mat-button-toggle-background-color: transparent;
   --mat-button-toggle-text-color: var(--ink-2);
-  --mat-button-toggle-selected-state-background-color: var(--surface);
+  --mat-button-toggle-selected-state-background-color: var(--glass-hi);
   --mat-button-toggle-selected-state-text-color: var(--pri-text);
   --mat-button-toggle-divider-color: transparent;
   --mat-button-toggle-label-text-size: 0.84rem;
@@ -351,10 +397,23 @@ td {
     border-radius: 9px;
   }
   .mat-button-toggle-checked {
-    box-shadow: 0 2px 8px -4px rgba(10, 70, 84, 0.35);
+    box-shadow: 0 2px 8px -4px var(--pri);
   }
-  .mat-button-toggle-button {
-    min-height: 44px;
+  .mat-pseudo-checkbox,
+  .mat-button-toggle-checkbox-wrapper {
+    display: none;
+  }
+  .mat-button-toggle .mat-button-toggle-button,
+  .mat-button-toggle.mat-button-toggle-checked .mat-button-toggle-button {
+    min-height: 34px;
+    padding: 0;
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -5px 0;
+    }
   }
 }
 
@@ -375,23 +434,6 @@ td {
   --mat-slider-hover-state-layer-color: var(--pri-soft);
   width: 100%;
   margin: 0;
-}
-
-// Dialog (enquiry sheet)
-.sheet-panel {
-  --mat-dialog-container-shape: 22px;
-  --mat-dialog-container-color: var(--surface);
-  --mat-dialog-supporting-text-color: var(--ink);
-  --mat-dialog-subhead-color: var(--ink);
-}
-
-@media (max-width: 620px) {
-  .cdk-global-overlay-wrapper:has(.sheet-panel) {
-    align-items: flex-end !important;
-  }
-  .sheet-panel {
-    --mat-dialog-container-shape: 22px 22px 0 0;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

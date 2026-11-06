@@ -43,7 +43,14 @@ abstract class BaseIntegrationTest {
 
     /** A name that is unique per test run and carries no real data. */
     protected static String uniqueName(String prefix) {
-        return prefix + " " + UUID.randomUUID();
+        // The audit writer masks every run of exactly ten digits in a stored value (it takes them for a mobile number), and a
+        // random UUID contains such a run about once in a thousand times, which made a name comparison fail now and then
+        // (AuditTrailIT, seen once in the SAH-31 gate). The digits are therefore written as letters; the name stays unique.
+        StringBuilder id = new StringBuilder();
+        for (char c : UUID.randomUUID().toString().toCharArray()) {
+            id.append(c >= '0' && c <= '9' ? (char) ('g' + (c - '0')) : c);
+        }
+        return prefix + " " + id;
     }
 
     /**

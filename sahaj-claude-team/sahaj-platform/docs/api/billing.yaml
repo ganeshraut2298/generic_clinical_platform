@@ -94,6 +94,29 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /revenue:
+    get:
+      tags: [SAH-16]
+      parameters:
+        - { name: range, in: query, required: true, schema: { type: string, enum: [TODAY, WEEK, MONTH] } }
+      responses:
+        '200': { description: Revenue report for the Asia/Kolkata range, content: { application/json: { schema: { $ref: '#/components/schemas/RevenueReport' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /today-summary:
+    get:
+      tags: [SAH-15]
+      responses:
+        '200':
+          description: Money figures for the Today screen (Asia/Kolkata day)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [collectedPaise, billsPending]
+                properties:
+                  collectedPaise: { type: integer, description: Net of today's payments (payments minus refunds). }
+                  billsPending: { type: integer, description: Visits in the Billing stage with a balance above zero. }
   /day-closing:
     post:
       tags: [SAH-10]
@@ -174,7 +197,7 @@ components:
         paidPaise: { type: integer }
         balancePaise: { type: integer }
         payments: { type: array, items: { $ref: '#/components/schemas/Payment' } }
-        canCollect: { type: boolean, description: Whether the signed-in user may edit items, discount or collect payment. }
+        canCollect: { type: boolean, description: 'Whether the signed-in user may edit items, discount or collect payment.' }
         discountLimitPercent: { type: integer, description: The signed-in role's maximum discount percent. }
     BillSummary:
       type: object
@@ -186,6 +209,40 @@ components:
         doctorName: { type: string }
         totalPaise: { type: integer }
         balancePaise: { type: integer }
+    RevenueReport:
+      type: object
+      required: [range, collectedPaise, billedPaise, patients, averageBillPaise, duePaise, atCounterPaise, discountPaise, refundPaise, cashInDrawerPaise, days, modes, doctors, topServices, dues, adjustments]
+      properties:
+        range: { type: string, enum: [TODAY, WEEK, MONTH] }
+        collectedPaise: { type: integer, description: Net of refunds. }
+        collectedChangePercent: { type: [integer, 'null'], description: Versus the previous period of the same length; null when the previous period had no activity. }
+        billedPaise: { type: integer }
+        patients: { type: integer }
+        averageBillPaise: { type: integer }
+        duePaise: { type: integer, description: Unpaid balance on bills that are Done. }
+        atCounterPaise: { type: integer, description: Balance on visits still in the Billing stage. }
+        discountPaise: { type: integer }
+        refundPaise: { type: integer }
+        cashInDrawerPaise: { type: integer, description: Cash taken today net of cash refunds. }
+        days:
+          type: array
+          items: { type: object, required: [date, collectedPaise], properties: { date: { type: string, format: date }, collectedPaise: { type: integer } } }
+        modes:
+          type: array
+          items: { type: object, required: [mode, amountPaise], properties: { mode: { $ref: '#/components/schemas/PaymentMode' }, amountPaise: { type: integer } } }
+        doctors:
+          type: array
+          items: { type: object, required: [doctorMembershipId, doctorName, patients, collectedPaise], properties: { doctorMembershipId: { type: string, format: uuid }, doctorName: { type: string }, patients: { type: integer }, collectedPaise: { type: integer } } }
+        topServices:
+          type: array
+          maxItems: 6
+          items: { type: object, required: [name, billedPaise], properties: { name: { type: string }, billedPaise: { type: integer } } }
+        dues:
+          type: array
+          items: { type: object, required: [visitId, patientName, doctorName, date, balancePaise], properties: { visitId: { type: string, format: uuid }, patientName: { type: string }, mobile: { type: [string, 'null'], description: On screen only; never logged. }, doctorName: { type: string }, date: { type: string, format: date }, balancePaise: { type: integer } } }
+        adjustments:
+          type: array
+          items: { type: object, required: [kind, patientName, amountPaise, detail, date], properties: { kind: { type: string, enum: [DISCOUNT, REFUND] }, patientName: { type: string }, amountPaise: { type: integer }, detail: { type: string, description: 'Percent and reason for a discount; reason, mode and who for a refund.' }, date: { type: string, format: date } } }
     DayClosing:
       type: object
       required: [businessDate, countedCashPaise, expectedCashPaise, diffPaise, closedByName, closedAt]

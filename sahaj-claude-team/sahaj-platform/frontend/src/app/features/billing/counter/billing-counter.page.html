@@ -1,16 +1,13 @@
-<div class="pagehead">
-  <div>
-    <h1>Billing</h1>
-    <p class="lead">Items come from the visit. Fee rules, discount limits and service prices are set in Clinic setup.</p>
-  </div>
-  <div class="actions">
-    @if (canCloseDay()) {
-      <button mat-stroked-button type="button" (click)="openClosing()">
-        <app-icon name="lock" [size]="15" /> Close the day
-      </button>
-    }
-  </div>
-</div>
+<app-page-head
+  title="Billing"
+  lead="Items come from the visit. Fee rules, discount limits and service prices are set in Clinic setup."
+>
+  @if (canCloseDay()) {
+    <button mat-stroked-button type="button" (click)="openClosing()">
+      <app-icon name="lock" [size]="15" /> Close the day
+    </button>
+  }
+</app-page-head>
 
 @if (loading()) {
   <p class="muted" aria-busy="true">Loading the billing counter</p>
@@ -42,12 +39,12 @@
             <b class="num">{{ formatInr(p.balancePaise / 100) }}</b>
           </button>
         } @empty {
-          <div class="empty">No bills waiting</div>
+          <app-empty>No bills waiting</app-empty>
         }
       </div>
 
       @if (c.dues.length) {
-        <div class="panel-h" style="margin-top: 6px">
+        <div class="panel-h list-head">
           <h2>Dues</h2>
           <span class="pill p-warn num">{{ formatInr(sumBalance(c.dues) / 100) }}</span>
         </div>
@@ -70,9 +67,9 @@
         </div>
       }
 
-      <div class="panel-h" style="margin-top: 6px">
+      <div class="panel-h list-head">
         <h2>Paid today</h2>
-        <span class="faint num" style="font-size: 0.8rem">
+        <span class="faint num t-sm">
           {{ formatInr(sumTotal(c.paidToday) / 100) }}
         </span>
       </div>
@@ -92,7 +89,7 @@
             <span class="muted num">{{ formatInr(p.totalPaise / 100) }}</span>
           </button>
         } @empty {
-          <div class="empty">None yet</div>
+          <app-empty>None yet</app-empty>
         }
       </div>
     </section>
@@ -106,7 +103,7 @@
           <span>{{ message }}</span>
         </div>
       } @else if (!bill()) {
-        <div class="empty" style="padding: 40px">
+        <div class="empty roomy">
           Nothing to bill right now.
           <br />
           <span class="faint">{{ c.paidToday.length }} visits paid today</span>
@@ -116,11 +113,11 @@
         <div class="panel-h">
           <div>
             <span class="eyebrow">Bill</span>
-            <h2 style="margin-top: 4px">
+            <h2 class="bill-title">
               T-{{ b.tokenNo }} · {{ b.patientName }}
-              <span class="faint" style="font-weight: 500; font-size: 0.88rem">{{ b.age }} {{ b.sex }}</span>
+              <span class="faint bill-age">{{ b.age }} {{ b.sex }}</span>
             </h2>
-            <div class="muted" style="font-size: 0.82rem">{{ b.doctorName }} · {{ b.visitType === 'FOLLOW_UP' ? 'Follow-up' : 'New' }} visit</div>
+            <div class="muted t-sm">{{ b.doctorName }} · {{ b.visitType === 'FOLLOW_UP' ? 'Follow-up' : 'New' }} visit</div>
           </div>
           @if (b.balancePaise === 0) {
             <span class="pill p-good"><app-icon name="check" [size]="12" /> Settled</span>
@@ -170,11 +167,11 @@
               </tbody>
             </table>
           </div>
-          <div class="actions" style="justify-content: flex-end">
+          <div class="actions end">
             @if (isOwner()) {
               <button mat-stroked-button type="button" (click)="openRefund()">Refund</button>
             } @else {
-              <span class="faint" style="font-size: 0.8rem">Refunds need the owner</span>
+              <span class="faint t-sm">Refunds need the owner</span>
             }
           </div>
         } @else {
@@ -191,7 +188,7 @@
                     <app-icon name="x" [size]="16" />
                   </button>
                 } @else {
-                  <span style="width: 44px"></span>
+                  <span class="line-gap"></span>
                 }
               </div>
             }
@@ -217,14 +214,13 @@
             </div>
           }
 
-          <div class="grid2 even" style="gap: 14px">
+          <div class="grid2 even tight">
             <div class="field">
               <label for="disc">Discount %</label>
-              <div class="row" style="flex-wrap: nowrap">
+              <div class="row nowrap">
                 <input
                   id="disc"
-                  class="input num"
-                  style="max-width: 90px"
+                  class="input num disc-input"
                   inputmode="numeric"
                   [value]="discountPercentInput()"
                   [disabled]="!b.canCollect"
@@ -244,7 +240,7 @@
                   }
                 </select>
               </div>
-              <span class="faint" id="discHelp" style="font-size: 0.74rem">
+              <span class="faint t-xs" id="discHelp">
                 Your limit: {{ b.discountLimitPercent >= 100 ? 'no limit' : b.discountLimitPercent + '%' }}
               </span>
             </div>
@@ -262,7 +258,7 @@
 
           @if (b.canCollect) {
             <div class="paybox">
-              <div class="row" style="justify-content: space-between">
+              <div class="row between">
                 <div class="seg" role="group" aria-label="Payment mode">
                   @for (mode of paymentModes; track mode) {
                     <button type="button" [attr.aria-pressed]="paymentMode() === mode" (click)="setPaymentMode(mode)">
@@ -270,9 +266,9 @@
                     </button>
                   }
                 </div>
-                <div class="field" style="flex-direction: row; align-items: center; gap: 8px">
-                  <label for="paynow" style="white-space: nowrap">Paying now</label>
-                  <div class="pre" style="width: 130px">
+                <div class="field inline">
+                  <label for="paynow">Paying now</label>
+                  <div class="pre paynow">
                     <span>₹</span>
                     <input
                       id="paynow"
@@ -287,12 +283,12 @@
 
               @if (paymentMode() === 'UPI') {
                 <div class="upi">
-                  <div style="flex: 1">
-                    <b style="font-size: 1.05rem" class="num">{{ formatInr(paymentAmountPaise() / 100) }}</b>
+                  <div class="upi-main">
+                    <b class="num">{{ formatInr(paymentAmountPaise() / 100) }}</b>
                     @if (upiMarkedReceived()) {
-                      <span class="pill p-good" style="margin-top: 6px"><app-icon name="check" [size]="12" /> Received</span>
+                      <span class="pill p-good"><app-icon name="check" [size]="12" /> Received</span>
                     } @else {
-                      <button class="linkbtn" type="button" style="font-size: 0.78rem" (click)="markUpiReceived()">
+                      <button class="linkbtn" type="button" (click)="markUpiReceived()">
                         Mockup: mark as received
                       </button>
                     }
@@ -300,12 +296,11 @@
                 </div>
               }
               @if (paymentMode() === 'CARD') {
-                <div class="field" style="flex-direction: row; align-items: center; gap: 8px">
-                  <label for="payslip" style="white-space: nowrap">Card slip number</label>
+                <div class="field inline">
+                  <label for="payslip">Card slip number</label>
                   <input
                     id="payslip"
-                    class="input num"
-                    style="max-width: 150px"
+                    class="input num slip-input"
                     placeholder="Optional"
                     [value]="paymentReference()"
                     (input)="paymentReference.set($any($event.target).value)"
@@ -320,7 +315,7 @@
               </ul>
             }
 
-            <div class="actions" style="justify-content: flex-end">
+            <div class="actions end">
               <button mat-flat-button type="button" [disabled]="busy() || !!collectBlockedReason()" (click)="collect()">
                 <app-icon name="check" [size]="16" /> Collect {{ formatInr(paymentAmountPaise() / 100) }}
               </button>
@@ -337,7 +332,7 @@
                 <span>₹</span>
                 <input id="rfa" class="input num" inputmode="numeric" [value]="refundAmountInput()" (input)="refundAmountInput.set($any($event.target).value)" />
               </div>
-              <span class="faint" style="font-size: 0.76rem">Up to {{ formatInr(b.paidPaise / 100) }}</span>
+              <span class="faint t-xs">Up to {{ formatInr(b.paidPaise / 100) }}</span>
             </div>
             <div class="field">
               <label for="rfr">Reason</label>
@@ -355,7 +350,7 @@
                 <button type="button" [attr.aria-pressed]="refundMode() === 'UPI'" (click)="refundMode.set('UPI')">UPI</button>
               </div>
             </div>
-            <div class="actions" style="justify-content: flex-end">
+            <div class="actions end">
               <button mat-stroked-button type="button" (click)="cancelRefund()">Cancel</button>
               <button mat-flat-button type="button" [disabled]="busy()" (click)="submitRefund()">Refund</button>
             </div>

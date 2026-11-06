@@ -1,5 +1,7 @@
 package com.sahaj;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
@@ -13,10 +15,19 @@ import org.springframework.modulith.core.ApplicationModules;
  *
  * <p>This is static analysis of the compiled classes; it starts no Spring context and needs no
  * database (ADR-001 D3).
+ *
+ * <p>Test classes are left out of the analysis by their location. Modulith already leaves out {@code target/test-classes},
+ * but the Maven profile {@code dev-tools} (ADR-008) builds into {@code target-devtools}, whose test classes it would
+ * otherwise count, and tests may reach into any module.
  */
 class ModularityTests {
 
-    private final ApplicationModules modules = ApplicationModules.of(SahajApplication.class);
+    private static final DescribedPredicate<JavaClass> TEST_CLASSES = DescribedPredicate.describe(
+            "classes that were loaded from a test-classes directory",
+            javaClass -> javaClass.getSource().map(source -> source.getUri().toString().contains("/test-classes/"))
+                    .orElse(false));
+
+    private final ApplicationModules modules = ApplicationModules.of(SahajApplication.class, TEST_CLASSES);
 
     @Test
     void verifiesModularStructure() {

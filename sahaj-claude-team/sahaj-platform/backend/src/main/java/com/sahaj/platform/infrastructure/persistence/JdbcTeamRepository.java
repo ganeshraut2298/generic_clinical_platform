@@ -35,6 +35,7 @@ public class JdbcTeamRepository implements TeamRepository {
             + " order by (m.role = 'OWNER') desc, m.created_at, m.id";
     private static final String FIND_BY_ID = SELECT + " and m.id = :id";
     private static final String FIND_BY_USER = SELECT + " and m.user_id = :userId";
+    private static final String FIND_ACTIVE_BY_USER = FIND_BY_USER + " and m.status = 'ACTIVE'";
     private static final String LOCK_TENANT = """
             select id from platform.tenant where id = platform.current_tenant() for update
             """;
@@ -81,6 +82,12 @@ public class JdbcTeamRepository implements TeamRepository {
     @Override
     public Optional<TeamRow> findByUser(UUID tenantId, UUID userId) {
         return jdbc.sql(FIND_BY_USER).param("tenantId", tenantId).param("userId", userId)
+                .query(JdbcTeamRepository::map).optional();
+    }
+
+    @Override
+    public Optional<TeamRow> findActiveByUser(UUID tenantId, UUID userId) {
+        return jdbc.sql(FIND_ACTIVE_BY_USER).param("tenantId", tenantId).param("userId", userId)
                 .query(JdbcTeamRepository::map).optional();
     }
 

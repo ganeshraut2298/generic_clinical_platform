@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -29,6 +30,7 @@ public class JwtTokenService implements TokenService {
     private static final String SELECT_CLINIC_PURPOSE = "select-clinic";
     private static final String ROLE_CLAIM = "role";
     private static final String TENANT_CLAIM = "tid";
+    private static final String ADMIN_AUDIENCE = "sahaj-admin";
 
     private final javax.crypto.SecretKey key;
     private final JwtProperties properties;
@@ -68,6 +70,9 @@ public class JwtTokenService implements TokenService {
     public Optional<AccessTokenClaims> parseAccessToken(String token) {
         try {
             Claims claims = Jwts.parser().clock(jwtClock()).verifyWith(key).build().parseSignedClaims(token).getPayload();
+            if (isAdminToken(claims)) {
+                return Optional.empty();
+            }
             if (claims.get(TENANT_CLAIM, String.class) == null || claims.get(ROLE_CLAIM, String.class) == null) {
                 return Optional.empty();
             }
@@ -79,6 +84,12 @@ public class JwtTokenService implements TokenService {
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }
+    }
+
+    /** ADM-1 (ADR-003 D3): a token meant for the Sahaj admin portal is never a clinic token, whatever key signed it. */
+    private static boolean isAdminToken(Claims claims) {
+        Set<String> audience = claims.getAudience();
+        return audience != null && audience.contains(ADMIN_AUDIENCE);
     }
 
     @Override
@@ -97,6 +108,9 @@ public class JwtTokenService implements TokenService {
     public Optional<UUID> parseSelectionToken(String token) {
         try {
             Claims claims = Jwts.parser().clock(jwtClock()).verifyWith(key).build().parseSignedClaims(token).getPayload();
+            if (isAdminToken(claims)) {
+                return Optional.empty();
+            }
             if (!SELECT_CLINIC_PURPOSE.equals(claims.get(PURPOSE_CLAIM, String.class))) {
                 return Optional.empty();
             }

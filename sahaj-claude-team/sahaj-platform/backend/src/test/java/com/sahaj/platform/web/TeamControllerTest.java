@@ -67,7 +67,7 @@ class TeamControllerTest {
 
     @Test
     void anyClinicRoleCanReadTheTeamAndSeesOnlyMaskedMobiles() throws Exception {
-        when(teamService.list(TENANT_ID)).thenReturn(List.of(aMember()));
+        when(teamService.list(TENANT_ID, USER_ID)).thenReturn(List.of(aMember()));
 
         mockMvc.perform(get(TEAM).with(as("FRONT_DESK")))
                 .andExpect(status().isOk())
@@ -155,6 +155,79 @@ class TeamControllerTest {
         when(teamService.deactivate(TENANT_ID, USER_ID, MEMBER_ID)).thenThrow(new NotFoundException("x"));
         mockMvc.perform(post(TEAM + "/" + MEMBER_ID + "/deactivate").with(as("OWNER")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void thePinStateIsOnTheRowWithEveryKeyAndNeverTheHash() throws Exception {
+        when(teamService.list(TENANT_ID, USER_ID)).thenReturn(List.of(
+                new TeamMemberView(MEMBER_ID, "Nisha", "••••••7410", MembershipRole.NURSE, MembershipStatus.ACTIVE,
+                        null, null, new TeamMemberView.PinView(com.sahaj.platform.domain.PinState.LOCKED,
+                                java.time.Instant.parse("2026-11-06T05:35:00Z"),
+                                java.time.Instant.parse("2026-11-06T05:50:00Z"))),
+                new TeamMemberView(UUID.randomUUID(), "Rahul", "••••••3301", MembershipRole.PHARMACIST,
+                        MembershipStatus.ACTIVE, null, null,
+                        new TeamMemberView.PinView(com.sahaj.platform.domain.PinState.NOT_SET, null, null))));
+
+        mockMvc.perform(get(TEAM).with(as("OWNER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].pin.state").value("LOCKED"))
+                .andExpect(jsonPath("$[0].pin.setAt").value("2026-11-06T05:35:00Z"))
+                .andExpect(jsonPath("$[0].pin.lockedUntil").value("2026-11-06T05:50:00Z"))
+                .andExpect(jsonPath("$[1].pin.state").value("NOT_SET"))
+                .andExpect(jsonPath("$[1].pin.setAt").value((Object) null))
+                .andExpect(jsonPath("$[1].pin.lockedUntil").value((Object) null))
+                .andExpect(jsonPath("$[0].pin.pinHash").doesNotExist());
+    }
+
+    @Test
+    void aRowWithoutPinInformationHasNoPinKey() throws Exception {
+        when(teamService.list(TENANT_ID, USER_ID)).thenReturn(List.of(aMember()));
+
+        mockMvc.perform(get(TEAM).with(as("NURSE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].pin").doesNotExist());
+    }
+
+    @Test
+    void theOwnerResetsAPinAndGetsTheMemberBackAsNotSet() throws Exception {
+        when(teamService.resetPin(TENANT_ID, USER_ID, MEMBER_ID)).thenReturn(
+                new TeamMemberView(MEMBER_ID, "Rahul Deshmukh", "••••••3301", MembershipRole.PHARMACIST,
+                        MembershipStatus.ACTIVE, null, null,
+                        new TeamMemberView.PinView(com.sahaj.platform.domain.PinState.NOT_SET, null, null)));
+
+        mockMvc.perform(post(TEAM + "/" + MEMBER_ID + "/pin/reset").with(as("OWNER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.role").value("PHARMACIST"))
+                .andExpect(jsonPath("$.pin.state").value("NOT_SET"));
+        verify(teamService).resetPin(TENANT_ID, USER_ID, MEMBER_ID);
+    }
+
+    @Test
+    void aNonOwnerGetsTheContractForbiddenTextOnReset() throws Exception {
+        when(teamService.resetPin(TENANT_ID, USER_ID, MEMBER_ID)).thenThrow(new com.sahaj.platform.api.ForbiddenException(
+                "forbidden", "Not allowed", "Only the clinic owner can do this."));
+
+        mockMvc.perform(post(TEAM + "/" + MEMBER_ID + "/pin/reset").with(as("NURSE")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/forbidden"))
+                .andExpect(jsonPath("$.detail").value("Only the clinic owner can do this."));
+    }
+
+    @Test
+    void resetNeedsASignedInUserAndMapsNotFoundAndRateLimit() throws Exception {
+        mockMvc.perform(post(TEAM + "/" + MEMBER_ID + "/pin/reset")).andExpect(status().isUnauthorized());
+
+        when(teamService.resetPin(TENANT_ID, USER_ID, MEMBER_ID)).thenThrow(new NotFoundException("x"));
+        mockMvc.perform(post(TEAM + "/" + MEMBER_ID + "/pin/reset").with(as("OWNER")))
+                .andExpect(status().isNotFound());
+
+        org.mockito.Mockito.doThrow(com.sahaj.platform.api.StaffPinException.rateLimited(600)).when(teamService)
+                .resetPin(TENANT_ID, USER_ID, MEMBER_ID);
+        mockMvc.perform(post(TEAM + "/" + MEMBER_ID + "/pin/reset").with(as("OWNER")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/rate-limit"))
+                .andExpect(jsonPath("$.retryAfterSeconds").value(600));
     }
 
     @Test

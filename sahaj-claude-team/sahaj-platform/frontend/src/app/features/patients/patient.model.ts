@@ -1,3 +1,5 @@
+import { ConsentInput } from '../privacy/privacy.model';
+
 /** Types for the SAH-8 endpoints in `docs/api/patient.yaml`. No field is invented. */
 
 export type Sex = 'F' | 'M' | 'O';
@@ -57,6 +59,7 @@ export interface PatientCreate {
   allergy?: string | null;
   chronic?: string | null;
   abhaLinked?: boolean;
+  consents?: ConsentInput[];
 }
 
 export interface PatientUpdate {

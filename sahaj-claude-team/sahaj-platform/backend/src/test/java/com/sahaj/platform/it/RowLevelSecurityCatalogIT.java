@@ -110,6 +110,15 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
             "platform.refresh_token.p_refresh_token_self_read",
             "platform.refresh_token.p_refresh_token_self_revoke");
 
+    /**
+     * SAH-31 (docs/database/SAH-31.md "RLS on the two reference tables"): the global medicine catalogue. No tenant_id; row level
+     * security is enabled and forced only to satisfy the repository gates; the policies are not tenant policies on purpose:
+     * select for sahaj_app using (true) and all for sahaj_migrator using (true) with check (true), so later content migrations
+     * still work. {@link #globalCatalogueTablesHaveExactlyTheSelectAndMigratorPoliciesAndNoTenantData} proves exactly that, so
+     * the tenant rule below skips them.
+     */
+    private static final Set<String> GLOBAL_CATALOGUE_TABLES = Set.of("ipd.drug", "ipd.drug_interaction");
+
     @Test
     void everyPolicyAppliesToSahajAppOnlyAndIsBuiltOnTheBoundTenantWithNoEscape() throws Exception {
         Map<String, List<String>> commandsByTable = new LinkedHashMap<>();
@@ -129,6 +138,9 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
                     """.formatted(SCHEMAS))) {
                 while (rs.next()) {
                     String table = rs.getString("tbl");
+                    if (GLOBAL_CATALOGUE_TABLES.contains(table)) {
+                        continue; // exact policies asserted in globalCatalogueTablesHaveExactlyTheSelectAndMigratorPoliciesAndNoTenantData
+                    }
                     String name = table + "." + rs.getString("polname");
                     commandsByTable.computeIfAbsent(table, k -> new ArrayList<>()).add(rs.getString("cmd"));
                     if (rs.getBoolean("for_public") || !"sahaj_app".equals(rs.getString("roles"))) {
@@ -166,6 +178,63 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
         assertThat(commandsByTable).containsKeys("platform.tenant", "platform.membership", "platform.audit_event");
         // audit_event: one SELECT policy and one INSERT policy and nothing else (no UPDATE, DELETE or ALL policy).
         assertThat(commandsByTable.get("platform.audit_event")).containsExactlyInAnyOrder("r", "a");
+    }
+
+    @Test
+    void globalCatalogueTablesHaveExactlyTheSelectAndMigratorPoliciesAndNoTenantData() throws Exception {
+        Map<String, Set<String>> expectedPolicies = new LinkedHashMap<>();
+        expectedPolicies.put("ipd.drug", Set.of("p_drug_select|r|sahaj_app|true|", "p_drug_migrator|*|sahaj_migrator|true|true"));
+        expectedPolicies.put("ipd.drug_interaction", Set.of("p_drug_interaction_select|r|sahaj_app|true|",
+                "p_drug_interaction_migrator|*|sahaj_migrator|true|true"));
+        assertThat(expectedPolicies.keySet()).containsExactlyInAnyOrderElementsOf(GLOBAL_CATALOGUE_TABLES);
+        db().asApp(c -> {
+            for (var entry : expectedPolicies.entrySet()) {
+                String table = entry.getKey();
+                // enabled and forced
+                assertThat(DbAccess.text(c, "select (relrowsecurity and relforcerowsecurity)::text from pg_class where oid = ?::regclass", table))
+                        .as(table + " enabled and forced").isEqualTo("true");
+                // exactly these policies
+                Set<String> found = new HashSet<>();
+                try (var st = c.prepareStatement("""
+                        select p.polname || '|' || p.polcmd::text || '|' ||
+                               coalesce((select string_agg(r.rolname, ',' order by r.rolname) from pg_roles r where r.oid = any (p.polroles)), '')
+                               || '|' || lower(coalesce(pg_get_expr(p.polqual, p.polrelid), '')) || '|' ||
+                               lower(coalesce(pg_get_expr(p.polwithcheck, p.polrelid), ''))
+                        from pg_policy p where p.polrelid = ?::regclass
+                        """)) {
+                    st.setString(1, table);
+                    try (var rs = st.executeQuery()) {
+                        while (rs.next()) {
+                            found.add(rs.getString(1));
+                        }
+                    }
+                }
+                assertThat(found).as(table + " policies").isEqualTo(entry.getValue());
+                // sahaj_app: select only, at table and column level
+                assertThat(DbAccess.text(c, "select has_table_privilege('sahaj_app', ?, 'SELECT')::text", table)).isEqualTo("true");
+                for (String privilege : List.of("INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")) {
+                    assertThat(DbAccess.text(c, "select has_table_privilege('sahaj_app', ?, ?)::text", table, privilege))
+                            .as(table + " " + privilege).isEqualTo("false");
+                }
+                String schema = table.substring(0, table.indexOf('.'));
+                String name = table.substring(table.indexOf('.') + 1);
+                assertThat(DbAccess.count(c, """
+                        select count(*) from information_schema.columns k where k.table_schema = ? and k.table_name = ?
+                          and (has_column_privilege('sahaj_app', ?::regclass, k.column_name, 'INSERT')
+                               or has_column_privilege('sahaj_app', ?::regclass, k.column_name, 'UPDATE'))
+                        """, schema, name, table, table)).as(table + " column-level write privileges").isZero();
+                // no tenant data: no tenant_id column, and nothing granted to PUBLIC
+                assertThat(DbAccess.count(c, "select count(*) from information_schema.columns where table_schema = ? and table_name = ? "
+                        + "and column_name = 'tenant_id'", schema, name)).as(table + " has no tenant_id").isZero();
+                assertThat(DbAccess.count(c, "select count(*) from pg_class cl, aclexplode(cl.relacl) a where cl.oid = ?::regclass and a.grantee = 0",
+                        table)).as(table + " grants to PUBLIC").isZero();
+                // readable without a bound tenant (policy using (true))
+                assertThat(DbAccess.count(c, "select count(*) from " + table)).as(table + " rows without a tenant").isPositive();
+            }
+            assertThat(DbAccess.count(c, "select count(*) from ipd.drug")).isEqualTo(14);
+            assertThat(DbAccess.count(c, "select count(*) from ipd.drug_interaction")).isEqualTo(3);
+            return null;
+        });
     }
 
     // ---- grants ----

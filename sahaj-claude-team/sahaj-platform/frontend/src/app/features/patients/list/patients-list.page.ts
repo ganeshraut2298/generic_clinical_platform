@@ -8,6 +8,7 @@ import { Observable, forkJoin } from 'rxjs';
 import { ApiError } from '../../../core/http/problem-detail';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { PageHeadComponent } from '../../../shared/ui/page-head.component';
 import { PatientFormDialogComponent } from '../form/patient-form-dialog.component';
 import { MergeConfirmDialogComponent } from '../merge/merge-confirm-dialog.component';
 import { PatientApi } from '../patient.api';
@@ -34,7 +35,7 @@ const FORM_DIALOG_CONFIG = {
 @Component({
   selector: 'app-patients-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatFormFieldModule, MatInputModule, IconComponent],
+  imports: [MatButtonModule, MatFormFieldModule, MatInputModule, IconComponent, PageHeadComponent],
   styleUrl: './patients-list.page.scss',
   templateUrl: './patients-list.page.html',
 })

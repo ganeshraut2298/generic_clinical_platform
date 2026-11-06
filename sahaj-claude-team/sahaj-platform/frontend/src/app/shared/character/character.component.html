@@ -21,14 +21,8 @@
       }
     }
     <rect x="62" y="74" width="16" height="32" rx="6" [attr.fill]="ch.skinD" />
-    <path
-      d="M24 186C24 132 38 104 70 102C102 104 116 132 116 186Z"
-      [attr.fill]="ch.top"
-    />
-    <path
-      d="M70 102C102 104 116 132 116 186L95 186C97 144 88 114 70 102Z"
-      [attr.fill]="ch.topD"
-    />
+    <path d="M24 186C24 132 38 104 70 102C102 104 116 132 116 186Z" [attr.fill]="ch.top" />
+    <path d="M70 102C102 104 116 132 116 186L95 186C97 144 88 114 70 102Z" [attr.fill]="ch.topD" />
     @if (ch.coat) {
       <path d="M60 104L70 130L80 104Z" [attr.fill]="ch.inner" />
       <path
@@ -63,7 +57,10 @@
       />
     }
     @if (ch.dupatta) {
-      <path d="M28 158C48 126 90 112 114 130L114 146C92 128 54 138 34 170Z" [attr.fill]="ch.dupatta" />
+      <path
+        d="M28 158C48 126 90 112 114 130L114 146C92 128 54 138 34 170Z"
+        [attr.fill]="ch.dupatta"
+      />
     }
     @if (ch.badge) {
       <rect

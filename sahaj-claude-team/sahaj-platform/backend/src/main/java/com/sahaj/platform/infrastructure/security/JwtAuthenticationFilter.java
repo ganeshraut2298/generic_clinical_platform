@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * Reads the {@code Authorization: Bearer} access token (SAH-3) and, only when it is valid and the
@@ -37,6 +38,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     ObjectProvider<CachedActiveMembershipChecker> activeMembershipChecker) {
         this.tokenService = tokenService;
         this.activeMembershipChecker = activeMembershipChecker;
+    }
+
+    /**
+     * ADM-1 (ADR-003 D8): {@code /api/v1/admin/**} belongs to the admin chain. This filter is also
+     * registered with the servlet container (it is a bean), so it must stay out of admin requests; a
+     * clinic token is never honoured there, not even on the public admin sign-in endpoints.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = UrlPathHelper.defaultInstance.getLookupPathForRequest(request);
+        return path.equals("/api/v1/admin") || path.startsWith("/api/v1/admin/");
     }
 
     @Override

@@ -25,6 +25,30 @@ describe('overview logic', () => {
     expect(fixTarget({ key: 'zzz', label: 'Something else' })).toBeNull();
   });
 
+  describe('PIN line (SAH-31, ADR-010 D12)', () => {
+    const PIN: SetupCheck = {
+      key: 'pin',
+      label: 'Own PIN for each staff member',
+      why: 'So medicine checks show who did them',
+      done: false,
+      optional: true,
+    };
+
+    it('points the Fix link to Team and access, panel Staff', () => {
+      expect(fixTarget(PIN)).toEqual({ section: 'team', fragment: 'f-staff' });
+    });
+
+    it('is optional: it does not change the count of essentials or the section to-do chip', () => {
+      expect(summarise([...CHECKS, PIN])).toEqual({ required: 4, done: 1, left: 3 });
+      expect(todoBySection([...CHECKS, PIN])).toEqual({ team: 1, fees: 1, profile: 1 });
+    });
+
+    it('sorts after the undone essentials', () => {
+      const keys = sortChecks([PIN, ...CHECKS]).map((c) => c.key);
+      expect(keys.indexOf('pin')).toBeGreaterThan(keys.indexOf('holidays'));
+    });
+  });
+
   it('counts what is left to do for each section tile', () => {
     expect(todoBySection(CHECKS)).toEqual({ team: 1, fees: 1, profile: 1 });
   });

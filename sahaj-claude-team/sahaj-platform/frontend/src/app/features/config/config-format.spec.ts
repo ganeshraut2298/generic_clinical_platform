@@ -1,4 +1,4 @@
-import { addDays, describeAction, formatDate, formatDayMonth, formatWeekdayDate, formatWhen, istToday } from './config-format';
+import { addDays, describeAction, describeEntity, formatDate, formatDayMonth, formatWeekdayDate, formatWhen, istToday } from './config-format';
 
 describe('config-format', () => {
   it('gives today in India, not in UTC', () => {
@@ -21,5 +21,27 @@ describe('config-format', () => {
   it('turns an action code into a sentence and leaves a sentence alone', () => {
     expect(describeAction('clinic.profile_updated')).toBe('Clinic profile updated');
     expect(describeAction('Clinic logo removed')).toBe('Clinic logo removed');
+  });
+
+  it('gives the PIN events fixed labels for the change history (ADR-010 D10)', () => {
+    expect(describeAction('PLATFORM_PIN_SET')).toBe('PIN set');
+    expect(describeAction('PLATFORM_PIN_CHANGED')).toBe('PIN changed');
+    expect(describeAction('PLATFORM_PIN_RESET')).toBe('PIN reset by the owner');
+    expect(describeAction('PLATFORM_PIN_LOCKED')).toBe('PIN locked after 5 wrong tries');
+    expect(describeAction('PLATFORM_PIN_CLEARED_AFTER_LOCKS')).toBe('PIN switched off after too many wrong tries');
+  });
+
+  it('gives the medicine order events fixed labels', () => {
+    expect(describeAction('IPD_MED_ORDERED')).toBe('Medicine ordered');
+    expect(describeAction('IPD_MED_ORDER_BLOCKED')).toBe('Medicine order blocked');
+    expect(describeAction('IPD_MED_STOPPED')).toBe('Medicine stopped');
+    expect(describeAction('IPD_MED_VERIFIED')).toBe('Medicine verified');
+    expect(describeAction('IPD_MED_REJECTED')).toBe('Medicine rejected');
+  });
+
+  it('names the entity types of the PIN and the medicine order, and leaves others alone', () => {
+    expect(describeEntity('STAFF_PIN')).toBe('Staff PIN');
+    expect(describeEntity('IPD_MEDICINE_ORDER')).toBe('Medicine order');
+    expect(describeEntity('Service')).toBe('Service');
   });
 });

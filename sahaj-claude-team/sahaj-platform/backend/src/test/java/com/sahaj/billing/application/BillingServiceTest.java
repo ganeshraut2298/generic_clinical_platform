@@ -77,7 +77,7 @@ class BillingServiceTest {
                 auditLog, CLOCK);
 
         when(patientLookupPort.find(TENANT_ID, PATIENT_ID))
-                .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F")));
+                .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F", "9000000001")));
         when(actorDirectoryPort.displayName(eq(TENANT_ID), any())).thenReturn(Optional.of("Priya"));
         when(billItemRepository.findByBill(eq(TENANT_ID), any())).thenReturn(List.of());
         when(paymentRepository.findByBill(eq(TENANT_ID), any())).thenReturn(List.of());
@@ -395,5 +395,48 @@ class BillingServiceTest {
     void aNonCollectRoleCannotCloseTheDay() {
         assertThatThrownBy(() -> service.closeDay(TENANT_ID, USER_ID, "NURSE", new DayClosingInput(10000L, null)))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    // --- SAH-15 today summary ---
+
+    @Test
+    void todaySummaryReportsTheNetCollectedSinceMidnightIstAndCountsOnlyBillingVisitsWithABalance() {
+        UUID owing = UUID.randomUUID();
+        UUID settled = UUID.randomUUID();
+        UUID finished = UUID.randomUUID();
+        when(visitBillingPort.today(TENANT_ID)).thenReturn(List.of(
+                new VisitForBilling(owing, PATIENT_ID, "Dr Rao", "NEW", "BILLING", 1, 50000),
+                new VisitForBilling(settled, PATIENT_ID, "Dr Rao", "NEW", "BILLING", 2, 50000),
+                new VisitForBilling(finished, PATIENT_ID, "Dr Rao", "NEW", "DONE", 3, 50000),
+                new VisitForBilling(UUID.randomUUID(), PATIENT_ID, "Dr Rao", "NEW", "WITH_DOCTOR", 4, 50000)));
+        when(billRepository.findByVisit(TENANT_ID, owing)).thenReturn(Optional.empty());
+        UUID settledBill = UUID.randomUUID();
+        when(billRepository.findByVisit(TENANT_ID, settled))
+                .thenReturn(Optional.of(new BillRow(settledBill, settled, 0, null, 0)));
+        when(paymentRepository.findByBill(TENANT_ID, settledBill)).thenReturn(
+                List.of(new PaymentRow(UUID.randomUUID(), "CASH", 50000, null, USER_ID, CLOCK.instant())));
+        // payments 80000 minus a refund of 30000, as the repository nets them
+        when(paymentRepository.netSince(TENANT_ID, Instant.parse("2026-10-31T18:30:00Z"))).thenReturn(50000L);
+
+        BillingTodaySummary summary = service.todaySummary(TENANT_ID);
+
+        assertThat(summary.collectedPaise()).isEqualTo(50000);
+        assertThat(summary.billsPending()).isEqualTo(1);
+    }
+
+    @Test
+    void todaySummaryOnAQuietDayIsZeroAndTheDayBoundaryIsMidnightIst() {
+        Clock justAfterMidnightIst = Clock.fixed(Instant.parse("2026-11-03T18:40:00Z"), ZoneOffset.UTC);
+        BillingService lateService = new BillingService(billRepository, billItemRepository, paymentRepository,
+                dayClosingRepository, visitBillingPort, serviceLookupPort, discountLimitPort, patientLookupPort,
+                actorDirectoryPort, auditLog, justAfterMidnightIst);
+        when(visitBillingPort.today(TENANT_ID)).thenReturn(List.of());
+        when(paymentRepository.netSince(any(), any())).thenReturn(0L);
+
+        BillingTodaySummary summary = lateService.todaySummary(TENANT_ID);
+
+        assertThat(summary.collectedPaise()).isZero();
+        assertThat(summary.billsPending()).isZero();
+        verify(paymentRepository).netSince(TENANT_ID, Instant.parse("2026-11-03T18:30:00Z"));
     }
 }

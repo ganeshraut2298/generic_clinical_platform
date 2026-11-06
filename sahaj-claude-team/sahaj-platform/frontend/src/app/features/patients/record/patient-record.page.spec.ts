@@ -1,3 +1,4 @@
+import { of } from 'rxjs';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -7,6 +8,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
+import { PatientConsentState, PrivacySettings } from '../../privacy/privacy.model';
 import { Patient, PatientSummary } from '../patient.model';
 import { PatientRecordPage } from './patient-record.page';
 
@@ -39,7 +41,15 @@ describe('PatientRecordPage', () => {
   let fixture: ComponentFixture<PatientRecordPage>;
   let http: HttpTestingController;
 
-  async function open(role: Role = 'FRONT_DESK', id = 'p1') {
+  const ON: PrivacySettings = { consentRequired: true, promoConsent: true, recordCopy: true };
+  const NONE: PatientConsentState = { records: null, promotional: null };
+
+  async function open(
+    role: Role = 'FRONT_DESK',
+    id = 'p1',
+    privacy: PrivacySettings = ON,
+    consents: PatientConsentState = NONE,
+  ) {
     await TestBed.configureTestingModule({
       imports: [PatientRecordPage],
       providers: [
@@ -58,6 +68,8 @@ describe('PatientRecordPage', () => {
     fixture.detectChanges();
     http.expectOne(`${BASE}/${id}`).flush(PATIENT);
     http.expectOne(`${BASE}/${id}/family`).flush([SISTER]);
+    http.expectOne('/api/v1/platform/privacy').flush(privacy);
+    http.expectOne(`${BASE}/${id}/consents`).flush(consents);
     fixture.detectChanges();
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
@@ -66,8 +78,7 @@ describe('PatientRecordPage', () => {
   const el = () => fixture.nativeElement as HTMLElement;
   const buttonByText = (text: string) =>
     Array.from(el().querySelectorAll('button')).find((b) => b.textContent?.includes(text)) as
-      | HTMLButtonElement
-      | undefined;
+      HTMLButtonElement | undefined;
 
   afterEach(() => http.verify());
 
@@ -105,7 +116,7 @@ describe('PatientRecordPage', () => {
     await open('FRONT_DESK');
     const dialog = TestBed.inject(MatDialog);
     const openSpy = vi.spyOn(dialog, 'open').mockReturnValue({
-      afterClosed: () => ({ subscribe: (cb: (v: Patient | null) => void) => cb(null) }),
+      afterClosed: () => of(null),
     } as never);
     buttonByText('Add family member')!.click();
     expect(openSpy).toHaveBeenCalled();
@@ -142,8 +153,74 @@ describe('PatientRecordPage', () => {
       .expectOne(`${BASE}/missing`)
       .flush({ title: 'Not found', status: 404 }, { status: 404, statusText: 'Not Found' });
     http.expectOne(`${BASE}/missing/family`).flush([]);
+    http.expectOne('/api/v1/platform/privacy').flush(ON);
+    http.expectOne(`${BASE}/missing/consents`).flush(NONE);
     fixture.detectChanges();
     await fixture.whenStable();
     expect(el().querySelector('[role="alert"]')?.textContent).toContain('Patient not found');
+  });
+
+  describe('consent (SAH-17)', () => {
+    const AGREED: PatientConsentState = {
+      records: {
+        kind: 'RECORDS',
+        given: true,
+        recordedAt: '2026-10-24T05:35:00Z',
+        recordedByName: 'Pooja',
+      },
+      promotional: null,
+    };
+
+    it('shows "Consent not recorded" for both kinds', async () => {
+      await open();
+      const text = el().textContent!;
+      expect(text).toContain('Records · Consent not recorded');
+      expect(text).toContain('Promotional messages · Consent not recorded');
+    });
+
+    it('shows who agreed and when', async () => {
+      await open('FRONT_DESK', 'p1', ON, AGREED);
+      expect(el().textContent).toContain('Records: agreed 24 Oct 2026 by Pooja');
+    });
+
+    it('hides kinds that are switched off', async () => {
+      await open('FRONT_DESK', 'p1', { ...ON, promoConsent: false });
+      expect(el().textContent).not.toContain('Promotional messages');
+    });
+
+    it('shows nothing when consent at first visit is off', async () => {
+      await open('FRONT_DESK', 'p1', { ...ON, consentRequired: false });
+      expect(el().textContent).not.toContain('Consent not recorded');
+    });
+
+    it('records a consent and shows the new state', async () => {
+      await open('NURSE');
+      buttonByText('Record consent')!.click();
+      const req = http.expectOne(`${BASE}/p1/consents`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ kind: 'RECORDS', given: true });
+      req.flush(AGREED);
+      fixture.detectChanges();
+      expect(el().textContent).toContain('Records: agreed 24 Oct 2026 by Pooja');
+      expect(buttonByText('Withdraw')).toBeTruthy();
+    });
+
+    it('withdraws a consent as a new row', async () => {
+      await open('OWNER', 'p1', ON, AGREED);
+      buttonByText('Withdraw')!.click();
+      const req = http.expectOne(`${BASE}/p1/consents`);
+      expect(req.request.body).toEqual({ kind: 'RECORDS', given: false });
+      req.flush({
+        ...AGREED,
+        records: { ...AGREED.records!, given: false },
+      });
+    });
+
+    it('offers no buttons to roles that cannot edit patients', async () => {
+      await open('DOCTOR', 'p1', ON, AGREED);
+      expect(buttonByText('Withdraw')).toBeUndefined();
+      expect(buttonByText('Record consent')).toBeUndefined();
+      expect(el().textContent).toContain('Records: agreed');
+    });
   });
 });

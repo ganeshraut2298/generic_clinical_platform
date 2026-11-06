@@ -30,6 +30,7 @@ class MeServiceTest {
     private ClinicProfileRepository clinicProfileRepository;
     private SetupProgressRepository setupProgressRepository;
     private UserPreferenceRepository userPreferenceRepository;
+    private ModuleEntitlementRepository moduleEntitlementRepository;
     private MeService service;
 
     @BeforeEach
@@ -39,9 +40,11 @@ class MeServiceTest {
         clinicProfileRepository = mock(ClinicProfileRepository.class);
         setupProgressRepository = mock(SetupProgressRepository.class);
         userPreferenceRepository = mock(UserPreferenceRepository.class);
+        moduleEntitlementRepository = mock(ModuleEntitlementRepository.class);
+        when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.empty());
         Clock clock = Clock.fixed(Instant.parse("2026-11-01T10:00:00Z"), ZoneOffset.UTC);
         service = new MeService(teamRepository, tenantRepository, clinicProfileRepository,
-                setupProgressRepository, userPreferenceRepository, clock);
+                setupProgressRepository, userPreferenceRepository, moduleEntitlementRepository, clock);
 
         when(teamRepository.findByUser(TENANT_ID, USER_ID)).thenReturn(Optional.of(new TeamRepository.TeamRow(
                 MEMBERSHIP_ID, USER_ID, "Asha", "9123456789", MembershipRole.OWNER, MembershipStatus.ACTIVE, null,
@@ -120,5 +123,69 @@ class MeServiceTest {
 
         assertThat(view.clinic().setupComplete()).isFalse();
         assertThat(view.clinic().setupPercent()).isEqualTo(40);
+    }
+
+    @Test
+    void ipdIsInTheMenuOfTheFiveIpdRolesWhenIpdIsTrialOnOrReadonlyButNotWhenOff() {
+        String[] withIpd = {"OWNER", "DOCTOR", "NURSE", "FRONT_DESK", "PHARMACIST"};
+        String[] without = {"BILLING", "COUNSELLOR", "VISITING_DOCTOR"};
+        for (String state : new String[] {"trial", "on", "readonly"}) {
+            when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                    new ModuleEntitlementRepository.EntitlementRow(state, Instant.parse("2027-01-01T00:00:00Z"),
+                            false, 25, null)));
+            for (String role : withIpd) {
+                assertThat(service.getMe(TENANT_ID, USER_ID, role).menu()).as(state + " " + role).contains("ipd");
+            }
+            for (String role : without) {
+                assertThat(service.getMe(TENANT_ID, USER_ID, role).menu()).as(state + " " + role)
+                        .doesNotContain("ipd");
+            }
+        }
+        when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                new ModuleEntitlementRepository.EntitlementRow("off", null, false, 25, null)));
+        for (String role : withIpd) {
+            assertThat(service.getMe(TENANT_ID, USER_ID, role).menu()).as(role).doesNotContain("ipd");
+        }
+    }
+
+    @Test
+    void emergencyIsInTheAdvancedMenuOfOwnerFrontDeskAndNurseOnlyWhileIpdIsTrialOrOn() {
+        for (String state : new String[] {"trial", "on"}) {
+            when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                    new ModuleEntitlementRepository.EntitlementRow(state, Instant.parse("2027-01-01T00:00:00Z"),
+                            false, 25, null)));
+            for (String role : new String[] {"OWNER", "FRONT_DESK", "NURSE"}) {
+                assertThat(service.getMe(TENANT_ID, USER_ID, role).menu()).as(state + " " + role)
+                        .containsSubsequence("emergency", "ipd");
+            }
+            assertThat(service.getMe(TENANT_ID, USER_ID, "DOCTOR").menu()).doesNotContain("emergency");
+        }
+        when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                new ModuleEntitlementRepository.EntitlementRow("readonly", null, false, 25, null)));
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").menu()).contains("ipd").doesNotContain("emergency");
+    }
+
+    @Test
+    void anExpiredTrialStillShowsTheIpdItemBecauseItReadsAsReadonly() {
+        when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                new ModuleEntitlementRepository.EntitlementRow("trial", Instant.parse("2026-10-01T00:00:00Z"),
+                        false, 25, null)));
+
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").menu()).containsSubsequence("followups", "ipd", "reports")
+                .doesNotContain("emergency");
+    }
+
+    @Test
+    void staffIsInTheMenuOfEveryRoleOnlyWhenHraIsOn() {
+        String[] roles = {"OWNER", "DOCTOR", "NURSE", "FRONT_DESK", "BILLING", "PHARMACIST"};
+        for (String role : roles) {
+            assertThat(service.getMe(TENANT_ID, USER_ID, role).menu()).as(role).doesNotContain("staff");
+        }
+        when(moduleEntitlementRepository.find(TENANT_ID)).thenReturn(Optional.of(
+                new ModuleEntitlementRepository.EntitlementRow("off", null, true, 25, null)));
+        for (String role : roles) {
+            assertThat(service.getMe(TENANT_ID, USER_ID, role).menu()).as(role).contains("staff");
+        }
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").menu()).containsSubsequence("reports", "staff", "config");
     }
 }

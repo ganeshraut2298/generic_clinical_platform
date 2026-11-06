@@ -98,4 +98,44 @@ describe('authInterceptor', () => {
     expect(auth.refresh).not.toHaveBeenCalled();
     expect(error).toBeTruthy();
   });
+
+  describe('admin realm isolation (ADR-003 D8)', () => {
+    const adminUrls = [
+      '/api/v1/admin/me',
+      '/api/v1/admin/clinics?page=0',
+      '/api/v1/admin/auth/sign-out',
+      '/api/v1/admin/auth/login',
+      '/api/v1/admin/../admin/me',
+      '/api/v1/%61dmin/me',
+      '/api/v1/Admin/me',
+    ];
+
+    it('never attaches the clinic token to /api/v1/admin/**', () => {
+      for (const url of adminUrls) {
+        http.get(url).subscribe();
+        const req = httpMock.expectOne((r) => r.url === url);
+        expect(req.request.headers.has('Authorization'), url).toBe(false);
+        req.flush({});
+      }
+    });
+
+    it('does not refresh the clinic session or go to /login after a 401 from an admin call', () => {
+      const navigate = vi.spyOn(router, 'navigate');
+      let error: unknown;
+      http.get('/api/v1/admin/me').subscribe({ error: (e: unknown) => (error = e) });
+      httpMock
+        .expectOne('/api/v1/admin/me')
+        .flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
+      expect(auth.refresh).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+      expect(error).toBeTruthy();
+    });
+
+    it('still attaches the clinic token to a clinic URL that only looks similar', () => {
+      http.get('/api/v1/platform/admin-notes').subscribe();
+      const req = httpMock.expectOne('/api/v1/platform/admin-notes');
+      expect(req.request.headers.get('Authorization')).toBe('Bearer token-1');
+      req.flush({});
+    });
+  });
 });

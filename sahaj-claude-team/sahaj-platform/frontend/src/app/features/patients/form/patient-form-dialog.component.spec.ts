@@ -3,6 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
+import { ShellStore } from '../../../core/shell/shell.store';
+import { PrivacySettings } from '../../privacy/privacy.model';
 import { PatientFormDialogComponent, PatientFormDialogData } from './patient-form-dialog.component';
 
 const URL = '/api/v1/patient/patients';
@@ -12,19 +14,24 @@ describe('PatientFormDialogComponent', () => {
   let http: HttpTestingController;
   let dialogRef: { close: ReturnType<typeof vi.fn> };
 
-  async function setup(data: PatientFormDialogData = {}) {
+  const OFF: PrivacySettings = { consentRequired: false, promoConsent: false, recordCopy: true };
+
+  async function setup(data: PatientFormDialogData = {}, privacy: PrivacySettings = OFF) {
     dialogRef = { close: vi.fn() };
     await TestBed.configureTestingModule({
       imports: [PatientFormDialogComponent],
       providers: [
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: dialogRef },
+        { provide: ShellStore, useValue: { me: () => ({ clinic: { name: 'Sai Clinic' } }) } },
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(PatientFormDialogComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/v1/platform/privacy').flush(privacy);
     fixture.detectChanges();
     await fixture.whenStable();
   }
@@ -56,6 +63,26 @@ describe('PatientFormDialogComponent', () => {
   it('titles itself "Add family member" and pre-fills the mobile when adding family', async () => {
     await setup({ familyMember: true, mobile: '9876543210' });
     expect(el().querySelector('h2')!.textContent).toContain('Add family member');
+    expect(input('mobile').value).toBe('9876543210');
+  });
+
+  it('pre-fills name, age, sex and mobile from an emergency case (SAH-28) and sends them as edited', async () => {
+    await setup({ name: 'Unknown male, about 40', age: 40, sex: 'M' });
+    expect(input('name').value).toBe('Unknown male, about 40');
+    expect(input('age').value).toBe('40');
+    expect(el().querySelector('mat-button-toggle[value="M"]')!.classList).toContain('mat-button-toggle-checked');
+    expect(input('mobile').value).toBe('');
+    await type('name', 'Ramesh Pawar');
+    await type('mobile', '9876543210');
+    await submit();
+    const req = http.expectOne(URL);
+    expect(req.request.body).toMatchObject({ name: 'Ramesh Pawar', age: 40, sex: 'M', mobile: '9876543210' });
+    req.flush({ id: 'p1' }, { status: 201, statusText: 'Created' });
+  });
+
+  it('leaves the age empty when the emergency case had none', async () => {
+    await setup({ name: 'Unknown person, about ?', age: null, sex: 'O', mobile: '9876543210' });
+    expect(input('age').value).toBe('');
     expect(input('mobile').value).toBe('9876543210');
   });
 
@@ -134,5 +161,67 @@ describe('PatientFormDialogComponent', () => {
     cancel.click();
     expect(dialogRef.close).toHaveBeenCalledWith(null);
     http.expectNone(URL);
+  });
+
+  describe('consent (SAH-17)', () => {
+    const ON: PrivacySettings = { consentRequired: true, promoConsent: true, recordCopy: true };
+    const boxes = () => Array.from(el().querySelectorAll('mat-checkbox')).map((b) => b.textContent!.trim());
+
+    async function fillAndSubmit() {
+      await type('name', 'Rohit Patil');
+      await type('age', '30');
+      await type('mobile', '9876543210');
+      await submit();
+    }
+
+    it('shows no consent boxes when consent is off', async () => {
+      await setup();
+      expect(boxes()).toEqual([]);
+    });
+
+    it('shows both boxes and the clinic line when both switches are on', async () => {
+      await setup({}, ON);
+      expect(boxes()).toEqual([
+        'The patient agreed to the consent line',
+        'The patient agreed to promotional messages',
+      ]);
+      expect(el().textContent).toContain('I agree that Sai Clinic may keep my health records');
+    });
+
+    it('shows only the consent box when promotional is off', async () => {
+      await setup({}, { ...ON, promoConsent: false });
+      expect(boxes()).toEqual(['The patient agreed to the consent line']);
+    });
+
+    it('sends the answers with the new patient, ticked or not', async () => {
+      await setup({}, ON);
+      (el().querySelector('mat-checkbox input') as HTMLInputElement).click();
+      await fillAndSubmit();
+      const req = http.expectOne(URL);
+      expect(req.request.body.consents).toEqual([
+        { kind: 'RECORDS', given: true },
+        { kind: 'PROMOTIONAL', given: false },
+      ]);
+      req.flush({ id: 'p1' });
+    });
+
+    it('registers without ticking anything', async () => {
+      await setup({}, ON);
+      await fillAndSubmit();
+      const req = http.expectOne(URL);
+      expect(req.request.body.consents).toEqual([
+        { kind: 'RECORDS', given: false },
+        { kind: 'PROMOTIONAL', given: false },
+      ]);
+      req.flush({ id: 'p1' });
+    });
+
+    it('sends no consents when consent is off', async () => {
+      await setup();
+      await fillAndSubmit();
+      const req = http.expectOne(URL);
+      expect(req.request.body.consents).toBeUndefined();
+      req.flush({ id: 'p1' });
+    });
   });
 });

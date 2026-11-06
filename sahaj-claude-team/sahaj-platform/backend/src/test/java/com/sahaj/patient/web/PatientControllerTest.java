@@ -94,6 +94,26 @@ class PatientControllerTest {
     }
 
     @Test
+    void consentsInTheCreateBodyReachTheServiceAndTheDetailReadGoesThroughOpen() throws Exception {
+        org.mockito.ArgumentCaptor<PatientInput> captor = org.mockito.ArgumentCaptor.forClass(PatientInput.class);
+        when(patientService.create(eq(TENANT_ID), eq(USER_ID), captor.capture())).thenReturn(view(PATIENT_ID, null));
+        when(patientService.open(TENANT_ID, USER_ID, PATIENT_ID)).thenReturn(view(PATIENT_ID, null));
+
+        mockMvc.perform(post(BASE).with(as("FRONT_DESK")).contentType(JSON).content(
+                        "{\"name\":\"Asha Rao\",\"age\":30,\"sex\":\"F\",\"mobile\":\"9123450001\","
+                                + "\"consents\":[{\"kind\":\"RECORDS\",\"given\":true},"
+                                + "{\"kind\":\"PROMOTIONAL\",\"given\":false}]}"))
+                .andExpect(status().isCreated());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().consents()).containsExactly(
+                new com.sahaj.patient.application.ConsentInput("RECORDS", true),
+                new com.sahaj.patient.application.ConsentInput("PROMOTIONAL", false));
+
+        mockMvc.perform(get(BASE + "/" + PATIENT_ID).with(as("NURSE"))).andExpect(status().isOk());
+        verify(patientService).open(TENANT_ID, USER_ID, PATIENT_ID);
+        verify(patientService, never()).find(any(), any());
+    }
+
+    @Test
     void aPossibleDuplicateIsFlaggedButStillCreated() throws Exception {
         UUID duplicateOf = UUID.randomUUID();
         when(patientService.create(eq(TENANT_ID), eq(USER_ID), any(PatientInput.class)))
@@ -118,7 +138,7 @@ class PatientControllerTest {
 
     @Test
     void getByIdReturns404ForAnotherTenantsPatient() throws Exception {
-        when(patientService.find(TENANT_ID, PATIENT_ID)).thenThrow(new NotFoundException("Patient not found"));
+        when(patientService.open(TENANT_ID, USER_ID, PATIENT_ID)).thenThrow(new NotFoundException("Patient not found"));
 
         mockMvc.perform(get(BASE + "/" + PATIENT_ID).with(as("NURSE"))).andExpect(status().isNotFound());
     }

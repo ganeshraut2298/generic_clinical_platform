@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -11,6 +12,10 @@ import { ApiError } from '../../../core/http/problem-detail';
 import { ROLE_LABELS, Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { PinState, TeamMemberPin, resetToast } from '../../pin/pin.model';
+import { PinCellComponent } from '../../pin/pin-cell.component';
+import { ResetPinSheetComponent, ResetPinSheetData } from '../../pin/reset-pin-sheet.component';
+import { SetPinSheetComponent } from '../../pin/set-pin-sheet.component';
 import { TeamApi } from './team.api';
 import {
   PERMISSION_COLUMNS,
@@ -72,6 +77,7 @@ export function initials(name: string): string {
     MatInputModule,
     MatSelectModule,
     IconComponent,
+    PinCellComponent,
   ],
   styleUrl: './team.page.scss',
   templateUrl: './team.page.html',
@@ -80,6 +86,7 @@ export class TeamPage implements OnInit {
   private readonly api = inject(TeamApi);
   private readonly store = inject(ShellStore);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   protected readonly roles = TEAM_ROLES;
   protected readonly roleLabels = ROLE_LABELS;
@@ -102,7 +109,7 @@ export class TeamPage implements OnInit {
 
   protected readonly isOwner = computed(() => this.store.me()?.role === 'OWNER');
   /** The signed-in user's own membership id; empty until /me returns it. */
-  private readonly selfId = computed(() => this.store.me()?.membershipId);
+  protected readonly selfId = computed(() => this.store.me()?.membershipId);
 
   private readonly visible = computed(() => this.members().filter((m) => m.status !== 'REMOVED'));
   protected readonly doctors = computed(() =>
@@ -300,6 +307,75 @@ export class TeamPage implements OnInit {
         this.toast(this.messageOf(error, 'We could not remove access. Try again.'));
       },
     });
+  }
+
+  // ---- SAH-31 personal PIN ----
+
+  /** The PIN state of a row; null when the server sent none (a role that may not see it). */
+  protected pinOf(member: TeamMember): TeamMemberPin | null {
+    return member.pin ?? null;
+  }
+
+  protected isSelf(member: TeamMember): boolean {
+    return member.id === this.selfId();
+  }
+
+  /** OWNER: Reset PIN on a row whose PIN is set or locked; opens the confirm sheet. */
+  protected resetPin(member: TeamMember): void {
+    if (!this.isOwner()) {
+      return;
+    }
+    this.dialog
+      .open<ResetPinSheetComponent, ResetPinSheetData, TeamMember>(ResetPinSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '480px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'rp-title',
+        data: { id: member.id, name: member.name },
+      })
+      .afterClosed()
+      .subscribe((updated) => {
+        if (!updated) {
+          return;
+        }
+        const cleared: TeamMemberPin = { state: 'NOT_SET', setAt: null, lockedUntil: null };
+        this.members.update((list) =>
+          list.map((m) =>
+            m.id === member.id ? { ...m, ...updated, pin: updated.pin ?? cleared } : m,
+          ),
+        );
+        this.toast(resetToast(member.name));
+        setTimeout(() => document.getElementById('pin-pill-' + member.id)?.focus(), 0);
+      });
+  }
+
+  /** Own row, every role: Set my PIN or Change my PIN opens the Set PIN sheet. */
+  protected setOwnPin(member: TeamMember): void {
+    if (!this.isSelf(member)) {
+      return;
+    }
+    this.dialog
+      .open<SetPinSheetComponent, undefined, { state: PinState; setAt: string | null; lockedUntil: string | null }>(
+        SetPinSheetComponent,
+        {
+          panelClass: 'sheet-panel',
+          width: '520px',
+          maxWidth: '100vw',
+          ariaLabelledBy: 'sp-title',
+        },
+      )
+      .afterClosed()
+      .subscribe((status) => {
+        if (!status) {
+          return;
+        }
+        const pin: TeamMemberPin = {
+          state: status.state,
+          setAt: status.setAt,
+          lockedUntil: status.lockedUntil,
+        };
+        this.members.update((list) => list.map((m) => (m.id === member.id ? { ...m, pin } : m)));
+      });
   }
 
   private run(id: string, call: Observable<TeamMember>, success: string): void {

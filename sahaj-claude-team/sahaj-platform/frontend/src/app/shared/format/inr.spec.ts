@@ -1,4 +1,4 @@
-import { formatInr, formatIndian } from './inr';
+import { formatInr, formatInrPaise, formatIndian } from './inr';
 
 describe('Indian number format', () => {
   it('groups digits as lakhs and thousands', () => {
@@ -13,5 +13,16 @@ describe('Indian number format', () => {
     expect(formatInr(3998)).toBe('₹3,998');
     expect(formatInr(1234.6)).toBe('₹1,235');
     expect(formatInr(-4500)).toBe('₹-4,500');
+  });
+
+  it('writes paise exactly: no decimals for whole rupees, two decimals otherwise', () => {
+    expect(formatInrPaise(0)).toBe('₹0');
+    expect(formatInrPaise(500)).toBe('₹5');
+    expect(formatInrPaise(12500000)).toBe('₹1,25,000');
+    expect(formatInrPaise(18750)).toBe('₹187.50');
+    expect(formatInrPaise(131250)).toBe('₹1,312.50');
+    expect(formatInrPaise(100005)).toBe('₹1,000.05');
+    expect(formatInrPaise(99)).toBe('₹0.99');
+    expect(formatInrPaise(-18750)).toBe('₹-187.50');
   });
 });

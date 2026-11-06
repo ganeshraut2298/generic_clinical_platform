@@ -22,6 +22,9 @@ public class JdbcVisitRepository implements VisitRepository {
     private static final String FIND_BY_ID = SELECT + " where tenant_id = :tenantId and id = :id";
     private static final String FIND_SINCE = SELECT
             + " where tenant_id = :tenantId and created_at >= :since order by token_no";
+    private static final String FIND_BETWEEN = SELECT
+            + " where tenant_id = :tenantId and created_at >= :from and created_at < :to order by created_at";
+    private static final String FIND_BY_IDS = SELECT + " where tenant_id = :tenantId and id in (:ids)";
     private static final String LAST_VISIT_AT = """
             select created_at from opd.visit
             where tenant_id = :tenantId and patient_id = :patientId and doctor_membership_id = :doctorMembershipId
@@ -76,6 +79,21 @@ public class JdbcVisitRepository implements VisitRepository {
     @Override
     public List<VisitRow> findSince(UUID tenantId, Instant since) {
         return jdbc.sql(FIND_SINCE).param("tenantId", tenantId).param("since", since)
+                .query(JdbcVisitRepository::map).list();
+    }
+
+    @Override
+    public List<VisitRow> findBetween(UUID tenantId, Instant from, Instant to) {
+        return jdbc.sql(FIND_BETWEEN).param("tenantId", tenantId).param("from", from).param("to", to)
+                .query(JdbcVisitRepository::map).list();
+    }
+
+    @Override
+    public List<VisitRow> findByIds(UUID tenantId, java.util.Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql(FIND_BY_IDS).param("tenantId", tenantId).param("ids", ids)
                 .query(JdbcVisitRepository::map).list();
     }
 

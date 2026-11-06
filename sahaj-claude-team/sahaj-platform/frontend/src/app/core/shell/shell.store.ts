@@ -50,6 +50,11 @@ export class ShellStore {
     return this.load();
   }
 
+  /** Re-reads `/me` in place (menu, plan) without clearing it, so the shell does not flash. */
+  reloadMenu(): Observable<Me> {
+    return this.api.getMe().pipe(tap((me) => this.applyMe(me)));
+  }
+
   updatePreferences(patch: Preferences): Observable<Me> {
     const before = this.meSig();
     return this.api.updatePreferences(patch).pipe(

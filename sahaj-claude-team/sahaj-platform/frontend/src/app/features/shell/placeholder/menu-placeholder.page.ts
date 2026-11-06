@@ -12,11 +12,11 @@ import { map } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: '../../shared-stub.scss',
   template: `
-    <main class="stub surf">
+    <section class="stub surf">
       <span class="pill p-wait">Coming soon</span>
       <h1>{{ title() }}</h1>
       <p class="muted">This page is built in a later story. You are signed in and can move around the rest of the shell.</p>
-    </main>
+    </section>
   `,
 })
 export class MenuPlaceholderPage {

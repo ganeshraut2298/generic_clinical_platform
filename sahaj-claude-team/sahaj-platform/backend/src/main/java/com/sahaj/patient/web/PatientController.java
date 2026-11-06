@@ -49,7 +49,8 @@ public class PatientController {
     @GetMapping("/{id}")
     @PreAuthorize(PatientRoles.READ)
     public PatientResponse get(@PathVariable UUID id) {
-        return PatientResponse.from(patientService.find(ClinicUser.current().tenantId(), id));
+        ClinicUser user = ClinicUser.current();
+        return PatientResponse.from(patientService.open(user.tenantId(), user.userId(), id));
     }
 
     @PatchMapping("/{id}")

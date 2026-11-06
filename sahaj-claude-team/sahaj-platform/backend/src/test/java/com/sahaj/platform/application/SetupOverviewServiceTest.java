@@ -41,6 +41,7 @@ class SetupOverviewServiceTest {
     private ClinicProfileRepository profileRepository;
     private HolidayRepository holidayRepository;
     private OpdSetupStatus opdSetupStatus;
+    private StaffPinRepository staffPinRepository;
     private AuditEventRepository auditEventRepository;
     private OwnerGuard ownerGuard;
     private SetupOverviewService service;
@@ -50,9 +51,10 @@ class SetupOverviewServiceTest {
         profileRepository = mock(ClinicProfileRepository.class);
         holidayRepository = mock(HolidayRepository.class);
         opdSetupStatus = mock(OpdSetupStatus.class);
+        staffPinRepository = mock(StaffPinRepository.class);
         auditEventRepository = mock(AuditEventRepository.class);
         ownerGuard = mock(OwnerGuard.class);
-        service = new SetupOverviewService(profileRepository, holidayRepository, opdSetupStatus,
+        service = new SetupOverviewService(profileRepository, holidayRepository, opdSetupStatus, staffPinRepository,
                 auditEventRepository, ownerGuard, new ObjectMapper(), CLOCK);
     }
 
@@ -77,7 +79,7 @@ class SetupOverviewServiceTest {
         Overview overview = service.overview(TENANT_ID, OWNER_USER);
 
         assertThat(overview.percent()).isEqualTo(100);
-        assertThat(overview.checks()).hasSize(6).allMatch(Check::done);
+        assertThat(overview.checks()).hasSize(7).allMatch(Check::done);
         assertThat(overview.lastChange().action()).isEqualTo("SERVICE_ADDED");
         assertThat(overview.lastChange().actorName()).isEqualTo("Asha");
         assertThat(overview.lastChange().after()).containsEntry("name", "Dressing");
@@ -101,6 +103,27 @@ class SetupOverviewServiceTest {
         assertThat(done(overview, "fees")).isTrue();
         assertThat(done(overview, "paper")).isFalse();
         assertThat(overview.lastChange()).isNull();
+    }
+
+    @Test
+    void thePinLineIsOptionalAndDoneOnlyWhenEveryActiveMemberHasAPin() {
+        profile("12 MG Road", "9876543210", "gp");
+        when(holidayRepository.countFrom(any(), any())).thenReturn(2);
+        when(opdSetupStatus.statusFor(TENANT_ID)).thenReturn(new OpdSetupStatus.Status(true, true, true));
+        when(auditEventRepository.findLatest(TENANT_ID, 1)).thenReturn(List.of());
+        when(staffPinRepository.countActiveMembersWithoutPin(TENANT_ID)).thenReturn(2);
+
+        Overview overview = service.overview(TENANT_ID, OWNER_USER);
+
+        Check pin = overview.checks().stream().filter(c -> c.key().equals("pin")).findFirst().orElseThrow();
+        assertThat(pin.label()).isEqualTo("Own PIN for each staff member");
+        assertThat(pin.why()).isEqualTo("So medicine checks show who did them");
+        assertThat(pin.done()).isFalse();
+        assertThat(pin.optional()).isTrue();
+        assertThat(overview.percent()).as("an optional line never changes the percent").isEqualTo(100);
+
+        when(staffPinRepository.countActiveMembersWithoutPin(TENANT_ID)).thenReturn(0);
+        assertThat(done(service.overview(TENANT_ID, OWNER_USER), "pin")).isTrue();
     }
 
     @Test

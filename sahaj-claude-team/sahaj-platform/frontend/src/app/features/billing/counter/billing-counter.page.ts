@@ -10,6 +10,8 @@ import { ApiError } from '../../../core/http/problem-detail';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { formatInr } from '../../../shared/format/inr';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
+import { PageHeadComponent } from '../../../shared/ui/page-head.component';
 import { Service } from '../../config/opd/opd.model';
 import { OpdApi } from '../../config/opd/opd.api';
 import { BillingApi } from '../billing.api';
@@ -42,6 +44,8 @@ const DIALOG_CONFIG = { panelClass: 'sheet-panel', width: '480px', maxWidth: '10
     MatInputModule,
     MatSelectModule,
     IconComponent,
+    PageHeadComponent,
+    EmptyStateComponent,
   ],
   styleUrl: './billing-counter.page.scss',
   templateUrl: './billing-counter.page.html',

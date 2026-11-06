@@ -35,11 +35,8 @@ export const SHELL_ROUTES: Routes = [
       },
       {
         path: 'followups',
-        title: 'Follow-ups · Sahaj',
         canActivate: [menuGuard('followups')],
-        data: { title: 'Follow-ups' },
-        loadComponent: () =>
-          import('./placeholder/menu-placeholder.page').then((m) => m.MenuPlaceholderPage),
+        loadChildren: () => import('../followups/followups.routes').then((m) => m.FOLLOWUPS_ROUTES),
       },
       {
         path: 'billing',
@@ -48,11 +45,21 @@ export const SHELL_ROUTES: Routes = [
       },
       {
         path: 'revenue',
-        title: 'Revenue · Sahaj',
         canActivate: [menuGuard('revenue')],
-        data: { title: 'Revenue' },
-        loadComponent: () =>
-          import('./placeholder/menu-placeholder.page').then((m) => m.MenuPlaceholderPage),
+        loadChildren: () => import('../revenue/revenue.routes').then((m) => m.REVENUE_ROUTES),
+      },
+      {
+        path: 'staff',
+        loadChildren: () => import('../staff/staff.routes').then((m) => m.STAFF_ROUTES),
+      },
+      {
+        path: 'ipd',
+        loadChildren: () => import('../ipd/ipd.routes').then((m) => m.IPD_ROUTES),
+      },
+      {
+        path: 'emergency',
+        canActivate: [menuGuard('emergency')],
+        loadChildren: () => import('../ipd/ipd.routes').then((m) => m.EMERGENCY_ROUTES),
       },
       {
         path: 'reports',

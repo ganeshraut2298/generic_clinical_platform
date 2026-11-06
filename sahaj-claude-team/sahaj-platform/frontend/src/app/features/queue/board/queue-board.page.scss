@@ -1,58 +1,70 @@
-:host {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.pagehead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-
-  h1 {
-    font-size: 1.4rem;
-  }
-}
-
-.lead {
-  color: var(--ink-2);
-  font-size: 0.9rem;
-  max-width: 54ch;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.notice.err {
-  background: var(--crit-soft);
-  color: var(--crit);
-}
-
+// Queue board columns and token cards (mockup `.board`, `.col`, `.qcard`). Shared blocks:
+// `_console.scss`.
+// The board shares the width equally. A column is never narrower than 210 px (mockup
+// `.app .board`); the number of columns that fit is chosen from the width of the wrap, so a
+// column is never cut in half. When there are more columns than fit, the board scrolls
+// sideways and each column snaps into place.
 .board-wrap {
+  --col-gap: 12px;
+  --col-n: 1;
+  container-type: inline-size;
   overflow-x: auto;
-  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 10px;
+  // Room for the card shadow so the scroll box does not cut it into a strip.
+  padding: 0 8px 36px;
+  margin: 0 -8px -22px;
+  scrollbar-width: thin;
 }
 
 .board {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  min-width: max-content;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(calc((100cqw - 4px - (var(--col-n) - 1) * var(--col-gap)) / var(--col-n)), 1fr);
+  gap: var(--col-gap);
+  min-width: 0;
+  padding: 2px;
+}
+
+.board > .col {
+  scroll-snap-align: start;
+}
+
+@container (min-width: 436px) {
+  .board {
+    --col-n: 2;
+  }
+}
+
+@container (min-width: 658px) {
+  .board {
+    --col-n: 3;
+  }
+}
+
+@container (min-width: 880px) {
+  .board {
+    --col-n: 4;
+  }
+}
+
+@container (min-width: 1102px) {
+  .board {
+    --col-n: 5;
+  }
+}
+
+@container (min-width: 1324px) {
+  .board {
+    --col-n: 6;
+  }
 }
 
 .col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  width: 270px;
-  flex: none;
+  gap: 8px;
+  padding: 10px;
 
   &.legacy {
     border-style: dashed;
@@ -62,36 +74,37 @@
 .col-h {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  padding: 2px 4px;
+
+  .n {
+    margin-left: auto;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink-3);
+  }
 }
 
 .colbody {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 60px;
 
   &.is-empty {
-    align-items: center;
     justify-content: center;
   }
-}
-
-.empty {
-  color: var(--ink-3);
-  font-size: 0.84rem;
-  padding: 12px 0;
 }
 
 .qcard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--glass-hi);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 4px 12px -8px var(--pri);
 }
 
 .qtop {
@@ -99,25 +112,33 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  row-gap: 4px;
+
+  .pill,
+  .w,
+  .tk {
+    white-space: nowrap;
+  }
 }
 
 .tk {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .w {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   margin-left: auto;
   color: var(--ink-3);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
 }
 
 .qname {
   font-weight: 600;
+  font-size: 0.86rem;
 
   span {
     font-weight: 500;
@@ -128,7 +149,7 @@
 
 .qdoc,
 .qfee {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: var(--ink-2);
 }
 
@@ -138,7 +159,18 @@
 
 .qact {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: auto;
+  padding-top: 3px;
+
+  .mat-mdc-button-base {
+    white-space: normal;
+    text-align: left;
+    height: auto;
+    min-height: 32px;
+    padding-block: 4px;
+    line-height: 1.25;
+  }
 }

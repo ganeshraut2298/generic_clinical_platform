@@ -1,6 +1,9 @@
 package com.sahaj.patient.application;
 
 import com.sahaj.patient.api.PatientLookupPort;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,24 @@ public class PatientLookup implements PatientLookupPort {
     @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
     public Optional<PatientSummary> find(UUID tenantId, UUID patientId) {
         return patientRepository.findById(tenantId, patientId)
-                .map(row -> new PatientSummary(row.id(), row.name(), row.age(), row.sex()));
+                .map(PatientLookup::summary);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public Map<UUID, PatientSummary> findAll(UUID tenantId, Collection<UUID> patientIds) {
+        Map<UUID, PatientSummary> result = new HashMap<>();
+        if (patientIds.isEmpty()) {
+            return result;
+        }
+        for (PatientRepository.PatientRow row : patientRepository.findByIds(tenantId, patientIds)) {
+            result.put(row.id(), summary(row));
+        }
+        return result;
+    }
+
+    private static PatientSummary summary(PatientRepository.PatientRow row) {
+        return new PatientSummary(row.id(), row.name(), row.age(), row.sex(), row.mobile(),
+                row.mergedIntoId() != null);
     }
 }

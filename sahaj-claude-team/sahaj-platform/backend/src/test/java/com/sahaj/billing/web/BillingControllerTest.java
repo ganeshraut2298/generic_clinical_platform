@@ -198,4 +198,22 @@ class BillingControllerTest {
                         .content("{\"amountPaise\":1000,\"mode\":\"CASH\",\"reason\":\"overcharged\"}"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void todaySummaryNeedsASignedInUser() throws Exception {
+        mockMvc.perform(get(BILLING + "/today-summary")).andExpect(status().isUnauthorized());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"OWNER", "DOCTOR", "VISITING_DOCTOR", "NURSE",
+            "FRONT_DESK", "BILLING", "PHARMACIST", "COUNSELLOR"})
+    void everyClinicRoleReadsTheTodaySummaryInTheContractShape(String role) throws Exception {
+        when(billingService.todaySummary(TENANT_ID))
+                .thenReturn(new com.sahaj.billing.application.BillingTodaySummary(125000, 3));
+
+        mockMvc.perform(get(BILLING + "/today-summary").with(as(role)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.collectedPaise").value(125000))
+                .andExpect(jsonPath("$.billsPending").value(3));
+    }
 }

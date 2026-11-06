@@ -38,6 +38,13 @@ public class BillingController {
         return CounterResponse.from(billingService.counter(user.tenantId()));
     }
 
+    @GetMapping("/today-summary")
+    @PreAuthorize(BillingRoles.ANY_CLINIC_ROLE)
+    public BillingTodaySummaryResponse todaySummary() {
+        ClinicUser user = ClinicUser.current();
+        return BillingTodaySummaryResponse.from(billingService.todaySummary(user.tenantId()));
+    }
+
     @GetMapping("/bills/{visitId}")
     @PreAuthorize(BillingRoles.ANY_CLINIC_ROLE)
     public BillResponse get(@PathVariable UUID visitId) {

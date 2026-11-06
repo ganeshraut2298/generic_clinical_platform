@@ -3,7 +3,7 @@
     <div class="sheet-h">
       <div>
         <h2 id="ntt">Token issued</h2>
-        <p class="muted" style="font-size: 0.86rem">{{ visit.patientName }} is on the board now.</p>
+        <p class="muted t-md">{{ visit.patientName }} is on the board now.</p>
       </div>
       <button mat-icon-button type="button" aria-label="Close" (click)="close()">
         <app-icon name="x" [size]="18" />
@@ -36,7 +36,7 @@
     <div class="sheet-h">
       <div>
         <h2 id="ntt">New walk-in token</h2>
-        <p class="muted" style="font-size: 0.86rem">Search by mobile number, then choose a doctor.</p>
+        <p class="muted t-md">Search by mobile number, then choose a doctor.</p>
       </div>
       <button mat-icon-button type="button" aria-label="Close" (click)="close()">
         <app-icon name="x" [size]="18" />
@@ -88,7 +88,7 @@
           </button>
         </div>
       } @else {
-        <p class="faint" style="font-size: 0.84rem">Enter a 10-digit mobile number to search.</p>
+        <p class="faint t-md">Enter a 10-digit mobile number to search.</p>
       }
 
       <div class="field-block">

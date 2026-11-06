@@ -14,7 +14,7 @@ export type WorkflowStepKey =
   | 'billing'
   | 'followup';
 
-/** A role code. Omitted for steps with no owner (queue, casepaper, followup) — contract note. */
+/** A role code. The API sends it only for Vitals and Counselling; the other steps have none. */
 export type WorkflowStepOwner = 'FRONT_DESK' | 'NURSE' | 'DOCTOR' | 'OWNER';
 
 export interface WorkflowStep {
@@ -107,17 +107,31 @@ export const WORKFLOW_STEP_OWNERS: readonly { value: WorkflowStepOwner; label: s
 ];
 
 /** Default steps (story §3 "Technical design"), used only as a fallback while the real
- * draft/current load, and in tests. The backend lazily creates the same defaults. */
+ * draft/current load, and in tests. Same payload the backend lazily creates: the API sends an
+ * `owner` only for Vitals and Counselling, none for the other steps. */
 export const DEFAULT_WORKFLOW_STEPS: readonly WorkflowStep[] = [
-  { key: 'token', on: true, owner: 'FRONT_DESK' },
+  { key: 'token', on: true },
   { key: 'queue', on: true },
   { key: 'vitals', on: true, owner: 'NURSE' },
-  { key: 'consult', on: true, owner: 'DOCTOR' },
+  { key: 'consult', on: true },
   { key: 'counsel', on: false, owner: 'DOCTOR' },
   { key: 'casepaper', on: true },
-  { key: 'billing', on: true, owner: 'FRONT_DESK' },
+  { key: 'billing', on: true },
   { key: 'followup', on: true },
 ];
+
+/**
+ * Who handles the steps the API sends no `owner` for - the mockup `initSteps` defaults
+ * (~line 2586). Shown read-only on the workflow panel; never editable, never sent to the server.
+ */
+export const FIXED_STEP_OWNER_LABELS: Partial<Record<WorkflowStepKey, string>> = {
+  token: 'Front desk',
+  queue: 'Front desk',
+  consult: 'Doctor',
+  billing: 'Front desk',
+  casepaper: 'Front desk',
+  followup: 'Doctor',
+};
 
 /** Whether two step lists have the same on/owner for every key, in order (used for the
  * "Live · vN" vs "Draft · not published" version badge — mockup `dirty()`). */

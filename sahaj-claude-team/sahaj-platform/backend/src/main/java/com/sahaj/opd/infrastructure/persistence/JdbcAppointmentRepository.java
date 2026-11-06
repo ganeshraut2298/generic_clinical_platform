@@ -6,7 +6,10 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -29,6 +32,19 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
     private static final String FIND_ACTIVE_CONFLICT = SELECT
             + " where tenant_id = :tenantId and doctor_membership_id = :doctorMembershipId"
             + " and appt_date = :apptDate and appt_time = :apptTime and status in ('BOOKED', 'ARRIVED')";
+    private static final String COUNT_BOOKED = """
+            select count(*) from opd.appointment
+            where tenant_id = :tenantId and doctor_membership_id = :doctorMembershipId
+              and appt_date between :fromDate and :toDate and status = 'BOOKED'
+            """;
+    private static final String COUNT_BOOKED_BY_DAY = """
+            select doctor_membership_id, appt_date, count(*) as booked from opd.appointment
+            where tenant_id = :tenantId and doctor_membership_id in (:doctorIds)
+              and appt_date between :fromDate and :toDate and status = 'BOOKED'
+            group by doctor_membership_id, appt_date
+            """;
+    private static final String LOCK_SLOT =
+            "select count(*) from (select pg_advisory_xact_lock(hashtextextended(:key, 0))) locked";
     private static final String INSERT = """
             insert into opd.appointment
                 (id, patient_id, doctor_membership_id, appt_date, appt_time, status, visit_type, source, note,
@@ -87,6 +103,12 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
     }
 
     @Override
+    public void lockSlot(UUID tenantId, UUID doctorMembershipId, LocalDate apptDate, LocalTime apptTime) {
+        String key = tenantId + "|" + doctorMembershipId + "|" + apptDate + "|" + apptTime;
+        jdbc.sql(LOCK_SLOT).param("key", key).query(Long.class).single();
+    }
+
+    @Override
     public Optional<AppointmentRow> findActiveConflict(UUID tenantId, UUID doctorMembershipId, LocalDate apptDate,
                                                          LocalTime apptTime) {
         return jdbc.sql(FIND_ACTIVE_CONFLICT)
@@ -96,6 +118,38 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
                 .param("apptTime", Time.valueOf(apptTime))
                 .query(JdbcAppointmentRepository::map)
                 .optional();
+    }
+
+    @Override
+    public int countBooked(UUID tenantId, UUID doctorMembershipId, LocalDate from, LocalDate to) {
+        return jdbc.sql(COUNT_BOOKED)
+                .param("tenantId", tenantId)
+                .param("doctorMembershipId", doctorMembershipId)
+                .param("fromDate", from)
+                .param("toDate", to)
+                .query(Integer.class)
+                .single();
+    }
+
+    @Override
+    public Map<UUID, Map<LocalDate, Integer>> countBookedByDay(UUID tenantId, Collection<UUID> doctorMembershipIds,
+                                                              LocalDate from, LocalDate to) {
+        Map<UUID, Map<LocalDate, Integer>> result = new HashMap<>();
+        if (doctorMembershipIds.isEmpty()) {
+            return result;
+        }
+        jdbc.sql(COUNT_BOOKED_BY_DAY)
+                .param("tenantId", tenantId)
+                .param("doctorIds", doctorMembershipIds)
+                .param("fromDate", from)
+                .param("toDate", to)
+                .query((rs, rowNum) -> {
+                    result.computeIfAbsent(rs.getObject("doctor_membership_id", UUID.class), key -> new HashMap<>())
+                            .put(rs.getObject("appt_date", LocalDate.class), rs.getInt("booked"));
+                    return rowNum;
+                })
+                .list();
+        return result;
     }
 
     @Override

@@ -18,3 +18,16 @@ export function formatIndian(value: number): string {
 export function formatInr(value: number): string {
   return `₹${formatIndian(value)}`;
 }
+
+/**
+ * Amount held in paise, written exactly: no decimals when it is a whole number of rupees
+ * (₹1,25,000), otherwise two decimals (₹187.50, ₹1,312.50). Bills never round to whole rupees.
+ */
+export function formatInrPaise(paise: number): string {
+  const total = Math.round(Math.abs(paise));
+  const rupees = Math.floor(total / 100);
+  const part = total % 100;
+  const sign = paise < 0 && total !== 0 ? '-' : '';
+  const decimals = part === 0 ? '' : `.${String(part).padStart(2, '0')}`;
+  return `₹${sign}${formatIndian(rupees)}${decimals}`;
+}

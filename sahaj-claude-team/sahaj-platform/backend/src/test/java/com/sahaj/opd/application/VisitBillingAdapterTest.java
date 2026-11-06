@@ -110,4 +110,22 @@ class VisitBillingAdapterTest {
         assertThatThrownBy(() -> adapter.advanceToDone(TENANT_ID, USER_ID, "OWNER", VISIT_ID))
                 .isInstanceOf(NotFoundException.class);
     }
+
+    @Test
+    void betweenAndFindAllGiveRevenueViewsWithTheDoctorNameResolvedOncePerDoctor() {
+        Instant from = Instant.parse("2026-10-31T18:30:00Z");
+        Instant to = Instant.parse("2026-11-01T18:30:00Z");
+        when(visitRepository.findBetween(TENANT_ID, from, to)).thenReturn(List.of(row("DONE"), row("BILLING")));
+        when(visitRepository.findByIds(TENANT_ID, List.of(VISIT_ID))).thenReturn(List.of(row("DONE")));
+
+        var between = adapter.between(TENANT_ID, from, to);
+        var byIds = adapter.findAll(TENANT_ID, List.of(VISIT_ID));
+
+        assertThat(between).hasSize(2);
+        assertThat(between.get(0).doctorName()).isEqualTo("Dr Rao");
+        assertThat(between.get(0).doctorMembershipId()).isEqualTo(DOCTOR_ID);
+        assertThat(between.get(1).stage()).isEqualTo("BILLING");
+        assertThat(byIds).singleElement().satisfies(v -> assertThat(v.feePaise()).isEqualTo(50000));
+        verify(teamMemberPort, org.mockito.Mockito.times(2)).find(TENANT_ID, DOCTOR_ID);
+    }
 }

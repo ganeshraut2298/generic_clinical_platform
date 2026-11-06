@@ -1,5 +1,7 @@
 package com.sahaj.platform.infrastructure.tenancy;
 
+import com.sahaj.platform.infrastructure.admin.AdminPrincipal;
+import com.sahaj.platform.infrastructure.admin.CurrentAdmin;
 import com.sahaj.platform.infrastructure.security.CurrentTenant;
 import com.sahaj.platform.infrastructure.security.CurrentTenantOnly;
 import com.sahaj.platform.infrastructure.security.CurrentVerifiedUser;
@@ -46,6 +48,11 @@ import org.springframework.transaction.TransactionDefinition;
  * At most one of the three sources applies per transaction; {@link CurrentTenant} (a full,
  * logged-in session) takes priority when present.
  *
+ * <p>ADM-1 adds a fourth source: a signed-in Sahaj platform admin ({@link AdminPrincipal}) binds
+ * {@code app.admin_id} and {@code app.admin_session_id} and never {@code app.tenant_id}. The admin
+ * chain and the clinic chain are separate, so an admin principal and a tenant principal never
+ * exist on the same request.
+ *
  * <p>Data access that must see tenant or user rows has to run inside a transaction; outside one,
  * the setting would apply to a single statement only.
  */
@@ -55,6 +62,8 @@ public class TenantBindingTransactionManager extends DataSourceTransactionManage
 
     private static final String BIND_TENANT_SQL = "select set_config('app.tenant_id', ?, true)";
     private static final String BIND_USER_SQL = "select set_config('app.user_id', ?, true)";
+    private static final String BIND_ADMIN_SQL = "select set_config('app.admin_id', ?, true)";
+    private static final String BIND_ADMIN_SESSION_SQL = "select set_config('app.admin_session_id', ?, true)";
 
     public TenantBindingTransactionManager(DataSource dataSource) {
         super(dataSource);
@@ -64,6 +73,14 @@ public class TenantBindingTransactionManager extends DataSourceTransactionManage
     protected void doBegin(Object transaction, TransactionDefinition definition) {
         super.doBegin(transaction, definition);
         try {
+            // ADM-1 (ADR-003 D4, D8): a Sahaj platform admin binds their id and session id and never a
+            // tenant. The admin functions refuse a transaction that has a tenant bound.
+            Optional<AdminPrincipal> admin = CurrentAdmin.principal();
+            if (admin.isPresent()) {
+                bind(BIND_ADMIN_SQL, admin.get().adminId());
+                bind(BIND_ADMIN_SESSION_SQL, admin.get().sessionId());
+                return;
+            }
             Optional<TenantPrincipal> principal = CurrentTenant.principal();
             if (principal.isPresent()) {
                 // SAH-5: platform.user_preference row level security needs both settings.

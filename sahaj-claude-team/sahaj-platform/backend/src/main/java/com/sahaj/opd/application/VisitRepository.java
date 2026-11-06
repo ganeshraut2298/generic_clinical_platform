@@ -20,6 +20,12 @@ public interface VisitRepository {
     /** Every visit created at or after {@code since} (today, server-side), newest token first within the day. */
     List<VisitRow> findSince(UUID tenantId, Instant since);
 
+    /** Every visit created at or after {@code from} and before {@code to}, oldest first (SAH-16 revenue). */
+    List<VisitRow> findBetween(UUID tenantId, Instant from, Instant to);
+
+    /** The visits with these ids that belong to the tenant (SAH-16 revenue); unknown ids are simply absent. */
+    List<VisitRow> findByIds(UUID tenantId, java.util.Collection<UUID> ids);
+
     /** The most recent visit this patient had with this doctor, if any (follow-up window, AC5). */
     Optional<Instant> lastVisitAt(UUID tenantId, UUID patientId, UUID doctorMembershipId);
 

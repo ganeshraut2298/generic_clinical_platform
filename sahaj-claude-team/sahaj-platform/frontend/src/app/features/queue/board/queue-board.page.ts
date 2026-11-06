@@ -4,16 +4,18 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { ApiError } from '../../../core/http/problem-detail';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { formatInr } from '../../../shared/format/inr';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
+import { PageHeadComponent } from '../../../shared/ui/page-head.component';
 import { NewTokenDialogComponent } from '../new-token/new-token-dialog.component';
 import { QueueApi } from '../queue.api';
-import { boardColumns, currentStages } from '../queue-columns.util';
+import { boardColumns } from '../queue-columns.util';
 import { WorkflowApi } from '../../workflow/workflow.api';
-import { WorkflowStep } from '../../workflow/workflow.model';
+import { WorkflowStep, WorkflowVersion } from '../../workflow/workflow.model';
 import { PLACEHOLDER_STAGES, STAGE_LABELS, Visit, VisitStage, visitTypeLabel } from '../queue.model';
 import {
   canCreateToken as roleCanCreateToken,
@@ -24,6 +26,7 @@ import {
   nextStage,
   ownsStage,
   stagePillClass,
+  stepsForVersion,
 } from '../queue-stage.util';
 
 interface ColumnView {
@@ -43,7 +46,7 @@ const NEW_TOKEN_DIALOG_CONFIG = { panelClass: 'sheet-panel', width: '560px', max
 @Component({
   selector: 'app-queue-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatButtonToggleModule, MatMenuModule, IconComponent],
+  imports: [MatButtonModule, MatButtonToggleModule, MatMenuModule, IconComponent, PageHeadComponent, EmptyStateComponent],
   styleUrl: './queue-board.page.scss',
   templateUrl: './queue-board.page.html',
 })
@@ -64,6 +67,9 @@ export class QueueBoardPage implements OnInit {
   protected readonly visits = signal<Visit[]>([]);
   /** Steps of the currently published workflow version (SAH-12). */
   protected readonly steps = signal<WorkflowStep[]>([]);
+  /** Every published version, loaded once per page load: a card moves through the steps of the
+   * version its visit was issued under, not the current one. */
+  private readonly versions = signal<WorkflowVersion[]>([]);
   protected readonly liveVersion = signal(1);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -74,9 +80,6 @@ export class QueueBoardPage implements OnInit {
   private readonly role = computed(() => this.store.me()?.role);
 
   protected readonly canCreateToken = computed(() => roleCanCreateToken(this.role()));
-  private readonly stages = computed(() => currentStages(this.steps()));
-  protected readonly vitalsEnabled = computed(() => this.stages().includes('VITALS'));
-  protected readonly counselEnabled = computed(() => this.stages().includes('COUNSEL'));
 
   protected readonly columns = computed<ColumnView[]>(() => {
     const role = this.role();
@@ -84,7 +87,9 @@ export class QueueBoardPage implements OnInit {
     const visits = this.visits();
     return boardColumns(this.steps(), visits).map((column) => ({
       ...column,
-      visits: visits.filter((visit) => visit.stage === column.stage && (!mine || ownsStage(role, column.stage))),
+      visits: visits.filter(
+        (visit) => visit.stage === column.stage && (!mine || ownsStage(role, visit.stage, this.stepsOf(visit))),
+      ),
     }));
   });
 
@@ -103,7 +108,7 @@ export class QueueBoardPage implements OnInit {
   }
 
   protected canMove(visit: Visit): boolean {
-    return canMoveForward(this.role(), visit.stage);
+    return canMoveForward(this.role(), visit.stage, this.stepsOf(visit));
   }
 
   protected canMoveBack(): boolean {
@@ -111,16 +116,16 @@ export class QueueBoardPage implements OnInit {
   }
 
   protected earlierStagesOf(visit: Visit): VisitStage[] {
-    return earlierStages(visit.stage);
+    return earlierStages(visit.stage, this.stepsOf(visit));
   }
 
   protected nextStageLabel(visit: Visit): string | null {
-    const next = nextStage(visit.stage, this.vitalsEnabled(), this.counselEnabled());
+    const next = nextStage(visit.stage, this.stepsOf(visit));
     return next ? STAGE_LABELS[next] : null;
   }
 
   protected moveToNext(visit: Visit): void {
-    const next = nextStage(visit.stage, this.vitalsEnabled(), this.counselEnabled());
+    const next = nextStage(visit.stage, this.stepsOf(visit));
     if (next) {
       this.move(visit, next);
     }
@@ -142,6 +147,11 @@ export class QueueBoardPage implements OnInit {
           this.load();
         }
       });
+  }
+
+  /** Steps of the visit's own workflow version; the current published steps if that version is not known. */
+  private stepsOf(visit: Visit): readonly WorkflowStep[] {
+    return stepsForVersion(visit.workflowVersionNo, this.versions(), this.steps());
   }
 
   private move(visit: Visit, stage: VisitStage): void {
@@ -168,8 +178,13 @@ export class QueueBoardPage implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.loadError.set(null);
-    forkJoin({ visits: this.api.today(), current: this.workflowApi.getCurrent() }).subscribe({
-      next: ({ visits, current }) => {
+    forkJoin({
+      visits: this.api.today(),
+      current: this.workflowApi.getCurrent(),
+      versions: this.workflowApi.listVersions().pipe(catchError(() => of<WorkflowVersion[]>([]))),
+    }).subscribe({
+      next: ({ visits, current, versions }) => {
+        this.versions.set(versions);
         this.visits.set(visits);
         this.steps.set(current.steps);
         this.liveVersion.set(current.versionNo);

@@ -1,5 +1,7 @@
 package com.sahaj.opd.api;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +19,17 @@ public interface VisitBillingPort {
     record VisitForBilling(UUID id, UUID patientId, String doctorName, String visitType, String stage, int tokenNo,
                             long feePaise) {
     }
+
+    /** A visit as the revenue report (SAH-16) needs it: who, which doctor, which stage, the fee and when. */
+    record VisitForRevenue(UUID id, UUID patientId, UUID doctorMembershipId, String doctorName, String stage,
+                            long feePaise, Instant createdAt) {
+    }
+
+    /** Visits created in {@code [from, to)}, any stage, oldest first (SAH-16). */
+    List<VisitForRevenue> between(UUID tenantId, Instant from, Instant to);
+
+    /** The tenant's visits with these ids; unknown ids are simply absent (SAH-16). */
+    List<VisitForRevenue> findAll(UUID tenantId, Collection<UUID> ids);
 
     /** Another clinic's visit id, or any id at all, is simply absent. */
     Optional<VisitForBilling> find(UUID tenantId, UUID visitId);

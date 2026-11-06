@@ -1,5 +1,5 @@
 <div class="pubwrap tight">
-  <header class="lnav surf">
+  <header class="lnav glass">
     <div class="brand">
       <div class="logo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
@@ -35,7 +35,7 @@
       </ul>
     </section>
 
-    <section class="auth-card surf">
+    <section class="auth-card glass">
       <mat-button-toggle-group
         class="seg"
         aria-label="Account"
@@ -55,7 +55,7 @@
         </div>
       } @else if (step() === 'mobile') {
         <form [formGroup]="mobileForm" (ngSubmit)="sendOtp()">
-          <mat-form-field class="field full">
+          <mat-form-field appearance="outline" class="field full">
             <mat-label>Mobile number</mat-label>
             <span matTextPrefix>+91&nbsp;</span>
             <input
@@ -81,7 +81,7 @@
         </form>
       } @else if (step() === 'otp') {
         <form [formGroup]="otpForm" (ngSubmit)="verify()">
-          <mat-form-field class="field full">
+          <mat-form-field appearance="outline" class="field full">
             <mat-label>Enter the 6-digit code sent to +91 {{ maskedMobile() }}</mat-label>
             <input
               id="login-code"

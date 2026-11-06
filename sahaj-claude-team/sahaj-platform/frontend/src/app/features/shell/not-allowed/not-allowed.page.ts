@@ -13,12 +13,12 @@ import { TranslatePipe } from '../../../core/i18n/translate.pipe';
   imports: [MatButtonModule, RouterLink, TranslatePipe],
   styleUrl: '../../shared-stub.scss',
   template: `
-    <main class="stub surf">
+    <section class="stub surf">
       <span class="pill p-warn">{{ 'shell.notAllowedTitle' | t }}</span>
       <h1>{{ 'shell.notAllowedTitle' | t }}</h1>
       <p class="muted">{{ 'shell.notAllowedBody' | t }}</p>
       <a mat-stroked-button class="btn-sec" routerLink="/app/today">Back to Today</a>
-    </main>
+    </section>
   `,
 })
 export class NotAllowedPage {}

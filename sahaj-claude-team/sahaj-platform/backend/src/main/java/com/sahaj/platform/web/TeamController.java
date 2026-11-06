@@ -38,7 +38,17 @@ public class TeamController {
     @GetMapping
     @PreAuthorize(ANY_CLINIC_ROLE)
     public List<TeamMemberResponse> list(@AuthenticationPrincipal TenantPrincipal principal) {
-        return teamService.list(principal.tenantId()).stream().map(TeamMemberResponse::from).toList();
+        return teamService.list(principal.tenantId(), principal.userId()).stream().map(TeamMemberResponse::from).toList();
+    }
+
+    /**
+     * SAH-31: clears a member's PIN (ADR-010 D8). Open to every clinic role at the door so that a non-owner gets the
+     * contract's 403 forbidden "Only the clinic owner can do this."; the service re-reads the owner's membership.
+     */
+    @PostMapping("/{id}/pin/reset")
+    @PreAuthorize(ANY_CLINIC_ROLE)
+    public TeamMemberResponse resetPin(@PathVariable UUID id, @AuthenticationPrincipal TenantPrincipal principal) {
+        return TeamMemberResponse.from(teamService.resetPin(principal.tenantId(), principal.userId(), id));
     }
 
     @PostMapping

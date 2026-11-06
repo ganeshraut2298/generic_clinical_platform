@@ -4,11 +4,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin } from 'rxjs';
+import { ApiError } from '../../../core/http/problem-detail';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../config-format';
 import { WorkflowApi } from '../../workflow/workflow.api';
 import {
+  FIXED_STEP_OWNER_LABELS,
   WORKFLOW_STEP_META,
   WORKFLOW_STEP_ORDER,
   WORKFLOW_STEP_OWNERS,
@@ -26,6 +28,9 @@ import {
  * owner change. Case paper print and Follow-up set are plain on/off toggles, stored only; they
  * have no effect yet (no print feature, no Follow-ups story). Step reordering is out of scope.
  * Owner-only edit; everyone else sees it read-only, same pattern as SAH-10/SAH-11.
+ *
+ * The API sends an owner only for Vitals and Counselling. The other steps show the mockup's
+ * default handler (Token Front desk, Consultation Doctor, ...) as read-only text.
  */
 @Component({
   selector: 'app-workflow',
@@ -49,6 +54,8 @@ export class WorkflowPage implements OnInit {
   protected readonly loadError = signal<string | null>(null);
   protected readonly saving = signal(false);
   protected readonly publishing = signal(false);
+  /** Spoken by the live region: 'Saved' or 'Saving failed'; empty until a save finishes. */
+  protected readonly status = signal('');
 
   protected readonly isOwner = computed(() => this.store.me()?.role === 'OWNER');
 
@@ -59,28 +66,37 @@ export class WorkflowPage implements OnInit {
 
   protected readonly onSteps = computed(() => this.draftSteps().filter((step) => step.on));
 
-  protected readonly owners = computed(() => [...new Set(this.onSteps().map((step) => this.ownerLabel(step.owner)))]);
+  protected readonly owners = computed(() => [
+    ...new Set(this.onSteps().map((step) => this.ownerLabel(step)).filter((label) => label !== '')),
+  ]);
 
   ngOnInit(): void {
-    forkJoin({ draft: this.api.getDraft(), current: this.api.getCurrent() }).subscribe({
-      next: ({ draft, current }) => {
-        this.draftSteps.set(draft.steps);
-        this.current.set(current);
-        this.loading.set(false);
-      },
-      error: (error: unknown) => {
-        this.loading.set(false);
-        this.loadError.set(problemMessage(error, 'We could not load the OPD workflow. Try again.'));
-      },
-    });
+    this.load();
+  }
+
+  protected retry(): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.load();
   }
 
   protected stepFor(key: WorkflowStepKey): WorkflowStep | undefined {
     return this.draftSteps().find((step) => step.key === key);
   }
 
-  protected ownerLabel(owner: WorkflowStepOwner | undefined): string {
-    return this.ownerChoices.find((choice) => choice.value === owner)?.label ?? '—';
+  /** Whether this step's owner can be chosen (Vitals and Counselling only). */
+  protected ownerEditable(key: WorkflowStepKey): boolean {
+    const meta = this.stepMeta[key];
+    return meta.hasOwner && !meta.fixed;
+  }
+
+  /** The step's owner: the chosen role, else the mockup default for the fixed steps, else empty. */
+  protected ownerLabel(step: WorkflowStep): string {
+    return (
+      this.ownerChoices.find((choice) => choice.value === step.owner)?.label ??
+      FIXED_STEP_OWNER_LABELS[step.key] ??
+      ''
+    );
   }
 
   protected toggleStep(key: WorkflowStepKey): void {
@@ -121,7 +137,27 @@ export class WorkflowPage implements OnInit {
       },
       error: (error: unknown) => {
         this.publishing.set(false);
+        if (error instanceof ApiError && error.problem.type.endsWith('workflow-conflict')) {
+          this.toast('Someone else published a new version first. We loaded the latest, so check it and publish again.');
+          this.load();
+          return;
+        }
         this.toast(problemMessage(error, 'We could not publish. Try again.'));
+      },
+    });
+  }
+
+  /** Loads the draft and the current version together; also the reload after a publish conflict. */
+  private load(): void {
+    forkJoin({ draft: this.api.getDraft(), current: this.api.getCurrent() }).subscribe({
+      next: ({ draft, current }) => {
+        this.draftSteps.set(draft.steps);
+        this.current.set(current);
+        this.loading.set(false);
+      },
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.loadError.set(problemMessage(error, 'We could not load the OPD workflow. Try again.'));
       },
     });
   }
@@ -134,10 +170,12 @@ export class WorkflowPage implements OnInit {
       next: (saved) => {
         this.saving.set(false);
         this.draftSteps.set(saved.steps);
+        this.status.set('Saved');
       },
       error: (error: unknown) => {
         this.saving.set(false);
         this.draftSteps.set(before);
+        this.status.set('Saving failed');
         this.toast(problemMessage(error, 'We could not save that change. Try again.'));
       },
     });

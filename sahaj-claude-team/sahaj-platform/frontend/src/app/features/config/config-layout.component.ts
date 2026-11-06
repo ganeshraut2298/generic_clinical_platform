@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter, map } from 'rxjs';
 import { ShellStore } from '../../core/shell/shell.store';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { IpdAccess } from './ipd/ipd-access';
 import { CONFIG_SECTIONS, ConfigSection, configSectionByKey } from './config-sections';
 
 interface NavGroup {
@@ -26,6 +27,7 @@ interface NavGroup {
 export class ConfigLayoutComponent {
   private readonly router = inject(Router);
   private readonly store = inject(ShellStore);
+  private readonly ipdAccess = inject(IpdAccess);
 
   protected readonly query = signal('');
   protected readonly tipsOpen = signal(true);
@@ -49,10 +51,16 @@ export class ConfigLayoutComponent {
 
   protected readonly groups = computed<NavGroup[]>(() => {
     const q = this.query().trim().toLowerCase();
-    const sections = CONFIG_SECTIONS.filter((s) => !q || s.label.toLowerCase().includes(q));
+    const sections = CONFIG_SECTIONS.filter(
+      (s) => this.ipdAccess.visible(s) && (!q || s.label.toLowerCase().includes(q)),
+    );
     const names = [...new Set(sections.map((s) => s.group))];
     return names.map((name) => ({ name, sections: sections.filter((s) => s.group === name) }));
   });
+
+  constructor() {
+    this.ipdAccess.ensureLoaded();
+  }
 
   protected onQuery(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);

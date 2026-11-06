@@ -1,44 +1,81 @@
 import { Role } from '../../core/platform/platform.model';
-import { STAGE_ORDER, VisitStage } from './queue.model';
-
-/**
- * Role that owns each stage (story acceptance criterion 4 and 8): NURSE owns Vitals,
- * DOCTOR/VISITING_DOCTOR own With doctor. Counsel and Billing have an owning role too
- * (Counsellor, Billing) even though no story has built their screens yet, so "My tasks"
- * behaves sensibly once SAH-10/SAH-11 land. OWNER and FRONT_DESK own none of these
- * specifically; they see "Everyone" by default and may move any card (acceptance
- * criterion 8), independent of this map.
- */
-const STAGE_OWNERS: Record<VisitStage, readonly Role[]> = {
-  WAITING: ['FRONT_DESK'],
-  VITALS: ['NURSE'],
-  WITH_DOCTOR: ['DOCTOR', 'VISITING_DOCTOR'],
-  COUNSEL: ['COUNSELLOR'],
-  BILLING: ['BILLING'],
-  DONE: [],
-};
+import { WorkflowStep, WorkflowStepKey, WorkflowVersion } from '../workflow/workflow.model';
+import { VisitStage } from './queue.model';
 
 /** Roles allowed to issue a walk-in token (acceptance criterion 8). */
 export const TOKEN_CREATOR_ROLES: readonly Role[] = ['OWNER', 'FRONT_DESK', 'NURSE'];
 
-/** Roles allowed to move any card, forward or backward (acceptance criterion 3 and 8). */
+/** Roles allowed to move any card, forward or backward (acceptance criterion 3 and 8). Mirrors
+ * `VisitService.MOVE_ANY_ROLES`; the same roles see every card under "My tasks". */
 const ANY_CARD_ROLES: readonly Role[] = ['OWNER', 'FRONT_DESK'];
+
+/** Doctor roles always own With doctor, whatever the Consultation step says. */
+const DOCTOR_ROLES: readonly Role[] = ['DOCTOR', 'VISITING_DOCTOR'];
 
 export function canCreateToken(role: Role | undefined): boolean {
   return !!role && TOKEN_CREATOR_ROLES.includes(role);
 }
 
-/** Whether the signed-in role owns the given stage (used by the Everyone/My tasks filter). */
-export function ownsStage(role: Role | undefined, stage: VisitStage): boolean {
-  return !!role && STAGE_OWNERS[stage].includes(role);
+function isOn(steps: readonly WorkflowStep[], key: WorkflowStepKey): boolean {
+  return steps.some((step) => step.key === key && step.on);
 }
 
-/** Whether the signed-in role may move this card forward (own stage, or OWNER/FRONT_DESK). */
-export function canMoveForward(role: Role | undefined, stage: VisitStage): boolean {
+/**
+ * The stages a visit passes through under the given workflow steps, in order, Done included.
+ * Mirrors `VisitService.enabledStages`: Waiting, Vitals only when on, With doctor, Counselling
+ * only when on, Billing, Done.
+ */
+export function enabledStages(steps: readonly WorkflowStep[]): VisitStage[] {
+  const stages: VisitStage[] = ['WAITING'];
+  if (isOn(steps, 'vitals')) {
+    stages.push('VITALS');
+  }
+  stages.push('WITH_DOCTOR');
+  if (isOn(steps, 'counsel')) {
+    stages.push('COUNSEL');
+  }
+  stages.push('BILLING', 'DONE');
+  return stages;
+}
+
+/** Whether the step owner (a role code) covers this role. A DOCTOR owner covers both doctor roles. */
+function stepOwnedBy(steps: readonly WorkflowStep[], key: WorkflowStepKey, role: Role): boolean {
+  return steps.some(
+    (step) =>
+      step.key === key &&
+      step.owner != null &&
+      (step.owner === role || (step.owner === 'DOCTOR' && DOCTOR_ROLES.includes(role))),
+  );
+}
+
+/**
+ * Whether the signed-in role owns the stage under these steps (used by the Everyone/My tasks
+ * filter and by "Move to next"). Mirrors `VisitService.ownedStages`: Owner and Front desk own every
+ * stage; doctors always own With doctor; Vitals and Counselling belong to whoever the workflow
+ * step names as owner.
+ */
+export function ownsStage(role: Role | undefined, stage: VisitStage, steps: readonly WorkflowStep[]): boolean {
   if (!role) {
     return false;
   }
-  return ANY_CARD_ROLES.includes(role) || ownsStage(role, stage);
+  if (ANY_CARD_ROLES.includes(role)) {
+    return true;
+  }
+  switch (stage) {
+    case 'WITH_DOCTOR':
+      return DOCTOR_ROLES.includes(role);
+    case 'VITALS':
+      return stepOwnedBy(steps, 'vitals', role);
+    case 'COUNSEL':
+      return stepOwnedBy(steps, 'counsel', role);
+    default:
+      return false;
+  }
+}
+
+/** Whether this role may move a card forward out of `stage` (its own stage, or Owner/Front desk). */
+export function canMoveForward(role: Role | undefined, stage: VisitStage, steps: readonly WorkflowStep[]): boolean {
+  return ownsStage(role, stage, steps);
 }
 
 /** Only OWNER may move a card backward, to an earlier stage, to correct a mistake. */
@@ -47,31 +84,22 @@ export function canMoveBackward(role: Role | undefined): boolean {
 }
 
 /**
- * The next stage one step forward from `current`, given which optional steps are on in the
- * clinic's current published workflow (Vitals, Counselling). The server still decides what a
- * visit may do, using the version the visit started on.
+ * The next stage one step forward from `current`, using the steps of the VISIT's own workflow
+ * version (not the clinic's current one). Null at Done, or if `current` is not a stage of those
+ * steps. The server still decides what a visit may do.
  */
-export function nextStage(current: VisitStage, vitalsEnabled: boolean, counselEnabled = false): VisitStage | null {
-  switch (current) {
-    case 'WAITING':
-      return vitalsEnabled ? 'VITALS' : 'WITH_DOCTOR';
-    case 'VITALS':
-      return 'WITH_DOCTOR';
-    case 'WITH_DOCTOR':
-      return counselEnabled ? 'COUNSEL' : 'BILLING';
-    case 'COUNSEL':
-      return 'BILLING';
-    case 'BILLING':
-      return 'DONE';
-    case 'DONE':
-      return null;
-  }
+export function nextStage(current: VisitStage, steps: readonly WorkflowStep[]): VisitStage | null {
+  const stages = enabledStages(steps);
+  const index = stages.indexOf(current);
+  return index < 0 ? null : (stages[index + 1] ?? null);
 }
 
-/** Earlier stages an owner could move a card back to, in forward order (acceptance criterion 3). */
-export function earlierStages(current: VisitStage): VisitStage[] {
-  const index = STAGE_ORDER.indexOf(current);
-  return STAGE_ORDER.slice(0, index).filter((stage) => stage !== 'COUNSEL');
+/** Earlier stages an owner could move a card back to, in forward order (acceptance criterion 3),
+ * limited to the stages the visit's own workflow version has. */
+export function earlierStages(current: VisitStage, steps: readonly WorkflowStep[]): VisitStage[] {
+  const stages = enabledStages(steps);
+  const index = stages.indexOf(current);
+  return index < 0 ? [] : stages.slice(0, index);
 }
 
 /** Maps a stage onto one of the existing `.pill` colour classes (`styles/_primitives.scss`),
@@ -96,4 +124,16 @@ export function minutesWaited(createdAt: string, now: Date = new Date()): number
     return 0;
   }
   return Math.max(0, Math.round((now.getTime() - created) / 60_000));
+}
+
+/**
+ * The steps a visit runs on: those of the published version it was issued under, or the
+ * fallback (the clinic's current published steps) when that version is not in the list.
+ */
+export function stepsForVersion(
+  versionNo: number | undefined,
+  versions: readonly WorkflowVersion[],
+  fallback: readonly WorkflowStep[],
+): readonly WorkflowStep[] {
+  return versions.find((version) => version.versionNo === versionNo)?.steps ?? fallback;
 }

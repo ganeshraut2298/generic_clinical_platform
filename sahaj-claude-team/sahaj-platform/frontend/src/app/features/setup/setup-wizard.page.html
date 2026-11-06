@@ -3,7 +3,7 @@
     <p class="muted">Loading your setup…</p>
   </main>
 } @else if (completing()) {
-  <main class="su-building surf">
+  <main class="su-building glass">
     <h1>Setting up your clinic</h1>
     <p class="muted">This takes a few seconds.</p>
     <div class="meter"><i style="width: 70%"></i></div>
@@ -16,7 +16,7 @@
     </header>
 
     <div class="su-grid">
-      <aside class="su-rail surf">
+      <aside class="su-rail glass">
         <span class="eyebrow">Set up your clinic</span>
         <ol class="su-steps">
           @for (step of steps; track step.title; let i = $index) {
@@ -39,7 +39,7 @@
         <span class="faint small">About {{ minutesLeft() }} minutes left. Everything can be changed later.</span>
       </aside>
 
-      <section class="su-card surf">
+      <section class="su-card glass">
         @if (loadError()) {
           <p class="notice">{{ loadError() }}</p>
         }
@@ -52,27 +52,27 @@
         @switch (currentStep()) {
           @case (1) {
             <form [formGroup]="clinicForm" class="grid-f">
-              <mat-form-field class="full">
+              <mat-form-field appearance="outline" class="full">
                 <mat-label>Clinic name</mat-label>
                 <input matInput formControlName="name" maxlength="160" />
               </mat-form-field>
-              <mat-form-field class="full">
+              <mat-form-field appearance="outline" class="full">
                 <mat-label>Address</mat-label>
                 <input matInput formControlName="address" placeholder="Building, road, area" />
               </mat-form-field>
-              <mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>City</mat-label>
                 <input matInput formControlName="city" />
               </mat-form-field>
-              <mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>PIN code</mat-label>
                 <input matInput formControlName="pin" inputmode="numeric" maxlength="6" />
               </mat-form-field>
-              <mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>Clinic phone</mat-label>
                 <input matInput formControlName="phone" inputmode="numeric" />
               </mat-form-field>
-              <mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>Registration number (optional)</mat-label>
                 <input matInput formControlName="registrationNo" />
               </mat-form-field>
@@ -109,22 +109,22 @@
               <div class="su-rows">
                 @for (doctor of doctors.controls; track $index; let i = $index) {
                   <div class="su-row" [formGroup]="doctor">
-                    <mat-form-field>
+                    <mat-form-field appearance="outline">
                       <mat-label>Doctor {{ i + 1 }} name</mat-label>
                       <input matInput formControlName="name" placeholder="Dr. full name" />
                     </mat-form-field>
-                    <mat-form-field>
+                    <mat-form-field appearance="outline">
                       <mat-label>Specialty</mat-label>
                       <input matInput formControlName="specialty" />
                     </mat-form-field>
-                    <mat-form-field>
+                    <mat-form-field appearance="outline">
                       <mat-label>Fee (₹)</mat-label>
                       <input matInput type="number" formControlName="feeRupees" min="0" />
                     </mat-form-field>
                     @if (i === 0) {
                       <span class="pill p-teal">Owner</span>
                     } @else {
-                      <mat-form-field>
+                      <mat-form-field appearance="outline">
                         <mat-label>Mobile</mat-label>
                         <input matInput formControlName="mobile" inputmode="numeric" />
                       </mat-form-field>
@@ -139,15 +139,15 @@
                 <app-icon name="plus" [size]="15" /> Add doctor
               </button>
 
-              <div class="eyebrow" style="margin-top: 14px">Staff · {{ staff.length }}</div>
+              <div class="eyebrow staff-head">Staff · {{ staff.length }}</div>
               <div class="su-rows">
                 @for (member of staff.controls; track $index; let i = $index) {
                   <div class="su-row" [formGroup]="member">
-                    <mat-form-field>
+                    <mat-form-field appearance="outline">
                       <mat-label>Staff {{ i + 1 }} name</mat-label>
                       <input matInput formControlName="name" />
                     </mat-form-field>
-                    <mat-form-field>
+                    <mat-form-field appearance="outline">
                       <mat-label>Role</mat-label>
                       <mat-select formControlName="role">
                         @for (role of staffRoles; track role) {
@@ -155,7 +155,7 @@
                         }
                       </mat-select>
                     </mat-form-field>
-                    <mat-form-field>
+                    <mat-form-field appearance="outline">
                       <mat-label>Mobile</mat-label>
                       <input matInput formControlName="mobile" inputmode="numeric" />
                     </mat-form-field>
