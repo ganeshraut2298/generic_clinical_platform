@@ -1,0 +1,509 @@
+<app-page-head
+  title="Staff and leave"
+  [lead]="
+    locked()
+      ? ''
+      : 'Shifts, leave, attendance and holidays. Payroll is not part of Sahaj; attendance exports to your payroll tool.'
+  "
+>
+  @if (!locked() && !loading() && !loadError()) {
+    <button type="button" mat-stroked-button (click)="openLeaveTab()">
+      <app-icon name="calendar" [size]="16" /> Apply for leave
+    </button>
+  }
+</app-page-head>
+
+@if (locked()) {
+  <section class="panel surf lockpage">
+    <span class="lockic"><app-icon name="lock" [size]="26" /></span>
+    <h2>Staff, timings and leave is an add-on</h2>
+    <p class="muted">
+      Doctor timings and holidays already work for appointment booking without it. Switch it on when
+      you want shifts, leave approval and attendance.
+    </p>
+    @if (isOwner()) {
+      <div>
+        <a mat-flat-button routerLink="/app/config/modules">See plan and modules</a>
+      </div>
+    }
+  </section>
+} @else if (loading()) {
+  <p class="muted" aria-busy="true">Loading staff and leave</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button type="button" mat-stroked-button (click)="loadAll()">Try again</button>
+  </div>
+} @else {
+  @if (summary(); as s) {
+    <section class="kpis" aria-label="Staff summary">
+      <div class="kpi surf" data-kpi="staff">
+        <span class="eyebrow">Staff</span>
+        <span class="v num">{{ s.staff }}</span>
+        <span class="s">{{ s.doctors }} doctors · {{ s.others }} staff</span>
+      </div>
+      <div class="kpi surf" data-kpi="present">
+        <span class="eyebrow">Present today</span>
+        <span class="v num">{{ s.presentToday }}</span>
+        <span class="s">{{ s.lateToday }} late</span>
+      </div>
+      <div class="kpi surf" data-kpi="leave">
+        <span class="eyebrow">Leave requests</span>
+        <span class="v num">{{ pendingLeave() }}</span>
+        <span class="s">Waiting for the owner</span>
+      </div>
+      <div class="kpi surf" data-kpi="holiday">
+        <span class="eyebrow">Next holiday</span>
+        @if (nextHoliday(); as h) {
+          <span class="v num small">{{ formatDate(h.date) }}</span>
+          <span class="s">{{ h.name }}</span>
+        } @else {
+          <span class="v num small">—</span>
+          <span class="s">None set</span>
+        }
+      </div>
+    </section>
+  }
+
+  <div class="tabs" role="tablist" aria-label="Staff and leave sections">
+    @for (t of tabs; track t.key) {
+      <button
+        type="button"
+        role="tab"
+        [id]="'st-tab-' + t.key"
+        aria-controls="st-panel"
+        [attr.aria-selected]="tab() === t.key"
+        [attr.tabindex]="tab() === t.key ? 0 : -1"
+        (click)="selectTab(t.key)"
+        (keydown)="onTabKeydown($event)"
+      >
+        {{ t.label }}
+        @if (t.key === 'leave' && pendingLeave() > 0) {
+          <span class="c num" [attr.aria-label]="pendingLeave() + ' waiting for the owner'">{{
+            pendingLeave()
+          }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  @if (actionError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  <section
+    class="panel surf"
+    role="tabpanel"
+    id="st-panel"
+    tabindex="0"
+    [attr.aria-labelledby]="'st-tab-' + tab()"
+  >
+    @switch (tab()) {
+      @case ('roster') {
+        @if (roster(); as r) {
+          <div class="panel-h">
+            <div>
+              <h2>Weekly roster</h2>
+              <small class="hint">
+                @if (isOwner()) {
+                  Tap a cell to change the shift.
+                }
+                Doctor OPD days come from Appointments and slots, so booking and the roster always
+                match.
+              </small>
+            </div>
+            @if (r.published) {
+              <span class="pill p-good">Published to staff</span>
+            } @else {
+              <button
+                type="button"
+                mat-flat-button
+                [disabled]="!isOwner() || busy() === 'publish'"
+                (click)="publish()"
+              >
+                Publish roster
+              </button>
+            }
+          </div>
+          <div class="roster-scroll">
+            <table class="roster" aria-label="Weekly roster">
+              <thead>
+                <tr>
+                  <th scope="col">Staff</th>
+                  @for (day of r.days; track day; let i = $index) {
+                    <th scope="col">
+                      {{ i === 0 ? 'Today' : weekdayShort(day) }}
+                      <small>{{ dayMonth(day) }}</small>
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of r.rows; track row.membershipId) {
+                  <tr>
+                    <th scope="row" class="rn">
+                      <b>{{ row.name }}</b>
+                      <small>{{ row.roleLabel }}</small>
+                    </th>
+                    @for (cell of row.cells; track cell.date) {
+                      <td>
+                        @if (cell.kind === 'SHIFT') {
+                          <button
+                            type="button"
+                            class="rc"
+                            [class]="'rc ' + cellClass(cell)"
+                            [disabled]="
+                              !isOwner() || busy() === 'cell|' + row.membershipId + '|' + cell.date
+                            "
+                            [attr.aria-label]="cellLabel(row, cell)"
+                            (click)="cycleCell(row, cell)"
+                          >
+                            {{ cellText(cell) }}
+                          </button>
+                        } @else {
+                          <span
+                            class="rc"
+                            [class]="'rc ' + cellClass(cell)"
+                            [attr.title]="cellTitle(cell)"
+                            [attr.aria-label]="cellLabel(row, cell)"
+                            >{{ cellText(cell) }}</span
+                          >
+                        }
+                      </td>
+                    }
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td [attr.colspan]="r.days.length + 1" class="empty">No team members yet.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="blegend" aria-label="Shift times">
+            @for (sh of r.shifts; track sh.key) {
+              @if (sh.key !== 'X') {
+                <span class="bl"
+                  ><span class="rc mini" [class]="'rc mini sh-' + sh.key">{{ sh.name }}</span>
+                  {{ sh.time }}</span
+                >
+              }
+            }
+          </div>
+        } @else {
+          <p class="muted" aria-busy="true">Loading roster</p>
+        }
+      }
+      @case ('leave') {
+        @if (leave(); as lv) {
+          <div class="grid2 lv-grid">
+            <div>
+              <div class="panel-h">
+                <h2>Leave requests</h2>
+                <small class="hint"
+                  >{{ lv.canApprove ? 'You approve leave.' : 'The owner approves leave.' }} Approved
+                  doctor leave closes booking for those days.</small
+                >
+              </div>
+              <div class="list">
+                @for (r of lv.requests; track r.id) {
+                  <div class="li lvrow">
+                    <div class="main">
+                      <b>{{ r.name }} · {{ r.typeName }}</b>
+                      <small
+                        >{{ leaveRange(r.from, r.to) }}
+                        @if (r.reason) {
+                          · {{ r.reason }}
+                        }
+                        · asked {{ askedAt(r.askedAt) }} IST</small
+                      >
+                      @if (r.status === 'pending' && (r.affectedAppointments ?? 0) > 0) {
+                        <small class="warnline">
+                          <app-icon name="calendar" [size]="12" />
+                          {{ affectedText(r.affectedAppointments ?? 0) }}
+                        </small>
+                      }
+                    </div>
+                    @if (r.status === 'pending') {
+                      @if (lv.canApprove) {
+                        <div class="nw">
+                          <button
+                            type="button"
+                            mat-stroked-button
+                            [disabled]="busy() === 'lv|' + r.id"
+                            [attr.aria-label]="'Decline leave for ' + r.name"
+                            (click)="decide(r, false)"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            type="button"
+                            mat-flat-button
+                            [disabled]="busy() === 'lv|' + r.id"
+                            [attr.aria-label]="'Approve leave for ' + r.name"
+                            (click)="decide(r, true)"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      } @else {
+                        <span class="pill p-warn">{{ leavePill.pending.text }}</span>
+                      }
+                    } @else {
+                      <span class="pill" [class]="'pill ' + leavePill[r.status].cls">{{
+                        leavePill[r.status].text
+                      }}</span>
+                    }
+                  </div>
+                } @empty {
+                  <app-empty>No leave requests.</app-empty>
+                }
+              </div>
+            </div>
+            <div>
+              <form
+                class="lvform"
+                [formGroup]="leaveForm"
+                (ngSubmit)="sendRequest()"
+                novalidate
+                aria-labelledby="lv-apply-h"
+              >
+                <h2 id="lv-apply-h">Apply for leave</h2>
+                @if (multipleApplicants()) {
+                  <div class="field">
+                    <label for="lv-who">For</label>
+                    <select id="lv-who" class="input" formControlName="who">
+                      @for (a of lv.applicants; track a.membershipId) {
+                        <option [value]="a.membershipId">{{ a.name }}</option>
+                      }
+                    </select>
+                  </div>
+                } @else {
+                  <div class="field">
+                    <span class="flabel">For</span>
+                    <b>{{ fixedApplicantName() }}</b>
+                  </div>
+                }
+                <div class="field">
+                  <label for="lv-type">Type</label>
+                  <select id="lv-type" class="input" formControlName="type">
+                    @for (o of typeOptions(); track o.key) {
+                      <option [value]="o.key">{{ o.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="frow">
+                  <div class="field">
+                    <label for="lv-from">From</label>
+                    <input
+                      id="lv-from"
+                      type="date"
+                      class="input"
+                      formControlName="from"
+                      [min]="today"
+                      [max]="fromMax()"
+                      (change)="onFromChange()"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="lv-to">To</label>
+                    <input
+                      id="lv-to"
+                      type="date"
+                      class="input"
+                      formControlName="to"
+                      [min]="leaveForm.controls.from.value || today"
+                      [max]="toMax()"
+                    />
+                  </div>
+                </div>
+                @if (leaveForm.errors?.['toBeforeFrom'] && leaveForm.touched) {
+                  <small class="ferr" role="alert">To must not be before From.</small>
+                }
+                @if (leaveForm.errors?.['rangeTooLong']) {
+                  <small class="ferr" role="alert">Leave can be up to 60 days at a time.</small>
+                }
+                <div class="field">
+                  <label for="lv-reason">Reason (optional)</label>
+                  <input
+                    id="lv-reason"
+                    class="input"
+                    formControlName="reason"
+                    placeholder="Short reason"
+                    autocomplete="off"
+                    [attr.maxlength]="maxReason"
+                  />
+                </div>
+                @if (formError(); as message) {
+                  <div class="notice err" role="alert">
+                    <app-icon name="alert" [size]="16" /><span>{{ message }}</span>
+                  </div>
+                }
+                <div>
+                  <button
+                    type="submit"
+                    mat-flat-button
+                    [disabled]="sending() || !lv.applicants.length"
+                  >
+                    <app-icon name="send" [size]="15" /> Send request
+                  </button>
+                </div>
+              </form>
+              <section aria-labelledby="lv-bal-h" class="balbox">
+                <h2 id="lv-bal-h">Balance this year</h2>
+                <table class="baltbl" aria-label="Balance this year">
+                  <thead>
+                    <tr>
+                      <th scope="col">Staff</th>
+                      @for (t of lv.types; track t.key) {
+                        <th scope="col" class="r">{{ t.key }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (b of lv.balances; track b.membershipId) {
+                      <tr>
+                        <th scope="row">{{ b.name }}</th>
+                        @for (t of lv.types; track t.key) {
+                          <td class="r num">{{ b.remaining[t.key] }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+                <small class="hint"
+                  >CL casual leave (8 a year) · SL sick leave (7 a year) · EL earned leave (15 a
+                  year)</small
+                >
+              </section>
+            </div>
+          </div>
+        } @else if (leaveError(); as message) {
+          <div class="notice err" role="alert">
+            <app-icon name="alert" [size]="16" /><span>{{ message }}</span>
+            <button type="button" mat-stroked-button (click)="loadLeave()">Try again</button>
+          </div>
+        } @else {
+          <p class="muted" aria-busy="true">Loading leave</p>
+        }
+      }
+      @case ('att') {
+        @if (attendance(); as a) {
+          <div class="panel-h">
+            <h2>Today's attendance</h2>
+            <small class="hint"
+              >Marked at the front desk · late after {{ a.lateAfterMinutes }} min</small
+            >
+          </div>
+          <div class="list">
+            @for (row of a.rows; track row.membershipId) {
+              <div class="li">
+                <div class="main">
+                  <b>{{ row.name }}</b>
+                  <small
+                    >{{ row.roleLabel }}
+                    @if (row.markedTime) {
+                      · {{ inAtText(row.markedTime) }}
+                    }
+                  </small>
+                </div>
+                @if (row.onLeave) {
+                  <span class="pill p-blue">On leave</span>
+                } @else if (row.status) {
+                  <span class="pill" [class]="'pill ' + attendancePill[row.status].cls">{{
+                    attendancePill[row.status].text
+                  }}</span>
+                } @else {
+                  <span class="pill p-wait">Not marked</span>
+                }
+                @if (a.canMark && !row.onLeave) {
+                  <div class="seg" role="group" [attr.aria-label]="'Mark ' + row.name">
+                    @for (o of attendanceOptions; track o.status) {
+                      <button
+                        type="button"
+                        [attr.aria-pressed]="row.status === o.status"
+                        [disabled]="busy() === 'att|' + row.membershipId"
+                        (click)="mark(row.membershipId, o.status)"
+                      >
+                        {{ o.label }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            } @empty {
+              <app-empty>No team members yet.</app-empty>
+            }
+          </div>
+        } @else {
+          <p class="muted" aria-busy="true">Loading attendance</p>
+        }
+      }
+      @case ('hol') {
+        <div class="grid2">
+          <div>
+            <h2>Clinic holidays</h2>
+            <small class="hint"
+              >The same list closes appointment booking, with or without HRA.</small
+            >
+            @if (holidaysError(); as message) {
+              <div class="notice err" role="alert">
+                <app-icon name="alert" [size]="16" /><span>{{ message }}</span>
+              </div>
+            } @else if (holidays() === null) {
+              <p class="muted" aria-busy="true">Loading holidays</p>
+            } @else {
+              <div class="list">
+                @for (h of clinicHolidays(); track h.id ?? h.date) {
+                  <div class="li">
+                    <span class="hday num">{{ formatDate(h.date) }}</span>
+                    <div class="main">
+                      <b>{{ h.name }}</b>
+                    </div>
+                  </div>
+                } @empty {
+                  <app-empty>No clinic holidays yet.</app-empty>
+                }
+              </div>
+            }
+            <a mat-stroked-button routerLink="/app/config/profile">
+              <app-icon name="plus" [size]="14" /> Add in Clinic profile
+            </a>
+          </div>
+          <div>
+            <h2>Public holidays</h2>
+            <small class="hint"
+              >From the India · Maharashtra pack. Switch on the days your clinic closes.</small
+            >
+            <div class="list">
+              @for (p of publicHolidays; track p.date) {
+                <div class="li">
+                  <span class="hday num">{{ formatDate(p.date) }}</span>
+                  <div class="main">
+                    <b>{{ p.name }}</b>
+                    <small>{{
+                      holidayOn(p.date) ? 'Clinic closed · booking off' : 'Clinic open'
+                    }}</small>
+                  </div>
+                  <button
+                    type="button"
+                    class="sw"
+                    role="switch"
+                    [attr.aria-checked]="!!holidayOn(p.date)"
+                    [attr.aria-label]="'Clinic closed on ' + p.name"
+                    [disabled]="!isOwner() || holidays() === null || busy() === 'hol|' + p.date"
+                    (click)="togglePublicHoliday(p.date, p.name)"
+                  ></button>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    }
+  </section>
+}

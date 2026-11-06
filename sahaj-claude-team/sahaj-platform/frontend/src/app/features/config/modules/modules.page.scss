@@ -1,0 +1,101 @@
+@use '../config-common';
+
+.panel-h .pill {
+  margin-left: auto;
+}
+
+.modrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-2);
+
+  &:first-child {
+    border-top: 0;
+  }
+  .ti {
+    color: var(--pri-text);
+  }
+  .main {
+    flex: 1;
+  }
+  .main small {
+    display: block;
+    color: var(--ink-3);
+  }
+  .modr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+.modecards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.modecard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
+  padding: 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink-2);
+  background: var(--glass-hi);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+
+  &.on {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 2px;
+  }
+}
+
+.mm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+
+  &.off .chip {
+    opacity: 0.6;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.mmchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--line-2);
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 720px) {
+  .modecards {
+    grid-template-columns: 1fr;
+  }
+}

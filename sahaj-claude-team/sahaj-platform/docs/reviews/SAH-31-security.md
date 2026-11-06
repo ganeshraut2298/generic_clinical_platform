@@ -1,0 +1,34 @@
+# Security review · SAH-31 (IPD medicine orders, safety checks, pharmacist check, staff PIN)
+
+Reviewer: security-reviewer (read-only), 6 Nov 2026. Saved by the tech lead. Tests not executed by the reviewer. No new runtime libraries.
+
+**Verdict: PASS.** No Critical or High. 6 Medium, 6 Low, 4 Info. Three Medium findings (S1, S4, S6) should block go-live, not the local merge.
+
+## Medium
+| # | Where | Finding | Fix | Tech lead decision |
+|---|---|---|---|---|
+| S1 | MedicineSafetyCheck.java:200-205, 121-133 | Allergy keyword match misses common spellings (Amoxycillin, Augmentin, Ampicillin, Cloxacillin, PCN, Sulfonamide, Septran, Bactrim, Co-trimoxazole, Hindi/Marathi text), so a hard stop does not fire. "unknown", "not known", "?" count as RECORDED, so the not-recorded warning is skipped. | Add stems (`amoxy`, `-cillin`, `augmentin`, `pcn`, `sulf`/`sulph`, `cotrimox`, `septran`, `bactrim`); treat unknown/not known/? as NOT_RECORDED; a unit test per keyword. | Fix now (adds hard stops, safer direction). Structured allergies and clinical sign-off of the keyword list stay a go-live blocker (OQ-31-1/4). |
+| S2 | PatientService.java:278-291 (rows at :90,:141,:169,:174); AuditSanitizer.java:48 | `PATIENT_REGISTERED/UPDATED/MERGED` audit rows store allergy and chronic-condition text in clear (before and after copies). Append-only, so it can never be erased. Breaks "never log clinical notes" and DPDP minimisation. Exposure is at rest/backups (no read API). | (a) snapshot holds `allergyRecorded`/`chronicRecorded` flags only; (b) AuditSanitizer redacts allergy, chronic, diagnosis, complaint, clinical, history for every entity type; (c) human-approved migration for existing rows. | Fix (a) and (b) now. (c) is a destructive change to existing rows: human decision (no live data yet, so low urgency); recorded in DEC-017. |
+| S3 | MedicineAssembler.java:202-254; PharmacistCheckService.java:63-80 | The pharmacist list shows names, UHID, age, sex, bed and allergy text for up to 100 patients per page and writes no record-access row. | One record-access row per distinct patient when the list is loaded (not on the counts-only summary poll). | Fix (safer direction, DEC-014); ADR-009 Q10 re-opened and noted in DEC-017. |
+| S4 | PatientService.java:166-167; PatientClinicalLookup.java:25-27 (SAH-8) | A patient merge copies the merged-away record's allergy/chronic text over the kept record's, even when null: a known allergy can be wiped. `PatientClinicalPort` does not follow `merged_into_id`, so an admission pointing at a merged-away record never sees later allergy updates. | Merge never overwrites with null (keep or combine); port reads through `merged_into_id`. | Fix both (safer direction), recorded in DEC-013 for the human to confirm the merge rule. |
+| S5 | OtpService.java:57-109; StaffPinService.java:70,99 | A PIN-set code is also a sign-in code and vice versa (`otp_challenge` has no purpose column); asking for one cancels the other; the "5 code requests per hour" PIN limit can be bypassed through the public sign-in request. | Add `purpose` to `otp_challenge`, check it on verify, separate SMS text. Reverses ADR-010 Q5. | Human decision; recommended before a real SMS sender exists. Not fixed now. |
+| S6 | MedicineRules.java:32 | Any OWNER can place medicine orders even if not a clinician (no doctor profile/registration number for OWNER). | Allow OWNER to order only with a doctor profile and registration number, or a clinic flag "owner is a registered doctor". | Human decision; go-live blocker. Recorded in DEC-017. |
+
+## Low
+| # | Where | Finding | Fix | Decision |
+|---|---|---|---|---|
+| S7 | StaffPinOps.java:122-140 | Anyone at an unattended signed-in pharmacist screen can switch off that PIN (15 wrong tries). Every lock is audited; no privilege gained. | Accept; notify the person once notifications exist; idle screen lock. | Accept |
+| S8 | InMemoryStaffPinLimits.java:24-28 | PIN rate limits are in memory, per instance. Database lockout unaffected. | Shared limiter (HARD-2). | HARD-2 |
+| S9 | verify-sheet.component.html:68-72 | Browser may offer to save the PIN (`type=password`, `autocomplete=off` ignored). | `autocomplete="one-time-code"`; check no save prompt in e2e. | Fix (angular-developer) |
+| S10 | .gitignore:2 | `backend/target-devtools/` not ignored; surefire reports there can hold one-time code log lines. | Add to .gitignore. | Human (file is human-owned) |
+| S11 | JdbcMedicineOrderRepository.java:41-45, 83-88 | Some reads have no row limit; order/stop/reject have no per-user rate limit. | Cap or page; platform limiter. | HARD-2 |
+| S12 | StaffPinHasher.java:71-78; ADR-010 Q6 | Pepper-differs-from-JWT check compares text/bytes only (other encodings pass); no rotation or compromise runbook. | Write the runbook, including how to clear every PIN despite the guard. | Backlog (security runbook before go-live) |
+
+## Info
+I1 The reflection seam `freshPinAllowance` exists only in tests (right trade). I2 Tampering with the unsigned cursor only moves the page start inside the caller's clinic (optional max-value cursor test). I3 The two-person rule leans on the owner (an owner can add a second PHARMACIST membership on another SIM); audited. I4 PIN check results are logged with tenantId, membershipId and outcome only; keep logs 180 days, India.
+
+## Passed
+PIN storage (BCrypt 12 of HMAC-SHA256 with pepper bound to tenant and membership; hash-format check); missing pepper fails closed (503, owner reset still works), invalid/short/equal-to-JWT pepper refuses start and never echoes the value; all seven weak-PIN rules; lockout on the database clock with row lock, trigger state machine, parallel tries counted; constant-time comparison; PIN checked outside the IPD transaction; set/change needs a fresh code to the person's own mobile; owner reset only clears; no enumeration; token role AND membership role checked per action; orderer can never verify (before PIN, under the lock, by `ck_medicine_order_self_verify`); tenant isolation (FORCE RLS, composite FKs, select-only global tables, every query tenant-filtered, 404 across clinics); verify bypass attempts (stale checkToken, hard stop at verify, races decided under the admission lock); input validation and parameterised SQL; no allergy text in logs, events, audit or problem details in the IPD code; frontend has no innerHTML, bypassSecurityTrust, storage or console; PIN fields masked and cleared; dialogs cannot close while running; polling pauses when hidden; PHARMACIST page makes no admissions calls.
+
+## Done well
+Fail-closed pepper handling with version tracking; database guard triggers as real backstops on the database clock; self-verification enforced in three places with the cheap check first; allergy text kept out of logs, events and audit; PIN error texts written once in platform.api for SAH-32 to reuse.

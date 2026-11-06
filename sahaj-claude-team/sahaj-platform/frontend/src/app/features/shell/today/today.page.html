@@ -1,0 +1,181 @@
+<app-page-head [title]="greeting()" lead="Fee is collected after the consultation.">
+  @if (showSetup()) {
+    <span class="pill p-warn">Setup {{ setupPercent() }}% done</span>
+  }
+  @if (canBook()) {
+    <a mat-stroked-button routerLink="/app/appointments">
+      <app-icon name="calendar" [size]="17" /> Book appointment
+    </a>
+  }
+  @if (canIssueToken()) {
+    <button mat-flat-button type="button" (click)="openNewToken()">
+      <app-icon name="plus" [size]="17" /> New token
+    </button>
+  }
+</app-page-head>
+
+@if (showSetup() && overview()) {
+  <section class="panel surf" aria-label="Getting started">
+    <div class="panel-h">
+      <h2>Getting started</h2>
+      <span class="faint small num">{{ setupCounts().done }} of {{ setupCounts().required }} done</span>
+    </div>
+    <div class="chk">
+      @for (check of checks(); track check.key) {
+        <div class="ci" [class.done]="check.done">
+          <span class="cb">
+            @if (check.done) {
+              <app-icon name="check" [size]="12" />
+            }
+          </span>
+          <div class="main">
+            <b>{{ check.label }}@if (check.optional) { <span class="faint"> · optional</span> }</b>
+            @if (check.why) {
+              <small>{{ check.why }}</small>
+            }
+          </div>
+          @if (!check.done) {
+            @if (fixTarget(check); as target) {
+              <a mat-stroked-button [routerLink]="['/app/config', target.section]" [fragment]="target.fragment">
+                {{ check.optional ? 'Add' : 'Fix' }}
+              </a>
+            }
+          }
+        </div>
+      }
+    </div>
+  </section>
+}
+
+@if (loading()) {
+  <p class="muted" aria-busy="true">Loading Today</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button mat-button type="button" (click)="reload()">Try again</button>
+  </div>
+} @else if (summary(); as s) {
+  <section class="kpis" aria-label="Today at a glance">
+    <div class="kpi surf" data-kpi="patients">
+      <span class="eyebrow">Patients today</span>
+      <span class="v num">{{ s.patientsTotal }}</span>
+      <span class="s"><b>{{ s.newCount }} new</b> · {{ s.followUpCount }} follow-up</span>
+    </div>
+    <div class="kpi surf" data-kpi="waiting">
+      <span class="eyebrow">Waiting now</span>
+      <span class="v num">{{ s.waitingCount }}</span>
+      <span class="s">{{ s.inOpdCount }} in OPD · longest {{ s.longestWaitMinutes }} min</span>
+    </div>
+    <div class="kpi surf" data-kpi="collected">
+      <span class="eyebrow">Collected</span>
+      @if (billing(); as b) {
+        <span class="v num">{{ formatInr(b.collectedPaise / 100) }}</span>
+        <span class="s">{{ b.billsPending }} bills pending</span>
+      } @else {
+        <span class="v num" aria-label="Not available">—</span>
+        <span class="s">Billing figures are not available right now</span>
+      }
+    </div>
+    <div class="kpi surf" data-kpi="followups">
+      <span class="eyebrow">Follow-ups due</span>
+      <span class="v num">{{ s.followUpsDue + s.followUpsReturned }}</span>
+      <span class="s"><b>{{ s.followUpsReturned }} returned</b> · {{ s.followUpsDue }} still to come</span>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel surf" aria-label="Live OPD">
+      <div class="panel-h">
+        <h2>Live OPD</h2>
+        <a mat-button routerLink="/app/queue">Open queue <app-icon name="arrow" [size]="15" /></a>
+      </div>
+      <div class="docq">
+        @for (d of s.doctors; track d.doctorMembershipId) {
+          <div class="dcard">
+            <div class="dhead">
+              <span class="avatar" aria-hidden="true">{{ initialsOf(d.doctorName) }}</span>
+              <b>{{ d.doctorName }}</b>
+            </div>
+            <div class="serving">
+              <div>
+                <div class="eyebrow">Now with doctor</div>
+                <div class="tk">{{ d.nowWithDoctor ? 'T-' + d.nowWithDoctor.tokenNo : '—' }}</div>
+              </div>
+              <div class="who">
+                @if (d.nowWithDoctor; as n) {
+                  <b>{{ n.patientName }}</b>
+                  <div class="muted small">{{ n.age }} {{ n.sex }} · {{ typeOf(n.visitType) }}</div>
+                } @else {
+                  <span class="muted">Room free</span>
+                }
+              </div>
+            </div>
+            <div>
+              <div class="eyebrow">Next in line · {{ d.nextTokens.length }}</div>
+              <div class="nextlist">
+                @for (t of d.nextTokens; track t) {
+                  <span class="tokchip">T-{{ t }}</span>
+                } @empty {
+                  <span class="faint small">No one waiting</span>
+                }
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <app-empty>No doctors are in the OPD today.</app-empty>
+        }
+      </div>
+    </section>
+
+    <div class="vstack">
+      <section class="panel surf" aria-label="My tasks">
+        <div class="panel-h">
+          <h2>My tasks <span class="faint small">· {{ roleLabel() }}</span></h2>
+          <span class="pill p-teal num">{{ s.myTasks.length }}</span>
+        </div>
+        @if (s.myTasks.length) {
+          <div class="list">
+            @for (task of s.myTasks; track task.visitId) {
+              <div class="li">
+                <span class="tokchip">T-{{ task.tokenNo }}</span>
+                <div class="main">
+                  <b>{{ task.patientName }}</b>
+                  <small>{{ stageLabels[task.stage] }} · {{ task.doctorName }} · {{ task.waitMinutes }} min</small>
+                </div>
+                @if (taskAction(task); as action) {
+                  @if (action.kind === 'move') {
+                    <button mat-stroked-button type="button" [disabled]="movingId() === task.visitId" (click)="moveTask(task)">
+                      {{ action.label }}
+                    </button>
+                  } @else {
+                    <a mat-stroked-button routerLink="/app/billing">{{ action.label }}</a>
+                  }
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <app-empty>Nothing waiting on {{ roleLabel().toLowerCase() }} right now.</app-empty>
+        }
+      </section>
+
+      <section class="panel surf" aria-label="Alerts">
+        <div class="panel-h"><h2>Alerts</h2></div>
+        @if (alerts().length) {
+          <div class="list">
+            @for (a of alerts(); track a.link) {
+              <div class="li">
+                <span class="sev warn" aria-hidden="true"></span>
+                <div class="main"><b>{{ a.text }}</b></div>
+                <a mat-stroked-button [routerLink]="a.link">{{ a.actionLabel }}</a>
+              </div>
+            }
+          </div>
+        } @else {
+          <app-empty>No alerts for your role.</app-empty>
+        }
+      </section>
+    </div>
+  </div>
+}

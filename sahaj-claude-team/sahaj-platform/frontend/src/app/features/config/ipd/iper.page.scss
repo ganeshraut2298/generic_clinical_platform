@@ -1,0 +1,18 @@
+// Level dot before the level name (mockup `.tridot`): colour from the tokens, name always written.
+.tridot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+
+  &.tri-crit {
+    background: var(--crit);
+  }
+  &.tri-warn {
+    background: var(--warn);
+  }
+  &.tri-good {
+    background: var(--good);
+  }
+}

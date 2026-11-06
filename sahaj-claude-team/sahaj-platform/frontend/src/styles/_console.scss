@@ -1,0 +1,1000 @@
+// Console building blocks, one definition for every screen behind the app shell and for the
+// dialogs. Source: the mockup `.panel`, `.pagehead`, `.kpi`, `.list/.li`, `.empty`, `.notice`,
+// `.tabs`, `.seg`, `.field/.input`, `.sheet*` rules and the `.cs` (clinic console) density layer.
+// Colours, radii and fonts come from tokens only. Pages must not redefine these classes: add a
+// page-specific class instead.
+//
+// Rule for touch targets (angular.md, 44 px): the drawn size follows the mockup; small controls
+// grow their hit area with a transparent ::after (see `.hit`), stacked rows are 44 px tall.
+
+// ---------------------------------------------------------------- surfaces
+
+// Glass: panels, tiles and columns in the console (mockup `.glass`).
+.glass,
+.shell .surf {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+
+// A small control whose hit area is 44 px high although it is drawn smaller.
+.hit {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
+  }
+}
+
+// ---------------------------------------------------------------- console frame
+
+.shell {
+  font-size: 13.5px;
+
+  h1 {
+    font-size: 1.28rem;
+  }
+  h2 {
+    font-size: 0.98rem;
+  }
+}
+
+// The work area. Routed page hosts are its children and stack with the page gap.
+.shell main.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  width: 100%;
+  max-width: var(--page-max, 1680px);
+  margin: 0 auto;
+  padding: 14px 20px 8px;
+  min-width: 0;
+
+  > router-outlet {
+    display: none;
+  }
+  > :not(router-outlet) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+// Clinic setup: the section page is routed into `.cfg-main` and stacks its blocks like any page.
+.cfg-main > :not(router-outlet):not(.cfg-head):not(.tipbox) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pagehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  h1 {
+    font-size: 1.18rem;
+  }
+  .lead {
+    margin-top: 1px;
+    color: var(--ink-2);
+    font-size: 0.8rem;
+    max-width: 76ch;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+// Vertical stack of panels (right-hand column of a grid)
+.vstack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+// Stacked share bar (payment mix)
+.stack {
+  display: flex;
+  height: 16px;
+  gap: 2px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 14px;
+  min-width: 0;
+}
+
+.panel-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  h2 {
+    font-size: 0.95rem;
+  }
+  small {
+    display: block;
+  }
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+
+  &.even {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// ---------------------------------------------------------------- KPI tiles
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.kpi {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 1px;
+  align-items: baseline;
+  padding: 9px 14px;
+
+  .eyebrow {
+    grid-column: 1 / -1;
+  }
+  .v {
+    font-family: var(--font-display);
+    font-size: 1.28rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .s {
+    min-width: 0;
+    font-size: 0.76rem;
+    color: var(--ink-2);
+
+    b {
+      color: var(--pri-text);
+      font-weight: 600;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- lists and rows
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line-2);
+  min-width: 0;
+  flex-wrap: wrap;
+
+  &:first-child {
+    border-top: 0;
+  }
+  &.dim .main {
+    opacity: 0.55;
+  }
+  .main {
+    min-width: 0;
+    flex: 1 1 140px;
+
+    b {
+      font-weight: 600;
+    }
+    small {
+      display: block;
+      color: var(--ink-3);
+      font-size: 0.78rem;
+    }
+  }
+}
+
+// Secondary line under a bold title, wherever a `.main` block is used (list rows, checklist, members)
+.main > small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+// A list row that is a button (patients, bills): full-width, hover and selected state.
+button.li {
+  width: 100%;
+  min-height: 44px;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  border-radius: 0;
+
+  &:hover {
+    background: var(--muted-soft);
+  }
+  &[aria-current='true'] {
+    background: var(--pri-soft);
+  }
+}
+
+// Severity bar at the start of an alert row
+.sev {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 4px;
+  background: var(--line);
+  flex: none;
+
+  &.warn {
+    background: var(--warn);
+  }
+  &.crit {
+    background: var(--crit);
+  }
+  &.info {
+    background: var(--sec);
+  }
+}
+
+// Initials badge: square with rounded corners, as the mockup `.avatar` and `.pav`
+.avatar,
+.av {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: var(--pri-soft);
+  color: var(--pri-text);
+
+  &.b,
+  &.f {
+    background: var(--sec-soft);
+    color: var(--sec);
+  }
+}
+
+// Small type scale for secondary text (use instead of inline font sizes)
+.t-xs {
+  font-size: 0.74rem;
+}
+.t-sm {
+  font-size: 0.8rem;
+}
+.t-md {
+  font-size: 0.86rem;
+}
+
+// ---------------------------------------------------------------- states
+
+.empty {
+  padding: 10px 12px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+.note {
+  color: var(--ink-3);
+  font-size: 0.84rem;
+  padding: 6px 0;
+}
+
+// Rule row: a sentence with a control on the right (clinic setup)
+.rulerow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-2);
+  color: var(--ink-2);
+  font-size: 0.88rem;
+
+  &:first-child {
+    border-top: 0;
+  }
+  small {
+    display: block;
+  }
+}
+
+.loading {
+  color: var(--ink-2);
+  font-size: 0.86rem;
+}
+
+.notice {
+  &.warn {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &.teal {
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &.err {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+  &.slim {
+    padding: 6px 10px;
+    align-items: center;
+    font-size: 0.8rem;
+  }
+  code {
+    font-size: 0.78rem;
+    background: var(--muted-soft);
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+
+// ---------------------------------------------------------------- tabs, segmented control, chips
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+
+  button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.84rem;
+    color: var(--ink-2);
+    white-space: nowrap;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -6px 0;
+    }
+    &[aria-selected='true'] {
+      background: var(--glass-hi);
+      color: var(--pri-text);
+      box-shadow: 0 3px 10px -6px var(--pri);
+    }
+  }
+  .c {
+    font-size: 0.72rem;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--muted-soft);
+  }
+}
+
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-sm);
+  background: var(--muted-soft);
+
+  // Plain buttons only: the Material toggle group variant is themed in _primitives.scss.
+  &:not(.mat-button-toggle-group) button {
+    position: relative;
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 9px;
+    font-weight: 600;
+    font-size: 0.84rem;
+    color: var(--ink-2);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -6px 0;
+    }
+    &[aria-pressed='true'] {
+      background: var(--glass-hi);
+      color: var(--pri-text);
+      box-shadow: 0 2px 8px -4px var(--pri);
+    }
+  }
+}
+
+// Filter chip with a count (patients list)
+.chipf {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-2);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
+  }
+  .num {
+    font-size: 0.72rem;
+    padding: 0 6px;
+    border-radius: var(--r-pill);
+    background: var(--muted-soft);
+    color: var(--ink-3);
+  }
+  &[aria-pressed='true'] {
+    background: var(--pri);
+    border-color: var(--pri);
+    color: var(--pri-ink);
+
+    .num {
+      background: var(--pri-soft);
+      color: var(--pri-ink);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- forms
+
+// Material text fields and selects in the console and its sheets follow the mockup `.input`:
+// the console text size (not the 16 px Material default) in a 44 px tall field, so a field next
+// to a button or a plain `.input` has the same height and type size.
+.shell,
+.sheet-panel {
+  --mat-form-field-container-text-size: 0.86rem;
+  --mat-form-field-container-text-line-height: 1.25rem;
+  --mat-form-field-outlined-label-text-size: 0.86rem;
+  --mat-form-field-container-height: 44px;
+  --mat-form-field-container-vertical-padding: 12px;
+  --mat-form-field-subscript-text-size: 0.76rem;
+  --mat-select-trigger-text-size: 0.86rem;
+}
+
+.field:not(mat-form-field) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  > label,
+  .field-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+}
+
+mat-form-field.field {
+  width: 100%;
+}
+
+.field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+
+.err-text {
+  font-size: 0.78rem;
+  color: var(--crit);
+}
+
+.input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--field-line);
+  background: var(--glass-hi);
+  color: var(--ink);
+  outline: 0;
+  min-width: 0;
+  width: 100%;
+
+  &:hover {
+    border-color: var(--ink-2);
+  }
+  &:focus,
+  &:focus-visible {
+    border-color: var(--pri);
+    box-shadow: 0 0 0 3px var(--pri-soft);
+  }
+  &:disabled {
+    opacity: 0.6;
+    background: var(--surface-2);
+  }
+}
+
+select.input {
+  appearance: auto;
+}
+
+// Rupee-prefixed amount: `.rs` wraps a `.input` and the symbol
+.rs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--ink-3);
+
+  .input {
+    width: 104px;
+    text-align: right;
+  }
+}
+
+// Switch (role="switch" button)
+.sw {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  transition: background var(--dur-1) var(--ease);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -11px -4px;
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: var(--paper);
+    box-shadow: 0 1px 3px var(--scrim);
+    transition: transform var(--dur-1) var(--ease);
+  }
+  &[aria-checked='true'] {
+    background: var(--pri);
+
+    &::after {
+      transform: translateX(17px);
+    }
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--field-line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--glass-hi);
+
+  button {
+    border: 0;
+    background: transparent;
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+    color: var(--ink-2);
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+  span {
+    min-width: 64px;
+    text-align: center;
+    font-weight: 700;
+  }
+}
+
+// Remove (x) button at the end of a row
+.xbtn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-3);
+
+  &:hover:not(:disabled) {
+    background: var(--muted-soft);
+    color: var(--crit);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// Icon button (topbar, sheet close): drawn 36 px, hit area 44 px
+.iconbtn {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-hi);
+  color: var(--ink-2);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+  &:hover {
+    color: var(--pri-text);
+  }
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+// Plan meter (sidebar plan card, setup progress)
+.meter {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--pri), var(--sec));
+  }
+  &.warn i {
+    background: var(--warn);
+  }
+}
+
+// A worked example under a form control (mockup `.hint` on a muted tile)
+.example {
+  font-size: 0.84rem;
+  color: var(--ink-2);
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--muted-soft);
+  line-height: 1.55;
+
+  > b:first-child {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+  }
+}
+
+// ---------------------------------------------------------------- dialogs and sheets
+
+// Material dialog container, shaped like the mockup `.sheet`
+.sheet-panel {
+  --mat-dialog-container-shape: 22px;
+  --mat-dialog-container-color: var(--glass-hi);
+  --mat-dialog-supporting-text-color: var(--ink);
+  --mat-dialog-subhead-color: var(--ink);
+
+  .mat-mdc-dialog-surface {
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid var(--glass-edge);
+    box-shadow: var(--shadow);
+  }
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+// Mockup `.sheet.wide`: the footer stays at the bottom edge while the body scrolls (used by the
+// Medicines tab of the Nursing sheet, mockup `sfMar`).
+.sheet.wide .sheet-f {
+  position: sticky;
+  bottom: 0;
+  background: var(--glass-hi);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.sheet-h {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 22px 12px;
+
+  // Close (X) button of every sheet: the real hit area is 44 x 44 px (angular.md). Material draws the
+  // icon button at the state-layer size (40 px by default); the icon stays 18 px, only the invisible
+  // area around it grows.
+  --mat-icon-button-state-layer-size: 44px;
+
+  > div {
+    flex: 1;
+    min-width: 0;
+  }
+  // Loading and error variants have a bare <h2> instead of a <div> holding the title: it takes the
+  // free width so the close button stays at the right edge.
+  > h2 {
+    flex: 1;
+    min-width: 0;
+  }
+  > .mat-mdc-icon-button {
+    flex: none;
+    width: 44px;
+    height: 44px;
+  }
+  h2 {
+    font-size: 1.08rem;
+  }
+  p {
+    margin-top: 2px;
+    font-size: 0.86rem;
+    color: var(--ink-2);
+  }
+}
+
+.sheet-b {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 22px 18px;
+}
+
+.sheet-f {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 22px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line-2);
+
+  // Touch target (angular.md): every footer button is at least 44 px tall. Material draws its
+  // flat, stroked and text buttons 40 px high by default.
+  button {
+    min-height: 44px;
+  }
+}
+
+// Choice buttons inside a sheet (doctor, slot, visit type): pressed = 2 px primary border
+.seg-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.seg-wrap button,
+.docbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-hi);
+  font-weight: 600;
+  font-size: 0.86rem;
+
+  small {
+    font-weight: 500;
+    color: var(--ink-3);
+    font-size: 0.74rem;
+  }
+  &:hover {
+    border-color: var(--pri);
+  }
+  &[aria-pressed='true'] {
+    border: 2px solid var(--pri);
+    padding: 7px 11px;
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+}
+
+// Choice rows inside a sheet (family members, patients)
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+
+  &:hover {
+    border-color: var(--pri);
+  }
+  &[aria-pressed='true'] {
+    border: 2px solid var(--pri);
+    padding: 10px 11px;
+    background: var(--pri-soft);
+  }
+  .main {
+    flex: 1;
+    min-width: 0;
+  }
+  small {
+    display: block;
+    color: var(--ink-3);
+    font-size: 0.78rem;
+  }
+}
+
+// Token slip and printed paper
+.slip {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--paper-ink);
+
+  .big {
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--paper-accent);
+  }
+  small {
+    display: block;
+    color: var(--paper-soft);
+  }
+}
+
+// ---------------------------------------------------------------- responsive
+
+@media (max-width: 1180px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid2,
+  .grid2.even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .shell main.page {
+    padding: 12px 12px 8px;
+  }
+}
+
+@media (max-width: 620px) {
+  .kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sheet-h {
+    padding: 16px 16px 10px;
+  }
+  .sheet-b {
+    padding: 4px 16px 16px;
+  }
+  .sheet-f {
+    padding-inline: 16px;
+  }
+  .sheet {
+    max-height: 92vh;
+  }
+  .cdk-global-overlay-wrapper:has(.sheet-panel) {
+    align-items: flex-end !important;
+  }
+  .sheet-panel {
+    --mat-dialog-container-shape: 22px 22px 0 0;
+  }
+}

@@ -1,0 +1,109 @@
+<div class="adm-shell" [class.collapsed]="collapsed()" [class.drawer]="drawerOpen()">
+  <aside class="adm-sidebar" aria-label="Sidebar">
+    <div class="adm-brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <div class="adm-label">
+        <b>Sahaj Admin</b>
+        <small>Platform and organizations</small>
+      </div>
+    </div>
+
+    <button
+      type="button"
+      class="adm-collapse"
+      (click)="toggleCollapsed()"
+      [attr.aria-expanded]="!collapsed()"
+      [attr.aria-label]="collapsed() ? 'Expand menu' : 'Collapse menu'"
+      [attr.title]="collapsed() ? 'Expand menu' : 'Collapse menu'"
+    >
+      <app-icon [name]="collapsed() ? 'chevR' : 'chevL'" [size]="15" />
+      @if (!collapsed()) {
+        <span>Collapse menu</span>
+      }
+    </button>
+
+    <nav class="adm-nav" aria-label="Admin navigation">
+      <div class="adm-group" id="adm-group-platform">{{ scopeLabel }}</div>
+      <a
+        class="adm-item"
+        routerLink="/admin/clinics"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        title="Organizations"
+        (click)="closeDrawer()"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16M14 10h5a1 1 0 0 1 1 1v10M3 21h18M8 8h2M8 12h2M8 16h2" />
+        </svg>
+        <span class="adm-label">Organizations</span>
+      </a>
+    </nav>
+  </aside>
+  @if (drawerOpen()) {
+    <button type="button" class="adm-scrim" aria-label="Close menu" (click)="closeDrawer()"></button>
+  }
+
+  <div class="adm-main">
+    <header class="adm-top">
+      <button type="button" class="iconbtn adm-ham" (click)="openDrawer()" aria-label="Open menu">
+        <app-icon name="menu" [size]="18" />
+      </button>
+      <div class="adm-org">
+        <span class="adm-org-logo" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <rect x="3" y="4" width="18" height="7" rx="1.5" />
+            <rect x="3" y="13" width="18" height="7" rx="1.5" />
+            <path d="M7 7.5h.01M7 16.5h.01" />
+          </svg>
+        </span>
+        <div>
+          <b>Sahaj platform</b>
+          <small>All organizations</small>
+        </div>
+      </div>
+      <span class="adm-scope">{{ scopeLabel }}</span>
+
+      <button
+        type="button"
+        class="adm-me"
+        [matMenuTriggerFor]="profileMenu"
+        aria-label="Your profile"
+      >
+        <span class="av">{{ initials() }}</span>
+      </button>
+      <mat-menu #profileMenu="matMenu" xPosition="before">
+        <div class="adm-menu-head" role="presentation">
+          <b>{{ adminName() }}</b>
+          <small>{{ roleLabel() }} · Sahaj team</small>
+        </div>
+        <button mat-menu-item type="button" (click)="signOut()" [disabled]="signingOut()">
+          <app-icon name="logout" [size]="15" />
+          <span>Sign out</span>
+        </button>
+      </mat-menu>
+    </header>
+
+    <div class="adm-strip" role="note">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      <span>{{ stripText }}</span>
+    </div>
+
+    <main class="adm-page" id="admin-main">
+      @if (crumb(); as current) {
+        <nav class="adm-crumb" aria-label="Breadcrumb">
+          <span>{{ scopeLabel }}</span>
+          <span class="sep" aria-hidden="true">›</span>
+          <span aria-current="page">{{ current }}</span>
+        </nav>
+      }
+      <router-outlet />
+    </main>
+  </div>
+</div>

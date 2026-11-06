@@ -1,0 +1,29 @@
+// Set PIN sheet. Colours come from the tokens only.
+.sub {
+  font-size: 0.86rem;
+}
+
+.sendrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.grid-f {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+// Touch target (angular.md): every button in the sheet is 44 px tall.
+.sheet-f button,
+.sheet-b button,
+.notice button {
+  min-height: 44px;
+}
+
+.notice button {
+  margin-left: auto;
+}

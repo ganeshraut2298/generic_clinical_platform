@@ -1,0 +1,240 @@
+<app-page-head [title]="heading()" [lead]="locked() ? '' : lead()">
+  @if (emergencyOn() && activeTab() !== 'er') {
+    <button type="button" mat-stroked-button data-act="open-emergency" (click)="openEmergency()">
+      <app-icon name="siren" [size]="16" /> Emergency
+    </button>
+  }
+  @if (list()?.canAdmit && !noBeds()) {
+    <button type="button" mat-flat-button (click)="admit()">
+      <app-icon name="bed" [size]="16" /> Admit patient
+    </button>
+  }
+</app-page-head>
+
+@if (locked()) {
+  <section class="panel surf lockpage">
+    <span class="lockic"><app-icon name="lock" [size]="26" /></span>
+    <h2>In-patient care (IPD) is not on for your clinic</h2>
+    <p class="muted">
+      Switch it on to admit patients, take deposits and see who is in a bed.
+    </p>
+    @if (isOwner()) {
+      <div>
+        <a mat-flat-button routerLink="/app/config/modules">See plan and modules</a>
+      </div>
+    }
+  </section>
+} @else if (isPharmacist()) {
+  <div class="tabs" role="tablist" aria-label="Beds and admissions">
+    <button
+      type="button"
+      role="tab"
+      id="ipd-tab-safety"
+      aria-controls="ipd-panel"
+      aria-selected="true"
+      tabindex="0"
+      data-testid="pharmacist-tab-button"
+    >
+      {{ safetyLabel }}@if (safetyTabNumber() > 0) {
+        <span class="c num">{{ safetyTabNumber() }}</span>
+      }
+    </button>
+  </div>
+  <div role="tabpanel" id="ipd-panel" tabindex="0" aria-labelledby="ipd-tab-safety" class="tabpanel">
+    <app-pharmacist-tab />
+  </div>
+} @else if (loading()) {
+  <p class="muted" aria-busy="true">Loading beds and admissions</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button type="button" mat-stroked-button (click)="load()">Try again</button>
+  </div>
+} @else if (list(); as l) {
+  <ng-template #setup>
+    <section class="panel surf lockpage">
+      <span class="lockic"><app-icon name="bed" [size]="26" /></span>
+      <h2>Add your wards and beds to start</h2>
+      <p class="muted">
+        IPD is on. Add wards, rooms and beds with their categories and daily charges.
+      </p>
+      @if (isOwner()) {
+        <div>
+          <a mat-flat-button routerLink="/app/config/ipbeds">
+            <app-icon name="plus" [size]="15" /> Add wards and beds
+          </a>
+        </div>
+      }
+    </section>
+  </ng-template>
+  @if (setupOnly()) {
+    <ng-container [ngTemplateOutlet]="setup" />
+  } @else {
+    <section class="kpis" aria-label="Bed summary">
+      <div class="kpi surf" data-kpi="occupied">
+        <span class="eyebrow">Beds occupied</span>
+        <span class="v num">{{ l.bedsOccupied }}<small> / {{ l.bedsTotal }}</small></span>
+        <span class="s">{{ occupancy() }}% occupancy · {{ l.bedsAvailable }} available</span>
+      </div>
+      <div class="kpi surf" data-kpi="emergency">
+        <span class="eyebrow">Emergency</span>
+        <span class="v num">{{ tileNumber() }}</span>
+        <span class="s">
+          @if (tileText().critical) {
+            <b class="crit">{{ tileText().text }}</b>
+          } @else {
+            {{ tileText().text }}
+          }
+        </span>
+      </div>
+      <div class="kpi surf" data-kpi="alerts">
+        <span class="eyebrow">Deposit alerts</span>
+        <span class="v num">{{ l.depositAlerts }}</span>
+        <span class="s">Running bill over {{ l.alertPercent }}% of deposit</span>
+      </div>
+      <div class="kpi surf" data-kpi="going-home">
+        <span class="eyebrow">Going home today</span>
+        <span class="v num">{{ goingHome(l) }}</span>
+        <span class="s">{{ goingHomeLine(l) }}</span>
+      </div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Beds and admissions">
+      <button
+        type="button"
+        role="tab"
+        id="ipd-tab-board"
+        aria-controls="ipd-panel"
+        [attr.aria-selected]="activeTab() === 'board'"
+        [attr.tabindex]="activeTab() === 'board' ? 0 : -1"
+        (click)="selectTab('board')"
+        (keydown)="onTabKeydown($event)"
+      >
+        Bed board
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="ipd-tab-admitted"
+        aria-controls="ipd-panel"
+        [attr.aria-selected]="activeTab() === 'admitted'"
+        [attr.tabindex]="activeTab() === 'admitted' ? 0 : -1"
+        (click)="selectTab('admitted')"
+        (keydown)="onTabKeydown($event)"
+      >
+        Admitted<span class="c num">{{ l.items.length }}</span>
+      </button>
+      @if (emergencyOn()) {
+        <button
+          type="button"
+          role="tab"
+          id="ipd-tab-er"
+          aria-controls="ipd-panel"
+          [attr.aria-selected]="activeTab() === 'er'"
+          [attr.tabindex]="activeTab() === 'er' ? 0 : -1"
+          (click)="selectTab('er')"
+          (keydown)="onTabKeydown($event)"
+        >
+          Emergency<span class="c num">{{ emergency()?.queue }}</span>
+        </button>
+      }
+      @if (safetyOn()) {
+        <button
+          type="button"
+          role="tab"
+          id="ipd-tab-safety"
+          aria-controls="ipd-panel"
+          [attr.aria-selected]="activeTab() === 'safety'"
+          [attr.tabindex]="activeTab() === 'safety' ? 0 : -1"
+          (click)="selectTab('safety')"
+          (keydown)="onTabKeydown($event)"
+        >
+          {{ safetyLabel }}@if (safetyTabNumber() > 0) {
+            <span class="c num">{{ safetyTabNumber() }}</span>
+          }
+        </button>
+      }
+    </div>
+
+    <div role="tabpanel" id="ipd-panel" tabindex="0" [attr.aria-labelledby]="'ipd-tab-' + activeTab()" class="tabpanel">
+      @if (activeTab() === 'er') {
+        <app-emergency (counts)="onEmergencyCounts($event)" (admitted)="afterAdmitted($event)" />
+      } @else if (noBeds()) {
+        <ng-container [ngTemplateOutlet]="setup" />
+      } @else if (activeTab() === 'safety') {
+        <app-safety (counts)="onSafetyCounts($event)" [showPharmacist]="isOwner()" />
+      } @else if (activeTab() === 'board') {
+        <app-bed-board
+          (openAdmission)="openAdmission($event)"
+          (admit)="admit($event)"
+          (changed)="refreshCounts()"
+        />
+      } @else {
+        @if (l.safety; as sf) {
+          @if (sf.pastTarget.length > 0) {
+            <div class="notice crit sfban" role="status" data-testid="safety-banner">
+              <app-icon name="siren" [size]="16" />
+              <span><b>{{ bannerNames(sf.pastTarget) }}</b>{{ bannerTail }}</span>
+              <button type="button" mat-flat-button data-act="open-safety" (click)="openSafetyFromBanner()">
+                {{ openBoardLabel }}
+              </button>
+            </div>
+          }
+        }
+        <section class="panel surf">
+          @if (l.items.length === 0) {
+            <div class="empty">No one is admitted right now.</div>
+          } @else {
+            <div class="iptbl" role="table" aria-label="Admitted patients">
+              <div class="iptr ipth" role="row">
+                <span role="columnheader">Patient</span>
+                <span role="columnheader">Bed</span>
+                <span role="columnheader">Doctor</span>
+                <span role="columnheader" class="r">Running bill</span>
+                <span role="columnheader" class="r">Deposit</span>
+                <span role="columnheader">Status</span>
+                <span role="columnheader"><span class="sr-only">Open</span></span>
+              </div>
+              @for (a of l.items; track a.id) {
+                <div class="iptr" role="row">
+                  <span role="cell">
+                    <b>{{ a.patientName }}</b>
+                    <small>{{ subline(a) }}</small>
+                  </span>
+                  <span role="cell">
+                    {{ a.bedCode }}
+                    <small>{{ a.categoryName }}</small>
+                  </span>
+                  <span role="cell">{{ a.doctorName }}</span>
+                  <span role="cell" class="r num">{{ formatInrPaise(a.runningBillPaise) }}</span>
+                  <span role="cell" class="r num">{{ formatInrPaise(a.depositPaise) }}</span>
+                  <span role="cell" class="pills">
+                    @for (p of pills(a); track p.text) {
+                      <span [class]="'pill ' + p.css">
+                        @if (p.css === 'p-crit') {
+                          <app-icon name="alert" [size]="12" />
+                        }
+                        {{ p.text }}
+                      </span>
+                    }
+                  </span>
+                  <span role="cell" class="r">
+                    <button
+                      type="button"
+                      mat-stroked-button
+                      [attr.aria-label]="'Open ' + a.patientName"
+                      (click)="open(a)"
+                    >
+                      Open
+                    </button>
+                  </span>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+    </div>
+  }
+}

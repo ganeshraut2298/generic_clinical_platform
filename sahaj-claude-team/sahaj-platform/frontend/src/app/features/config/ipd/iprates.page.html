@@ -1,0 +1,130 @@
+@if (store.gate() !== 'ready') {
+  <app-ipd-gate [gate]="store.gate()" (retry)="store.retry()" />
+} @else if (store.loading() || (!store.layout() && !store.loadError())) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading bed categories and charges</p>
+  </section>
+} @else if (store.loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button (click)="store.retry()">Try again</button>
+    </div>
+  </section>
+} @else if (store.layout(); as l) {
+  <section class="panel surf" id="f-iprates">
+    <h2>Bed categories and charges</h2>
+
+    @if (store.isReadonly()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>IPD is read-only. Nothing can be changed.</span>
+      </div>
+    } @else if (!store.isOwner()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>Only the owner can change bed charges. You can view them here.</span>
+      </div>
+    }
+
+    <div class="cattbl" role="table" aria-label="Bed categories and charges">
+      <div class="cattr cath" role="row">
+        <span role="columnheader">Category</span>
+        <span role="columnheader">Bed charge a day</span>
+        <span role="columnheader">Rate on services</span>
+        <span role="columnheader" class="r">Beds</span>
+      </div>
+      @for (c of l.categories; track c.key) {
+        <div class="cattr" role="row">
+          <b role="cell">{{ c.name }}</b>
+          <span role="cell" class="rs">
+            ₹<input
+              class="input num"
+              type="text"
+              inputmode="numeric"
+              [value]="paiseToRupees(c.ratePaise)"
+              [disabled]="store.locked()"
+              [attr.aria-label]="c.name + ' bed charge a day, in rupees'"
+              [attr.title]="formatInrPaise(c.ratePaise)"
+              (change)="saveRate(c, $any($event.target))"
+            />
+          </span>
+          <span role="cell" class="rs">
+            ×<input
+              class="input num mult"
+              type="text"
+              inputmode="decimal"
+              [value]="c.multiplier"
+              [disabled]="store.locked()"
+              [attr.aria-label]="c.name + ' rate on services'"
+              (change)="saveMultiplier(c, $any($event.target))"
+            />
+          </span>
+          <span role="cell" class="r num">{{ c.beds }}</span>
+        </div>
+      }
+    </div>
+    <small class="faint">
+      "Rate on services" multiplies doctor visits and services for patients in that category. ×1.5
+      means a ₹500 visit is billed ₹750 in a private room.
+    </small>
+
+    <div class="rulerow">
+      <span>
+        <span id="cut-label">Bed day counted</span>
+        <small class="faint">When a new bed day is added to the bill</small>
+      </span>
+      <mat-button-toggle-group
+        class="seg"
+        aria-labelledby="cut-label"
+        [hideSingleSelectionIndicator]="true"
+        [value]="l.charges.bedDayCut"
+        [disabled]="store.locked()"
+        (change)="setBedDayCut($event.value)"
+      >
+        @for (cut of cuts; track cut.value) {
+          <mat-button-toggle [value]="cut.value">{{ cut.label }}</mat-button-toggle>
+        }
+      </mat-button-toggle-group>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <label for="ip-nursing">Nursing charge</label>
+        <small class="faint">Per day, every category</small>
+      </span>
+      <span class="rs">
+        ₹<input
+          id="ip-nursing"
+          class="input num"
+          type="text"
+          inputmode="numeric"
+          [value]="paiseToRupees(l.charges.nursingPaise)"
+          [disabled]="store.locked()"
+          aria-label="Nursing charge per day, in rupees"
+          (change)="saveCharge('nursingPaise', $any($event.target))"
+        />
+      </span>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <label for="ip-visit">Doctor visit</label>
+        <small class="faint">Per day, before the category rate</small>
+      </span>
+      <span class="rs">
+        ₹<input
+          id="ip-visit"
+          class="input num"
+          type="text"
+          inputmode="numeric"
+          [value]="paiseToRupees(l.charges.visitPaise)"
+          [disabled]="store.locked()"
+          aria-label="Doctor visit per day, in rupees"
+          (change)="saveCharge('visitPaise', $any($event.target))"
+        />
+      </span>
+    </div>
+  </section>
+}

@@ -1,0 +1,177 @@
+@if (sheet(); as s) {
+  <div class="sheet-h">
+    <div>
+      <h2 id="ads">Discharge {{ s.patientName }}</h2>
+      <p class="muted sub">{{ s.ipNumber }} · bed {{ s.bedCode }} · day {{ s.dayNumber }}</p>
+    </div>
+    <button mat-icon-button type="button" aria-label="Close" (click)="closed.emit()">
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    <ol class="disteps" aria-label="Discharge steps">
+      @for (step of steps(); track step.label) {
+        <li [class]="step.state === 'todo' ? '' : step.state" [attr.aria-current]="step.state === 'cur' ? 'step' : null">
+          <span aria-hidden="true">
+            @if (step.state === 'done') {
+              <app-icon name="check" [size]="12" />
+            } @else {
+              {{ step.number }}
+            }
+          </span>
+          {{ step.label }}
+          @if (step.state === 'done') {
+            <span class="sr-only">(done)</span>
+          }
+        </li>
+      }
+    </ol>
+
+    <div class="field">
+      <span class="flabel" id="dis-type-l">Discharge type</span>
+      <div class="seg-wrap" role="group" aria-labelledby="dis-type-l">
+        @for (t of s.types; track t.key) {
+          <button type="button" [attr.aria-pressed]="type() === t.key" (click)="setType(t.key)">
+            {{ t.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="dis-tpl">Summary template</label>
+      <select #tplSelect id="dis-tpl" class="input" (change)="setTemplate(tplSelect.value)">
+        @for (t of s.templates; track t.key) {
+          <option [value]="t.key" [selected]="template() === t.key">{{ t.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="dispv" role="group" aria-label="Summary preview">
+      <div class="dpr">
+        <span>Diagnosis</span>
+        <b>{{ s.preview.diagnosis }}</b>
+      </div>
+      <div class="dpr">
+        <span>Stay</span>
+        <b>{{ stay(s.preview) }}</b>
+      </div>
+      <div class="dpr">
+        <span>Treatment</span>
+        <b>As recorded in the case sheet and nursing notes</b>
+      </div>
+      <div class="dpr">
+        <span>Follow-up</span>
+        <b>{{ followUp() }}</b>
+      </div>
+    </div>
+
+    <label class="chkrow">
+      <input
+        #signBox
+        type="checkbox"
+        [checked]="signed()"
+        [disabled]="!s.canSign || signing() || stale() || signed()"
+        [attr.aria-describedby]="signedLine() ? 'dis-signed' : null"
+        (change)="sign(signBox)"
+      />
+      @if (signedLine()) {
+        Summary checked and signed
+      } @else {
+        Summary checked and signed by {{ s.preview.doctorName }}
+      }
+    </label>
+    @if (signedLine(); as line) {
+      <p id="dis-signed" class="signed-by faint">{{ line }}</p>
+    }
+
+    <div class="ipbill">
+      <div class="ipbh"><b>Final bill</b></div>
+      <div class="ipbl">
+        <span>Total charges</span>
+        <span></span>
+        <b class="num">{{ formatInrPaise(s.bill.totalPaise) }}</b>
+      </div>
+      <div class="ipbl dep">
+        <span>Deposits received</span>
+        <span></span>
+        <b class="num">− {{ formatInrPaise(s.bill.depositsPaise) }}</b>
+      </div>
+      <div class="ipbl tot">
+        <span>{{ balanceLabel(balance()) }}</span>
+        <span></span>
+        <b class="num">{{ formatInrPaise(balance() < 0 ? -balance() : balance()) }}</b>
+      </div>
+    </div>
+
+    @if (balance() !== 0) {
+      <div class="field">
+        <span class="flabel" id="dis-mode-l">{{ payModeLabel(balance()) }}</span>
+        <div class="seg-wrap" role="group" aria-labelledby="dis-mode-l">
+          @for (m of modes; track m) {
+            <button type="button" [attr.aria-pressed]="mode() === m" (click)="setMode(m)">{{ m }}</button>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="notice info" role="status">
+      <app-icon name="msg" [size]="16" />
+      <span>{{ notice() }}</span>
+    </div>
+
+    @if (escalationWarning(); as warning) {
+      <div class="notice crit" role="status" data-testid="dis-escalation">
+        <app-icon name="siren" [size]="16" />
+        <span>{{ warning }}</span>
+      </div>
+    }
+
+    @if (actionError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="sheet-f">
+    @if (!s.canDischarge) {
+      <span id="dis-role-hint" class="faint hint">{{ roleHint }}</span>
+    } @else if (!signed()) {
+      <span id="dis-hint" class="faint hint">The doctor signs the summary first</span>
+    }
+    <button mat-stroked-button type="button" [disabled]="running()" (click)="back.emit()">Back</button>
+    <button
+      mat-flat-button
+      type="button"
+      [disabled]="!s.canDischarge || !signed() || running() || stale()"
+      [attr.aria-describedby]="!s.canDischarge ? 'dis-role-hint' : signed() ? null : 'dis-hint'"
+      (click)="discharge()"
+    >
+      <app-icon name="door" [size]="15" /> {{ buttonText() }}
+    </button>
+  </div>
+} @else {
+  <div class="sheet-h">
+    <h2 id="ads">Discharge</h2>
+    <button mat-icon-button type="button" aria-label="Close" (click)="closed.emit()">
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+  <div class="sheet-b">
+    @if (loadError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button (click)="load()">Try again</button>
+      </div>
+    } @else {
+      <p class="muted" aria-busy="true">Loading the discharge sheet</p>
+    }
+  </div>
+  <div class="sheet-f">
+    <button mat-stroked-button type="button" (click)="back.emit()">Back</button>
+  </div>
+}

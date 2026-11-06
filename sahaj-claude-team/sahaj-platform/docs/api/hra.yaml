@@ -1,0 +1,250 @@
+openapi: 3.1.0
+info:
+  title: Sahaj HRA API
+  version: 0.1.0
+  description: Phase 1 contract, SAH-20 (staff, roster, attendance). Every call answers 403 (problem type module-off) when the HRA add-on is off for the clinic. Reads are for any clinic role. Errors are RFC 9457 application/problem+json.
+servers:
+  - url: /api/v1/hra
+security:
+  - bearer: []
+paths:
+  /summary:
+    get:
+      tags: [SAH-20]
+      responses:
+        '200': { description: Tiles for the Staff and leave page, content: { application/json: { schema: { $ref: '#/components/schemas/StaffSummary' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+  /roster:
+    get:
+      tags: [SAH-20]
+      responses:
+        '200': { description: Seven days from today (Asia/Kolkata) for every active team member, content: { application/json: { schema: { $ref: '#/components/schemas/Roster' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+  /roster/cells:
+    put:
+      tags: [SAH-20]
+      description: OWNER only. Set one staff member's shift for one of the seven shown days. 400 for a doctor, a date outside the seven days, or an unknown shift.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RosterCellInput' } } }
+      responses:
+        '200': { description: Updated roster, content: { application/json: { schema: { $ref: '#/components/schemas/Roster' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /roster/publish:
+    post:
+      tags: [SAH-20]
+      description: OWNER only. Marks the roster as published to staff (idempotent; keeps the first time).
+      responses:
+        '200': { description: Updated roster, content: { application/json: { schema: { $ref: '#/components/schemas/Roster' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+  /attendance:
+    get:
+      tags: [SAH-20]
+      responses:
+        '200': { description: Today's attendance (Asia/Kolkata day), content: { application/json: { schema: { $ref: '#/components/schemas/Attendance' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+  /attendance/{membershipId}:
+    parameters:
+      - { name: membershipId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [SAH-20]
+      description: OWNER and FRONT_DESK. Mark or change today's attendance for an active team member. Present and Late record the time of marking in IST.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/AttendanceStatus' } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Attendance' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /leave:
+    get:
+      tags: [SAH-21]
+      description: The owner sees every request and balance; other roles only their own. 403 module-off when HRA is off.
+      responses:
+        '200': { description: 'Leave requests, balances and form data', content: { application/json: { schema: { $ref: '#/components/schemas/LeaveView' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [SAH-21]
+      description: Any clinic role for themselves; only the OWNER may name another person. 409 if the person already has pending or approved leave on any of those days.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LeaveInput' } } }
+      responses:
+        '201': { description: Created as pending, content: { application/json: { schema: { $ref: '#/components/schemas/LeaveView' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /leave/{id}/approve:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-21]
+      description: OWNER only. 409 if already decided.
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/LeaveView' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /leave/{id}/decline:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-21]
+      description: OWNER only. 409 if already decided.
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/LeaveView' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            properties:
+              type: { type: string }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              fieldErrors:
+                type: array
+                items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+  schemas:
+    Shift:
+      type: string
+      enum: [M, E, N, X]
+      description: Morning, Evening, Night, Off.
+    AttendanceStatus:
+      type: string
+      enum: [in, late, abs]
+    StaffSummary:
+      type: object
+      required: [staff, doctors, others, presentToday, lateToday, leaveRequests]
+      properties:
+        staff: { type: integer }
+        doctors: { type: integer }
+        others: { type: integer }
+        presentToday: { type: integer, description: Present or late. }
+        lateToday: { type: integer }
+        leaveRequests: { type: integer, description: Pending leave requests. Owner only; 0 for other roles. }
+    RosterCellInput:
+      type: object
+      required: [membershipId, date, shift]
+      properties:
+        membershipId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        shift: { $ref: '#/components/schemas/Shift' }
+    RosterCell:
+      type: object
+      required: [date, kind]
+      properties:
+        date: { type: string, format: date }
+        kind: { type: string, enum: [SHIFT, OPD, OFF, LEAVE], description: 'SHIFT for staff cells (see shift); OPD or OFF for doctors, derived from Appointments and slots and clinic holidays; LEAVE for any person on approved leave that day (SAH-21, not editable).' }
+        shift: { oneOf: [{ $ref: '#/components/schemas/Shift' }, { type: 'null' }] }
+    RosterRow:
+      type: object
+      required: [membershipId, name, roleLabel, doctor, cells]
+      properties:
+        membershipId: { type: string, format: uuid }
+        name: { type: string }
+        roleLabel: { type: string }
+        doctor: { type: boolean }
+        cells: { type: array, minItems: 7, maxItems: 7, items: { $ref: '#/components/schemas/RosterCell' } }
+    Roster:
+      type: object
+      required: [days, shifts, published, rows]
+      properties:
+        days: { type: array, items: { type: string, format: date }, minItems: 7, maxItems: 7 }
+        shifts:
+          type: array
+          items: { type: object, required: [key, name, time], properties: { key: { $ref: '#/components/schemas/Shift' }, name: { type: string }, time: { type: string, description: 'Empty for Off.' } } }
+        published: { type: boolean }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        rows: { type: array, items: { $ref: '#/components/schemas/RosterRow' } }
+    AttendanceRow:
+      type: object
+      required: [membershipId, name, roleLabel, onLeave]
+      properties:
+        membershipId: { type: string, format: uuid }
+        name: { type: string }
+        roleLabel: { type: string }
+        onLeave: { type: boolean, description: Approved leave covers today (SAH-21). Then status buttons are not offered and a mark is refused with 409. }
+        status: { oneOf: [{ $ref: '#/components/schemas/AttendanceStatus' }, { type: 'null' }] }
+        markedTime: { type: [string, 'null'], description: 'HH:mm, IST.' }
+    Attendance:
+      type: object
+      required: [date, lateAfterMinutes, canMark, rows]
+      properties:
+        date: { type: string, format: date }
+        lateAfterMinutes: { type: integer, description: Fixed at 15 in this phase. }
+        canMark: { type: boolean, description: Whether the signed-in role may mark attendance. }
+        rows: { type: array, items: { $ref: '#/components/schemas/AttendanceRow' } }
+    LeaveType:
+      type: string
+      enum: [CL, SL, EL]
+    LeaveInput:
+      type: object
+      required: [type, from, to]
+      properties:
+        membershipId: { type: [string, 'null'], format: uuid, description: Omit for yourself. Only the owner may name another person. }
+        type: { $ref: '#/components/schemas/LeaveType' }
+        from: { type: string, format: date, description: Not before today (Asia/Kolkata). }
+        to: { type: string, format: date, description: Not before from; at most 60 days after from. }
+        reason: { type: [string, 'null'], maxLength: 200, description: Free text typed by staff. Never logged or audited. }
+    LeaveRequest:
+      type: object
+      required: [id, membershipId, name, roleLabel, type, typeName, from, to, days, status, askedAt]
+      properties:
+        id: { type: string, format: uuid }
+        membershipId: { type: string, format: uuid }
+        name: { type: string }
+        roleLabel: { type: string }
+        type: { $ref: '#/components/schemas/LeaveType' }
+        typeName: { type: string, description: 'Casual leave, Sick leave or Earned leave.' }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        days: { type: integer, description: 'Calendar days, from to to inclusive.' }
+        reason: { type: [string, 'null'] }
+        status: { type: string, enum: [pending, approved, declined] }
+        askedAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decidedByName: { type: [string, 'null'] }
+        affectedAppointments: { type: integer, description: 'Booked appointments of the doctor on those days; only for pending requests of doctors, else 0.' }
+    LeaveBalance:
+      type: object
+      required: [membershipId, name, remaining]
+      properties:
+        membershipId: { type: string, format: uuid }
+        name: { type: string }
+        remaining:
+          type: object
+          required: [CL, SL, EL]
+          properties:
+            CL: { type: integer, minimum: 0 }
+            SL: { type: integer, minimum: 0 }
+            EL: { type: integer, minimum: 0 }
+    LeaveView:
+      type: object
+      required: [types, requests, balances, applicants, pendingCount, canApprove]
+      properties:
+        types:
+          type: array
+          items: { type: object, required: [key, name, days], properties: { key: { $ref: '#/components/schemas/LeaveType' }, name: { type: string }, days: { type: integer, description: Yearly allowance. } } }
+        requests: { type: array, items: { $ref: '#/components/schemas/LeaveRequest' }, description: Newest first. }
+        balances: { type: array, items: { $ref: '#/components/schemas/LeaveBalance' } }
+        applicants:
+          type: array
+          description: Who the signed-in user may apply for (everyone active for the owner, only themselves otherwise).
+          items: { type: object, required: [membershipId, name], properties: { membershipId: { type: string, format: uuid }, name: { type: string } } }
+        pendingCount: { type: integer, description: Pending requests the signed-in user can see. }
+        canApprove: { type: boolean }

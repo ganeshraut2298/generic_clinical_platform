@@ -1,0 +1,134 @@
+<section class="panel surf erform" aria-labelledby="er-reg-h">
+  <div>
+    <h2 id="er-reg-h">Quick registration</h2>
+    <small class="faint">Name, age, sex and the complaint are enough. Full details can wait.</small>
+  </div>
+
+  <form class="erfields" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (unknownAllowed()) {
+      <mat-checkbox formControlName="unknown">Name not known yet</mat-checkbox>
+    }
+
+    @if (!nameHidden()) {
+      <div class="field-block">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+          <mat-label>Name</mat-label>
+          <input
+            matInput
+            id="er-name"
+            formControlName="name"
+            autocomplete="off"
+            placeholder="Full name"
+            [attr.aria-invalid]="errors().name ? 'true' : null"
+            [attr.aria-describedby]="errors().name ? 'er-name-err' : null"
+          />
+        </mat-form-field>
+        @if (errors().name; as message) {
+          <span id="er-name-err" class="err-text" role="alert">{{ message }}</span>
+        }
+      </div>
+    }
+
+    <div class="agesex">
+      <div class="field-block">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+          <mat-label>Age (approx.)</mat-label>
+          <input
+            matInput
+            id="er-age"
+            class="num"
+            formControlName="age"
+            inputmode="numeric"
+            autocomplete="off"
+            [attr.aria-invalid]="errors().age ? 'true' : null"
+            [attr.aria-describedby]="errors().age ? 'er-age-err' : null"
+          />
+        </mat-form-field>
+        @if (errors().age; as message) {
+          <span id="er-age-err" class="err-text" role="alert">{{ message }}</span>
+        }
+      </div>
+
+      <div class="field-block">
+        <span class="field-label" id="er-sex-label">Sex</span>
+        <div class="seg" role="group" aria-labelledby="er-sex-label">
+          @for (s of sexChoices; track s.value) {
+            <button
+              type="button"
+              [attr.aria-pressed]="form.controls.sex.value === s.value"
+              (click)="setSex(s.value)"
+            >
+              {{ s.label }}
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="field-block">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Mobile of patient or relative <span class="faint">(optional)</span></mat-label>
+        <input
+          matInput
+          id="er-mobile"
+          class="num"
+          formControlName="mobile"
+          inputmode="numeric"
+          autocomplete="off"
+          [attr.aria-invalid]="errors().mobile ? 'true' : null"
+          [attr.aria-describedby]="errors().mobile ? 'er-mobile-err' : null"
+        />
+      </mat-form-field>
+      @if (errors().mobile; as message) {
+        <span id="er-mobile-err" class="err-text" role="alert">{{ message }}</span>
+      }
+    </div>
+
+    <div class="field-block">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Main complaint</mat-label>
+        <input
+          matInput
+          id="er-complaint"
+          formControlName="complaint"
+          autocomplete="off"
+          placeholder="For example: chest pain for 1 hour"
+          [attr.aria-invalid]="errors().complaint ? 'true' : null"
+          [attr.aria-describedby]="errors().complaint ? 'er-complaint-err' : null"
+        />
+      </mat-form-field>
+      @if (errors().complaint; as message) {
+        <span id="er-complaint-err" class="err-text" role="alert">{{ message }}</span>
+      }
+    </div>
+
+    <div class="field-block">
+      <span class="field-label" id="er-level-label">Triage level</span>
+      <div class="triseg" role="group" aria-labelledby="er-level-label">
+        @for (l of queue().levels; track l.level) {
+          <button
+            type="button"
+            [class]="'tri-' + l.tone"
+            [attr.data-level]="l.level"
+            [attr.aria-pressed]="level() === l.level"
+            (click)="setLevel(l)"
+          >
+            <b>{{ l.name }}</b>
+            <small>{{ hint(l) }}</small>
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (formError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+
+    <button type="submit" mat-flat-button [disabled]="running()" [attr.aria-busy]="running()">
+      <app-icon name="siren" [size]="16" /> Register and add to queue
+    </button>
+  </form>
+</section>

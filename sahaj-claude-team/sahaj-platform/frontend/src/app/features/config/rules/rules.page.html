@@ -1,0 +1,140 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading the rules</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else if (data(); as d) {
+  @if (!isOwner()) {
+    <div class="notice info">
+      <app-icon name="lock" [size]="16" />
+      <span>Only the owner can change the rules. You can see them below.</span>
+    </div>
+  }
+  <div class="notice info" id="f-rules-note">
+    <app-icon name="bell" [size]="16" />
+    <span>Rules are saved now. Automatic checking starts in a later release.</span>
+  </div>
+  <div class="grid2 even" id="f-rules">
+    <section class="panel surf">
+      <div class="panel-h">
+        <div>
+          <h2>Your rules</h2>
+          <small class="faint">Switch a rule off to keep it without using it.</small>
+        </div>
+        <span class="pill p-teal">{{ onCount() }} on</span>
+      </div>
+      <div class="steps">
+        @for (rule of d.rules; track $index; let i = $index) {
+          <div class="rule" [class.off]="!rule.enabled">
+            <div class="txt">
+              <span class="kw">IF</span><b>{{ rule.when }}</b> {{ rule.cond }}
+              <span class="kw then">THEN</span><b>{{ rule.then }}</b>
+            </div>
+            @if (isOwner()) {
+              @if (confirmIndex() === i) {
+                <span class="confirm" role="alert">
+                  Delete this rule?
+                  <button mat-flat-button type="button" [disabled]="busy()" (click)="remove(rule)">
+                    Delete
+                  </button>
+                  <button mat-stroked-button type="button" (click)="cancelRemove()">Keep</button>
+                </span>
+              } @else {
+                <button
+                  type="button"
+                  class="xbtn"
+                  [attr.aria-label]="'Delete rule ' + sentence(rule)"
+                  [disabled]="busy()"
+                  (click)="askRemove(i)"
+                >
+                  <app-icon name="x" [size]="14" />
+                </button>
+              }
+              <button
+                type="button"
+                class="sw"
+                role="switch"
+                [attr.aria-label]="'Switch ' + sentence(rule) + ' on or off'"
+                [attr.aria-checked]="rule.enabled"
+                [disabled]="busy()"
+                (click)="toggle(rule)"
+              ></button>
+            }
+          </div>
+        } @empty {
+          <div class="empty">No rules yet. Make one below or add a suggested rule.</div>
+        }
+      </div>
+      <div class="eyebrow">Make your own rule</div>
+      <form class="builder" [formGroup]="builder" (ngSubmit)="add()">
+        <div class="field">
+          <label for="rule-when">If</label>
+          <select id="rule-when" class="input" formControlName="when">
+            @for (o of d.options.when; track o) {
+              <option [value]="o">{{ o }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="rule-cond">Is</label>
+          <select id="rule-cond" class="input" formControlName="cond">
+            @for (o of d.options.cond; track o) {
+              <option [value]="o">{{ o }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="rule-then">Then</label>
+          <select id="rule-then" class="input" formControlName="then">
+            @for (o of d.options.then; track o) {
+              <option [value]="o">{{ o }}</option>
+            }
+          </select>
+        </div>
+        @if (isOwner()) {
+          <button mat-flat-button type="submit" [disabled]="busy()">
+            <app-icon name="plus" [size]="16" /> Add
+          </button>
+        }
+      </form>
+    </section>
+
+    <section class="panel surf">
+      <div>
+        <h2>Suggested for Indian OPDs</h2>
+        <small class="faint">Add with one tap. You can switch any of them off later.</small>
+      </div>
+      @if (d.suggestions.length) {
+        <div class="list">
+          @for (s of d.suggestions; track s.index) {
+            <div class="li">
+              <div class="main">
+                <b>{{ sentence(s) }}</b>
+                <small>{{ s.why }}</small>
+              </div>
+              @if (isOwner()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [attr.aria-label]="'Add suggested rule: ' + sentence(s)"
+                  [disabled]="busy()"
+                  (click)="addSuggestion(s)"
+                >
+                  <app-icon name="plus" [size]="13" /> Add
+                </button>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="empty">All suggested rules are added.</div>
+      }
+    </section>
+  </div>
+}

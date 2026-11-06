@@ -1,0 +1,183 @@
+<form
+  class="sheet"
+  [class.wide]="tab() === 'mar'"
+  [formGroup]="form"
+  (ngSubmit)="save()"
+  novalidate
+  data-testid="nursing-sheet"
+>
+  @if (sheet(); as s) {
+    <div class="sheet-h">
+      <div>
+        <h2 id="nv-title">Nursing · {{ s.patientName }}</h2>
+        <p class="muted sub" data-testid="nursing-subtitle">{{ subtitle() }}</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+
+    <div class="sheet-b">
+      <div class="seg sfnst" role="tablist" aria-label="Nursing" data-testid="nursing-tabs">
+        <button
+          type="button"
+          role="tab"
+          id="nv-tab-vit"
+          [attr.aria-controls]="tab() === 'vit' ? 'nv-panel-vit' : null"
+          data-testid="nursing-tab-vit"
+          [attr.aria-selected]="tab() === 'vit'"
+          [attr.tabindex]="tab() === 'vit' ? 0 : -1"
+          (click)="selectTab('vit')"
+          (keydown)="tabKey($event)"
+        >
+          <app-icon name="heart" [size]="14" /> {{ tabVitals }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="nv-tab-mar"
+          [attr.aria-controls]="tab() === 'mar' ? 'nv-panel-mar' : null"
+          data-testid="nursing-tab-mar"
+          [attr.aria-selected]="tab() === 'mar'"
+          [attr.tabindex]="tab() === 'mar' ? 0 : -1"
+          (click)="selectTab('mar')"
+          (keydown)="tabKey($event)"
+        >
+          <app-icon name="pill" [size]="14" /> {{ tabMar }}
+          @if (doseBadge(); as n) {
+            <span class="c num" data-testid="nursing-dose-count">{{ n }}</span>
+          }
+        </button>
+      </div>
+
+      @if (tab() === 'vit') {
+        <div class="panel" role="tabpanel" tabindex="0" id="nv-panel-vit" aria-labelledby="nv-tab-vit">
+          @if (notice(); as n) {
+            <div [class]="'notice ' + n.tone" role="status" data-testid="nursing-ews" [attr.data-tone]="n.tone">
+              <app-icon name="heart" [size]="16" />
+              <span>Early warning score <b>{{ n.strong }}</b>{{ n.advice }}</span>
+            </div>
+          }
+
+          <div class="nvg">
+            @for (f of fields; track f.key) {
+              <div class="field">
+                <label [for]="'nv-' + f.key">{{ f.label }} <span class="faint">{{ f.unit }}</span></label>
+                <input
+                  class="input num"
+                  autocomplete="off"
+                  [id]="'nv-' + f.key"
+                  [formControlName]="f.key"
+                  (input)="edited(f.key)"
+                  [attr.inputmode]="f.inputMode"
+                  [placeholder]="f.placeholder"
+                  [attr.aria-invalid]="errors()[f.key] ? 'true' : null"
+                  [attr.aria-describedby]="errors()[f.key] ? 'nv-' + f.key + '-err' : null"
+                />
+                @if (errors()[f.key]; as message) {
+                  <span class="err-text" role="alert" [id]="'nv-' + f.key + '-err'">{{ message }}</span>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="field">
+            <label for="nv-note">Nursing note</label>
+            <textarea
+              id="nv-note"
+              class="input"
+              rows="3"
+              formControlName="note"
+              (input)="edited('note')"
+              [placeholder]="notePlaceholder"
+              [attr.aria-invalid]="errors().note ? 'true' : null"
+              [attr.aria-describedby]="errors().note ? 'nv-note-err' : null"
+            ></textarea>
+            @if (errors().note; as message) {
+              <span class="err-text" role="alert" id="nv-note-err">{{ message }}</span>
+            }
+          </div>
+
+          @if (viewOnlyRole()) {
+            <div class="notice warn" data-testid="nursing-role-notice">
+              <app-icon name="lock" [size]="16" />
+              <span>{{ roleNotice }}</span>
+            </div>
+          }
+
+          @if (confirming()) {
+            <div class="notice warn" role="status" data-testid="nursing-same-values">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ sameValuesNotice }}</span>
+            </div>
+          }
+
+          @if (failure(); as f) {
+            <div class="notice err" role="alert" data-testid="nursing-failure">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ f.message }}</span>
+              @if (f.lost) {
+                <button type="button" mat-stroked-button [disabled]="checking()" (click)="check()">
+                  Check the sheet
+                </button>
+              }
+            </div>
+          }
+
+          <div class="pcnotes" data-testid="nursing-notes">
+            <b>Recent notes</b>
+            @for (n of s.recentNotes; track n.id) {
+              <div>
+                <small>{{ noteAgo(s, n) }}</small>
+                <span class="notetext">{{ n.text }}</span>
+              </div>
+            } @empty {
+              <span class="faint">{{ noNotes }}</span>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="panel" role="tabpanel" tabindex="0" id="nv-panel-mar" aria-labelledby="nv-tab-mar">
+          <app-mar-tab [admissionId]="s.admissionId" (marChange)="marChanged($event)" />
+        </div>
+      }
+    </div>
+
+    <div class="sheet-f">
+      @if (tab() === 'vit') {
+        <button mat-stroked-button type="button" (click)="close()">Close</button>
+        @if (s.canRecord) {
+          <button
+            mat-flat-button
+            type="submit"
+            data-testid="nursing-save"
+            [disabled]="running() || locked() || held()"
+            [attr.aria-busy]="running()"
+          >
+            <app-icon name="check" [size]="15" /> Save vitals and note
+          </button>
+        }
+      } @else {
+        <button mat-flat-button type="button" data-act="mar-done" (click)="close()">Done</button>
+      }
+    </div>
+  } @else {
+    <div class="sheet-h">
+      <h2 id="nv-title">Nursing</h2>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      @if (loadError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+          <button type="button" mat-stroked-button [disabled]="loading()" (click)="load()">Try again</button>
+        </div>
+      } @else {
+        <p class="muted" role="status" aria-busy="true">Loading the Nursing sheet</p>
+      }
+    </div>
+  }
+</form>

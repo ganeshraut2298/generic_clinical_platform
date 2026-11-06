@@ -1,0 +1,204 @@
+<div class="adm-wrap">
+  <header class="adm-nav glass">
+    <div class="brand">
+      <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <div>
+        <b>Sahaj</b>
+        <small>Clinic software for India</small>
+      </div>
+    </div>
+    <div class="actions">
+      <a mat-button routerLink="/">
+        <app-icon name="back" [size]="16" />
+        Back to website
+      </a>
+    </div>
+  </header>
+
+  <main class="adm-auth">
+    <section class="adm-side" aria-label="About the admin console">
+      <span class="adm-pill">
+        <app-icon name="lock" [size]="13" />
+        {{ sidePill }}
+      </span>
+      <h1>{{ sideHeading }}</h1>
+      <p class="lede">{{ sideLede }}</p>
+      <ul class="adm-ticks">
+        @for (tick of sideTicks; track tick) {
+          <li><app-icon name="check" [size]="16" /><span>{{ tick }}</span></li>
+        }
+      </ul>
+    </section>
+
+    <section class="adm-card glass" aria-labelledby="admin-step-heading">
+      @switch (step()) {
+        @case ('credentials') {
+          <h2 id="admin-step-heading" tabindex="-1">Sign in</h2>
+
+          @if (showEnded()) {
+            <div class="msg info" role="status">
+              <span>{{ sessionEnded }}</span>
+            </div>
+          }
+          @if (error()) {
+            <div class="msg err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ error() }}</span>
+            </div>
+          }
+
+          <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Work email</mat-label>
+              <input
+                id="admin-email"
+                matInput
+                type="email"
+                formControlName="email"
+                autocomplete="username"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+              @if (form.controls.email.touched && form.controls.email.invalid) {
+                <mat-error>{{ emailError }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Password</mat-label>
+              <input
+                id="admin-password"
+                matInput
+                type="password"
+                formControlName="password"
+                autocomplete="current-password"
+              />
+              @if (form.controls.password.touched && form.controls.password.invalid) {
+                <mat-error>{{ passwordError }}</mat-error>
+              }
+            </mat-form-field>
+
+            @if (useRecovery()) {
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Recovery code</mat-label>
+                <input
+                  id="admin-recovery"
+                  matInput
+                  class="num"
+                  formControlName="recoveryCode"
+                  maxlength="19"
+                  placeholder="XXXX-XXXX-XXXX-XXXX"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  spellcheck="false"
+                />
+              </mat-form-field>
+              <button type="button" class="linkbtn adm-link" (click)="toggleRecovery()">
+                Use the authenticator code instead
+              </button>
+            } @else {
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Code from authenticator app</mat-label>
+                <input
+                  id="admin-code"
+                  matInput
+                  class="num otp"
+                  formControlName="code"
+                  inputmode="numeric"
+                  maxlength="7"
+                  autocomplete="one-time-code"
+                />
+              </mat-form-field>
+              <button type="button" class="linkbtn adm-link" (click)="toggleRecovery()">
+                Use a recovery code
+              </button>
+            }
+
+            <button mat-flat-button type="submit" class="btn-lg full" [disabled]="busy()">
+              <app-icon name="lock" [size]="16" />
+              Sign in to admin console
+            </button>
+          </form>
+
+          <p class="hint">{{ cardHint }}</p>
+        }
+
+        @case ('enrol') {
+          <h2 id="admin-step-heading" tabindex="-1">Set up your authenticator app</h2>
+          <p class="muted">
+            Two-step sign-in is always on for admins. Add Sahaj admin to an authenticator app on
+            your phone, then enter the 6-digit code it shows.
+          </p>
+
+          @if (error()) {
+            <div class="msg err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ error() }}</span>
+            </div>
+          }
+
+          @if (enrolment(); as enrol) {
+            <div class="adm-block">
+              <div class="eyebrow">Key for manual entry</div>
+              <div class="adm-key-row">
+                <code class="adm-key num" aria-label="Key for manual entry">{{ enrol.secretKey }}</code>
+                <button mat-stroked-button type="button" (click)="copyKey()">Copy key</button>
+              </div>
+            </div>
+
+            <div class="adm-block">
+              <div class="eyebrow">Or open on your phone</div>
+              @if (otpauthLink(); as link) {
+                <a class="adm-uri" [href]="link">{{ enrol.otpauthUri }}</a>
+              } @else {
+                <code class="adm-uri">{{ enrol.otpauthUri }}</code>
+              }
+            </div>
+          }
+
+          <form [formGroup]="enrolForm" (ngSubmit)="confirmEnrolment()" novalidate>
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Code from authenticator app</mat-label>
+              <input
+                id="admin-enrol-code"
+                matInput
+                class="num otp"
+                formControlName="code"
+                inputmode="numeric"
+                maxlength="7"
+                autocomplete="one-time-code"
+              />
+              @if (enrolForm.controls.code.invalid) {
+                <mat-error>Enter the 6-digit code from your authenticator app</mat-error>
+              }
+            </mat-form-field>
+            <button mat-flat-button type="submit" class="btn-lg full" [disabled]="busy()">
+              Confirm and sign in
+            </button>
+          </form>
+          <button type="button" class="linkbtn adm-link" (click)="startAgain()">Start again</button>
+        }
+
+        @case ('recovery-codes') {
+          <h2 id="admin-step-heading" tabindex="-1">Save your recovery codes</h2>
+          <p class="muted">
+            Each code signs you in once if you lose your phone. They are shown only now.
+          </p>
+          <ol class="adm-codes" aria-label="Recovery codes">
+            @for (code of recoveryCodes(); track code) {
+              <li class="num">{{ code }}</li>
+            }
+          </ol>
+          <div class="row">
+            <button mat-stroked-button type="button" (click)="copyCodes()">Copy codes</button>
+            <button mat-flat-button type="button" (click)="saved()">I have saved them</button>
+          </div>
+        }
+      }
+    </section>
+  </main>
+</div>

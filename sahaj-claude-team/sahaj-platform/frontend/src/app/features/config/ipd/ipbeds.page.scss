@@ -1,0 +1,88 @@
+.wardcfg {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wardhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  small {
+    display: block;
+  }
+}
+
+.roomcfg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-2);
+}
+
+.roomh {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.bchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.bchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 2px 10px;
+  border-radius: 12px;
+  background: var(--muted-soft);
+  font-size: 0.82rem;
+
+  select.input {
+    width: auto;
+    min-height: 44px;
+    padding: 2px 6px;
+    font-size: 0.76rem;
+  }
+}
+
+.newward {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+
+  .input {
+    flex: 1;
+    min-width: 220px;
+  }
+}
+
+.field-error {
+  color: var(--crit);
+  font-size: 0.82rem;
+}
+
+.foot {
+  font-size: 0.8rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -1,0 +1,216 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="adt">
+  <div class="sheet-h">
+    <div>
+      <h2 id="adt">Admit a patient</h2>
+      <p class="muted sub">{{ emergencyCaseId ? 'From Emergency' : 'From the front desk' }}</p>
+    </div>
+    <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  @if (!options()) {
+    <div class="sheet-b">
+      @if (loadError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+          <button type="button" mat-stroked-button (click)="loadOptions()">Try again</button>
+        </div>
+      } @else {
+        <p class="muted" aria-busy="true">Loading beds and doctors</p>
+      }
+    </div>
+  } @else {
+    <form class="sheet-b" [formGroup]="form" (ngSubmit)="submit()" id="admit-form">
+      <div class="field-block">
+        <span class="eyebrow" id="adt-patient">Patient</span>
+        @if (patient(); as p) {
+          <div class="picked" role="group" aria-labelledby="adt-patient">
+            <span class="av">{{ p.name.charAt(0) }}</span>
+            <div class="main">
+              <b>{{ p.name }}</b>
+              <small>{{ p.age }} {{ p.sex }} · {{ p.uhid }}</small>
+            </div>
+            <button type="button" mat-stroked-button (click)="changePatient()">Change</button>
+          </div>
+        } @else {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+            <mat-label>Search by name or mobile</mat-label>
+            <input
+              matInput
+              type="search"
+              autocomplete="off"
+              aria-labelledby="adt-patient"
+              [value]="query()"
+              (input)="onSearchInput($any($event.target).value)"
+            />
+          </mat-form-field>
+          @if (handoff(); as h) {
+            @if (!h.identityPending) {
+              <p class="faint hintline">
+                From Emergency: {{ h.displayName }}{{ h.mobile ? ' · ' + h.mobile : '' }}
+              </p>
+            }
+          }
+          @if (searching()) {
+            <p class="muted" aria-busy="true">Searching</p>
+          } @else if (searchError(); as message) {
+            <div class="notice err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ message }}</span>
+            </div>
+          } @else if (searched() && results().length === 0) {
+            <p class="faint hintline">No patient found. Register a new patient below.</p>
+          }
+          @if (results().length > 0) {
+            <div class="members" role="list">
+              @for (r of results(); track r.id) {
+                <button type="button" class="member" role="listitem" (click)="pick(r)">
+                  <span class="av">{{ r.name.charAt(0) }}</span>
+                  <div class="main">
+                    <b>{{ r.name }}</b>
+                    <small>{{ r.age }} {{ r.sex }} · {{ r.mobile }}</small>
+                  </div>
+                </button>
+              }
+            </div>
+          }
+          <div>
+            <button type="button" class="linkbtn" (click)="register()">Register a new patient</button>
+          </div>
+        }
+      </div>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Admitting doctor</mat-label>
+        <select matNativeControl formControlName="doctor">
+          @for (d of options()!.doctors; track d.membershipId) {
+            <option [value]="d.membershipId">{{ d.name }}</option>
+          }
+        </select>
+      </mat-form-field>
+
+      <div class="field-block">
+        <span class="eyebrow" id="adt-type">Admission type</span>
+        <div class="seg-wrap" role="group" aria-labelledby="adt-type">
+          @for (t of types; track t.value) {
+            <button
+              type="button"
+              [attr.aria-pressed]="form.controls.type.value === t.value"
+              (click)="setType(t.value)"
+            >
+              {{ t.label }}
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (bedGroups().length === 0) {
+        <div class="notice warn" role="status">
+          <app-icon name="alert" [size]="16" />
+          <span>No free bed right now.</span>
+        </div>
+      } @else {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+          <mat-label>Bed</mat-label>
+          <select matNativeControl formControlName="bed">
+            @for (g of bedGroups(); track g.key) {
+              <optgroup [label]="g.label">
+                @for (b of g.beds; track b.id) {
+                  <option [value]="b.id">{{ b.code }} · {{ b.wardName }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+        </mat-form-field>
+      }
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="field">
+        <mat-label>Reason for admission</mat-label>
+        <input
+          matInput
+          formControlName="reason"
+          autocomplete="off"
+          placeholder="Provisional diagnosis"
+          [attr.maxlength]="maxReason"
+        />
+      </mat-form-field>
+
+      <div class="field-block">
+        <span class="eyebrow" id="adt-payer">Payer</span>
+        <div class="seg-wrap" role="group" aria-labelledby="adt-payer">
+          @for (p of payers; track p) {
+            <button
+              type="button"
+              [attr.aria-pressed]="form.controls.payer.value === p"
+              (click)="setPayer(p)"
+            >
+              {{ p }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="field-block">
+        <label class="eyebrow" for="adt-deposit">Deposit now</label>
+        <div class="pre">
+          <span aria-hidden="true">₹</span>
+          <input
+            id="adt-deposit"
+            class="input num"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            formControlName="deposit"
+            aria-describedby="adt-hint"
+            (input)="onDepositInput()"
+          />
+        </div>
+        <span id="adt-hint" class="faint hintline">{{ hint() }}</span>
+        @if (depositError(); as message) {
+          <span class="err-text" role="alert">{{ message }}</span>
+        }
+      </div>
+
+      <div class="field-block">
+        <span class="eyebrow" id="adt-mode">Paid by</span>
+        <div class="seg-wrap" role="group" aria-labelledby="adt-mode">
+          @for (m of modes; track m) {
+            <button
+              type="button"
+              [attr.aria-pressed]="form.controls.mode.value === m"
+              (click)="setMode(m)"
+            >
+              {{ m }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <mat-checkbox formControlName="consent">
+        Admission and treatment consent signed by the patient or a relative
+      </mat-checkbox>
+
+      <div class="notice info">
+        <app-icon name="msg" [size]="16" />
+        <span>
+          The IP number, bed and deposit receipt are not sent yet (WhatsApp is not in this phase).
+        </span>
+      </div>
+
+      @if (serverError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    </form>
+    <div class="sheet-f">
+      <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+      <button mat-flat-button type="submit" form="admit-form" [disabled]="!canSubmit()">
+        <app-icon name="bed" [size]="15" /> Admit to bed {{ bed()?.code }}
+      </button>
+    </div>
+  }
+</div>

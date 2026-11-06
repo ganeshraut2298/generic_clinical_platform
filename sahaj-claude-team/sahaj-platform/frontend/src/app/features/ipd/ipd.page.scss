@@ -1,0 +1,91 @@
+// IPD overview (admitted patients and tabs). Shared blocks: `_console.scss`.
+.lockpage {
+  padding: 28px 20px;
+  align-items: flex-start;
+  max-width: 560px;
+}
+
+.lockic {
+  display: inline-flex;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--pri-soft);
+  color: var(--pri-text);
+}
+
+.iptbl {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+.iptr {
+  display: grid;
+  grid-template-columns: 2.2fr 1.1fr 1.3fr 1fr 1fr 1.4fr 90px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-2);
+  font-size: 0.88rem;
+  min-width: 860px;
+
+  b,
+  small {
+    display: block;
+  }
+  small {
+    color: var(--ink-3);
+    font-size: 0.78rem;
+  }
+  .r {
+    text-align: right;
+  }
+  .pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+}
+
+.ipth {
+  border-top: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+
+.tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kpis {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.kpi .v small {
+  font-size: 0.9rem;
+  color: var(--ink-3);
+}
+
+.kpi .s b.crit {
+  color: var(--crit);
+  font-weight: 600;
+}
+
+.sfban {
+  align-items: center;
+
+  > span {
+    flex: 1;
+  }
+}

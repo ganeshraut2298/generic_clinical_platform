@@ -1,0 +1,133 @@
+@if (loading()) {
+  <p class="muted" aria-busy="true">Loading the emergency queue</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button type="button" mat-stroked-button (click)="load()">Try again</button>
+  </div>
+} @else if (queue(); as q) {
+  @if (refreshFailed()) {
+    <div class="notice warn stale" role="status" data-testid="er-stale">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ staleText() }}</span>
+    </div>
+  }
+  <div class="ergrid">
+    @if (q.canRegister) {
+      <app-emergency-register [queue]="q" (registered)="onRegistered($event)" (conflict)="refresh()" />
+    }
+
+    <section class="panel surf" aria-labelledby="er-queue-h">
+      <div class="panel-h">
+        <h2 id="er-queue-h">Emergency queue</h2>
+        <span class="faint note" data-testid="er-note">{{ note() }}</span>
+      </div>
+
+      @if (q.cases.length === 0) {
+        <div class="empty">No one in emergency right now.</div>
+      } @else {
+        <div class="erlist" role="list">
+          @for (c of q.cases; track c.id) {
+            @let lv = levelOf(c);
+            <article
+              role="listitem"
+              class="ercard"
+              [class]="'ercard tri-' + (lv?.tone ?? 'good')"
+              [class.breach]="c.overTarget"
+              [attr.data-case]="c.id"
+            >
+              <div class="erl">
+                <b>{{ c.levelName }}</b>
+                <small>{{ lv?.description }}</small>
+              </div>
+              <div class="erm">
+                <div class="erhead">
+                  <b>{{ c.displayName }}</b>
+                  <span class="faint num">{{ ageSex(c) }}</span>
+                </div>
+                <div class="muted complaint">{{ c.complaint }}</div>
+                <div class="row pills">
+                  @if (c.status === 'SEEN') {
+                    <span class="pill p-good">Seen by doctor</span>
+                  } @else if (c.overTarget) {
+                    <span class="pill p-crit">
+                      <app-icon name="alert" [size]="12" /> {{ wait(c) }}
+                    </span>
+                  } @else {
+                    <span class="pill p-wait">{{ wait(c) }}</span>
+                  }
+                  @if (c.identityPending) {
+                    <span class="pill p-warn">Identity pending</span>
+                  }
+                </div>
+
+                @if (q.canAct || q.canAdmit || q.canRetriage) {
+                  <div class="qact">
+                    @if (q.canAct && c.status === 'WAITING') {
+                      <button
+                        type="button"
+                        mat-flat-button
+                        data-act="seen"
+                        [disabled]="busy()"
+                        (click)="seen(c)"
+                      >
+                        Doctor has seen<span class="sr-only">{{ forPatient(c) }}</span>
+                      </button>
+                    }
+                    @if (q.canAdmit) {
+                      <button
+                        type="button"
+                        mat-stroked-button
+                        data-act="admit"
+                        [disabled]="busy()"
+                        (click)="admit(c)"
+                      >
+                        <app-icon name="bed" [size]="14" /> Admit<span class="sr-only">{{ forPatient(c) }}</span>
+                      </button>
+                    }
+                    @if (q.canAct) {
+                      <button
+                        type="button"
+                        mat-button
+                        data-act="release"
+                        [disabled]="busy()"
+                        (click)="release(c)"
+                      >
+                        Treat and release<span class="sr-only">{{ forPatient(c) }}</span>
+                      </button>
+                    }
+                    @if (q.canRetriage) {
+                      <select
+                        class="input trisel"
+                        data-act="level"
+                        [attr.aria-label]="'Triage level for ' + c.displayName"
+                        [disabled]="busy()"
+                        (change)="retriage(c, $any($event.target))"
+                      >
+                        @for (l of q.levels; track l.level) {
+                          <option [value]="l.level" [selected]="l.level === c.level">{{ l.name }}</option>
+                        }
+                      </select>
+                    }
+                    @if (q.canAct) {
+                      <button
+                        type="button"
+                        mat-button
+                        data-act="refer"
+                        [disabled]="busy()"
+                        (click)="refer(c)"
+                      >
+                        Refer out<span class="sr-only">{{ forPatient(c) }}</span>
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  </div>
+}

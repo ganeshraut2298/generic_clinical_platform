@@ -1,0 +1,86 @@
+@if (loading()) {
+  <p class="muted" aria-busy="true">Loading the bed board</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button type="button" mat-stroked-button (click)="reload()">Try again</button>
+  </div>
+} @else if (board(); as b) {
+  <div class="boardbar">
+    <div class="blegend" role="list" aria-label="Bed status counts">
+      @for (s of statuses; track s) {
+        <span [class]="'bl st-' + s" role="listitem">
+          <app-icon [name]="meta[s].icon" [size]="12" /> {{ meta[s].label }}
+          <b class="num">{{ b.counts[s] }}</b>
+        </span>
+      }
+    </div>
+    <button type="button" mat-stroked-button (click)="reload()">Refresh</button>
+  </div>
+
+  @for (w of b.wards; track w.id) {
+    <section class="panel surf ward" [attr.aria-label]="w.name">
+      <div class="panel-h">
+        <div>
+          <h2>{{ w.name }}</h2>
+          <small class="faint">{{ w.station }} · {{ w.occupied }} of {{ w.total }} occupied</small>
+        </div>
+        <div class="wardside">
+          @if (w.hasFreeBed && b.canAdmit) {
+            <button type="button" mat-stroked-button (click)="admitHere(w)">
+              <app-icon name="bed" [size]="15" /> Admit here
+            </button>
+          }
+          <div
+            class="occbar"
+            role="img"
+            [attr.aria-label]="w.occupied + ' of ' + w.total + ' beds occupied'"
+          >
+            <i [style.width.%]="percent(w)"></i>
+          </div>
+        </div>
+      </div>
+      <div class="rooms">
+        @for (r of w.rooms; track roomKey(r)) {
+          <div class="room">
+            @if (r.name) {
+              <div class="roomh">{{ r.name }}</div>
+            }
+            <div class="beds">
+              @for (bed of r.beds; track bed.id) {
+                <button
+                  type="button"
+                  [class]="'bed st-' + bed.status"
+                  [attr.aria-label]="label(bed)"
+                  [attr.aria-disabled]="actionable(bed, b) ? null : 'true'"
+                  (click)="tileClick(bed, w)"
+                >
+                  <span class="bt">
+                    <b>{{ bed.code }}</b>
+                    <span class="bcat">{{ bed.categoryName }}</span>
+                  </span>
+                  <span class="bst">
+                    <app-icon [name]="meta[bed.status].icon" [size]="12" />
+                    {{ meta[bed.status].label }}
+                  </span>
+                  @if (bed.status === 'occ') {
+                    <span class="bpt">{{ bed.patientName }}</span>
+                    <span class="bmeta">Day {{ bed.dayNumber }} · {{ bed.doctorShortName }}</span>
+                    @if (bed.goingHomeToday) {
+                      <span class="bflag go">Going home today</span>
+                    } @else if (bed.depositLow) {
+                      <span class="bflag low"><app-icon name="alert" [size]="11" /> Deposit low</span>
+                    }
+                  } @else if (bed.status === 'free') {
+                    <span class="bmeta">{{ formatInrPaise(bed.ratePaise) }} a day</span>
+                  }
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+}

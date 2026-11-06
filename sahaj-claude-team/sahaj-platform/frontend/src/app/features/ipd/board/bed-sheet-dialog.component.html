@@ -1,0 +1,32 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bsh">
+  <div class="sheet-h">
+    <div>
+      <h2 id="bsh">Bed {{ data.bed.code }}</h2>
+      <p class="muted sub">
+        {{ data.bed.categoryName }} · {{ formatInrPaise(data.bed.ratePaise) }} a day · {{ data.wardName }}
+      </p>
+    </div>
+    <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+  <div class="sheet-b">
+    <span [class]="'pill ' + status.pill">
+      <app-icon [name]="status.icon" [size]="12" /> {{ status.label }}
+    </span>
+    <p class="muted txt">{{ text }}</p>
+  </div>
+  <div class="sheet-f">
+    <button mat-stroked-button type="button" (click)="close()">Close</button>
+    @if (canBlock) {
+      <button mat-stroked-button type="button" [disabled]="busy()" (click)="block()">
+        <app-icon name="lock" [size]="15" /> Block bed
+      </button>
+    }
+    @if (canReady) {
+      <button mat-flat-button type="button" [disabled]="busy()" (click)="ready()">
+        <app-icon name="check" [size]="15" /> {{ readyLabel }}
+      </button>
+    }
+  </div>
+</div>

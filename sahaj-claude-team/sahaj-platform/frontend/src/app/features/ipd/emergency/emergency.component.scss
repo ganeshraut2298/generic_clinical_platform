@@ -1,0 +1,115 @@
+// Emergency page (mockup `.ergrid`, `.ercard`). Level colours come from the tokens only; the level
+// name is always written on the card, so colour is never the only signal.
+:host {
+  display: block;
+}
+
+.ergrid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.6fr);
+  gap: 18px;
+  align-items: start;
+
+  > section:only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.stale {
+  margin-bottom: 12px;
+}
+
+.note {
+  font-size: 0.8rem;
+}
+
+.erlist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ercard {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  overflow: hidden;
+
+  .erl {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 12px;
+    // --crit-ink is the only "text on a level colour" token (white in light, dark in dark theme); it is
+    // used for warn and good too because the theme has no separate warn-ink or good-ink.
+    color: var(--crit-ink);
+
+    small {
+      font-size: 0.7rem;
+      opacity: 0.92;
+    }
+  }
+  &.tri-crit .erl {
+    background: var(--crit);
+  }
+  &.tri-warn .erl {
+    background: var(--warn);
+  }
+  &.tri-good .erl {
+    background: var(--good);
+  }
+  &.breach {
+    box-shadow: 0 0 0 2px var(--crit);
+  }
+
+  .erm {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    min-width: 0;
+  }
+  .erhead {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+
+    .faint {
+      font-size: 0.8rem;
+    }
+  }
+  .complaint {
+    font-size: 0.85rem;
+  }
+  .pills {
+    gap: 6px;
+  }
+  .qact {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
+
+.trisel {
+  width: auto;
+  min-height: 44px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 980px) {
+  .ergrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .ercard {
+    grid-template-columns: 72px 1fr;
+  }
+}

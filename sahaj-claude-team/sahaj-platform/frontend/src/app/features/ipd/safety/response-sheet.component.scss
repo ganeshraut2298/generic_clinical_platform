@@ -1,0 +1,39 @@
+// Response sheet (mockup `sfrp`). Colours come from the tokens only.
+.sub {
+  font-size: 0.86rem;
+}
+
+// Touch target (angular.md): footer and discard-prompt buttons are 44 px tall. The close icon button
+// keeps the shared 36 px drawn size with a 44 px hit area (see `_console.scss`).
+.sheet-f button,
+.notice button {
+  min-height: 44px;
+}
+
+textarea.input {
+  resize: vertical;
+  min-height: 84px;
+  font: inherit;
+}
+
+.note-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+
+  .err-text {
+    flex: 1;
+  }
+
+  .counter {
+    margin-left: auto;
+    font-size: 0.8rem;
+    white-space: nowrap;
+
+    &.over {
+      color: var(--crit);
+      font-weight: 600;
+    }
+  }
+}

@@ -1,0 +1,146 @@
+<form class="sheet" [formGroup]="form" (ngSubmit)="save()" novalidate data-testid="set-pin-sheet">
+  <div class="sheet-h">
+    <div>
+      <h2 id="sp-title">{{ title() }}</h2>
+      <p class="muted sub">Your 4-digit PIN confirms medicine checks in your name.</p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close"
+      data-act="sp-x"
+      [disabled]="busy()"
+      (click)="cancel()"
+    >
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    @if (loading()) {
+      <p class="muted" role="status" aria-busy="true">Loading your PIN status</p>
+    } @else if (loadError(); as message) {
+      <div class="notice err" role="alert" data-testid="sp-load-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button data-act="sp-retry" (click)="load()">Try again</button>
+      </div>
+    } @else {
+      @if (unavailable()) {
+        <div class="notice warn" role="alert" data-testid="sp-unavailable">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ unavailableText }}</span>
+        </div>
+      } @else {
+        <div class="sendrow">
+          <span data-testid="sp-mobile-line">
+            @if (codeSent()) {
+              Code sent to <b class="num">{{ mobile() }}</b>.
+            } @else {
+              We will send a 6-digit code to <b class="num">{{ mobile() }}</b>.
+            }
+          </span>
+          @if (resendSeconds() > 0) {
+            <span class="faint num" role="status" data-testid="sp-resend-wait">
+              Resend code in {{ resendLabel() }}
+            </span>
+          } @else {
+            <button
+              type="button"
+              mat-stroked-button
+              data-act="sp-send"
+              [disabled]="busy()"
+              [attr.aria-busy]="sending()"
+              (click)="sendCode()"
+            >
+              {{ codeSent() ? 'Resend code' : 'Send code' }}
+            </button>
+          }
+        </div>
+
+        @if (codeSent()) {
+          <div class="field">
+            <label for="sp-code">6-digit code</label>
+            <input
+              id="sp-code"
+              class="input num"
+              formControlName="code"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="6 digits"
+              (input)="typed('code', 6)"
+              [attr.aria-invalid]="errors().code ? 'true' : null"
+              [attr.aria-describedby]="errors().code ? 'sp-code-err' : null"
+            />
+            @if (errors().code; as message) {
+              <span class="err-text" role="alert" id="sp-code-err">{{ message }}</span>
+            }
+          </div>
+          <div class="grid-f">
+            <div class="field">
+              <label for="sp-new">New PIN</label>
+              <input
+                id="sp-new"
+                class="input num"
+                type="password"
+                formControlName="newPin"
+                inputmode="numeric"
+                maxlength="4"
+                autocomplete="new-password"
+                placeholder="4 digits"
+                (input)="typed('newPin', 4)"
+                [attr.aria-invalid]="errors().newPin ? 'true' : null"
+                [attr.aria-describedby]="errors().newPin ? 'sp-new-err' : null"
+              />
+              @if (errors().newPin; as message) {
+                <span class="err-text" role="alert" id="sp-new-err">{{ message }}</span>
+              }
+            </div>
+            <div class="field">
+              <label for="sp-confirm">Confirm PIN</label>
+              <input
+                id="sp-confirm"
+                class="input num"
+                type="password"
+                formControlName="confirmPin"
+                inputmode="numeric"
+                maxlength="4"
+                autocomplete="new-password"
+                placeholder="4 digits"
+                (input)="typed('confirmPin', 4)"
+                [attr.aria-invalid]="errors().confirmPin ? 'true' : null"
+                [attr.aria-describedby]="errors().confirmPin ? 'sp-confirm-err' : null"
+              />
+              @if (errors().confirmPin; as message) {
+                <span class="err-text" role="alert" id="sp-confirm-err">{{ message }}</span>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (failure(); as message) {
+        <div class="notice err" role="alert" data-testid="sp-failure">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="sheet-f">
+    <button mat-stroked-button type="button" data-act="sp-cancel" [disabled]="busy()" (click)="cancel()">
+      Cancel
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      data-act="sp-save"
+      [disabled]="busy() || loading() || unavailable() || !codeSent()"
+      [attr.aria-busy]="saving()"
+    >
+      <app-icon name="key" [size]="15" /> Save PIN
+    </button>
+  </div>
+</form>

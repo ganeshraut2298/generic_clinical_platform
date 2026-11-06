@@ -1,0 +1,270 @@
+<app-page-head
+  title="Revenue"
+  [lead]="forbidden() ? 'Collections, dues and discounts for the whole clinic.' : lead()"
+>
+  @if (!forbidden()) {
+    <div class="seg" role="group" aria-label="Range">
+      @for (r of ranges; track r.range) {
+        <button type="button" [attr.aria-pressed]="range() === r.range" (click)="selectRange(r.range)">
+          {{ r.label }}
+        </button>
+      }
+    </div>
+    <span class="remind">
+      <button type="button" mat-stroked-button disabled>
+        <app-icon name="receipt" [size]="15" /> Export to Excel
+      </button>
+      <small class="hint">{{ exportNote }}</small>
+    </span>
+  }
+</app-page-head>
+
+@if (forbidden()) {
+  <section class="panel surf">
+    <div class="empty big" role="alert">
+      <app-icon name="lock" [size]="22" />
+      <p>{{ nonOwnerMessage }}</p>
+    </div>
+  </section>
+} @else if (loading()) {
+  <div class="skeleton" aria-busy="true" aria-live="polite">
+    <span class="sr-only">Loading the revenue report</span>
+    <div class="kpis">
+      @for (i of skeletonTiles; track i) {
+        <div class="kpi surf sk"></div>
+      }
+    </div>
+    <div class="panel surf sk tall"></div>
+  </div>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button type="button" mat-stroked-button (click)="load()">Try again</button>
+  </div>
+} @else if (report(); as r) {
+  <section class="kpis" aria-label="Summary">
+    <div class="kpi surf">
+      <span class="eyebrow">Collected</span>
+      <span class="v num">{{ rupees(r.collectedPaise) }}</span>
+      <span class="s">
+        @if (change(); as c) {
+          <b class="chg" [class.down]="changeIsDown()">{{ c }}</b> vs previous period
+        } @else {
+          Cash, UPI and card
+        }
+      </span>
+    </div>
+    <div class="kpi surf">
+      <span class="eyebrow">Billed</span>
+      <span class="v num">{{ rupees(r.billedPaise) }}</span>
+      <span class="s">{{ r.patients }} patients · avg {{ rupees(r.averageBillPaise) }}</span>
+    </div>
+    <div class="kpi surf">
+      <span class="eyebrow">Still due</span>
+      <span class="v num">{{ rupees(r.duePaise) }}</span>
+      <span class="s">
+        @if (r.atCounterPaise > 0) {
+          plus {{ rupees(r.atCounterPaise) }} at the counter now
+        } @else {
+          Unpaid balances on closed bills
+        }
+      </span>
+    </div>
+    <div class="kpi surf">
+      <span class="eyebrow">Discounts and refunds</span>
+      <span class="v num">{{ rupees(r.discountPaise + r.refundPaise) }}</span>
+      <span class="s">{{ rupees(r.discountPaise) }} discounts · {{ rupees(r.refundPaise) }} refunds</span>
+    </div>
+  </section>
+
+  <div class="grid2 wide">
+    <section class="panel surf">
+      <div class="panel-h">
+        <div>
+          <h2>Collections by day</h2>
+          <small class="faint">Today so far in blue</small>
+        </div>
+        <b class="num">{{ rupees(r.collectedPaise) }}</b>
+      </div>
+      @if (bars().length === 0) {
+        <div class="empty">No collections in this period.</div>
+      } @else {
+        <svg
+          class="chart"
+          [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+          role="group"
+          aria-label="Collections by day"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          @for (b of bars(); track b.date) {
+            <g role="img" [attr.aria-label]="b.title">
+              <title>{{ b.title }}</title>
+              <rect
+                class="bar"
+                [class.today]="b.isToday"
+                [attr.x]="b.x"
+                [attr.y]="b.y"
+                [attr.width]="b.width"
+                [attr.height]="b.height"
+                rx="4"
+              />
+              @if (b.showLabel) {
+                <text class="axis" [attr.x]="b.x + b.width / 2" [attr.y]="chartHeight - 6" text-anchor="middle">
+                  {{ b.label }}
+                </text>
+              }
+            </g>
+          }
+        </svg>
+      }
+    </section>
+
+    <section class="panel surf">
+      <div class="panel-h"><h2>How patients paid</h2></div>
+      <div class="stack" aria-hidden="true">
+        @for (m of modes(); track m.mode) {
+          @if (m.widthPercent > 0) {
+            <i [class]="'m-' + m.mode.toLowerCase()" [style.width.%]="m.widthPercent"></i>
+          }
+        }
+      </div>
+      <div class="list">
+        @for (m of modes(); track m.mode) {
+          <div class="li">
+            <span class="mdot" [class]="'mdot m-' + m.mode.toLowerCase()"></span>
+            <div class="main"><b>{{ m.label }}</b></div>
+            <span class="faint num">{{ m.percent }}%</span>
+            <b class="num amt">{{ rupees(m.amountPaise) }}</b>
+          </div>
+        }
+      </div>
+      <div class="drawer">
+        <span class="muted">
+          Cash in drawer today: <b class="num">{{ rupees(r.cashInDrawerPaise) }}</b>
+        </span>
+        <a mat-stroked-button routerLink="/app/billing">Close the day</a>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid2 even">
+    <section class="panel surf">
+      <div class="panel-h"><h2>By doctor</h2></div>
+      @if (doctors().length === 0) {
+        <div class="empty">No doctor figures in this period.</div>
+      } @else {
+        <div class="tbl-wrap">
+          <table class="rtab">
+            <thead>
+              <tr>
+                <th scope="col">Doctor</th>
+                <th scope="col">Patients</th>
+                <th scope="col">Collected</th>
+                <th scope="col">Avg</th>
+                <th scope="col">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (d of doctors(); track d.doctorMembershipId) {
+                <tr>
+                  <td>
+                    <b>{{ d.doctorName }}</b>
+                  </td>
+                  <td class="num">{{ d.patients }}</td>
+                  <td class="num">{{ rupees(d.collectedPaise) }}</td>
+                  <td class="num">{{ rupees(d.averagePaise) }}</td>
+                  <td>
+                    <span class="sbar" aria-hidden="true"><i [style.width.%]="d.sharePercent"></i></span>
+                    <span class="num share">{{ d.sharePercent }}%</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="panel surf">
+      <div class="panel-h">
+        <h2>Top services</h2>
+        <small class="faint">Billed amount</small>
+      </div>
+      @if (services().length === 0) {
+        <div class="empty">No services billed in this period.</div>
+      } @else {
+        <div class="bars">
+          @for (s of services(); track s.name) {
+            <div class="rbar">
+              <span class="name" [title]="s.name">{{ s.name }}</span>
+              <div class="track" aria-hidden="true"><i [style.width.%]="s.widthPercent"></i></div>
+              <span class="val num">{{ rupees(s.billedPaise) }}</span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+
+  <div class="grid2 even">
+    <section class="panel surf">
+      <div class="panel-h">
+        <h2>Dues to collect</h2>
+        <span class="pill p-warn num">{{ rupees(dueTotal()) }}</span>
+      </div>
+      @if (r.dues.length === 0) {
+        <div class="empty">No dues. Every closed bill is fully paid.</div>
+      } @else {
+        <div class="list">
+          @for (d of r.dues; track d.visitId) {
+            <div class="li">
+              <span class="sev"></span>
+              <div class="main">
+                <b>{{ d.patientName }}</b>
+                <small>
+                  {{ formatDate(d.date) }} · {{ d.doctorName }}
+                  @if (d.mobile) {
+                    · <span class="num">{{ d.mobile }}</span>
+                  }
+                </small>
+              </div>
+              <b class="num">{{ rupees(d.balancePaise) }}</b>
+              <span class="remind">
+                <button type="button" mat-stroked-button disabled>
+                  <app-icon name="send" [size]="13" /> Remind
+                </button>
+                <small class="hint">{{ whatsappNote }}</small>
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="panel surf">
+      <div class="panel-h">
+        <h2>Discounts and refunds</h2>
+        <small class="faint">Every entry has a reason</small>
+      </div>
+      @if (r.adjustments.length === 0) {
+        <div class="empty">No discounts or refunds in this period.</div>
+      } @else {
+        <div class="list">
+          @for (a of r.adjustments; track $index) {
+            <div class="li">
+              <span class="pill" [class]="a.kind === 'REFUND' ? 'pill p-crit' : 'pill p-sec'">
+                {{ a.kind === 'REFUND' ? 'Refund' : 'Discount' }}
+              </span>
+              <div class="main">
+                <b>{{ a.patientName }}</b>
+                <small>{{ formatDate(a.date) }} · {{ a.detail }}</small>
+              </div>
+              <b class="num">− {{ rupees(a.amountPaise) }}</b>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+}

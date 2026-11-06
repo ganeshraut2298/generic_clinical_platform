@@ -1,0 +1,35 @@
+// Bill table shared by the admission sheet and the Discharge sheet (mockup .ipbill, .ipbl).
+.ipbill {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+}
+
+.ipbh {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 4px 0 6px;
+}
+
+.ipbl {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-2);
+  font-size: 0.86rem;
+
+  &.tot {
+    font-weight: 700;
+  }
+
+  &.dep {
+    color: var(--good);
+  }
+}

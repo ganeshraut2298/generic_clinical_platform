@@ -1,0 +1,490 @@
+// App shell frame, mockup `.ax.cs`: sidebar 248 px (60 px collapsed), sticky blurred topbar; below
+// 1000 px the sidebar is a drawer. Global (scoped under `.shell`) because the shell exists once and
+// its rules are too long for a component style budget. The work area is in `_console.scss`.
+.shell {
+  // Widest the page content gets. The top bar lines up with it (see `.topbar`), so on a very wide
+  // screen the bar and the page share one left edge instead of the page floating away from it.
+  --page-max: 1680px;
+  --rail-w: 60px;
+
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+  transition: grid-template-columns var(--dur-2) var(--ease);
+
+  // Icon rail (desktop only; below 1000 px the sidebar is a drawer and always shows full labels).
+  // Group headings are dropped completely and a thin divider separates the groups instead.
+  @media (min-width: 1001px) {
+    &.collapsed {
+      grid-template-columns: var(--rail-w) minmax(0, 1fr);
+
+      .sidebar {
+        padding: 10px 8px;
+        align-items: stretch;
+      }
+      .sidebar-head {
+        flex-direction: column;
+      }
+      .clinic-card {
+        flex: none;
+        justify-content: center;
+        padding: 2px 0 6px;
+      }
+      .clinic-text,
+      .mode-toggle,
+      .search-menu,
+      .plan-card,
+      .group-head,
+      .nav-item .label {
+        display: none;
+      }
+      .nav-group {
+        margin-top: 0;
+      }
+      .nav-group + .nav-group {
+        margin-top: 4px;
+        padding-top: 4px;
+        border-top: 1px solid var(--line-2);
+      }
+      .nav-item {
+        justify-content: center;
+        padding-inline: 0;
+
+        .badge {
+          position: absolute;
+          top: 3px;
+          right: 4px;
+          margin: 0;
+          padding: 0 5px;
+          font-size: 0.62rem;
+        }
+      }
+    }
+  }
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 8px;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .sidebar-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .clinic-card {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: 1;
+    min-width: 0;
+    padding: 2px 4px 6px;
+  }
+
+  .sidebar .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, var(--pri), var(--sec));
+    color: var(--pri-ink);
+    text-transform: uppercase;
+  }
+
+  .clinic-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    small {
+      font-size: 0.72rem;
+      color: var(--ink-3);
+    }
+    b {
+      font-family: var(--font-display);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .mode-toggle {
+    display: flex;
+    padding: 3px;
+    gap: 2px;
+    border-radius: var(--r-sm);
+    background: var(--muted-soft);
+
+    button {
+      position: relative;
+      flex: 1;
+      border: 0;
+      background: transparent;
+      padding: 6px 0;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--ink-2);
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: -6px 0;
+      }
+      &[aria-pressed='true'] {
+        background: var(--glass-hi);
+        color: var(--pri-text);
+        box-shadow: 0 2px 8px -4px var(--pri);
+      }
+    }
+  }
+
+  .search-menu,
+  .search-mobile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--surface-2);
+    color: var(--ink-3);
+
+    &:focus-within {
+      border-color: var(--pri);
+      background: var(--surface);
+    }
+    input {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      outline: 0;
+      color: var(--ink);
+      font-size: 0.84rem;
+    }
+  }
+
+  .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 4px;
+  }
+
+  .group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 28px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding: 7px 10px 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-3);
+
+    &:hover {
+      color: var(--ink);
+    }
+    app-icon {
+      transition: transform var(--dur-1);
+    }
+    &[aria-expanded='false'] app-icon {
+      transform: rotate(-90deg);
+    }
+  }
+
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 10px;
+    border-radius: 9px;
+    color: var(--ink-2);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.86rem;
+    transition:
+      background var(--dur-1),
+      color var(--dur-1);
+
+    &:hover {
+      background: var(--muted-soft);
+      color: var(--ink);
+    }
+    &.active {
+      background: var(--pri-soft);
+      color: var(--pri-text);
+      font-weight: 600;
+    }
+    .label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    // Count on "Emergency" (shown above 0 only); on the icon rail it sits on the icon corner.
+    .badge {
+      margin-left: auto;
+      padding: 1px 7px;
+      border-radius: var(--r-pill);
+      background: var(--pri-soft);
+      color: var(--pri-text);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+  }
+
+  .nav-empty {
+    padding: 12px 10px;
+    color: var(--ink-3);
+    font-size: 0.82rem;
+  }
+
+  .plan-card {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--muted-soft);
+    border: 1px solid var(--line-2);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+
+    b {
+      color: var(--ink-2);
+      font-weight: 600;
+    }
+  }
+
+  .row-sb {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .scrim {
+    display: none;
+    border: 0;
+    padding: 0;
+  }
+
+  .work {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 7px max(20px, calc((100% - var(--page-max)) / 2 + 20px));
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .hamburger {
+    display: none;
+  }
+
+  .clinic-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    // Takes the free room and gives it back first, so the controls on the right never wrap to a
+    // second row when the work area is narrow.
+    flex: 1 1 120px;
+
+    b {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    span {
+      font-size: 0.74rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .search-mobile {
+    flex: 0 1 240px;
+    min-height: 36px;
+    border-color: var(--line);
+    background: var(--glass-hi);
+  }
+
+  .goto-btn,
+  .chip-select {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--glass-hi);
+    color: var(--ink-2);
+    font-size: 0.82rem;
+    font-weight: 600;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -4px 0;
+    }
+    select {
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      font-weight: 600;
+      outline: 0;
+      max-width: 150px;
+    }
+  }
+
+  .goto-btn kbd {
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 0 5px;
+    font-size: 0.7rem;
+    color: var(--ink-3);
+  }
+
+  .user-menu {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    padding: 3px 10px;
+
+    .role-name {
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: var(--ink);
+    }
+    small {
+      color: var(--ink-3);
+      font-size: 0.7rem;
+    }
+  }
+
+  // Work area 740 to 990 px: shorten the two widest controls so the bar stays on one row.
+  @media (max-width: 1240px) {
+    .goto-btn span,
+    .goto-btn kbd {
+      display: none;
+    }
+    .search-mobile {
+      flex-basis: 180px;
+    }
+  }
+
+  @media (max-width: 1000px) {
+    &,
+    &.collapsed {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sidebar,
+    &.collapsed .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 80;
+      width: 280px;
+      height: auto;
+      padding: 10px 8px;
+      align-items: stretch;
+      transform: translateX(-100%);
+      transition: transform var(--dur-2) var(--ease);
+      box-shadow: var(--shadow);
+
+      &.open {
+        transform: none;
+      }
+      .sidebar-head .iconbtn {
+        display: none;
+      }
+    }
+
+    .scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 79;
+      background: var(--scrim);
+    }
+
+    .hamburger {
+      display: inline-grid;
+    }
+
+    .topbar {
+      padding: 7px 12px;
+    }
+    .search-mobile {
+      display: none;
+    }
+    .goto-btn span,
+    .goto-btn kbd {
+      display: none;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .user-menu small {
+      display: none;
+    }
+    .chip-select select {
+      max-width: 92px;
+    }
+    .clinic-info {
+      flex: 1 1 140px;
+    }
+  }
+
+  .hide-sm {
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+}

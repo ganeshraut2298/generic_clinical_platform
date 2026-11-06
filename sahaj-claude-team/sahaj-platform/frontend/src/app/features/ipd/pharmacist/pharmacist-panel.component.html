@@ -1,0 +1,106 @@
+<section class="panel surf sfp" aria-labelledby="ph-h" data-testid="pharmacist-panel">
+  <div class="sfph">
+    <h2 [id]="headingId" tabindex="-1"><app-icon name="shieldu" [size]="18" /> {{ title }}</h2>
+    <small class="faint">{{ subtitle }}</small>
+  </div>
+
+  @if (store.loading()) {
+    <p class="muted" role="status" aria-busy="true">Loading the pharmacist checks</p>
+  } @else if (store.loadError(); as message) {
+    <div class="notice err" role="alert" data-testid="pharmacist-error">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button data-act="ph-retry" (click)="reload()">Try again</button>
+    </div>
+  } @else if (store.meta()) {
+    @if (store.refreshFailed()) {
+      <div class="notice warn" role="status" data-testid="pharmacist-stale">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ staleText() }}</span>
+      </div>
+    }
+
+    @if (store.items().length === 0) {
+      <div class="empty" data-testid="pharmacist-empty">{{ empty }}</div>
+    } @else {
+      <div role="list" aria-label="Orders waiting for the pharmacist check">
+        @for (r of store.items(); track r.orderId) {
+          <div class="sfrow" role="listitem" [attr.data-order]="r.orderId">
+            <span class="sfmn">
+              <b data-testid="ph-title">
+                {{ titleOf(r) }}
+                @if (r.highAlert) {
+                  <span class="pill p-crit sfha">High-alert</span>
+                }
+              </b>
+              <small data-testid="ph-line">{{ line(r) }}</small>
+              @for (f of r.check.hardStops; track $index) {
+                <small class="sfbad" data-testid="ph-hardstop">
+                  <app-icon name="alert" [size]="12" /> {{ f.text }}
+                </small>
+              }
+              @for (w of r.check.warnings; track $index) {
+                <small class="sfwarn" data-testid="ph-warning">
+                  <app-icon name="alert" [size]="12" /> {{ severity(w.severity) }}: {{ w.text }}
+                </small>
+              }
+              @if (r.overrideReason; as reason) {
+                <small data-testid="ph-reason">Doctor's reason: {{ reason.label }}</small>
+              }
+            </span>
+            <span class="sfacts">
+              @if (r.canReject) {
+                <button
+                  type="button"
+                  mat-stroked-button
+                  data-act="sfrej"
+                  [attr.aria-label]="'Reject ' + r.drugName + ' for ' + r.patient.name"
+                  (click)="reject(r)"
+                >
+                  Reject
+                </button>
+              }
+              <button
+                type="button"
+                mat-flat-button
+                data-act="sfver"
+                [disabled]="!r.canVerify"
+                [attr.aria-label]="'Verify ' + r.drugName + ' for ' + r.patient.name"
+                [attr.aria-describedby]="r.canVerify ? null : 'ph-hint-' + r.orderId"
+                (click)="verify(r)"
+              >
+                Verify
+              </button>
+              @if (!r.canVerify && r.verifyLockReason; as why) {
+                <small class="faint sfhint" [id]="'ph-hint-' + r.orderId" data-testid="ph-hint">
+                  {{ lockHint[why] }}
+                </small>
+              }
+            </span>
+          </div>
+        }
+      </div>
+    }
+
+    @if (store.moreError(); as message) {
+      <div class="notice err" role="alert" data-testid="pharmacist-more-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+    @if (store.nextCursor() !== null) {
+      <div class="more">
+        <button
+          type="button"
+          mat-stroked-button
+          data-act="ph-more"
+          [disabled]="store.moreLoading()"
+          [attr.aria-busy]="store.moreLoading()"
+          (click)="loadMore()"
+        >
+          {{ showMore }}
+        </button>
+      </div>
+    }
+  }
+</section>

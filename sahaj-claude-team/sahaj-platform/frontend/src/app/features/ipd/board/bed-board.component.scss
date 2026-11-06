@@ -1,0 +1,236 @@
+// Bed board. Shared blocks: `_console.scss`.
+.boardbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.blegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+
+  .bl {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  b {
+    color: var(--ink);
+  }
+}
+
+.wardside {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+}
+
+.room {
+  min-width: 0;
+}
+
+.roomh {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.beds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bed {
+  width: 156px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  min-height: 104px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  position: relative;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+
+  &:hover:not([aria-disabled="true"]) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+  &[aria-disabled="true"] {
+    cursor: default;
+  }
+  &:focus-visible {
+    outline: 3px solid var(--pri);
+    outline-offset: 2px;
+  }
+  .bt {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+    align-items: baseline;
+
+    b {
+      font-family: var(--font-display);
+      font-size: 1rem;
+    }
+  }
+}
+
+.bcat {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.bst {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.bpt {
+  font-weight: 600;
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.bmeta {
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}
+
+.bflag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+
+  &.low {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+  &.go {
+    background: var(--sec-soft);
+    color: var(--sec);
+  }
+}
+
+.st-free {
+  &.bl app-icon {
+    color: var(--good);
+  }
+  .bst {
+    color: var(--good);
+    background: var(--good-soft);
+  }
+  &.bed {
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--good) 45%, transparent);
+  }
+}
+
+.st-occ {
+  &.bl app-icon {
+    color: var(--pri-text);
+  }
+  .bst {
+    color: var(--pri-text);
+    background: var(--pri-soft);
+  }
+  &.bed {
+    border-left: 4px solid var(--pri);
+  }
+}
+
+.st-clean {
+  &.bl app-icon {
+    color: var(--warn);
+  }
+  .bst {
+    color: var(--warn);
+    background: var(--warn-soft);
+  }
+  &.bed {
+    background: repeating-linear-gradient(135deg, var(--surface) 0 10px, var(--warn-soft) 10px 12px);
+  }
+}
+
+.st-res {
+  &.bl app-icon {
+    color: var(--sec);
+  }
+  .bst {
+    color: var(--sec);
+    background: var(--sec-soft);
+  }
+}
+
+.st-blk {
+  &.bl app-icon {
+    color: var(--ink-3);
+  }
+  .bst {
+    color: var(--ink-3);
+    background: var(--muted-soft);
+  }
+  &.bed {
+    opacity: 0.7;
+    background: var(--muted-soft);
+  }
+}
+
+.occbar {
+  width: 120px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted-soft);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    background: var(--pri);
+    border-radius: 999px;
+  }
+}
+
+@media (max-width: 560px) {
+  .rooms {
+    flex-direction: column;
+  }
+  .bed {
+    width: calc(50% - 5px);
+  }
+}

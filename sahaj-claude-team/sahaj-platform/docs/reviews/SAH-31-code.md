@@ -1,0 +1,29 @@
+# Code review · SAH-31 (IPD medicine orders, safety checks, pharmacist check, staff PIN)
+
+Reviewer: code-reviewer (read-only), 6 Nov 2026. Saved by the tech lead. Nothing was run by the reviewer (QA ran the suites).
+
+**Verdict: APPROVE WITH COMMENTS.** No Blocker or Major. 6 Minor, 7 Nit. Security review: PASS (docs/reviews/SAH-31-security.md).
+
+Process notes for the human: no SAH-31 `stories`/`contract` lines in docs/approvals.md; ADR-009 and ADR-010 are PROPOSED and the contracts carry post-build wording changes (B2, B4, third-lock answer) that need re-approval; the branch carries ADM-1 and SAH-22 to SAH-33 as well, so `merge` approval covers the whole bundle.
+
+| # | Sev | Where | Finding | Fix | Tech lead decision |
+|---|---|---|---|---|---|
+| R1 | Minor | StaffPinService.java:123; InMemoryStaffPinLimits.java:25 (ADR-010 D13) | The 10 PIN operations / 5 min limit counts successful checks too and `PUT /me/pin` shares the bucket: a pharmacist verifying 11 orders in 5 minutes gets 429 and cannot give first doses. | Count only failed checks toward the limiter (the database lockout already caps guessing); separate bucket for set/change. | Fix (java); noted in DEC-017; ADR-010 D13 wording to the architect later. |
+| R2 | Minor | emr-sheet.component.ts:186 (`reload`, `load`) | Reload after a refused action or a retry calls `GET /emr`, which writes a view event and a record-access row for an opening the doctor did not make. | Use a sheet carried in the response, a `refresh` flag, or accept. | Accept and record (growth already flagged in ADR-009 D12); no contract change now. |
+| R3 | Minor | MedicineAssembler.java:207; JdbcMedicineOrderRepository.java:83 | `waiting` loads every waiting order's id and version just to count. | `countWaiting` with `select count(*)`; keep `findWaitingKeys` for the summary. | Fix (java) |
+| R4 | Minor | verify-sheet.component.ts:361; pin.model.ts:80 | The not-set reason is recovered by matching the start of the server's detail text; a wording change silently shows the wrong notice. | After a 409 `pin-not-set` use `GET /me/pin` (it returns `notSetReason`). | Fix (angular) |
+| R5 | Minor | PinTestSupport.java:47 | Reflection into private limiter fields. | Package-visible reset or a test Clock bean. | Accept (a public reset in production code is the worse trade; the helper fails loudly if the shape changes). |
+| R6 | Minor | emr-sheet.component.html:235 | When `orderLockReason` is IPD_READONLY or NOT_ADMITTED the order form disappears with no sentence. | Add short lines ("IPD is read-only. Medicines can be stopped but not added." / "This patient is not admitted any more."). | Fix (angular); added to the deviation list in DEC-017. |
+| R7 | Nit | V2026_11_28_1000:9, :342 | Header and stored table comment on `ipd.drug` still say "no row level security". | Cannot edit an applied migration (checksum). | Fix with a new forward comment-only migration (db-engineer); the header text stays and is explained there. |
+| R8 | Nit | JdbcMedicineOrderRepository.java:52 | `ordered_at default now()` is the transaction start; a later committed order can carry an earlier time (chart order, rare cursor slip). | `clock_timestamp()` or accept. | Accept and note (needs an applied-migration change); a reload is correct. |
+| R9 | Nit | verify-sheet.component.html:68 | `autocomplete="off"` on a password field is ignored; the browser may offer to save the PIN. | `one-time-code` or `new-password`; same in set-pin-sheet. | Fix (angular), same as security S9 |
+| R10 | Nit | pharmacist.store.ts:85 | After verify/reject the first page replaces all loaded pages. | Merge or note. | Accept and note in the test plan |
+| R11 | Nit | `.sheet-h` in _console.scss:792; team.page.spec.ts:93 | Loading/error sheet variants with a bare `<h2>` put the close button next to the title; the `.tbl-wrap` comment/test claims a containing block the rule does not give. | `> h2 { flex: 1 }`; make `.tbl-wrap` `position: relative` (the fix pass claimed so) or fix the comment. | Fix (angular) |
+| R12 | Nit | MedicineAssembler.java:238 vs `row()`:117; PharmacistCheckService.java:119 vs MedicineOrderService.java:495 | Frequency/override lookups and `membershipRole` written twice; `order()` is about 70 lines. | Extract helpers; split `order()`. | Fix (java) |
+| R13 | Nit | TeamService.java:101 | The reset limiter is spent before the 404 lookup. | Move the call after the lookup. | Fix (java) |
+
+## Checked and correct
+Check order in order/stop/reject/prepareVerify/verifyLocked; role re-read from the active membership on every action; outcomes and status codes; checkToken; client-key rules (B2); self-verification in three places; three-step verify with the PIN check outside any transaction (refused inside one); one lock per write (admission row, `for no key update`, bare row first), no deadlock cycle with the PIN row lock; DB-error mapping; migrations (forced RLS, composite FKs, column grants, delete/truncate triggers, state-machine guard, partial unique index); keyset paging with 32-character cursor; no N+1; module boundaries (`PatientClinicalLookup` MANDATORY); privacy (fixed event templates, ids-only audit, redacted `toString` on all records holding names/findings/secrets); PIN hashing, pepper fail-closed, lockout and third-lock switch-off, weak-PIN rules, code check outside the write transaction; frontend OnPush/signals/aria/focus/44 px, no console/storage; SAH-31 tests (no hidden skips; the `assumeTrue` calls are in BedTransfer ITs from earlier stories).
+
+## Done well
+One pure rule class shared by order, queue, verify and EMR; fingerprint prevents override/verification against findings not seen; PIN check refused inside a transaction; database backstops for the service rules; careful PIN design; narrow unit-tested `pinState` exception; client-key handling in the EMR sheet; counts-only polling.

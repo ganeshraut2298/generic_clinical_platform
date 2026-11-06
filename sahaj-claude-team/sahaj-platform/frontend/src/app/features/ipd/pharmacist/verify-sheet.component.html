@@ -1,0 +1,145 @@
+<form class="sheet" [formGroup]="form" (ngSubmit)="submit()" novalidate data-testid="verify-sheet">
+  <div class="sheet-h">
+    <div>
+      <h2 id="sf-vh">{{ title() }}</h2>
+      <p class="muted sub" data-testid="verify-subtitle">{{ subtitle() }}</p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close"
+      data-act="vf-x"
+      [disabled]="running()"
+      (click)="cancel()"
+    >
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    <app-identity-bar [patient]="current().patient" />
+
+    @if (current().check.hardStops.length > 0) {
+      <div class="notice crit" role="alert" data-testid="verify-hardstops">
+        <app-icon name="alert" [size]="16" />
+        <span>
+          @for (f of current().check.hardStops; track $index) {
+            <span class="line">{{ f.text }}</span>
+          }
+        </span>
+      </div>
+    }
+    @if (current().check.warnings.length > 0) {
+      <div class="notice warn" data-testid="verify-warnings">
+        <app-icon name="alert" [size]="16" />
+        <span>
+          @for (w of current().check.warnings; track $index) {
+            <span class="line"><b>{{ severity(w.severity) }}:</b> {{ w.text }}</span>
+          }
+          @if (current().overrideReason; as reason) {
+            <span class="line"><b>Doctor's reason:</b> {{ reason.label }}</span>
+          }
+        </span>
+      </div>
+    } @else if (current().check.hardStops.length === 0) {
+      <div class="notice good" data-testid="verify-clear">
+        <app-icon name="check" [size]="16" />
+        <span>{{ noFindings }}</span>
+      </div>
+    }
+
+    @if (!current().canVerify && lockReason(); as why) {
+      <p class="faint hint" data-testid="verify-lock-hint">{{ lockHint[why] }}</p>
+    }
+
+    <div class="grid-f">
+      <div class="field">
+        <label for="sf-vby">Verified by</label>
+        <input id="sf-vby" class="input" readonly [value]="verifierName" data-testid="verified-by" />
+      </div>
+
+      @switch (gate().kind) {
+        @case ('ready') {
+          <div class="field">
+            <label for="sf-vpin">PIN</label>
+            <input
+              id="sf-vpin"
+              class="input num"
+              type="password"
+              formControlName="pin"
+              inputmode="numeric"
+              maxlength="4"
+              autocomplete="one-time-code"
+              placeholder="4 digits"
+              (input)="typed()"
+              [attr.aria-invalid]="pinError() ? 'true' : null"
+              [attr.aria-describedby]="pinError() ? 'sf-vpin-err' : null"
+            />
+            @if (pinError(); as message) {
+              <span class="err-text" role="alert" id="sf-vpin-err" data-testid="pin-error">{{ message }}</span>
+            }
+          </div>
+        }
+        @case ('loading') {
+          <p class="muted" role="status" aria-busy="true">Checking your PIN</p>
+        }
+      }
+    </div>
+
+    @switch (gate().kind) {
+      @case ('error') {
+        <div class="notice err" role="alert" data-testid="pin-load-error">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ gateError() }}</span>
+          <button type="button" mat-stroked-button data-act="vf-retry" (click)="loadStatus()">Try again</button>
+        </div>
+      }
+      @case ('unavailable') {
+        <div class="notice warn" role="alert" tabindex="-1" data-testid="pin-unavailable">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ unavailableText }}</span>
+        </div>
+      }
+      @case ('notset') {
+        <div class="notice warn" role="alert" data-testid="pin-not-set">
+          <app-icon name="key" [size]="16" />
+          <span>{{ notSet(gateReason()) }}</span>
+          <button type="button" mat-stroked-button data-act="vf-setpin" (click)="openSetPin()">
+            <app-icon name="key" [size]="14" /> Set my PIN
+          </button>
+        </div>
+      }
+      @case ('locked') {
+        <div class="notice warn" role="alert" data-testid="pin-locked">
+          <app-icon name="lock" [size]="16" />
+          <span>{{ lockedText() }}</span>
+          <button type="button" mat-stroked-button data-act="vf-newpin" (click)="openSetPin()">
+            Set a new PIN
+          </button>
+        </div>
+      }
+    }
+
+    @if (failure(); as message) {
+      <div class="notice err" role="alert" data-testid="verify-failure">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="sheet-f">
+    <button mat-stroked-button type="button" data-act="vf-cancel" [disabled]="running()" (click)="cancel()">
+      Cancel
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      data-act="sfverok"
+      [disabled]="!canVerify()"
+      [attr.aria-busy]="running()"
+    >
+      <app-icon name="check" [size]="15" /> Verify order
+    </button>
+  </div>
+</form>

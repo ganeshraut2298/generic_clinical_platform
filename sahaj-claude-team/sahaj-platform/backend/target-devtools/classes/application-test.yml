@@ -1,0 +1,17 @@
+# Profile test: the local sahaj_test database, used by integration tests (*IT.java).
+# Flyway clean is allowed here only (rules: java-spring.md).
+spring:
+  datasource:
+    url: ${SAHAJ_TEST_DB_URL:jdbc:postgresql://localhost:5432/sahaj_test}
+    username: sahaj_app
+    password: ${SAHAJ_DB_APP_PASSWORD}
+  flyway:
+    url: ${SAHAJ_TEST_DB_URL:jdbc:postgresql://localhost:5432/sahaj_test}
+    user: sahaj_migrator
+    password: ${SAHAJ_DB_MIGRATOR_PASSWORD}
+    clean-disabled: false
+
+sahaj:
+  modules:
+    # DEC-010: on for integration tests; ModulesTrialSwitchOffIT turns it off in its own context.
+    owner-ipd-trial: true

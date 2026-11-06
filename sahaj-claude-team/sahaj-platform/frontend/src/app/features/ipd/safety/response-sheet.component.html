@@ -1,0 +1,117 @@
+<form
+  class="sheet"
+  [formGroup]="form"
+  (ngSubmit)="submit()"
+  novalidate
+  data-testid="response-sheet"
+  aria-labelledby="rs-title"
+>
+  <div class="sheet-h">
+    <div>
+      <h2 id="rs-title">{{ title() }}</h2>
+      <p class="muted sub" data-testid="response-subtitle">{{ subtitle() }}</p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close"
+      data-act="response-x"
+      [disabled]="running()"
+      (click)="cancel()"
+    >
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    <div class="field">
+      <label for="rs-action">What was done</label>
+      <select
+        id="rs-action"
+        class="input"
+        formControlName="action"
+        (change)="edited('action')"
+        [attr.aria-invalid]="errors().action ? 'true' : null"
+        [attr.aria-describedby]="errors().action ? 'rs-action-err' : null"
+      >
+        @for (a of actions; track a.key) {
+          <option [value]="a.key">{{ a.label }}</option>
+        }
+      </select>
+      @if (errors().action; as message) {
+        <span class="err-text" role="alert" id="rs-action-err">{{ message }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="rs-note">Plan and next vitals</label>
+      <textarea
+        id="rs-note"
+        class="input"
+        rows="3"
+        formControlName="note"
+        (input)="edited('note')"
+        [placeholder]="placeholder"
+        [attr.aria-invalid]="errors().note ? 'true' : null"
+        [attr.aria-describedby]="
+          errors().note || overLimit() ? 'rs-note-err rs-note-count' : 'rs-note-count'
+        "
+      ></textarea>
+      <div class="note-foot">
+        @if (errors().note; as message) {
+          <span class="err-text" role="alert" id="rs-note-err">{{ message }}</span>
+        } @else if (overLimit()) {
+          <span class="err-text" role="alert" id="rs-note-err">{{ tooLong }}</span>
+        }
+        <span
+          class="counter faint num"
+          id="rs-note-count"
+          data-testid="plan-counter"
+          [class.over]="overLimit()"
+          >{{ counter() }}</span
+        >
+      </div>
+    </div>
+
+    @if (confirming()) {
+      <div class="notice warn" role="alert" data-testid="response-discard">
+        <app-icon name="alert" [size]="16" />
+        <span>Discard the plan you typed?</span>
+        <button type="button" mat-stroked-button data-act="response-keep" id="rs-keep" (click)="keepEditing()">
+          Keep editing
+        </button>
+        <button type="button" mat-flat-button data-act="response-discard" id="rs-discard" (click)="discard()">
+          Discard plan
+        </button>
+      </div>
+    }
+
+    @if (failure(); as message) {
+      <div class="notice err" role="alert" data-testid="response-failure">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="sheet-f">
+    <button
+      mat-stroked-button
+      type="button"
+      data-act="response-cancel"
+      [disabled]="running()"
+      (click)="cancel()"
+    >
+      Cancel
+    </button>
+    <button
+      mat-flat-button
+      type="submit"
+      data-act="response-close"
+      [disabled]="running() || locked()"
+      [attr.aria-busy]="running()"
+    >
+      <app-icon name="check" [size]="15" /> Close escalation
+    </button>
+  </div>
+</form>

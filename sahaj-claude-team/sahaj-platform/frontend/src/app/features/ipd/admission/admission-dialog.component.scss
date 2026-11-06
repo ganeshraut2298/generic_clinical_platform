@@ -1,0 +1,76 @@
+.sub {
+  font-size: 0.86rem;
+}
+
+.ipsum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+  }
+  small {
+    color: var(--ink-3);
+    font-size: 0.74rem;
+  }
+  b {
+    font-size: 1.1rem;
+  }
+  span {
+    color: var(--ink-2);
+    font-size: 0.78rem;
+  }
+  .over {
+    color: var(--crit);
+    font-weight: 600;
+  }
+}
+
+.ipdx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  small {
+    color: var(--ink-3);
+    font-size: 0.74rem;
+  }
+}
+
+.ipact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .nw {
+    flex-wrap: wrap;
+  }
+}
+
+.pre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink-3);
+
+  .input {
+    width: 130px;
+    text-align: right;
+  }
+}
+
+select.input {
+  min-width: 220px;
+}

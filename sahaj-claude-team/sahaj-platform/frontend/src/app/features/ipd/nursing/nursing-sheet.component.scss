@@ -1,0 +1,99 @@
+// Nursing sheet (mockup `.nvg`, `.pcnotes`). Colours come from the tokens only; the score notice
+// always carries the risk word, so colour is never the only signal.
+.sub {
+  font-size: 0.86rem;
+}
+
+// The tabs (mockup `.seg.sfnst`): the selected tab is marked by `aria-selected`.
+.sfnst {
+  align-self: flex-start;
+  max-width: 100%;
+
+  button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    // Touch target (angular.md): every tab is at least 44 px tall.
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 9px;
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.84rem;
+    color: var(--ink-2);
+
+    &[aria-selected='true'] {
+      background: var(--glass-hi);
+      color: var(--pri-text);
+      box-shadow: 0 2px 8px -4px var(--pri);
+    }
+  }
+  .c {
+    background: var(--crit);
+    color: var(--crit-ink);
+    border-radius: 99px;
+    padding: 0 6px;
+    font-size: 0.7rem;
+    line-height: 1.5;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nvg {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+
+  .field {
+    min-width: 0;
+  }
+}
+
+textarea.input {
+  resize: vertical;
+  min-height: 84px;
+  font: inherit;
+}
+
+.pcnotes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  > b {
+    font-size: 0.8rem;
+    color: var(--ink-2);
+  }
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+
+    small {
+      color: var(--ink-3);
+      font-size: 0.74rem;
+    }
+  }
+  .notetext {
+    font-size: 0.86rem;
+    // Line breaks the nurse typed are kept; long words wrap.
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+.notice button {
+  margin-left: auto;
+  min-height: 44px;
+}

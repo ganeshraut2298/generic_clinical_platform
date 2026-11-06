@@ -1,0 +1,186 @@
+@if (store.gate() !== 'ready') {
+  <app-ipd-gate [gate]="store.gate()" (retry)="store.retry()" />
+} @else if (store.loading() || (!store.rules() && !store.loadError())) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading deposit rules</p>
+  </section>
+} @else if (store.loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button (click)="store.retry()">Try again</button>
+    </div>
+  </section>
+} @else if (store.rules(); as r) {
+  <section class="panel surf" id="f-ipadm">
+    <div class="panel-h">
+      <h2>Minimum deposit</h2>
+      @if (r.confirmed) {
+        <span class="pill p-good">Confirmed</span>
+      } @else if (store.isOwner()) {
+        <button
+          type="button"
+          mat-flat-button
+          [disabled]="store.busy() || store.isReadonly()"
+          (click)="confirm()"
+        >
+          Confirm these rules
+        </button>
+      }
+    </div>
+
+    @if (store.isReadonly()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>IPD is read-only. Nothing can be changed.</span>
+      </div>
+    } @else if (!store.isOwner()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>Only the owner can change the deposit rules. You can view them here.</span>
+      </div>
+    }
+
+    @for (t of types; track t.value) {
+      <div class="rulerow">
+        <span>
+          <label [for]="'dep-' + t.value">{{ t.label }} admission</label>
+          <small class="faint">Base deposit</small>
+        </span>
+        <span class="rs">
+          ₹<input
+            [id]="'dep-' + t.value"
+            class="input num"
+            type="text"
+            inputmode="numeric"
+            [value]="paiseToRupees(r.depositPaise[t.value])"
+            [disabled]="store.locked()"
+            [attr.aria-label]="t.label + ' minimum deposit, in rupees'"
+            (change)="saveBase(t.value, $any($event.target))"
+          />
+        </span>
+      </div>
+    }
+
+    <div class="addons" role="group" aria-label="Added for the bed category">
+      <span class="faint addons-h">Added for the bed category</span>
+      <div class="addons-row">
+        @for (c of categories; track c.key) {
+          <span class="rs">
+            <span class="cat">{{ c.name }}</span>
+            ₹<input
+              class="input num"
+              type="text"
+              inputmode="numeric"
+              [value]="paiseToRupees(r.categoryAddPaise[c.key])"
+              [disabled]="store.locked()"
+              [attr.aria-label]="c.name + ' added to the minimum deposit, in rupees'"
+              (change)="saveAddOn(c.key, $any($event.target))"
+            />
+          </span>
+        }
+      </div>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <span id="er-nodep">Emergency without deposit</span>
+        <small class="faint">Admit first, take the deposit the same day</small>
+      </span>
+      <button
+        type="button"
+        class="sw"
+        role="switch"
+        aria-label="Emergency without deposit"
+        [attr.aria-checked]="r.emergencyWithoutDeposit"
+        [disabled]="store.locked()"
+        (click)="toggleEmergency()"
+      ></button>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <span id="dep-alert">Deposit alert</span>
+        <small class="faint">Warn when the running bill reaches this share of the deposit</small>
+      </span>
+      <span class="stepper" role="group" aria-labelledby="dep-alert">
+        <button
+          type="button"
+          aria-label="Lower the alert level"
+          [disabled]="store.locked() || r.alertPercent <= alertMin"
+          (click)="stepAlert(-1)"
+        >
+          −
+        </button>
+        <span aria-live="polite">{{ r.alertPercent }}%</span>
+        <button
+          type="button"
+          aria-label="Raise the alert level"
+          [disabled]="store.locked() || r.alertPercent >= alertMax"
+          (click)="stepAlert(1)"
+        >
+          +
+        </button>
+      </span>
+    </div>
+  </section>
+
+  <section class="panel surf" id="f-iptransfer">
+    <h2>Bed transfer rules</h2>
+    @if (store.transfer(); as t) {
+      @if (!store.isOwner() && !store.isReadonly()) {
+        <div class="notice warn" role="status">
+          <app-icon name="lock" [size]="16" />
+          <span>Only the owner can change the bed transfer rules. You can view them here.</span>
+        </div>
+      }
+      <div class="rulerow">
+        <span>
+          <span id="tr-up">Moving to a higher category</span>
+          <small class="faint">For example General to Private</small>
+        </span>
+        <mat-button-toggle-group
+          #up="matButtonToggleGroup"
+          class="seg"
+          aria-labelledby="tr-up"
+          [hideSingleSelectionIndicator]="true"
+          [value]="t.upgradeNeedsOwner"
+          [disabled]="store.locked()"
+          (change)="setUpgrade($event.value, up)"
+        >
+          @for (c of upgradeChoices; track c.label) {
+            <mat-button-toggle [value]="c.value">{{ c.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+      </div>
+      <div class="rulerow">
+        <span>
+          <span id="tr-rate">New bed rate starts</span>
+          <small class="faint">On the day of the transfer</small>
+        </span>
+        <mat-button-toggle-group
+          #rate="matButtonToggleGroup"
+          class="seg"
+          aria-labelledby="tr-rate"
+          [hideSingleSelectionIndicator]="true"
+          [value]="t.newRateFrom"
+          [disabled]="store.locked()"
+          (change)="setRateFrom($event.value, rate)"
+        >
+          @for (c of newRateChoices; track c.value) {
+            <mat-button-toggle [value]="c.value">{{ c.label }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+      </div>
+    } @else if (store.transferLoadError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button (click)="store.retryTransfer()">Try again</button>
+      </div>
+    } @else {
+      <p class="muted" aria-busy="true">Loading bed transfer rules</p>
+    }
+  </section>
+}

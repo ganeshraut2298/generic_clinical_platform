@@ -1,0 +1,144 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading the plan and modules</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else if (view(); as v) {
+  <section class="panel surf" id="f-modules">
+    <div class="panel-h">
+      <h2>Modules on your plan</h2>
+      <span class="pill p-teal">{{ planLabel() }}</span>
+    </div>
+    <div class="modlist">
+      <div class="modrow">
+        <span class="ti"><app-icon name="users" [size]="17" /></span>
+        <div class="main">
+          <b>OPD</b>
+          <small>Appointments, tokens, queue, case paper, billing and follow-ups. Always on.</small>
+        </div>
+        <div class="modr"><span class="pill p-good">Included</span></div>
+      </div>
+      <div class="modrow">
+        <span class="ti"><app-icon name="msg" [size]="17" /></span>
+        <div class="main">
+          <b>WhatsApp messages</b>
+          <small>Later: needs the messaging service, not in this phase</small>
+        </div>
+        <div class="modr"><span class="pill p-wait">Later</span></div>
+      </div>
+      <div class="modrow">
+        <span class="ti"><app-icon name="home" [size]="17" /></span>
+        <div class="main">
+          <b>In-patients (IPD)</b>
+          <small>Emergency, wards and beds, admissions, deposits, transfers and discharge. Sahaj switches it on for your clinic.</small>
+        </div>
+        <div class="modr">
+          <span [class]="'pill ' + ipdPill().css" id="ipd-pill">{{ ipdPill().label }}</span>
+          @if (v.ipd.state === 'off') {
+            @if (v.ipd.requested) {
+              <small class="faint">Request sent · Sahaj will call you</small>
+            } @else if (isOwner()) {
+              <button mat-stroked-button type="button" [disabled]="saving()" (click)="requestIpd()">Request IPD</button>
+            }
+          }
+        </div>
+      </div>
+      <div class="modrow">
+        <span class="ti"><app-icon name="clock" [size]="17" /></span>
+        <div class="main">
+          <b>Staff, timings and leave (HRA)</b>
+          <small>Shifts, leave approval, attendance and holidays. Doctor timings and holidays work without it.</small>
+        </div>
+        <div class="modr">
+          <small class="faint">Add-on</small>
+          <button
+            type="button"
+            class="sw"
+            role="switch"
+            aria-label="Staff, timings and leave (HRA)"
+            [attr.aria-checked]="v.hra.on"
+            [disabled]="!isOwner() || saving()"
+            (click)="toggleHra()"
+          ></button>
+        </div>
+      </div>
+      <div class="modrow">
+        <span class="ti"><app-icon name="receipt" [size]="17" /></span>
+        <div class="main">
+          <b>Pharmacy and Lab</b>
+          <small>Dispensing, stock, lab orders and reports.</small>
+        </div>
+        <div class="modr"><span class="pill p-wait">Phase 2</span></div>
+      </div>
+    </div>
+    @if (!isOwner()) {
+      <div class="notice info">
+        <app-icon name="lock" [size]="16" />
+        <span>Only the owner can request IPD or switch HRA. You can see the plan below.</span>
+      </div>
+    }
+    @if (v.ipdTrialAvailable && v.ipd.state === 'off') {
+      <div class="notice teal" id="ipd-trial-notice">
+        <app-icon name="alert" [size]="16" />
+        <span><b>Try IPD:</b> start a 30-day trial here. In the product the Sahaj team does this from the admin console.</span>
+        <button mat-flat-button type="button" [disabled]="!isOwner() || saving()" (click)="startTrial()">Start 30-day IPD trial</button>
+      </div>
+    }
+    @if (v.ipd.state === 'readonly') {
+      <div class="notice warn">
+        <app-icon name="lock" [size]="16" />
+        <span>IPD is read-only. Past admissions, bills and summaries stay viewable for 90 days, then IPD is hidden. Nothing is deleted.</span>
+      </div>
+    }
+  </section>
+
+  <section class="panel surf" id="f-mode">
+    <div class="panel-h">
+      <h2>Menu mode</h2>
+      <small class="faint">Each person can switch this from the sidebar</small>
+    </div>
+    <div class="modecards" role="group" aria-label="Menu mode">
+      <button type="button" class="modecard" [class.on]="menuMode() === 'simple'" [attr.aria-pressed]="menuMode() === 'simple'" (click)="setMode('simple')">
+        <b>Simple</b>
+        <small>{{ v.menuCounts.simple }} menu items with large buttons. Good for a small clinic or a new receptionist.</small>
+      </button>
+      <button type="button" class="modecard" [class.on]="menuMode() === 'advanced'" [attr.aria-pressed]="menuMode() === 'advanced'" (click)="setMode('advanced')">
+        <b>Advanced</b>
+        <small>{{ v.menuCounts.advanced }} menu items in groups, with Revenue, Follow-ups and Reports. Good for owners and larger teams.</small>
+      </button>
+    </div>
+    <p class="faint t-sm">
+      Nothing is lost in Simple mode. Every page still opens from <b>Go to…</b> (Ctrl K) at the top.
+    </p>
+  </section>
+
+  <section class="panel surf" id="f-masters">
+    <div>
+      <h2>Which masters each module uses</h2>
+      <small class="faint">Common masters are shared. OPD, IPD and HRA masters appear in Clinic setup only when their module is on.</small>
+    </div>
+    @for (g of groups(); track g.name) {
+      <div class="mm" [class.off]="!g.inUse">
+        <div class="row">
+          <b>{{ g.name }}</b>
+          @if (g.inUse) {
+            <span class="pill p-good">In use</span>
+          } @else {
+            <span class="pill p-wait">Module off</span>
+          }
+        </div>
+        <div class="mmchips">
+          @for (chip of g.chips; track chip) {
+            <span class="chip">{{ chip }}</span>
+          }
+        </div>
+      </div>
+    }
+  </section>
+}

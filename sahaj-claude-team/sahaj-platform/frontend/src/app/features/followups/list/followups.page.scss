@@ -1,0 +1,14 @@
+// Follow-ups: only the reminder placeholders are page-specific. Tabs, panel, list and pills
+// come from `_console.scss`.
+.remind-all,
+.remind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.hint {
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}

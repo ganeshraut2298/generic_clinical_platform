@@ -1,0 +1,181 @@
+@if (store.gate() !== 'ready') {
+  <app-ipd-gate [gate]="store.gate()" (retry)="store.retry()" />
+} @else if (store.loading() || (!store.layout() && !store.loadError())) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading wards, rooms and beds</p>
+  </section>
+} @else if (store.loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button (click)="store.retry()">Try again</button>
+    </div>
+  </section>
+} @else if (store.layout(); as l) {
+  <section class="panel surf" id="f-ipbeds">
+    <div class="panel-h">
+      <h2>Wards, rooms and beds</h2>
+      <span class="pill num" [class.p-warn]="atLimit()" [class.p-teal]="!atLimit()" aria-live="polite">
+        {{ l.bedCount }} of {{ l.bedLimit }} beds on your plan
+      </span>
+    </div>
+
+    @if (store.isReadonly()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>IPD is read-only. Nothing can be changed.</span>
+      </div>
+    } @else if (!store.isOwner()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>Only the owner can change the wards, rooms and beds. You can view them here.</span>
+      </div>
+    }
+
+    <div class="rulerow">
+      <span>
+        Use rooms
+        <small class="faint">Switch off for a small nursing home: beds sit straight under each ward</small>
+      </span>
+      <button
+        type="button"
+        class="sw"
+        role="switch"
+        aria-label="Use rooms"
+        [attr.aria-checked]="l.roomLevel"
+        [disabled]="store.locked()"
+        (click)="setRoomLevel()"
+      ></button>
+    </div>
+
+    @for (ward of l.wards; track ward.id) {
+      <div class="wardcfg">
+        <div class="wardhead">
+          <div>
+            <b>{{ ward.name }}</b>
+            <small class="faint">{{ ward.station }} · {{ bedCountLabel(ward) }}</small>
+          </div>
+          @if (l.roomLevel) {
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="store.locked()"
+              [attr.aria-label]="'Add a room to ' + ward.name"
+              (click)="addRoom(ward)"
+            >
+              <app-icon name="plus" [size]="14" /> Room
+            </button>
+          } @else {
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="store.locked()"
+              [attr.aria-label]="'Add a bed to ' + ward.name"
+              (click)="addBed(ward)"
+            >
+              <app-icon name="plus" [size]="14" /> Bed
+            </button>
+          }
+        </div>
+
+        @if (l.roomLevel) {
+          @for (room of ward.rooms; track room.id) {
+            <div class="roomcfg">
+              <span class="roomh">{{ room.name }}</span>
+              <div class="bchips">
+                @for (bed of room.beds; track bed.id) {
+                  <ng-container *ngTemplateOutlet="chip; context: { $implicit: bed }" />
+                }
+                <button
+                  type="button"
+                  mat-stroked-button
+                  [disabled]="store.locked()"
+                  [attr.aria-label]="'Add a bed to ' + room.name + ' in ' + ward.name"
+                  (click)="addBed(ward, room.id)"
+                >
+                  <app-icon name="plus" [size]="13" /> Bed
+                </button>
+              </div>
+            </div>
+          }
+          @if (looseBeds(ward); as loose) {
+            @if (loose.length) {
+              <div class="roomcfg">
+                <span class="roomh">Not in a room</span>
+                <div class="bchips">
+                  @for (bed of loose; track bed.id) {
+                    <ng-container *ngTemplateOutlet="chip; context: { $implicit: bed }" />
+                  }
+                </div>
+              </div>
+            }
+          }
+        } @else {
+          <div class="bchips">
+            @for (bed of ward.beds; track bed.id) {
+              <ng-container *ngTemplateOutlet="chip; context: { $implicit: bed }" />
+            }
+          </div>
+        }
+      </div>
+    } @empty {
+      <div class="empty">No wards yet. Add your first ward below.</div>
+    }
+
+    <div class="newward">
+      <label class="visually-hidden" for="new-ward">New ward name</label>
+      <input
+        #wardName
+        id="new-ward"
+        class="input"
+        type="text"
+        maxlength="80"
+        autocomplete="off"
+        placeholder="New ward, for example General ward · Female"
+        [disabled]="store.locked()"
+        [attr.aria-invalid]="wardError() ? 'true' : null"
+        [attr.aria-describedby]="wardError() ? 'new-ward-error' : null"
+        (input)="wardError.set(null)"
+        (keydown.enter)="addWard(wardName)"
+      />
+      <button type="button" mat-stroked-button [disabled]="store.locked()" (click)="addWard(wardName)">
+        <app-icon name="plus" [size]="15" /> Add ward
+      </button>
+    </div>
+    @if (wardError(); as message) {
+      <div id="new-ward-error" class="field-error" role="alert">{{ message }}</div>
+    }
+
+    <p class="faint foot">
+      Stored as one location tree (Branch → Ward → Room → Bed), so a hospital can add buildings and
+      floors later without changing anything here.
+    </p>
+  </section>
+
+  <ng-template #chip let-bed>
+    <span class="bchip">
+      <b>{{ bed.code }}</b>
+      <select
+        class="input"
+        [attr.aria-label]="'Category for bed ' + bed.code"
+        [disabled]="store.locked()"
+        (change)="setCategory(bed, $any($event.target))"
+      >
+        @for (c of categories; track c.key) {
+          <option [value]="c.key" [selected]="bed.categoryKey === c.key">{{ c.name }}</option>
+        }
+      </select>
+      <button
+        type="button"
+        class="xbtn"
+        [attr.aria-label]="'Remove bed ' + bed.code"
+        [attr.title]="bed.status === 'occ' ? 'A patient is in this bed' : null"
+        [disabled]="store.locked() || bed.status === 'occ'"
+        (click)="removeBed(bed)"
+      >
+        <app-icon name="x" [size]="13" />
+      </button>
+    </span>
+  </ng-template>
+}

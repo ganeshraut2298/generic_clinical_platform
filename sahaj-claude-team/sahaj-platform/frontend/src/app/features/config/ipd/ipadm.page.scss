@@ -1,0 +1,26 @@
+.addons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.addons-h {
+  font-size: 0.8rem;
+}
+
+.addons-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+
+  .rs {
+    font-size: 0.86rem;
+  }
+  .cat {
+    color: var(--ink-2);
+    font-weight: 600;
+    margin-right: 4px;
+  }
+}

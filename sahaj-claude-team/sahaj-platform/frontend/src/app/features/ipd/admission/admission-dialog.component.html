@@ -1,0 +1,374 @@
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ads">
+  @if (admission(); as a) {
+    @if (view() === 'discharge') {
+      <app-discharge-sheet
+        [admissionId]="a.id"
+        (back)="backToAdmission()"
+        (closed)="close()"
+        (discharged)="onDischarged($event)"
+        (changed)="markChanged()"
+        (outdated)="reloadAfterOutdated()"
+      />
+    } @else {
+    <div class="sheet-h">
+      <div>
+        <h2 id="ads">
+          {{ a.patientName }}
+          @if (a.age !== null || a.sex) {
+            <span class="faint agesex">{{ a.age }} {{ a.sex }}</span>
+          }
+        </h2>
+        <p class="muted sub">{{ a.ipNumber }}@if (a.mobile) { · {{ a.mobile }} }</p>
+      </div>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+
+    <div class="sheet-b">
+      <div class="ipsum">
+        <div>
+          <small>Bed</small>
+          <b>{{ a.bedCode }}</b>
+          <span>{{ a.categoryName }} · {{ a.wardName }}</span>
+        </div>
+        <div>
+          <small>Day</small>
+          <b class="num">{{ a.dayNumber }}</b>
+          <span>{{ typeLabel[a.admissionType] }}</span>
+        </div>
+        <div>
+          <small>{{ a.finalBill ? 'Final bill' : 'Running bill' }}</small>
+          <b class="num">{{ formatInrPaise(a.finalBill ? a.finalBill.totalPaise : a.bill.totalPaise) }}</b>
+          <span>
+            @if (a.finalBill) {
+              Frozen at discharge
+            } @else if (a.bill.depositPercent !== null) {
+              {{ a.bill.depositPercent }}% of deposit
+            } @else {
+              No deposit yet
+            }
+          </span>
+        </div>
+        <div>
+          <small>Deposit</small>
+          <b class="num">{{ formatInrPaise(a.depositPaise) }}</b>
+          @if (a.bill.totalPaise > a.depositPaise) {
+            <span class="over">{{ formatInrPaise(a.bill.totalPaise - a.depositPaise) }} over</span>
+          } @else {
+            <span>{{ formatInrPaise(a.depositPaise - a.bill.totalPaise) }} left</span>
+          }
+        </div>
+      </div>
+
+      @if (a.finalBill && a.discharge; as d) {
+        <div class="notice good" role="status">
+          <app-icon name="door" [size]="16" />
+          <span>
+            Discharged on {{ when(d.dischargedAt) }} · {{ dischargeTypeLabel[d.type] }}. Nothing on this
+            admission can be changed.
+          </span>
+        </div>
+      }
+      @if (a.depositLow) {
+        <div class="notice crit" role="status">
+          <app-icon name="alert" [size]="16" />
+          <span>
+            The bill has reached {{ a.bill.depositPercent ?? 100 }}% of the deposit (alert at
+            {{ a.bill.alertPercent ?? defaultAlert }}%). Ask the relatives for a further deposit.
+          </span>
+        </div>
+      }
+      @if (a.payer === "Insurance" && !a.finalBill) {
+        <div class="notice info" role="status">
+          <app-icon name="shield" [size]="16" />
+          <span>
+            Insurance patient · pre-authorisation pending with the insurer. Deposit alerts are paused.
+          </span>
+        </div>
+      }
+
+      <div class="ipdx">
+        <small>Reason for admission</small>
+        <b>{{ a.reason }}</b>
+        <span class="faint">{{ a.doctorName }}</span>
+      </div>
+
+      @if (a.finalBill; as fb) {
+        @if (a.discharge; as d) {
+          <div class="ipbill" role="table" aria-label="Discharge">
+            <div class="ipbh"><b>Discharge</b></div>
+            <div class="ipbl" role="row">
+              <span role="cell">Discharge type</span>
+              <span role="cell"></span>
+              <b role="cell">{{ dischargeTypeLabel[d.type] }}</b>
+            </div>
+            <div class="ipbl" role="row">
+              <span role="cell">Summary template</span>
+              <span role="cell"></span>
+              <b role="cell">{{ dischargeTemplateLabel[d.templateKey] }}</b>
+            </div>
+            <div class="ipbl" role="row">
+              <span role="cell">Summary signed by</span>
+              <span role="cell" class="faint">{{ when(d.signedAt) }}</span>
+              <b role="cell">{{ d.signedByName }}</b>
+            </div>
+            <div class="ipbl" role="row">
+              <span role="cell">Discharged by</span>
+              <span role="cell" class="faint">{{ when(d.dischargedAt) }}</span>
+              <b role="cell">{{ d.dischargedByName }}</b>
+            </div>
+            <div class="ipbl" role="row">
+              <span role="cell">Follow-up</span>
+              <span role="cell"></span>
+              <b role="cell">
+                @if (d.followUpDate) {
+                  OPD review on {{ longDate(d.followUpDate) }}
+                } @else {
+                  —
+                }
+              </b>
+            </div>
+          </div>
+        }
+        <div class="ipbill">
+          <div class="ipbh">
+            <b>Final bill</b>
+            <small class="faint">{{ note(a.bill) }}</small>
+          </div>
+          <div class="ipbt" role="table" aria-label="Final bill">
+            <div class="sr-only" role="row">
+              <span role="columnheader">Item</span>
+              <span role="columnheader">Quantity and price</span>
+              <span role="columnheader">Amount</span>
+            </div>
+            @for (l of fb.lines; track $index) {
+              <div class="ipbl" role="row">
+                <span role="cell">{{ l.name }}</span>
+                <span role="cell" class="num faint">
+                  @if (l.qty > 1) {
+                    {{ l.qty }} × {{ formatInrPaise(l.unitPaise) }}
+                  }
+                </span>
+                <b role="cell" class="num">{{ formatInrPaise(l.amountPaise) }}</b>
+              </div>
+            }
+            <div class="ipbl tot" role="row">
+              <span role="cell">Total charges</span>
+              <span role="cell"></span>
+              <b role="cell" class="num">{{ formatInrPaise(fb.totalPaise) }}</b>
+            </div>
+            <div class="ipbl dep" role="row">
+              <span role="cell">Deposits received</span>
+              <span role="cell"></span>
+              <b role="cell" class="num">− {{ formatInrPaise(fb.depositsPaise) }}</b>
+            </div>
+            <div class="ipbl tot" role="row">
+              <span role="cell">
+                @switch (fb.outcome) {
+                  @case ('collected') {
+                    Collected by {{ fb.mode }}
+                  }
+                  @case ('refunded') {
+                    Refunded by {{ fb.mode }}
+                  }
+                  @default {
+                    Settled
+                  }
+                }
+              </span>
+              <span role="cell" class="faint">{{ fb.settledByName }} · {{ when(fb.settledAt) }}</span>
+              <b role="cell" class="num">{{ formatInrPaise(fb.balancePaise < 0 ? -fb.balancePaise : fb.balancePaise) }}</b>
+            </div>
+          </div>
+        </div>
+      } @else {
+        <div class="ipbill">
+          <div class="ipbh">
+            <b>Running bill</b>
+            <small class="faint">{{ note(a.bill) }}</small>
+          </div>
+          <div class="ipbt" role="table" aria-label="Running bill">
+            <div class="sr-only" role="row">
+              <span role="columnheader">Item</span>
+              <span role="columnheader">Quantity and price</span>
+              <span role="columnheader">Amount</span>
+            </div>
+            @for (l of a.bill.lines; track l.name) {
+              <div class="ipbl" role="row">
+                <span role="cell">{{ l.name }}</span>
+                <span role="cell" class="num faint">
+                  @if (l.qty > 1) {
+                    {{ l.qty }} × {{ formatInrPaise(l.unitPaise) }}
+                  }
+                </span>
+                <b role="cell" class="num">{{ formatInrPaise(l.amountPaise) }}</b>
+              </div>
+            }
+            <div class="ipbl tot" role="row">
+              <span role="cell">Total so far</span>
+              <span role="cell"></span>
+              <b role="cell" class="num">{{ formatInrPaise(a.bill.totalPaise) }}</b>
+            </div>
+            @for (d of a.deposits; track d.id) {
+              <div class="ipbl dep" role="row">
+                <span role="cell">Deposit · {{ d.mode }} · {{ day(d.collectedAt) }}</span>
+                <span role="cell"></span>
+                <b role="cell" class="num">− {{ formatInrPaise(d.amountPaise) }}</b>
+              </div>
+            }
+          </div>
+        </div>
+  
+      }
+
+      @if (a.canCollectDeposit) {
+        <div class="ipact">
+          <label for="ad-amount">Collect deposit</label>
+          <div class="row nw">
+            <div class="pre">
+              <span aria-hidden="true">₹</span>
+              <input
+                id="ad-amount"
+                class="input num"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                [formControl]="amount"
+              />
+            </div>
+            <div class="seg-wrap" role="group" aria-label="Paid by">
+              @for (m of modes; track m) {
+                <button type="button" [attr.aria-pressed]="mode() === m" (click)="setMode(m)">
+                  {{ m }}
+                </button>
+              }
+            </div>
+            <button
+              type="button"
+              mat-flat-button
+              [disabled]="amountRupees() === null || collecting()"
+              (click)="collect()"
+            >
+              Collect
+            </button>
+          </div>
+          @if (invalidAmount(); as message) {
+            <span class="err-text" role="alert">{{ message }}</span>
+          }
+          @if (collectError(); as message) {
+            <div class="notice err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ message }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (a.canAddCharge) {
+        <div class="ipact">
+          <label for="ad-charge">Add a charge</label>
+          <div class="row nw">
+            <select
+              id="ad-charge"
+              class="input"
+              [formControl]="service"
+            >
+              @for (svc of services(); track svc.key) {
+                <option [value]="svc.key">
+                  {{ svc.name }} · {{ formatInrPaise(pricePaise(svc.basePaise, a.bill.multiplier)) }}
+                </option>
+              }
+            </select>
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="serviceKey() === null || adding()"
+              (click)="addCharge()"
+            >
+              Add
+            </button>
+          </div>
+          @if (chargeError(); as message) {
+            <div class="notice err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ message }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (a.canTransfer) {
+        <div class="ipact">
+          <label for="ad-bed">Move to another bed</label>
+          <div class="row nw">
+            <select id="ad-bed" class="input" [formControl]="bed">
+              @for (b of freeBeds(); track b.id) {
+                <option [value]="b.id">{{ optionLabel(b) }}</option>
+              } @empty {
+                <option value="">No free bed</option>
+              }
+            </select>
+            <button
+              type="button"
+              mat-stroked-button
+              [disabled]="bedId() === null || freeBeds().length === 0 || moving()"
+              (click)="move()"
+            >
+              <app-icon name="swap" [size]="14" /> Move
+            </button>
+          </div>
+          @if (moveError(); as message) {
+            <div class="notice err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ message }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <div class="sheet-f">
+      @if (!a.finalBill) {
+        <span id="ad-print-hint" class="faint hint">Needs printing, not in this phase</span>
+        <button mat-stroked-button type="button" disabled aria-describedby="ad-print-hint">
+          <app-icon name="print" [size]="15" /> Print interim bill
+        </button>
+      }
+      @if (a.canOpenNursing) {
+        <button mat-stroked-button type="button" data-act="nursing" (click)="openNursing()">
+          <app-icon name="nurse" [size]="15" /> Nursing
+        </button>
+      }
+      @if (a.canOpenEmr) {
+        <button mat-stroked-button type="button" data-act="emr" (click)="openEmr()">
+          <app-icon name="emr" [size]="15" /> EMR
+        </button>
+      }
+      <button mat-stroked-button type="button" (click)="close()">Close</button>
+      @if (a.canStartDischarge) {
+        <button mat-flat-button type="button" (click)="startDischarge()">
+          <app-icon name="door" [size]="15" /> Start discharge
+        </button>
+      }
+    </div>
+    }
+  } @else {
+    <div class="sheet-h">
+      <h2 id="ads">Admission</h2>
+      <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <div class="sheet-b">
+      @if (loadError(); as message) {
+        <div class="notice err" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+          <button type="button" mat-stroked-button (click)="load()">Try again</button>
+        </div>
+      } @else {
+        <p class="muted" aria-busy="true">Loading admission</p>
+      }
+    </div>
+  }
+</div>

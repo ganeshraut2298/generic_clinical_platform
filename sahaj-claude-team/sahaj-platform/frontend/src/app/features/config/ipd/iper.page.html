@@ -1,0 +1,124 @@
+@if (store.gate() !== 'ready') {
+  <app-ipd-gate [gate]="store.gate()" (retry)="store.retry()" />
+} @else if (store.loading() || (!store.settings() && !store.loadError())) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading emergency setup</p>
+  </section>
+} @else if (store.loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button (click)="store.retry()">Try again</button>
+    </div>
+  </section>
+} @else if (store.settings(); as s) {
+  <section class="panel surf" id="f-iper">
+    <h2>Triage scale</h2>
+
+    @if (store.isReadonly()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>IPD is read-only. Nothing can be changed.</span>
+      </div>
+    } @else if (!store.isOwner()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>Only the owner can change the emergency setup. You can view it here.</span>
+      </div>
+    }
+
+    <div class="rulerow">
+      <span>
+        <b id="er-levels">Levels</b>
+        <small class="faint">
+          3 colours suit a small nursing home; 5 levels suit a hospital emergency
+        </small>
+      </span>
+      <div class="seg" role="group" aria-labelledby="er-levels">
+        @for (c of scales; track c.value) {
+          <button
+            type="button"
+            [attr.aria-pressed]="s.scale === c.value"
+            [disabled]="store.locked()"
+            (click)="setScale(c.value)"
+          >
+            {{ c.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @for (l of s.levels; track l.level) {
+      <div class="rulerow" [attr.data-level]="l.level">
+        <span>
+          <b><span [class]="'tridot tri-' + l.tone" aria-hidden="true"></span>{{ title(l) }}</b>
+          <small class="faint">Target time to see a doctor</small>
+        </span>
+        <span class="stepper" role="group" [attr.aria-label]="l.name + ' target'">
+          <button
+            type="button"
+            [attr.aria-label]="'Less: ' + l.name + ' target'"
+            [disabled]="store.locked() || l.targetMinutes <= targetMin"
+            (click)="stepTarget(l, -1)"
+          >
+            −
+          </button>
+          <span aria-live="polite">{{ targetLabel(l.targetMinutes) }}</span>
+          <button
+            type="button"
+            [attr.aria-label]="'More: ' + l.name + ' target'"
+            [disabled]="store.locked() || l.targetMinutes >= targetMax"
+            (click)="stepTarget(l, 1)"
+          >
+            +
+          </button>
+        </span>
+      </div>
+    }
+
+    <div class="rulerow">
+      <span>
+        <b id="er-bays">Emergency bays</b>
+        <small class="faint">Shown on the emergency queue</small>
+      </span>
+      <span class="stepper" role="group" aria-labelledby="er-bays">
+        <button
+          type="button"
+          aria-label="Less: emergency bays"
+          [disabled]="store.locked() || s.bays <= baysMin"
+          (click)="stepBays(-1)"
+        >
+          −
+        </button>
+        <span aria-live="polite">{{ s.bays }}</span>
+        <button
+          type="button"
+          aria-label="More: emergency bays"
+          [disabled]="store.locked() || s.bays >= baysMax"
+          (click)="stepBays(1)"
+        >
+          +
+        </button>
+      </span>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <b>Unknown patient registration</b>
+        <small class="faint">
+          Register as "Unknown male, about 40" and add details later
+        </small>
+      </span>
+      <button
+        type="button"
+        class="sw"
+        role="switch"
+        aria-label="Unknown patient registration"
+        [attr.aria-checked]="s.unknownPatientRegistration"
+        [disabled]="store.locked()"
+        (click)="toggleUnknown()"
+      ></button>
+    </div>
+  </section>
+}

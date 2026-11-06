@@ -1,0 +1,265 @@
+<div class="sheet" data-testid="emr-sheet">
+  <div class="sheet-h">
+    <div>
+      <h2 id="emr-title">{{ title() }}</h2>
+      @if (subtitle(); as s) {
+        <p class="muted sub" data-testid="emr-subtitle">{{ s }}</p>
+      }
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close"
+      data-act="emr-x"
+      [disabled]="busy()"
+      (click)="close()"
+    >
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    @if (loading()) {
+      <p class="muted" role="status" aria-busy="true">Loading the clinical record</p>
+    } @else if (hidden()) {
+      <div class="notice warn" role="alert" data-testid="emr-hidden">
+        <app-icon name="lock" [size]="16" />
+        <span>{{ hiddenText }}</span>
+      </div>
+    } @else if (loadError(); as message) {
+      <div class="notice err" role="alert" data-testid="emr-load-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button data-act="emr-retry" (click)="load()">Try again</button>
+      </div>
+    } @else if (sheet(); as s) {
+      <app-identity-bar [patient]="s.patient" />
+
+      <div class="ipsum" data-testid="emr-strip">
+        <div>
+          <small>Diagnosis</small>
+          <span class="dx">{{ s.diagnosis }}</span>
+        </div>
+        <div>
+          <small>Day</small>
+          <b class="num">{{ s.dayNumber }}</b>
+        </div>
+      </div>
+
+      <section class="ipbill" [attr.aria-labelledby]="medsHeadingId">
+        <div class="ipbh">
+          <b [id]="medsHeadingId" tabindex="-1">{{ medsTitle }}</b>
+          <small class="faint">{{ medsSubtitle }}</small>
+        </div>
+        <div role="list" aria-label="Medicines on chart" aria-live="polite" data-testid="emr-orders">
+          @for (o of s.orders; track o.id) {
+            @let p = pill(o);
+            <div
+              role="listitem"
+              class="ipbl sfol"
+              [class.gone]="o.status === 'STOPPED' || o.status === 'REJECTED'"
+              [attr.data-order]="o.id"
+              [attr.data-status]="o.status"
+            >
+              <span>
+                <span class="dn">{{ o.drugName }}</span>
+                @if (o.highAlert) {
+                  <span class="pill p-crit sfha" data-testid="high-alert">High-alert</span>
+                }
+                <small class="faint sl" data-testid="order-line">{{ smallLine(o) }}</small>
+                @if (lastDoseOf(o, s.asOf); as ld) {
+                  <small
+                    class="faint sl ldose"
+                    [class.warnline]="ld.warn"
+                    data-testid="order-last-dose"
+                    [attr.data-warn]="ld.warn"
+                    >{{ ld.text }}</small
+                  >
+                }
+              </span>
+              <span [class]="'pill ' + p.css" data-testid="order-pill">{{ p.text }}</span>
+              <b class="acts">
+                @if (o.canStop) {
+                  @if (stopConfirmId() === o.id) {
+                    <span class="confirm" role="alert" data-testid="stop-confirm">
+                      {{ stopConfirm }}
+                      <button
+                        type="button"
+                        mat-flat-button
+                        class="danger"
+                        data-act="sfstopok"
+                        [id]="'emr-stopok-' + o.id"
+                        [disabled]="busy()"
+                        [attr.aria-busy]="busy()"
+                        [attr.aria-label]="'Stop ' + o.drugName"
+                        (click)="confirmStop(o)"
+                      >
+                        Stop
+                      </button>
+                      <button
+                        type="button"
+                        mat-stroked-button
+                        data-act="sfstopkeep"
+                        [id]="'emr-keep-' + o.id"
+                        [disabled]="busy()"
+                        (click)="keepOrder(o)"
+                      >
+                        Keep
+                      </button>
+                    </span>
+                  } @else {
+                    <button
+                      type="button"
+                      mat-stroked-button
+                      data-act="sfstop"
+                      [id]="'emr-stop-' + o.id"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Stop ' + o.drugName"
+                      (click)="askStop(o)"
+                    >
+                      Stop
+                    </button>
+                  }
+                }
+              </b>
+            </div>
+          } @empty {
+            <div class="ipbl">
+              <span class="faint">{{ noOrders }}</span>
+              <span></span>
+              <b></b>
+            </div>
+          }
+        </div>
+      </section>
+
+      @if (s.canOrder) {
+        <form class="sford" [formGroup]="form" (ngSubmit)="submit()" novalidate data-testid="order-form">
+          <div class="grid-f">
+            <div class="field">
+              <label for="emr-drug">Medicine</label>
+              <select
+                id="emr-drug"
+                class="input"
+                formControlName="drug"
+                (change)="selectionChanged()"
+                [attr.aria-invalid]="errors().drugKey ? 'true' : null"
+                [attr.aria-describedby]="errors().drugKey ? 'emr-drug-err' : null"
+              >
+                @for (d of s.drugs; track d.key) {
+                  <option [value]="d.key">{{ drugLabel(d) }}</option>
+                }
+              </select>
+              @if (errors().drugKey; as message) {
+                <span class="err-text" role="alert" id="emr-drug-err">{{ message }}</span>
+              }
+            </div>
+            <div class="field">
+              <label for="emr-freq">How often</label>
+              <select
+                id="emr-freq"
+                class="input"
+                formControlName="freq"
+                (change)="selectionChanged()"
+                [attr.aria-invalid]="errors().frequencyKey ? 'true' : null"
+                [attr.aria-describedby]="errors().frequencyKey ? 'emr-freq-err' : null"
+              >
+                @for (f of s.frequencies; track f.key) {
+                  <option [value]="f.key">{{ f.label }}</option>
+                }
+              </select>
+              @if (errors().frequencyKey; as message) {
+                <span class="err-text" role="alert" id="emr-freq-err">{{ message }}</span>
+              }
+            </div>
+          </div>
+
+          @if (shown(); as c) {
+            @if (c.outcome === 'BLOCKED') {
+              <div class="notice crit" role="alert" data-testid="order-blocked">
+                <app-icon name="alert" [size]="16" />
+                <span>
+                  <b>{{ hardStopHead }}</b>
+                  @for (f of c.check.hardStops; track $index) {
+                    <span class="line">{{ f.text }}</span>
+                  }
+                </span>
+              </div>
+            } @else {
+              <div class="notice warn" role="alert" data-testid="order-warnings">
+                <app-icon name="alert" [size]="16" />
+                <span>
+                  <b>{{ warnHead }}</b>
+                  @for (w of c.check.warnings; track $index) {
+                    <span class="line"><b>{{ severity(w.severity) }}:</b> {{ w.text }}</span>
+                  }
+                </span>
+              </div>
+              <div class="field">
+                <label for="emr-reason">{{ reasonLabel }}</label>
+                <select
+                  id="emr-reason"
+                  class="input"
+                  formControlName="reason"
+                  (change)="reasonChanged()"
+                  [attr.aria-invalid]="errors().overrideReasonKey ? 'true' : null"
+                  [attr.aria-describedby]="errors().overrideReasonKey ? 'emr-reason-err' : null"
+                >
+                  <option value="">{{ reasonPlaceholder }}</option>
+                  @for (r of s.overrideReasons; track r.key) {
+                    <option [value]="r.key">{{ r.label }}</option>
+                  }
+                </select>
+                @if (errors().overrideReasonKey; as message) {
+                  <span class="err-text" role="alert" id="emr-reason-err">{{ message }}</span>
+                }
+              </div>
+            }
+          }
+
+          <div class="row">
+            <button
+              type="submit"
+              mat-flat-button
+              data-act="sfordchk"
+              [disabled]="busy()"
+              [attr.aria-busy]="busy()"
+            >
+              <app-icon name="shieldu" [size]="14" /> {{ buttonText() }}
+            </button>
+            @if (shown()) {
+              <button
+                type="button"
+                mat-stroked-button
+                data-act="sfordx"
+                [disabled]="busy()"
+                (click)="clear()"
+              >
+                Clear
+              </button>
+            }
+            <small class="faint">{{ orderHint }}</small>
+          </div>
+        </form>
+      } @else if (s.orderLockReason; as why) {
+        <p
+          class="faint lockline"
+          [attr.data-testid]="why === 'ROLE' ? 'order-role-lock' : 'order-lock'"
+          [attr.data-reason]="why"
+        >
+          <app-icon name="lock" [size]="12" /> {{ orderLockLines[why] }}
+        </p>
+      }
+
+      <p class="faint logline">
+        <app-icon name="eye" [size]="12" /> {{ loggedLine }}
+      </p>
+    }
+  </div>
+
+  <div class="sheet-f">
+    <button mat-flat-button type="button" data-act="emr-done" [disabled]="busy()" (click)="close()">
+      Done
+    </button>
+  </div>
+</div>

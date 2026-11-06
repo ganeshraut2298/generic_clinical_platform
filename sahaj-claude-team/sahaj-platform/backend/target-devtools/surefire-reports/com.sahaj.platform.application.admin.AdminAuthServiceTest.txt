@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.application.admin.AdminAuthServiceTest
+-------------------------------------------------------------------------------
+Tests run: 44, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.390 s -- in com.sahaj.platform.application.admin.AdminAuthServiceTest

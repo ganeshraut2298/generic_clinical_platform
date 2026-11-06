@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.it.DevSampleAdminFunctionIT
+-------------------------------------------------------------------------------
+Tests run: 19, Failures: 0, Errors: 0, Skipped: 19, Time elapsed: 1.301 s -- in com.sahaj.platform.it.DevSampleAdminFunctionIT

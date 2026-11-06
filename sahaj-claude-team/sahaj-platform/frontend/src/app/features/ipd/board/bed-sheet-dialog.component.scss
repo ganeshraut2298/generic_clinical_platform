@@ -1,0 +1,13 @@
+.sub {
+  font-size: 0.86rem;
+}
+
+.txt {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 560px) {
+  .sheet {
+    min-width: 0;
+  }
+}

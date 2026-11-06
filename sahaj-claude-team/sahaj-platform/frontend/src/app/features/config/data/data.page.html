@@ -1,0 +1,181 @@
+@if (loading()) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading the privacy settings</p>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  </section>
+} @else if (settings(); as s) {
+  @if (!isOwner()) {
+    <div class="notice info">
+      <app-icon name="lock" [size]="16" />
+      <span>Only the owner can change privacy settings. You can see them below.</span>
+    </div>
+  }
+  <div class="grid2 even">
+    <section class="panel surf" id="f-consent">
+      <div>
+        <h2>Patient consent</h2>
+        <small class="faint">
+          India's Digital Personal Data Protection Act, 2023 asks that patients know why their data is kept.
+        </small>
+      </div>
+      <div class="rulerow">
+        <span>
+          Ask for consent at the first visit
+          <small class="faint">The front desk reads one line, and the yes is saved with the date and the staff name</small>
+        </span>
+        <button
+          type="button"
+          class="sw"
+          role="switch"
+          aria-label="Consent at first visit"
+          [attr.aria-checked]="s.consentRequired"
+          [disabled]="!isOwner() || saving()"
+          (click)="toggle('consentRequired')"
+        ></button>
+      </div>
+      @if (s.consentRequired) {
+        <blockquote class="consent">
+          <span class="line-en">"{{ line() }}"</span>
+          @if (lineMarathi(); as mr) {
+            <span class="line-mr">"{{ mr }}"</span>
+          }
+        </blockquote>
+      } @else {
+        <div class="notice warn">
+          <app-icon name="alert" [size]="16" />
+          <span>Without recorded consent, sending WhatsApp reminders and keeping records is harder to defend if a patient complains.</span>
+        </div>
+      }
+      <div class="rulerow">
+        <span>
+          Separate yes for promotional messages
+          <small class="faint">Greetings and offers go only to patients who agreed</small>
+        </span>
+        <button
+          type="button"
+          class="sw"
+          role="switch"
+          aria-label="Promotional consent"
+          [attr.aria-checked]="s.promoConsent"
+          [disabled]="!isOwner() || saving()"
+          (click)="toggle('promoConsent')"
+        ></button>
+      </div>
+      <div class="rulerow">
+        <span>
+          Patients can ask for a copy of their records
+          <small class="faint">Sent on WhatsApp after an OTP to the patient's mobile</small>
+        </span>
+        <button
+          type="button"
+          class="sw"
+          role="switch"
+          aria-label="Record copy on request"
+          [attr.aria-checked]="s.recordCopy"
+          [disabled]="!isOwner() || saving()"
+          (click)="toggle('recordCopy')"
+        ></button>
+      </div>
+    </section>
+
+    <section class="panel surf" id="f-abdm">
+      <div class="panel-h">
+        <h2>ABDM</h2>
+        <span class="pill p-wait">Built to connect</span>
+      </div>
+      <small class="faint">
+        Ayushman Bharat Digital Mission links let patients share past records with your clinic using their ABHA number.
+      </small>
+      <div class="hfr">
+        <label for="hfr-id">Health Facility Registry (HFR) ID</label>
+        <div class="row">
+          <input
+            id="hfr-id"
+            class="input"
+            [formControl]="hfr"
+            [maxLength]="hfrMax"
+            placeholder="Add it when you have it"
+            autocomplete="off"
+          />
+          @if (isOwner()) {
+            <button mat-stroked-button type="button" [disabled]="!hfrDirty() || hfr.invalid || saving()" (click)="saveHfr()">
+              Save
+            </button>
+          }
+        </div>
+      </div>
+      <div class="list">
+        @for (doctor of doctors(); track doctor.id) {
+          <div class="li">
+            <div class="main">
+              <b>{{ doctor.name }}</b>
+              <small>Healthcare Professional Registry (HPR) ID</small>
+            </div>
+            <span class="pill p-wait">Not added</span>
+          </div>
+        }
+      </div>
+      <div class="rulerow">
+        <span>
+          Scan and Share at reception
+          <small class="faint">Patients scan the clinic QR with an ABHA app to share their details</small>
+        </span>
+        <span class="pill p-wait">After linking</span>
+      </div>
+      <div class="notice info">
+        <app-icon name="link" [size]="16" />
+        <span>ABDM linking is planned.</span>
+      </div>
+    </section>
+
+    <section class="panel surf" id="f-backup">
+      <h2>Records and backup</h2>
+      <div>
+        <div class="rulerow"><span>Patient records are kept</span><b>Until you delete them</b></div>
+        <div class="rulerow"><span>Backup<small class="faint">Encrypted, every night</small></span></div>
+        <div class="rulerow"><span>Where data is stored</span><b>Servers in India (planned)</b></div>
+      </div>
+      <button mat-stroked-button type="button" disabled>Export all data</button>
+      <small class="faint">Needs the documents service, not in this phase</small>
+    </section>
+
+    @if (isOwner()) {
+      <section class="panel surf" id="f-access">
+        <div class="panel-h">
+          <h2>Who opened which record</h2>
+          <span class="faint t-sm">Today, latest first</span>
+        </div>
+        @if (accessState() === 'loading') {
+          <p class="muted" aria-busy="true">Loading</p>
+        } @else if (accessState() === 'error') {
+          <div class="notice err" role="alert">
+            <app-icon name="alert" [size]="16" />
+            <span>We could not load the access list. Try again.</span>
+          </div>
+        } @else if (!access().length) {
+          <div class="empty">No records opened today.</div>
+        } @else {
+          <div class="list">
+            @for (row of access(); track $index) {
+              <div class="li">
+                <span class="av">{{ initials(row.userName) }}</span>
+                <div class="main">
+                  <b>{{ row.userName }}</b>
+                  <small>opened the file of {{ row.patientName }}</small>
+                </div>
+                <span class="faint num t-sm">{{ timeOf(row.at) }}</span>
+              </div>
+            }
+          </div>
+        }
+        <button mat-stroked-button type="button" class="log-btn" disabled>See full log</button>
+      </section>
+    }
+  </div>
+}

@@ -1,0 +1,216 @@
+@if (loading()) {
+  <p class="muted" role="status" aria-busy="true">Loading the Safety board</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button type="button" mat-stroked-button (click)="load()">Try again</button>
+  </div>
+} @else if (board(); as b) {
+  <div class="safety" data-testid="safety-board">
+    @if (refreshFailed()) {
+      <div class="notice warn" role="status" data-testid="safety-stale">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ staleText() }}</span>
+      </div>
+    }
+
+    @if (actionNotice(); as message) {
+      <div class="notice err" role="alert" data-testid="safety-action-notice">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button (click)="dismissNotice()">Dismiss</button>
+      </div>
+    }
+
+    @if (b.counts.pastTarget > 0) {
+      <div class="notice crit" role="status" data-testid="safety-late-notice">
+        <app-icon name="siren" [size]="16" />
+        <span>
+          <b>{{ head(b.counts.pastTarget) }}</b>
+          {{ body(b) }}
+        </span>
+      </div>
+    }
+
+    <section class="kpis" aria-label="Safety summary">
+      <div class="kpi surf" data-kpi="escalations">
+        <span class="eyebrow">Escalations open</span>
+        <span class="v num" [class.crit]="b.counts.pastTarget > 0">{{ b.counts.open }}</span>
+        <span class="s">
+          @if (tileText(b.counts).critical) {
+            <b class="crit">{{ tileText(b.counts).text }}</b>
+          } @else {
+            {{ tileText(b.counts).text }}
+          }
+        </span>
+      </div>
+      @if (showPharmacist()) {
+        <app-pharmacist-tile />
+      }
+      @if (b.view === 'NURSE') {
+        <div class="kpi surf" data-kpi="your-patients">
+          <span class="eyebrow">Your patients</span>
+          <span class="v num">{{ b.yourPatients ?? 0 }}</span>
+          <span class="s">{{ yourPatientsText }}</span>
+        </div>
+      }
+    </section>
+
+    <section class="panel surf sfp" aria-labelledby="sf-esc-h">
+      <div class="sfph">
+        <h2 id="sf-esc-h" tabindex="-1"><app-icon name="siren" [size]="18" /> {{ panelTitle }}</h2>
+        <small class="faint">{{ panelSubtitle }}</small>
+      </div>
+
+      @if (b.escalations.length === 0) {
+        <div class="empty">{{ noEscalations }}</div>
+      } @else {
+        <div role="list" aria-label="Early warning escalations">
+          @for (e of b.escalations; track e.id) {
+            @let p = pill(e);
+            @let d = detail(e);
+            <div
+              role="listitem"
+              class="sfrow"
+              [class.done]="e.status === 'DONE'"
+              [class.late]="e.pastTarget"
+              [attr.data-esc]="e.id"
+              [attr.data-status]="e.status"
+            >
+              <span class="sfew" [class.crit]="e.ewsRisk === 'HIGH'" [class.warn]="e.ewsRisk === 'MEDIUM'">
+                <b class="num">{{ e.ewsScore }}</b>&ngsp;
+                <small>{{ risk(e.ewsRisk) }}</small>
+              </span>
+              <span class="sfmn">
+                <b>{{ e.patientName }} · bed {{ e.bedCode }}</b>
+                <small data-testid="esc-raised">{{ raised(e) }}</small>
+                @if (d; as line) {
+                  <small [class.sfok]="line.icon === 'check'" data-testid="esc-detail">
+                    <app-icon [name]="line.icon" [size]="12" /> {{ line.text }}
+                  </small>
+                }
+              </span>
+              <span class="sfst">
+                <span [class]="'pill p-' + p.tone" data-testid="esc-pill">{{ p.text }}</span>
+              </span>
+              <span class="sfacts">
+                @if (e.canAcknowledge) {
+                  <button
+                    type="button"
+                    mat-flat-button
+                    data-act="sfack"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Acknowledge ' + e.patientName + ', bed ' + e.bedCode"
+                    (click)="acknowledge(e)"
+                  >
+                    Acknowledge
+                  </button>
+                }
+                @if (e.canRespond) {
+                  @if (e.status === 'ACK') {
+                    <button
+                      type="button"
+                      mat-flat-button
+                      data-act="sfresp"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Record response for ' + e.patientName + ', bed ' + e.bedCode"
+                      (click)="openResponse(e)"
+                    >
+                      Record response
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      mat-stroked-button
+                      data-act="sfresp"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Record response for ' + e.patientName + ', bed ' + e.bedCode"
+                      (click)="openResponse(e)"
+                    >
+                      Record response
+                    </button>
+                  }
+                }
+                @if (e.canCallSenior) {
+                  @if (e.pastTarget) {
+                    <button
+                      type="button"
+                      mat-flat-button
+                      data-act="sfup"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Call senior for ' + e.patientName + ', bed ' + e.bedCode"
+                      (click)="callSenior(e)"
+                    >
+                      <app-icon name="siren" [size]="14" /> Call senior
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      mat-stroked-button
+                      data-act="sfup"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Call senior for ' + e.patientName + ', bed ' + e.bedCode"
+                      (click)="callSenior(e)"
+                    >
+                      <app-icon name="siren" [size]="14" /> Call senior
+                    </button>
+                  }
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    @if (showPharmacist()) {
+      <app-pharmacist-panel />
+    }
+
+    <section class="panel surf sfp" aria-labelledby="sf-aud-h">
+      <div class="sfph">
+        <h2 id="sf-aud-h" tabindex="-1"><app-icon name="history" [size]="18" /> {{ auditTitle }}</h2>
+        <small class="faint">{{ subtitleOf(b.view) }}</small>
+      </div>
+
+      @if (eventsError(); as message) {
+        <div class="notice err" role="alert" data-testid="events-error">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+
+      @if (events().length === 0 && !eventsError()) {
+        <div class="empty">{{ noEvents }}</div>
+      } @else {
+        <div class="sfaud" role="list" aria-label="Clinical audit trail" data-testid="audit-list">
+          @for (x of events(); track x.id) {
+            <div role="listitem" [class]="'sfai k-' + x.kind">
+              <span class="ti"><app-icon [name]="icon(x.kind)" [size]="14" /></span>
+              <span class="sfmn">
+                <b>{{ x.text }}</b>
+                <small>{{ line(x) }}</small>
+              </span>
+              <span class="faint num">{{ time(x) }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (nextCursor() !== null) {
+        <div class="more">
+          <button
+            type="button"
+            mat-stroked-button
+            data-act="events-more"
+            [disabled]="eventsLoading()"
+            (click)="loadMore()"
+          >
+            {{ showEarlier }}
+          </button>
+        </div>
+      }
+    </section>
+  </div>
+}

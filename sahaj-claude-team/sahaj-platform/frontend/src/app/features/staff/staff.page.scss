@@ -1,0 +1,202 @@
+// Staff and leave: roster, leave forms and balances. Shared blocks: `_console.scss`.
+.hint {
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+.lockpage {
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.lockic {
+  display: inline-flex;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--pri-soft);
+  color: var(--pri-text);
+}
+
+.roster-scroll {
+  overflow-x: auto;
+}
+
+.roster {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  min-width: 720px;
+
+  th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--ink-2);
+
+    small {
+      display: block;
+      font-weight: 400;
+      color: var(--ink-3);
+    }
+  }
+  th.rn,
+  th:first-child {
+    text-align: left;
+  }
+  .rn small {
+    display: block;
+    font-weight: 400;
+    color: var(--ink-3);
+  }
+}
+
+.rc {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 30px;
+
+  &.sh-M {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &.sh-E {
+    background: var(--sec-soft);
+    color: var(--sec);
+  }
+  &.sh-N {
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &.op {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+  &.lv {
+    background: var(--sec-soft);
+    color: var(--sec);
+    border-style: dashed;
+  }
+  &:disabled {
+    cursor: default;
+  }
+  &.mini {
+    display: inline-block;
+    width: auto;
+    min-height: 0;
+    line-height: 1.4;
+    padding: 2px 8px;
+  }
+}
+
+.blegend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--ink-2);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+
+    > * {
+      align-self: stretch;
+    }
+    > a {
+      align-self: flex-start;
+    }
+  }
+}
+
+.hday {
+  min-width: 96px;
+  font-weight: 600;
+}
+
+.tabs .c {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+.lvrow .nw {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.warnline {
+  color: var(--warn);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lvform,
+.balbox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.frow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ferr {
+  color: var(--crit);
+}
+
+.baltbl {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 8px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--line-2);
+    font-size: 0.86rem;
+  }
+  th {
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .r {
+    text-align: right;
+  }
+}
+
+.kpi .v.small {
+  font-size: 1.05rem;
+}
+

@@ -1,0 +1,100 @@
+@if (store.gate() !== 'ready') {
+  <app-ipd-gate [gate]="store.gate()" (retry)="store.retry()" />
+} @else if (store.loading() || (!store.settings() && !store.loadError())) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading discharge setup</p>
+  </section>
+} @else if (store.loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button (click)="store.retry()">Try again</button>
+    </div>
+  </section>
+} @else if (store.settings(); as s) {
+  <section class="panel surf" id="f-ipdis">
+    <h2>Discharge</h2>
+
+    @if (store.isReadonly()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>IPD is read-only. Nothing can be changed.</span>
+      </div>
+    } @else if (!store.isOwner()) {
+      <div class="notice warn" role="status">
+        <app-icon name="lock" [size]="16" />
+        <span>Only the owner can change the discharge setup. You can view it here.</span>
+      </div>
+    }
+
+    <div class="rulerow">
+      <span>
+        <label for="dis-template">Summary template</label>
+        <small class="faint">The doctor fills and signs it before the final bill</small>
+      </span>
+      <select
+        id="dis-template"
+        class="input"
+        [disabled]="store.locked()"
+        (change)="setTemplate($any($event.target))"
+      >
+        <option value="" [selected]="s.templateKey === null">Choose a template</option>
+        @for (t of s.templates; track t.key) {
+          <option [value]="t.key" [selected]="s.templateKey === t.key">{{ t.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <span>Approval chain</span>
+        <small class="faint">Doctor signs → billing clearance → nursing handover</small>
+      </span>
+      <button
+        type="button"
+        class="sw"
+        role="switch"
+        aria-label="Approval chain"
+        [attr.aria-checked]="s.approvalChain"
+        [disabled]="store.locked()"
+        (click)="toggleChain()"
+      ></button>
+    </div>
+
+    <div class="rulerow">
+      <span>
+        <span id="dis-days">Follow-up after discharge</span>
+        <small class="faint">{{ hint(s.opdFollowUpRule) }}</small>
+      </span>
+      <span class="stepper" role="group" aria-labelledby="dis-days">
+        <button
+          type="button"
+          aria-label="Fewer follow-up days"
+          [disabled]="!store.canEdit() || s.followUpDays <= minDays"
+          (click)="stepDays(-1)"
+        >
+          −
+        </button>
+        <span aria-live="polite">{{ s.followUpDays }} {{ s.followUpDays === 1 ? 'day' : 'days' }}</span>
+        <button
+          type="button"
+          aria-label="More follow-up days"
+          [disabled]="!store.canEdit() || s.followUpDays >= maxDays"
+          (click)="stepDays(1)"
+        >
+          +
+        </button>
+      </span>
+    </div>
+
+    <div class="types">
+      <b id="dis-types">Discharge types</b>
+      <ul class="chips" aria-labelledby="dis-types">
+        @for (t of s.types; track t.key) {
+          <li class="chip">{{ t.label }}</li>
+        }
+      </ul>
+    </div>
+  </section>
+}

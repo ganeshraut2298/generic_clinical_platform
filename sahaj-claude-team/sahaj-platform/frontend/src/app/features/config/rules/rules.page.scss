@@ -1,0 +1,87 @@
+@use '../config-common';
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--glass-hi);
+
+  &.off .txt {
+    opacity: 0.55;
+  }
+  .txt {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+}
+
+.kw {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: var(--pri-soft);
+  color: var(--pri-text);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+
+  &.then {
+    margin-left: 6px;
+    background: var(--muted-soft);
+    color: var(--ink-2);
+  }
+}
+
+.eyebrow {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.builder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 140px;
+
+    label {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--ink-2);
+    }
+  }
+  button {
+    min-height: 44px;
+  }
+}

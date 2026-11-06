@@ -1,0 +1,171 @@
+<div class="sheet" [formGroup]="form" data-testid="give-sheet">
+  <div class="sheet-h">
+    <div>
+      <h2 [id]="titleId">{{ title }}</h2>
+      <p class="muted sub" data-testid="give-subtitle">{{ subtitle }}</p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close"
+      data-act="gv-x"
+      [disabled]="running()"
+      (click)="cancel()"
+    >
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    <app-identity-bar [patient]="patient" />
+
+    <div class="sfstep" data-testid="give-step-one">
+      <b>{{ stepOne }}</b>
+      <input
+        id="sf-id"
+        class="input"
+        type="text"
+        formControlName="wristband"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        maxlength="200"
+        data-testid="wristband"
+        [attr.aria-label]="wristbandLabel"
+        [placeholder]="wristbandPlaceholder"
+        [attr.aria-invalid]="errors().wristband ? 'true' : null"
+        [attr.aria-describedby]="errors().wristband ? 'sf-id-err sf-idok' : 'sf-idok'"
+        (input)="boxEdited()"
+        (keydown)="boxKey($event)"
+      />
+      @if (errors().wristband; as message) {
+        <span class="err-text" role="alert" id="sf-id-err" data-testid="wristband-error">{{ message }}</span>
+      }
+      <div id="sf-idok" class="sfidok" aria-live="polite" data-testid="wristband-line">
+        @if (mismatch()) {
+          <span class="sfbad" data-testid="wristband-mismatch">
+            <app-icon name="alert" [size]="13" /> {{ mismatchText }}
+          </span>
+        }
+      </div>
+      <label class="sfchk" for="sf-said">
+        <input
+          id="sf-said"
+          type="checkbox"
+          formControlName="said"
+          data-testid="said"
+          [attr.aria-invalid]="errors().identityConfirmed ? 'true' : null"
+          [attr.aria-describedby]="errors().identityConfirmed ? 'sf-said-err' : null"
+          (change)="dropError('identityConfirmed')"
+        />
+        <span>{{ saidLabel }}</span>
+      </label>
+      @if (errors().identityConfirmed; as message) {
+        <span class="err-text" role="alert" id="sf-said-err" data-testid="said-error">{{ message }}</span>
+      }
+    </div>
+
+    @if (highAlert) {
+      <div class="sfstep ha" data-testid="give-step-second">
+        <b>{{ stepTwo }}</b>
+        <small>{{ secondSmall }}</small>
+        <div class="grid-f">
+          <div class="field">
+            <label for="sf-wit">{{ checkedByLabel }}</label>
+            <select
+              id="sf-wit"
+              class="input"
+              formControlName="nurse"
+              data-testid="second-nurse"
+              [attr.aria-invalid]="errors().secondNurseId ? 'true' : null"
+              [attr.aria-describedby]="errors().secondNurseId ? 'sf-wit-err' : null"
+              (change)="dropError('secondNurseId')"
+            >
+              <option value="">{{ chooseNurse }}</option>
+              @for (n of nurses; track n.membershipId) {
+                <option [value]="n.membershipId">{{ n.name }}</option>
+              }
+            </select>
+            @if (errors().secondNurseId; as message) {
+              <span class="err-text" role="alert" id="sf-wit-err" data-testid="second-nurse-error">{{ message }}</span>
+            }
+          </div>
+          <div class="field">
+            <label for="sf-pin">{{ pinLabel }}</label>
+            <input
+              id="sf-pin"
+              class="input num"
+              type="password"
+              formControlName="pin"
+              inputmode="numeric"
+              maxlength="4"
+              autocomplete="one-time-code"
+              data-testid="second-pin"
+              [placeholder]="pinPlaceholder"
+              [attr.aria-invalid]="errors().secondNursePin ? 'true' : null"
+              [attr.aria-describedby]="errors().secondNursePin ? 'sf-pin-err' : null"
+              (input)="pinEdited()"
+            />
+            @if (errors().secondNursePin; as message) {
+              <span class="err-text" role="alert" id="sf-pin-err" data-testid="pin-error">{{ message }}</span>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="sfstep" data-testid="give-step-last">
+      <b>{{ stepLast }}</b>
+      <div class="field">
+        <label for="sf-why">{{ reasonLabel }}</label>
+        <select
+          id="sf-why"
+          class="input"
+          formControlName="reason"
+          data-testid="reason"
+          [attr.aria-invalid]="errors().reasonKey ? 'true' : null"
+          [attr.aria-describedby]="errors().reasonKey ? 'sf-why-err' : null"
+          (change)="dropError('reasonKey')"
+        >
+          <option value="">{{ chooseReason }}</option>
+          @for (r of reasons; track r.key) {
+            <option [value]="r.key">{{ r.label }}</option>
+          }
+        </select>
+        @if (errors().reasonKey; as message) {
+          <span class="err-text" role="alert" id="sf-why-err" data-testid="reason-error">{{ message }}</span>
+        }
+      </div>
+    </div>
+
+    @if (failure(); as message) {
+      <div class="notice err" role="alert" data-testid="give-failure">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="sheet-f">
+    <button
+      mat-stroked-button
+      type="button"
+      data-act="sfnogive"
+      [disabled]="running()"
+      [attr.aria-busy]="running()"
+      (click)="notGiven()"
+    >
+      Record not given
+    </button>
+    <button
+      mat-flat-button
+      type="button"
+      data-act="sfgiveok"
+      [disabled]="running()"
+      [attr.aria-busy]="running()"
+      (click)="given()"
+    >
+      <app-icon name="check" [size]="15" /> Given
+    </button>
+  </div>
+</div>

@@ -1,0 +1,33 @@
+@use '../config-common';
+
+.consent {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--pri-soft);
+  color: var(--pri-text);
+  font-size: 0.88rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hfr {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .input {
+    flex: 1;
+  }
+}
+
+
+.log-btn {
+  align-self: flex-start;
+}

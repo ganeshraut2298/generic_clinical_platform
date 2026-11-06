@@ -1,0 +1,68 @@
+// Give sheet (mockup `.sfstep`, `.sfidok`, `.sfchk`, `.sfbad`). Colours come from the tokens only.
+// A mismatch and every error is written out with an icon or words, so colour is never the only signal.
+.sub {
+  font-size: 0.86rem;
+}
+
+.sfstep {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 10px;
+
+  > b {
+    font-size: 0.86rem;
+  }
+  > small {
+    color: var(--ink-3);
+    font-size: 0.78rem;
+  }
+  &.ha {
+    border-color: var(--crit);
+    background: color-mix(in srgb, var(--crit) 5%, transparent);
+  }
+}
+
+.grid-f {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.sfidok {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1em;
+}
+
+.sfbad {
+  color: var(--crit);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
+.sfchk {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.84rem;
+  // Touch target (angular.md): the whole row is at least 44 px tall.
+  min-height: 44px;
+
+  input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.input {
+  min-height: 44px;
+}

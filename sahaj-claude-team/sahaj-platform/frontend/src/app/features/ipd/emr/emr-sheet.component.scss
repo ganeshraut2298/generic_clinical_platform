@@ -1,0 +1,141 @@
+// EMR sheet (mockup `.ipsum`, `.ipbill`, `.sfol`, `.sford`). Colours come from the tokens only. A
+// status is always written in its pill and the allergy chip in words, so colour is never the only
+// signal.
+.sub {
+  font-size: 0.86rem;
+}
+
+.ipsum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    min-width: 0;
+  }
+  small {
+    color: var(--ink-3);
+    font-size: 0.74rem;
+  }
+  b {
+    font-size: 1.1rem;
+  }
+  .dx {
+    font-size: 0.86rem;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+}
+
+.ipbl.sfol {
+  // minmax(0, 1fr): a long medicine name wraps inside its column instead of widening the row.
+  grid-template-columns: minmax(0, 1fr) auto minmax(96px, auto);
+  align-items: center;
+
+  .dn {
+    overflow-wrap: anywhere;
+  }
+  .sfha {
+    margin-left: 6px;
+    font-size: 0.68rem;
+  }
+  .sl {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  // "Last dose ... Not given" and "Refused" read in the warn colour; the words say it too.
+  .ldose.warnline {
+    color: var(--warn);
+  }
+  .acts {
+    display: flex;
+    justify-content: flex-end;
+    font-weight: 400;
+  }
+  &.gone > span:first-child .dn {
+    text-decoration: line-through;
+  }
+  &.gone {
+    opacity: 0.7;
+  }
+
+  // Phone width (the sheet is full width below 620 px): name and pill on the first line, the Stop
+  // button or the Stop question on its own line below, so the row never needs more than its box and
+  // the buttons keep their 44 px height.
+  @media (max-width: 620px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    > .pill {
+      white-space: normal;
+      text-align: center;
+    }
+    .acts {
+      grid-column: 1 / -1;
+      min-width: 0;
+
+      &:not(:has(button)) {
+        display: none;
+      }
+    }
+  }
+}
+
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  font-size: 0.82rem;
+}
+
+.sford {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+
+  .grid-f {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .line {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+}
+
+.lockline,
+.logline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+// Touch target (angular.md): every button in the sheet is 44 px tall.
+.sheet-f button,
+.sheet-b button,
+.notice button {
+  min-height: 44px;
+}
+
+.notice button {
+  margin-left: auto;
+}

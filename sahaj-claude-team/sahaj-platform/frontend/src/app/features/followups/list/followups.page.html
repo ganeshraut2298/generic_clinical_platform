@@ -1,0 +1,80 @@
+<app-page-head
+  title="Follow-ups"
+  lead="Follow-ups are created when the doctor sets the next visit. Reminders go on WhatsApp from your plan's monthly allowance."
+>
+  <div class="remind-all">
+    <button type="button" mat-flat-button disabled>
+      <app-icon name="send" [size]="16" /> Remind all due today
+    </button>
+    <small class="hint">{{ notInPhase }}</small>
+  </div>
+</app-page-head>
+
+<div class="tabs" role="tablist" aria-label="Follow-up lists">
+  @for (tab of tabs; track tab.status) {
+    <button
+      type="button"
+      role="tab"
+      [id]="'fu-tab-' + tab.status"
+      aria-controls="fu-panel"
+      [attr.aria-selected]="status() === tab.status"
+      [attr.tabindex]="status() === tab.status ? 0 : -1"
+      (click)="selectTab(tab.status)"
+      (keydown)="onTabKeydown($event)"
+    >
+      {{ tab.label }}<span class="c num">{{ countFor(tab.status) }}</span>
+    </button>
+  }
+</div>
+
+<section
+  class="panel surf"
+  role="tabpanel"
+  id="fu-panel"
+  tabindex="0"
+  [attr.aria-labelledby]="'fu-tab-' + status()"
+>
+  @if (loading()) {
+    <p class="muted" aria-busy="true">Loading follow-ups</p>
+  } @else if (loadError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  } @else if (items().length === 0) {
+    <app-empty>No follow-ups in this list.</app-empty>
+  } @else {
+    <div class="list">
+      @for (item of items(); track item.id) {
+        <div class="li">
+          <span class="sev" [class]="'sev ' + severity(item.status)"
+            ><span class="sr-only">{{ severityText(item.status) }}</span></span
+          >
+          <div class="main">
+            <b>{{ item.patientName }}</b>
+            <small>
+              {{ item.reason }} · {{ doctorShortName(item.doctorName) }}
+              @if (item.mobile) {
+                · <span class="num">{{ item.mobile }}</span>
+              }
+            </small>
+          </div>
+          <span class="pill" [class]="'pill ' + pillClass(item.status)">
+            @if (item.status === 'RETURNED') {
+              <app-icon name="check" [size]="13" />
+            }
+            {{ pillText(item) }}
+          </span>
+          @if (item.status !== 'RETURNED') {
+            <span class="remind">
+              <button type="button" mat-stroked-button disabled>
+                <app-icon name="send" [size]="14" /> Remind
+              </button>
+              <small class="hint">{{ notInPhase }}</small>
+            </span>
+          }
+        </div>
+      }
+    </div>
+  }
+</section>

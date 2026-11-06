@@ -1,0 +1,123 @@
+// The sheet sits inside the admission dialog's `.sheet`; its header, body and footer are that
+// flex column's children.
+:host {
+  display: contents;
+}
+
+.sub {
+  font-size: 0.86rem;
+}
+
+.disteps {
+  list-style: none;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink-3);
+    padding: 5px 10px 5px 5px;
+    border-radius: var(--r-pill);
+    background: var(--muted-soft);
+  }
+  li > span[aria-hidden] {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--line);
+    color: var(--ink-2);
+    font-size: 0.7rem;
+  }
+  li.cur {
+    color: var(--pri-text);
+    background: var(--pri-soft);
+
+    > span[aria-hidden] {
+      background: var(--pri);
+      color: var(--pri-ink);
+    }
+  }
+  li.done {
+    color: var(--good);
+    background: var(--good-soft);
+
+    > span[aria-hidden] {
+      background: var(--good);
+      color: var(--pri-ink);
+    }
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label,
+  .flabel {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+}
+
+.dispv {
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+
+.dpr {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 0.84rem;
+  border-top: 1px solid var(--paper-line);
+
+  &:first-child {
+    border-top: 0;
+  }
+  span {
+    color: var(--paper-soft);
+    font-size: 0.78rem;
+  }
+}
+
+.chkrow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: 44px;
+  font-size: 0.86rem;
+  color: var(--ink-2);
+  cursor: pointer;
+
+  input {
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    accent-color: var(--pri);
+    flex: none;
+  }
+}
+
+select.input {
+  min-width: 220px;
+}
+
+.signed-by {
+  margin: -6px 0 0 30px;
+  font-size: 0.8rem;
+}

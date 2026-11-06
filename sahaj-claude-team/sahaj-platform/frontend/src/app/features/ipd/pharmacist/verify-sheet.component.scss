@@ -1,0 +1,31 @@
+// Verify sheet (mockup `sfver`). Colours come from the tokens only. Findings are written out with
+// the severity word, so colour is never the only signal.
+.sub {
+  font-size: 0.86rem;
+}
+
+.grid-f {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.line {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+// Touch target (angular.md): every button in the sheet is 44 px tall.
+.sheet-f button,
+.notice button {
+  min-height: 44px;
+}
+
+.notice button {
+  margin-left: auto;
+}

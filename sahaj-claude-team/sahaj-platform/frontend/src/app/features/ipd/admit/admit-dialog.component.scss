@@ -1,0 +1,32 @@
+.sub {
+  font-size: 0.86rem;
+}
+
+.pre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink-3);
+
+  .input {
+    width: 160px;
+    text-align: right;
+  }
+}
+
+.picked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--pri);
+  border-radius: var(--r-sm);
+  background: var(--pri-soft);
+  text-align: left;
+}
+
+.hintline {
+  font-size: 0.78rem;
+}
