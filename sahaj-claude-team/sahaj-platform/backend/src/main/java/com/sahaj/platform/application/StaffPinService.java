@@ -8,7 +8,6 @@ import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
 import com.sahaj.platform.api.PinCheck;
 import com.sahaj.platform.api.StaffPinException;
 import com.sahaj.platform.api.StaffPinPort;
-import com.sahaj.platform.application.StaffPinOps.Colleague;
 import com.sahaj.platform.application.StaffPinOps.ColleagueResult;
 import com.sahaj.platform.application.StaffPinOps.Own;
 import com.sahaj.platform.domain.MembershipRole;
@@ -18,8 +17,16 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
+import org.springframework.dao.PermissionDeniedDataAccessException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -41,6 +48,8 @@ public class StaffPinService implements StaffPinPort {
     static final String MSG_PIN_WEAK = "This PIN is too easy to guess. Choose another one.";
     static final String MSG_PIN_MISMATCH = "The two PINs do not match.";
     static final String MSG_NO_CODE = "Send a code first.";
+
+    private static final Logger log = LoggerFactory.getLogger(StaffPinService.class);
 
     private final StaffPinOps ops;
     private final StaffPinHasher hasher;
@@ -148,13 +157,18 @@ public class StaffPinService implements StaffPinPort {
     /**
      * {@inheritDoc}
      *
-     * <p>Order (ADR-011 D7): the transaction guard; the caller's own limit on failed colleague checks (5 per 15 minutes,
-     * 10 per 24 hours; looked at before any hash); the pepper (fail closed); who may be named (same answer for every
-     * ineligible case); the colleague's own failed-check limit (the same bucket as their own PIN checks); then the
-     * comparison on the colleague's row in one short platform transaction. Only a WRONG PIN (including the wrong try that
-     * locks or switches the PIN off) counts toward both limits; a right PIN, a locked PIN, a missing PIN and a refusal
-     * never do. A caller's colleague checks run one after another (a striped lock, in memory), so a burst of parallel
-     * tries cannot pass the limit before the first failure is counted.
+     * <p>Order (ADR-014 D3, amending ADR-011 D7): the transaction guard; the caller's own in-memory limit on failed
+     * colleague checks (5 per 15 minutes, 10 per 24 hours; looked at before any hash); the pepper (fail closed); then one
+     * short platform transaction of {@link StaffPinOps#checkColleague}: who may be named (same answer for every ineligible
+     * case), the colleague's row lock, no PIN, locked, the durable pair cap, the comparison. The colleague's own
+     * failed-check limit is no longer read or filled (D7). Only a WRONG PIN (including the wrong try that locks the PIN)
+     * counts toward the caller's limit; a right PIN, a locked PIN, a missing PIN, a pair limit and a refusal never do. A
+     * caller's colleague checks run one after another (a striped lock, in memory), so a burst of parallel tries cannot
+     * pass the limit before the first failure is counted.
+     *
+     * <p>Fail closed (D5): a timeout or other database failure in that transaction rolls everything back and answers
+     * CHECK_FAILED, the same whether the PIN was right or wrong, and nothing is counted. A constraint, permission or SQL
+     * refusal is a code fault and is thrown (a plain 500), never turned into an answer about the PIN.
      */
     @Override
     public ColleaguePinCheck checkColleague(UUID tenantId, UUID callerUserId, UUID colleagueMembershipId,
@@ -175,24 +189,36 @@ public class StaffPinService implements StaffPinPort {
             if (!hasher.isAvailable()) {
                 return ColleaguePinCheck.failed(new PinCheck(PinCheck.Outcome.UNAVAILABLE, 0, null, 0));
             }
-            Colleague target = scope.runAsTenant(callerUserId, tenantId,
-                    () -> ops.findEligibleColleague(tenantId, callerUserId, colleagueMembershipId, role)).orElse(null);
-            if (target == null) {
-                return ColleaguePinCheck.notEligible();
+            ColleagueResult result;
+            try {
+                result = scope.runAsTenant(callerUserId, tenantId,
+                        () -> ops.checkColleague(tenantId, callerUserId, colleagueMembershipId, role, pin));
+            } catch (DataAccessException | TransactionException ex) {
+                if (isCodeFault(ex)) {
+                    throw ex;
+                }
+                log.warn("staff-pin-colleague-check tenantId={} callerUserId={} membershipId={} outcome=CHECK_FAILED cause={}",
+                        tenantId, callerUserId, colleagueMembershipId, ex.getClass().getSimpleName());
+                return ColleaguePinCheck.failed(new PinCheck(PinCheck.Outcome.CHECK_FAILED, 0, null, 0));
             }
-            long colleagueWait = limits.pinCheckWait(tenantId, target.userId());
-            if (colleagueWait > 0) {
-                return ColleaguePinCheck.failed(new PinCheck(PinCheck.Outcome.RATE_LIMITED, 0, null, colleagueWait));
-            }
-            ColleagueResult result = scope.runAsTenant(callerUserId, tenantId,
-                    () -> ops.checkColleague(tenantId, callerUserId, colleagueMembershipId, role, pin));
             if (result.wrongTry()) {
                 limits.colleagueCheckFailed(tenantId, callerUserId);
-                limits.pinCheckFailed(tenantId, target.userId());
+            }
+            if (result.check().outcome() == PinCheck.Outcome.NOT_ELIGIBLE) {
+                return ColleaguePinCheck.notEligible();
             }
             return new ColleaguePinCheck(result.check(),
                     result.check().isOk() ? result.colleagueUserId() : null);
         }
+    }
+
+    /**
+     * A refusal by the database of a statement the code wrote (constraint, permission, SQL): a bug, not a slow or
+     * unreachable store (ADR-014 D5, docs/database/SAH-38.md error classes). Only timeouts and the like fail closed.
+     */
+    private static boolean isCodeFault(RuntimeException ex) {
+        return ex instanceof DataIntegrityViolationException || ex instanceof PermissionDeniedDataAccessException
+                || ex instanceof BadSqlGrammarException || ex instanceof InvalidDataAccessApiUsageException;
     }
 
     private Object callerLock(UUID tenantId, UUID callerUserId) {

@@ -4,6 +4,13 @@
 # Database settings live in application-dev.yml and application-test.yml.
 server:
   port: ${SERVER_PORT:8080}
+  compression:
+    # SAH-36 (ADR-013 D2): GET /api/v1/ipd/admissions is about 1 KB a row (300 KB at 300 patients) and is reloaded every
+    # 60 seconds by each open Admitted tab; gzip brings it to about 30 to 40 KB. JSON only, and only above 2 KB. Set
+    # SAHAJ_HTTP_COMPRESSION=false when a reverse proxy already compresses.
+    enabled: ${SAHAJ_HTTP_COMPRESSION:true}
+    mime-types: application/json
+    min-response-size: 2KB
   tomcat:
     remoteip:
       # Forwarded headers are IGNORED unless both are set for a known reverse proxy. The rate limit

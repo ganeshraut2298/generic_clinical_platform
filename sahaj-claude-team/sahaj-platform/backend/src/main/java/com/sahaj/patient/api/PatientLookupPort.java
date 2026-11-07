@@ -13,14 +13,24 @@ import java.util.UUID;
  */
 public interface PatientLookupPort {
 
-    /** {@code merged} is true for a record that was merged away into another (SAH-23: it cannot be admitted). */
-    record PatientSummary(UUID id, String name, int age, String sex, String mobile, boolean merged) {
+    /**
+     * {@code merged} is true for a record that was merged away into another (SAH-23: it cannot be admitted).
+     * {@code uhid} is the patient's UHID as stored (SAH-36, ADR-013 D15); the constructors without it leave it null.
+     */
+    record PatientSummary(UUID id, String name, int age, String sex, String mobile, boolean merged, String uhid) {
 
-        public PatientSummary(UUID id, String name, int age, String sex, String mobile) {
-            this(id, name, age, sex, mobile, false);
+        public PatientSummary(UUID id, String name, int age, String sex, String mobile, boolean merged) {
+            this(id, name, age, sex, mobile, merged, null);
         }
 
-        /** Ids and the merged flag only: the name and the mobile number must never reach a log (security review L5). */
+        public PatientSummary(UUID id, String name, int age, String sex, String mobile) {
+            this(id, name, age, sex, mobile, false, null);
+        }
+
+        /**
+         * Ids and the merged flag only: the name, the UHID and the mobile number must never reach a log (security
+         * review L5).
+         */
         @Override
         public String toString() {
             return "PatientSummary[id=" + id + ", merged=" + merged + "]";
@@ -32,4 +42,13 @@ public interface PatientLookupPort {
 
     /** SAH-24: many patients in one query, keyed by id. Unknown or other-clinic ids are absent. */
     Map<UUID, PatientSummary> findAll(UUID tenantId, Collection<UUID> patientIds);
+
+    /**
+     * SAH-36 (ADR-013 D15): many patients in one batch, keyed by the id asked for, for a caller without clinical
+     * access. A merged-away record answers with the record it was merged into (id, UHID, name, age, sex), the same
+     * resolution as {@link PatientClinicalPort#findAll}, so every role sees the same identity. The mobile number is
+     * never filled in, and the allergy text is never read. Unknown or other-clinic ids are absent. {@link #find} and
+     * {@link #findAll} do not follow a merge.
+     */
+    Map<UUID, PatientSummary> findAllCurrent(UUID tenantId, Collection<UUID> patientIds);
 }

@@ -21,7 +21,6 @@ import com.sahaj.platform.api.PinCheck;
 import com.sahaj.platform.api.PinCheck.NotSetReason;
 import com.sahaj.platform.api.PinCheck.Outcome;
 import com.sahaj.platform.api.StaffPinException;
-import com.sahaj.platform.application.StaffPinOps.Colleague;
 import com.sahaj.platform.application.StaffPinOps.ColleagueResult;
 import com.sahaj.platform.application.StaffPinOps.Own;
 import com.sahaj.platform.domain.MembershipRole;
@@ -214,20 +213,20 @@ class StaffPinServiceTest {
                 });
     }
 
-    // ---- checkColleague (StaffPinPort, SAH-32, ADR-011 D7) ----
+    // ---- checkColleague (StaffPinPort, SAH-32, ADR-011 D7; SAH-38, ADR-014 D3, D5, D7) ----
 
     private static final UUID COLLEAGUE_MEMBER = UUID.randomUUID();
     private static final UUID COLLEAGUE_USER = UUID.randomUUID();
     private static final String COLLEAGUE_PIN = "4821";
 
-    private void colleagueIsEligible() {
-        when(ops.findEligibleColleague(TENANT, USER, COLLEAGUE_MEMBER, MembershipRole.NURSE))
-                .thenReturn(Optional.of(new Colleague(COLLEAGUE_MEMBER, COLLEAGUE_USER)));
-    }
-
     private void opsAnswers(PinCheck check, boolean wrongTry) {
         when(ops.checkColleague(TENANT, USER, COLLEAGUE_MEMBER, MembershipRole.NURSE, COLLEAGUE_PIN))
                 .thenReturn(new ColleagueResult(check, check.isOk() ? COLLEAGUE_USER : null, wrongTry));
+    }
+
+    private void opsThrows(RuntimeException failure) {
+        org.mockito.Mockito.doThrow(failure).when(ops)
+                .checkColleague(TENANT, USER, COLLEAGUE_MEMBER, MembershipRole.NURSE, COLLEAGUE_PIN);
     }
 
     private ColleaguePinCheck checkColleague() {
@@ -295,56 +294,47 @@ class StaffPinServiceTest {
     }
 
     @Test
-    void anIneligibleOrUnknownColleagueIsNotEligibleAndNothingIsComparedOrCounted() {
-        // the mock returns an empty Optional: another clinic's id, an inactive member, another role, the caller
+    void anIneligibleColleagueIsAnsweredByTheTransactionAndNothingIsCounted() {
+        // another clinic's id, an inactive member, another role, the caller: the transaction decides, all look the same
+        opsAnswers(new PinCheck(Outcome.NOT_ELIGIBLE, 0, null, 0), false);
+
         ColleaguePinCheck result = checkColleague();
 
         assertThat(result.outcome()).isEqualTo(Outcome.NOT_ELIGIBLE);
         assertThat(result.colleagueUserId()).isNull();
-        verify(ops, never()).checkColleague(any(), any(), any(), any(), any());
         verify(limits, never()).colleagueCheckFailed(any(), any());
-        verify(limits, never()).pinCheckFailed(any(), any());
+        assertThatThrownBy(result::requireOk).isInstanceOf(InvalidFieldsException.class);
+    }
+
+    @Test
+    void theColleaguesOwnFailedCheckLimitIsNeverReadOrFilled() {
+        // ADR-014 D7: other people's wrong tries must not make anyone who names the colleague get a 429
+        opsAnswers(new PinCheck(Outcome.WRONG, 3, null, 0), true);
+        checkColleague();
+        opsAnswers(new PinCheck(Outcome.LOCKED, 0, Instant.parse("2026-11-06T05:50:00Z"), 900), true);
+        checkColleague();
+        opsAnswers(new PinCheck(Outcome.OK, 5, null, 0), false);
+        checkColleague();
+
         verify(limits, never()).pinCheckWait(any(), any());
-    }
-
-    @Test
-    void aMissingColleagueIdIsNotEligibleToo() {
-        assertThat(service.checkColleague(TENANT, USER, null, "NURSE", "4821").outcome())
-                .isEqualTo(Outcome.NOT_ELIGIBLE);
-        verify(ops, never()).checkColleague(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void theColleaguesOwnFailedCheckLimitIsLookedAtByTheColleaguesUserBeforeComparing() {
-        colleagueIsEligible();
-        when(limits.pinCheckWait(TENANT, COLLEAGUE_USER)).thenReturn(120L);
-
-        ColleaguePinCheck result = checkColleague();
-
-        assertThat(result.outcome()).isEqualTo(Outcome.RATE_LIMITED);
-        assertThat(result.pin().retryAfterSeconds()).isEqualTo(120L);
-        verify(ops, never()).checkColleague(any(), any(), any(), any(), any());
-        verify(limits, never()).colleagueCheckFailed(any(), any());
         verify(limits, never()).pinCheckFailed(any(), any());
+        verify(ops, never()).readOwn(any(), any());
     }
 
     @Test
     void aRightColleaguePinReturnsTheColleaguesUserIdAndNeverUsesAllowance() {
-        colleagueIsEligible();
         opsAnswers(new PinCheck(Outcome.OK, 5, null, 0), false);
 
         ColleaguePinCheck result = checkColleague();
 
         assertThat(result.requireOk()).isEqualTo(COLLEAGUE_USER);
-        verify(scope, org.mockito.Mockito.times(2)).runAsTenant(org.mockito.ArgumentMatchers.eq(USER),
+        verify(scope, org.mockito.Mockito.times(1)).runAsTenant(org.mockito.ArgumentMatchers.eq(USER),
                 org.mockito.ArgumentMatchers.eq(TENANT), any());
         verify(limits, never()).colleagueCheckFailed(any(), any());
-        verify(limits, never()).pinCheckFailed(any(), any());
     }
 
     @Test
-    void aWrongColleaguePinCountsOnceOnTheCallerAndOnceOnTheColleaguesOwnBucketAfterLookingAtBoth() {
-        colleagueIsEligible();
+    void aWrongColleaguePinCountsOnceOnTheCallersInMemoryLimitAfterLookingAtIt() {
         opsAnswers(new PinCheck(Outcome.WRONG, 3, null, 0), true);
 
         ColleaguePinCheck result = checkColleague();
@@ -352,12 +342,8 @@ class StaffPinServiceTest {
         assertThat(result.outcome()).isEqualTo(Outcome.WRONG);
         InOrder order = inOrder(limits, ops);
         order.verify(limits).colleagueCheckWait(TENANT, USER);
-        order.verify(ops).findEligibleColleague(TENANT, USER, COLLEAGUE_MEMBER, MembershipRole.NURSE);
-        order.verify(limits).pinCheckWait(TENANT, COLLEAGUE_USER);
         order.verify(ops).checkColleague(TENANT, USER, COLLEAGUE_MEMBER, MembershipRole.NURSE, COLLEAGUE_PIN);
         order.verify(limits).colleagueCheckFailed(TENANT, USER);
-        order.verify(limits).pinCheckFailed(TENANT, COLLEAGUE_USER);
-        verify(limits, never()).pinCheckFailed(TENANT, USER);
         assertThatThrownBy(result::requireOk).isInstanceOfSatisfying(StaffPinException.class, ex -> {
             assertThat(ex.slug()).isEqualTo("wrong-pin");
             assertThat(ex.getMessage()).isEqualTo("That PIN is not right.");
@@ -365,55 +351,94 @@ class StaffPinServiceTest {
     }
 
     @Test
-    void theWrongTryThatLocksOrSwitchesThePinOffCountsToo() {
-        colleagueIsEligible();
+    void theWrongTryThatLocksCountsToo() {
         opsAnswers(new PinCheck(Outcome.LOCKED, 0, Instant.parse("2026-11-06T05:50:00Z"), 900), true);
         checkColleague();
-        opsAnswers(new PinCheck(Outcome.NOT_SET, 0, null, 0, NotSetReason.TOO_MANY_LOCKS), true);
-        checkColleague();
 
-        verify(limits, org.mockito.Mockito.times(2)).colleagueCheckFailed(TENANT, USER);
-        verify(limits, org.mockito.Mockito.times(2)).pinCheckFailed(TENANT, COLLEAGUE_USER);
+        verify(limits, org.mockito.Mockito.times(1)).colleagueCheckFailed(TENANT, USER);
     }
 
     @Test
     void aLockedOrNotSetColleagueAnswersWithoutCountingAnyAllowance() {
-        colleagueIsEligible();
         opsAnswers(new PinCheck(Outcome.LOCKED, 0, Instant.parse("2026-11-06T05:50:00Z"), 600), false);
         assertThat(checkColleague().outcome()).isEqualTo(Outcome.LOCKED);
         opsAnswers(new PinCheck(Outcome.NOT_SET, 0, null, 0, NotSetReason.RESET_BY_OWNER), false);
         assertThat(checkColleague().outcome()).isEqualTo(Outcome.NOT_SET);
 
         verify(limits, never()).colleagueCheckFailed(any(), any());
-        verify(limits, never()).pinCheckFailed(any(), any());
     }
 
     @Test
-    void ifTheColleagueBecameIneligibleOrThePepperWentAwayTheAnswerPassesThroughUncounted() {
-        colleagueIsEligible();
-        opsAnswers(new PinCheck(Outcome.NOT_ELIGIBLE, 0, null, 0), false);
-        assertThat(checkColleague().outcome()).isEqualTo(Outcome.NOT_ELIGIBLE);
+    void thePairLimitAnswers429ColleaguePinLimitWithNoRetryTimeAndCountsNothing() {
+        opsAnswers(new PinCheck(Outcome.PAIR_LIMIT, 0, null, 0), false);
+
+        ColleaguePinCheck result = checkColleague();
+
+        assertThat(result.outcome()).isEqualTo(Outcome.PAIR_LIMIT);
+        verify(limits, never()).colleagueCheckFailed(any(), any());
+        assertThatThrownBy(result::requireOk).isInstanceOfSatisfying(StaffPinException.class, ex -> {
+            assertThat(ex.slug()).isEqualTo("colleague-pin-limit");
+            assertThat(ex.status()).isEqualTo(429);
+            assertThat(ex.title()).isEqualTo("Too many wrong PIN tries");
+            assertThat(ex.getMessage()).isEqualTo("Too many wrong PIN tries for this nurse. Choose another nurse.");
+            assertThat(ex.retryAfterSeconds()).isZero();
+        });
+    }
+
+    @Test
+    void aMissingPepperInsideTheTransactionPassesThroughUncounted() {
         opsAnswers(new PinCheck(Outcome.UNAVAILABLE, 0, null, 0), false);
         assertThat(checkColleague().outcome()).isEqualTo(Outcome.UNAVAILABLE);
 
         verify(limits, never()).colleagueCheckFailed(any(), any());
-        verify(limits, never()).pinCheckFailed(any(), any());
     }
 
     @Test
-    void aFailureInsideTheTransactionIsNotCountedAndIsNotSwallowed() {
-        colleagueIsEligible();
-        when(ops.checkColleague(TENANT, USER, COLLEAGUE_MEMBER, MembershipRole.NURSE, COLLEAGUE_PIN))
-                .thenThrow(new IllegalStateException("The staff PIN row disappeared during a lock"));
+    void aDatabaseTimeoutOrOutageFailsClosedWith503AndCountsNothing() {
+        RuntimeException[] failures = {
+            new org.springframework.dao.CannotAcquireLockException("lock timeout"),
+            new org.springframework.dao.QueryTimeoutException("statement timeout"),
+            new org.springframework.dao.DataAccessResourceFailureException("connection lost"),
+            new org.springframework.transaction.CannotCreateTransactionException("no connection")
+        };
+        for (RuntimeException failure : failures) {
+            opsThrows(failure);
 
-        assertThatThrownBy(this::checkColleague).isInstanceOf(IllegalStateException.class);
+            ColleaguePinCheck result = checkColleague();
+
+            assertThat(result.outcome()).as(failure.getClass().getSimpleName()).isEqualTo(Outcome.CHECK_FAILED);
+            assertThat(result.colleagueUserId()).isNull();
+            assertThatThrownBy(result::requireOk).isInstanceOfSatisfying(StaffPinException.class, ex -> {
+                assertThat(ex.slug()).isEqualTo("pin-check-failed");
+                assertThat(ex.status()).isEqualTo(503);
+                assertThat(ex.title()).isEqualTo("PIN check failed");
+                assertThat(ex.getMessage()).isEqualTo("We could not check the PIN. Try again.");
+                assertThat(ex.retryAfterSeconds()).isZero();
+            });
+        }
+        verify(limits, never()).colleagueCheckFailed(any(), any());
+    }
+
+    @Test
+    void aConstraintPermissionOrSqlRefusalIsACodeFaultAndIsNotTurnedIntoAnAnswerAboutThePin() {
+        RuntimeException[] faults = {
+            new org.springframework.dao.DataIntegrityViolationException("23514"),
+            new org.springframework.dao.DuplicateKeyException("23505"),
+            new org.springframework.dao.PermissionDeniedDataAccessException("42501", null),
+            new org.springframework.jdbc.BadSqlGrammarException("task", "sql", new java.sql.SQLException("42601")),
+            new org.springframework.dao.InvalidDataAccessApiUsageException("misuse"),
+            new IllegalStateException("The staff PIN row disappeared during a lock")
+        };
+        for (RuntimeException fault : faults) {
+            opsThrows(fault);
+
+            assertThatThrownBy(this::checkColleague).as(fault.getClass().getSimpleName()).isSameAs(fault);
+        }
         verify(limits, never()).colleagueCheckFailed(any(), any());
     }
 
     @Test
     void theCallersParallelTriesRunOneAfterAnotherSoABurstCannotPassTheLimit() throws Exception {
-        colleagueIsEligible();
-        opsAnswers(new PinCheck(Outcome.WRONG, 4, null, 0), true);
         AtomicBoolean counted = new AtomicBoolean();
         when(limits.colleagueCheckWait(TENANT, USER)).thenAnswer(call -> counted.get() ? 600L : 0L);
         org.mockito.Mockito.doAnswer(call -> {
@@ -450,7 +475,6 @@ class StaffPinServiceTest {
 
     @Test
     void checkColleagueNeverPutsThePinOrAnIdIntoTheResultText() {
-        colleagueIsEligible();
         opsAnswers(new PinCheck(Outcome.WRONG, 3, null, 0), true);
 
         ColleaguePinCheck result = checkColleague();

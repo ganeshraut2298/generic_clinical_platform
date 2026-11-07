@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sahaj.ipd.application.AdmissionRepository.AdmissionRow;
+import com.sahaj.ipd.application.AdmissionRepository.AdmittedRow;
 import com.sahaj.ipd.application.AdmissionRepository.DepositRow;
 import com.sahaj.ipd.application.AdmissionRepository.NewAdmission;
 import com.sahaj.ipd.application.AdmissionViews.AdmissionList;
@@ -30,6 +31,8 @@ import com.sahaj.ipd.application.IpdSettingsRepository.TransferRules;
 import com.sahaj.ipd.application.WardRepository.RoomRow;
 import com.sahaj.ipd.application.WardRepository.WardRow;
 import com.sahaj.patient.api.PatientAccessPort;
+import com.sahaj.patient.api.PatientClinicalPort;
+import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
 import com.sahaj.platform.api.ActorDirectoryPort;
@@ -72,6 +75,7 @@ class AdmissionServiceTest {
     /** The database clock the mocked vitals repository reports: seconds after the application clock, so they cannot be mixed up. */
     private static final Instant DB_NOW = Instant.parse("2026-11-11T05:30:07.654321Z");
     private static final Instant ADMITTED_AT = Instant.parse("2026-11-09T05:30:00Z");
+    private static final Instant AS_OF = Instant.parse("2026-11-11T05:30:09Z");
 
     private AdmissionRepository admissions;
     private BedRepository beds;
@@ -89,6 +93,7 @@ class AdmissionServiceTest {
     private EmergencyService emergency;
     private VitalsRepository vitals;
     private SafetyService safety;
+    private PatientClinicalPort clinicalPatients;
     private AdmissionService service;
     private BedRow freeBed;
 
@@ -110,12 +115,16 @@ class AdmissionServiceTest {
         emergency = mock(EmergencyService.class);
         vitals = mock(VitalsRepository.class);
         safety = mock(SafetyService.class);
+        clinicalPatients = mock(PatientClinicalPort.class);
+        when(safety.databaseNow()).thenReturn(AS_OF);
+        when(safety.liveEscalations(TENANT)).thenReturn(List.of());
+        when(vitals.findLatestOfAdmitted(TENANT)).thenReturn(Map.of());
         when(vitals.databaseNow()).thenReturn(DB_NOW);
         IpdCatalog catalog = new IpdCatalog(settings);
         service = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team, patients,
                 patientAccess, actors, new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
                 catalog, charges, new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
-                emergency, vitals, safety);
+                emergency, vitals, new AdmittedCards(clinicalPatients, patients, vitals, safety));
 
         state("on");
         freeBed = new BedRow(BED, WARD, null, "101-A", "gen", "free");
@@ -140,6 +149,24 @@ class AdmissionServiceTest {
 
     private void state(String ipdState) {
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement(ipdState, false, 25));
+    }
+
+    /** SAH-36: the list needs the caller's active membership (the role is read again), so each call sets it first. */
+    private AdmissionList listAs(String role, String status) {
+        membershipIs(role, true);
+        return service.list(TENANT, ACTOR, role, status);
+    }
+
+    private static List<AdmittedRow> placed(AdmissionRow... rows) {
+        List<AdmittedRow> placed = new java.util.ArrayList<>();
+        for (AdmissionRow row : rows) {
+            placed.add(new AdmittedRow(row, WARD, null));
+        }
+        return placed;
+    }
+
+    private static PatientClinical clinical(String allergy) {
+        return new PatientClinical(PATIENT, "UH-0001", "Test Patient", 56, "M", allergy);
     }
 
     private static AdmissionRow row(String payer, String type, String category, long deposit) {
@@ -491,13 +518,13 @@ class AdmissionServiceTest {
         assertThatThrownBy(() -> service.confirmRules(TENANT, ACTOR)).isInstanceOf(ConflictException.class);
         verify(wards, never()).lockTenant(any());
         assertThat(service.rules(TENANT)).isNotNull();
-        assertThat(service.list(TENANT, ACTOR, "OWNER", null).canAdmit()).isFalse();
+        assertThat(listAs("OWNER", null).canAdmit()).isFalse();
 
         state("off");
         assertThatThrownBy(() -> service.rules(TENANT)).isInstanceOf(ModuleOffException.class);
         assertThatThrownBy(() -> service.admit(TENANT, ACTOR, "OWNER", validInput()))
                 .isInstanceOf(ModuleOffException.class);
-        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", null)).isInstanceOf(ModuleOffException.class);
+        assertThatThrownBy(() -> listAs("OWNER", null)).isInstanceOf(ModuleOffException.class);
         assertThatThrownBy(() -> service.options(TENANT, "FRONT_DESK", null)).isInstanceOf(ModuleOffException.class);
         assertThatThrownBy(() -> service.detail(TENANT, ACTOR, "OWNER", ADMISSION)).isInstanceOf(ModuleOffException.class);
     }
@@ -572,15 +599,14 @@ class AdmissionServiceTest {
         UUID second = UUID.randomUUID();
         AdmissionRow due = new AdmissionRow(second, "IP/26-27/0041", PATIENT, BED, "101-B", "semi", "General ward",
                 DOCTOR, "planned", "Self", "x", "ADMITTED", ADMITTED_AT, 500_000L);
-        when(admissions.findAdmitted(TENANT)).thenReturn(List.of(row("Self", "planned", "gen", 1_000_000L), due,
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row("Self", "planned", "gen", 1_000_000L), due,
                 row("Corporate", "planned", "gen", 0)));
 
-        when(patients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT,
-                new PatientSummary(PATIENT, "Test Patient", 56, "M", "9000000001")));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known")));
         when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
                 new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
 
-        AdmissionList list = service.list(TENANT, ACTOR, "NURSE", "ADMITTED");
+        AdmissionList list = listAs("NURSE", "ADMITTED");
 
         assertThat(list.bedsTotal()).isEqualTo(4);
         assertThat(list.bedsOccupied()).isEqualTo(2);
@@ -591,7 +617,8 @@ class AdmissionServiceTest {
         assertThat(list.items().get(0).doctorName()).isEqualTo("Dr Test");
         assertThat(list.items().get(0).categoryName()).isEqualTo("General");
         assertThat(list.items().get(0).age()).isEqualTo(56);
-        verify(patients, org.mockito.Mockito.times(1)).findAll(eq(TENANT), any());
+        verify(clinicalPatients, org.mockito.Mockito.times(1)).findAll(eq(TENANT), any());
+        verify(patients, never()).findAll(any(), any());
         // The doctors of all rows come in one query, not one per row (code review 6).
         verify(team, org.mockito.Mockito.times(1)).findAll(eq(TENANT), any());
         verify(team, never()).find(any(), any());
@@ -602,17 +629,18 @@ class AdmissionServiceTest {
     @Test
     void listCanAdmitOnlyForAdmittingRoles() {
         when(beds.findAll(TENANT)).thenReturn(List.of());
-        when(admissions.findAdmitted(TENANT)).thenReturn(List.of());
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed());
 
-        assertThat(service.list(TENANT, ACTOR, "OWNER", null).canAdmit()).isTrue();
-        assertThat(service.list(TENANT, ACTOR, "FRONT_DESK", null).canAdmit()).isTrue();
-        assertThat(service.list(TENANT, ACTOR, "DOCTOR", null).canAdmit()).isFalse();
-        assertThat(service.list(TENANT, ACTOR, "BILLING", null).canAdmit()).isFalse();
+        assertThat(listAs("OWNER", null).canAdmit()).isTrue();
+        assertThat(listAs("FRONT_DESK", null).canAdmit()).isTrue();
+        assertThat(listAs("DOCTOR", null).canAdmit()).isFalse();
+        // BILLING (and every role outside the four) is refused by the list now (SAH-36).
+        assertThatThrownBy(() -> listAs("BILLING", null)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
     void listRejectsAnyStatusButAdmitted() {
-        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", "DISCHARGED"))
+        assertThatThrownBy(() -> listAs("OWNER", "DISCHARGED"))
                 .isInstanceOfSatisfying(InvalidInputException.class, e -> assertThat(e.field()).isEqualTo("status"));
     }
 
@@ -630,14 +658,13 @@ class AdmissionServiceTest {
     void dayNumberIsTheBillDaysOfTheBedDayCutInTheDetailAndTheList() {
         // Admitted 9 Nov 11:00 IST, now 11 Nov 11:00 IST: calendar day 3, but exactly two 24-hour periods.
         when(settings.findConfig(TENANT)).thenReturn(Optional.of(new IpdSettingsRepository.ConfigRow(true, "24h", 0L, 0L)));
-        when(admissions.findAdmitted(TENANT)).thenReturn(List.of(row("Self", "planned", "gen", 1_000_000L)));
-        when(patients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT,
-                new PatientSummary(PATIENT, "Test Patient", 56, "M", "9000000001")));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row("Self", "planned", "gen", 1_000_000L)));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known")));
         when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
                 new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
 
         Detail detail = service.detail(TENANT, ACTOR, "OWNER", ADMISSION);
-        AdmissionList list = service.list(TENANT, ACTOR, "OWNER", "ADMITTED");
+        AdmissionList list = listAs("OWNER", "ADMITTED");
 
         assertThat(detail.bill().billDays()).isEqualTo(2);
         assertThat(detail.dayNumber()).isEqualTo(2);
@@ -1092,9 +1119,8 @@ class AdmissionServiceTest {
         UUID second = UUID.randomUUID();
         AdmissionRow other = new AdmissionRow(second, "IP/26-27/0041", PATIENT, BED, "101-B", "gen", "General ward",
                 DOCTOR, "planned", "Self", "x", "ADMITTED", ADMITTED_AT, 500_000L);
-        when(admissions.findAdmitted(TENANT)).thenReturn(List.of(row("Self", "planned", "gen", 1_000_000L), other));
-        when(patients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT,
-                new PatientSummary(PATIENT, "Test Patient", 56, "M", "9000000001")));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row("Self", "planned", "gen", 1_000_000L), other));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known")));
         when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
                 new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
         // NOW is 11 Nov 11:00 IST. Signed this morning: going home. Signed yesterday evening IST: not.
@@ -1104,13 +1130,13 @@ class AdmissionServiceTest {
         when(discharges.countDischargedBetween(TENANT, Instant.parse("2026-11-10T18:30:00Z"),
                 Instant.parse("2026-11-11T18:30:00Z"))).thenReturn(4);
 
-        AdmissionList list = service.list(TENANT, ACTOR, "NURSE", "ADMITTED");
+        AdmissionList list = listAs("NURSE", "ADMITTED");
 
         assertThat(list.dischargedToday()).isEqualTo(4);
         assertThat(list.goingHomeToday()).isEqualTo(1);
         assertThat(list.items()).extracting(s -> s.goingHomeToday()).containsExactly(true, false);
         // The list reads the admitted patients only, so a discharged patient is in neither the rows nor the alerts.
-        verify(admissions).findAdmitted(TENANT);
+        verify(admissions).findAdmittedWithPlacement(TENANT);
         verify(discharges, org.mockito.Mockito.times(1)).findLatestSignoffsOfAdmitted(TENANT);
     }
 
@@ -1372,7 +1398,7 @@ class AdmissionServiceTest {
         EmergencyViews.Counts counts = new EmergencyViews.Counts(true, 3, 1);
         when(emergency.counts(eq(TENANT), any())).thenReturn(counts);
 
-        assertThat(service.list(TENANT, ACTOR, "DOCTOR", null).emergency()).isEqualTo(counts);
+        assertThat(listAs("DOCTOR", null).emergency()).isEqualTo(counts);
     }
 
     // ---- SAH-31: the EMR button and the EMR header numbers ----

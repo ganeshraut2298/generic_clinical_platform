@@ -5,6 +5,7 @@ import {
   ElementRef,
   HostListener,
   OnInit,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -16,7 +17,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { TranslateService } from '../../core/i18n/translate.service';
@@ -34,6 +36,8 @@ import { Language, ROLE_LABELS } from '../../core/platform/platform.model';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { formatIstDateTime } from '../../shared/format/ist-clock';
 import { EmergencyBadgeStore } from '../ipd/emergency/emergency-badge.store';
+import { ColleagueTriesBannerComponent } from '../pin/colleague-tries-banner.component';
+import { ColleagueTriesNoticeStore } from '../pin/colleague-tries-notice.store';
 import { SetPinSheetComponent } from '../pin/set-pin-sheet.component';
 import { GoToDialogComponent, GoToOption } from './go-to/go-to-dialog.component';
 
@@ -60,6 +64,7 @@ interface NavGroupView {
     RouterOutlet,
     IconComponent,
     TranslatePipe,
+    ColleagueTriesBannerComponent,
   ],
   styleUrl: './shell.component.scss',
   templateUrl: './shell.component.html',
@@ -72,6 +77,7 @@ export class ShellComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
   private readonly emergencyBadge = inject(EmergencyBadgeStore);
+  private readonly colleagueNotice = inject(ColleagueTriesNoticeStore);
 
   protected readonly roleLabels = ROLE_LABELS;
 
@@ -141,6 +147,17 @@ export class ShellComponent implements OnInit {
       }
     });
     this.destroyRef.onDestroy(() => this.emergencyBadge.stop());
+
+    // SAH-38 (ADR-014 D8): the colleague-tries notice is asked for after the first screen is shown, so
+    // sign-in is never slowed. A failed load is tried again at a later route change (once a minute at most).
+    afterNextRender(() => this.colleagueNotice.load());
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => this.colleagueNotice.retryAfterFailure());
+    this.destroyRef.onDestroy(() => this.colleagueNotice.reset());
   }
 
   /** Number on a menu item; only "Emergency" has one, and only above 0. */
@@ -253,6 +270,7 @@ export class ShellComponent implements OnInit {
 
   protected logout(): void {
     this.auth.logout().subscribe(() => {
+      this.colleagueNotice.reset();
       this.store.clear();
       void this.router.navigate(['/login']);
     });

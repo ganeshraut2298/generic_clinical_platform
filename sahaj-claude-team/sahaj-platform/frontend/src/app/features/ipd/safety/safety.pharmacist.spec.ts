@@ -51,10 +51,10 @@ describe('SafetyComponent with the pharmacist check', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const tiles = Array.from(el().querySelectorAll('.kpis > *')).map((n) => n.getAttribute('data-kpi') ?? n.tagName.toLowerCase());
-    expect(tiles).toEqual(['escalations', 'app-pharmacist-tile']);
+    expect(tiles).toEqual(['escalations', 'app-pharmacist-tile', 'doses']);
     expect(el().querySelector('[data-kpi=pharmacist] .eyebrow')!.textContent).toBe('Pharmacist checks');
     const blocks = Array.from(el().querySelectorAll('.safety > *')).map((n) => n.tagName.toLowerCase());
-    expect(blocks).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'section']);
+    expect(blocks).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'app-medicine-round', 'section']);
     expect(store.panelShown()).toBe(true);
     expect(store.waiting()).toBe(2);
   });

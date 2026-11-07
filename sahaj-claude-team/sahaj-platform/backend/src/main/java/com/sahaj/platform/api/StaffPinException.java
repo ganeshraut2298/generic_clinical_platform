@@ -21,6 +21,8 @@ public class StaffPinException extends RuntimeException {
     private static final String RATE_LIMITED_TEXT = "Too many PIN tries in a short time. Try again in a few minutes.";
     private static final String COLLEAGUE_NOT_SET = "The second nurse has not set a PIN yet. Choose another nurse.";
     private static final String COLLEAGUE_WRONG_PIN = "That PIN is not right.";
+    private static final String PAIR_LIMIT_TEXT = "Too many wrong PIN tries for this nurse. Choose another nurse.";
+    private static final String CHECK_FAILED_TEXT = "We could not check the PIN. Try again.";
 
     private static final DateTimeFormatter CLOCK_IST = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
             .withZone(ZoneId.of("Asia/Kolkata"));
@@ -31,7 +33,11 @@ public class StaffPinException extends RuntimeException {
         PIN_LOCKED("pin-locked", 403, "PIN locked"),
         PIN_NOT_SET("pin-not-set", 409, "No PIN set"),
         RATE_LIMIT("rate-limit", 429, "Too many requests"),
-        PIN_UNAVAILABLE("pin-unavailable", 503, "PIN checks are off");
+        PIN_UNAVAILABLE("pin-unavailable", 503, "PIN checks are off"),
+        /** SAH-38 (ADR-014 D3): 5 wrong tries of one colleague's PIN by one caller in a rolling 7 days. No retry time. */
+        COLLEAGUE_PIN_LIMIT("colleague-pin-limit", 429, "Too many wrong PIN tries"),
+        /** SAH-38 (ADR-014 D5): the PIN store could not be read or written in time; nothing was counted. */
+        PIN_CHECK_FAILED("pin-check-failed", 503, "PIN check failed");
 
         private final String slug;
         private final int status;
@@ -107,6 +113,10 @@ public class StaffPinException extends RuntimeException {
                         Math.max(0, check.retryAfterSeconds()), subject);
             case UNAVAILABLE:
                 return new StaffPinException(Kind.PIN_UNAVAILABLE, UNAVAILABLE_TEXT, 0, subject);
+            case PAIR_LIMIT:
+                return new StaffPinException(Kind.COLLEAGUE_PIN_LIMIT, PAIR_LIMIT_TEXT, 0, subject);
+            case CHECK_FAILED:
+                return new StaffPinException(Kind.PIN_CHECK_FAILED, CHECK_FAILED_TEXT, 0, subject);
             default:
                 throw new IllegalArgumentException(check.outcome() + " is not a PIN problem");
         }

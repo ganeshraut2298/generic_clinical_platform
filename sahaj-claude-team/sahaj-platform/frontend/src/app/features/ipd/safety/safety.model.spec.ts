@@ -1,5 +1,6 @@
 import { VitalsSaved, savedToast } from '../nursing/nursing.model';
-import { ACTIONS, ROW } from './safety.fixtures';
+import { marOf, orderOf, slotOf, GIVEN_DOSE } from '../mar/mar.fixtures';
+import { ACTIONS, ROUND_DUE, ROUND_LATE, ROW, SLOT_1030AM, SLOT_8AM } from './safety.fixtures';
 import {
   ClinicalEvent,
   ClinicalEventPage,
@@ -10,6 +11,14 @@ import {
   auditSubtitle,
   bannerNames,
   callToast,
+  checkGive,
+  dosesTileNumber,
+  dosesTileText,
+  giveName,
+  roundKey,
+  roundRowLine,
+  roundStatusPill,
+  roundSubtitle,
   closedToast,
   detailLine,
   eventLine,
@@ -268,9 +277,18 @@ describe('safety.model', () => {
     });
   });
 
-  it('sameCounts compares open, pastTarget and the change token', () => {
+  it('sameCounts compares open, pastTarget, the dose numbers and the change token', () => {
     const A = 'AAAAAAAAAAAAAAAAAAAAAA';
-    const c = (open: number, pastTarget: number, changeToken = A) => ({ open, pastTarget, changeToken });
+    const c = (open: number, pastTarget: number, changeToken = A, dosesDue = 0, dosesLate = 0) => ({
+      open,
+      pastTarget,
+      dosesDue,
+      dosesLate,
+      changeToken,
+    });
+    expect(sameCounts(c(2, 1, A, 1, 0), c(2, 1, A, 2, 0))).toBe(false);
+    expect(sameCounts(c(2, 1, A, 1, 0), c(2, 1, A, 1, 1))).toBe(false);
+    expect(sameCounts(c(2, 1, A, 1, 1), c(2, 1, A, 1, 1))).toBe(true);
     expect(sameCounts(c(2, 1), c(2, 1))).toBe(true);
     expect(sameCounts(c(2, 1), c(2, 0))).toBe(false);
     expect(sameCounts(c(2, 1), c(3, 1))).toBe(false);
@@ -288,6 +306,100 @@ describe('safety.model', () => {
     expect(validateResponse({ action: 'BEDSIDE_REVIEW', note: '😀'.repeat(1000) }, actions)).toEqual({});
     expect(validateResponse({ action: 'BEDSIDE_REVIEW', note: '😀'.repeat(1001) }, actions)).toEqual({
       note: 'Keep the plan to 1,000 characters.',
+    });
+  });
+
+  describe('Medicine round (SAH-35)', () => {
+    it('tile figure is Due plus Late, the small text is the Late count and says 0 overdue when none', () => {
+      expect(dosesTileNumber({ dosesDue: 3, dosesLate: 2 })).toBe(5);
+      expect(dosesTileNumber({ dosesDue: 0, dosesLate: 0 })).toBe(0);
+      expect(dosesTileText({ dosesLate: 2 })).toBe('2 overdue');
+      expect(dosesTileText({ dosesLate: 0 })).toBe('0 overdue');
+    });
+
+    it('the subtitle shows the server clock in IST', () => {
+      expect(roundSubtitle('2026-11-05T05:35:00Z')).toBe(
+        'Doses due in the next hour and doses not given on time. Clock: 11:05 AM.',
+      );
+    });
+
+    it('writes the small line with the slot time as 8 AM, 2 PM, 8:30 AM', () => {
+      expect(roundRowLine(ROUND_LATE)).toBe('Asha Patil · bed 101-A · 8 AM dose');
+      expect(roundRowLine({ ...ROUND_LATE, slotAt: '2026-11-05T09:00:00Z' })).toBe('Asha Patil · bed 101-A · 2:30 PM dose');
+      expect(roundRowLine({ ...ROUND_LATE, slotAt: '2026-11-05T08:30:00Z' })).toBe('Asha Patil · bed 101-A · 2 PM dose');
+    });
+
+    it('status pill: "N h late" red, at least 1; "Due now" amber', () => {
+      expect(roundStatusPill({ state: 'LATE', lateHours: 3 })).toEqual({ text: '3 h late', tone: 'crit' });
+      expect(roundStatusPill({ state: 'LATE', lateHours: 1 })).toEqual({ text: '1 h late', tone: 'crit' });
+      expect(roundStatusPill({ state: 'LATE', lateHours: null })).toEqual({ text: '1 h late', tone: 'crit' });
+      expect(roundStatusPill({ state: 'DUE', lateHours: null })).toEqual({ text: 'Due now', tone: 'warn' });
+    });
+
+    it('names the Give button after the medicine and the patient', () => {
+      expect(giveName(ROUND_DUE)).toBe('Give Tab. Paracetamol 650 mg to Ravi Shah');
+    });
+
+    it('keys a dose by order and slot', () => {
+      expect(roundKey(ROUND_LATE)).toBe(`o2|${SLOT_8AM}`);
+      expect(roundKey(ROUND_LATE)).not.toBe(roundKey({ ...ROUND_LATE, slotAt: SLOT_1030AM }));
+    });
+
+    describe('checkGive (the re-check after the MAR read)', () => {
+      const dueOrder = (state: 'DUE' | 'LATE' = 'LATE') =>
+        orderOf({ orderId: 'o2', slots: [slotOf({ slotAt: SLOT_8AM, state, lateHours: 3 })] });
+
+      it('opens with the order and the slot when the slot is Late or Due and can be given', () => {
+        for (const state of ['LATE', 'DUE'] as const) {
+          const mar = marOf({ orders: [dueOrder(state)] });
+          const check = checkGive(mar, ROUND_LATE);
+          expect(check.open).toBe(true);
+          if (check.open) {
+            expect(check.order.orderId).toBe('o2');
+            expect(check.slot.state).toBe(state);
+          }
+        }
+      });
+
+      it('matches the slot by instant, not by text', () => {
+        const mar = marOf({ orders: [orderOf({ orderId: 'o2', slots: [slotOf({ slotAt: '2026-11-05T08:00:00+05:30' })] })] });
+        expect(checkGive(mar, ROUND_LATE).open).toBe(true);
+      });
+
+      it('refuses with the existing texts, in this order', () => {
+        const slotWith = (state: 'GIVEN' | 'HELD' | 'REFUSED') =>
+          marOf({
+            orders: [
+              orderOf({
+                orderId: 'o2',
+                slots: [slotOf({ slotAt: SLOT_8AM, state, canGive: false, dose: state === 'GIVEN' ? GIVEN_DOSE : null })],
+              }),
+            ],
+          });
+        expect(checkGive(marOf({ status: 'DISCHARGED', orders: [] }), ROUND_LATE)).toEqual({
+          open: false,
+          message: 'This patient is not admitted any more. Doses cannot be recorded.',
+        });
+        expect(checkGive(marOf({ orders: [] }), ROUND_LATE)).toEqual({
+          open: false,
+          message: 'This medicine was stopped. Its doses can no longer be recorded.',
+        });
+        for (const state of ['GIVEN', 'HELD', 'REFUSED'] as const) {
+          expect(checkGive(slotWith(state), ROUND_LATE)).toEqual({ open: false, message: 'This dose is already recorded.' });
+        }
+        expect(checkGive(marOf({ canGive: false, giveLockReason: 'IPD_READONLY', orders: [dueOrder()] }), ROUND_LATE)).toEqual({
+          open: false,
+          message: 'IPD is read-only. Doses cannot be recorded.',
+        });
+        expect(checkGive(marOf({ canGive: false, giveLockReason: 'ROLE', orders: [dueOrder()] }), ROUND_LATE)).toEqual({
+          open: false,
+          message: 'Reload the page and try again.',
+        });
+        expect(checkGive(marOf({ orders: [orderOf({ orderId: 'o2', slots: [] })] }), ROUND_LATE)).toEqual({
+          open: false,
+          message: 'Reload the page and try again.',
+        });
+      });
     });
   });
 });

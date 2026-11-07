@@ -1,0 +1,67 @@
+<section class="panel surf sfp" aria-labelledby="sf-round-h" data-testid="medicine-round">
+  <div class="sfph">
+    <h2 [id]="headingId" tabindex="-1"><app-icon name="pill" [size]="18" /> {{ title }}</h2>
+    <small class="faint" data-testid="round-subtitle">{{ subtitle() }}</small>
+  </div>
+
+  @if (showReadonly()) {
+    <p class="sfnote" data-testid="round-readonly">
+      <app-icon name="lock" [size]="14" /> <span>{{ readonlyText }}</span>
+    </p>
+  }
+
+  @if (round().truncated) {
+    <p class="sfnote" data-testid="round-truncated">{{ truncatedText }}</p>
+  }
+
+  @if (round().rows.length === 0) {
+    <div class="empty" data-testid="round-empty">{{ empty }}</div>
+  } @else {
+    <div role="list" aria-label="Doses due or late" data-testid="round-list">
+      @for (r of round().rows; track keyOf(r)) {
+        @let p = pill(r);
+        <div
+          role="listitem"
+          class="sfrow"
+          [class.late]="r.state === 'LATE'"
+          data-testid="round-row"
+          [attr.data-order]="r.orderId"
+          [attr.data-slot]="r.slotAt"
+          [attr.data-state]="r.state"
+        >
+          <span class="sfmn">
+            <b data-testid="round-drug">
+              {{ r.drugName }}
+              @if (r.highAlert !== null) {
+                <span class="pill p-crit sfha" data-testid="round-high-alert">{{ highAlertText }}</span>
+              }
+            </b>
+            <small data-testid="round-line">{{ line(r) }}</small>
+          </span>
+          <span class="sfst">
+            <span [class]="'pill p-' + p.tone" data-testid="round-pill">{{ p.text }}</span>
+          </span>
+          <span class="sfacts">
+            @if (round().canGive) {
+              <button
+                type="button"
+                mat-flat-button
+                data-act="sfgive"
+                data-from="safety"
+                data-testid="round-give"
+                [attr.data-key]="keyOf(r)"
+                [disabled]="busyKey() !== null"
+                [disabledInteractive]="true"
+                [attr.aria-busy]="busyKey() === keyOf(r) ? 'true' : null"
+                [attr.aria-label]="nameOf(r)"
+                (click)="give(r)"
+              >
+                {{ giveLabel }}
+              </button>
+            }
+          </span>
+        </div>
+      }
+    </div>
+  }
+</section>

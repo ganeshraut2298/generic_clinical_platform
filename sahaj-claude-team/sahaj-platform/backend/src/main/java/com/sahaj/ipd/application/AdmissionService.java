@@ -1,10 +1,11 @@
 package com.sahaj.ipd.application;
 
 import com.sahaj.ipd.application.AdmissionRepository.AdmissionRow;
+import com.sahaj.ipd.application.AdmissionRepository.AdmittedRow;
 import com.sahaj.ipd.application.AdmissionRepository.DepositRow;
 import com.sahaj.ipd.application.AdmissionRepository.NewAdmission;
 import com.sahaj.ipd.application.AdmissionViews.AdmissionList;
-import com.sahaj.ipd.application.SafetyViews.Banner;
+import com.sahaj.ipd.application.AdmissionViews.AdmittedPatientRow;
 import com.sahaj.ipd.application.AdmissionViews.BedOption;
 import com.sahaj.ipd.application.AdmissionViews.CategoryAdds;
 import com.sahaj.ipd.application.AdmissionViews.ChargeService;
@@ -16,6 +17,7 @@ import com.sahaj.ipd.application.AdmissionViews.Options;
 import com.sahaj.ipd.application.AdmissionViews.Rules;
 import com.sahaj.ipd.application.AdmissionViews.RulesInput;
 import com.sahaj.ipd.application.AdmissionViews.Summary;
+import com.sahaj.ipd.application.AdmissionViews.WardOption;
 import com.sahaj.ipd.application.BedRepository.BedRow;
 import com.sahaj.ipd.application.EmergencyCaseRepository.CaseRow;
 import com.sahaj.ipd.application.EmergencyViews.Counts;
@@ -25,9 +27,11 @@ import com.sahaj.ipd.application.DischargeRepository.FinalBillRow;
 import com.sahaj.ipd.application.DischargeRepository.SignoffRow;
 import com.sahaj.ipd.application.IpdBilling.Batch;
 import com.sahaj.ipd.application.IpdSettingsRepository.CategoryRow;
+import com.sahaj.ipd.application.IpdSettingsRepository.ConfigRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.DepositRules;
 import com.sahaj.ipd.application.WardRepository.WardRow;
 import com.sahaj.patient.api.PatientAccessPort;
+import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
 import com.sahaj.platform.api.ActorDirectoryPort;
@@ -111,15 +115,15 @@ public class AdmissionService {
     private final DischargeRepository discharges;
     private final EmergencyService emergency;
     private final VitalsRepository vitals;
-    private final SafetyService safety;
+    private final AdmittedCards cards;
 
     AdmissionService(AdmissionRepository admissions, BedRepository beds, WardRepository wards,
                      IpdSettingsRepository settings, OwnerGuard ownerGuard, AuditLog auditLog, TeamMemberPort team,
                      PatientLookupPort patients, PatientAccessPort patientAccess, ActorDirectoryPort actors,
                      IpdGate gate, IpdCatalog catalog, ChargeRepository charges, IpdBilling billing,
                      DischargeRepository discharges, EmergencyService emergency, VitalsRepository vitals,
-                     SafetyService safety) {
-        this.safety = safety;
+                     AdmittedCards cards) {
+        this.cards = cards;
         this.vitals = vitals;
         this.emergency = emergency;
         this.discharges = discharges;
@@ -221,55 +225,86 @@ public class AdmissionService {
         return new Options(doctors, free, toRules(catalog.depositRules(tenantId)), handoff);
     }
 
+    /**
+     * The Admitted list (table and cards, SAH-36 ADR-013). Check order: IPD Off (403 module-off), then the role in the
+     * token and the role read again from the active membership, both one of the four list roles (403 forbidden: a
+     * deactivated member or a changed role applies on the next reload), then the status (400). One REPEATABLE READ
+     * transaction, one {@code asOf} (the database clock). A fixed number of set queries whatever the number of patients,
+     * no call per patient. Writes nothing: no record-access row, no audit row, no event (ADR-013 D10, D11).
+     * {@code clinical} is on a row, and {@code safety} is set, only when the token role and the membership role are both
+     * OWNER, DOCTOR or NURSE.
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AdmissionList list(UUID tenantId, UUID actor, String role, String status) {
         ModuleEntitlement ent = gate.check(tenantId, false);
+        SafetySupport.requireRole(role, AdmittedCardRules.LIST_ROLES, AdmittedCardRules.FORBIDDEN_MESSAGE);
+        String memberRole = SafetySupport.membershipRole(team, tenantId, actor, AdmittedCardRules.LIST_ROLES,
+                AdmittedCardRules.FORBIDDEN_MESSAGE);
         if (status != null && !"ADMITTED".equals(status)) {
             throw new InvalidInputException("status", "Only the Admitted list is available");
         }
+        Instant asOf = cards.asOf();
         List<BedRow> allBeds = beds.findAll(tenantId);
         int occupied = (int) allBeds.stream().filter(b -> "occ".equals(b.status())).count();
         int available = (int) allBeds.stream().filter(b -> "free".equals(b.status())).count();
         DepositRules rules = catalog.depositRules(tenantId);
+        ConfigRow config = catalog.config(tenantId);
+        boolean roomLevel = config.roomLevel();
         Lookups lookups = new Lookups();
         Instant now = gate.now();
-        List<AdmissionRow> admitted = admissions.findAdmitted(tenantId);
+        List<AdmittedRow> placed = admissions.findAdmittedWithPlacement(tenantId);
+        List<AdmissionRow> admitted = new ArrayList<>();
         Set<UUID> patientIds = new HashSet<>();
-        for (AdmissionRow row : admitted) {
-            patientIds.add(row.patientId());
+        for (AdmittedRow placedRow : placed) {
+            admitted.add(placedRow.admission());
+            patientIds.add(placedRow.admission().patientId());
         }
-        Map<UUID, PatientSummary> patientMap = patientIds.isEmpty() ? Map.of() : patients.findAll(tenantId, patientIds);
+        // ADR-013 D15: decided once, from the membership re-read above, before any patient read.
+        boolean clinicalAccess = AdmittedCardRules.clinical(role, memberRole);
+        Map<UUID, PatientClinical> patientMap = cards.patients(tenantId, patientIds, clinicalAccess);
         lookups.preloadDoctors(tenantId, admitted);
         // SAH-25: one query for the charges of all admitted patients; the deposit sums come with the rows.
-        Batch batch = billing.forAdmitted(tenantId, now, rules.alertPercent());
+        Batch batch = billing.forAdmitted(tenantId, now, rules.alertPercent(), catalog.categories(tenantId), config);
         // SAH-27: one query for the latest discharge sign-off of every admitted patient.
         Map<UUID, SignoffRow> signoffs = discharges.findLatestSignoffsOfAdmitted(tenantId);
         LocalDate today = DischargeRules.istDate(now);
-        List<Summary> items = new ArrayList<>();
+        // SAH-33, SAH-36: the Safety tab count, the banner and the clinical facts of the cards, for OWNER, DOCTOR and
+        // NURSE only, from the same snapshot and the same escalation rows; null / absent for every other role.
+        AdmittedCards.Clinical clinical = clinicalAccess
+                ? cards.clinical(tenantId, asOf, placed, patientMap) : AdmittedCards.Clinical.NONE;
+        List<AdmittedPatientRow> items = new ArrayList<>();
         int alerts = 0;
         int goingHome = 0;
-        for (AdmissionRow row : admitted) {
+        for (AdmittedRow placedRow : placed) {
+            AdmissionRow row = placedRow.admission();
             RunningBill bill = batch.bill(row, lookups.doctor(tenantId, row.doctorMembershipId()));
             boolean home = DischargeRules.goingHomeToday(signoffs.get(row.id()), today);
-            Summary summary = summary(tenantId, row, patientMap.get(row.patientId()), rules, lookups, bill, home);
+            PatientClinical patient = patientMap.get(row.patientId());
+            Summary summary = summary(tenantId, row, patient == null ? null : patient.name(),
+                    patient == null ? null : patient.age(), patient == null ? null : patient.sex(), rules, lookups,
+                    bill, home);
             if (summary.depositLow()) {
                 alerts++;
             }
             if (home) {
                 goingHome++;
             }
-            items.add(summary);
+            items.add(AdmittedPatientRow.of(summary, patient == null ? null : patient.uhid(), placedRow.wardId(),
+                    roomLevel ? placedRow.roomName() : null, clinical.flags().get(row.id())));
         }
         boolean canAdmit = ADMIT_ROLES.contains(role) && !"readonly".equals(ent.ipdState());
         Instant dayStart = today.atStartOfDay(RunningBill.IST).toInstant();
         int dischargedToday = discharges.countDischargedBetween(tenantId, dayStart,
                 today.plusDays(1).atStartOfDay(RunningBill.IST).toInstant());
         Counts emergencyCounts = emergency.counts(tenantId, ent);
-        // SAH-33: the Safety tab count and the banner, for OWNER, DOCTOR and NURSE only, from the same snapshot and
-        // with the patients already loaded above, so no patient or escalation is read twice.
-        Banner safetyBanner = safety.banner(tenantId, actor, role, patientMap);
+        // The select "Ward": every ward of the clinic in the order of the Beds setup, also wards with no patient.
+        List<WardOption> wardOptions = new ArrayList<>();
+        for (WardRow ward : wards.findWards(tenantId)) {
+            wardOptions.add(new WardOption(ward.id(), ward.name()));
+        }
         return new AdmissionList(allBeds.size(), occupied, available, canAdmit, alerts, rules.alertPercent(),
-                dischargedToday, goingHome, emergencyCounts, safetyBanner, items);
+                dischargedToday, goingHome, emergencyCounts, clinical.banner(), asOf, List.copyOf(wardOptions),
+                AdmittedCardRules.abilities(role, memberRole, ent.ipdState()), List.copyOf(items));
     }
 
     /**
@@ -505,6 +540,13 @@ public class AdmissionService {
 
     private Summary summary(UUID tenantId, AdmissionRow row, PatientSummary patient, DepositRules rules,
                             Lookups lookups, RunningBill bill, boolean goingHome) {
+        return summary(tenantId, row, patient == null ? null : patient.name(), patient == null ? null : patient.age(),
+                patient == null ? null : patient.sex(), rules, lookups, bill, goingHome);
+    }
+
+    /** The row of the table. A patient record that cannot be found is shown as "Patient" with no age and no sex. */
+    private Summary summary(UUID tenantId, AdmissionRow row, String patientName, Integer age, String sex,
+                            DepositRules rules, Lookups lookups, RunningBill bill, boolean goingHome) {
         long minimum = rules.minimum(row.admissionType(), row.categoryKey());
         String state;
         if (!"Self".equals(row.payer())) {
@@ -512,9 +554,8 @@ public class AdmissionService {
         } else {
             state = row.depositTotalPaise() >= minimum ? "OK" : "DUE";
         }
-        return new Summary(row.id(), row.ipNumber(), row.patientId(), patient == null ? "Patient" : patient.name(),
-                patient == null ? null : patient.age(), patient == null ? null : patient.sex(),
-                lookups.doctor(tenantId, row.doctorMembershipId()), row.bedCode(),
+        return new Summary(row.id(), row.ipNumber(), row.patientId(), patientName == null ? "Patient" : patientName,
+                age, sex, lookups.doctor(tenantId, row.doctorMembershipId()), row.bedCode(),
                 IpdService.NAMES.get(row.categoryKey()), row.wardName(), row.admissionType(), row.payer(),
                 bill.billDays(), row.depositTotalPaise(), minimum, state, row.admittedAt(),
                 bill.totalPaise(), bill.depositLow(row.payer()), goingHome);

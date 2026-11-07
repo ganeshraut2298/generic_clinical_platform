@@ -48,13 +48,15 @@ public class TeamService {
     private final StaffPinRepository staffPinRepository;
     private final StaffPinOps staffPinOps;
     private final StaffPinLimits staffPinLimits;
+    private final StaffPinColleagueEventRepository colleagueEvents;
     private final Clock clock;
 
     public TeamService(TeamRepository teamRepository, AppUserRepository appUserRepository,
                         DoctorProfileRepository doctorProfileRepository,
                         RefreshTokenRepository refreshTokenRepository, AuditLog auditLog,
                         StaffPinRepository staffPinRepository, StaffPinOps staffPinOps,
-                        StaffPinLimits staffPinLimits, Clock clock) {
+                        StaffPinLimits staffPinLimits, StaffPinColleagueEventRepository colleagueEvents,
+                        Clock clock) {
         this.teamRepository = teamRepository;
         this.appUserRepository = appUserRepository;
         this.doctorProfileRepository = doctorProfileRepository;
@@ -63,13 +65,16 @@ public class TeamService {
         this.staffPinRepository = staffPinRepository;
         this.staffPinOps = staffPinOps;
         this.staffPinLimits = staffPinLimits;
+        this.colleagueEvents = colleagueEvents;
         this.clock = clock;
     }
 
     /**
      * AC3, AC6: anyone signed in to the clinic may read the team; the mobile is masked. SAH-31 (ADR-010 D12): the PIN
      * state is filled on every row for an active owner (membership read again, not the token) and on the caller's own
-     * row for everyone else; other people's PIN state, especially a lock, is not shown to non-owners.
+     * row for everyone else; other people's PIN state, especially a lock, is not shown to non-owners. SAH-38 (ADR-014
+     * D9): {@code pin.colleagueTries7d}, the wrong tries of the member's PIN by colleagues in the last 7 days, is filled
+     * for an owner only (one grouped query for the page); null for every other role, the caller's own row included.
      */
     @Transactional(readOnly = true)
     public List<TeamMemberView> list(UUID tenantId, UUID viewerUserId) {
@@ -78,9 +83,12 @@ public class TeamService {
                 && row.role() == MembershipRole.OWNER && row.status() == MembershipStatus.ACTIVE);
         Map<UUID, StaffPinRow> pins = new HashMap<>();
         staffPinRepository.findAll(tenantId).forEach(pin -> pins.put(pin.membershipId(), pin));
+        Map<UUID, Integer> colleagueTries = viewerIsOwner ? colleagueEvents.wrongTriesLast7Days(tenantId) : Map.of();
         return rows.stream()
                 .map(row -> toView(row, viewerIsOwner || row.userId().equals(viewerUserId)
-                        ? pinViewOf(pins.get(row.id())) : null))
+                        ? pinViewOf(pins.get(row.id()),
+                                viewerIsOwner ? colleagueTries.getOrDefault(row.id(), 0) : null)
+                        : null))
                 .toList();
     }
 
@@ -105,7 +113,7 @@ public class TeamService {
         }
         staffPinOps.clear(tenantId, actorUserId, membershipId);
         StaffPinRow pin = staffPinRepository.find(tenantId, membershipId, false).orElse(null);
-        return toView(row, pinViewOf(pin));
+        return toView(row, pinViewOf(pin, colleagueEvents.wrongTriesLast7Days(tenantId, membershipId)));
     }
 
     /** AC1, AC4, AC7, AC8, AC12. */
@@ -293,12 +301,13 @@ public class TeamService {
     }
 
     /** No row = never set. SET and LOCKED carry the set time; only LOCKED carries the end of the lock. */
-    private static TeamMemberView.PinView pinViewOf(StaffPinRow pin) {
+    private static TeamMemberView.PinView pinViewOf(StaffPinRow pin, Integer colleagueTries7d) {
         if (pin == null || !pin.hasPin()) {
-            return new TeamMemberView.PinView(PinState.NOT_SET, null, null);
+            return new TeamMemberView.PinView(PinState.NOT_SET, null, null, colleagueTries7d);
         }
         PinState state = pin.state();
-        return new TeamMemberView.PinView(state, pin.setAt(), state == PinState.LOCKED ? pin.lockedUntil() : null);
+        return new TeamMemberView.PinView(state, pin.setAt(), state == PinState.LOCKED ? pin.lockedUntil() : null,
+                colleagueTries7d);
     }
 
     private static TeamMemberView toView(TeamRow row) {

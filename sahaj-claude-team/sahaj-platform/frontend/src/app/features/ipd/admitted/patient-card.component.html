@@ -1,0 +1,79 @@
+<article class="pc" [class.pc-crit]="critical()" [attr.aria-label]="label()" data-testid="patient-card" [attr.data-id]="row().id">
+  <div class="pch">
+    <span class="pav" [class.f]="female()" aria-hidden="true">{{ initials() }}</span>
+    <div class="pchm">
+      <button
+        type="button"
+        class="pcn"
+        [title]="nameTooltip"
+        data-testid="card-name"
+        (click)="openName.emit()"
+      >
+        <span class="cut">{{ row().patientName }}</span>
+      </button>
+      <small data-testid="card-identity">{{ identity() }}</small>
+    </div>
+    <span class="pcbed" data-testid="card-bed">
+      <small>Bed</small>
+      <b>{{ row().bedCode }}</b>
+    </span>
+  </div>
+
+  <div class="pcsec pcstat" data-testid="card-flags">
+    @for (f of flags().shown; track f.kind) {
+      <span [class]="'pcf ' + f.tone" [attr.data-flag]="f.kind" [title]="f.title">
+        <app-icon [name]="f.icon" [size]="11" />
+        <span class="pcft">{{ f.text }}</span>
+      </span>
+    }
+    @if (flags().folded.length > 0) {
+      <span class="pcf grey pcmorec" data-flag="more" [title]="foldedLabel()">
+        <span aria-hidden="true">+{{ flags().folded.length }}</span>
+        <span class="sr-only">{{ foldedLabel() }}</span>
+      </span>
+    }
+  </div>
+
+  <dl class="pckv">
+    <div>
+      <dt>Admitted on</dt>
+      <dd [title]="admittedOn()" data-testid="card-admitted-on">{{ admittedOn() }}</dd>
+    </div>
+    <div>
+      <dt>Length of stay</dt>
+      <dd [title]="stay()" data-testid="card-stay">{{ stay() }}</dd>
+    </div>
+    <div>
+      <dt>Ward</dt>
+      <dd [title]="row().wardName" data-testid="card-ward">{{ row().wardName }}</dd>
+    </div>
+    <div>
+      <dt>Room</dt>
+      <dd [title]="room()" data-testid="card-room">{{ room() }}</dd>
+    </div>
+  </dl>
+  <dl class="pckv">
+    <div>
+      <dt>Doctor</dt>
+      <dd [title]="row().doctorName" data-testid="card-doctor">{{ row().doctorName }}</dd>
+    </div>
+  </dl>
+
+  @if (actions().length > 0) {
+    <div class="pcacts" data-testid="card-actions">
+      @for (a of actions(); track a.key) {
+        <button
+          type="button"
+          class="pctb"
+          [class.pri]="a.key === 'nursing'"
+          [attr.aria-label]="actionName(a)"
+          [attr.data-act]="a.key"
+          (click)="act.emit(a.key)"
+        >
+          <app-icon [name]="a.icon" [size]="17" />
+          <span>{{ a.label }}</span>
+        </button>
+      }
+    </div>
+  }
+</article>

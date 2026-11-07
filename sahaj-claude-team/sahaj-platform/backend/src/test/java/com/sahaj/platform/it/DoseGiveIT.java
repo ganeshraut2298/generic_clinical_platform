@@ -101,7 +101,7 @@ class DoseGiveIT extends MarSupport {
         assertThat(row.recordedAtIsDbClock()).isTrue();
 
         List<String> events = eventLines(w.clinic(), w.adm().id());
-        assertThat(events).contains("give|Gave Tab. Paracetamol 650 mg (8 AM dose) · wristband scanned");
+        assertThat(events).contains("give|Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID");
         assertThat(giveEvents(w.clinic(), w.adm().id())).isOne();
         List<String[]> audits = audit(w.clinic(), "IPD_DOSE_GIVEN");
         assertThat(audits).hasSize(1);
@@ -148,9 +148,9 @@ class DoseGiveIT extends MarSupport {
         offset.put("slotAt", day + "T22:00:00+05:30");
         doseOk(w.nurse().auth(), q8, offset);
         List<String> events = eventLines(w.clinic(), w.adm().id());
-        assertThat(events).contains("give|Gave Inj. Ceftriaxone 1 g (6 AM dose) · wristband scanned",
+        assertThat(events).contains("give|Gave Inj. Ceftriaxone 1 g (6 AM dose) · identity checked against UHID",
                 "give|Did not give Inj. Ceftriaxone 1 g (2 PM dose) · Patient away from the ward",
-                "give|Gave Inj. Ceftriaxone 1 g (10 PM dose) · wristband scanned");
+                "give|Gave Inj. Ceftriaxone 1 g (10 PM dose) · identity checked against UHID");
         assertThat(doseDb(w.clinic(), q8, ist(22, 0)).outcome()).isEqualTo("GIVEN");
     }
 
@@ -470,7 +470,7 @@ class DoseGiveIT extends MarSupport {
         assertThat(now.pins()).isEqualTo(before.pins());
         assertThat(now.events()).as("the deny entry is committed although the answer is 409").isEqualTo(before.events() + 1);
         assertThat(now.audits()).isEqualTo(before.audits() + 1);
-        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the wristband check: scanned " + other
+        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the identity check: entered " + other
                 + ", expected " + w.uhid() + " (Tab. Paracetamol 650 mg)");
         assertThat(denyEvents(w.clinic(), w.adm().id())).isOne();
         List<String[]> audits = audit(w.clinic(), "IPD_DOSE_WRISTBAND_MISMATCH");
@@ -516,7 +516,7 @@ class DoseGiveIT extends MarSupport {
         assertThat(deny).isEqualTo(typed.length);
         for (String l : events) {
             if (l.startsWith("deny|")) {
-                assertThat(l).isEqualTo("deny|Stopped at the wristband check: scanned text that is not a UHID, expected " + w.uhid()
+                assertThat(l).isEqualTo("deny|Stopped at the identity check: entered text that is not a UHID, expected " + w.uhid()
                         + " (Tab. Paracetamol 650 mg)");
             }
         }
@@ -532,7 +532,7 @@ class DoseGiveIT extends MarSupport {
         String padded201 = w.uhid() + " ".repeat(201 - w.uhid().length());
         assertThat(padded201.length()).isEqualTo(201);
         refused(doseCall(w.nurse().auth(), f.order(), given(ist(8, 0), padded201)), 409, "wristband-mismatch", MISMATCH_TEXT);
-        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the wristband check: scanned text that is not a "
+        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the identity check: entered text that is not a "
                 + "UHID, expected " + w.uhid() + " (Tab. Paracetamol 650 mg)");
         String padded200 = w.uhid() + " ".repeat(200 - w.uhid().length());
         doseOk(w.nurse().auth(), f.order(), given(ist(8, 0), padded200));
@@ -544,13 +544,13 @@ class DoseGiveIT extends MarSupport {
         Fix f = fix("pcm", "od");
         Ward w = f.w();
         String expected = ", expected " + w.uhid() + " (Tab. Paracetamol 650 mg)";
-        String words = "deny|Stopped at the wristband check: scanned text that is not a UHID" + expected;
+        String words = "deny|Stopped at the identity check: entered text that is not a UHID" + expected;
         // the shape is ^[A-Z]{2,6}-[0-9]{5,9}$ (8 to 16 characters): the normal UHID shape stays shown, as typed in capitals
         refused(doseCall(w.nurse().auth(), f.order(), given(ist(8, 0), "pt-12345")), 409, "wristband-mismatch", MISMATCH_TEXT);
-        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the wristband check: scanned PT-12345" + expected);
+        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the identity check: entered PT-12345" + expected);
         // the longest shape that is still shown: six letters and nine digits (16 characters)
         refused(doseCall(w.nurse().auth(), f.order(), given(ist(8, 0), "abcdef-123456789")), 409, "wristband-mismatch", null);
-        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the wristband check: scanned ABCDEF-123456789"
+        assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the identity check: entered ABCDEF-123456789"
                 + expected);
         long shown = eventLines(w.clinic(), w.adm().id()).stream().filter(l -> l.startsWith("deny|")).count();
         assertThat(shown).isEqualTo(2);
@@ -572,9 +572,9 @@ class DoseGiveIT extends MarSupport {
         refused(doseCall(w.nurse().auth(), f.order(), given(ist(8, 0), "ABCDEFG-12345")), 409, "wristband-mismatch", null);
         refused(doseCall(w.nurse().auth(), f.order(), given(ist(8, 0), "AB-1234")), 409, "wristband-mismatch", null);
         List<String> now = eventLines(w.clinic(), w.adm().id()).stream().filter(l -> l.startsWith("deny|")).toList();
-        assertThat(now.stream().filter(l -> l.contains("scanned A-12345")).count()).as("one letter is not the shape").isZero();
-        assertThat(now.stream().filter(l -> l.contains("scanned ABCDEFG-")).count()).as("seven letters").isZero();
-        assertThat(now.stream().filter(l -> l.contains("scanned AB-1234,")).count()).as("four digits").isZero();
+        assertThat(now.stream().filter(l -> l.contains("entered A-12345")).count()).as("one letter is not the shape").isZero();
+        assertThat(now.stream().filter(l -> l.contains("entered ABCDEFG-")).count()).as("seven letters").isZero();
+        assertThat(now.stream().filter(l -> l.contains("entered AB-1234,")).count()).as("four digits").isZero();
         assertThat(now.stream().filter(l -> l.equals(words)).count()).isEqualTo(hidden.length + 3);
         assertThat(doseRowsOfOrder(w.clinic(), f.order())).as("a mismatch never writes a dose").isZero();
     }

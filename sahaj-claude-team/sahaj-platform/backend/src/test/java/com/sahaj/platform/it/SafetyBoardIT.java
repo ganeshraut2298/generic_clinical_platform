@@ -279,7 +279,7 @@ class SafetyBoardIT extends SafetyTestSupport {
         JsonNode summary = summaryOf(w.nurse().auth());
         List<String> fields = new ArrayList<>();
         summary.fieldNames().forEachRemaining(fields::add);
-        assertThat(fields).containsExactlyInAnyOrder("open", "pastTarget", "changeToken", "asOf");
+        assertThat(fields).containsExactlyInAnyOrder("open", "pastTarget", "dosesDue", "dosesLate", "changeToken", "asOf");   // SAH-35: numbers only; the two dose figures carry no name, medicine or bed
         assertThat(summary.get("changeToken").asText()).as("an opaque token of 22 base64url characters (ADR-007 R1)")
                 .matches("[A-Za-z0-9_-]{22}");
         assertThat(summary.get("open").asInt()).isOne();

@@ -41,6 +41,7 @@
             [self]="isSelf(doctor)"
             (resetPin)="resetPin(doctor)"
             (ownPin)="setOwnPin(doctor)"
+            (showTries)="showTries(doctor)"
           />
           <mat-form-field
             appearance="outline"
@@ -175,6 +176,7 @@
               [self]="isSelf(member)"
               (resetPin)="resetPin(member)"
               (ownPin)="setOwnPin(member)"
+              (showTries)="showTries(member)"
             />
             @if (isOwner()) {
               @if (confirmRemoveId() === member.id) {

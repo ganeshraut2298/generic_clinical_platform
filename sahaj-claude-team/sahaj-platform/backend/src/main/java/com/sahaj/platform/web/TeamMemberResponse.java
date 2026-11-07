@@ -11,14 +11,18 @@ public record TeamMemberResponse(UUID id, String name, String mobileMasked, Stri
                                   @JsonInclude(JsonInclude.Include.ALWAYS) Instant lastLoginAt,
                                   DoctorDetails doctor, Pin pin) {
 
-    /** {@code TeamMemberPin} (SAH-31): state always, {@code setAt} and {@code lockedUntil} always present, null when not applicable. */
+    /**
+     * {@code TeamMemberPin} (SAH-31): state always, {@code setAt} and {@code lockedUntil} always present, null when not
+     * applicable. SAH-38: {@code colleagueTries7d} always present, a number for an owner viewer and null otherwise.
+     */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Pin(String state, Instant setAt, Instant lockedUntil) {
+    public record Pin(String state, Instant setAt, Instant lockedUntil, Integer colleagueTries7d) {
     }
 
     public static TeamMemberResponse from(TeamMemberView view) {
         Pin pin = view.pin() == null ? null
-                : new Pin(view.pin().state().name(), view.pin().setAt(), view.pin().lockedUntil());
+                : new Pin(view.pin().state().name(), view.pin().setAt(), view.pin().lockedUntil(),
+                        view.pin().colleagueTries7d());
         return new TeamMemberResponse(view.id(), view.name(), view.mobileMasked(), view.role().name(),
                 view.status().name(), view.lastLoginAt(), DoctorDetails.from(view.doctor()), pin);
     }

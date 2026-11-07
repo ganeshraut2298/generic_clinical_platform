@@ -68,4 +68,11 @@ describe('TeamApi', () => {
     expect(req.request.body).toEqual(matrix);
     req.flush(matrix);
   });
+
+  it('reads the colleague tries of one member (SAH-38, owner only)', () => {
+    api.colleagueTries('m-nurse').subscribe();
+    const req = http.expectOne('/api/v1/platform/team/m-nurse/pin/colleague-tries');
+    expect(req.request.method).toBe('GET');
+    req.flush({});
+  });
 });

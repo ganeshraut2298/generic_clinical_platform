@@ -121,18 +121,50 @@ final class DoseRules {
         return input == null ? null : NotGivenReason.ofKey(input.reasonKey()).orElse(null);
     }
 
-    // ---- clinical event templates (ADR-011 D9) ----
+    // ---- clinical event templates (ADR-011 D9; wording changed forward only by ADR-014 D11: the record must not claim a
+    // scan that may not have happened; events written before keep "wristband scanned") ----
+
+    /** {@code ck_clinical_event_text}: an event text is 1 to 300 characters. */
+    static final int MAX_EVENT_TEXT = 300;
+    private static final String ELLIPSIS = "…";
+    private static final String SECOND_CHECK = " · second check by ";
 
     static String gaveText(Drug drug, Instant slotAt, String secondNurseName) {
-        String text = "Gave " + drug.name() + " (" + DoseSlots.clock(slotAt) + " dose) · wristband scanned";
-        return secondNurseName == null ? text : text + " · second check by " + secondNurseName;
+        String text = "Gave " + drug.name() + " (" + DoseSlots.clock(slotAt) + " dose) · identity checked against UHID";
+        if (secondNurseName == null) {
+            return fit(text);
+        }
+        // The name is the only part of unbounded length (a member name may be 200 characters): shorten it, with an
+        // ellipsis, so the whole text always fits the database limit; the rest of the wording is never cut.
+        int room = MAX_EVENT_TEXT - text.length() - SECOND_CHECK.length();
+        return fit(text + SECOND_CHECK + shorten(secondNurseName, room));
     }
 
     static String notGivenText(Drug drug, Instant slotAt, NotGivenReason reason) {
-        return "Did not give " + drug.name() + " (" + DoseSlots.clock(slotAt) + " dose) · " + reason.label();
+        return fit("Did not give " + drug.name() + " (" + DoseSlots.clock(slotAt) + " dose) · " + reason.label());
     }
 
     static String deniedText(String scan, String uhid, Drug drug) {
-        return "Stopped at the wristband check: scanned " + scan + ", expected " + uhid + " (" + drug.name() + ")";
+        return fit("Stopped at the identity check: entered " + scan + ", expected " + uhid + " (" + drug.name() + ")");
+    }
+
+    /** {@code value} cut to at most {@code room} characters, the last being an ellipsis when something was cut. */
+    private static String shorten(String value, int room) {
+        if (value.length() <= room) {
+            return value;
+        }
+        if (room <= ELLIPSIS.length()) {
+            return room <= 0 ? "" : ELLIPSIS;
+        }
+        int end = room - ELLIPSIS.length();
+        if (Character.isHighSurrogate(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(0, end).stripTrailing() + ELLIPSIS;
+    }
+
+    /** The last guard: whatever the parts, the text never goes over the database limit. */
+    private static String fit(String text) {
+        return shorten(text, MAX_EVENT_TEXT);
     }
 }

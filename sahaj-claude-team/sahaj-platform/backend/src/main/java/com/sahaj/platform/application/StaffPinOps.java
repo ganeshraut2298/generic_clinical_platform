@@ -20,8 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The short platform transactions of the staff PIN (SAH-31, ADR-010 D5 to D10). {@link StaffPinService} decides the
- * order of the steps and calls these methods from outside any transaction, so the one-time code check and the
+ * The short platform transactions of the staff PIN (SAH-31, ADR-010 D5 to D10; SAH-38, ADR-014). {@link StaffPinService}
+ * decides the order of the steps and calls these methods from outside any transaction, so the one-time code check and the
  * rate limits never sit inside a write transaction, and a wrong try is committed before the caller's own request
  * fails. Each method here is one READ COMMITTED transaction with the clinic bound.
  *
@@ -39,18 +39,25 @@ public class StaffPinOps {
     static final String LOCKED = "PLATFORM_PIN_LOCKED";
     static final String CLEARED_AFTER_LOCKS = "PLATFORM_PIN_CLEARED_AFTER_LOCKS";
     static final String COLLEAGUE_CHECK_FAILED = "PLATFORM_PIN_COLLEAGUE_CHECK_FAILED";
+    static final String COLLEAGUE_RIGHT_AFTER_WRONG = "PLATFORM_PIN_COLLEAGUE_RIGHT_AFTER_WRONG";
+    static final String CAUSED_BY_SELF = "SELF";
+    static final String CAUSED_BY_COLLEAGUES = "COLLEAGUES";
+    /** ADR-014 D3 (OQ-38-1, DEC-023): wrong tries of one caller on one colleague's PIN allowed in a rolling 7 days. */
+    static final int PAIR_WRONG_TRIES_CAP = 5;
 
     private static final Logger log = LoggerFactory.getLogger(StaffPinOps.class);
 
     private final TeamRepository teamRepository;
     private final StaffPinRepository staffPinRepository;
+    private final StaffPinColleagueEventRepository colleagueEvents;
     private final StaffPinHasher hasher;
     private final AuditLog auditLog;
 
-    public StaffPinOps(TeamRepository teamRepository, StaffPinRepository staffPinRepository, StaffPinHasher hasher,
-                       AuditLog auditLog) {
+    public StaffPinOps(TeamRepository teamRepository, StaffPinRepository staffPinRepository,
+                       StaffPinColleagueEventRepository colleagueEvents, StaffPinHasher hasher, AuditLog auditLog) {
         this.teamRepository = teamRepository;
         this.staffPinRepository = staffPinRepository;
+        this.colleagueEvents = colleagueEvents;
         this.hasher = hasher;
         this.auditLog = auditLog;
     }
@@ -102,16 +109,15 @@ public class StaffPinOps {
         }
         UUID membershipId = member.id();
         StaffPinRow row = staffPinRepository.find(tenantId, membershipId, true).orElse(null);
-        return done(tenantId, membershipId, decide(tenantId, userId, membershipId, row, pin, null).check());
-    }
-
-    /** An ACTIVE member who may be named as a second checker: membership id and user id (never name or mobile). */
-    public record Colleague(UUID membershipId, UUID userId) {
+        PinCheck blocked = blocked(row);
+        PinCheck result = blocked != null ? blocked
+                : compare(tenantId, userId, membershipId, row, pin, null, 0).check();
+        return done(tenantId, membershipId, result);
     }
 
     /**
      * What one colleague check decided. {@code wrongTry} is true exactly when the PIN was compared and was wrong,
-     * including the wrong try that locked the PIN or switched it off: those are the tries the limits count.
+     * including the wrong try that locked the PIN: those are the tries the caller's in-memory limit counts.
      * {@code colleagueUserId} is set only for OK. Numbers, states and ids only.
      */
     public record ColleagueResult(PinCheck check, UUID colleagueUserId, boolean wrongTry) {
@@ -124,23 +130,15 @@ public class StaffPinOps {
     }
 
     /**
-     * Who may be named (ADR-011 D7): the caller has an ACTIVE membership in the clinic, and the colleague is an ACTIVE
-     * member of the same clinic (another clinic's id is simply absent) with the required role, who is not the caller.
-     * Reads only; used to find the colleague's user id for the colleague's own failed-check limit before any hash.
-     */
-    @Transactional(readOnly = true)
-    public Optional<Colleague> findEligibleColleague(UUID tenantId, UUID callerUserId, UUID colleagueMembershipId,
-                                                     MembershipRole requiredRole) {
-        return resolveColleague(tenantId, callerUserId, colleagueMembershipId, requiredRole)
-                .map(pair -> new Colleague(pair.colleague().id(), pair.colleague().userId()));
-    }
-
-    /**
-     * The check of ADR-011 D7: the eligibility again under the same transaction, then the row lock, the clock
-     * decision and the comparison of ADR-010 D5 on the COLLEAGUE's own row. A wrong try is audited as
-     * {@code PLATFORM_PIN_COLLEAGUE_CHECK_FAILED} (ids and the tries left only); a lock or a switch-off also carries
-     * {@code checkedByMembershipId}. Runs in its own transaction (the caller guarantees none is active). The
-     * {@code updated_by} of the changed row is the caller: the person who typed the try.
+     * The colleague check of ADR-014 D3 on the COLLEAGUE's own row, in one transaction: the waiting time is limited
+     * (lock 3 s, statement 5 s, D5), the eligibility is checked (the caller has an ACTIVE membership; the colleague is an
+     * ACTIVE member of the same clinic with the required role and is not the caller; another clinic's id looks like an
+     * unknown id), the colleague's row is locked, then: no PIN, locked, the pair cap (5 wrong tries of this pair in the
+     * pair's window; the PIN is not compared and nothing is counted), then the comparison. A wrong try is audited as
+     * {@code PLATFORM_PIN_COLLEAGUE_CHECK_FAILED} (ids and the tries left only) and written as a {@code WRONG} event; a
+     * lock caused by it also as {@code LOCKED}; a right PIN of a pair that had wrong tries clears the pair. The
+     * {@code updated_by} of the changed row is the caller: the person who typed the try. A database failure or timeout
+     * propagates (everything rolled back); {@link StaffPinService} turns it into CHECK_FAILED.
      */
     @Transactional
     public ColleagueResult checkColleague(UUID tenantId, UUID callerUserId, UUID colleagueMembershipId,
@@ -148,6 +146,7 @@ public class StaffPinOps {
         if (!hasher.isAvailable()) {
             return new ColleagueResult(new PinCheck(PinCheck.Outcome.UNAVAILABLE, 0, null, 0), null, false);
         }
+        staffPinRepository.limitWaitingTime();
         Pair pair = resolveColleague(tenantId, callerUserId, colleagueMembershipId, requiredRole).orElse(null);
         if (pair == null) {
             log.info("staff-pin-colleague-check tenantId={} outcome=NOT_ELIGIBLE", tenantId);
@@ -156,7 +155,17 @@ public class StaffPinOps {
         UUID colleagueId = pair.colleague().id();
         UUID callerMembershipId = pair.caller().id();
         StaffPinRow row = staffPinRepository.find(tenantId, colleagueId, true).orElse(null);
-        Decision decision = decide(tenantId, callerUserId, colleagueId, row, pin, callerMembershipId);
+        Decision decision;
+        PinCheck blocked = blocked(row);
+        if (blocked != null) {
+            decision = new Decision(blocked, false);
+        } else {
+            int pairWrongTries = colleagueEvents.countPairWrongTries(tenantId, colleagueId, callerMembershipId,
+                    row.setAt());
+            decision = pairWrongTries >= PAIR_WRONG_TRIES_CAP
+                    ? new Decision(new PinCheck(PinCheck.Outcome.PAIR_LIMIT, 0, null, 0), false)
+                    : compare(tenantId, callerUserId, colleagueId, row, pin, callerMembershipId, pairWrongTries);
+        }
         PinCheck result = decision.check();
         if (decision.wrongTry()) {
             Map<String, Object> failed = new LinkedHashMap<>();
@@ -195,48 +204,87 @@ public class StaffPinOps {
     private record Decision(PinCheck check, boolean wrongTry) {
     }
 
-    /**
-     * The shared rules of ADR-010 D5 for the own check and the colleague check. {@code checkedBy} is the caller's
-     * membership id for a colleague check (added to the lock audits), null for the own check.
-     */
-    private Decision decide(UUID tenantId, UUID actorUserId, UUID membershipId, StaffPinRow row, String pin,
-                            UUID checkedBy) {
+    /** No PIN or locked: answered before anything is compared or counted (ADR-010 D5, ADR-014 D3 step 5). */
+    private static PinCheck blocked(StaffPinRow row) {
         if (row == null || !row.hasPin()) {
-            return new Decision(notSet(row), false);
+            return notSet(row);
         }
         if (row.isLocked()) {
-            return new Decision(locked(row), false);
+            return locked(row);
         }
+        return null;
+    }
+
+    /**
+     * The comparison and the counting for the own check and the colleague check, on a row that has a PIN and is not
+     * locked. {@code checkedBy} is the caller's membership id for a colleague check (added to the lock audits), null for
+     * the own check. {@code pairWrongTries} is the pair's count of wrong tries inside its window (colleague check only).
+     */
+    private Decision compare(UUID tenantId, UUID actorUserId, UUID membershipId, StaffPinRow row, String pin,
+                             UUID checkedBy, int pairWrongTries) {
+        boolean byColleague = checkedBy != null;
         if (hasher.matches(tenantId, membershipId, pin, row.pinHash())) {
             if (row.failedCount() > 0) {
                 staffPinRepository.recordRightPin(tenantId, membershipId, actorUserId);
             }
+            if (byColleague && pairWrongTries > 0) {
+                colleagueEvents.insertRightAfterWrong(membershipId, checkedBy, actorUserId);
+                Map<String, Object> cleared = new LinkedHashMap<>();
+                cleared.put("membershipId", membershipId.toString());
+                cleared.put("checkedByMembershipId", checkedBy.toString());
+                cleared.put("wrongTries", pairWrongTries);
+                auditLog.record(COLLEAGUE_RIGHT_AFTER_WRONG, ENTITY_TYPE, membershipId, null, cleared);
+            }
             return new Decision(new PinCheck(PinCheck.Outcome.OK, StaffPinRow.MAX_TRIES, null, 0), false);
         }
+        if (byColleague) {
+            colleagueEvents.insertWrong(membershipId, checkedBy, actorUserId);
+        }
         if (row.failedCount() < StaffPinRow.MAX_TRIES - 1) {
-            staffPinRepository.recordWrongTry(tenantId, membershipId, actorUserId);
+            if (byColleague) {
+                staffPinRepository.recordColleagueWrongTry(tenantId, membershipId, actorUserId);
+            } else {
+                staffPinRepository.recordWrongTry(tenantId, membershipId, actorUserId);
+            }
             return new Decision(new PinCheck(PinCheck.Outcome.WRONG,
                     StaffPinRow.MAX_TRIES - (row.failedCount() + 1), null, 0), true);
         }
         return new Decision(fifthWrongTry(tenantId, actorUserId, membershipId, row, checkedBy), true);
     }
 
+    /**
+     * The fifth wrong try of a run (ADR-014 D6). A run with any colleague try (this try is a colleague check, or the run
+     * flag is set: mixed runs too) locks for 15 minutes, leaves the lock count and the window alone, writes a
+     * {@code LOCKED} event and never switches the PIN off. A run typed only in the person's own session is the SAH-31
+     * lock, and the third such lock in 24 hours switches the PIN off.
+     */
     private PinCheck fifthWrongTry(UUID tenantId, UUID userId, UUID membershipId, StaffPinRow row, UUID checkedBy) {
+        if (checkedBy != null || row.runHasColleagueTry()) {
+            staffPinRepository.lockByColleagues(tenantId, membershipId, userId);
+            colleagueEvents.insertLocked(membershipId, userId);
+            return lockedAudit(tenantId, membershipId, checkedBy, CAUSED_BY_COLLEAGUES);
+        }
         boolean newWindow = row.lockWindowIsNew();
         if (!newWindow && row.lockCount() >= 2) {
             staffPinRepository.switchOffAfterLocks(tenantId, membershipId, userId);
+            Map<String, Object> off = snapshot(membershipId, PinState.NOT_SET, "TOO_MANY_LOCKS", null, null);
+            off.put("causedBy", CAUSED_BY_SELF);
             auditLog.record(CLEARED_AFTER_LOCKS, ENTITY_TYPE, membershipId,
-                    snapshot(membershipId, PinState.LOCKED, null, null, checkedBy),
-                    snapshot(membershipId, PinState.NOT_SET, "TOO_MANY_LOCKS", null, checkedBy));
+                    snapshot(membershipId, PinState.LOCKED, null, null, null), off);
             return new PinCheck(PinCheck.Outcome.NOT_SET, 0, null, 0, PinCheck.NotSetReason.TOO_MANY_LOCKS);
         }
         int newLockCount = newWindow ? 1 : row.lockCount() + 1;
         staffPinRepository.lock(tenantId, membershipId, newLockCount, userId);
+        return lockedAudit(tenantId, membershipId, null, CAUSED_BY_SELF);
+    }
+
+    private PinCheck lockedAudit(UUID tenantId, UUID membershipId, UUID checkedBy, String causedBy) {
         StaffPinRow locked = staffPinRepository.find(tenantId, membershipId, false)
                 .orElseThrow(() -> new IllegalStateException("The staff PIN row disappeared during a lock"));
         Map<String, Object> after = snapshot(membershipId, PinState.LOCKED, null, locked.lockCount(), checkedBy);
         after.put("lockedUntil", locked.lockedUntil() == null ? null
                 : locked.lockedUntil().truncatedTo(ChronoUnit.SECONDS).toString());
+        after.put("causedBy", causedBy);
         auditLog.record(LOCKED, ENTITY_TYPE, membershipId, snapshot(membershipId, PinState.SET, null, null, checkedBy),
                 after);
         return locked(locked);
@@ -302,7 +350,6 @@ public class StaffPinOps {
         log.info("staff-pin-check tenantId={} membershipId={} outcome={}", tenantId, membershipId, result.outcome());
         return result;
     }
-
 
     private static Map<String, Object> snapshot(UUID membershipId, PinState state, String reason, Integer lockCount) {
         return snapshot(membershipId, state, reason, lockCount, null);

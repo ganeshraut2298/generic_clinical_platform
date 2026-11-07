@@ -21,9 +21,12 @@ import com.sahaj.ipd.application.SafetyViews.Event;
 import com.sahaj.ipd.application.SafetyViews.EventPage;
 import com.sahaj.ipd.application.SafetyViews.Response;
 import com.sahaj.ipd.application.SafetyViews.ResponseInput;
+import com.sahaj.ipd.application.SafetyViews.RoundPanel;
+import com.sahaj.ipd.application.SafetyViews.RoundRow;
 import com.sahaj.ipd.application.SafetyViews.Row;
 import com.sahaj.ipd.application.SafetyViews.SeniorCallInput;
 import com.sahaj.ipd.application.SafetyViews.VersionInput;
+import com.sahaj.ipd.domain.DoseSlots.State;
 import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState.Status;
 import com.sahaj.platform.api.ConflictException;
@@ -58,6 +61,8 @@ class SafetyControllerTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ESCALATION_ID = UUID.randomUUID();
     private static final UUID ADMISSION_ID = UUID.randomUUID();
+    private static final UUID ORDER_ID = UUID.randomUUID();
+    private static final RoundPanel EMPTY_ROUND = new RoundPanel(true, null, false, List.of());
     private static final String JSON = MediaType.APPLICATION_JSON_VALUE;
     private static final Instant NOW = Instant.parse("2026-11-11T06:00:00Z");
     private static final String[] READ_ROLES = {"OWNER", "DOCTOR", "NURSE"};
@@ -94,8 +99,13 @@ class SafetyControllerTest {
 
     @Test
     void theBoardHasTheContractShape() throws Exception {
-        Board board = new Board("on", "DOCTOR", NOW, new Counts(1, 1, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null,
-                List.of(new ActionOption("BEDSIDE_REVIEW", "Reviewed at the bedside")), List.of(row(Status.OPEN)));
+        Board board = new Board("on", "DOCTOR", NOW, new Counts(1, 1, 2, 1, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null,
+                List.of(new ActionOption("BEDSIDE_REVIEW", "Reviewed at the bedside")), List.of(row(Status.OPEN)),
+                new RoundPanel(true, null, false, List.of(new RoundRow(ADMISSION_ID, ORDER_ID,
+                        Instant.parse("2026-11-11T02:30:00Z"), State.LATE, 3, "Tab. Paracetamol 650 mg", null,
+                        "Test Patient", "202"), new RoundRow(ADMISSION_ID, ORDER_ID,
+                        Instant.parse("2026-11-11T08:30:00Z"), State.DUE, null, "Inj. Heparin 5,000 IU",
+                        "Anticoagulant", "Test Patient", "202"))));
         when(reads.board(TENANT_ID, USER_ID, "DOCTOR")).thenReturn(board);
 
         mockMvc.perform(get(URL + "/safety").with(as("DOCTOR")))
@@ -105,6 +115,9 @@ class SafetyControllerTest {
                 .andExpect(jsonPath("$.asOf").value("2026-11-11T06:00:00Z"))
                 .andExpect(jsonPath("$.counts.open").value(1))
                 .andExpect(jsonPath("$.counts.pastTarget").value(1))
+                .andExpect(jsonPath("$.counts.dosesDue").value(2))
+                .andExpect(jsonPath("$.counts.dosesLate").value(1))
+                .andExpect(jsonPath("$.counts.length()").value(6))
                 .andExpect(jsonPath("$.counts.changeToken").value("AAAAAAAAAAAAAAAAAAAAAA"))
                 .andExpect(jsonPath("$.counts.asOf").value("2026-11-11T06:00:00Z"))
                 .andExpect(jsonPath("$.yourPatients").value(Matchers.nullValue()))
@@ -131,13 +144,45 @@ class SafetyControllerTest {
                 .andExpect(jsonPath("$.escalations[0].response").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.escalations[0].canAcknowledge").value(true))
                 .andExpect(jsonPath("$.escalations[0].canRespond").value(true))
-                .andExpect(jsonPath("$.escalations[0].canCallSenior").value(false));
+                .andExpect(jsonPath("$.escalations[0].canCallSenior").value(false))
+                .andExpect(jsonPath("$.medicineRound.canGive").value(true))
+                .andExpect(jsonPath("$.medicineRound.giveLockReason").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.medicineRound.truncated").value(false))
+                .andExpect(jsonPath("$.medicineRound.length()").value(4))
+                .andExpect(jsonPath("$.medicineRound.rows.length()").value(2))
+                .andExpect(jsonPath("$.medicineRound.rows[0].admissionId").value(ADMISSION_ID.toString()))
+                .andExpect(jsonPath("$.medicineRound.rows[0].orderId").value(ORDER_ID.toString()))
+                .andExpect(jsonPath("$.medicineRound.rows[0].slotAt").value("2026-11-11T02:30:00Z"))
+                .andExpect(jsonPath("$.medicineRound.rows[0].state").value("LATE"))
+                .andExpect(jsonPath("$.medicineRound.rows[0].lateHours").value(3))
+                .andExpect(jsonPath("$.medicineRound.rows[0].drugName").value("Tab. Paracetamol 650 mg"))
+                .andExpect(jsonPath("$.medicineRound.rows[0].highAlert").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.medicineRound.rows[0].patientName").value("Test Patient"))
+                .andExpect(jsonPath("$.medicineRound.rows[0].bedCode").value("202"))
+                .andExpect(jsonPath("$.medicineRound.rows[0].length()").value(9))
+                .andExpect(jsonPath("$.medicineRound.rows[1].state").value("DUE"))
+                .andExpect(jsonPath("$.medicineRound.rows[1].lateHours").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.medicineRound.rows[1].highAlert").value("Anticoagulant"));
+    }
+
+    @Test
+    void aReadOnlyOrDoctorPanelCarriesTheLockReasonAndTheTruncatedFlag() throws Exception {
+        when(reads.board(TENANT_ID, USER_ID, "DOCTOR")).thenReturn(new Board("readonly", "DOCTOR", NOW,
+                new Counts(0, 0, 0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null, List.of(), List.of(),
+                new RoundPanel(false, "IPD_READONLY", true, List.of())));
+
+        mockMvc.perform(get(URL + "/safety").with(as("DOCTOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.medicineRound.canGive").value(false))
+                .andExpect(jsonPath("$.medicineRound.giveLockReason").value("IPD_READONLY"))
+                .andExpect(jsonPath("$.medicineRound.truncated").value(true))
+                .andExpect(jsonPath("$.medicineRound.rows.length()").value(0));
     }
 
     @Test
     void aClosedRowCarriesTheResponseObject() throws Exception {
         when(reads.board(TENANT_ID, USER_ID, "OWNER")).thenReturn(new Board("readonly", "DOCTOR", NOW,
-                new Counts(0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null, List.of(), List.of(row(Status.DONE))));
+                new Counts(0, 0, 0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null, List.of(), List.of(row(Status.DONE)), EMPTY_ROUND));
 
         mockMvc.perform(get(URL + "/safety").with(as("OWNER")))
                 .andExpect(status().isOk())
@@ -153,7 +198,7 @@ class SafetyControllerTest {
     @Test
     void theNurseBoardCarriesYourPatients() throws Exception {
         when(reads.board(TENANT_ID, USER_ID, "NURSE")).thenReturn(new Board("on", "NURSE", NOW,
-                new Counts(0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), 12, List.of(), List.of()));
+                new Counts(0, 0, 0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), 12, List.of(), List.of(), EMPTY_ROUND));
 
         mockMvc.perform(get(URL + "/safety").with(as("NURSE")))
                 .andExpect(status().isOk())
@@ -164,9 +209,9 @@ class SafetyControllerTest {
 
     @Test
     void onlyOwnerDoctorAndNurseMayReadTheBoardTheSummaryAndTheAuditTrail() throws Exception {
-        when(reads.board(any(), any(), any())).thenReturn(new Board("on", "DOCTOR", NOW, new Counts(0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null,
-                List.of(), List.of()));
-        when(reads.summary(any(), any(), any())).thenReturn(new Counts(0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW));
+        when(reads.board(any(), any(), any())).thenReturn(new Board("on", "DOCTOR", NOW, new Counts(0, 0, 0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW), null,
+                List.of(), List.of(), EMPTY_ROUND));
+        when(reads.summary(any(), any(), any())).thenReturn(new Counts(0, 0, 0, 0, "AAAAAAAAAAAAAAAAAAAAAA", NOW));
         when(reads.events(any(), any(), any(), any(), any())).thenReturn(new EventPage(NOW, List.of(), null));
 
         for (String role : READ_ROLES) {
@@ -206,15 +251,17 @@ class SafetyControllerTest {
 
     @Test
     void theSummaryIsCountsOnly() throws Exception {
-        when(reads.summary(TENANT_ID, USER_ID, "NURSE")).thenReturn(new Counts(3, 1, "AAAAAAAAAAAAAAAAAAAAAA", NOW));
+        when(reads.summary(TENANT_ID, USER_ID, "NURSE")).thenReturn(new Counts(3, 1, 4, 2, "AAAAAAAAAAAAAAAAAAAAAA", NOW));
 
         mockMvc.perform(get(URL + "/safety/summary").with(as("NURSE")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.open").value(3))
                 .andExpect(jsonPath("$.pastTarget").value(1))
+                .andExpect(jsonPath("$.dosesDue").value(4))
+                .andExpect(jsonPath("$.dosesLate").value(2))
                 .andExpect(jsonPath("$.asOf").value("2026-11-11T06:00:00Z"))
                 .andExpect(jsonPath("$.changeToken").value("AAAAAAAAAAAAAAAAAAAAAA"))
-                .andExpect(jsonPath("$.length()").value(4));
+                .andExpect(jsonPath("$.length()").value(6));
     }
 
     // ---- GET /clinical-events ----

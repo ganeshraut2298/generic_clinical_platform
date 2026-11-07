@@ -25,6 +25,7 @@ import com.sahaj.ipd.application.SafetyViews.EventPage;
 import com.sahaj.ipd.application.SafetyViews.Row;
 import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState.Status;
+import com.sahaj.ipd.domain.SeedCatalogue;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
 import com.sahaj.platform.api.ActorDirectoryPort;
@@ -69,6 +70,7 @@ class SafetyServiceTest {
     private PatientLookupPort patients;
     private ActorDirectoryPort actors;
     private TeamMemberPort team;
+    private MedicineRoundRepository roundRepository;
     private ModuleEntitlementPort entitlements;
     private SafetyService service;
     private String memberRole = "DOCTOR";
@@ -84,8 +86,10 @@ class SafetyServiceTest {
         actors = mock(ActorDirectoryPort.class);
         team = mock(TeamMemberPort.class);
         entitlements = mock(ModuleEntitlementPort.class);
+        roundRepository = mock(MedicineRoundRepository.class);
         service = new SafetyService(board, admissions, events, patients, actors, team,
-                new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)));
+                new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
+                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue())));
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement("on", false, 25));
         when(board.databaseNow()).thenReturn(NOW);
         when(team.findActiveByUserId(eq(TENANT), eq(ACTOR))).thenAnswer(call -> memberRole == null ? Optional.empty()
@@ -447,7 +451,7 @@ class SafetyServiceTest {
         }
         boardHas(rows.toArray(new BoardRow[0]));
 
-        Banner banner = service.banner(TENANT, ACTOR, "DOCTOR", patientMap);
+        Banner banner = bannerOf(patientMap);
 
         assertThat(banner.pastTarget()).hasSize(50);
         verify(board, times(1)).findLiveOnBoard(TENANT);
@@ -483,13 +487,13 @@ class SafetyServiceTest {
 
         String fromBoard = service.board(TENANT, ACTOR, "NURSE").counts().changeToken();
         String fromSummary = service.summary(TENANT, ACTOR, "NURSE").changeToken();
-        String fromBanner = service.banner(TENANT, ACTOR, "OWNER", new HashMap<>(patientMap)).counts().changeToken();
+        String fromBanner = bannerOf(new HashMap<>(patientMap)).counts().changeToken();
 
         assertThat(fromBoard).hasSize(22).matches("^[A-Za-z0-9_-]{22}$");
         assertThat(fromSummary).isEqualTo(fromBoard);
         assertThat(fromBanner).isEqualTo(fromBoard);
         // the closed row is not in the token: the token equals the one over the two live rows
-        assertThat(fromBoard).isEqualTo(SafetyRows.changeToken(List.of(a, b)));
+        assertThat(fromBoard).isEqualTo(SafetyRows.changeToken(List.of(a, b), List.of()));
 
         Detail aAfterRaise = new Detail(a.id(), a.admissionId(), a.version() + 1, 10, a.ewsRisk(),
                 a.targetMinutes(), a.status(), a.raisedAt(), a.raisedBy(), a.reopenedAt(), a.acknowledgedBy(),
@@ -521,6 +525,14 @@ class SafetyServiceTest {
 
     // ---- the banner of the Admitted patients tab ----
 
+    /** The banner as the Admitted list builds it: the live rows read once, the names from the loaded patients. */
+    private Banner bannerOf(Map<UUID, PatientSummary> loaded) {
+        return service.banner(TENANT, board.databaseNow(), service.liveEscalations(TENANT), row -> {
+            PatientSummary patient = loaded.get(row.patientId());
+            return patient == null ? "Patient" : patient.name();
+        });
+    }
+
     @Test
     void theBannerListsOnlyOpenEscalationsPastTargetWithNameAndScoreInBoardOrder() {
         Detail past8 = esc(8, Status.OPEN, ago(Duration.ofMinutes(20)), null, 15);
@@ -531,7 +543,7 @@ class SafetyServiceTest {
                 onBoard(past10, "Ramesh Kulkarni", "4"));
         Map<UUID, PatientSummary> loaded = new HashMap<>(patientMap);
 
-        Banner banner = service.banner(TENANT, ACTOR, "OWNER", loaded);
+        Banner banner = bannerOf(loaded);
 
         assertThat(banner.counts().open()).isEqualTo(4);
         assertThat(banner.counts().pastTarget()).isEqualTo(2);
@@ -545,31 +557,10 @@ class SafetyServiceTest {
     }
 
     @Test
-    void theBannerIsNullForEveryRoleWithoutVitalsAccessAndNothingIsRead() {
-        for (String role : new String[] {"FRONT_DESK", "BILLING", "VISITING_DOCTOR", "PHARMACIST", "COUNSELLOR",
-            null}) {
-            assertThat(service.banner(TENANT, ACTOR, role, Map.of())).as(String.valueOf(role)).isNull();
-        }
-        verifyNoInteractions(board, team, patients, actors);
-    }
-
-    @Test
-    void theBannerIsNullWhenTheMembershipNoLongerAllowsIt() {
-        for (String now : new String[] {"FRONT_DESK", "BILLING", "VISITING_DOCTOR", "PHARMACIST", null}) {
-            memberRole = now;
-            assertThat(service.banner(TENANT, ACTOR, "OWNER", Map.of())).as(String.valueOf(now)).isNull();
-        }
-        memberRole = "NURSE";
-        memberActive = false;
-        assertThat(service.banner(TENANT, ACTOR, "NURSE", Map.of())).isNull();
-        verifyNoInteractions(board);
-    }
-
-    @Test
     void theBannerIsPresentWithEmptyListWhenNothingIsPastTarget() {
         boardHas(onBoard(esc(8, Status.OPEN, ago(Duration.ofMinutes(5)), null, 15), "A", "1"));
 
-        Banner banner = service.banner(TENANT, ACTOR, "NURSE", Map.of());
+        Banner banner = bannerOf(Map.of());
 
         assertThat(banner).isNotNull();
         assertThat(banner.counts().open()).isEqualTo(1);
@@ -581,7 +572,7 @@ class SafetyServiceTest {
     void aPatientMissingFromTheLoadedMapIsNamedPatientOnTheBanner() {
         boardHas(onBoard(esc(8, Status.OPEN, ago(Duration.ofMinutes(25)), null, 15), "A", "1"));
 
-        Banner banner = service.banner(TENANT, ACTOR, "DOCTOR", Map.of());
+        Banner banner = bannerOf(Map.of());
 
         assertThat(banner.pastTarget().get(0).patientName()).isEqualTo("Patient");
     }

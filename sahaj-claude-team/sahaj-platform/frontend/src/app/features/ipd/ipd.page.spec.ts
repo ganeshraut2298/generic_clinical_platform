@@ -8,14 +8,16 @@ import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { problemDetailInterceptor } from '../../core/http/problem-detail.interceptor';
 import { ShellStore } from '../../core/shell/shell.store';
-import { AdmissionDetail, AdmissionList, AdmissionRow, BedBoard } from './ipd.model';
+import { AdmissionDetail, AdmissionList, AdmittedPatientRow, BedBoard } from './ipd.model';
+import { EmrSheetComponent } from './emr/emr-sheet.component';
 import { IpdPage } from './ipd.page';
+import { NursingSheetComponent } from './nursing/nursing-sheet.component';
 import { TOKEN_A, TOKEN_B, boardOf, pageOf } from './safety/safety.fixtures';
 import { AdmissionSafety, SafetyBannerItem } from './safety/safety.model';
 
 const IPD = '/api/v1/ipd';
 
-const ROW: AdmissionRow = {
+const ROW: AdmittedPatientRow = {
   id: 'a1',
   ipNumber: 'IP/26-27/0042',
   patientId: 'p1',
@@ -35,6 +37,9 @@ const ROW: AdmissionRow = {
   depositLow: false,
   depositState: 'OK',
   admittedAt: '2026-10-24T05:35:00Z',
+  uhid: 'PT-000042',
+  wardId: 'w-general',
+  roomName: 'Room 1',
 };
 
 const EMPTY_BOARD: BedBoard = {
@@ -56,6 +61,9 @@ function list(partial: Partial<AdmissionList> = {}): AdmissionList {
     alertPercent: 80,
     emergency: { writable: true, queue: 3, overTarget: 1 },
     safety: null,
+    asOf: '2026-10-24T07:30:00Z',
+    wards: [{ id: 'w-general', name: 'General ward' }],
+    card: { nursing: true, emr: true, transfer: true, discharge: true, depositLowFlag: true },
     items: [
       ROW,
       { ...ROW, id: 'a2', patientName: 'Ravi Shah', payer: 'Insurance', depositState: 'NOT_NEEDED', depositPaise: 0, runningBillPaise: 450000, admissionType: 'planned', dayNumber: 1 },
@@ -116,6 +124,12 @@ describe('IpdPage', () => {
     }
   }
 
+  /** SAH-36: the Admitted tab opens as Cards; the table of SAH-23 is one tap away. */
+  async function showTable(view: HTMLElement): Promise<void> {
+    view.querySelector<HTMLElement>('[data-view=table]')!.click();
+    await settle();
+  }
+
   function button(view: HTMLElement, text: string): HTMLElement | undefined {
     return Array.from(view.querySelectorAll<HTMLElement>('button, a')).find((b) =>
       b.textContent!.includes(text),
@@ -130,6 +144,7 @@ describe('IpdPage', () => {
   it('shows the tiles, the lead and the Admitted list', async () => {
     const view = setup();
     await loadOk();
+    await showTable(view);
     expect(view.querySelector('h1')!.textContent).toContain('Beds and admissions');
     expect(view.querySelector('.lead')!.textContent).toContain('Bed and nursing charges post at midnight');
     expect(view.querySelector('.lead')!.textContent).toContain('deposit alert at 80% of the deposit');
@@ -172,18 +187,18 @@ describe('IpdPage', () => {
     expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1']);
     expect(tabs[1].textContent).toContain('3');
     expect(view.querySelector('app-bed-board')).not.toBeNull();
-    expect(view.querySelector('.iptbl')).toBeNull();
+    expect(view.querySelector('app-admitted-panel')).toBeNull();
     expect(view.querySelector('[role=tabpanel]')!.getAttribute('aria-labelledby')).toBe('ipd-tab-board');
     tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     await settle();
-    expect(view.querySelector('.iptbl')).not.toBeNull();
+    expect(view.querySelector('app-admitted-panel')).not.toBeNull();
     expect(view.querySelector('[role=tabpanel]')!.getAttribute('aria-labelledby')).toBe('ipd-tab-admitted');
     tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     await settle();
     expect(view.querySelector('app-bed-board')).not.toBeNull();
     tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
     await settle();
-    expect(view.querySelector('.iptbl')).not.toBeNull();
+    expect(view.querySelector('app-admitted-panel')).not.toBeNull();
     tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     await settle();
     expect(view.querySelector('app-bed-board')).not.toBeNull();
@@ -219,6 +234,7 @@ describe('IpdPage', () => {
     const view = setup('DOCTOR');
     await loadOk(list({ canAdmit: false }));
     expect(button(view, 'Admit patient')).toBeUndefined();
+    await showTable(view);
     expect(button(view, 'Open')).toBeDefined();
   });
 
@@ -270,7 +286,7 @@ describe('IpdPage', () => {
   });
 
   it('toasts and reloads the list after an admission', async () => {
-    const admitted = { ...ROW, depositPaise: 1000000 } as AdmissionDetail;
+    const admitted = { ...ROW, depositPaise: 1000000 } as unknown as AdmissionDetail;
     const view = setup('FRONT_DESK', admitted);
     await loadOk();
     button(view, 'Admit patient')!.click();
@@ -284,8 +300,37 @@ describe('IpdPage', () => {
     await settle();
   });
 
+  it('lets the newest reload win: an older read still on its way is cancelled and cannot overwrite it (R36-3)', async () => {
+    const admitted = { ...ROW, depositPaise: 0 } as unknown as AdmissionDetail;
+    const view = setup('FRONT_DESK', admitted);
+    await loadOk();
+    button(view, 'Admit patient')!.click();
+    button(view, 'Admit patient')!.click();
+    const reads = http.match(listUrl);
+    expect(reads.length).toBe(2);
+    expect(reads[0].cancelled).toBe(true);
+    expect(reads[1].cancelled).toBe(false);
+    reads[1].flush(list({ asOf: '2026-10-24T07:31:00Z' }));
+    await settle();
+    expect(view.querySelector('[data-testid=admitted-stale]')).toBeNull();
+  });
+
+  it('a failed newest reload shows the stale line and a later good one clears it (R36-3)', async () => {
+    const admitted = { ...ROW, depositPaise: 0 } as unknown as AdmissionDetail;
+    const view = setup('FRONT_DESK', admitted);
+    await loadOk();
+    button(view, 'Admit patient')!.click();
+    http.expectOne(listUrl).flush({}, { status: 500, statusText: 'Server Error' });
+    await settle();
+    expect(view.querySelector('[data-testid=admitted-stale]')).not.toBeNull();
+    button(view, 'Admit patient')!.click();
+    http.expectOne(listUrl).flush(list());
+    await settle();
+    expect(view.querySelector('[data-testid=admitted-stale]')).toBeNull();
+  });
+
   it('says the deposit is due today when none was taken', async () => {
-    const admitted = { ...ROW, depositPaise: 0 } as AdmissionDetail;
+    const admitted = { ...ROW, depositPaise: 0 } as unknown as AdmissionDetail;
     const view = setup('FRONT_DESK', admitted);
     await loadOk();
     button(view, 'Admit patient')!.click();
@@ -296,6 +341,7 @@ describe('IpdPage', () => {
   it('opens the admission sheet and reloads only when something changed', async () => {
     const view = setup('FRONT_DESK', true);
     await loadOk();
+    await showTable(view);
     button(view, 'Open')!.click();
     expect(dialog.open.mock.calls[0][1].data).toEqual({ id: 'a1' });
     http.expectOne(listUrl).flush(list());
@@ -305,6 +351,7 @@ describe('IpdPage', () => {
   it('does not reload when the admission sheet closes unchanged', async () => {
     const view = setup('FRONT_DESK', false);
     await loadOk();
+    await showTable(view);
     button(view, 'Open')!.click();
     await settle();
   });
@@ -334,6 +381,7 @@ describe('IpdPage', () => {
       data.items[0] = { ...data.items[0], goingHomeToday: true };
       data.items[1] = { ...data.items[1], goingHomeToday: true };
       await loadOk(data);
+      await showTable(view);
       const rows = view.querySelectorAll('.iptr:not(.ipth)');
       const first = Array.from(rows[0].querySelectorAll('.pill')).map((p) => p.textContent!.trim());
       expect(first).toEqual(['Going home today']);
@@ -541,7 +589,14 @@ describe('IpdPage', () => {
       pastTarget: SafetyBannerItem[] = [],
       changeToken = TOKEN_A,
     ): AdmissionSafety => ({
-      counts: { open, pastTarget: pastTarget.length, changeToken, asOf: '2026-11-05T05:47:00Z' },
+      counts: {
+        open,
+        pastTarget: pastTarget.length,
+        dosesDue: 0,
+        dosesLate: 0,
+        changeToken,
+        asOf: '2026-11-05T05:47:00Z',
+      },
       pastTarget,
     });
     const tabs = (view: HTMLElement) =>
@@ -575,6 +630,69 @@ describe('IpdPage', () => {
       expect(view.querySelector('#ipd-tab-safety')!.getAttribute('role')).toBe('tab');
     });
 
+    describe('late doses in the tab number (SAH-35)', () => {
+      const withDoses = (open: number, dosesDue: number, dosesLate: number, changeToken = TOKEN_A): AdmissionSafety => ({
+        counts: { ...safety(open).counts, dosesDue, dosesLate, changeToken },
+        pastTarget: [],
+      });
+
+      it('adds the late doses to the open escalations and not the doses that are only due', async () => {
+        const view = setup('NURSE');
+        await loadOk(list({ safety: withDoses(2, 5, 3) }), false);
+        expect(view.querySelector('#ipd-tab-safety .c')!.textContent).toBe('5');
+      });
+
+      it('is hidden when there are no escalations and no late doses, even with doses due', async () => {
+        const view = setup('NURSE');
+        await loadOk(list({ safety: withDoses(0, 4, 0) }), false);
+        expect(view.querySelector('#ipd-tab-safety .c')).toBeNull();
+      });
+
+      it('shows the late doses alone', async () => {
+        const view = setup('DOCTOR');
+        await loadOk(list({ safety: withDoses(0, 0, 2) }), false);
+        expect(view.querySelector('#ipd-tab-safety .c')!.textContent).toBe('2');
+      });
+
+      it('follows the counts of the board answer once the Safety tab is open', async () => {
+        const view = setup('NURSE');
+        await loadOk(list({ safety: withDoses(0, 0, 9) }), false);
+        view.querySelector<HTMLElement>('#ipd-tab-safety')!.click();
+        await settle();
+        flushSafetyTab(); // boardOf(): one open escalation, one late dose, one due dose
+        await settle();
+        expect(view.querySelector('#ipd-tab-safety .c')!.textContent).toBe('2');
+      });
+
+      it('the counts-only poll reloads the list when only a dose number differs', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('NURSE');
+        await loadOk(list({ safety: withDoses(0, 1, 0) }), false);
+        vi.advanceTimersByTime(60_000);
+        await settle();
+        http
+          .expectOne(SUMMARY)
+          .flush({ open: 0, pastTarget: 0, dosesDue: 0, dosesLate: 1, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
+        await settle();
+        http.expectOne(listUrl).flush(list({ safety: withDoses(0, 0, 1) }));
+        await settle();
+        expect(view.querySelector('#ipd-tab-safety .c')!.textContent).toBe('1');
+      });
+
+      it('the counts-only poll leaves the list alone when the dose numbers and the token are the same', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        setup('NURSE');
+        await loadOk(list({ safety: withDoses(0, 1, 1) }), false);
+        vi.advanceTimersByTime(60_000);
+        await settle();
+        http
+          .expectOne(SUMMARY)
+          .flush({ open: 0, pastTarget: 0, dosesDue: 1, dosesLate: 1, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
+        await settle();
+        http.expectNone(listUrl);
+      });
+    });
+
     it('hides the count at 0 and still shows Safety after Admitted when Emergency is off', async () => {
       const view = setup('NURSE');
       await loadOk(list({ safety: safety(0), emergency: { writable: false, queue: 0, overTarget: 0 } }), false);
@@ -592,7 +710,8 @@ describe('IpdPage', () => {
       expect(view.querySelector('#ipd-tab-safety')!.getAttribute('aria-selected')).toBe('true');
       expect(view.querySelector('app-safety')).not.toBeNull();
       expect(view.querySelector('[data-testid=safety-board]')).not.toBeNull();
-      expect(view.querySelector('#ipd-tab-safety .c')!.textContent).toBe('1');
+      // One open escalation plus the one late dose of the board answer (the due dose is not added).
+      expect(view.querySelector('#ipd-tab-safety .c')!.textContent).toBe('2');
     });
 
     it('moves to the Safety tab with the End key', async () => {
@@ -618,7 +737,7 @@ describe('IpdPage', () => {
         );
         expect(banner.querySelector('b')!.textContent).toBe('Asha Patil · EWS 8, Sunita More · EWS 6');
         expect(banner.querySelector('[data-act=open-safety]')!.textContent!.trim()).toBe('Open safety board');
-        expect(banner.nextElementSibling!.classList).toContain('panel');
+        expect(banner.nextElementSibling!.tagName).toBe('APP-ADMITTED-PANEL');
       });
 
       it('is not shown when nothing is past target', async () => {
@@ -674,7 +793,7 @@ describe('IpdPage', () => {
         await advance(59_000);
         http.expectNone(SUMMARY);
         await advance(1_000);
-        http.expectOne(SUMMARY).flush({ open: 2, pastTarget: 2, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
+        http.expectOne(SUMMARY).flush({ open: 2, pastTarget: 2, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
         await settle();
         http.expectNone(listUrl);
       });
@@ -684,7 +803,7 @@ describe('IpdPage', () => {
         const view = setup('DOCTOR');
         await loadOk(list({ safety: safety(2, LATE) }), false);
         await advance(60_000);
-        http.expectOne(SUMMARY).flush({ open: 3, pastTarget: 2, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
+        http.expectOne(SUMMARY).flush({ open: 3, pastTarget: 2, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
         await settle();
         http.expectOne(listUrl).flush(list({ safety: safety(3, LATE) }));
         await settle();
@@ -698,7 +817,7 @@ describe('IpdPage', () => {
         await advance(60_000);
         http
           .expectOne(SUMMARY)
-          .flush({ open: 2, pastTarget: 2, changeToken: TOKEN_B, asOf: '2026-11-05T05:48:00Z' });
+          .flush({ open: 2, pastTarget: 2, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_B, asOf: '2026-11-05T05:48:00Z' });
         await settle();
         const NEW_LATE = [{ ...LATE[0], patientName: 'Ravi Shah', ewsScore: 9 }, LATE[1]];
         http.expectOne(listUrl).flush(list({ safety: safety(2, NEW_LATE, TOKEN_B) }));
@@ -730,12 +849,12 @@ describe('IpdPage', () => {
           await settle();
           http
             .expectOne(SUMMARY)
-            .flush({ open: 2, pastTarget: 2, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
+            .flush({ open: 2, pastTarget: 2, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-11-05T05:48:00Z' });
           await settle();
           await advance(60_000);
           http
             .expectOne(SUMMARY)
-            .flush({ open: 2, pastTarget: 2, changeToken: TOKEN_A, asOf: '2026-11-05T05:49:00Z' });
+            .flush({ open: 2, pastTarget: 2, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-11-05T05:49:00Z' });
           await settle();
         });
       });
@@ -771,7 +890,7 @@ describe('IpdPage', () => {
         await settle();
         expect(view.querySelector('#ipd-tab-safety')).not.toBeNull();
         await advance(60_000);
-        http.expectOne(SUMMARY).flush({ open: 2, pastTarget: 2, changeToken: TOKEN_A, asOf: '2026-11-05T05:49:00Z' });
+        http.expectOne(SUMMARY).flush({ open: 2, pastTarget: 2, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-11-05T05:49:00Z' });
         await settle();
       });
 
@@ -792,6 +911,215 @@ describe('IpdPage', () => {
     });
   });
 
+  describe('Admitted patient cards (SAH-36)', () => {
+    const SUMMARY = `${IPD}/safety/summary`;
+    const LATE = [{ escalationId: 'e1', admissionId: 'a1', patientName: 'Asha Patil', ewsScore: 8 }];
+    const safety = (): AdmissionSafety => ({
+      counts: { open: 1, pastTarget: 1, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-10-24T07:30:00Z' },
+      pastTarget: LATE,
+    });
+    const names = (view: HTMLElement) =>
+      Array.from(view.querySelectorAll('[data-testid=card-name]')).map((n) => n.textContent!.trim());
+    const advance = async (ms: number) => {
+      vi.advanceTimersByTime(ms);
+      await settle();
+    };
+
+    afterEach(() => vi.useRealTimers());
+
+    it('opens the Admitted tab as Cards, 3 per row, with the toolbar under the red banner', async () => {
+      const view = setup('DOCTOR');
+      await loadOk(list({ safety: safety() }));
+      const panel = view.querySelector('[role=tabpanel]')!;
+      const order = Array.from(panel.querySelectorAll('[data-testid=safety-banner], [data-testid=admitted-toolbar], [data-testid=admitted-cards]')).map(
+        (e) => e.getAttribute('data-testid'),
+      );
+      expect(order).toEqual(['safety-banner', 'admitted-toolbar', 'admitted-cards']);
+      expect(view.querySelector('[data-testid=admitted-cards]')!.classList.contains('cols-3')).toBe(true);
+      expect(names(view)).toEqual(['Asha Patil', 'Ravi Shah', 'Sunita More']);
+      expect(view.querySelector('.iptbl')).toBeNull();
+    });
+
+    it('keeps the Admitted tab number at all admitted patients while a filter is on', async () => {
+      const view = setup();
+      await loadOk();
+      const search = view.querySelector<HTMLInputElement>('[data-testid=admitted-search]')!;
+      search.value = 'asha';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await settle();
+      expect(names(view)).toEqual(['Asha Patil']);
+      expect(view.querySelector('#ipd-tab-admitted .c')!.textContent).toBe('3');
+    });
+
+    it('keeps the choices when the user goes to another tab and back', async () => {
+      const view = setup();
+      await loadOk();
+      view.querySelector<HTMLElement>('[data-view=table]')!.click();
+      await settle();
+      view.querySelector<HTMLElement>('#ipd-tab-board')!.click();
+      await settle();
+      http
+        .match((r) => r.url === `${IPD}/board`)
+        .filter((r) => !r.cancelled)
+        .forEach((r) => r.flush(EMPTY_BOARD));
+      view.querySelector<HTMLElement>('#ipd-tab-admitted')!.click();
+      await settle();
+      expect(view.querySelector('.iptbl')).not.toBeNull();
+    });
+
+    it('opens the admission sheet from the name on its main view', async () => {
+      const view = setup('FRONT_DESK', false);
+      await loadOk();
+      view.querySelector<HTMLElement>('[data-testid=card-name]')!.click();
+      expect(dialog.open.mock.calls[0][1].data).toEqual({ id: 'a1' });
+    });
+
+    it('opens the admission sheet at Move for Transfer and at the discharge view for Discharge, in memory only', async () => {
+      const view = setup('OWNER', false);
+      await loadOk();
+      const router = TestBed.inject(Router);
+      const url = router.url;
+      view.querySelector<HTMLElement>('app-patient-card [data-act=transfer]')!.click();
+      expect(dialog.open.mock.calls[0][1].data).toEqual({ id: 'a1', startView: 'move' });
+      view.querySelector<HTMLElement>('app-patient-card [data-act=discharge]')!.click();
+      expect(dialog.open.mock.calls[1][1].data).toEqual({ id: 'a1', startView: 'discharge' });
+      expect(router.url).toBe(url);
+    });
+
+    it('opens the sheet with autoFocus off only for Transfer (F-1), and keeps restoreFocus and the default focus for the others', async () => {
+      const view = setup('OWNER', false);
+      await loadOk();
+      view.querySelector<HTMLElement>('[data-testid=card-name]')!.click();
+      view.querySelector<HTMLElement>('app-patient-card [data-act=transfer]')!.click();
+      view.querySelector<HTMLElement>('app-patient-card [data-act=discharge]')!.click();
+      const [details, move, discharge] = dialog.open.mock.calls.map((c) => c[1]);
+      expect(move.autoFocus).toBe(false);
+      expect(move.restoreFocus).toBeUndefined();
+      expect('autoFocus' in details).toBe(false);
+      expect('autoFocus' in discharge).toBe(false);
+    });
+
+    it('reloads the cards after a sheet closed with a change, and not after an unchanged close', async () => {
+      const view = setup('OWNER', true);
+      await loadOk();
+      view.querySelector<HTMLElement>('app-patient-card [data-act=transfer]')!.click();
+      http.expectOne(listUrl).flush(list());
+      http
+        .match((r) => r.url === `${IPD}/board`)
+        .filter((r) => !r.cancelled)
+        .forEach((r) => r.flush(EMPTY_BOARD));
+      await settle();
+    });
+
+    it('opens the Nursing sheet for the admission and reloads when it saved', async () => {
+      const view = setup('NURSE', true);
+      await loadOk();
+      view.querySelector<HTMLElement>('app-patient-card [data-act=nursing]')!.click();
+      const [component, config] = dialog.open.mock.calls[0];
+      expect(component).toBe(NursingSheetComponent);
+      expect(config.data).toEqual({ admissionId: 'a1' });
+      expect(config.panelClass).toBe('sheet-panel');
+      http.expectOne(listUrl).flush(list());
+      await settle();
+    });
+
+    it('opens the EMR sheet for the admission and does not reload', async () => {
+      const view = setup('DOCTOR', undefined);
+      await loadOk();
+      view.querySelector<HTMLElement>('app-patient-card [data-act=emr]')!.click();
+      const [component, config] = dialog.open.mock.calls[0];
+      expect(component).toBe(EmrSheetComponent);
+      expect(config.data).toEqual({ admissionId: 'a1' });
+      await settle();
+    });
+
+    describe('60-second reload of the Admitted tab', () => {
+      it('reads the whole list every 60 seconds and not the counts-only summary, keeping the filters', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('DOCTOR');
+        await loadOk(list({ safety: safety() }));
+        const search = view.querySelector<HTMLInputElement>('[data-testid=admitted-search]')!;
+        search.value = 'sunita';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        view.querySelector<HTMLElement>('[data-cols="4"]')!.click();
+        await settle();
+        await advance(59_000);
+        http.expectNone(listUrl);
+        await advance(1_000);
+        http.expectNone(SUMMARY);
+        const second = list({ safety: safety(), asOf: '2026-10-24T07:31:00Z' });
+        second.items[2] = { ...second.items[2], goingHomeToday: true };
+        http.expectOne(listUrl).flush(second);
+        await settle();
+        expect(names(view)).toEqual(['Sunita More']);
+        expect(view.querySelector<HTMLInputElement>('[data-testid=admitted-search]')!.value).toBe('sunita');
+        expect(view.querySelector('[data-testid=admitted-cards]')!.classList.contains('cols-4')).toBe(true);
+        expect(view.querySelector('[data-flag=home]')).not.toBeNull();
+        expect(view.querySelector('[data-testid=admitted-stale]')).toBeNull();
+      });
+
+      it('keeps the last answer with "Could not refresh. Showing data from <time>." when a reload fails, and clears it after a good one', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('DOCTOR');
+        await loadOk(list());
+        await advance(60_000);
+        http.expectOne(listUrl).flush({}, { status: 500, statusText: 'Server Error' });
+        await settle();
+        expect(names(view).length).toBe(3);
+        expect(view.querySelector('[data-testid=admitted-stale]')!.textContent).toContain(
+          'Could not refresh. Showing data from 1:00 PM.',
+        );
+        await advance(60_000);
+        http.expectOne(listUrl).flush(list({ asOf: '2026-10-24T07:32:00Z' }));
+        await settle();
+        expect(view.querySelector('[data-testid=admitted-stale]')).toBeNull();
+      });
+
+      it('does not reload while the browser tab is hidden and reloads once when it shows again', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        setup('DOCTOR');
+        await loadOk(list());
+        const hide = (hidden: boolean) => {
+          Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+          document.dispatchEvent(new Event('visibilitychange'));
+        };
+        try {
+          hide(true);
+          await advance(180_000);
+          http.expectNone(listUrl);
+          hide(false);
+          await settle();
+          http.expectOne(listUrl).flush(list());
+          await settle();
+        } finally {
+          delete (document as unknown as Record<string, unknown>)['hidden'];
+        }
+      });
+
+      it('does not start a second reload while one is still on its way', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        setup('DOCTOR');
+        await loadOk(list());
+        await advance(60_000);
+        const pending = http.expectOne(listUrl);
+        await advance(60_000);
+        http.expectNone(listUrl);
+        pending.flush(list());
+        await settle();
+      });
+
+      it('does not reload the list from the Admitted timer on the Bed board, where the summary poll runs', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        setup('DOCTOR');
+        await loadOk(list({ safety: safety() }), false);
+        await advance(60_000);
+        http.expectOne(SUMMARY).flush({ open: 1, pastTarget: 1, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-10-24T07:31:00Z' });
+        await settle();
+        http.expectNone(listUrl);
+      });
+    });
+  });
+
   describe('Pharmacist checks (SAH-31)', () => {
     const SUMMARY = `${IPD}/pharmacist-checks/summary`;
     const CHECKS = `${IPD}/pharmacist-checks`;
@@ -800,7 +1128,7 @@ describe('IpdPage', () => {
     const EVENTS = `${IPD}/clinical-events`;
     const AS_OF = '2026-11-06T05:47:00Z';
     const open = (open: number): AdmissionSafety => ({
-      counts: { open, pastTarget: 0, changeToken: TOKEN_A, asOf: AS_OF },
+      counts: { open, pastTarget: 0, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: AS_OF },
       pastTarget: [],
     });
     const summary = (waiting: number, changeToken = TOKEN_A) => ({ waiting, changeToken, asOf: AS_OF });
@@ -862,10 +1190,10 @@ describe('IpdPage', () => {
         http.expectOne((r) => r.url === CHECKS).flush(checks(1));
         await settle();
         const tiles = Array.from(view.querySelectorAll('.safety .kpis > *')).map((n) => n.getAttribute('data-kpi') ?? n.tagName.toLowerCase());
-        expect(tiles).toEqual(['escalations', 'app-pharmacist-tile']);
+        expect(tiles).toEqual(['escalations', 'app-pharmacist-tile', 'doses']);
         expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('1');
         const panels = Array.from(view.querySelectorAll('.safety > *')).map((n) => n.tagName.toLowerCase());
-        expect(panels).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'section']);
+        expect(panels).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'app-medicine-round', 'section']);
         expect(view.querySelector('#sf-esc-h')).not.toBeNull();
         expect(view.querySelector('#ph-h')).not.toBeNull();
         expect(view.querySelector('#sf-aud-h')).not.toBeNull();
@@ -878,7 +1206,7 @@ describe('IpdPage', () => {
         http.expectOne(SUMMARY).flush(summary(3));
         await settle();
         await advance(60_000);
-        http.expectOne(SAFETY_SUMMARY).flush({ open: 2, pastTarget: 0, changeToken: TOKEN_A, asOf: AS_OF });
+        http.expectOne(SAFETY_SUMMARY).flush({ open: 2, pastTarget: 0, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: AS_OF });
         http.expectOne(SUMMARY).flush(summary(4));
         await settle();
         expect(tabs(view)[3]).toBe('Safety 6');
@@ -901,7 +1229,7 @@ describe('IpdPage', () => {
           hide(false);
           await settle();
           http.expectOne(SUMMARY).flush(summary(3));
-          http.expectOne(SAFETY_SUMMARY).flush({ open: 2, pastTarget: 0, changeToken: TOKEN_A, asOf: AS_OF });
+          http.expectOne(SAFETY_SUMMARY).flush({ open: 2, pastTarget: 0, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: AS_OF });
           await settle();
         } finally {
           delete (document as unknown as Record<string, unknown>)['hidden'];

@@ -37,4 +37,20 @@ describe('PinApi', () => {
     expect(req.request.body).toEqual(body);
     req.flush({});
   });
+
+  it('reads the colleague-tries notice of the signed-in person, nothing else', () => {
+    api.colleagueTries().subscribe();
+    const req = http.expectOne('/api/v1/platform/me/pin/colleague-tries');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush({});
+  });
+
+  it('posts "Got it" with seenThrough as received', () => {
+    api.markColleagueTriesSeen('2026-11-07T05:35:12.123456Z').subscribe();
+    const req = http.expectOne('/api/v1/platform/me/pin/colleague-tries/seen');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ seenThrough: '2026-11-07T05:35:12.123456Z' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+  });
 });

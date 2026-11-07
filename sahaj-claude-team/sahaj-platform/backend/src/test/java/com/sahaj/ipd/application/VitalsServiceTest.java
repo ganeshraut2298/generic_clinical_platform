@@ -1223,6 +1223,11 @@ class VitalsServiceTest {
         }
 
         @Override
+        public java.util.Map<UUID, LatestScore> findLatestOfAdmitted(UUID tenantId) {
+            throw new UnsupportedOperationException("not used by the vitals service");
+        }
+
+        @Override
         public Optional<VitalsRow> findByClientKey(UUID tenantId, UUID clientKey) {
             calls.add("keyLookup");
             int index = clientKeys.indexOf(clientKey);

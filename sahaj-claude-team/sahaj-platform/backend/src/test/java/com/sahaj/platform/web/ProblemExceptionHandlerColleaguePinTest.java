@@ -77,6 +77,29 @@ class ProblemExceptionHandlerColleaguePinTest {
     }
 
     @Test
+    void thePairLimitIs429ColleaguePinLimitWithNoRetryAfterAndNoCount() {
+        ResponseEntity<Object> response = answer(new PinCheck(Outcome.PAIR_LIMIT, 0, null, 0));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(429);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(problem(response).getType().toString()).isEqualTo("https://sahaj.in/problems/colleague-pin-limit");
+        assertThat(problem(response).getTitle()).isEqualTo("Too many wrong PIN tries");
+        assertThat(problem(response).getDetail()).isEqualTo("Too many wrong PIN tries for this nurse. Choose another nurse.");
+        assertThat(problem(response).getProperties()).isNullOrEmpty();
+    }
+
+    @Test
+    void aFailedCheckIs503PinCheckFailedWithNoRetryAfter() {
+        ResponseEntity<Object> response = answer(new PinCheck(Outcome.CHECK_FAILED, 0, null, 0));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(503);
+        assertThat(problem(response).getType().toString()).isEqualTo("https://sahaj.in/problems/pin-check-failed");
+        assertThat(problem(response).getTitle()).isEqualTo("PIN check failed");
+        assertThat(problem(response).getDetail()).isEqualTo("We could not check the PIN. Try again.");
+        assertThat(problem(response).getProperties()).isNullOrEmpty();
+    }
+
+    @Test
     void anIneligibleColleagueIs400ValidationOnSecondNurseIdWithTheMessageAsDetail() {
         try {
             ColleaguePinCheck.notEligible().requireOk();

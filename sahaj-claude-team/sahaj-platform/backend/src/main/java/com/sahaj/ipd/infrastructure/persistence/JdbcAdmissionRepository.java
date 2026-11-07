@@ -40,20 +40,29 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
             values (:admissionId, :amount, :mode, :by)
             returning id
             """;
-    private static final String SELECT = """
+    // The admission row is written once; the list with placement (SAH-36) is built from the same pieces, so the two
+    // reads cannot drift apart (code review R36-8).
+    private static final String ADMISSION_COLUMNS = """
             select a.id, a.ip_number, a.patient_id, a.bed_id, b.code as bed_code, b.category_key,
                    w.name as ward_name, a.doctor_membership_id, a.admission_type, a.payer, a.reason, a.status,
                    a.admitted_at, a.discharged_at,
                    coalesce((select sum(d.amount_paise) from ipd.deposit d
-                             where d.tenant_id = a.tenant_id and d.admission_id = a.id), 0) as deposit_total
+                             where d.tenant_id = a.tenant_id and d.admission_id = a.id), 0) as deposit_total""";
+    private static final String ADMISSION_FROM = """
             from ipd.admission a
             join ipd.bed b on b.tenant_id = a.tenant_id and b.id = a.bed_id
             join ipd.ward w on w.tenant_id = b.tenant_id and w.id = b.ward_id
             """;
-    private static final String FIND_ADMITTED = SELECT + """
+    private static final String SELECT = ADMISSION_COLUMNS + "\n" + ADMISSION_FROM;
+    private static final String ADMITTED_FILTER = """
             where a.tenant_id = :tenantId and a.status = 'ADMITTED'
             order by a.admitted_at desc, a.id
             """;
+    // SAH-36 (ADR-013 R1): the same row plus the ward id and the room name of the bed (left join: a bed may have no room).
+    static final String FIND_ADMITTED_WITH_PLACEMENT = ADMISSION_COLUMNS
+            + ",\n       b.ward_id as ward_id, r.name as room_name\n" + ADMISSION_FROM
+            + "left join ipd.room r on r.tenant_id = b.tenant_id and r.id = b.room_id\n" + ADMITTED_FILTER;
+    static final String FIND_ADMITTED = SELECT + ADMITTED_FILTER;
     private static final String COUNT_ADMITTED = """
             select count(*) from ipd.admission where tenant_id = :tenantId and status = 'ADMITTED'
             """;
@@ -127,6 +136,14 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
     @Override
     public List<AdmissionRow> findAdmitted(UUID tenantId) {
         return jdbc.sql(FIND_ADMITTED).param("tenantId", tenantId).query(JdbcAdmissionRepository::admission).list();
+    }
+
+    @Override
+    public List<AdmittedRow> findAdmittedWithPlacement(UUID tenantId) {
+        return jdbc.sql(FIND_ADMITTED_WITH_PLACEMENT).param("tenantId", tenantId)
+                .query((rs, rowNum) -> new AdmittedRow(admission(rs, rowNum), rs.getObject("ward_id", UUID.class),
+                        rs.getString("room_name")))
+                .list();
     }
 
     @Override

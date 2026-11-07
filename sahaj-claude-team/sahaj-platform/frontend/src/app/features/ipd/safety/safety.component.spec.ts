@@ -6,7 +6,21 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { SAFETY_REFRESH_MS, SafetyComponent } from './safety.component';
-import { ACTIONS, AS_OF, ROW, asNurse, boardOf, eventOf, pageOf, problem } from './safety.fixtures';
+import { marOf, orderOf, slotOf } from '../mar/mar.fixtures';
+import {
+  ACTIONS,
+  AS_OF,
+  ROUND_DUE,
+  ROUND_LATE,
+  ROW,
+  SLOT_8AM,
+  asNurse,
+  boardOf,
+  eventOf,
+  pageOf,
+  problem,
+  roundOf,
+} from './safety.fixtures';
 import { EscalationActionResult, EscalationRow, SafetyBoard, SafetyCounts } from './safety.model';
 
 const IPD = '/api/v1/ipd';
@@ -104,7 +118,7 @@ describe('SafetyComponent', () => {
 
   const el = () => fixture.nativeElement as HTMLElement;
   const squash = (node: Element | null | undefined) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
-  const rows = () => Array.from(el().querySelectorAll<HTMLElement>('.sfrow'));
+  const rows = () => Array.from(el().querySelectorAll<HTMLElement>('.sfrow[data-esc]'));
   const row = (id: string) => el().querySelector<HTMLElement>(`[data-esc=${id}]`)!;
   const act = (id: string, name: string) => row(id).querySelector<HTMLButtonElement>(`[data-act=${name}]`);
   const labels = (id: string) => Array.from(row(id).querySelectorAll('.sfacts button')).map((b) => squash(b));
@@ -118,8 +132,10 @@ describe('SafetyComponent', () => {
   describe('Doctor view', () => {
     it('shows, top to bottom, the red notice, the tile, the escalation panel and the audit trail', async () => {
       await open(boardOf({ escalations: [ROW, ACK, DONE] }));
-      const blocks = Array.from(el().querySelectorAll('.safety > *')).map((n) => n.className.split(' ')[0]);
-      expect(blocks).toEqual(['notice', 'kpis', 'panel', 'panel']);
+      const blocks = Array.from(el().querySelectorAll('.safety > *')).map((n) =>
+        n.tagName === 'APP-MEDICINE-ROUND' ? 'round' : n.className.split(' ')[0],
+      );
+      expect(blocks).toEqual(['notice', 'kpis', 'panel', 'round', 'panel']);
       expect(squash(el().querySelector('[data-testid=safety-late-notice]'))).toBe(
         '1 escalation past the response target. Asha Patil (EWS 8) raised 17 min ago. Acknowledge, then record what you did.',
       );
@@ -528,7 +544,7 @@ describe('SafetyComponent', () => {
     it('asks for the first 14 and shows "Nothing recorded yet." when empty', async () => {
       snack = vi.fn();
       await open(boardOf(), pageOf([]));
-      expect(squash(el().querySelectorAll('.sfp')[1].querySelector('.empty'))).toBe('Nothing recorded yet.');
+      expect(squash(el().querySelector('#sf-aud-h')!.closest('.sfp')!.querySelector('.empty'))).toBe('Nothing recorded yet.');
       expect(el().querySelector('[data-act=events-more]')).toBeNull();
     });
 
@@ -601,6 +617,146 @@ describe('SafetyComponent', () => {
       await settle();
       expect(squash(el().querySelector('[data-testid=events-error]'))).toContain('Try later.');
       expect(rows().length).toBe(1);
+    });
+  });
+
+  describe('Medicine round (SAH-35)', () => {
+    const kpiNames = () => Array.from(el().querySelectorAll('.kpis .eyebrow')).map((n) => squash(n));
+    const panels = () => Array.from(el().querySelectorAll('.safety h2')).map((n) => squash(n));
+    const gives = () => Array.from(el().querySelectorAll<HTMLButtonElement>('[data-testid=round-give]'));
+    const roundRows = () => el().querySelectorAll('[data-testid=round-row]');
+    const MAR_A1 = `${IPD}/admissions/a1/mar`;
+    const marForLate = () =>
+      marOf({
+        admissionId: 'a1',
+        orders: [orderOf({ orderId: 'o2', slots: [slotOf({ slotAt: SLOT_8AM, state: 'LATE', lateHours: 3 })] })],
+      });
+    const reloaded = async (board: SafetyBoard) => {
+      http.expectOne(BOARD).flush(board);
+      eventsReq().flush(pageOf());
+      await settle();
+    };
+    const afterTick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+    it('the tile "Doses due or overdue" shows Due plus Late, "N overdue", red when someone is late', async () => {
+      await open(boardOf({ escalations: [] }));
+      const tile = el().querySelector('[data-kpi=doses]')!;
+      expect(squash(tile.querySelector('.eyebrow'))).toBe('Doses due or overdue');
+      expect(squash(tile.querySelector('.v'))).toBe('2');
+      expect(tile.querySelector('.v')!.classList).toContain('crit');
+      expect(squash(tile.querySelector('.s'))).toBe('1 overdue');
+    });
+
+    it('the tile says "0 overdue", is not red when nobody is late, and shows the full count, not the rows', async () => {
+      const board = boardOf({ medicineRound: roundOf({ rows: [ROUND_DUE] }) });
+      board.counts = { ...board.counts, dosesDue: 340, dosesLate: 0 };
+      await open(board);
+      const tile = el().querySelector('[data-kpi=doses]')!;
+      expect(squash(tile.querySelector('.v'))).toBe('340');
+      expect(tile.querySelector('.v')!.classList).not.toContain('crit');
+      expect(squash(tile.querySelector('.s'))).toBe('0 overdue');
+    });
+
+    it('puts the tile after Escalations open and before Your patients (nurse), and the panel before the audit trail', async () => {
+      await open(boardOf({ view: 'NURSE', yourPatients: 4, escalations: [asNurse(ROW)] }));
+      expect(kpiNames()).toEqual(['Escalations open', 'Doses due or overdue', 'Your patients']);
+      expect(panels()).toEqual(['Early warning escalations', 'Medicine round', 'Clinical audit trail']);
+    });
+
+    it('a doctor reads the same tile and rows but gets no Give and no line', async () => {
+      await open(boardOf({ medicineRound: roundOf({ canGive: false, giveLockReason: 'ROLE' }) }));
+      expect(roundRows().length).toBe(2);
+      expect(gives()).toEqual([]);
+      expect(el().querySelector('[data-testid=round-readonly]')).toBeNull();
+    });
+
+    it('needs no request of its own: the board answer carries the round', async () => {
+      await open();
+      http.expectNone((r) => r.url.includes('medicine-round'));
+      expect(roundRows().length).toBe(2);
+    });
+
+    it('Give: one MAR read, then the Give sheet; after a dose the board reloads, the user stays, focus goes to the heading when the row is gone', async () => {
+      await open();
+      dialog.open.mockReturnValue({ afterClosed: () => of({ mar: marForLate() }) });
+      document.body.appendChild(el());
+      gives()[0].click();
+      http.expectOne(MAR_A1).flush(marForLate());
+      await settle();
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      await reloaded(boardOf({ medicineRound: roundOf({ rows: [ROUND_DUE] }) }));
+      expect(roundRows().length).toBe(1);
+      expect(el().querySelector('[data-kpi=doses] .v')!.textContent!.trim()).toBe('1');
+      await afterTick();
+      expect(document.activeElement).toBe(el().querySelector('#sf-round-h'));
+      expect(counts.at(-1)!.dosesLate).toBe(0);
+      el().remove();
+    });
+
+    it('Give: the focus returns to the same Give button when the row is still on the board', async () => {
+      await open();
+      dialog.open.mockReturnValue({ afterClosed: () => of({ reload: true }) });
+      document.body.appendChild(el());
+      gives()[1].click();
+      http.expectOne(`${IPD}/admissions/a2/mar`).flush(
+        marOf({
+          admissionId: 'a2',
+          orders: [orderOf({ orderId: 'o1', slots: [slotOf({ slotAt: ROUND_DUE.slotAt, state: 'DUE' })] })],
+        }),
+      );
+      await settle();
+      await reloaded(boardOf());
+      await afterTick();
+      expect(document.activeElement).toBe(gives()[1]);
+      el().remove();
+    });
+
+    it('Give: a slot recorded meanwhile opens no sheet, shows the text and reloads the board', async () => {
+      await open();
+      gives()[0].click();
+      http.expectOne(MAR_A1).flush(
+        marOf({
+          admissionId: 'a1',
+          orders: [orderOf({ orderId: 'o2', slots: [slotOf({ slotAt: SLOT_8AM, state: 'GIVEN', canGive: false })] })],
+        }),
+      );
+      await settle();
+      expect(dialog.open).not.toHaveBeenCalled();
+      expect(toasts()).toEqual(['This dose is already recorded.']);
+      await reloaded(boardOf({ medicineRound: roundOf({ rows: [ROUND_DUE] }) }));
+      expect(roundRows().length).toBe(1);
+    });
+
+    it('Give: a failed reload after an answer keeps the old rows and shows the stale line', async () => {
+      await open();
+      dialog.open.mockReturnValue({ afterClosed: () => of({ reload: true }) });
+      gives()[0].click();
+      http.expectOne(MAR_A1).flush(marForLate());
+      await settle();
+      http.expectOne(BOARD).flush(problem('server-error', 500, 'x'), { status: 500, statusText: 'x' });
+      eventsReq().flush(pageOf());
+      await settle();
+      expect(el().querySelector('[data-testid=safety-stale]')).not.toBeNull();
+      expect(roundRows().length).toBe(2);
+    });
+
+    it('the 60-second reload brings what changed without anyone acting: a Due row turns Late', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      await open(boardOf({ medicineRound: roundOf({ rows: [ROUND_DUE] }) }));
+      expect(squash(el().querySelector('[data-testid=round-pill]'))).toBe('Due now');
+      vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+      await reloaded(
+        boardOf({ medicineRound: roundOf({ rows: [{ ...ROUND_DUE, state: 'LATE', lateHours: 1 }, ROUND_LATE] }) }),
+      );
+      expect(Array.from(el().querySelectorAll('[data-testid=round-pill]')).map((n) => squash(n))).toEqual([
+        '1 h late',
+        '3 h late',
+      ]);
+    });
+
+    it('emits the counts with the dose numbers so the tab number follows', async () => {
+      await open();
+      expect(counts.at(-1)).toMatchObject({ dosesDue: 1, dosesLate: 1 });
     });
   });
 

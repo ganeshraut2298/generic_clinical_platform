@@ -126,3 +126,6 @@ Status after the review fix pass (6 Nov 2026):
 
 ## Earlier run (6 Nov 2026, before the fix pass)
 - Unit 3,043; IT 1,554 (138 new for this story); 26 skipped; exit 0. Mistakes of my own found and fixed while writing (not product faults): a Read-only clinic cannot sign or discharge; `InvalidFieldsException.getMessage()` is the generic text, the field text is in `errors()`; a fixed membership id cannot be reused because `sahaj_test` is never cleaned; the fifth wrong try answers LOCKED, not WRONG.
+
+## History note (SAH-38, 7 Nov 2026)
+From SAH-38 (ADR-014 D11) a new give event reads "Gave <medicine> (<time> dose) · identity checked against UHID" and a new deny event "Stopped at the identity check: entered <text>, expected <UHID> (<medicine>)". The test texts in this plan that say "wristband scanned" / "Stopped at the wristband check: scanned" describe what SAH-32 wrote at the time; events already written keep that wording (append-only table). `DoseGiveIT`, `DosePrivacyIT` and `DoseSecondNurseIT` now assert the new wording; the colleague-lock tests assert the SAH-38 rules (lock count unchanged by a colleague lock, the pair cap). See `docs/test-plans/SAH-38.md`.

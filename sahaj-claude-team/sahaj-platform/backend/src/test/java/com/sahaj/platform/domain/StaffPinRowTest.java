@@ -49,6 +49,25 @@ class StaffPinRowTest {
     }
 
     @Test
+    void theSah31ShapeHasNeitherColleagueFlag() {
+        StaffPinRow row = row(HASH, 2, null, 0, null);
+
+        assertThat(row.runHasColleagueTry()).isFalse();
+        assertThat(row.lockByColleagues()).isFalse();
+    }
+
+    @Test
+    void theColleagueFlagsAreCarriedAndPrintedButTheHashNever() {
+        StaffPinRow row = new StaffPinRow(UUID.randomUUID(), HASH, 1, 2, null, 0, null, NOW.minusSeconds(100), null,
+                null, true, true, 3L, NOW);
+
+        assertThat(row.runHasColleagueTry()).isTrue();
+        assertThat(row.lockByColleagues()).isTrue();
+        assertThat(row.toString()).contains("runHasColleagueTry=true", "lockByColleagues=true")
+                .doesNotContain("$2a$").doesNotContain(HASH);
+    }
+
+    @Test
     void toStringNeverShowsTheHash() {
         assertThat(row(HASH, 2, null, 0, null).toString()).doesNotContain("$2a$").doesNotContain(HASH);
     }

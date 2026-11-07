@@ -1,6 +1,7 @@
 package com.sahaj.ipd.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.sahaj.ipd.domain.DoseSlots;
 import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState.Status;
 import java.time.Instant;
@@ -19,10 +20,37 @@ public final class SafetyViews {
 
     /**
      * Counts only, no names (ADR-005 D3). {@code open} is OPEN plus ACK; {@code asOf} is the database clock.
-     * {@code changeToken} (ADR-007 R1) is an opaque hash of the id and version of every escalation counted in
-     * {@code open}; the client compares it for equality with the last one it saw.
+     * SAH-35 (ADR-012 D3): {@code dosesDue} and {@code dosesLate} are the listed dose slots in state DUE and LATE (the
+     * full counts, also when the panel is cut at 200 rows). {@code changeToken} (ADR-007 R1) is an opaque hash of the
+     * id and version of every escalation counted in {@code open} and of every listed dose slot; the client compares it
+     * for equality with the last one it saw.
      */
-    public record Counts(int open, int pastTarget, String changeToken, Instant asOf) {
+    public record Counts(int open, int pastTarget, int dosesDue, int dosesLate, String changeToken, Instant asOf) {
+    }
+
+    /**
+     * SAH-35 one row of the panel "Medicine round". The patient name and the medicine are on screen only: hidden from
+     * {@code toString}.
+     */
+    public record RoundRow(UUID admissionId, UUID orderId, Instant slotAt, DoseSlots.State state, Integer lateHours,
+                           String drugName, String highAlert, String patientName, String bedCode) {
+
+        @Override
+        public String toString() {
+            return "RoundRow[orderId=" + orderId + ", state=" + state + "]";
+        }
+    }
+
+    /**
+     * SAH-35 the panel "Medicine round" ({@code MedicineRound} in the contract). {@code giveLockReason} is null when
+     * {@code canGive}; otherwise ROLE or IPD_READONLY.
+     */
+    public record RoundPanel(boolean canGive, String giveLockReason, boolean truncated, List<RoundRow> rows) {
+
+        @Override
+        public String toString() {
+            return "RoundPanel[rows=" + rows.size() + ", truncated=" + truncated + "]";
+        }
     }
 
     /** One choice of the select "What was done". */
@@ -51,9 +79,12 @@ public final class SafetyViews {
         }
     }
 
-    /** The Safety board. {@code view} is DOCTOR or NURSE; {@code yourPatients} is set for NURSE only. */
+    /**
+     * The Safety board. {@code view} is DOCTOR or NURSE; {@code yourPatients} is set for NURSE only;
+     * {@code medicineRound} is the SAH-35 panel.
+     */
     public record Board(String state, String view, Instant asOf, Counts counts, Integer yourPatients,
-                        List<ActionOption> responseActions, List<Row> escalations) {
+                        List<ActionOption> responseActions, List<Row> escalations, RoundPanel medicineRound) {
 
         @Override
         public String toString() {

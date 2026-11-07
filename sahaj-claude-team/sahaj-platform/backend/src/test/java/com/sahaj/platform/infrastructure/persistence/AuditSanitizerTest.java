@@ -56,6 +56,31 @@ class AuditSanitizerTest {
     }
 
     @Test
+    void keepsTheColleagueHardeningAuditFieldsCausedByAndWrongTriesReadable() {
+        // SAH-38 (ADR-014 D12): causedBy (SELF or COLLEAGUES) and wrongTries are ids-and-kinds data without "pin" in the key
+        Map<String, Object> locked = AuditSanitizer.sanitize("STAFF_PIN", Map.of(
+                "membershipId", "3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10", "pinState", "LOCKED", "lockCount", 1,
+                "causedBy", "COLLEAGUES", "lockedUntil", "2026-11-07T05:50:12Z"));
+        Map<String, Object> right = AuditSanitizer.sanitize("STAFF_PIN", Map.of(
+                "membershipId", "3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10",
+                "checkedByMembershipId", "8a1e2c44-0b7d-4c19-8f55-6d3e9a7b2c01", "wrongTries", 3));
+
+        assertThat(locked).containsEntry("causedBy", "COLLEAGUES").containsEntry("pinState", "LOCKED")
+                .containsEntry("lockCount", 1);
+        assertThat(right).containsEntry("wrongTries", 3)
+                .containsEntry("checkedByMembershipId", "8a1e2c44-0b7d-4c19-8f55-6d3e9a7b2c01");
+    }
+
+    @Test
+    void aNameOrAPinPutNextToTheColleagueHardeningFieldsIsStillReplaced() {
+        Map<String, Object> result = AuditSanitizer.sanitize("STAFF_PIN", Map.of(
+                "causedBy", "COLLEAGUES", "staffName", "Sunita Pawar", "colleaguePin", "4821", "byName", "x"));
+
+        assertThat(result).containsEntry("causedBy", "COLLEAGUES").containsEntry("staffName", AuditSanitizer.REDACTED)
+                .containsEntry("colleaguePin", AuditSanitizer.REDACTED);
+    }
+
+    @Test
     void anIdWhoseLastGroupIsTenOrMoreDigitsIsNotMaskedAsAMobileNumber() {
         String id = "3f0c9a52-6a1e-4f7e-9d1b-123456789012";
 

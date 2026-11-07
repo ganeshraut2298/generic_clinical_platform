@@ -1,6 +1,9 @@
 package com.sahaj.ipd.application;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.sahaj.ipd.application.IpdSettingsRepository.TransferRules;
+import com.sahaj.ipd.domain.EscalationState;
+import com.sahaj.ipd.domain.MedicineSafetyCheck;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -61,11 +64,82 @@ public final class AdmissionViews {
 
     /**
      * SAH-28: {@code emergency} holds the counts for the second tile and the tab. SAH-33: {@code safety} holds the Safety
-     * tab count and the banner for OWNER, DOCTOR and NURSE; it is null for every other role.
+     * tab count and the banner for OWNER, DOCTOR and NURSE; it is null for every other role. SAH-36 (ADR-013 D1):
+     * {@code asOf} is the database clock of the answer, {@code wards} the options of the ward select and {@code card}
+     * the card abilities of the caller, once for the whole list.
      */
     public record AdmissionList(int bedsTotal, int bedsOccupied, int bedsAvailable, boolean canAdmit,
                                 int depositAlerts, int alertPercent, int dischargedToday, int goingHomeToday,
-                                EmergencyViews.Counts emergency, SafetyViews.Banner safety, List<Summary> items) {
+                                EmergencyViews.Counts emergency, SafetyViews.Banner safety, Instant asOf,
+                                List<WardOption> wards, AdmittedCardAbilities card, List<AdmittedPatientRow> items) {
+    }
+
+    /** SAH-36 one option of the select "Ward": the id is the filter value. */
+    public record WardOption(UUID id, String name) {
+    }
+
+    /**
+     * SAH-36 (ADR-013 D5) what the card shows for this caller. Each is true only when the role in the token and the role
+     * of the active membership are both in the set of the ability, and the IPD state allows it.
+     */
+    public record AdmittedCardAbilities(boolean nursing, boolean emr, boolean transfer, boolean discharge,
+                                        boolean depositLowFlag) {
+    }
+
+    /**
+     * SAH-36 one admitted patient of the list: the {@link Summary} fields plus the card facts. {@code clinical} is
+     * written only when it is not null, so for FRONT_DESK the property is absent from the JSON (ADR-013 D3); every other
+     * property that is null is written as null. Name, UHID and clinical data are on screen only: ids in {@code toString}.
+     */
+    public record AdmittedPatientRow(UUID id, String ipNumber, UUID patientId, String patientName, Integer age,
+                                     String sex, String doctorName, String bedCode, String categoryName,
+                                     String wardName, String admissionType, String payer, int dayNumber,
+                                     long depositPaise, long minimumDepositPaise, String depositState,
+                                     Instant admittedAt, long runningBillPaise, boolean depositLow,
+                                     boolean goingHomeToday, String uhid, UUID wardId, String roomName,
+                                     @JsonInclude(JsonInclude.Include.NON_NULL) AdmittedClinicalFlags clinical) {
+
+        /** The row of the table plus the card facts; {@code clinical} null for a caller who may not read it. */
+        public static AdmittedPatientRow of(Summary s, String uhid, UUID wardId, String roomName,
+                                            AdmittedClinicalFlags clinical) {
+            return new AdmittedPatientRow(s.id(), s.ipNumber(), s.patientId(), s.patientName(), s.age(), s.sex(),
+                    s.doctorName(), s.bedCode(), s.categoryName(), s.wardName(), s.admissionType(), s.payer(),
+                    s.dayNumber(), s.depositPaise(), s.minimumDepositPaise(), s.depositState(), s.admittedAt(),
+                    s.runningBillPaise(), s.depositLow(), s.goingHomeToday(), uhid, wardId, roomName, clinical);
+        }
+
+        @Override
+        public String toString() {
+            return "AdmittedPatientRow[id=" + id + ", ipNumber=" + ipNumber + "]";
+        }
+    }
+
+    /**
+     * SAH-36 the clinical facts behind the card flags, for OWNER, DOCTOR and NURSE. Here null means "none exists"
+     * ({@code escalation} no open escalation, {@code latestEws} no vitals), never "not allowed".
+     */
+    public record AdmittedClinicalFlags(CardEscalationFlag escalation, VitalsViews.EwsSummary latestEws,
+                                        boolean vitalsDue, CardAllergy allergy) {
+
+        @Override
+        public String toString() {
+            return "AdmittedClinicalFlags[redacted]";
+        }
+    }
+
+    /** SAH-36 the open (OPEN or ACK) escalation of one admitted patient: minutes from {@code EscalationClock} at asOf. */
+    public record CardEscalationFlag(EscalationState.Status status, int waitingMinutes, int targetMinutes,
+                                     boolean pastTarget) {
+    }
+
+    /** SAH-36 the allergy status; {@code text} only when RECORDED (absent otherwise). Clinical text: hidden from toString. */
+    public record CardAllergy(MedicineSafetyCheck.AllergyStatus status,
+                              @JsonInclude(JsonInclude.Include.NON_NULL) String text) {
+
+        @Override
+        public String toString() {
+            return "CardAllergy[status=" + status + "]";
+        }
     }
 
     public record DepositEntry(UUID id, long amountPaise, String mode, Instant collectedAt, String collectedByName) {

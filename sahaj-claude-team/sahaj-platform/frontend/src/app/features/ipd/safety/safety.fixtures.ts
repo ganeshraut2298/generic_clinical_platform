@@ -1,4 +1,11 @@
-import { ClinicalEvent, ClinicalEventPage, EscalationRow, SafetyBoard } from './safety.model';
+import {
+  ClinicalEvent,
+  ClinicalEventPage,
+  EscalationRow,
+  MedicineRound,
+  MedicineRoundRow,
+  SafetyBoard,
+} from './safety.model';
 
 /** Test data in the shape of docs/api/ipd.yaml. Fictional names only. */
 export const ROW: EscalationRow = {
@@ -47,9 +54,45 @@ export const asNurse = (row: EscalationRow): EscalationRow => ({
   canCallSenior: row.status === 'OPEN',
 });
 
+/** 8 AM and 10:30 AM IST on 5 Nov 2026 (the board clock AS_OF is 11:17 AM IST). */
+export const SLOT_8AM = '2026-11-05T02:30:00Z';
+export const SLOT_1030AM = '2026-11-05T05:00:00Z';
+
+/** A Late dose (3 h late at AS_OF) of a high-alert medicine. */
+export const ROUND_LATE: MedicineRoundRow = {
+  admissionId: 'a1',
+  orderId: 'o2',
+  slotAt: SLOT_8AM,
+  state: 'LATE',
+  lateHours: 3,
+  drugName: 'Inj. Heparin 5,000 IU',
+  highAlert: 'Anticoagulant',
+  patientName: 'Asha Patil',
+  bedCode: '101-A',
+};
+
+/** A Due dose. */
+export const ROUND_DUE: MedicineRoundRow = {
+  admissionId: 'a2',
+  orderId: 'o1',
+  slotAt: SLOT_1030AM,
+  state: 'DUE',
+  lateHours: null,
+  drugName: 'Tab. Paracetamol 650 mg',
+  highAlert: null,
+  patientName: 'Ravi Shah',
+  bedCode: '202-B',
+};
+
+export function roundOf(over: Partial<MedicineRound> = {}): MedicineRound {
+  return { canGive: true, giveLockReason: null, truncated: false, rows: [ROUND_LATE, ROUND_DUE], ...over };
+}
+
 export function boardOf(over: Partial<SafetyBoard> = {}): SafetyBoard {
   const escalations = over.escalations ?? [ROW];
   const open = escalations.filter((e) => e.status !== 'DONE');
+  const medicineRound = over.medicineRound ?? roundOf();
+  const rows = medicineRound.rows;
   return {
     state: 'on',
     view: 'DOCTOR',
@@ -57,12 +100,15 @@ export function boardOf(over: Partial<SafetyBoard> = {}): SafetyBoard {
     counts: {
       open: open.length,
       pastTarget: open.filter((e) => e.pastTarget).length,
+      dosesDue: rows.filter((r) => r.state === 'DUE').length,
+      dosesLate: rows.filter((r) => r.state === 'LATE').length,
       changeToken: TOKEN_A,
       asOf: AS_OF,
     },
     yourPatients: null,
     responseActions: ACTIONS,
     escalations,
+    medicineRound,
     ...over,
   };
 }

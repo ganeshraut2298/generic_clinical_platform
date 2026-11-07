@@ -14,6 +14,11 @@ import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { PinState, TeamMemberPin, resetToast } from '../../pin/pin.model';
 import { PinCellComponent } from '../../pin/pin-cell.component';
+import {
+  COLLEAGUE_TRIES_TITLE_ID,
+  ColleagueTriesSheetComponent,
+  ColleagueTriesSheetData,
+} from '../../pin/colleague-tries-sheet.component';
 import { ResetPinSheetComponent, ResetPinSheetData } from '../../pin/reset-pin-sheet.component';
 import { SetPinSheetComponent } from '../../pin/set-pin-sheet.component';
 import { TeamApi } from './team.api';
@@ -338,15 +343,40 @@ export class TeamPage implements OnInit {
         if (!updated) {
           return;
         }
-        const cleared: TeamMemberPin = { state: 'NOT_SET', setAt: null, lockedUntil: null };
+        // The 7-day colleague tries are evidence: a reset does not clear them (ADR-014 D9).
+        const cleared: TeamMemberPin = {
+          state: 'NOT_SET',
+          setAt: null,
+          lockedUntil: null,
+          colleagueTries7d: member.pin?.colleagueTries7d ?? null,
+        };
         this.members.update((list) =>
           list.map((m) =>
-            m.id === member.id ? { ...m, ...updated, pin: updated.pin ?? cleared } : m,
+            m.id === member.id ? { ...m, ...updated, pin: this.afterReset(updated.pin, cleared) } : m,
           ),
         );
         this.toast(resetToast(member.name));
         setTimeout(() => document.getElementById('pin-pill-' + member.id)?.focus(), 0);
       });
+  }
+
+  /** The server's PIN after a reset; the 7-day count stays when the answer carries none. */
+  private afterReset(pin: TeamMemberPin | null | undefined, cleared: TeamMemberPin): TeamMemberPin {
+    return pin ? { ...pin, colleagueTries7d: pin.colleagueTries7d ?? cleared.colleagueTries7d } : cleared;
+  }
+
+  /** OWNER: the history of wrong tries by colleagues on this member's PIN (SAH-38, ADR-014 D9). */
+  protected showTries(member: TeamMember): void {
+    if (!this.isOwner()) {
+      return;
+    }
+    this.dialog.open<ColleagueTriesSheetComponent, ColleagueTriesSheetData>(ColleagueTriesSheetComponent, {
+      panelClass: 'sheet-panel',
+      width: '520px',
+      maxWidth: '100vw',
+      ariaLabelledBy: COLLEAGUE_TRIES_TITLE_ID,
+      data: { id: member.id, name: member.name },
+    });
   }
 
   /** Own row, every role: Set my PIN or Change my PIN opens the Set PIN sheet. */
@@ -373,6 +403,7 @@ export class TeamPage implements OnInit {
           state: status.state,
           setAt: status.setAt,
           lockedUntil: status.lockedUntil,
+          colleagueTries7d: member.pin?.colleagueTries7d ?? null,
         };
         this.members.update((list) => list.map((m) => (m.id === member.id ? { ...m, pin } : m)));
       });

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Sahaj platform API
   version: 0.1.0
-  description: Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json.
+  description: Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json.
 servers:
   - url: /api/v1/platform
 security:
@@ -275,14 +275,82 @@ paths:
         '423': { $ref: '#/components/responses/Problem', description: 'otp-locked' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
         '503': { $ref: '#/components/responses/Problem', description: 'pin-unavailable' }
+  /me/pin/colleague-tries:
+    get:
+      tags: [SAH-38]
+      summary: Wrong tries of my PIN by colleagues that I have not seen yet
+      x-required-role: any clinic role (own data only)
+      description: >-
+        SAH-38, ADR-014 D8. The notice to the PIN's owner (NEW, not in the mockup; texts T2 and T3 of the SAH-38
+        register). Any clinic role with an ACTIVE membership; the tenant and the person come from the session only;
+        another person's data can never be asked for. unseenCount = wrong tries of the caller's own PIN typed by
+        colleagues during a second-nurse check (compared and wrong) after the caller last tapped "Got it" (POST
+        /me/pin/colleague-tries/seen); before the first "Got it", every kept try. The caller's own wrong tries are
+        never in it. A new PIN does not clear it; only "Got it" does (OQ-38-3, ADR-014 Q2). Never returns who tried,
+        when each try was made, a PIN, a hash or a name (OQ-38-2, BR10). Writes nothing. Works in every plan and IPD
+        state and whether or not PIN checks are available. Client (app shell): called once after sign-in and on
+        every full page load, after the first screen shows (sign-in is never slowed); when unseenCount is above 0, a
+        banner at the top of the main content area (role status) with "N wrong tries of your PIN by colleagues
+        since your last use." or, for 1, "1 wrong try of your PIN by a colleague since your last use."; under it,
+        when state is LOCKED, "Your PIN is locked until <h:mm AM/PM> IST." from lockedUntil, and when state is
+        NOT_SET with notSetReason TOO_MANY_LOCKS, "Your PIN was switched off. Set a new one." with the button "Set
+        my PIN" (the existing Set PIN sheet); one button "Got it". On a failure no banner is shown and the shell
+        tries again at the next route change, at most once a minute.
+      responses:
+        '200':
+          description: The notice data (unseenCount 0 means no banner)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ColleagueTriesNotice' }
+              examples:
+                three: { value: { unseenCount: 3, latestAt: '2026-11-07T05:35:12.123456Z', state: SET, lockedUntil: null, notSetReason: null } }
+                locked: { value: { unseenCount: 5, latestAt: '2026-11-07T05:35:12.123456Z', state: LOCKED, lockedUntil: '2026-11-07T05:50:12Z', notSetReason: null } }
+                none: { value: { unseenCount: 0, latestAt: null, state: SET, lockedUntil: null, notSetReason: null } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
+  /me/pin/colleague-tries/seen:
+    post:
+      tags: [SAH-38]
+      summary: Dismiss the colleague-tries notice ("Got it")
+      x-required-role: any clinic role (own data only)
+      description: >-
+        SAH-38, ADR-014 D8. The button "Got it" of the notice. Body seenThrough = latestAt of the GET answer the
+        banner showed. The server records that the caller has seen every colleague wrong try up to seenThrough,
+        capped at the database clock (a future value cannot hide later tries). A try made after seenThrough stays
+        unseen and shows at the next load. Something is written only when at least one unseen try lies at or before
+        seenThrough; otherwise nothing is written (a double tap or a repeat after a lost answer is safe). Never
+        audited (the stored marker is its own record; staff data, ids and times only). Body format 400 validation,
+        field seenThrough "Reload the page and try again." when missing, longer than 40 characters, not a readable
+        date-time, more than one day ahead of the server clock, or earlier than 1 Jan 2020 (00:00 UTC); the same
+        problem type and title in every case, nothing written (security review S38-3: an out-of-range value never
+        reaches the database). 204. Client: the
+        banner closes at once and is not shown again for the same tries; on a failure it closes for this page and
+        comes back at the next load.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ColleagueTriesSeenInput' }
+            examples:
+              seen: { value: { seenThrough: '2026-11-07T05:35:12.123456Z' } }
+      responses:
+        '204': { description: Seen (or nothing to record) }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (field seenThrough)' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
   /team:
     get:
       tags: [SAH-6]
       description: >-
         Readable by any signed-in clinic user (the Fees and Case paper pages need doctor names, fees and
-        registration numbers). Writes are owner-only. TeamMember.pin (SAH-31, ADR-010) is filled on every row
-        when the caller is OWNER and on the caller's own row for every other role; it is null on other people's
-        rows for non-owners (the PIN state of colleagues, especially a lock, is not shown to them).
+        registration numbers). Writes are owner-only. TeamMember.pin (SAH-31, ADR-010) is sent on every row
+        when the caller is OWNER and on the caller's own row for every other role. For a non-owner caller no pin
+        object is sent on other people's rows (the key is left out; a client treats a missing pin like null): the
+        PIN state of colleagues, especially a lock, is not shown to them. SAH-38 (ADR-014 D9):
+        TeamMember.pin.colleagueTries7d is always present inside a sent pin object. OWNER caller: a number (0 or
+        more) on every row, the owner's own row included. Any other role: the only pin object they receive is
+        their own row's, and there colleagueTries7d is null (their own figure reaches them only through
+        GET /me/pin/colleague-tries).
       responses:
         '200': { description: Team, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TeamMember' } } } } }
     post:
@@ -354,7 +422,9 @@ paths:
         PIN set or locked: the PIN is cleared with the reason RESET_BY_OWNER, wrong tries and lock cleared,
         reset time (database) and the owner's user id stored; audit PLATFORM_PIN_RESET (membership id, state
         before, state after; never a name or the hash). No PIN: nothing written (a repeat after a lost answer is
-        safe). 200 with the member as GET /team returns it (pin.state NOT_SET). Client: confirm sheet first;
+        safe). 200 with the member as GET /team returns it to the owner (pin.state NOT_SET). pin.colleagueTries7d
+        is NOT cleared by the reset (ADR-014 D9: the 7-day figure is evidence, so the owner can still see why
+        they reset); the answer carries the current 7-day count, unchanged by the reset. Client: confirm sheet first;
         toast "PIN reset for <name>.". Removing access (DELETE /team/{id}) also clears the PIN with the same
         audit.
       responses:
@@ -364,7 +434,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TeamMember' }
               examples:
-                reset: { value: { id: 3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10, name: Rahul Deshmukh, mobileMasked: '••••••3301', role: PHARMACIST, status: ACTIVE, lastLoginAt: '2026-11-06T04:10:00Z', pin: { state: NOT_SET, setAt: null, lockedUntil: null } } }
+                reset:
+                  summary: 'Reset of a nurse''s PIN after colleague tries: the 7-day figure (3 before the reset) is unchanged'
+                  value: { id: 3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10, name: Priya Nair, mobileMasked: '••••••3301', role: NURSE, status: ACTIVE, lastLoginAt: '2026-11-06T04:10:00Z', pin: { state: NOT_SET, setAt: null, lockedUntil: null, colleagueTries7d: 3 } }
         '401': { $ref: '#/components/responses/Problem' }
         '403':
           description: forbidden
@@ -375,6 +447,52 @@ paths:
                 notOwner: { value: { type: 'https://sahaj.in/problems/forbidden', title: Not allowed, status: 403, detail: Only the clinic owner can do this. } }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
+  /team/{id}/pin/colleague-tries:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [SAH-38]
+      summary: Wrong PIN tries by colleagues on a team member's PIN, last 7 days
+      x-required-role: OWNER
+      description: >-
+        SAH-38, ADR-014 D9 (NEW, not in the mockup; texts T5, T10, T11, T12). The owner's history of colleague tries
+        on one member's PIN (membership id), for the last 7 days by the database clock, opened from the row line
+        "N wrong tries by colleagues in 7 days" (T4) on Clinic setup, Team and access, panel Staff (f-staff). OWNER
+        only (token role and the membership re-read); every other role 403 forbidden "Only the clinic owner can do
+        this." and no counts or names. A member of another clinic or an unknown id 404 not-found (same as any
+        other clinic's record). Allowed for every member, switched-off and removed ones included. Entries latest
+        first, at most 100 (truncated true when more): WRONG_TRIES groups the wrong tries of one colleague on one
+        IST calendar day (at = the latest try of the group, count = the tries), shown as "Wrong PIN tries by
+        <byName>: <count>"; LOCKED, one per lock caused by a run with a colleague's try, shown as "PIN locked after
+        wrong tries by colleagues" (no name); RIGHT_AFTER_WRONG, one per right PIN typed by a colleague who had
+        wrong tries on this PIN in the previous 7 days, shown as "Right PIN entered by <byName> after wrong tries".
+        Each line with its time as "24 Oct 2026, 11:05 AM IST". byName is looked up when the answer is built
+        (never stored); a switched-off or removed colleague keeps their name (mockup: past entries stay under their
+        name); "Former staff member" only when no name can be found. Writes nothing; no access row (staff data,
+        not patient data). Not cleared by an owner reset or a new PIN (evidence; ADR-014 Q3). Client: a sheet
+        "Wrong PIN tries · <name>" with the lines, empty state "No wrong tries by colleagues in the last 7 days.",
+        footer "Close"; on a failure the sheet shows the existing error state, never an empty list.
+      responses:
+        '200':
+          description: History
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ColleagueTriesHistory' }
+              examples:
+                some:
+                  value:
+                    membershipId: 5e2f8a1b-9c3d-4e7f-8a6b-1c2d3e4f5a6b
+                    asOf: '2026-11-07T06:00:00Z'
+                    wrongTries7d: 6
+                    truncated: false
+                    entries:
+                      - { kind: RIGHT_AFTER_WRONG, at: '2026-11-07T05:40:00Z', byMembershipId: 7a1c2e3f-4b5d-4c6e-8f70-81a2b3c4d5e6, byName: Sunita Pawar, count: null }
+                      - { kind: LOCKED, at: '2026-11-07T05:35:12Z', byMembershipId: null, byName: null, count: null }
+                      - { kind: WRONG_TRIES, at: '2026-11-07T05:35:12Z', byMembershipId: 7a1c2e3f-4b5d-4c6e-8f70-81a2b3c4d5e6, byName: Sunita Pawar, count: 5 }
+                      - { kind: WRONG_TRIES, at: '2026-11-05T14:02:00Z', byMembershipId: 9b8a7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d, byName: Meena Kale, count: 1 }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Only the clinic owner can do this.")' }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found' }
   /role-permissions:
     get:
       tags: [SAH-6]
@@ -523,7 +641,7 @@ components:
       type: object
       required: [type, title, status]
       properties:
-        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), validation, forbidden, not-found, rate-limit, otp-locked, and for the staff PIN (SAH-31, ADR-010 D11) wrong-pin (403), pin-locked (403; the 5th wrong try that causes the first or second lock within 24 hours, or any try while locked), pin-not-set (409; no PIN, by notSetReason, and also the 5th wrong try that causes the third lock within 24 hours, which switches the PIN off: "Your PIN was switched off after too many wrong tries. Set a new one, then try again."), pin-unavailable (503), under https://sahaj.in/problems/. The PIN types are also answered by other modules that check a PIN through platform.api.StaffPinPort (ipd verify). SAH-32 (ADR-011 D7, PROPOSED): the second-nurse check of a high-alert dose (ipd POST /medicine-orders/{id}/doses) checks a colleague''s PIN through StaffPinPort.checkColleague and answers the same types with colleague texts and no names: wrong-pin "That PIN is not right." (no tries-left count, so a guesser is not told when to stop before a lock; the wrong try still counts on the colleague''s PIN; security review S4; the own-PIN answer keeps the count), pin-locked "The second nurse''s PIN is locked after 5 wrong tries. Choose another nurse, or try again at <h:mm AM/PM>.", pin-not-set "The second nurse has not set a PIN yet. Choose another nurse.", rate-limit (also when the caller has 5 failed colleague checks in 15 minutes or 10 in 24 hours), pin-unavailable; a client never reads GET /me/pin after such a pin-not-set.', examples: ['https://sahaj.in/problems/plan-limit'] }
+        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), validation, forbidden, not-found, rate-limit, otp-locked, and for the staff PIN (SAH-31, ADR-010 D11) wrong-pin (403), pin-locked (403; the 5th wrong try that causes the first or second lock within 24 hours, or any try while locked), pin-not-set (409; no PIN, by notSetReason, and also the 5th wrong try that causes the third lock within 24 hours, which switches the PIN off: "Your PIN was switched off after too many wrong tries. Set a new one, then try again."), pin-unavailable (503), under https://sahaj.in/problems/. The PIN types are also answered by other modules that check a PIN through platform.api.StaffPinPort (ipd verify). SAH-32 (ADR-011 D7, PROPOSED): the second-nurse check of a high-alert dose (ipd POST /medicine-orders/{id}/doses) checks a colleague''s PIN through StaffPinPort.checkColleague and answers the same types with colleague texts and no names: wrong-pin "That PIN is not right." (no tries-left count, so a guesser is not told when to stop before a lock; the wrong try still counts on the colleague''s PIN; security review S4; the own-PIN answer keeps the count), pin-locked "The second nurse''s PIN is locked after 5 wrong tries. Choose another nurse, or try again at <h:mm AM/PM>.", pin-not-set "The second nurse has not set a PIN yet. Choose another nurse.", rate-limit (also when the caller has 5 failed colleague checks in 15 minutes or 10 in 24 hours), pin-unavailable; a client never reads GET /me/pin after such a pin-not-set. SAH-38 (ADR-014, PROPOSED) adds for the colleague check only: colleague-pin-limit (429; "Too many wrong PIN tries for this nurse. Choose another nurse."; the caller made 5 wrong tries of this colleague''s PIN within a rolling 7 days, durable in the database, cleared by a right PIN of the same pair or a new PIN; the PIN is not compared and nothing is counted; no retryAfterSeconds and no count) and pin-check-failed (503; "We could not check the PIN. Try again."; the PIN store could not be read or written in time: only a timeout, a lost connection or a lock failure; a constraint or permission refusal by the database (23514, 23503, 42501) is a code fault and stays a plain 500 server error, never an answer about the PIN (ADR-014 D5); fail closed, nothing counted, the same answer whether the PIN was right or wrong). Also from SAH-38: the colleague''s own failed-check limit is no longer used by colleague checks (only the caller''s limit, the pair cap and the lockout), and a lock caused by a run with any colleague try answers pin-locked and never switches the PIN off (pin-not-set TOO_MANY_LOCKS comes only from three own-session locks within 24 hours).', examples: ['https://sahaj.in/problems/plan-limit'] }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
@@ -676,7 +794,7 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/TeamMemberPin' }
             - { type: 'null' }
-          description: 'SAH-31. Filled for OWNER on every row and for the caller''s own row; null otherwise (GET /team).'
+          description: 'SAH-31. Sent for an OWNER caller on every row and for the caller''s own row; otherwise not sent (the key is left out; treat a missing pin like null). Never sent for a non-owner on other people''s rows (GET /team).'
     TeamMemberPin:
       type: object
       description: >-
@@ -685,12 +803,25 @@ components:
         in place of the mockup's "Send PIN link" button (WhatsApp is not in phase 1). OWNER also gets the ghost
         button "Reset PIN" (key icon) on rows with SET or LOCKED, opening the confirm sheet "Reset PIN · <name>".
         Own row, every role: the button "Set my PIN" (NOT_SET) or "Change my PIN" (SET, LOCKED) opening the Set
-        PIN sheet. Never the PIN or the hash.
-      required: [state, setAt, lockedUntil]
+        PIN sheet. Never the PIN or the hash. Whenever a pin object is sent, all four keys are present (setAt,
+        lockedUntil and colleagueTries7d as null when they do not apply).
+      required: [state, setAt, lockedUntil, colleagueTries7d]
       properties:
         state: { $ref: '#/components/schemas/PinState' }
         setAt: { type: [string, 'null'], format: date-time, description: 'When the current PIN was set; null when NOT_SET.' }
         lockedUntil: { type: [string, 'null'], format: date-time, description: 'Set only when LOCKED.' }
+        colleagueTries7d:
+          type: [integer, 'null']
+          minimum: 0
+          description: >-
+            SAH-38, ADR-014 D9. Always present in a sent pin object. A number for an OWNER caller, on every row
+            (the owner's own row included). Null for every other role: such a caller receives a pin object only on
+            their own row (other people's rows carry no pin), so null appears only there. The number: wrong tries
+            of this member's PIN typed by colleagues in second-nurse checks in the last 7 days (database clock),
+            not cleared by a reset or a new PIN. 0 when none or no PIN row. Row text (NEW, T4), only when above 0,
+            as a link-style button that opens the sheet of GET /team/{id}/pin/colleague-tries: "N wrong tries by
+            colleagues in 7 days" or "1 wrong try by a colleague in 7 days". Next to the existing pills; the "PIN
+            locked" pill is unchanged. Never a name here.
     PinState:
       type: string
       enum: [NOT_SET, SET, LOCKED]
@@ -721,6 +852,47 @@ components:
         code: { type: [string, 'null'], maxLength: 16, description: 'The 6-digit one-time code from POST /me/pin/code. Exactly 6 ASCII digits, else 400 field code "Enter the 6-digit code.". Never logged or echoed.' }
         newPin: { type: [string, 'null'], maxLength: 16, description: 'Exactly 4 ASCII digits (a string, so leading zeros survive), else "Enter a 4-digit PIN."; refused by the weak-PIN rules of ADR-010 D4 with "This PIN is too easy to guess. Choose another one.". Never logged, audited, stored in clear or echoed.' }
         confirmPin: { type: [string, 'null'], maxLength: 16, description: 'Must equal newPin, else "The two PINs do not match.".' }
+    ColleagueTriesNotice:
+      type: object
+      description: 'SAH-38, ADR-014 D8. Answer of GET /me/pin/colleague-tries: the caller''s own data only, counts and state, never who tried.'
+      required: [unseenCount, latestAt, state, lockedUntil, notSetReason]
+      properties:
+        unseenCount: { type: integer, minimum: 0, description: 'Colleague wrong tries of the caller''s PIN after the last "Got it" (all kept tries before the first). 0 means no banner.' }
+        latestAt: { type: [string, 'null'], format: date-time, description: 'Time of the newest try counted in unseenCount (database clock, microseconds kept); null when unseenCount is 0. Send it back as seenThrough. Not shown on screen.' }
+        state: { $ref: '#/components/schemas/PinState' }
+        lockedUntil: { type: [string, 'null'], format: date-time, description: 'Set only when LOCKED; shown as "Your PIN is locked until 11:05 AM IST.".' }
+        notSetReason:
+          oneOf:
+            - { type: string, enum: [RESET_BY_OWNER, TOO_MANY_LOCKS] }
+            - { type: 'null' }
+          description: 'As PinStatus.notSetReason. TOO_MANY_LOCKS adds "Your PIN was switched off. Set a new one." and the button "Set my PIN".'
+    ColleagueTriesSeenInput:
+      type: object
+      required: [seenThrough]
+      properties:
+        seenThrough: { type: string, format: date-time, maxLength: 40, description: 'ColleagueTriesNotice.latestAt as received. Capped at the database clock by the server. 400 validation, field seenThrough "Reload the page and try again." when missing, longer than 40 characters, not a readable date-time, more than one day ahead of the server clock, or earlier than 1 Jan 2020 (00:00 UTC) (security review S38-3).' }
+    ColleagueTriesHistory:
+      type: object
+      description: 'SAH-38, ADR-014 D9. Answer of GET /team/{id}/pin/colleague-tries (OWNER only).'
+      required: [membershipId, asOf, wrongTries7d, truncated, entries]
+      properties:
+        membershipId: { type: string, format: uuid }
+        asOf: { type: string, format: date-time, description: 'Database clock; the window is the 7 days before it.' }
+        wrongTries7d: { type: integer, minimum: 0, description: 'Equals TeamMember.pin.colleagueTries7d at the same instant.' }
+        truncated: { type: boolean, description: 'True when more than 100 entries exist; the newest 100 are returned.' }
+        entries: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ColleagueTriesEntry' }, description: 'Latest first.' }
+    ColleagueTriesEntry:
+      type: object
+      required: [kind, at, byMembershipId, byName, count]
+      properties:
+        kind:
+          type: string
+          enum: [WRONG_TRIES, LOCKED, RIGHT_AFTER_WRONG]
+          description: 'WRONG_TRIES "Wrong PIN tries by <byName>: <count>"; LOCKED "PIN locked after wrong tries by colleagues"; RIGHT_AFTER_WRONG "Right PIN entered by <byName> after wrong tries".'
+        at: { type: string, format: date-time, description: 'WRONG_TRIES: the latest try of the group (one colleague, one IST day). Shown as "24 Oct 2026, 11:05 AM IST".' }
+        byMembershipId: { type: [string, 'null'], format: uuid, description: 'The colleague who typed; null for LOCKED.' }
+        byName: { type: [string, 'null'], description: 'Looked up at answer time, never stored; "Former staff member" only when no name can be found; null for LOCKED. Screen only, never logged.' }
+        count: { type: [integer, 'null'], minimum: 1, description: 'WRONG_TRIES only; null otherwise.' }
     PinCodeSent:
       type: object
       required: [resendAfterSeconds, mobileMasked]

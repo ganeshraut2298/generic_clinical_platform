@@ -39,3 +39,5 @@ Backend QA tail: running.
 ## Backend QA tail (qa-engineer, 6 Nov 2026) - PASS
 validate backend exit 0 after the fixes: unit 3,043 (192 classes), IT 1,555 (114 classes, +1), 26 precondition skips (none SAH-32). Tech lead read target/failsafe-reports/failsafe-summary.xml (1555 completed, 0 errors, 0 failures, 26 skipped). New/updated: colleague wrong-PIN text (DoseSecondNurseIT, StaffPinColleagueIT), deny scan shape (DoseGiveIT), Stopped/Rejected never on MAR or count (MarReadIT). Plan: docs/test-plans/SAH-32.md.
 Story status: DONE, awaiting human `merge` approval (release together with SAH-31). Human to-do: `git add -f` the e2e files and the new IT files; approval lines; DEC-018 decisions.
+
+(Parallel lanes SAH-35, SAH-36, SAH-38 are tracked in their own files under docs/decisions/DEC-020..DEC-023 and docs/test-plans/.)

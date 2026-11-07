@@ -3,9 +3,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { ReplaySubject, of } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { DischargeSheet } from '../discharge.model';
 import { AdmissionBedOption, AdmissionDetail, AdmissionOptions, ChargeService } from '../ipd.model';
+import { AdmissionsApi } from '../admissions.api';
 import { AdmissionDialogComponent } from './admission-dialog.component';
 
 const URL = '/api/v1/ipd/admissions/a1';
@@ -97,14 +99,17 @@ const DETAIL: AdmissionDetail = {
 describe('AdmissionDialogComponent', () => {
   let fixture: ComponentFixture<AdmissionDialogComponent>;
   let http: HttpTestingController;
-  let dialogRef: { close: ReturnType<typeof vi.fn> };
+  let dialogRef: { close: ReturnType<typeof vi.fn>; afterOpened: () => ReplaySubject<void> };
+  /** The dialog finished opening (Material's afterOpened, a replaying subject). */
+  let opened: ReplaySubject<void>;
   let snack: ReturnType<typeof vi.fn>;
 
   async function setup(
     detail: AdmissionDetail | null = DETAIL,
     free: AdmissionBedOption[] = FREE_BEDS,
   ): Promise<void> {
-    dialogRef = { close: vi.fn() };
+    opened = new ReplaySubject<void>(1);
+    dialogRef = { close: vi.fn(), afterOpened: () => opened };
     snack = vi.fn();
     await TestBed.configureTestingModule({
       imports: [AdmissionDialogComponent],
@@ -1024,6 +1029,186 @@ describe('AdmissionDialogComponent', () => {
       await setup({ ...DETAIL, canOpenNursing: true, canOpenEmr: true });
       const labels = Array.from(el().querySelectorAll('.sheet-f button')).map(squash);
       expect(labels.indexOf('EMR')).toBeGreaterThan(labels.indexOf('Nursing'));
+    });
+  });
+
+  describe('start view from a patient card (SAH-36, ADR-013 D6)', () => {
+    const DISCHARGE_URL = '/api/v1/ipd/admissions/a1/discharge';
+    const MOVABLE: AdmissionDetail = { ...DETAIL, canCollectDeposit: false, canAddCharge: false, canTransfer: true };
+    const READY: AdmissionDetail = { ...MOVABLE, canTransfer: false, canStartDischarge: true, status: 'ADMITTED' };
+    const SHEET_ANSWER: DischargeSheet = {
+      admissionId: 'a1',
+      ipNumber: 'IP/26-27/0042',
+      patientName: 'Asha Patil',
+      bedCode: '101-A',
+      dayNumber: 2,
+      approvalChain: true,
+      types: [{ key: 'normal', label: 'Normal' }],
+      templates: [{ key: 'general', label: 'General medicine' }],
+      defaultType: 'normal',
+      defaultTemplateKey: 'general',
+      signature: null,
+      canSign: true,
+      canDischarge: true,
+      canRefund: true,
+      preview: {
+        diagnosis: 'Chest pain',
+        stayDays: 2,
+        bedCode: '101-A',
+        doctorName: 'Dr. Meera Kulkarni',
+        doctorShortName: 'Dr. Meera Kulkarni',
+        doctorSpecialty: null,
+      },
+      bill: { totalPaise: 265000, depositsPaise: 400000, balancePaise: -135000 },
+      followUpDays: 7,
+      followUpDate: '2026-10-31',
+      openEscalation: false,
+      signoffBeforeEscalation: false,
+    };
+
+    async function setupAt(
+      startView: 'details' | 'move' | 'discharge' | undefined,
+      detail: AdmissionDetail,
+      free: AdmissionBedOption[] = FREE_BEDS,
+      openWhen: 'before-read' | 'after-read' | 'never' = 'before-read',
+    ): Promise<void> {
+      opened = new ReplaySubject<void>(1);
+      dialogRef = { close: vi.fn(), afterOpened: () => opened };
+      snack = vi.fn();
+      await TestBed.configureTestingModule({
+        imports: [AdmissionDialogComponent],
+        providers: [
+          { provide: MAT_DIALOG_DATA, useValue: startView ? { id: 'a1', startView } : { id: 'a1' } },
+          { provide: MatDialogRef, useValue: dialogRef },
+          { provide: MatSnackBar, useValue: { open: snack } },
+          provideHttpClient(withInterceptors([problemDetailInterceptor])),
+          provideHttpClientTesting(),
+        ],
+      }).compileComponents();
+      http = TestBed.inject(HttpTestingController);
+      fixture = TestBed.createComponent(AdmissionDialogComponent);
+      document.body.appendChild(el());
+      // Material's focus step at the end of the opening: the first thing in the dialog (the close button).
+      opened.subscribe(() => closeButton.focus());
+      fixture.detectChanges();
+      if (openWhen === 'before-read') {
+        await open();
+      }
+      http.expectOne(URL).flush(detail);
+      if (detail.canTransfer) {
+        http.expectOne(OPTIONS_URL).flush(optionsOf(free));
+      }
+      await settle();
+      if (openWhen === 'after-read') {
+        await open();
+      }
+    }
+
+    const closeButton = document.createElement('button');
+
+    async function open(): Promise<void> {
+      opened.next();
+      await settle();
+    }
+
+    beforeEach(() => document.body.appendChild(closeButton));
+    afterEach(() => {
+      el().remove();
+      closeButton.remove();
+    });
+
+    it('opens on the main view for `details` and for no start view', async () => {
+      await setupAt('details', MOVABLE);
+      expect(el().querySelector('#ads')!.textContent).toContain('Asha Patil');
+      expect(document.activeElement).not.toBe(el().querySelector('#ad-bed'));
+    });
+
+    it('focuses the Move row (the bed select) for `move`', async () => {
+      await setupAt('move', MOVABLE);
+      expect(document.activeElement).toBe(el().querySelector('#ad-bed'));
+    });
+
+    it('focuses the bed select when the free beds answer after the dialog opened (F-1)', async () => {
+      await setupAt('move', MOVABLE, FREE_BEDS, 'before-read');
+      expect(document.activeElement).toBe(el().querySelector('#ad-bed'));
+    });
+
+    it('focuses the bed select when the dialog opens after the free beds answered, taking back the focus the dialog set (F-1)', async () => {
+      await setupAt('move', MOVABLE, FREE_BEDS, 'after-read');
+      expect(document.activeElement).toBe(el().querySelector('#ad-bed'));
+    });
+
+    it('does not take the focus while the dialog is still opening, then takes it right after it opened', async () => {
+      await setupAt('move', MOVABLE, FREE_BEDS, 'never');
+      expect(document.activeElement).not.toBe(el().querySelector('#ad-bed'));
+      await open();
+      expect(document.activeElement).toBe(el().querySelector('#ad-bed'));
+    });
+
+    it('focuses the Move row itself when there is no free bed and the dialog opens after the read (F-1)', async () => {
+      await setupAt('move', MOVABLE, [], 'after-read');
+      expect(document.activeElement).toBe(el().querySelector('#ad-move-row'));
+    });
+
+    it('does not move the focus away from the dialog for details, whichever comes first', async () => {
+      await setupAt('details', MOVABLE, FREE_BEDS, 'after-read');
+      expect(document.activeElement).toBe(closeButton);
+    });
+
+    it('focuses the bed select even when the server answers at once, before the start view could be applied (R36-9)', async () => {
+      opened = new ReplaySubject<void>(1);
+      dialogRef = { close: vi.fn(), afterOpened: () => opened };
+      await TestBed.configureTestingModule({
+        imports: [AdmissionDialogComponent],
+        providers: [
+          { provide: MAT_DIALOG_DATA, useValue: { id: 'a1', startView: 'move' } },
+          { provide: MatDialogRef, useValue: dialogRef },
+          { provide: MatSnackBar, useValue: { open: vi.fn() } },
+          {
+            provide: AdmissionsApi,
+            useValue: {
+              get: () => of(MOVABLE),
+              options: () => of(optionsOf(FREE_BEDS)),
+              chargeServices: () => of([]),
+            },
+          },
+        ],
+      }).compileComponents();
+      fixture = TestBed.createComponent(AdmissionDialogComponent);
+      document.body.appendChild(el());
+      fixture.detectChanges();
+      await open();
+      expect(document.activeElement).toBe(el().querySelector('#ad-bed'));
+    });
+
+    it('focuses the Move row itself when there is no free bed', async () => {
+      await setupAt('move', MOVABLE, []);
+      expect(document.activeElement).toBe(el().querySelector('#ad-move-row'));
+    });
+
+    it('stays on the main view for `move` when the detail says the patient cannot be moved', async () => {
+      await setupAt('move', { ...MOVABLE, canTransfer: false });
+      expect(el().querySelector('#ad-bed')).toBeNull();
+      expect(el().querySelector('#ads')!.textContent).toContain('Asha Patil');
+    });
+
+    it('opens straight on the discharge view for `discharge` and makes the same read as Start discharge', async () => {
+      await setupAt('discharge', READY);
+      http.expectOne(DISCHARGE_URL).flush(SHEET_ANSWER);
+      await settle();
+      expect(el().querySelector('h2')!.textContent).toBe('Discharge Asha Patil');
+    });
+
+    it('stays on the main view for `discharge` when the detail says discharge is not possible any more', async () => {
+      await setupAt('discharge', { ...READY, canStartDischarge: false });
+      expect(el().querySelector('#ads')!.textContent).toContain('Asha Patil');
+      http.expectNone(DISCHARGE_URL);
+    });
+
+    it('stays on the main view for `discharge` on an already discharged admission', async () => {
+      await setupAt('discharge', { ...READY, canStartDischarge: false, status: 'DISCHARGED' });
+      http.expectNone(DISCHARGE_URL);
+      expect(el().querySelector('h2')!.textContent).not.toContain('Discharge Asha');
     });
   });
 });

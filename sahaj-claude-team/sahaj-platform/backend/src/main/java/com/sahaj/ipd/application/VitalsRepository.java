@@ -4,6 +4,7 @@ import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,6 +24,13 @@ public interface VitalsRepository {
     /** The newest record of the admission: {@code recorded_at} descending, then {@code id} descending. */
     Optional<VitalsRow> findLatest(UUID tenantId, UUID admissionId);
 
+    /**
+     * SAH-36 (ADR-013 R4): the score, risk and time of the newest record ({@code recorded_at} descending, then
+     * {@code id} descending, the rule of {@link #findLatest}) of every ADMITTED admission of the clinic, in one statement
+     * (one index probe per admission). An admission with no vitals is absent from the map.
+     */
+    Map<UUID, LatestScore> findLatestOfAdmitted(UUID tenantId);
+
     /** The record stored with this client key, in any admission of the clinic. */
     Optional<VitalsRow> findByClientKey(UUID tenantId, UUID clientKey);
 
@@ -36,6 +44,15 @@ public interface VitalsRepository {
     List<NoteRow> findRecentNotes(UUID tenantId, UUID admissionId, int limit);
 
     record Stored(UUID id, Instant recordedAt) {
+    }
+
+    /** SAH-36: the latest score of one admission, nothing else of the record (no five values). Clinical data. */
+    record LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt) {
+
+        @Override
+        public String toString() {
+            return "LatestScore[admissionId=" + admissionId + "]";
+        }
     }
 
     /** The five values are clinical data: {@code toString} shows the admission id only. */

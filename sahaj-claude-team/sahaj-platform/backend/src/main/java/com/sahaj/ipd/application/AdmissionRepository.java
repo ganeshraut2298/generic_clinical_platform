@@ -26,6 +26,12 @@ public interface AdmissionRepository {
     /** Admitted patients, newest first, with the total of their deposits. */
     List<AdmissionRow> findAdmitted(UUID tenantId);
 
+    /**
+     * SAH-36 (ADR-013 R1): the same rows as {@link #findAdmitted} (same order) with the ward id and the name of the bed's
+     * room (null when the bed has no room), from the same statement: bed, ward and room are joined by primary key.
+     */
+    List<AdmittedRow> findAdmittedWithPlacement(UUID tenantId);
+
     /** SAH-33: how many patients are Admitted now (the nurse's tile "Your patients"), counted in one query. */
     int countAdmitted(UUID tenantId);
 
@@ -81,6 +87,15 @@ public interface AdmissionRepository {
         @Override
         public String toString() {
             return "AdmissionRow[id=" + id + ", ipNumber=" + ipNumber + "]";
+        }
+    }
+
+    /** SAH-36: an admitted row with the ward id and the room name of its bed. Ids only in {@code toString}. */
+    record AdmittedRow(AdmissionRow admission, UUID wardId, String roomName) {
+
+        @Override
+        public String toString() {
+            return "AdmittedRow[id=" + admission.id() + "]";
         }
     }
 

@@ -5,6 +5,7 @@ import {
   ElementRef,
   Injector,
   afterNextRender,
+  computed,
   effect,
   inject,
   signal,
@@ -38,6 +39,7 @@ import {
   SECOND_NURSE_SMALL,
   STEP_ONE,
   THEIR_PIN_LABEL,
+  WARD_LINE,
   WRISTBAND_LABEL,
   WRISTBAND_PLACEHOLDER,
   classifyGiveError,
@@ -139,6 +141,7 @@ export class GiveSheetComponent {
   protected readonly reasonLabel = REASON_LABEL;
   protected readonly chooseReason = CHOOSE_REASON;
   protected readonly mismatchText = mismatchLine(this.data.mar.patient.name);
+  protected readonly wardText = WARD_LINE;
 
   protected readonly running = signal(false);
   /** Refusals that belong to one control, shown under it. */
@@ -147,6 +150,16 @@ export class GiveSheetComponent {
   protected readonly mismatch = signal(false);
   /** A failure that is not about one control. */
   protected readonly failure = signal<string | null>(null);
+  /** The last answer was one after which the ward line (T6) is shown. */
+  private readonly wardAnswer = signal(false);
+  /**
+   * SAH-38 (ADR-014 D10, T6): for a high-alert medicine, after pin-locked, pin-not-set, rate-limit or
+   * colleague-pin-limit, and always when there is no other nurse to choose. Never after wrong-pin or
+   * either 503. There is no bypass behind it.
+   */
+  protected readonly showWardLine = computed(
+    () => this.highAlert && (this.nurses.length === 0 || this.wardAnswer()),
+  );
 
   protected readonly form = new FormGroup({
     wristband: new FormControl('', { nonNullable: true }),
@@ -185,6 +198,18 @@ export class GiveSheetComponent {
     if (event.key === 'Enter') {
       event.preventDefault();
     }
+  }
+
+  /** Another nurse in "Checked by": the ward line was about the nurse before. */
+  protected nurseChosen(): void {
+    this.dropError('secondNurseId');
+    this.wardAnswer.set(false);
+  }
+
+  /** The PIN box is described by its reason and, when shown, the ward line. */
+  protected pinDescribedBy(): string | null {
+    const ids = [this.errors().secondNursePin ? 'sf-pin-err' : '', this.showWardLine() ? 'sf-ward' : ''].filter(Boolean);
+    return ids.length > 0 ? ids.join(' ') : null;
   }
 
   protected pinEdited(): void {
@@ -275,6 +300,7 @@ export class GiveSheetComponent {
 
   private failed(error: unknown): void {
     const failure = classifyGiveError(error);
+    this.wardAnswer.set(failure.kind === 'pin' && failure.ward);
     switch (failure.kind) {
       case 'mismatch':
         this.mismatch.set(true);

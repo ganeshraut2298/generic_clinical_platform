@@ -155,7 +155,8 @@
         <app-icon name="logout" [size]="17" />
       </button>
     </header>
-    <main class="page">
+    <main class="page" id="main-content" tabindex="-1">
+      <app-colleague-tries-banner />
       <router-outlet />
     </main>
   </div>

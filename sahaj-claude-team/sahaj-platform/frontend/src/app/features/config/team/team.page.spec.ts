@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
 import { ResetPinSheetComponent } from '../../pin/reset-pin-sheet.component';
+import { ColleagueTriesSheetComponent } from '../../pin/colleague-tries-sheet.component';
 import { SetPinSheetComponent } from '../../pin/set-pin-sheet.component';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
@@ -342,6 +343,94 @@ describe('TeamPage personal PIN (SAH-31)', () => {
     el.querySelector<HTMLButtonElement>('[data-act=pin-own]')!.click();
     fixture.detectChanges();
     expect(pills(el)).toEqual(['No PIN yet']);
+  });
+});
+
+describe('TeamPage colleague tries (SAH-38, ADR-014 D9)', () => {
+  let fixture: ComponentFixture<TeamPage>;
+  let http: HttpTestingController;
+
+  const row = (m: TeamMember, tries: number | null | undefined): TeamMember => ({
+    ...m,
+    pin: { state: 'SET', setAt: '2026-11-06T05:35:00Z', lockedUntil: null, colleagueTries7d: tries },
+  });
+
+  async function open(role: Role, members: TeamMember[], membershipId?: string) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([problemDetailInterceptor])),
+        provideHttpClientTesting(),
+        { provide: ShellStore, useValue: { me: () => ({ userId: 'u1', membershipId, role }) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(TeamPage);
+    fixture.detectChanges();
+    http.expectOne(`${BASE}/team`).flush(members);
+    http.expectOne(`${BASE}/role-permissions`).flush(MATRIX);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  const squash = (n: Element | null | undefined) => (n?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const lines = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('#f-staff [data-act=pin-tries]')).map((b) => squash(b));
+
+  afterEach(() => http.verify());
+
+  it('shows the owner the count on each row that has tries, and nothing on a row with none', async () => {
+    const el = await open('OWNER', [row(OWNER, 0), row(NURSE, 4), row({ ...NURSE, id: 'm-n2', name: 'Anita Rao' }, 1)], 'm-owner');
+    expect(lines(el)).toEqual(['4 wrong tries by colleagues in 7 days', '1 wrong try by a colleague in 7 days']);
+  });
+
+  it('shows no count when the server sent none (no zero is made up)', async () => {
+    const el = await open('OWNER', [row(OWNER, 0), row(NURSE, null)], 'm-owner');
+    expect(lines(el)).toEqual([]);
+  });
+
+  it('shows no count to a role that is not the owner', async () => {
+    const el = await open('NURSE', [OWNER, row(NURSE, null)], 'm-nurse');
+    expect(el.querySelector('[data-act=pin-tries]')).toBeNull();
+  });
+
+  it('opens the history sheet for that member with the name', async () => {
+    const el = await open('OWNER', [row(OWNER, 0), row(NURSE, 4)], 'm-owner');
+    const dialog = vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({ afterClosed: () => of(undefined) } as never);
+    el.querySelector<HTMLButtonElement>('#f-staff [data-act=pin-tries]')!.click();
+    const [component, config] = dialog.mock.calls[0];
+    expect(component).toBe(ColleagueTriesSheetComponent);
+    expect((config as { data: unknown }).data).toEqual({ id: 'm-nurse', name: 'Meera Patil' });
+    expect((config as { ariaLabelledBy: string }).ariaLabelledBy).toBe('ct-title');
+  });
+
+  it('keeps the count after an owner reset, because it is evidence', async () => {
+    const el = await open('OWNER', [row(OWNER, 0), row(NURSE, 4)], 'm-owner');
+    const cleared: TeamMember = { ...NURSE, pin: { state: 'NOT_SET', setAt: null, lockedUntil: null } };
+    vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({ afterClosed: () => of(cleared) } as never);
+    vi.spyOn(TestBed.inject(MatSnackBar), 'open').mockReturnValue({} as never);
+    el.querySelector<HTMLButtonElement>('[aria-label="Reset PIN for Meera Patil"]')!.click();
+    fixture.detectChanges();
+    expect(squash(el.querySelector('#f-staff [data-act=pin-tries]'))).toBe('4 wrong tries by colleagues in 7 days');
+  });
+
+  it('shows the existing error state, with no counts, when the team cannot be loaded', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([problemDetailInterceptor])),
+        provideHttpClientTesting(),
+        { provide: ShellStore, useValue: { me: () => ({ userId: 'u1', membershipId: 'm-owner', role: 'OWNER' }) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(TeamPage);
+    fixture.detectChanges();
+    http.expectOne(`${BASE}/team`).flush({}, { status: 500, statusText: 'Server Error' });
+    http.expectOne(`${BASE}/role-permissions`).flush(MATRIX);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.notice.err')).not.toBeNull();
+    expect(el.querySelector('[data-act=pin-tries]')).toBeNull();
   });
 });
 

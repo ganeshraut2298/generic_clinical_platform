@@ -113,8 +113,8 @@ class DosePrivacyIT extends MarSupport {
                     .doesNotContain("penicillin");
             if (line.startsWith("deny|")) {
                 deny++;
-                assertThat(line).startsWith("deny|Stopped at the wristband check: scanned ").contains(", expected " + w.uhid() + " (");
-                assertThat(line).matches("deny\\|Stopped at the wristband check: scanned (text that is not a UHID|" + other
+                assertThat(line).startsWith("deny|Stopped at the identity check: entered ").contains(", expected " + w.uhid() + " (");
+                assertThat(line).matches("deny\\|Stopped at the identity check: entered (text that is not a UHID|" + other
                         + "), expected " + w.uhid() + " \\(.+\\)");
             } else {
                 assertThat(line).as("the UHID is only in the deny entries").doesNotContain(w.uhid());

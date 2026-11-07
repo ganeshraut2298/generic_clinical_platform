@@ -6,7 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -29,6 +31,18 @@ public class JdbcVitalsRepository implements VitalsRepository {
             where v.tenant_id = :tenantId and v.admission_id = :admissionId
             order by v.recorded_at desc, v.id desc
             limit 1
+            """;
+    // SAH-36 (ADR-013 R4): one probe of ix_vitals_tenant_admission_recorded per admitted admission, newest first.
+    private static final String FIND_LATEST_OF_ADMITTED = """
+            select v.admission_id, v.ews_score, v.ews_risk, v.recorded_at
+            from ipd.admission a
+            cross join lateral (
+                select x.admission_id, x.ews_score, x.ews_risk, x.recorded_at
+                from ipd.vitals x
+                where x.tenant_id = a.tenant_id and x.admission_id = a.id
+                order by x.recorded_at desc, x.id desc
+                limit 1) v
+            where a.tenant_id = :tenantId and a.status = 'ADMITTED'
             """;
     private static final String FIND_BY_CLIENT_KEY = "select " + COLUMNS + """
             from ipd.vitals v
@@ -70,6 +84,17 @@ public class JdbcVitalsRepository implements VitalsRepository {
     public Optional<VitalsRow> findLatest(UUID tenantId, UUID admissionId) {
         return jdbc.sql(FIND_LATEST).param("tenantId", tenantId).param("admissionId", admissionId)
                 .query(JdbcVitalsRepository::vitals).optional();
+    }
+
+    @Override
+    public Map<UUID, LatestScore> findLatestOfAdmitted(UUID tenantId) {
+        Map<UUID, LatestScore> latest = new HashMap<>();
+        jdbc.sql(FIND_LATEST_OF_ADMITTED).param("tenantId", tenantId)
+                .query((rs, rowNum) -> new LatestScore(rs.getObject("admission_id", UUID.class),
+                        rs.getInt("ews_score"), Risk.valueOf(rs.getString("ews_risk")),
+                        rs.getObject("recorded_at", OffsetDateTime.class).toInstant()))
+                .list().forEach(row -> latest.put(row.admissionId(), row));
+        return latest;
     }
 
     @Override

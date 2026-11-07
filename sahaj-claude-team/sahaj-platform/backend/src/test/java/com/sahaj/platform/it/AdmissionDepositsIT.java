@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -1198,6 +1199,14 @@ class AdmissionDepositsIT extends SweepSupport {
         assertThat(row.get("ipNumber").asText()).isEqualTo(a1.get("ipNumber").asText());
         assertThat(row.has("reason")).as("the list carries no clinical text").isFalse();
         assertThat(row.has("mobile")).isFalse();
+        // SAH-36 (ADR-013 D1): the row also carries the UHID, the ward id and the room name; the clinical object is for the clinical roles
+        assertThat(row.get("uhid").asText()).isNotBlank();
+        assertThat(row.get("wardId").asText()).matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}");
+        assertThat(row.has("roomName")).isTrue();
+        assertThat(row.has("clinical")).as("the owner is a clinical role").isTrue();
+        assertThat(list.get("wards")).isNotEmpty();
+        assertThat(list.get("card").get("transfer").asBoolean()).isTrue();
+        assertThat(Instant.parse(list.get("asOf").asText())).isNotNull();
         assertThat(items.get(1).get("categoryName").asText()).isEqualTo("ICU");
         assertThat(items.get(0).get("depositState").asText()).isEqualTo("NOT_NEEDED");
 
@@ -1205,6 +1214,9 @@ class AdmissionDepositsIT extends SweepSupport {
             JsonNode l = ok(HttpMethod.GET, ADMISSIONS, clinic.as(role), null, 200);
             assertThat(l.get("canAdmit").asBoolean()).as(role).isEqualTo(!"DOCTOR".equals(role));
             assertThat(l.get("items")).hasSize(3);
+            // SAH-36: clinical facts only for OWNER, DOCTOR, NURSE; absent (not null) for the front desk
+            assertThat(l.get("items").get(0).has("clinical")).as(role + " clinical object").isEqualTo(!"FRONT_DESK".equals(role));
+            assertThat(l.get("items").get(0).has("uhid")).as(role + " uhid").isTrue();
         }
         for (String role : NON_READERS) {
             problem(call(HttpMethod.GET, ADMISSIONS, clinic.as(role), null), 403);

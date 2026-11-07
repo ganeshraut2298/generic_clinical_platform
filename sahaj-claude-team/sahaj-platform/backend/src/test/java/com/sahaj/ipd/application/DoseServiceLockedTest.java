@@ -199,7 +199,7 @@ class DoseServiceLockedTest extends DoseTestBase {
 
         assertThat(doses.writes).isZero();
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_DENY,
-                "Stopped at the wristband check: scanned UH-000123, expected UH-000777 (Inj. Heparin 5,000 IU)",
+                "Stopped at the identity check: entered UH-000123, expected UH-000777 (Inj. Heparin 5,000 IU)",
                 NURSE);
         verify(auditLog).record(eq("IPD_DOSE_WRISTBAND_MISMATCH"), eq("IPD_MEDICINE_ORDER"), eq(order.id()), any(),
                 any());

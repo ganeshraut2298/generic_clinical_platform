@@ -14,6 +14,7 @@ import { TeamMemberPin } from './pin.model';
       [self]="self()"
       (resetPin)="resets = resets + 1"
       (ownPin)="owns = owns + 1"
+      (showTries)="tries = tries + 1"
     />
   `,
 })
@@ -23,6 +24,7 @@ class HostComponent {
   readonly self = signal(false);
   resets = 0;
   owns = 0;
+  tries = 0;
 }
 
 const pin = (state: TeamMemberPin['state']): TeamMemberPin => ({
@@ -106,5 +108,52 @@ describe('PinCellComponent', () => {
     expect(host.owns).toBe(1);
     expect(pill()!.getAttribute('id')).toBe('pin-pill-m1');
     expect(pill()!.getAttribute('tabindex')).toBe('-1');
+  });
+
+  describe('colleague tries line (SAH-38, ADR-014 D9)', () => {
+    const triesButton = () => el().querySelector<HTMLButtonElement>('[data-act=pin-tries]');
+    const withTries = (count: number | null | undefined): void => {
+      host.pin.set({ ...pin('SET'), colleagueTries7d: count });
+      host.owner.set(true);
+      fixture.detectChanges();
+    };
+
+    it('shows "N wrong tries by colleagues in 7 days" to the owner as a button that names the member', () => {
+      withTries(4);
+      expect(squash(triesButton())).toBe('4 wrong tries by colleagues in 7 days');
+      expect(triesButton()!.getAttribute('aria-label')).toBe('4 wrong tries by colleagues in 7 days for Rahul Deshmukh');
+      expect(triesButton()!.getAttribute('aria-haspopup')).toBe('dialog');
+      triesButton()!.click();
+      expect(host.tries).toBe(1);
+    });
+
+    it('says "1 wrong try by a colleague in 7 days" for one', () => {
+      withTries(1);
+      expect(squash(triesButton())).toBe('1 wrong try by a colleague in 7 days');
+    });
+
+    it('shows nothing extra at 0, and no 0 when the server sent none', () => {
+      withTries(0);
+      expect(triesButton()).toBeNull();
+      withTries(null);
+      expect(triesButton()).toBeNull();
+      withTries(undefined);
+      expect(triesButton()).toBeNull();
+    });
+
+    it('is never shown to a role that is not the owner, even if a count were present', () => {
+      withTries(4);
+      host.owner.set(false);
+      fixture.detectChanges();
+      expect(triesButton()).toBeNull();
+    });
+
+    it('keeps the "PIN locked" pill unchanged next to it', () => {
+      host.pin.set({ ...pin('LOCKED'), colleagueTries7d: 5 });
+      host.owner.set(true);
+      fixture.detectChanges();
+      expect(squash(pill())).toBe('PIN locked');
+      expect(triesButton()).not.toBeNull();
+    });
   });
 });

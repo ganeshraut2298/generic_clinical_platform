@@ -40,8 +40,22 @@ public class PatientLookup implements PatientLookupPort {
         return result;
     }
 
+    /** ADR-013 D15: the same merge resolution as the clinical port; no mobile number, no allergy text. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public Map<UUID, PatientSummary> findAllCurrent(UUID tenantId, Collection<UUID> patientIds) {
+        Map<UUID, PatientSummary> result = new HashMap<>();
+        for (Map.Entry<UUID, PatientRepository.PatientRow> entry
+                : PatientMergeChains.current(patientRepository, tenantId, patientIds).entrySet()) {
+            PatientRepository.PatientRow row = entry.getValue();
+            result.put(entry.getKey(), new PatientSummary(row.id(), row.name(), row.age(), row.sex(), null,
+                    row.mergedIntoId() != null, row.uhid()));
+        }
+        return result;
+    }
+
     private static PatientSummary summary(PatientRepository.PatientRow row) {
         return new PatientSummary(row.id(), row.name(), row.age(), row.sex(), row.mobile(),
-                row.mergedIntoId() != null);
+                row.mergedIntoId() != null, row.uhid());
     }
 }

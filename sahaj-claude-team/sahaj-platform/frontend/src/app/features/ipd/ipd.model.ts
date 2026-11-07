@@ -1,6 +1,8 @@
 import { BedStatus, CategoryKey } from '../config/ipd/ipd.model';
 import type { DischargeRecord, FinalBill } from './discharge.model';
 import type { EmergencyCounts, EmergencyHandoff } from './emergency/emergency.model';
+import type { AllergyStatus } from './emr/emr.model';
+import type { EwsSummary } from './nursing/nursing.model';
 import type { AdmissionSafety } from './safety/safety.model';
 
 /** Types for the SAH-23 endpoints in `docs/api/ipd.yaml`. Money is integer paise. */
@@ -109,7 +111,58 @@ export interface AdmissionList {
   emergency: EmergencyCounts;
   /** SAH-33. The Safety tab count and the banner; null for a role without a Safety tab. */
   safety: AdmissionSafety | null;
-  items: AdmissionRow[];
+  /** SAH-36. Database clock of this answer (the time in "Could not refresh. Showing data from ..."). */
+  asOf: string;
+  /** SAH-36. Every ward of the clinic in the Beds setup order, for the select "Ward". */
+  wards: WardOption[];
+  /** SAH-36. What the card shows for this caller, once for the whole list. */
+  card: AdmittedCardAbilities;
+  items: AdmittedPatientRow[];
+}
+
+/** SAH-36 `WardOption`: one option of the select "Ward". */
+export interface WardOption {
+  id: string;
+  name: string;
+}
+
+/** SAH-36 `AdmittedCardAbilities`: the same for every row; a false action is not drawn. */
+export interface AdmittedCardAbilities {
+  nursing: boolean;
+  emr: boolean;
+  transfer: boolean;
+  discharge: boolean;
+  depositLowFlag: boolean;
+}
+
+/** SAH-36 `CardEscalationFlag`: the open escalation of one patient (status OPEN or ACK). */
+export interface CardEscalationFlag {
+  status: 'OPEN' | 'ACK';
+  waitingMinutes: number;
+  targetMinutes: 15 | 60;
+  pastTarget: boolean;
+}
+
+/** SAH-36 `CardAllergy`: `text` is present only when the status is RECORDED. */
+export interface CardAllergy {
+  status: AllergyStatus;
+  text?: string;
+}
+
+/** SAH-36 `AdmittedClinicalFlags`: absent from the row for FRONT_DESK; null inside means "none exists". */
+export interface AdmittedClinicalFlags {
+  escalation: CardEscalationFlag | null;
+  latestEws: EwsSummary | null;
+  vitalsDue: boolean;
+  allergy: CardAllergy;
+}
+
+/** SAH-36 `AdmittedPatientRow`: `AdmissionRow` plus the card facts. */
+export interface AdmittedPatientRow extends AdmissionRow {
+  uhid: string | null;
+  wardId: string;
+  roomName: string | null;
+  clinical?: AdmittedClinicalFlags;
 }
 
 export interface DepositEntry {

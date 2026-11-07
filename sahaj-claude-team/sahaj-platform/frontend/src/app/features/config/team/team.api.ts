@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../../../core/config/api-config';
+import { ColleagueTriesHistory } from '../../pin/pin.model';
 import { RolePermission, TeamMember, TeamMemberCreate, TeamMemberUpdate } from './team.model';
 
 /** The only place that calls `/team` and `/role-permissions` (SAH-6). */
@@ -33,6 +34,11 @@ export class TeamApi {
   /** SAH-31, OWNER only. Clears the PIN (the owner never sees or sets one). 200 with the member. */
   resetPin(id: string): Observable<TeamMember> {
     return this.http.post<TeamMember>(`${this.baseUrl}/team/${id}/pin/reset`, null);
+  }
+
+  /** SAH-38 (ADR-014 D9), OWNER only: the last 7 days of colleague tries on a member's PIN. Names come from the server. */
+  colleagueTries(id: string): Observable<ColleagueTriesHistory> {
+    return this.http.get<ColleagueTriesHistory>(`${this.baseUrl}/team/${id}/pin/colleague-tries`);
   }
 
   remove(id: string): Observable<void> {

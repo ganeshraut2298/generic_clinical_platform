@@ -5,6 +5,12 @@ spring:
     url: ${SAHAJ_TEST_DB_URL:jdbc:postgresql://localhost:5432/sahaj_test}
     username: sahaj_app
     password: ${SAHAJ_DB_APP_PASSWORD}
+    hikari:
+      # The integration suite keeps about nine Spring contexts alive at once (different properties give different
+      # cached contexts). Nine pools of the default 10 hold about 90 of PostgreSQL's 100 max_connections, which leaves
+      # no room for Flyway, psql or a second run. Five connections a context cover the parallel-request tests
+      # (9 x 5 = 45 of 100). Set SAHAJ_DB_POOL_SIZE to override.
+      maximum-pool-size: ${SAHAJ_DB_POOL_SIZE:5}
   flyway:
     url: ${SAHAJ_TEST_DB_URL:jdbc:postgresql://localhost:5432/sahaj_test}
     user: sahaj_migrator

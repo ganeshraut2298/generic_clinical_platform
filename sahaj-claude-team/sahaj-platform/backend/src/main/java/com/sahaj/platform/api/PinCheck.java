@@ -18,9 +18,12 @@ public record PinCheck(Outcome outcome, int triesLeft, Instant lockedUntil, long
     /**
      * What a check can answer. {@code NOT_ELIGIBLE} is answered only by {@link StaffPinPort#checkColleague} (SAH-32,
      * ADR-011 D7): the named person is not an ACTIVE member of the clinic with the required role, or is the caller.
-     * {@link StaffPinPort#check} never answers it.
+     * {@link StaffPinPort#check} never answers it. {@code PAIR_LIMIT} and {@code CHECK_FAILED} (SAH-38, ADR-014 D3 and D5) are
+     * also answered only by {@link StaffPinPort#checkColleague}: the caller already made 5 wrong tries of this colleague's
+     * PIN within a rolling 7 days (the PIN was not compared and nothing was counted), or the PIN store could not be read
+     * or written in time (fail closed: nothing was counted, whether the PIN was right or wrong).
      */
-    public enum Outcome { OK, WRONG, LOCKED, NOT_SET, RATE_LIMITED, UNAVAILABLE, NOT_ELIGIBLE }
+    public enum Outcome { OK, WRONG, LOCKED, NOT_SET, RATE_LIMITED, UNAVAILABLE, NOT_ELIGIBLE, PAIR_LIMIT, CHECK_FAILED }
 
     /** Why a person has no PIN. {@code NEVER_SET} when no PIN was ever saved. */
     public enum NotSetReason { NEVER_SET, RESET_BY_OWNER, TOO_MANY_LOCKS }

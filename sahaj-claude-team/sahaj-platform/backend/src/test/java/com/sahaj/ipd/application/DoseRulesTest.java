@@ -183,13 +183,13 @@ class DoseRulesTest {
     @Test
     void theGaveEventForAMedicineThatIsNotHighAlert() {
         assertThat(DoseRules.gaveText(PARACETAMOL, EIGHT_AM, null))
-                .isEqualTo("Gave Tab. Paracetamol 650 mg (8 AM dose) · wristband scanned");
+                .isEqualTo("Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID");
     }
 
     @Test
     void theGaveEventForAHighAlertMedicineNamesTheSecondNurse() {
         assertThat(DoseRules.gaveText(HEPARIN, Instant.parse("2026-11-11T14:30:00Z"), "Sr. Rupali More"))
-                .isEqualTo("Gave Inj. Heparin 5,000 IU (8 PM dose) · wristband scanned · second check by Sr. Rupali More");
+                .isEqualTo("Gave Inj. Heparin 5,000 IU (8 PM dose) · identity checked against UHID · second check by Sr. Rupali More");
     }
 
     @Test
@@ -202,17 +202,86 @@ class DoseRulesTest {
     @Test
     void theDeniedEvent() {
         assertThat(DoseRules.deniedText("SJ-00043", "SJ-00042", HEPARIN)).isEqualTo(
-                "Stopped at the wristband check: scanned SJ-00043, expected SJ-00042 (Inj. Heparin 5,000 IU)");
+                "Stopped at the identity check: entered SJ-00043, expected SJ-00042 (Inj. Heparin 5,000 IU)");
+    }
+
+    private static Drug longestDrug() {
+        return SeedCatalogue.catalogue().drugs().stream()
+                .max(java.util.Comparator.comparingInt(d -> d.name().length())).orElseThrow();
     }
 
     @Test
-    void theLongestEventTextStaysUnderTheDatabaseLimitOfThreeHundred() {
-        Drug longest = SeedCatalogue.drug("kcl");
-        String second = "A".repeat(80);
+    void theGiveTextWithA200CharacterSecondNurseNameAndTheLongestDrugStaysWithinThreeHundred() {
+        Drug longest = longestDrug();
+        String second = "A".repeat(TeamNameLimit.MAX);
 
-        assertThat(DoseRules.gaveText(longest, EIGHT_AM, second).length()).isLessThan(300);
-        assertThat(DoseRules.deniedText("ABCDEF-" + "1".repeat(34), "ABCDEF-" + "1".repeat(34), longest).length())
-                .isLessThan(300);
+        String text = DoseRules.gaveText(longest, EIGHT_AM, second);
+
+        assertThat(text.length()).isLessThanOrEqualTo(300);
+        assertThat(text).startsWith("Gave " + longest.name() + " (")
+                .contains(" · identity checked against UHID · second check by A")
+                .endsWith("…");
+    }
+
+    @Test
+    void aShortSecondNurseNameIsNotShortened() {
+        Drug longest = longestDrug();
+        String name = "N".repeat(80);
+
+        String text = DoseRules.gaveText(longest, EIGHT_AM, name);
+
+        assertThat(text).endsWith(" · second check by " + name).doesNotContain("…");
+    }
+
+    @Test
+    void theGiveTextIsCutOnlyWhenTheNameDoesNotFitAndThenFillsTheLimit() {
+        Drug longest = longestDrug();
+        String fixedPart = DoseRules.gaveText(longest, EIGHT_AM, null) + " · second check by ";
+        int room = 300 - fixedPart.length();
+
+        assertThat(DoseRules.gaveText(longest, EIGHT_AM, "B".repeat(room))).hasSize(300).doesNotContain("…");
+        String cut = DoseRules.gaveText(longest, EIGHT_AM, "B".repeat(room + 1));
+        assertThat(cut).hasSize(300).endsWith("B…");
+    }
+
+    @Test
+    void aNameCutThroughASurrogatePairKeepsNoHalfCharacter() {
+        Drug longest = longestDrug();
+        String fixedPart = DoseRules.gaveText(longest, EIGHT_AM, null) + " · second check by ";
+        int room = 300 - fixedPart.length();
+        // Place a supplementary character so the cut falls between its two UTF-16 units.
+        String name = "C".repeat(room - 2) + "😀" + "D".repeat(20);
+
+        String text = DoseRules.gaveText(longest, EIGHT_AM, name);
+
+        assertThat(text.length()).isLessThanOrEqualTo(300);
+        assertThat(Character.isHighSurrogate(text.charAt(text.length() - 2))).isFalse();
+    }
+
+    @Test
+    void everyCatalogueDrugKeepsEveryEventTextWithinThreeHundred() {
+        String second = "A".repeat(TeamNameLimit.MAX);
+        String scan = "ABCDEF-" + "1".repeat(34);
+        for (Drug drug : SeedCatalogue.catalogue().drugs()) {
+            assertThat(DoseRules.gaveText(drug, EIGHT_AM, second).length()).as(drug.key()).isLessThanOrEqualTo(300);
+            assertThat(DoseRules.gaveText(drug, EIGHT_AM, null).length()).as(drug.key()).isLessThanOrEqualTo(300);
+            assertThat(DoseRules.deniedText(scan, scan, drug).length()).as(drug.key()).isLessThanOrEqualTo(300);
+            for (NotGivenReason reason : NotGivenReason.values()) {
+                assertThat(DoseRules.notGivenText(drug, EIGHT_AM, reason).length()).isLessThanOrEqualTo(300);
+            }
+        }
+    }
+
+    @Test
+    void anOverlongMismatchTextIsCutToTheLimitWithAnEllipsis() {
+        String text = DoseRules.deniedText("X".repeat(400), "Y".repeat(10), longestDrug());
+
+        assertThat(text).hasSize(300).endsWith("…");
+    }
+
+    /** The longest name a team member can have ({@code TeamService.MAX_NAME_LENGTH}, 200). */
+    private static final class TeamNameLimit {
+        static final int MAX = 200;
     }
 
     @Test

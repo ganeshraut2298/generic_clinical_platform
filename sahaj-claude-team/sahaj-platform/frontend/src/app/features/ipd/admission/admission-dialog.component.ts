@@ -2,6 +2,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -18,6 +21,7 @@ import { ApiError } from '../../../core/http/problem-detail';
 import { formatDate, formatWhen, problemMessage } from '../../config/config-format';
 import { DischargeSheetComponent } from '../discharge/discharge-sheet.component';
 import { DISCHARGE_TEMPLATE_LABEL, DISCHARGE_TYPE_LABEL, dischargeToast } from '../discharge.model';
+import type { AdmissionStartView } from '../admitted/admitted.model';
 import { AdmissionsApi } from '../admissions.api';
 import { EmrSheetComponent, EmrSheetData } from '../emr/emr-sheet.component';
 import { NursingSheetComponent, NursingSheetData } from '../nursing/nursing-sheet.component';
@@ -40,6 +44,13 @@ import {
 
 export interface AdmissionDialogData {
   id: string;
+  /**
+   * SAH-36 (ADR-013 D6). Where the sheet opens when it is started from a patient card: `details` (the
+   * default), `move` (the "Move to another bed" row open and focused) or `discharge` (straight on the
+   * discharge view). In memory only, never in the URL. When the detail says the action is no longer
+   * possible the sheet stays on its main view.
+   */
+  startView?: AdmissionStartView;
 }
 
 const LOAD_ERROR = 'We could not load this admission. Try again.';
@@ -69,6 +80,8 @@ export class AdmissionDialogComponent {
   private readonly dialogRef = inject<MatDialogRef<AdmissionDialogComponent, boolean>>(MatDialogRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly data = inject<AdmissionDialogData>(MAT_DIALOG_DATA);
+  private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly modes = PAY_MODES;
   protected readonly formatInrPaise = formatInrPaise;
@@ -110,6 +123,12 @@ export class AdmissionDialogComponent {
   protected readonly optionLabel = (b: AdmissionBedOption): string => transferOptionLabel(b, formatInrPaise);
   private changed = false;
   private freeBedsCall?: Subscription;
+  private startApplied = false;
+  private focusMoveWhenReady = false;
+  /** The free-bed read has answered (beds or error), for the card's Transfer focus. */
+  private freeBedsAnswered = false;
+  /** The dialog has finished opening; its own first focus is done by then. */
+  private dialogOpened = false;
 
   protected readonly amountText = signal('');
 
@@ -121,6 +140,15 @@ export class AdmissionDialogComponent {
 
   constructor() {
     this.amount.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => this.amountText.set(v));
+    // SAH-36 F-1: the dialog's own opening step (autoFocus / focus trap) takes the focus when it ends,
+    // so the Move row only takes it after afterOpened and after the free-bed read, whichever is later.
+    this.dialogRef
+      .afterOpened()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.dialogOpened = true;
+        this.placeMoveFocus();
+      });
     this.load();
   }
 
@@ -134,12 +162,32 @@ export class AdmissionDialogComponent {
           this.admission.set(admission);
           this.prefill(admission);
           this.loadServices(admission);
+          // The start view first: a free-bed answer that arrives at once must already see the focus flag (R36-9).
+          this.applyStartView(admission);
           this.loadFreeBeds(admission);
         },
         error: (error: unknown) => {
           this.loadError.set(problemMessage(error, LOAD_ERROR));
         },
       });
+  }
+
+  /**
+   * Opens on the part the card asked for (once): `discharge` goes straight to the discharge view when
+   * the detail allows it; `move` focuses the Move row once the free beds have answered. Otherwise the
+   * main view stays, with its own texts.
+   */
+  private applyStartView(admission: AdmissionDetail): void {
+    if (this.startApplied) {
+      return;
+    }
+    this.startApplied = true;
+    const start = this.data.startView ?? 'details';
+    if (start === 'discharge' && admission.canStartDischarge) {
+      this.startDischarge();
+    } else if (start === 'move' && admission.canTransfer) {
+      this.focusMoveWhenReady = true;
+    }
   }
 
   /** Offers the shortfall to the minimum when the deposit is due. */
@@ -197,9 +245,41 @@ export class AdmissionDialogComponent {
             this.bed.disable();
           }
           this.bed.setValue(keep ?? beds[0]?.id ?? null);
+          this.focusMoveRow();
         },
-        error: (error: unknown) => this.moveError.set(problemMessage(error, BEDS_ERROR)),
+        error: (error: unknown) => {
+          this.moveError.set(problemMessage(error, BEDS_ERROR));
+          this.focusMoveRow();
+        },
       });
+  }
+
+  /** The free-bed read has answered; the focus is placed once the dialog has also opened. */
+  private focusMoveRow(): void {
+    this.freeBedsAnswered = true;
+    this.placeMoveFocus();
+  }
+
+  /**
+   * Started from the card's Transfer (once, when the dialog has opened and the free beds have answered):
+   * the Move row is scrolled into view and the bed select is focused; with no free bed the select is
+   * off, so the row itself takes the focus. The render step is queued after the dialog's own focus step.
+   */
+  private placeMoveFocus(): void {
+    if (!this.focusMoveWhenReady || !this.freeBedsAnswered || !this.dialogOpened) {
+      return;
+    }
+    this.focusMoveWhenReady = false;
+    afterNextRender(
+      () => {
+        const root = this.host.nativeElement;
+        const select = root.querySelector<HTMLSelectElement>('#ad-bed');
+        const target = select && !select.disabled ? select : root.querySelector<HTMLElement>('#ad-move-row');
+        target?.focus();
+        target?.scrollIntoView?.({ block: 'nearest' });
+      },
+      { injector: this.injector },
+    );
   }
 
   protected move(): void {

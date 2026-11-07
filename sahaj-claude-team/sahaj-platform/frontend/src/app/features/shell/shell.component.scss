@@ -1,3 +1,8 @@
 :host {
   display: block;
 }
+
+// The main area takes the focus when the notice closes (the button that had it is gone); no ring on a region.
+main.page:focus {
+  outline: none;
+}

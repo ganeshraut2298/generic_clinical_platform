@@ -145,7 +145,11 @@ final class AuditSanitizer {
     }
 
     /**
-     * SAH-31 (ADR-010 D10): the audit rows of the staff PIN carry {@code pinState} (one of three fixed labels). The
+     * SAH-38 (ADR-014 D12): the new PIN audit keys {@code causedBy} (SELF or COLLEAGUES) and {@code wrongTries} (a number)
+     * hold no "pin" marker, so they stay readable without an exception here. The audit rows carry ids, states, kinds and
+     * numbers only: never a PIN, a hash, a name (the owner's history sheet looks names up at display time) or a mobile.
+     *
+     * <p>SAH-31 (ADR-010 D10): the audit rows of the staff PIN carry {@code pinState} (one of three fixed labels). The
      * key contains "pin", so it would be redacted like a PIN; this exact key with exactly one of the three labels is
      * the only exception. A real PIN under any key, or any other value under this key, is still replaced.
      */

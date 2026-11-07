@@ -72,6 +72,7 @@ About 400 of the 10,000 PINs are refused. "Same as the current PIN" is **not** a
 - Setting a new PIN (D7) or an owner reset (D8) clears `failed_count`, `locked_until`, `lock_count` and the window.
 - The counter row is read `for update` in a short platform transaction and the BCrypt comparison runs inside it, so one person's tries are serialised and two parallel wrong tries both count.
 - Wrong-try message carries the tries left ("That PIN is not right. 2 tries left."). This tells nothing to anyone but the signed-in person, whose own state is shown anyway.
+- **Amended by ADR-014 D6 (SAH-38, 7 Nov 2026, PROPOSED):** the row records whether the current run of wrong tries contains a colleague try (`run_has_colleague_try`) and whether the lock was caused by such a run (`lock_by_colleagues`). A lock from a run with any colleague try (mixed runs included) locks for 15 minutes but does **not** raise `lock_count` and never switches the PIN off. Only three own-session locks within 24 hours switch it off. The lock audit carries `causedBy: SELF | COLLEAGUES`. The update guard is replaced accordingly.
 
 ### D6 · Comparison in constant time
 
@@ -171,6 +172,7 @@ public record PinCheck(Outcome outcome, int triesLeft, Instant lockedUntil, long
 
 - **Why failed checks only:** the lockout in the database (D5: 5 wrong tries lock for 15 minutes, the third lock in 24 hours switches the PIN off) is the real limit on guessing; the limiter is a backstop and protects CPU. Successful verifies are real work and must never lock out a pharmacist verifying a burst of orders. With the lockout at 5, the failed-check limit is reached only when a lock is cleared inside the window (a new PIN or an owner reset); it stays as a backstop.
 - **Residual, accepted (HARD-2):** successful checks are not limited by this limiter. Each costs one BCrypt hash (about 0.25 s); a signed-in person who knows their own PIN could repeat requests that reach the check (for example a verify of an order that is already ACTIVE, whose state is checked only after the PIN, ADR-009 B1). No privilege is gained; the cost is CPU. A per-user platform request limiter (HARD-2, security review S11) covers it.
+- **Amended by ADR-014 D7 (SAH-38, 7 Nov 2026, PROPOSED):** the failed-check bucket of a person counts and limits only that person's own checks. Colleague checks no longer read or fill it. Colleague tries are limited by the caller's bucket, the durable pair cap (ADR-014 D3) and the lockout.
 - **In memory, per application instance** (`InMemoryStaffPinLimits`, platform infrastructure; phase 1 runs one instance). Nothing is persisted; a restart clears the windows (the database lockout of D5 is unaffected). A shared limiter for more than one instance (database or cache backed) is backlog item **HARD-2** (security review S8), not phase 1 of this story.
 
 ### D14 · Retention and tenant scope

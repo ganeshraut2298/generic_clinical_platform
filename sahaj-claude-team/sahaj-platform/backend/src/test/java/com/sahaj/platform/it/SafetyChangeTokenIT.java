@@ -198,7 +198,7 @@ class SafetyChangeTokenIT extends SafetyTestSupport {
         String id = raise(w.clinic(), a, high7());
         String token = token(w);
         assertThat(token).hasSize(22).doesNotContain(id).doesNotContain("Kavita");
-        assertThat(boardOf(w.owner().auth()).get("counts").size()).as("open, pastTarget, changeToken, asOf").isEqualTo(4);
+        assertThat(boardOf(w.owner().auth()).get("counts").size()).as("open, pastTarget, dosesDue, dosesLate, changeToken, asOf (SAH-35)").isEqualTo(6);
     }
 
     /** The vitals body with a new client key, so that it is a new save and not a replay. */

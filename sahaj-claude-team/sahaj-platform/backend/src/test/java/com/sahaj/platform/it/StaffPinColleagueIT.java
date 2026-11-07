@@ -159,7 +159,7 @@ class StaffPinColleagueIT extends PinTestSupport {
         assertThat(fifth.pin().retryAfterSeconds()).isBetween(800L, 900L);
         PinRow row = pinRow(clinic, c.p().membershipId());
         assertThat(row.lockedNow()).isTrue();
-        assertThat(row.lockCount()).isOne();
+        assertThat(row.lockCount()).as("SAH-38: a colleague-caused lock never moves the lock count").isZero();
         assertThat(audit(clinic, "PLATFORM_PIN_COLLEAGUE_CHECK_FAILED")).as("the locking try is audited too").hasSize(5);
         assertThat(audit(clinic, "PLATFORM_PIN_LOCKED")).hasSize(1);
         JsonNode lock = after(clinic, "PLATFORM_PIN_LOCKED", 0);
@@ -178,26 +178,40 @@ class StaffPinColleagueIT extends PinTestSupport {
         assertThat(still.outcome()).isEqualTo(Outcome.LOCKED);
         assertThat(check(other, c.p(), c.pin()).outcome()).isEqualTo(Outcome.LOCKED);
         assertThat(pinRow(clinic, c.p().membershipId()).failed()).isEqualTo(row.failed());
-        assertThat(pinRow(clinic, c.p().membershipId()).lockCount()).isOne();
+        assertThat(pinRow(clinic, c.p().membershipId()).lockCount()).isZero();
         // after the lock the right PIN is OK again
         lockEnded(c.p());
         assertThat(check(caller, c.p(), c.pin()).outcome()).isEqualTo(Outcome.OK);
     }
 
     @Test
-    void theThirdLockInTwentyFourHoursSwitchesThePinOffForTheColleagueAndEveryNotSetReasonHasTheSameSecondNurseText()
-            throws Exception {
+    void aColleagueCausedFifthTryAfterTwoLocksIsOnlyALockAndNeverSwitchesThePinOff() throws Exception {
         Clinic clinic = hospital();
         Pn caller = newPn(clinic, NURSE);
         Colleague c = colleague(clinic);
         forceCounters(c.p(), 4, 2);
         ColleaguePinCheck r = check(caller, c.p(), wrongFor(c.pin()));
+        assertThat(r.outcome()).as("SAH-38 (ADR-014 D6): locked, not switched off").isEqualTo(Outcome.LOCKED);
+        PinRow row = pinRow(clinic, c.p().membershipId());
+        assertThat(row.hasPin()).isTrue();
+        assertThat(row.lockCount()).isEqualTo(2);
+        assertThat(audit(clinic, "PLATFORM_PIN_CLEARED_AFTER_LOCKS")).isEmpty();
+    }
+
+    @Test
+    void theThirdOwnSessionLockInTwentyFourHoursSwitchesThePinOffAndEveryNotSetReasonHasTheSameSecondNurseText()
+            throws Exception {
+        Clinic clinic = hospital();
+        Pn caller = newPn(clinic, NURSE);
+        Colleague c = colleague(clinic);
+        forceCounters(c.p(), 4, 2);
+        assertThat(port.check(clinic.tenantId(), c.p().userId(), wrongFor(c.pin())).outcome()).isEqualTo(Outcome.NOT_SET);
+        ColleaguePinCheck r = check(caller, c.p(), c.pin());
         assertThat(r.outcome()).isEqualTo(Outcome.NOT_SET);
         assertThat(r.pin().notSetReason()).isEqualTo(NotSetReason.TOO_MANY_LOCKS);
         assertThat(pinRow(clinic, c.p().membershipId()).hasPin()).isFalse();
         assertThat(audit(clinic, "PLATFORM_PIN_CLEARED_AFTER_LOCKS")).hasSize(1);
-        assertThat(after(clinic, "PLATFORM_PIN_CLEARED_AFTER_LOCKS", 0).get("checkedByMembershipId").asText())
-                .isEqualTo(caller.membershipId().toString());
+        assertThat(after(clinic, "PLATFORM_PIN_CLEARED_AFTER_LOCKS", 0).get("causedBy").asText()).isEqualTo("SELF");
         assertThatThrownBy(r::requireOk).isInstanceOfSatisfying(StaffPinException.class, e -> {
             assertThat(e.slug()).isEqualTo("pin-not-set");
             assertThat(e.status()).isEqualTo(409);
@@ -363,26 +377,23 @@ class StaffPinColleagueIT extends PinTestSupport {
             assertThat(pinRow(clinic, x.p().membershipId()).hasPin()).isTrue();
             assertThat(pinRow(clinic, x.p().membershipId()).lockCount()).isZero();
         }
-        // 10 a day on ONE colleague would be two locks at most (5 + 5): the third lock is never reached alone
+        // SAH-38: one caller can make 5 wrong tries on ONE colleague in 7 days (the pair cap), so a second lock by the same
+        // caller is no longer reachable; the 5 tries are one colleague lock that never counts toward the switch-off
         Pn lone = newPn(clinic, NURSE);
         Colleague target = colleague(clinic);
         wrongTries(lone, target, 4);
         assertThat(check(lone, target.p(), wrongFor(target.pin())).outcome()).isEqualTo(Outcome.LOCKED);
-        assertThat(pinRow(clinic, target.p().membershipId()).lockCount()).isOne();
+        assertThat(pinRow(clinic, target.p().membershipId()).lockCount()).as("SAH-38: a colleague lock never counts").isZero();
         lockEnded(target.p());
         forgetColleagueShortWindow(lone);
-        wrongTries(lone, target, 4);
-        ColleaguePinCheck fifth = check(lone, target.p(), wrongFor(target.pin()));
-        assertThat(fifth.outcome()).isEqualTo(Outcome.LOCKED);
-        assertThat(pinRow(clinic, target.p().membershipId()).lockCount()).isEqualTo(2);
-        lockEnded(target.p());
-        forgetColleagueShortWindow(lone);
-        assertThat(check(lone, target.p(), target.pin()).outcome()).as("10 failures used the whole day").isEqualTo(Outcome.RATE_LIMITED);
+        assertThat(check(lone, target.p(), target.pin()).outcome()).as("the pair is at its cap of 5 for 7 days").isEqualTo(Outcome.PAIR_LIMIT);
+        assertThat(check(lone, target.p(), wrongFor(target.pin())).outcome()).isEqualTo(Outcome.PAIR_LIMIT);
+        assertThat(pinRow(clinic, target.p().membershipId()).lockCount()).isZero();
         assertThat(pinRow(clinic, target.p().membershipId()).hasPin()).isTrue();
     }
 
     @Test
-    void theColleaguesOwnFailedCheckBucketOfTenPerFiveMinutesCountsTriesOfEveryCallerAndAlsoStopsTheirOwnChecks() throws Exception {
+    void theColleaguesOwnFailedCheckBucketIsGoneSoTenWrongTriesOfOthersStopNeitherAnotherCallerNorTheirOwnChecks() throws Exception {
         Clinic clinic = hospital();
         Pn c1 = newPn(clinic, NURSE);
         Pn c2 = newPn(clinic, NURSE);
@@ -396,15 +407,11 @@ class StaffPinColleagueIT extends PinTestSupport {
         wrongTries(c3, target, 2);
         forceCounters(target.p(), 0, 0);
         Pn fresh = newPn(clinic, NURSE);
+        // SAH-38 (ADR-014 D7): the colleague.s own failed-check bucket (10 per 5 minutes) is no longer read or filled by colleague
+        // checks, so ten wrong tries by others stop nobody and the colleague.s own checks go on working
         ColleaguePinCheck r = check(fresh, target.p(), target.pin());
-        assertThat(r.outcome()).isEqualTo(Outcome.RATE_LIMITED);
-        assertThat(r.pin().retryAfterSeconds()).isPositive();
-        assertThat(pinRow(clinic, target.p().membershipId()).failed()).isZero();
-        // the colleague's own check is stopped by the same bucket
-        assertThat(port.check(clinic.tenantId(), target.p().userId(), target.pin()).outcome()).isEqualTo(Outcome.RATE_LIMITED);
-        // the caller's own allowance was not spent by the refusal
-        forgetOwnFailureWindow(target.p());
-        assertThat(check(fresh, target.p(), target.pin()).outcome()).isEqualTo(Outcome.OK);
+        assertThat(r.outcome()).isEqualTo(Outcome.OK);
+        assertThat(port.check(clinic.tenantId(), target.p().userId(), target.pin()).outcome()).isEqualTo(Outcome.OK);
     }
 
     // ---------------- parallel ----------------

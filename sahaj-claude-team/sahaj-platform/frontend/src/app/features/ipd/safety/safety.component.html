@@ -48,6 +48,13 @@
       @if (showPharmacist()) {
         <app-pharmacist-tile />
       }
+      <div class="kpi surf" data-kpi="doses">
+        <span class="eyebrow">{{ dosesTitle }}</span>
+        <span class="v num" [class.crit]="b.counts.dosesLate > 0" data-testid="doses-number">{{
+          dosesNumber(b.counts)
+        }}</span>
+        <span class="s" data-testid="doses-text">{{ dosesText(b.counts) }}</span>
+      </div>
       @if (b.view === 'NURSE') {
         <div class="kpi surf" data-kpi="your-patients">
           <span class="eyebrow">Your patients</span>
@@ -167,6 +174,8 @@
     @if (showPharmacist()) {
       <app-pharmacist-panel />
     }
+
+    <app-medicine-round [round]="b.medicineRound" [asOf]="b.asOf" (answered)="roundAnswered()" />
 
     <section class="panel surf sfp" aria-labelledby="sf-aud-h">
       <div class="sfph">

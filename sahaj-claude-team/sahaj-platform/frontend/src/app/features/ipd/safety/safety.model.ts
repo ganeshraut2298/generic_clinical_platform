@@ -1,5 +1,6 @@
 import { formatDayMonth, istToday } from '../../config/config-format';
 import { timeOfInstant } from '../emergency/emergency.model';
+import { KEY_RELOAD, Mar, MAR_LOCK_LINES, clockText } from '../mar/mar.model';
 
 /**
  * SAH-33 Safety board (mockup `ipSafety`, `escRow`, `sfban`). Types follow `SafetyBoard`,
@@ -60,6 +61,10 @@ export interface EscalationRow {
 export interface SafetyCounts {
   open: number;
   pastTarget: number;
+  /** SAH-35: dose slots in state DUE (not counting LATE) of the Medicine round; always the full count. */
+  dosesDue: number;
+  /** SAH-35: dose slots in state LATE; the tile's "N overdue" and the dose term of the tab number. */
+  dosesLate: number;
   /**
    * Opaque, 22 characters (ADR-007 R1): a hash of the id and version of every open escalation. Only
    * compared for equality: it differs when one is raised, acknowledged, closed, re-opened or scores
@@ -82,6 +87,31 @@ export interface AdmissionSafety {
   pastTarget: SafetyBannerItem[];
 }
 
+export type MedicineRoundSlotState = 'LATE' | 'DUE';
+
+/** One dose slot of today with no dose record: `MedicineRoundRow` in docs/api/ipd.yaml (SAH-35). */
+export interface MedicineRoundRow {
+  admissionId: string;
+  orderId: string;
+  /** The dose time of today as an instant; matched against `MarSlot.slotAt`. */
+  slotAt: string;
+  state: MedicineRoundSlotState;
+  /** LATE: whole hours late, rounded down (at least 1); null for DUE. */
+  lateHours: number | null;
+  drugName: string;
+  /** Not null for a high-alert medicine (the class is not shown here). */
+  highAlert: string | null;
+  patientName: string;
+  bedCode: string;
+}
+
+export interface MedicineRound {
+  canGive: boolean;
+  giveLockReason: 'ROLE' | 'IPD_READONLY' | null;
+  truncated: boolean;
+  rows: MedicineRoundRow[];
+}
+
 export interface SafetyBoard {
   state: 'trial' | 'on' | 'readonly';
   view: SafetyView;
@@ -91,6 +121,8 @@ export interface SafetyBoard {
   yourPatients: number | null;
   responseActions: EscalationResponseActionOption[];
   escalations: EscalationRow[];
+  /** SAH-35: the panel "Medicine round" (OWNER, DOCTOR, NURSE). */
+  medicineRound: MedicineRound;
 }
 
 export interface EscalationVersionInput {
@@ -408,9 +440,97 @@ export function mergeEvents(
   };
 }
 
+// ---- Medicine round (SAH-35, mockup `ipSafety` tile `kpi('Doses due or overdue')`, `doseRow`) ----
+
+export const DOSES_TILE_TITLE = 'Doses due or overdue';
+export const ROUND_TITLE = 'Medicine round';
+export const ROUND_HEADING_ID = 'sf-round-h';
+export const NO_DOSES = 'No doses due right now.';
+/** Contract wording (OQ-35-4, OQ-35-9); not in the mockup. */
+export const ROUND_TRUNCATED = 'Showing the 200 most overdue doses.';
+export const HIGH_ALERT_PILL = 'High-alert';
+export const DUE_NOW = 'Due now';
+export const GIVE_LABEL = 'Give';
+/** DEC-018 text (also `MAR_LOCK_LINES.IPD_READONLY`). */
+export const ROUND_READONLY_LINE = MAR_LOCK_LINES.IPD_READONLY;
+export const GIVE_STOPPED = 'This medicine was stopped. Its doses can no longer be recorded.';
+export const GIVE_RECORDED = 'This dose is already recorded.';
+export const GIVE_DISCHARGED = 'This patient is not admitted any more. Doses cannot be recorded.';
+/** The SAH-32 text of the MAR tab read (DEC-018 build notes). */
+export const ROUND_MAR_ERROR = 'We could not load the medicines. Try again.';
+
+/** The number on the tile: Due plus Late (the same set as the rows, before the 200 limit). */
+export const dosesTileNumber = (counts: Pick<SafetyCounts, 'dosesDue' | 'dosesLate'>): number =>
+  (counts.dosesDue ?? 0) + (counts.dosesLate ?? 0);
+
+/** Small text of the tile: "3 overdue", and "0 overdue" when nobody is late (mockup). */
+export const dosesTileText = (counts: Pick<SafetyCounts, 'dosesLate'>): string =>
+  `${counts.dosesLate ?? 0} overdue`;
+
+/** "Doses due in the next hour and doses not given on time. Clock: 11:05 AM." (server clock, IST). */
+export function roundSubtitle(asOf: string | null | undefined): string {
+  return `Doses due in the next hour and doses not given on time. Clock: ${timeOfInstant(asOf)}.`;
+}
+
+/** "Asha Patil · bed 101-A · 8 AM dose". */
+export const roundRowLine = (row: Pick<MedicineRoundRow, 'patientName' | 'bedCode' | 'slotAt'>): string =>
+  `${row.patientName} · bed ${row.bedCode} · ${clockText(row.slotAt)} dose`;
+
+/** "2 h late" (red) or "Due now" (amber); the words carry the meaning, never the colour alone. */
+export function roundStatusPill(row: Pick<MedicineRoundRow, 'state' | 'lateHours'>): RowPill {
+  return row.state === 'LATE'
+    ? { text: `${Math.max(1, row.lateHours ?? 1)} h late`, tone: 'crit' }
+    : { text: DUE_NOW, tone: 'warn' };
+}
+
+/** Accessible name of the button: "Give Tab. Paracetamol 650 mg to Asha Patil". */
+export const giveName = (row: Pick<MedicineRoundRow, 'drugName' | 'patientName'>): string =>
+  `Give ${row.drugName} to ${row.patientName}`;
+
+/** A stable key of one dose: the same order and slot is the same row after a reload. */
+export const roundKey = (row: Pick<MedicineRoundRow, 'orderId' | 'slotAt'>): string => `${row.orderId}|${row.slotAt}`;
+
+export type GiveCheck =
+  | { open: true; order: Mar['orders'][number]; slot: Mar['orders'][number]['slots'][number] }
+  | { open: false; message: string };
+
+/**
+ * The re-check after the MAR read (ADR-012 D4): the Give sheet opens only when the slot is still
+ * givable. The texts are the existing SAH-32 and DEC-018 ones; no new problem text.
+ */
+export function checkGive(mar: Mar, row: Pick<MedicineRoundRow, 'orderId' | 'slotAt'>): GiveCheck {
+  if (mar.status === 'DISCHARGED') {
+    return { open: false, message: GIVE_DISCHARGED };
+  }
+  const order = mar.orders.find((o) => o.orderId === row.orderId);
+  if (!order) {
+    return { open: false, message: GIVE_STOPPED };
+  }
+  const at = Date.parse(row.slotAt);
+  const slot = order.slots.find((s) => Date.parse(s.slotAt) === at);
+  if (!slot) {
+    return { open: false, message: KEY_RELOAD };
+  }
+  if (slot.state === 'GIVEN' || slot.state === 'HELD' || slot.state === 'REFUSED') {
+    return { open: false, message: GIVE_RECORDED };
+  }
+  if (!mar.canGive && mar.giveLockReason === 'IPD_READONLY') {
+    return { open: false, message: ROUND_READONLY_LINE };
+  }
+  if (!mar.canGive || !slot.canGive || (slot.state !== 'DUE' && slot.state !== 'LATE')) {
+    return { open: false, message: KEY_RELOAD };
+  }
+  return { open: true, order, slot };
+}
+
 // ---- Counts ----
 
-export const sameCounts = (
-  a: Pick<SafetyCounts, 'open' | 'pastTarget' | 'changeToken'>,
-  b: Pick<SafetyCounts, 'open' | 'pastTarget' | 'changeToken'>,
-): boolean => a.open === b.open && a.pastTarget === b.pastTarget && a.changeToken === b.changeToken;
+type Compared = Pick<SafetyCounts, 'open' | 'pastTarget' | 'dosesDue' | 'dosesLate' | 'changeToken'>;
+
+/** The poll compares the escalation numbers, the dose numbers and the token (the token also catches a swap). */
+export const sameCounts = (a: Compared, b: Compared): boolean =>
+  a.open === b.open &&
+  a.pastTarget === b.pastTarget &&
+  a.dosesDue === b.dosesDue &&
+  a.dosesLate === b.dosesLate &&
+  a.changeToken === b.changeToken;

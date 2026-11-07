@@ -2,12 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -18,6 +21,7 @@ import { Observable, Subscription } from 'rxjs';
 import { ApiError } from '../../../core/http/problem-detail';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
+import { MedicineRoundComponent } from './medicine-round.component';
 import { PharmacistPanelComponent } from '../pharmacist/pharmacist-panel.component';
 import { PharmacistTileComponent } from '../pharmacist/pharmacist-tile.component';
 import { ResponseSheetComponent, ResponseSheetData } from './response-sheet.component';
@@ -47,7 +51,10 @@ import {
   auditSubtitle,
   callToast,
   closedToast,
+  DOSES_TILE_TITLE,
   detailLine,
+  dosesTileNumber,
+  dosesTileText,
   eventLine,
   eventTime,
   kindIcon,
@@ -85,7 +92,13 @@ export const ESCALATIONS_HEADING_ID = 'sf-esc-h';
 @Component({
   selector: 'app-safety',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, IconComponent, PharmacistTileComponent, PharmacistPanelComponent],
+  imports: [
+    MatButtonModule,
+    IconComponent,
+    PharmacistTileComponent,
+    PharmacistPanelComponent,
+    MedicineRoundComponent,
+  ],
   styleUrl: './safety.component.scss',
   templateUrl: './safety.component.html',
 })
@@ -95,6 +108,8 @@ export class SafetyComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
   private readonly doc = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private readonly roundPanel = viewChild(MedicineRoundComponent);
 
   /** Counts of every board answer: the tab number and the banner of the page follow them. */
   readonly counts = output<SafetyCounts>();
@@ -127,6 +142,9 @@ export class SafetyComponent implements OnInit {
   protected readonly noEvents = NO_EVENTS;
   protected readonly showEarlier = SHOW_EARLIER;
   protected readonly yourPatientsText = YOUR_PATIENTS_TEXT;
+  protected readonly dosesTitle = DOSES_TILE_TITLE;
+  protected readonly dosesNumber = dosesTileNumber;
+  protected readonly dosesText = dosesTileText;
   protected readonly pill = statusPill;
   protected readonly raised = raisedLine;
   protected readonly detail = detailLine;
@@ -248,6 +266,22 @@ export class SafetyComponent implements OnInit {
    */
   private focusHeading(): void {
     setTimeout(() => this.doc.getElementById(ESCALATIONS_HEADING_ID)?.focus(), 0);
+  }
+
+  /**
+   * A Give from the Medicine round was answered (dose recorded, sheet refused, stale slot): the whole
+   * board is read again, the user stays on this tab, and the focus goes to the row's Give button, or
+   * to the panel heading once the row is gone. It moves when the new rows are drawn, also when the
+   * reload fails (the old rows stay).
+   */
+  protected roundAnswered(): void {
+    this.actionNotice.set(null);
+    const focus = () => afterNextRender(() => this.roundPanel()?.restoreFocus(), { injector: this.injector });
+    this.fetchBoard(focus, () => {
+      this.refreshFailed.set(true);
+      focus();
+    });
+    this.fetchEvents(true);
   }
 
   private reloadAll(): void {

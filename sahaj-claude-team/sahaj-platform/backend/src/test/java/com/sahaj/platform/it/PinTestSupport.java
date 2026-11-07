@@ -309,8 +309,10 @@ abstract class PinTestSupport extends SafetyTestSupport {
 
     /** Sets the failed count, lock count and window as the owner (guard off). The window is now when {@code locks} &gt; 0. */
     protected void forceCounters(Pn p, int failed, int locks) throws SQLException {
+        // SAH-38: both colleague flags are cleared too (a flag needs a counted wrong try or a lock end, which this state has not)
         forcePinRow(p, "failed_count = " + failed + ", lock_count = " + locks + ", lock_window_started_at = "
-                + (locks > 0 ? "clock_timestamp()" : "null") + ", locked_until = null");
+                + (locks > 0 ? "clock_timestamp()" : "null") + ", locked_until = null, run_has_colleague_try = false, "
+                + "lock_by_colleagues = false");
     }
 
     protected static Timestamp ts(Instant instant) {

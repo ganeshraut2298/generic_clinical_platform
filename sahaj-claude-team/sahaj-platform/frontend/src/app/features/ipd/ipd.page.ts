@@ -15,6 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subject, catchError, map, of, switchMap } from 'rxjs';
 import { ApiError } from '../../core/http/problem-detail';
 import { ShellStore } from '../../core/shell/shell.store';
 import { formatInrPaise } from '../../shared/format/inr';
@@ -29,22 +30,19 @@ import {
 } from './admission/admission-dialog.component';
 import { goingHomeCount, goingHomeText } from './discharge.model';
 import { AdmitDialogComponent, AdmitDialogData } from './admit/admit-dialog.component';
+import { AdmittedPanelComponent, OpenAdmissionRequest } from './admitted/admitted-panel.component';
+import { AdmittedViewState } from './admitted/admitted-view.state';
 import { AdmissionsApi } from './admissions.api';
 import { BedBoardComponent } from './board/bed-board.component';
 import { EmergencyComponent } from './emergency/emergency.component';
+import { EmrSheetComponent, EmrSheetData } from './emr/emr-sheet.component';
 import {
   EmergencyCounts,
   tileNumber,
   tileText,
 } from './emergency/emergency.model';
-import {
-  AdmissionDetail,
-  AdmissionList,
-  AdmissionRow,
-  admissionSubline,
-  ipdLead,
-  statusPills,
-} from './ipd.model';
+import { AdmissionDetail, AdmissionList, ipdLead } from './ipd.model';
+import { NursingSheetComponent, NursingSheetData } from './nursing/nursing-sheet.component';
 import { PharmacistStore } from './pharmacist/pharmacist.store';
 import { PharmacistTabComponent } from './pharmacist/pharmacist-tab.component';
 import { safetyTabCount } from './pharmacist/pharmacist.model';
@@ -58,6 +56,7 @@ import {
   SafetyCounts,
   bannerNames,
   sameCounts,
+  staleBoardText,
 } from './safety/safety.model';
 
 type IpdTab = 'board' | 'admitted' | 'er' | 'safety';
@@ -83,9 +82,10 @@ const LOAD_ERROR = 'We could not load beds and admissions. Try again.';
     EmergencyComponent,
     SafetyComponent,
     PharmacistTabComponent,
+    AdmittedPanelComponent,
     PageHeadComponent,
   ],
-  providers: [PharmacistStore],
+  providers: [PharmacistStore, AdmittedViewState],
   styleUrl: './ipd.page.scss',
   templateUrl: './ipd.page.html',
 })
@@ -102,9 +102,6 @@ export class IpdPage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly doc = inject(DOCUMENT);
 
-  protected readonly formatInrPaise = formatInrPaise;
-  protected readonly subline = admissionSubline;
-  protected readonly pills = statusPills;
   protected readonly goingHome = goingHomeCount;
   protected readonly goingHomeLine = goingHomeText;
   protected readonly safetyLabel = SAFETY_LABEL;
@@ -123,11 +120,20 @@ export class IpdPage implements OnInit {
   );
   private readonly board = viewChild(BedBoardComponent);
   private polling = false;
+  /** A reload of the list is on its way (SAH-36): the 60-second timer does not start a second one. */
+  private reloading = false;
+  /** Every reload goes through here; a newer request cancels the older one, so the latest always wins (R36-3). */
+  private readonly reloadRequests = new Subject<void>();
 
   protected readonly loading = signal(true);
   protected readonly locked = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly list = signal<AdmissionList | null>(null);
+  /** SAH-36. A reload failed: the last answer stays on screen with "Could not refresh. Showing data from ...". */
+  private readonly refreshFailed = signal(false);
+  protected readonly staleText = computed(() =>
+    this.refreshFailed() ? staleBoardText(this.list()?.asOf) : null,
+  );
   private readonly charges = signal<IpdCharges | null>(null);
   private readonly alertPercent = signal<number | null>(null);
 
@@ -144,10 +150,16 @@ export class IpdPage implements OnInit {
     return !!l && l.safety != null && l.items.length > 0;
   });
   protected readonly safetyCounts = computed(() => this.liveSafety() ?? this.list()?.safety?.counts ?? null);
-  /** The number on the Safety tab: the owner's open escalations plus the orders waiting (mockup `sfCount`); a pharmacist's is the orders waiting. */
-  protected readonly safetyTabNumber = computed(() =>
-    safetyTabCount(this.isPharmacist() ? 0 : this.safetyCounts()?.open, this.pharmacist.waiting()),
-  );
+  /**
+   * The number on the Safety tab (mockup `sfCount`): open escalations, the owner's orders waiting and
+   * the late doses (SAH-35; due doses are not added); a pharmacist's is the orders waiting. The
+   * server's counts only; the page adds nothing of its own.
+   */
+  protected readonly safetyTabNumber = computed(() => {
+    const pharmacist = this.isPharmacist();
+    const counts = pharmacist ? null : this.safetyCounts();
+    return safetyTabCount(counts?.open, this.pharmacist.waiting(), counts?.dosesLate);
+  });
   protected readonly tabs = computed<IpdTab[]>(() => [
     'board',
     'admitted',
@@ -198,6 +210,28 @@ export class IpdPage implements OnInit {
   });
 
   constructor() {
+    this.reloadRequests
+      .pipe(
+        switchMap(() =>
+          this.api.list().pipe(
+            map((list) => ({ list })),
+            catchError(() => of(null)),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((answer) => {
+        // Only the newest request can answer (switchMap drops the older ones), so the flag is cleared once.
+        this.reloading = false;
+        if (answer === null) {
+          this.refreshFailed.set(true);
+          return;
+        }
+        this.list.set(answer.list);
+        this.refreshFailed.set(false);
+        this.liveCounts.set(null);
+        this.liveSafety.set(null);
+      });
     // IPD switched off is answered by the pharmacist calls too (403 module-off): same lock notice.
     effect(() => {
       if (this.pharmacist.moduleOff()) {
@@ -213,7 +247,7 @@ export class IpdPage implements OnInit {
     } else {
       this.load();
     }
-    startVisiblePoll(this.doc, SAFETY_REFRESH_MS, () => this.pollSafety(), this.destroyRef);
+    startVisiblePoll(this.doc, SAFETY_REFRESH_MS, () => this.pollList(), this.destroyRef);
     startVisiblePoll(this.doc, SAFETY_REFRESH_MS, () => this.pollPharmacist(), this.destroyRef);
   }
 
@@ -281,17 +315,8 @@ export class IpdPage implements OnInit {
   }
 
   private refreshList(): void {
-    this.api
-      .list()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (list) => {
-          this.list.set(list);
-          this.liveCounts.set(null);
-          this.liveSafety.set(null);
-        },
-        error: () => undefined,
-      });
+    this.reloading = true;
+    this.reloadRequests.next();
   }
 
   protected selectTab(tab: IpdTab): void {
@@ -307,7 +332,23 @@ export class IpdPage implements OnInit {
   }
 
   /**
-   * Every 60 seconds, counts only (no names), and not while the browser tab is hidden (one poll
+   * Every 60 seconds while the browser tab is visible (ADR-013 D7). On the Admitted tab the whole list
+   * is read again (its answer carries the safety counts, so the counts-only summary call below is not
+   * made there); on the Safety tab the board refreshes itself; on every other tab the summary poll runs.
+   * A reload still on its way is not doubled.
+   */
+  private pollList(): void {
+    if (this.activeTab() !== 'admitted') {
+      this.pollSafety();
+      return;
+    }
+    if (!this.reloading && this.list() !== null && !this.locked() && !this.noBeds()) {
+      this.refreshList();
+    }
+  }
+
+  /**
+   * Counts only (no names), and not while the browser tab is hidden (one poll
    * follows when it shows again): when the open or past-target number or the change token differs
    * from what the page shows, the list is read again so the tab number and the banner follow. The
    * token catches a swap the two numbers miss (one overdue escalation closes while another becomes
@@ -426,21 +467,57 @@ export class IpdPage implements OnInit {
     this.openById(id);
   }
 
-  protected open(row: AdmissionRow): void {
-    this.openById(row.id);
+  /** The name, Transfer or Discharge of a card, or Open in the table (start view: in memory only). */
+  protected openFromCard(request: OpenAdmissionRequest): void {
+    this.openById(request.id, request.start);
+  }
+
+  /** The card's Nursing: the sheet of SAH-30 for the admission; focus returns to the button on close. */
+  protected openNursing(admissionId: string): void {
+    this.dialog
+      .open<NursingSheetComponent, NursingSheetData, boolean>(NursingSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '640px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'nv-title',
+        data: { admissionId },
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((saved) => {
+        if (saved) {
+          this.refreshList();
+        }
+      });
+  }
+
+  /** The card's EMR: the sheet of SAH-31 for the admission; focus returns to the button on close. */
+  protected openEmr(admissionId: string): void {
+    this.dialog.open<EmrSheetComponent, EmrSheetData>(EmrSheetComponent, {
+      panelClass: 'sheet-panel',
+      width: '640px',
+      maxWidth: '100vw',
+      ariaLabelledBy: 'emr-title',
+      data: { admissionId },
+    });
   }
 
   protected refreshCounts(): void {
     this.refreshList();
   }
 
-  private openById(id: string): void {
+  private openById(id: string, startView: AdmissionDialogData['startView'] = 'details'): void {
     this.dialog
       .open<AdmissionDialogComponent, AdmissionDialogData, boolean>(AdmissionDialogComponent, {
         panelClass: 'sheet-panel',
         width: '640px',
         maxWidth: '100vw',
-        data: { id },
+        data: startView === 'details' ? { id } : { id, startView },
+        // SAH-36 F-1: from a card's Transfer the sheet places the focus itself (on the bed select), so
+        // Material's first-tabbable step (the Close button) must not take it back. With autoFocus off,
+        // Material still focuses the sheet container until the sheet moves the focus. restoreFocus stays
+        // on, so closing returns to the card's button.
+        ...(startView === 'move' ? { autoFocus: false } : {}),
       })
       .afterClosed()
       .pipe(takeUntilDestroyed(this.destroyRef))

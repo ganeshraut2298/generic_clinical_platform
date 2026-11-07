@@ -13,7 +13,10 @@ import com.sahaj.ipd.application.SafetyViews.Board;
 import com.sahaj.ipd.application.SafetyViews.Counts;
 import com.sahaj.ipd.application.SafetyViews.Event;
 import com.sahaj.ipd.application.SafetyViews.EventPage;
+import com.sahaj.ipd.application.SafetyViews.RoundPanel;
+import com.sahaj.ipd.application.SafetyViews.RoundRow;
 import com.sahaj.ipd.application.SafetyViews.Row;
+import com.sahaj.ipd.domain.MedicineRound;
 import com.sahaj.ipd.domain.ResponseAction;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
@@ -28,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -60,9 +64,11 @@ public class SafetyService {
     private final ActorDirectoryPort actors;
     private final TeamMemberPort team;
     private final IpdGate gate;
+    private final MedicineRoundReader round;
 
     SafetyService(EscalationBoardRepository board, AdmissionRepository admissions, ClinicalEventRepository events,
-                  PatientLookupPort patients, ActorDirectoryPort actors, TeamMemberPort team, IpdGate gate) {
+                  PatientLookupPort patients, ActorDirectoryPort actors, TeamMemberPort team, IpdGate gate,
+                  MedicineRoundReader round) {
         this.board = board;
         this.admissions = admissions;
         this.events = events;
@@ -70,6 +76,7 @@ public class SafetyService {
         this.actors = actors;
         this.team = team;
         this.gate = gate;
+        this.round = round;
     }
 
     // ---- the board ----
@@ -89,7 +96,9 @@ public class SafetyService {
         List<BoardRow> found = new ArrayList<>(board.findOnBoard(tenantId, asOf));
         found.sort((a, b) -> SafetyRows.ORDER.compare(a.escalation(), b.escalation()));
 
-        Map<UUID, PatientSummary> patientMap = patientsOf(tenantId, found);
+        // SAH-35: the Medicine round in the same transaction and against the same asOf (two statements).
+        MedicineRound.Result doses = round.read(tenantId, asOf);
+        Map<UUID, PatientSummary> patientMap = patientsOf(tenantId, found, doses);
         List<Detail> details = new ArrayList<>();
         for (BoardRow row : found) {
             details.add(row.escalation());
@@ -103,8 +112,28 @@ public class SafetyService {
         }
         boolean nurse = SafetySupport.isNurseView(memberRole);
         Integer yourPatients = nurse ? admissions.countAdmitted(tenantId) : null;
-        return new Board(ent.ipdState(), nurse ? "NURSE" : "DOCTOR", asOf, SafetyRows.counts(details, asOf),
-                yourPatients, actionOptions(), List.copyOf(rows));
+        return new Board(ent.ipdState(), nurse ? "NURSE" : "DOCTOR", asOf, SafetyRows.counts(details, doses, asOf),
+                yourPatients, actionOptions(), List.copyOf(rows), roundPanel(doses, access, ent.ipdState(), patientMap));
+    }
+
+    /**
+     * SAH-35 (ADR-012 D6): the panel. {@code canGive} needs the role in the token and the role of the membership both
+     * NURSE or OWNER, and IPD Trial or On; {@code giveLockReason} is then ROLE first, else IPD_READONLY. A patient
+     * whose record is not found is shown as "Patient": a row is never dropped.
+     */
+    static RoundPanel roundPanel(MedicineRound.Result doses, Access access, String ipdState,
+                                 Map<UUID, PatientSummary> patientMap) {
+        boolean roleCanGive = DoseRules.GIVE_ROLES.contains(access.tokenRole())
+                && DoseRules.GIVE_ROLES.contains(access.memberRole());
+        boolean writable = "trial".equals(ipdState) || "on".equals(ipdState);
+        boolean canGive = roleCanGive && writable;
+        String lock = canGive ? null : !roleCanGive ? "ROLE" : "IPD_READONLY";
+        List<RoundRow> rows = new ArrayList<>();
+        for (MedicineRound.Entry e : doses.rows()) {
+            rows.add(new RoundRow(e.admissionId(), e.orderId(), e.slotAt(), e.state(), e.lateHours(), e.drugName(),
+                    e.highAlert(), patientName(patientMap, e.patientId()), e.bedCode()));
+        }
+        return new RoundPanel(canGive, lock, doses.truncated(), List.copyOf(rows));
     }
 
     /** Counts only: no names, no scores, no text (ADR-005 D3). */
@@ -115,47 +144,48 @@ public class SafetyService {
         SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.READ_ROLES,
                 "You cannot open the safety board.");
         Instant asOf = board.databaseNow();
-        return countsOf(board.findLiveOnBoard(tenantId), asOf);
+        return countsOf(board.findLiveOnBoard(tenantId), round.read(tenantId, asOf), asOf);
     }
 
     /**
-     * {@code AdmissionList.safety}: the counts and the escalations past target, for OWNER, DOCTOR and NURSE only (the
-     * role in the token and the role of the active membership); null for every other role and when the membership no
-     * longer allows it. The caller runs this inside the REPEATABLE READ transaction of the list and hands over the
-     * patients it already loaded, so no patient is looked up twice and no query runs per row.
+     * SAH-36 (ADR-013 D2): the live (OPEN and ACK) escalations of the clinic in the board order, one query. The Admitted
+     * list reads them once and hands the same rows to the banner, the counts and the card flags.
      */
-    public Banner banner(UUID tenantId, UUID actor, String role, Map<UUID, PatientSummary> loadedPatients) {
-        if (role == null || !EscalationRules.READ_ROLES.contains(role)) {
-            return null;
-        }
-        boolean allowed = team.findActiveByUserId(tenantId, actor)
-                .filter(TeamMemberPort.TeamMember::active)
-                .filter(member -> EscalationRules.READ_ROLES.contains(member.role())).isPresent();
-        if (!allowed) {
-            return null;
-        }
-        Instant asOf = board.databaseNow();
+    List<BoardRow> liveEscalations(UUID tenantId) {
         List<BoardRow> live = new ArrayList<>(board.findLiveOnBoard(tenantId));
         live.sort((a, b) -> SafetyRows.ORDER.compare(a.escalation(), b.escalation()));
+        return live;
+    }
+
+    /**
+     * The banner of already-read rows, for a caller whose role and membership the caller has checked. {@code live} is in
+     * the board order; {@code nameOf} gives the name shown for a row's patient.
+     */
+    Banner banner(UUID tenantId, Instant asOf, List<BoardRow> live, Function<BoardRow, String> nameOf) {
         List<BannerItem> past = new ArrayList<>();
         List<Detail> liveDetails = new ArrayList<>();
         for (BoardRow row : live) {
             Detail d = row.escalation();
             liveDetails.add(d);
             if (SafetyRows.pastTarget(d, asOf)) {
-                past.add(new BannerItem(d.id(), d.admissionId(), patientName(loadedPatients, row.patientId()),
-                        d.ewsScore()));
+                past.add(new BannerItem(d.id(), d.admissionId(), nameOf.apply(row), d.ewsScore()));
             }
         }
-        return new Banner(SafetyRows.counts(liveDetails, asOf), List.copyOf(past));
+        // SAH-35: the dose counts and the dose lines of the token, from the same function as the board and the summary.
+        return new Banner(SafetyRows.counts(liveDetails, round.read(tenantId, asOf), asOf), List.copyOf(past));
     }
 
-    private static Counts countsOf(List<BoardRow> live, Instant asOf) {
+    /** SAH-36: the database clock for an answer that does not go through the board (the Admitted list). */
+    Instant databaseNow() {
+        return board.databaseNow();
+    }
+
+    private static Counts countsOf(List<BoardRow> live, MedicineRound.Result doses, Instant asOf) {
         List<Detail> details = new ArrayList<>();
         for (BoardRow row : live) {
             details.add(row.escalation());
         }
-        return SafetyRows.counts(details, asOf);
+        return SafetyRows.counts(details, doses, asOf);
     }
 
     private static List<ActionOption> actionOptions() {
@@ -232,10 +262,14 @@ public class SafetyService {
 
     // ---- helpers ----
 
-    private Map<UUID, PatientSummary> patientsOf(UUID tenantId, List<BoardRow> rows) {
+    /** One lookup for the escalation rows and the listed (at most 200) dose rows of the answer. */
+    private Map<UUID, PatientSummary> patientsOf(UUID tenantId, List<BoardRow> rows, MedicineRound.Result doses) {
         Set<UUID> ids = new HashSet<>();
         for (BoardRow row : rows) {
             ids.add(row.patientId());
+        }
+        for (MedicineRound.Entry entry : doses.rows()) {
+            ids.add(entry.patientId());
         }
         return ids.isEmpty() ? Map.of() : patients.findAll(tenantId, ids);
     }

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Sahaj IPD API
   version: 0.1.0
-  description: 'Phase 1 contract, SAH-22 (wards, rooms, beds, bed categories and charges), SAH-23 to SAH-27 (admissions, board, charges, transfer, discharge), SAH-28 (emergency queue, triage and Emergency setup; ADR-005) and SAH-30 (nursing vitals, nursing notes and early warning score; ADR-006) and SAH-33 (Safety board: early warning escalations and the clinical audit trail; ADR-007) and SAH-31 (medicine orders with safety checks, EMR sheet and the pharmacist check; ADR-009) and SAH-32 (Medicines (MAR) tab of the Nursing sheet and giving a dose with the bedside checks; ADR-011). Every call answers 401 (problem type unauthorized) without a valid session, and 403 (problem type module-off, "In-patients (IPD) is not switched on for your clinic.") when IPD is Off for the clinic; every write answers 409 (ipd-readonly, "IPD is read-only. Nothing can be changed.") when IPD is Read-only. SAH-22 reads are for any clinic role and its writes are OWNER only; from SAH-23 the roles are stated on each operation, and a role outside them answers 403 (problem type forbidden). Another clinic''s record answers 404 (row-level security). Money is integer paise. Calendar dates are Asia/Kolkata (IST) dates as YYYY-MM-DD strings; instants are date-time. Errors are RFC 9457 application/problem+json; the type is https://sahaj.in/problems/<slug> and the slugs below are written without the prefix.'
+  description: 'Phase 1 contract, SAH-22 (wards, rooms, beds, bed categories and charges), SAH-23 to SAH-27 (admissions, board, charges, transfer, discharge), SAH-28 (emergency queue, triage and Emergency setup; ADR-005) and SAH-30 (nursing vitals, nursing notes and early warning score; ADR-006) and SAH-33 (Safety board: early warning escalations and the clinical audit trail; ADR-007) and SAH-31 (medicine orders with safety checks, EMR sheet and the pharmacist check; ADR-009) and SAH-32 (Medicines (MAR) tab of the Nursing sheet and giving a dose with the bedside checks; ADR-011) and SAH-35 (Medicine round on the Safety board: doses due or overdue across admitted patients, dose counts on the Safety tab; ADR-012) and SAH-36 (Admitted patients as uniform cards: card facts, role-gated clinical flags and card abilities on GET /admissions; ADR-013). Every call answers 401 (problem type unauthorized) without a valid session, and 403 (problem type module-off, "In-patients (IPD) is not switched on for your clinic.") when IPD is Off for the clinic; every write answers 409 (ipd-readonly, "IPD is read-only. Nothing can be changed.") when IPD is Read-only. SAH-22 reads are for any clinic role and its writes are OWNER only; from SAH-23 the roles are stated on each operation, and a role outside them answers 403 (problem type forbidden). Another clinic''s record answers 404 (row-level security). Money is integer paise. Calendar dates are Asia/Kolkata (IST) dates as YYYY-MM-DD strings; instants are date-time. Errors are RFC 9457 application/problem+json; the type is https://sahaj.in/problems/<slug> and the slugs below are written without the prefix.'
 servers:
   - url: /api/v1/ipd
 security:
@@ -150,8 +150,8 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
   /admissions:
     get:
-      tags: [SAH-23, SAH-27, SAH-28, SAH-33]
-      description: 'OWNER, FRONT_DESK, NURSE, DOCTOR. Admitted patients only: a discharged patient leaves the list, the Admitted count and the deposit alert count (SAH-27). There is no discharged list (OQ-27-6). SAH-28: the answer also carries emergency (EmergencyCounts) for the second tile "Emergency" and the count on the Emergency tab of Beds and admissions. SAH-33 (ADR-007 D8): the answer also carries safety (AdmissionSafety) for OWNER, DOCTOR and NURSE, null for every other role: the count on the Safety tab and the red banner "Open safety board" at the top of the Admitted patients tab. The role for safety is the token role and the role re-read from the active membership (platform.api TeamMemberPort.findActiveByUserId); safety is null unless both are OWNER, DOCTOR or NURSE. Writes no record-access row (a list).'
+      tags: [SAH-23, SAH-27, SAH-28, SAH-33, SAH-35, SAH-36]
+      description: 'OWNER, FRONT_DESK, NURSE, DOCTOR. Admitted patients only: a discharged patient leaves the list, the Admitted count and the deposit alert count (SAH-27). There is no discharged list (OQ-27-6). SAH-28: the answer also carries emergency (EmergencyCounts) for the second tile "Emergency" and the count on the Emergency tab of Beds and admissions. SAH-33 (ADR-007 D8): the answer also carries safety (AdmissionSafety) for OWNER, DOCTOR and NURSE, null for every other role: the count on the Safety tab and the red banner "Open safety board" at the top of the Admitted patients tab. The role for safety is the token role and the role re-read from the active membership (platform.api TeamMemberPort.findActiveByUserId); safety is null unless both are OWNER, DOCTOR or NURSE. Writes no record-access row (a list). SAH-36 (ADR-013): the same answer feeds the Cards and the Table view of the Admitted tab. The rows are AdmittedPatientRow (uhid, wardId, roomName, and clinical only for OWNER, DOCTOR and NURSE: absent, not null, for every other role); the list carries asOf, wards (ward filter) and card (action abilities, once per list). One read-only REPEATABLE READ transaction, one asOf (database clock), a fixed number of set queries whatever the number of patients (ADR-013 D2); never one request per patient. The membership is re-read once, first: no active membership, or a membership role other than OWNER, FRONT_DESK, NURSE or DOCTOR, answers 403 forbidden (ADR-013 D3; a tightening). No search, ward, limit or cursor parameter: search, ward filter and "Show 24 more" work on the device over the whole loaded list, and the typed search text is never sent (ADR-013 D8). Still writes no record-access row, on first load or on reload (ADR-013 D10; OQ-36-7, human to confirm). The client reloads it every 60 seconds while the Admitted tab and the browser tab are visible, and after any change; on that tab this reload replaces the GET /safety/summary poll (ADR-013 D7). Never logged (names, UHID, allergy text, scores).'
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [ADMITTED], default: ADMITTED } }
       responses:
@@ -707,7 +707,7 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
   /safety:
     get:
-      tags: [SAH-33]
+      tags: [SAH-33, SAH-35]
       description: >-
         The Safety board (mockup ipSafety): the Safety tab of Beds and admissions, the last tab (after Admitted
         patients, and after Emergency when that tab is shown). OWNER, DOCTOR, NURSE (DEC-015 OQ-33-1); FRONT_DESK,
@@ -732,13 +732,27 @@ paths:
         The client loads it when the tab opens, every 60 seconds while it is open, and after every action
         (AC20); while loading it shows "Loading"; a failed refresh keeps the last answer and shows the notice
         "Could not refresh. Showing data from <time of the last asOf, as 11:05 AM>."
+        SAH-35 (ADR-012): the answer also carries medicineRound (the panel "Medicine round" and the tile "Doses
+        due or overdue") and counts.dosesDue and counts.dosesLate, computed in the same transaction against the
+        same asOf by the SAH-32 slot rule (DoseSlots, ADR-011 D2) over every ACTIVE medicine order of every
+        ADMITTED admission of the clinic: two set-based reads (the orders, and today's dose records of the
+        admitted admissions), never a read per patient (ADR-012 D1). A slot is listed when it has no dose record
+        and is DUE (from 60 whole minutes before to 60 whole minutes after the slot time) or LATE (more than 60
+        whole minutes after); PENDING, REJECTED and STOPPED orders, discharged patients, slots before the order
+        started and slots more than 60 minutes ahead are not listed; only today's slots (IST date of asOf) exist,
+        so a late dose not recorded by midnight leaves the list (OQ-35-2, open). The round is readable by OWNER,
+        DOCTOR and NURSE in Trial, On and Read-only state; only NURSE and OWNER in Trial or On get Give
+        (MedicineRound.canGive). The rows hold patient name, bed and medicine only (no UHID, age, sex or
+        allergy); reading them writes no record-access row (ADR-012 D5; OQ-35-6) and nothing is logged. A
+        failure of the round is a failure of this answer: the board's "Loading", failure and stale notice cover
+        the panel (ADR-012 D8; the story's separate panel error text is not used).
       responses:
         '200': { description: The Safety board, content: { application/json: { schema: { $ref: '#/components/schemas/SafetyBoard' } } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role or membership role not OWNER, DOCTOR or NURSE) or module-off' }
   /safety/summary:
     get:
-      tags: [SAH-33]
+      tags: [SAH-33, SAH-35]
       description: >-
         Counts only, for the number on the Safety tab (ADR-005 D3, ADR-007 D8): no names, scores or clinical text.
         OWNER, DOCTOR, NURSE; others 403 forbidden; module Off 403 module-off; same membership re-read and the
@@ -751,6 +765,12 @@ paths:
         banner), so names never travel in a poll. changeToken (SAH-33 review fix, code review SAH-33 item 2,
         ADR-007 R1) catches the changes the two counts miss: one overdue escalation closed while another became
         overdue (counts equal), or the score of an overdue one rose. Writes nothing.
+        SAH-35 (ADR-012 D3): the counts also carry dosesDue and dosesLate (numbers only: no patient name, bed or
+        medicine), computed by the same function as SafetyBoard.counts and medicineRound, and changeToken now
+        also covers every listed dose slot, so a dose recorded by anyone, a slot entering the 60-minute window
+        or turning late changes it. The client compares open, pastTarget, dosesDue, dosesLate and changeToken.
+        The Safety tab number is open + dosesLate (+ PharmacistChecksSummary.waiting for OWNER); DUE doses are
+        not added (mockup sfCount; OQ-35-3).
       responses:
         '200': { description: Counts, content: { application/json: { schema: { $ref: '#/components/schemas/SafetyCounts' } } } }
         '401': { $ref: '#/components/responses/Problem' }
@@ -1140,8 +1160,8 @@ paths:
         Counted by the same rule as PharmacistChecks.waiting. The page calls it when Beds and admissions opens
         for OWNER or PHARMACIST and every 60 seconds while the Safety tab is shown to them; when waiting or
         changeToken differ from the last values, the client reloads GET /pharmacist-checks when that panel is on
-        screen. Tab number: for OWNER safety.counts.open (SAH-33) plus waiting (mockup sfCount); for PHARMACIST
-        waiting; hidden at 0. Writes nothing.
+        screen. Tab number: for OWNER safety.counts.open (SAH-33) plus safety.counts.dosesLate (SAH-35, ADR-012
+        D3) plus waiting (mockup sfCount); for PHARMACIST waiting; hidden at 0. Writes nothing.
       responses:
         '200': { description: Counts, content: { application/json: { schema: { $ref: '#/components/schemas/PharmacistChecksSummary' } } } }
         '401': { $ref: '#/components/responses/Problem' }
@@ -1297,6 +1317,16 @@ paths:
         (orderedAt ascending, then id), each with the slots of today (the IST date of asOf) and today's dose
         records; not paged (ADR-011 D12). Loaded when the tab is chosen and after every dose answer (the
         answers carry it); not polled. Never logged.
+        SAH-35 (ADR-012 D4): also loaded, once and for that patient only, when Give is tapped on a row of the
+        Safety board's Medicine round (never per row, never on a refresh); the same rules apply, so each tap
+        writes one record-access row (OQ-35-6). The client takes the order MedicineRoundRow.orderId and the slot
+        MedicineRoundRow.slotAt from this answer and opens the Give sheet with its data. When the slot is no
+        longer givable the sheet does not open; the client shows, and reloads the board: slot GIVEN, HELD or
+        REFUSED "This dose is already recorded."; the order not in orders "This medicine was stopped. Its doses
+        can no longer be recorded."; status DISCHARGED "This patient is not admitted any more. Doses cannot be
+        recorded."; giveLockReason IPD_READONLY "IPD is read-only. Doses cannot be recorded."; any other case
+        (slot not found, not DUE or LATE, or canGive false) "Reload the page and try again.". A failed read: the
+        toast "We could not load the medicines. Try again." and the board stays.
       responses:
         '200':
           description: The MAR
@@ -1377,7 +1407,8 @@ paths:
         every white-space, control and format character removed, upper case; a value longer than 200
         characters counts as not equal) 409 wristband-mismatch, detail "Wristband does not match this patient.
         Stop. Check the patient before giving anything." (no name in a problem detail), and the clinical event
-        (kind deny) "Stopped at the wristband check: scanned <scan>, expected <UHID> (<drug name>)" where <scan>
+        (kind deny) "Stopped at the identity check: entered <scan>, expected <UHID> (<drug name>)" (SAH-38, ADR-014
+        D11, from that release; rows written before keep "Stopped at the wristband check: scanned ...") where <scan>
         is the normalised text when it matches the UHID-shape pattern ^[A-Z]{2,6}-[0-9]{5,9}$ (2 to 6 letters,
         a hyphen, 5 to 9 digits: 8 to 16 characters; the server's pattern in WristbandCheck is the authority),
         and otherwise the words "text that is not a UHID" (ADR-011 D4; never free text in the log). The pattern
@@ -1396,17 +1427,29 @@ paths:
         field secondNurseId "Choose a nurse from the list." (contract wording). (4) High-alert GIVEN only, outside
         any transaction: the second nurse's own personal staff PIN through platform.api
         StaffPinPort.checkColleague (ADR-011 D7, PROPOSED platform addition), in its own platform transaction
-        that commits first (a wrong try counts on the second nurse's PIN although this request fails): the
-        caller already has 5 failed colleague checks in 15 minutes or 10 in 24 hours, or the second nurse 10
-        failed checks in 5 minutes, 429 rate-limit "Too many PIN tries in a short time. Try again in a few
-        minutes."; SAHAJ_PIN_PEPPER not set 503 pin-unavailable "PIN checks are not available right now. Try
-        again later."; the second nurse has no PIN (any reason, also the try that causes the third lock in 24
-        hours) 409 pin-not-set "The second nurse has not set a PIN yet. Choose another nurse."; locked 403
-        pin-locked "The second nurse's PIN is locked after 5 wrong tries. Choose another nurse, or try again at
-        <h:mm AM/PM>." (IST; retryAfterSeconds); wrong 403 wrong-pin "That PIN is not right." (no tries-left
-        count for a colleague's PIN, so a guesser is not told when to stop before a lock; the try still counts
-        on the second nurse's PIN; security review S4; the caller's own PIN answer on verify keeps the count);
-        not eligible any more 400 field secondNurseId "Choose a nurse from the list.". A
+        that commits first (a wrong try counts on the second nurse's PIN although this request fails), in the
+        order of ADR-014 D3: SAHAJ_PIN_PEPPER not set 503 pin-unavailable "PIN checks are not available right
+        now. Try again later."; the caller already has 5 failed colleague checks in 15 minutes or 10 in 24
+        hours (in memory until HARD-2) 429 rate-limit "Too many PIN tries in a short time. Try again in a few
+        minutes." (SAH-38: the second nurse's own failed-check limit is no longer used, so other people's
+        wrong tries never block naming that nurse); not eligible any more 400 field secondNurseId "Choose a
+        nurse from the list."; the second nurse has no PIN (any reason) 409 pin-not-set "The second nurse has
+        not set a PIN yet. Choose another nurse."; locked 403 pin-locked "The second nurse's PIN is locked after
+        5 wrong tries. Choose another nurse, or try again at <h:mm AM/PM>." (IST; retryAfterSeconds); SAH-38
+        pair cap: the caller already made 5 wrong tries of this second nurse's PIN within a rolling 7 days
+        (durable in the database, the same after a restart and on every instance; cleared by a right PIN typed
+        by the same caller for the same nurse, or by a new PIN) 429 colleague-pin-limit "Too many wrong PIN
+        tries for this nurse. Choose another nurse." (the PIN is not compared, nothing is counted; no
+        retryAfterSeconds, no count; another nurse can be named at once); wrong 403 wrong-pin "That PIN is not
+        right." (no tries-left count for a colleague's PIN, so a guesser is not told when to stop before a lock;
+        the try counts on the second nurse's PIN and on the pair; security review S4; the caller's own PIN
+        answer on verify keeps the count); the fifth wrong try in a row locks that PIN for 15 minutes and answers
+        pin-locked, and because a colleague typed it the lock never counts toward switching the PIN off (SAH-38,
+        ADR-014 D6: a colleague check never answers pin-not-set because of its own tries); the PIN store could
+        not be read or written in time (a timeout, a lost connection or a lock failure) 503 pin-check-failed
+        "We could not check the PIN. Try again." (fail closed: nothing recorded, nothing counted, the same answer
+        whether the PIN was right or wrong; a database constraint or permission refusal, 23514, 23503 or 42501,
+        is a code fault and stays a 500 server error, ADR-014 D5). A
         format-only check is never accepted (AC6). For a medicine that is not high-alert, secondNurseId and
         secondNursePin are ignored (not checked, not stored, the PIN never sent anywhere). For outcome NOT_GIVEN
         (AC8): reasonKey missing or not a NotGivenReasonKey 400 field reasonKey "Choose why the dose is not
@@ -1420,8 +1463,10 @@ paths:
         nurse still an active NURSE and not the caller. Then one dose record: outcome GIVEN, or REFUSED for
         reason PATIENT_REFUSED and HELD for any other reason; recorded by the caller; the second nurse (high-alert
         GIVEN); the normalised wristband text (GIVEN); identityConfirmed (GIVEN); recordedAt = clock_timestamp().
-        Clinical event (kind give): GIVEN "Gave <drug name> (<slot time> dose) · wristband scanned" plus " ·
-        second check by <second nurse display name>" for a high-alert medicine; NOT_GIVEN "Did not give <drug
+        Clinical event (kind give): GIVEN "Gave <drug name> (<slot time> dose) · identity checked against UHID"
+        plus " · second check by <second nurse display name>" for a high-alert medicine (SAH-38, ADR-014 D11,
+        security review S3: the record never claims a wristband scan that may not have happened; events written
+        before that release keep "· wristband scanned", nothing is rewritten); NOT_GIVEN "Did not give <drug
         name> (<slot time> dose) · <reason label>" (slot time as "8 AM", "8:30 AM"). Audit IPD_DOSE_GIVEN
         (doseId, orderId, admissionId, drugKey, slotAt, outcome GIVEN, highAlert, secondCheckUserId) or
         IPD_DOSE_NOT_GIVEN (doseId, orderId, admissionId, drugKey, slotAt, outcome HELD or REFUSED, reasonKey);
@@ -1440,13 +1485,26 @@ paths:
         does not match <patient name>. Stop. Check the patient before giving anything." and under the box (crit,
         alert icon) "Wrong patient. This band is not <patient name>'s." (names from the MAR the client holds);
         400 with fieldErrors: the error toast with detail, and for the PIN errors (wrong-pin, pin-locked,
-        pin-not-set) the detail under "Their PIN" (pin-not-set here is the second nurse's state: the client
-        never reads GET /api/v1/platform/me/pin for it); 409 dose-recorded, order-state, order-not-verified,
+        pin-not-set, colleague-pin-limit, rate-limit, pin-check-failed) the detail under "Their PIN" (pin-not-set
+        here is the second nurse's state: the client never reads GET /api/v1/platform/me/pin for it); SAH-38
+        ward line (ADR-014 D10, NEW text T6, client only): for a high-alert medicine, after pin-locked,
+        pin-not-set, rate-limit or colleague-pin-limit, and whenever secondNurses is empty, one more line under
+        the reason, in the same polite live region: "No second PIN works? Do not give this medicine yet. Choose
+        another nurse, or ask the nurse in charge or the clinic owner. Never share a PIN." (not for wrong-pin,
+        pin-unavailable or pin-check-failed; hidden when another nurse is chosen in "Checked by" or another
+        answer arrives; there is no bypass, no "give anyway" and no paper option); 409 dose-recorded, order-state, order-not-verified,
         dose-not-due, dose-before-start, not-admitted: the error toast with detail, the sheet closes and the MAR
         is reloaded; any other failure (5xx, network): the sheet stays open with everything entered except the
         PIN, which is cleared (the PIN is cleared after every answer). clientKey: made when the Give sheet opens,
         kept while the same request is retried, a new one for a new sheet and after 409 client-key-reused. No
-        offline queue.
+        offline queue. SAH-35 (ADR-012 D4): unchanged when the Give sheet was opened from a Medicine round row
+        of the Safety board (every check, status code, event and audit above applies; there is no other way to
+        record a dose from the board); the client then, after 201 or 200, shows the same toast, closes the
+        sheet, stays on the Safety tab and reloads GET /safety (not the mar of the answer), with focus on the
+        Give button of the next row or the panel heading; after 409 dose-recorded, order-state,
+        order-not-verified, not-admitted, dose-not-due, dose-before-start, ipd-readonly or 400 on slotAt it
+        shows the detail, closes the sheet and reloads GET /safety; any other failure keeps the sheet open as
+        above.
       requestBody:
         required: true
         content:
@@ -1492,8 +1550,20 @@ paths:
                 mismatch: { value: { type: 'https://sahaj.in/problems/wristband-mismatch', title: Wristband does not match, status: 409, detail: Wristband does not match this patient. Stop. Check the patient before giving anything. } }
                 recorded: { value: { type: 'https://sahaj.in/problems/dose-recorded', title: Dose already recorded, status: 409, detail: This dose is already recorded. } }
                 notVerified: { value: { type: 'https://sahaj.in/problems/order-not-verified', title: Order not checked, status: 409, detail: This order is not checked by the pharmacist yet. } }
-        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit (colleague PIN limits; retryAfterSeconds)' }
-        '503': { $ref: '#/components/responses/Problem', description: 'pin-unavailable (SAHAJ_PIN_PEPPER not set; fail closed: nothing is recorded)' }
+        '429':
+          description: 'rate-limit (the caller''s colleague PIN limit; retryAfterSeconds); colleague-pin-limit (SAH-38 pair cap; no retryAfterSeconds)'
+          content:
+            application/problem+json:
+              schema: { type: object }
+              examples:
+                pairLimit: { summary: 'SAH-38: 5 wrong tries of this nurse''s PIN by this caller within 7 days', value: { type: 'https://sahaj.in/problems/colleague-pin-limit', title: Too many wrong PIN tries, status: 429, detail: Too many wrong PIN tries for this nurse. Choose another nurse. } }
+        '503':
+          description: 'pin-unavailable (SAHAJ_PIN_PEPPER not set); pin-check-failed (SAH-38: the PIN store could not be read or written in time: a timeout, a lost connection or a lock failure only; a database constraint or permission refusal is a code fault, 500, ADR-014 D5). Fail closed: nothing is recorded.'
+          content:
+            application/problem+json:
+              schema: { type: object }
+              examples:
+                checkFailed: { value: { type: 'https://sahaj.in/problems/pin-check-failed', title: PIN check failed, status: 503, detail: We could not check the PIN. Try again. } }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -1670,8 +1740,11 @@ components:
         goingHomeToday: { type: boolean, description: 'SAH-27 (assumption OQ-27-5). True when the admission is ADMITTED and has a discharge sign-off whose signedAt falls on today''s IST date. Drives the teal pill "Going home today" in the Status column (instead of the Insurance, Corporate and Deposit pills (the mockup is exclusive)). Always false for a DISCHARGED admission.' }
     AdmissionList:
       type: object
-      required: [bedsTotal, bedsOccupied, bedsAvailable, canAdmit, depositAlerts, alertPercent, dischargedToday, goingHomeToday, emergency, safety, items]
+      required: [bedsTotal, bedsOccupied, bedsAvailable, canAdmit, depositAlerts, alertPercent, dischargedToday, goingHomeToday, emergency, safety, asOf, wards, card, items]
       properties:
+        asOf: { type: string, format: date-time, description: 'SAH-36 (ADR-013 D2, D7). Database clock (clock_timestamp()) of this answer, read once; base of every minute count and of vitalsDue in the rows. The time in "Could not refresh. Showing data from <asOf as 11:05 AM>." when a 60-second reload fails (the last answer stays on screen). For every role (FRONT_DESK has no safety.counts.asOf).' }
+        wards: { type: array, items: { $ref: '#/components/schemas/WardOption' }, description: 'SAH-36 (story 2, AC14, AC20, AC21). Every ward of the clinic, in the order of IpdLayout.wards (the Beds setup), also wards with no admitted patient, for the select "Ward" after the option "All wards". Filtering is on the device by AdmittedPatientRow.wardId.' }
+        card: { $ref: '#/components/schemas/AdmittedCardAbilities', description: 'SAH-36 (story 5; ADR-013 D5). What the card shows for this caller, once for the whole list (every listed patient is ADMITTED, so abilities depend only on the role and the IPD state).' }
         safety: { oneOf: [{ $ref: '#/components/schemas/AdmissionSafety' }, { type: 'null' }], description: 'SAH-33. The Safety tab count and the banner of the Admitted patients tab, for OWNER, DOCTOR and NURSE (token role and membership role both); null for every other role, which has no Safety tab. The client shows the Safety tab, as the last tab, when safety is not null and items is not empty (mockup sfTabOn), in Trial, On and Read-only state.' }
         emergency: { $ref: '#/components/schemas/EmergencyCounts', description: 'SAH-28. Second tile "Emergency" (after Beds occupied, before Deposit alerts and Going home today) and the count on the Emergency tab.' }
         bedsTotal: { type: integer }
@@ -1682,7 +1755,100 @@ components:
         dischargedToday: { type: integer, minimum: 0, description: 'SAH-27. Admissions discharged on today''s IST date (N in the tile text "N discharged · M planned").' }
         goingHomeToday: { type: integer, minimum: 0, description: 'SAH-27. Admitted patients with goingHomeToday true (M in "N discharged · M planned"). The tile number is dischargedToday + goingHomeToday.' }
         alertPercent: { type: integer }
-        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRow' }, description: Newest admission first. }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmittedPatientRow' }, description: 'Newest admission first (the order of the cards and of the table; no sort, OQ-36-13). Not paged: bounded by the clinic''s bed limit. SAH-36: the items are AdmittedPatientRow (AdmissionRow plus the card facts).' }
+    WardOption:
+      type: object
+      description: 'SAH-36. One option of the select "Ward" on the Admitted tab: the ward name; value the id.'
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, maxLength: 80 }
+    AdmittedCardAbilities:
+      type: object
+      description: >-
+        SAH-36 (story 5, AC43, AC44, AC51; ADR-013 D5). Card abilities for the caller, the same for every row.
+        Each is true only when the token role and the role re-read from the active membership are both in the
+        set named, and the IPD state allows it; each set is the narrower of the mockup's default card
+        (pcDefault acl.act) and what the server already allows (OQ-36-4). A false action is not shown (no
+        disabled button). A convenience only: every endpoint the opened sheets call checks role, membership,
+        state and admission status again, unchanged. Action row order on the card: Nursing (primary), EMR,
+        Transfer, Discharge, each with its icon and word (nurse, emr, swap, door icons), at least 44 px, with the
+        accessible name "<Action> for <patientName>". When no action is true the row is not drawn.
+      required: [nursing, emr, transfer, discharge, depositLowFlag]
+      properties:
+        nursing: { type: boolean, description: 'OWNER, NURSE, DOCTOR; IPD Trial, On or Read-only. Opens the Nursing sheet of SAH-30/32 for the row (GET /admissions/{id}/nursing, record access as today); closing it returns focus to this button.' }
+        emr: { type: boolean, description: 'OWNER, NURSE, DOCTOR; IPD Trial, On or Read-only. Opens the EMR sheet of SAH-31 (GET /admissions/{id}/emr, record access and view event as today); closing it returns focus to this button.' }
+        transfer: { type: boolean, description: 'OWNER, NURSE, FRONT_DESK; IPD Trial or On (false in Read-only). Opens the admission sheet of SAH-23 (GET /admissions/{id}) with the "Move to another bed" row of SAH-26 open and focused (ADR-013 D6; no separate Transfer sheet and no reason field, OQ-36-11). When the detail answer has canTransfer false the sheet opens on its main view.' }
+        discharge: { type: boolean, description: 'OWNER, DOCTOR; IPD Trial or On (false in Read-only). Opens the admission sheet straight on the SAH-27 discharge view, making the same requests as the button "Start discharge" (ADR-013 D6). When the detail answer has canStartDischarge false the sheet opens on its main view.' }
+        depositLowFlag: { type: boolean, description: 'OWNER, FRONT_DESK. The card shows the flag "Deposit low" for a row with depositLow true only when this is true (the mockup''s default card hides billing from DOCTOR and NURSE; OQ-36-4). A display rule, not a privacy control: the Table view still shows the bill and deposit columns to all four roles, unchanged.' }
+    AdmittedPatientRow:
+      description: >-
+        SAH-36 (story 1, AC3 to AC7; ADR-013). One admitted patient of GET /admissions: AdmissionRow (unchanged,
+        also what the Table view shows) plus the card facts. The Standard card (mockup pcCard, layout standard,
+        uniform grid), top to bottom: round initials of patientName (decorative, aria-hidden); patientName as a
+        button with the tooltip "Open bill and bed details", which opens the admission sheet (ADR-013 D6); under
+        it "UHID <uhid> · <age> · <Male|Female|Other>" (label OQ-36-8; "—" for a null uhid, age or sex; never
+        "null" or "undefined"); the bed block "Bed" and bedCode; the flags line (order and rules in
+        AdmittedClinicalFlags; Going home today and Deposit low from this row); "Admitted on" admittedAt as "24
+        Oct 2026, 9:20 AM IST"; "Length of stay" "Day 1 (today)" when the IST date of admittedAt is the IST
+        date of AdmissionList.asOf, otherwise "<dayNumber> days" ("1 day" when dayNumber is 1, possible only
+        with the 24-hour cut; ADR-013 Q8); "Ward" wardName; "Room" roomName or "—"; "Doctor" doctorName; the
+        action row (AdmittedCardAbilities). Long name, ward or room cut with an ellipsis, full text in the
+        tooltip and the accessible name. The card is an article named "<patientName>, bed <bedCode>". Search
+        (on the device only) matches, ignoring case and leading or trailing spaces, part of patientName, uhid,
+        bedCode or ipNumber. Flags "Going home today" (blue, door icon) when goingHomeToday, for all four roles;
+        "Deposit low" (crit, deposit icon) when depositLow and AdmissionList.card.depositLowFlag. Names, UHID and
+        clinical data on screen only; never logged.
+      allOf:
+        - $ref: '#/components/schemas/AdmissionRow'
+        - type: object
+          required: [uhid, wardId, roomName]
+          properties:
+            uhid: { type: [string, 'null'], description: 'The patient''s UHID from the patient record, read through patient.api PatientClinicalPort (one batch call per answer). Null only when the patient record cannot be found (a data fault; the row is never dropped).' }
+            wardId: { type: string, format: uuid, description: 'Ward of the current bed; the value matched by the ward filter (ward names are not used as keys).' }
+            roomName: { type: [string, 'null'], maxLength: 80, description: 'Room of the current bed; null when the bed has no room or the clinic uses no rooms (IpdLayout.roomLevel false), shown as "—" (ADR-013 Q7).' }
+            clinical: { $ref: '#/components/schemas/AdmittedClinicalFlags', description: 'Present only when the token role and the role re-read from the active membership are both OWNER, DOCTOR or NURSE. For every other caller (FRONT_DESK) the property is absent from the JSON: not null, not an empty object (AC34; ADR-013 D3).' }
+    AdmittedClinicalFlags:
+      type: object
+      description: >-
+        SAH-36 (story 4, AC29 to AC37; ADR-013 D4). The clinical facts behind the card flags, for OWNER, DOCTOR
+        and NURSE only, from existing rules computed by the server at AdmissionList.asOf (no rule in the
+        browser). Flags, in this order, each with an icon and words (never colour alone): (1) the escalation
+        flag: escalation.status OPEN "Not seen · <escalation.waitingMinutes> min" (crit, siren icon; tooltip
+        "Early warning escalation raised <waitingMinutes> min ago, past the <targetMinutes> min target, not seen
+        by a doctor" when pastTarget, "... within the <targetMinutes> min target ..." otherwise) or ACK "Doctor
+        reviewing" (warn, siren icon); (2) allergy.status RECORDED "Allergy: <allergy.text>" (crit, alert icon;
+        cut by width, the full text in the tooltip and the accessible name); (3) latestEws.risk MEDIUM "EWS
+        <score> · Medium" (warn, heart icon) or HIGH "EWS <score> · High" (crit, heart icon; the card also gets
+        the red outline, mockup pc-crit); (4) vitalsDue "Vitals due" (warn, clock icon); then, from the row,
+        "Going home today" and "Deposit low". Flags (1) to (3) are safety flags and are never folded into "+N"
+        (OQ-36-1); Vitals due, Going home today and Deposit low may fold into a chip "+N" whose tooltip and
+        accessible name list them ("2 more: Vitals due, Deposit low"). Minute counts are never counted up on the
+        device between reloads (OQ-36-10). The later "Dose overdue" flag (after SAH-35) is added here as an
+        optional dosesLate for NURSE and OWNER only, second in the order (ADR-013 D9); it is not in this
+        version and no placeholder is shown. Clinical data: on screen only; never logged or audited.
+      required: [escalation, latestEws, vitalsDue, allergy]
+      properties:
+        escalation: { oneOf: [{ $ref: '#/components/schemas/CardEscalationFlag' }, { type: 'null' }], description: 'The admission''s escalation with status OPEN or ACK (at most one, SAH-30); null when none is open. The same rows as AdmissionSafety.counts and the banner (one read, same snapshot).' }
+        latestEws: { oneOf: [{ $ref: '#/components/schemas/EwsSummary' }, { type: 'null' }], description: 'Score and risk of the latest vitals record (recordedAt descending, then id descending; same rule as AdmissionDetail.latestEws); null when no vitals were recorded. No flag for LOW.' }
+        vitalsDue: { type: boolean, description: 'Same rule and function as AdmissionDetail.vitalsDue (SAH-30 AC10): no vitals yet, or more than 240 whole minutes from the latest recordedAt to AdmissionList.asOf.' }
+        allergy: { $ref: '#/components/schemas/CardAllergy' }
+    CardEscalationFlag:
+      type: object
+      description: 'SAH-36. The open escalation of one admitted patient for the card flag; values from EscalationClock at AdmissionList.asOf (ADR-007 D5), equal to the EscalationRow of the Safety board at the same snapshot. No id, score or names (the card does not act on it; Acknowledge and Call senior stay on the Safety board).'
+      required: [status, waitingMinutes, targetMinutes, pastTarget]
+      properties:
+        status: { type: string, enum: [OPEN, ACK], description: 'OPEN "Not seen · N min" (crit); ACK "Doctor reviewing" (warn).' }
+        waitingMinutes: { type: integer, minimum: 0, description: 'Whole minutes from the start of the response clock (reopenedAt, else raisedAt) to asOf, rounded down; the N of "Not seen · N min" (the same number as the red notice of the Safety board).' }
+        targetMinutes: { type: integer, enum: [15, 60], description: '15 for HIGH, 60 for MEDIUM; for the tooltip.' }
+        pastTarget: { type: boolean, description: 'As EscalationRow.pastTarget: OPEN and the exact time since the clock start is more than targetMinutes; false for ACK. Chooses "past" or "within" in the tooltip.' }
+    CardAllergy:
+      type: object
+      description: 'SAH-36 (AC33; OQ-36-6). Allergy of the patient record (SAH-8), read through patient.api PatientClinicalPort in one batch call; status by the SAH-31 allergy-status function (AllergyStatus, ADR-009 D2), never by matching in the browser. Only RECORDED shows a flag; NONE_KNOWN and NOT_RECORDED show none (as the mockup). A patient record that cannot be found gives NOT_RECORDED.'
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/AllergyStatus' }
+        text: { type: string, minLength: 1, maxLength: 400, description: 'Present only when status is RECORDED: the allergy field as stored, never cut in the data. Absent for NONE_KNOWN and NOT_RECORDED. Clinical data: on screen only; never logged, audited or put in a clinical event.' }
     DepositEntry:
       type: object
       required: [id, amountPaise, mode, collectedAt, collectedByName]
@@ -2355,12 +2521,14 @@ components:
         canCallSenior: { type: boolean, description: 'status OPEN and both roles NURSE.' }
     SafetyCounts:
       type: object
-      description: 'SAH-33. Counts only, no names (ADR-005 D3). Escalations of ADMITTED admissions of the clinic.'
-      required: [open, pastTarget, changeToken, asOf]
+      description: 'SAH-33. Counts only, no names (ADR-005 D3). Escalations of ADMITTED admissions of the clinic; from SAH-35 also the dose slots of the Medicine round (ADR-012 D3). The Safety tab number is open + dosesLate (+ PharmacistChecksSummary.waiting for OWNER), hidden at 0 (mockup sfCount).'
+      required: [open, pastTarget, dosesDue, dosesLate, changeToken, asOf]
       properties:
-        open: { type: integer, minimum: 0, description: 'Escalations with status OPEN or ACK. The number next to the Safety tab name (hidden at 0) and the tile "Escalations open"; always equal to the rows of SafetyBoard.escalations that are not DONE.' }
+        open: { type: integer, minimum: 0, description: 'Escalations with status OPEN or ACK. Part of the number next to the Safety tab name (with dosesLate, and waiting for OWNER) and the tile "Escalations open"; always equal to the rows of SafetyBoard.escalations that are not DONE.' }
+        dosesDue: { type: integer, minimum: 0, description: 'SAH-35. Dose slots of today in state DUE (from 60 whole minutes before to 60 whole minutes after the slot time, no dose record) of ACTIVE orders of ADMITTED admissions (DoseSlots, ADR-011 D2; ADR-012 D1). LATE slots are not included. The tile "Doses due or overdue" shows dosesDue + dosesLate. Not added to the tab number (OQ-35-3). Always the full count, also when MedicineRound.truncated is true.' }
+        dosesLate: { type: integer, minimum: 0, description: 'SAH-35. Dose slots of today in state LATE (more than 60 whole minutes after the slot time, no dose record) of ACTIVE orders of ADMITTED admissions. The tile small text "<dosesLate> overdue" ("0 overdue" when none; the figure in crit when above 0) and the dose term of the tab number. Always the full count.' }
         pastTarget: { type: integer, minimum: 0, description: 'Escalations with pastTarget true.' }
-        changeToken: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$', description: 'SAH-33 review fix (code review SAH-33 item 2, ADR-007 R1). Opaque; the client only compares it for equality with the last one it saw and reloads the board or the banner when it, open or pastTarget differ. Computed from the same snapshot as open and pastTarget: a hash of the id and version of every escalation counted in open (status OPEN or ACK of ADMITTED admissions), with no name, score or text in it (ADR-007 R1 gives the exact rule). It changes when such an escalation is raised, acknowledged, closed, re-opened or gets a higher score; not on a senior call (version unchanged) and not when only the minutes pass.' }
+        changeToken: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$', description: 'SAH-33 review fix (code review SAH-33 item 2, ADR-007 R1). Opaque; the client only compares it for equality with the last one it saw and reloads the board or the banner when it, open or pastTarget differ. Computed from the same snapshot as open and pastTarget: a hash of the id and version of every escalation counted in open (status OPEN or ACK of ADMITTED admissions), with no name, score or text in it (ADR-007 R1 gives the exact rule). It changes when such an escalation is raised, acknowledged, closed, re-opened or gets a higher score; not on a senior call (version unchanged) and not when only the minutes pass. SAH-35 (ADR-012 D3): the sorted lines also hold one line per dose slot counted in dosesDue or dosesLate (all of them, not only the 200 rows), "dose:<order id lower case>:<slotAt as epoch seconds>:<LATE or DUE>", with the same join, SHA-256, 16 bytes and base64url; with no dose in the window the token is the SAH-33 token. It then also changes when a dose is recorded by anyone, a slot enters the window or turns from DUE to LATE, or an order or admission with a slot in the window starts or ends; not when only lateHours grows. No name, medicine or text is in it.' }
         asOf: { type: string, format: date-time, description: 'Database clock the counts were computed at.' }
     SafetyBannerItem:
       type: object
@@ -2377,7 +2545,15 @@ components:
         empty the Admitted patients tab shows at the top the notice (crit, siren icon) "<patientName> · EWS
         <ewsScore>, <patientName> · EWS <ewsScore>" in bold (items joined with ", ") followed by " escalated and
         not seen by a doctor within target." and the primary button "Open safety board", which switches to the
-        Safety tab. With pastTarget empty there is no banner.
+        Safety tab. With pastTarget empty there is no banner. SAH-35 (ADR-012 D3): counts carries dosesDue and
+        dosesLate from the same function as GET /safety and GET /safety/summary (GET /admissions runs the two
+        dose reads for OWNER, DOCTOR and NURSE only, without names), so the Safety tab number (counts.open +
+        counts.dosesLate, plus waiting for OWNER) is right on page load and the change token equals the
+        summary's at the same snapshot. When the summary's changeToken differs on this tab the client reloads
+        GET /admissions, at most once per 60-second poll. SAH-36 (ADR-013 D7): while the Admitted tab is shown
+        and the browser tab is visible, the client reloads GET /admissions itself every 60 seconds and takes the
+        tab number and the token from each answer's counts, so it does not poll GET /safety/summary on that tab;
+        the summary poll on the other tabs is unchanged. The banner stays above the toolbar in both views.
       required: [counts, pastTarget]
       properties:
         counts: { $ref: '#/components/schemas/SafetyCounts' }
@@ -2395,14 +2571,18 @@ components:
         patients" with yourPatients and the small text "In your wards" (mockup; OQ-33-2 open: until wards exist it
         counts every admitted patient); SAH-31 (ADR-009 D11): for OWNER only, right after "Escalations open", the
         tile "Pharmacist checks" with PharmacistChecks.waiting (warn when above 0) and the small text "Orders waiting
-        before the first dose", from GET /pharmacist-checks; the tiles of SAH-32 and SAH-34 are not shown; (3) the panel
+        before the first dose", from GET /pharmacist-checks; SAH-35 (ADR-012 D7): for OWNER, DOCTOR and NURSE,
+        after "Pharmacist checks" (OWNER) or "Escalations open" and before "Your patients" (NURSE), the tile "Doses
+        due or overdue" with counts.dosesDue + counts.dosesLate (in crit when counts.dosesLate is above 0) and the
+        small text "<counts.dosesLate> overdue"; the tile of SAH-34 (Emergency access) is not shown; (3) the panel
         "Early warning escalations" (siren icon), subtitle "High score: doctor within 15 min. Medium: within 1
         hour. A nurse can call the senior doctor if the target passes.", the rows (EscalationRow), empty "No
         escalations. Scores of 5 and above raise one automatically when vitals are saved."; (4) SAH-31, for OWNER
         only: the panel "Pharmacist check" (PharmacistChecks, loaded with GET /pharmacist-checks; shieldu icon);
-        the panel of SAH-32 when it exists; (5) the panel "Clinical audit trail" (ClinicalEventPage, loaded with
-        GET /clinical-events). Emergency access (SAH-34) is not shown.
-      required: [state, view, asOf, counts, yourPatients, responseActions, escalations]
+        SAH-35: the panel "Medicine round" (MedicineRound, pill icon) for OWNER, DOCTOR and NURSE; (5) the panel
+        "Clinical audit trail" (ClinicalEventPage, loaded with GET /clinical-events). Emergency access (SAH-34) is
+        not shown.
+      required: [state, view, asOf, counts, yourPatients, responseActions, escalations, medicineRound]
       properties:
         state: { type: string, enum: [trial, on, readonly], description: 'IPD state; never off (403). The actions stay allowed in readonly (DEC-015 OQ-33-9).' }
         view: { type: string, enum: [DOCTOR, NURSE], description: 'From the membership role: DOCTOR for OWNER and DOCTOR, NURSE for NURSE. Chooses the notice ending, the second tile and the audit trail subtitle.' }
@@ -2411,6 +2591,60 @@ components:
         yourPatients: { type: [integer, 'null'], minimum: 0, description: 'view NURSE: admitted patients the nurse can see (every admitted patient in phase 1). Null for view DOCTOR.' }
         responseActions: { type: array, items: { $ref: '#/components/schemas/EscalationResponseActionOption' }, description: 'The five doctor actions in select order (never CLOSED_AT_DISCHARGE).' }
         escalations: { type: array, items: { $ref: '#/components/schemas/EscalationRow' }, description: 'Every escalation of every ADMITTED admission that is OPEN or ACK, and every DONE one closed within the last 24 hours before asOf (SAH-33 review fix, security review L5, OQ-33-13 proposal, ADR-007 R5; older closed ones are in the clinical audit trail only): not DONE first, then ewsScore descending, then the earlier response clock start (reopenedAt, else raisedAt) first (a tie-break not in the mockup), then id (java.util.UUID order; deterministic only, it carries no meaning, ADR-007 R7).' }
+        medicineRound: { $ref: '#/components/schemas/MedicineRound' }
+    MedicineRoundSlotState:
+      type: string
+      enum: [LATE, DUE]
+      description: 'SAH-35. The two MarSlotState values listed in the Medicine round (ADR-011 D2, same whole-minute rule): LATE more than 60 whole minutes after the slot time; DUE from 60 whole minutes before to 60 whole minutes after it.'
+    MedicineRoundRow:
+      type: object
+      description: >-
+        SAH-35. One row of the panel "Medicine round" (mockup doseRow): one dose slot of today, with no dose
+        record, of an ACTIVE order of an ADMITTED admission. Display, in this order: drugName in bold, followed
+        for a high-alert medicine (highAlert not null) by the red pill "High-alert" (crit; the class is not shown
+        here, mockup); the small line "<patientName> · bed <bedCode> · <slot time> dose" with the slot time in
+        IST as "8 AM", "2 PM", "8:30 AM" (minutes left out when 0); the status pill "<lateHours> h late" (crit)
+        for LATE or "Due now" (warn) for DUE (the text always carries the meaning, never the colour alone); the
+        primary button "Give" when MedicineRound.canGive, accessible name "Give <drugName> to <patientName>",
+        target at least 44 px. Give loads GET /admissions/{admissionId}/mar once and opens the SAH-32 Give sheet
+        for orderId and slotAt (ADR-012 D4). Names and medicine on screen only; never logged, never in a toast
+        seen by another user.
+      required: [admissionId, orderId, slotAt, state, lateHours, drugName, highAlert, patientName, bedCode]
+      properties:
+        admissionId: { type: string, format: uuid, description: 'For the MAR read on Give (GET /admissions/{id}/mar).' }
+        orderId: { type: string, format: uuid, description: 'MarOrder.orderId in the MAR answer; the path id of POST /medicine-orders/{id}/doses.' }
+        slotAt: { type: string, format: date-time, description: 'The dose time of today as an instant; matched against MarSlot.slotAt and sent as DoseInput.slotAt.' }
+        state: { $ref: '#/components/schemas/MedicineRoundSlotState' }
+        lateHours: { type: [integer, 'null'], minimum: 1, description: 'For LATE: whole hours late, rounded down (61 to 119 minutes is 1); null for DUE. The pill "<lateHours> h late".' }
+        drugName: { type: string, maxLength: 80, description: 'From the drug catalogue.' }
+        highAlert: { type: [string, 'null'], maxLength: 40, description: 'Anticoagulant, Insulin or Concentrated electrolyte; null for other medicines. Not null shows the pill "High-alert".' }
+        patientName: { type: string, description: 'Read through patient.api at display time; "Patient" when the record cannot be found (a data fault; the row is never dropped). On screen only; never logged.' }
+        bedCode: { type: string, description: 'The current bed of the admission.' }
+    MedicineRound:
+      type: object
+      description: >-
+        SAH-35 (ADR-012). The panel "Medicine round" (pill icon), below "Pharmacist check" (OWNER) or "Early
+        warning escalations" and above "Clinical audit trail": subtitle "Doses due in the next hour and doses
+        not given on time. Clock: <SafetyBoard.asOf as 11:05 AM>." (server clock in IST, never the device clock);
+        when giveLockReason is IPD_READONLY the line (lock icon) "IPD is read-only. Doses cannot be recorded."
+        (DEC-018 text; OQ-35-8); the rows (MedicineRoundRow) or, when rows is empty, "No doses due right now.";
+        when truncated the line "Showing the 200 most overdue doses." (contract wording, OQ-35-4, OQ-35-9). The
+        tile and the tab number use SafetyBoard.counts (full counts), never the number of rows. No text says
+        that anyone was alerted (no notifications in phase 1).
+      required: [canGive, giveLockReason, truncated, rows]
+      properties:
+        canGive: { type: boolean, description: 'Token role and membership role both NURSE or OWNER, and IPD Trial or On (ADR-012 D6). When false no row shows a Give button. A convenience only: POST /medicine-orders/{id}/doses checks everything again.' }
+        giveLockReason:
+          oneOf:
+            - { type: string, enum: [ROLE, IPD_READONLY] }
+            - { type: 'null' }
+          description: 'Null when canGive is true; otherwise the first that applies: ROLE (DOCTOR: rows without Give and no line; OQ-35-1) or IPD_READONLY (rows without Give and the read-only line).'
+        truncated: { type: boolean, description: 'True when more than 200 slots qualify; rows then holds the first 200 in the order below.' }
+        rows:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/MedicineRoundRow' }
+          description: 'LATE before DUE; inside each, slotAt ascending (most late first, mockup); tie-break not in the mockup (OQ-35-4): bedCode ascending (code-point order), then drugName ascending, then orderId (java.util.UUID order; deterministic only). At most 200 (ADR-012 D2).'
     EscalationVersionInput:
       type: object
       required: [version]
@@ -2919,7 +3153,10 @@ components:
         check · high-alert <highAlert in lower case>" with the small text "A second nurse checks the drug, dose,
         patient and route, then enters their PIN.", "Checked by" (select, "Choose a nurse" first, then
         secondNurses) and "Their PIN" (4 digits, numeric keypad, masked, autocomplete off, never prefilled,
-        cleared after every answer); the last step "2 · If you are not giving it" ("3 ·" for a high-alert
+        cleared after every answer; under it the reason of a PIN answer and, in the cases of POST
+        /medicine-orders/{id}/doses, the SAH-38 ward line "No second PIN works? Do not give this medicine yet.
+        Choose another nurse, or ask the nurse in charge or the clinic owner. Never share a PIN.", also shown at
+        once when secondNurses is empty); the last step "2 · If you are not giving it" ("3 ·" for a high-alert
         medicine) with "Reason" (select, "Choose a reason" first, then notGivenReasons); footer "Record not
         given" (ghost) and "Given" (primary, check icon). There is no "Scan wristband" button (OQ-32-1, ADR-011
         D4: the mockup's button copies the patient's own UHID, so the check would pass by itself). Names, UHID

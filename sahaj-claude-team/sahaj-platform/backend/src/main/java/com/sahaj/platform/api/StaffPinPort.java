@@ -51,10 +51,15 @@ public interface StaffPinPort {
      * {@link PinCheck.Outcome#NOT_ELIGIBLE} and no PIN is compared or counted; the answer is the same for every such case,
      * so it tells the caller nothing about the person.
      *
-     * <p>A wrong PIN counts on the colleague's own lockout (the same row and rules as {@link #check}: 5 wrong tries in a row
-     * lock it for 15 minutes, the third lock in 24 hours switches it off) and is audited with ids only. Per caller, at most
-     * 5 wrong colleague tries per 15 minutes and 10 per 24 hours are allowed; beyond that the answer is RATE_LIMITED before
-     * any hash is computed. A right PIN never uses allowance.
+     * <p>Order (SAH-38, ADR-014 D3): pepper missing UNAVAILABLE; the caller's in-memory limit (5 failed colleague tries per
+     * 15 minutes, 10 per 24 hours) RATE_LIMITED before any hash; not eligible NOT_ELIGIBLE; then one platform transaction
+     * (lock wait 3 s, statement time 5 s) that locks the colleague's PIN row: no PIN NOT_SET, locked LOCKED, then the pair
+     * cap (the caller already made 5 wrong tries of this colleague's PIN within a rolling 7 days, durable in the database)
+     * PAIR_LIMIT without comparing the PIN or counting anything, then the comparison. A wrong PIN counts on the colleague's
+     * lockout (5 wrong tries in a row lock it for 15 minutes; a lock caused by a run with a colleague try never counts
+     * toward switching the PIN off) and on the pair, and is audited with ids only. A right PIN of a pair that had wrong
+     * tries clears the pair. A database failure or timeout answers CHECK_FAILED (fail closed, nothing counted, the same
+     * answer for a right or a wrong PIN).
      *
      * @param tenantId            the clinic, from the signed-in user
      * @param callerUserId        the signed-in person (the giver), from the signed-in user

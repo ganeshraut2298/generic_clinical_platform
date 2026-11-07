@@ -119,6 +119,25 @@ export const CHECKED_BY_LABEL = 'Checked by';
 export const CHOOSE_NURSE = 'Choose a nurse';
 export const THEIR_PIN_LABEL = 'Their PIN';
 export const PIN_PLACEHOLDER = '4 digits';
+
+// ---- SAH-38 (ADR-014 D3, D5, D10). NEW texts: the mockup shows none of them. ----
+
+/**
+ * The colleague's wrong PIN never shows a count of tries left (security review S4, ADR-011 D7): a
+ * guesser is not told when to stop. The fixed text is used whatever the detail says.
+ */
+export const WRONG_PIN_COLLEAGUE = 'That PIN is not right.';
+/** T1 (429 `colleague-pin-limit`): used only when the problem carries no detail. */
+export const COLLEAGUE_PIN_LIMIT = 'Too many wrong PIN tries for this nurse. Choose another nurse.';
+/** T7 (503 `pin-check-failed`): used only when the problem carries no detail. */
+export const PIN_CHECK_FAILED = 'We could not check the PIN. Try again.';
+/**
+ * T6, the ward line. Shown under "Their PIN" for a high-alert medicine after pin-locked, pin-not-set,
+ * rate-limit or colleague-pin-limit, and whenever there is no other nurse to choose. There is no
+ * bypass, no "give anyway" and no paper option behind it.
+ */
+export const WARD_LINE =
+  'No second PIN works? Do not give this medicine yet. Choose another nurse, or ask the nurse in charge or the clinic owner. Never share a PIN.';
 export const REASON_LABEL = 'Reason';
 export const CHOOSE_REASON = 'Choose a reason';
 
@@ -323,7 +342,7 @@ export type GiveErrors = Partial<Record<GiveField, string>>;
 export type GiveFailure =
   | { kind: 'mismatch' }
   | { kind: 'fields'; errors: GiveErrors; message: string }
-  | { kind: 'pin'; message: string; focus: 'nurse' | 'pin' }
+  | { kind: 'pin'; message: string; focus: 'nurse' | 'pin'; ward: boolean }
   | { kind: 'reload'; message: string }
   | { kind: 'key-reused'; message: string }
   | { kind: 'notice'; message: string; lost: boolean };
@@ -353,8 +372,14 @@ export function classifyGiveError(error: unknown): GiveFailure {
   const slug = error.problem.type.split('/').pop() ?? '';
   const message = problemMessage(error, GIVE_ERROR);
   if (error.status === 503 && slug === 'pin-unavailable') {
-    // Nothing was recorded: the PIN check is switched off on the server (fail closed).
-    return { kind: 'pin', message, focus: 'pin' };
+    // Nothing was recorded: the PIN check is switched off on the server (fail closed). No ward line:
+    // "choose another nurse" would not help.
+    return { kind: 'pin', message, focus: 'pin', ward: false };
+  }
+  if (error.status === 503 && slug === 'pin-check-failed') {
+    // SAH-38 (ADR-014 D5, T7): the PIN store could not be read or written in time. Nothing was
+    // recorded and nothing counted, whether the PIN was right or wrong. Try again; no ward line.
+    return { kind: 'pin', message: error.problem.detail ?? PIN_CHECK_FAILED, focus: 'pin', ward: false };
   }
   if (isLostAnswer(error)) {
     return { kind: 'notice', message: GIVE_ERROR, lost: true };
@@ -385,10 +410,10 @@ export function classifyGiveError(error: unknown): GiveFailure {
     }
     case 403:
       if (slug === 'wrong-pin') {
-        return { kind: 'pin', message, focus: 'pin' };
+        return { kind: 'pin', message: WRONG_PIN_COLLEAGUE, focus: 'pin', ward: false };
       }
       if (slug === 'pin-locked') {
-        return { kind: 'pin', message, focus: 'nurse' };
+        return { kind: 'pin', message, focus: 'nurse', ward: true };
       }
       return { kind: 'notice', message, lost: false };
     case 409:
@@ -396,7 +421,7 @@ export function classifyGiveError(error: unknown): GiveFailure {
         return { kind: 'mismatch' };
       }
       if (slug === 'pin-not-set') {
-        return { kind: 'pin', message, focus: 'nurse' };
+        return { kind: 'pin', message, focus: 'nurse', ward: true };
       }
       if (slug === 'client-key-reused') {
         return { kind: 'key-reused', message };
@@ -406,7 +431,11 @@ export function classifyGiveError(error: unknown): GiveFailure {
       }
       return { kind: 'notice', message, lost: false };
     case 429:
-      return { kind: 'pin', message, focus: 'pin' };
+      if (slug === 'colleague-pin-limit') {
+        // SAH-38 (ADR-014 D3, T1): the pair cap. No count and no retry time; another nurse works at once.
+        return { kind: 'pin', message: error.problem.detail ?? COLLEAGUE_PIN_LIMIT, focus: 'nurse', ward: true };
+      }
+      return { kind: 'pin', message, focus: 'pin', ward: slug === 'rate-limit' };
     default:
       return { kind: 'notice', message, lost: false };
   }

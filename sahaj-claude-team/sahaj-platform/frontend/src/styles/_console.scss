@@ -58,7 +58,11 @@
   > router-outlet {
     display: none;
   }
-  > :not(router-outlet) {
+  // The colleague-tries banner (SAH-38) is not a page: its host makes no box (`display: contents`,
+  // set in the component), so it must stay out of this rule, or an empty banner would still be a
+  // flex item and add one 12 px gap above the page. When it has content, its live region is the
+  // flex item, so the banner keeps the same place, look and gap to the page below.
+  > :not(router-outlet):not(app-colleague-tries-banner) {
     display: flex;
     flex-direction: column;
     gap: 12px;

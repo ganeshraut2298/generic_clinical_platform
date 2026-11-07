@@ -25,7 +25,8 @@ public class JdbcStaffPinRepository implements StaffPinRepository {
 
     private static final String COLUMNS = """
             membership_id, pin_hash, pepper_version, failed_count, locked_until, lock_count,
-            lock_window_started_at, set_at, not_set_reason, reset_at, version, clock_timestamp() as db_now
+            lock_window_started_at, set_at, not_set_reason, reset_at, run_has_colleague_try, lock_by_colleagues, version,
+            clock_timestamp() as db_now
             """;
     private static final String FIND = "select " + COLUMNS
             + " from platform.staff_pin where tenant_id = :t and membership_id = :m";
@@ -44,6 +45,7 @@ public class JdbcStaffPinRepository implements StaffPinRepository {
             update platform.staff_pin
                set pin_hash = :hash, pepper_version = :pv, failed_count = 0, locked_until = null, lock_count = 0,
                    lock_window_started_at = null, set_at = clock_timestamp(), not_set_reason = null,
+                   run_has_colleague_try = false, lock_by_colleagues = false,
                    updated_by = :u, version = version + 1
              where tenant_id = :t and membership_id = :m
             """;
@@ -52,22 +54,36 @@ public class JdbcStaffPinRepository implements StaffPinRepository {
                set failed_count = failed_count + 1, updated_by = :u, version = version + 1
              where tenant_id = :t and membership_id = :m
             """;
+    private static final String COLLEAGUE_WRONG_TRY = """
+            update platform.staff_pin
+               set failed_count = failed_count + 1, run_has_colleague_try = true, updated_by = :u,
+                   version = version + 1
+             where tenant_id = :t and membership_id = :m
+            """;
     private static final String RIGHT_PIN = """
             update platform.staff_pin
-               set failed_count = 0, updated_by = :u, version = version + 1
+               set failed_count = 0, run_has_colleague_try = false, updated_by = :u, version = version + 1
              where tenant_id = :t and membership_id = :m
             """;
     private static final String LOCK = """
             update platform.staff_pin
                set failed_count = 0, lock_count = :n, locked_until = clock_timestamp() + interval '15 minutes',
                    lock_window_started_at = case when :n = 1 then clock_timestamp() else lock_window_started_at end,
+                   run_has_colleague_try = false, lock_by_colleagues = false,
                    updated_by = :u, version = version + 1
+             where tenant_id = :t and membership_id = :m
+            """;
+    private static final String LOCK_BY_COLLEAGUES = """
+            update platform.staff_pin
+               set failed_count = 0, run_has_colleague_try = false, lock_by_colleagues = true,
+                   locked_until = clock_timestamp() + interval '15 minutes', updated_by = :u, version = version + 1
              where tenant_id = :t and membership_id = :m
             """;
     private static final String SWITCH_OFF = """
             update platform.staff_pin
                set pin_hash = null, set_at = null, not_set_reason = 'TOO_MANY_LOCKS', failed_count = 0,
                    locked_until = null, lock_count = 0, lock_window_started_at = null,
+                   run_has_colleague_try = false, lock_by_colleagues = false,
                    updated_by = :u, version = version + 1
              where tenant_id = :t and membership_id = :m
             """;
@@ -75,6 +91,7 @@ public class JdbcStaffPinRepository implements StaffPinRepository {
             update platform.staff_pin
                set pin_hash = null, set_at = null, not_set_reason = 'RESET_BY_OWNER', failed_count = 0,
                    locked_until = null, lock_count = 0, lock_window_started_at = null,
+                   run_has_colleague_try = false, lock_by_colleagues = false,
                    reset_by = :u, reset_at = clock_timestamp(), updated_by = :u, version = version + 1
              where tenant_id = :t and membership_id = :m
             """;
@@ -111,6 +128,22 @@ public class JdbcStaffPinRepository implements StaffPinRepository {
     public void replace(UUID tenantId, UUID membershipId, String pinHash, int pepperVersion, UUID actorUserId) {
         jdbc.sql(REPLACE).param("t", tenantId).param("m", membershipId).param("hash", pinHash)
                 .param("pv", pepperVersion).param("u", actorUserId).update();
+    }
+
+    @Override
+    public void limitWaitingTime() {
+        jdbc.sql("set local lock_timeout = '3s'").update();
+        jdbc.sql("set local statement_timeout = '5s'").update();
+    }
+
+    @Override
+    public void recordColleagueWrongTry(UUID tenantId, UUID membershipId, UUID actorUserId) {
+        jdbc.sql(COLLEAGUE_WRONG_TRY).param("t", tenantId).param("m", membershipId).param("u", actorUserId).update();
+    }
+
+    @Override
+    public void lockByColleagues(UUID tenantId, UUID membershipId, UUID actorUserId) {
+        jdbc.sql(LOCK_BY_COLLEAGUES).param("t", tenantId).param("m", membershipId).param("u", actorUserId).update();
     }
 
     @Override
@@ -151,6 +184,8 @@ public class JdbcStaffPinRepository implements StaffPinRepository {
                 instant(rs.getTimestamp("set_at")),
                 rs.getString("not_set_reason"),
                 instant(rs.getTimestamp("reset_at")),
+                rs.getBoolean("run_has_colleague_try"),
+                rs.getBoolean("lock_by_colleagues"),
                 rs.getLong("version"),
                 instant(rs.getTimestamp("db_now")));
     }

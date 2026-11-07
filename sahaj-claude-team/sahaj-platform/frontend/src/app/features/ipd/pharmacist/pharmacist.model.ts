@@ -134,12 +134,16 @@ export const verifiedToast = (drugName: string, actorName: string): string =>
   `${drugName} verified by ${actorName}. It is now on the MAR.`;
 export const rejectedToast = (label: string): string => `Order rejected · ${label}.`;
 
-/** The number on the Safety tab: the owner's open escalations plus the orders waiting. */
+/**
+ * The number on the Safety tab (mockup `sfCount`): open escalations, plus (owner) the orders waiting,
+ * plus the late doses of the Medicine round (SAH-35). Doses that are only due are not added.
+ */
 export function safetyTabCount(
   open: number | null | undefined,
   waiting: number | null | undefined,
+  dosesLate: number | null | undefined = 0,
 ): number {
-  return (open ?? 0) + (waiting ?? 0);
+  return (open ?? 0) + (waiting ?? 0) + (dosesLate ?? 0);
 }
 
 /**

@@ -28,6 +28,9 @@ import org.springframework.http.HttpMethod;
 @WithPinPepper
 class DoseSecondNurseIT extends MarSupport {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.sahaj.platform.api.StaffPinPort port;
+
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH).withZone(IST);
 
     private record Fix(Ward w, String hep) {
@@ -67,7 +70,7 @@ class DoseSecondNurseIT extends MarSupport {
         assertThat(row.secondCheckBy()).isNotEqualTo(w.nurse2().membershipId().toString());
         assertThat(row.recordedBy()).isEqualTo(w.nurse().userId().toString());
         assertThat(row.scan()).isEqualTo(w.uhid());
-        assertThat(eventLines(w.clinic(), w.adm().id())).contains("give|Gave Inj. Heparin 5,000 IU (8 AM dose) · wristband scanned"
+        assertThat(eventLines(w.clinic(), w.adm().id())).contains("give|Gave Inj. Heparin 5,000 IU (8 AM dose) · identity checked against UHID"
                 + " · second check by " + displayName(w.nurse2()));
         JsonNode after = auditRow(w.clinic(), "IPD_DOSE_GIVEN", 0);
         assertThat(after.get("highAlert").asBoolean()).isTrue();
@@ -79,6 +82,47 @@ class DoseSecondNurseIT extends MarSupport {
         assertThat(now.audits()).as("one dose audit row, no PIN audit row for a right PIN").isEqualTo(before.audits() + 1);
         assertThat(pinRow(w.clinic(), w.nurse2().membershipId())).as("a right PIN with no wrong tries writes nothing").isEqualTo(pinBefore);
         assertThat(pinRow(w.clinic(), w.nurse().membershipId()).exists()).as("the giver needs no PIN of their own").isFalse();
+    }
+
+    /** R38-1: a second nurse with a 200-character name and the longest high-alert medicine never break ck_clinical_event_text. */
+    @Test
+    void aSecondNurseWithA200CharacterNameAndTheLongestHighAlertMedicineStillRecordsTheDoseAndTheEventTextFitsThe300Characters()
+            throws Exception {
+        Ward w = ward();
+        StringBuilder name = new StringBuilder();
+        for (int i = 0; name.length() < 200; i++) {
+            name.append(i % 2 == 0 ? "Priyadarshini " : "Venkataraghavan ");
+        }
+        String longName = name.substring(0, 200).stripTrailing();
+        while (longName.length() < 200) {
+            longName = longName + "a";
+        }
+        assertThat(longName).hasSize(200);
+        Pn longNurse = pn(w.clinic(), staff(w.clinic(), "NURSE", longName));
+        String pin = goodPin(longNurse);
+        setPin(longNurse, pin);
+        assertThat(displayName(longNurse)).isEqualTo(longName);
+        List<String> drugs = values(w.clinic(), "select key || '|' || char_length(name) from ipd.drug where high_alert is not null "
+                + "order by char_length(name) desc, key limit 1");
+        String drugKey = drugs.get(0).split("\\|")[0];
+        int drugNameLength = Integer.parseInt(drugs.get(0).split("\\|")[1]);
+        String order = activeOrder(w, drugKey, "od");
+        clockAt(8, 5);
+
+        JsonNode a = doseOk(w.nurse().auth(), order, givenHighAlert(w, ist(8, 0), longNurse, pin));
+
+        assertThat(a.get("dose").get("outcome").asText()).isEqualTo("GIVEN");
+        assertThat(doseDb(w.clinic(), order, ist(8, 0)).secondCheckBy()).isEqualTo(longNurse.userId().toString());
+        List<String> gave = eventLines(w.clinic(), w.adm().id()).stream().filter(l -> l.startsWith("give|")).toList();
+        assertThat(gave).hasSize(1);
+        String text = gave.get(0).substring("give|".length());
+        assertThat(text.length()).as("the longest medicine name is " + drugNameLength + " characters").isLessThanOrEqualTo(300);
+        assertThat(text).startsWith("Gave ").contains(" · identity checked against UHID · second check by Priyadarshini ");
+        assertThat(text).as("the name is shortened with an ellipsis, the rest of the wording is not cut").endsWith("…");
+        assertThat(count(w.clinic(), "select count(*) from ipd.clinical_event where admission_id = ?::uuid and char_length(text) > 300",
+                w.adm().id())).isZero();
+        // the audit row still names the checking nurse's USER id, whatever the event text shows
+        assertThat(auditRow(w.clinic(), "IPD_DOSE_GIVEN", 0).get("secondCheckUserId").asText()).isEqualTo(longNurse.userId().toString());
     }
 
     @Test
@@ -148,7 +192,10 @@ class DoseSecondNurseIT extends MarSupport {
                 "pin-locked", null);
         PinRow row = pinRow(w.clinic(), w.nurse2().membershipId());
         assertThat(row.lockedNow()).isTrue();
-        assertThat(row.lockCount()).isOne();
+        // SAH-38 (ADR-014 D6): a lock caused by colleagues locks for 15 minutes but never moves the lock count
+        assertThat(row.lockCount()).isZero();
+        assertThat(values(w.clinic(), "select lock_by_colleagues::text || run_has_colleague_try::text from platform.staff_pin "
+                + "where membership_id = ?::uuid", w.nurse2().membershipId().toString()).get(0)).isEqualTo("truefalse");
         Instant until = Instant.parse(values(w.clinic(), "select to_char(locked_until at time zone 'UTC', "
                 + "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') from platform.staff_pin where membership_id = ?::uuid",
                 w.nurse2().membershipId().toString()).get(0));
@@ -164,6 +211,8 @@ class DoseSecondNurseIT extends MarSupport {
         JsonNode lockAfter = auditRow(w.clinic(), "PLATFORM_PIN_LOCKED", 0);
         assertThat(lockAfter.get("checkedByMembershipId").asText()).isEqualTo(w.nurse().membershipId().toString());
         assertThat(lockAfter.get("membershipId").asText()).isEqualTo(w.nurse2().membershipId().toString());
+        assertThat(lockAfter.get("causedBy").asText()).isEqualTo("COLLEAGUES");
+        assertThat(lockAfter.get("lockCount").asInt()).isZero();
         assertThat(lock.get(0)[3]).doesNotContain(bad).doesNotContain(w.nurse2Pin());
         assertThat(doseRows(w.clinic(), w.adm().id())).isZero();
 
@@ -174,11 +223,15 @@ class DoseSecondNurseIT extends MarSupport {
                 "pin-locked", null);
         assertThat(still.get("retryAfterSeconds").asInt()).isPositive();
         refused(doseCall(w.clinic().owner(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin())), 403, "pin-locked", null);
-        assertThat(pinRow(w.clinic(), w.nurse2().membershipId()).lockCount()).isOne();
+        assertThat(pinRow(w.clinic(), w.nurse2().membershipId()).lockCount()).isZero();
         assertThat(audit(w.clinic(), "PLATFORM_PIN_COLLEAGUE_CHECK_FAILED")).hasSize(5);
-        // a lock that is over lets the right PIN through again
+        // a lock that is over lets the right PIN through again for another caller; the caller who made the five wrong tries is at
+        // the pair cap now (SAH-38, ADR-014 D3): 429 colleague-pin-limit, the PIN is not even compared
         lockEnded(w.nurse2());
-        doseOk(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin()));
+        freshPinAllowance(w.nurse());
+        refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin())), 429,
+                "colleague-pin-limit", "Too many wrong PIN tries for this nurse. Choose another nurse.");
+        doseOk(w.clinic().owner(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin()));
     }
 
     @Test
@@ -199,11 +252,32 @@ class DoseSecondNurseIT extends MarSupport {
     }
 
     @Test
-    void thirdLockInTwentyFourHoursSwitchesTheColleaguesPinOffAndTheCallerGetsPinNotSetWithTheAuditNamingTheChecker() throws Exception {
+    void aThirdLockInTwentyFourHoursCausedByAColleagueIsOnlyALockAndNeverSwitchesThePinOff() throws Exception {
+        Fix f = fix();
+        Ward w = f.w();
+        // SAH-38 (ADR-014 D6, amends ADR-010 D5): the state that used to switch the PIN off (4 wrong tries, 2 locks in the
+        // window) now ends in a colleague lock when the fifth try is a colleague's: locked for 15 minutes, count unchanged
+        forceCounters(w.nurse2(), 4, 2);
+        JsonNode p = refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), wrong(w.nurse2Pin()))), 403,
+                "pin-locked", null);
+        assertThat(p.toString()).doesNotContain(displayName(w.nurse2()));
+        PinRow row = pinRow(w.clinic(), w.nurse2().membershipId());
+        assertThat(row.hasPin()).as("the PIN is not switched off").isTrue();
+        assertThat(row.lockedNow()).isTrue();
+        assertThat(row.lockCount()).as("the lock count is unchanged").isEqualTo(2);
+        assertThat(audit(w.clinic(), "PLATFORM_PIN_CLEARED_AFTER_LOCKS")).isEmpty();
+        assertThat(doseRows(w.clinic(), w.adm().id())).isZero();
+    }
+
+    @Test
+    void thirdOwnSessionLockInTwentyFourHoursStillSwitchesThePinOffAndTheCallerGetsPinNotSet() throws Exception {
         Fix f = fix();
         Ward w = f.w();
         forceCounters(w.nurse2(), 4, 2);
-        JsonNode p = refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), wrong(w.nurse2Pin()))), 409,
+        // the fifth wrong try is typed in the second nurse's own session: the SAH-31 switch-off
+        assertThat(port.check(w.clinic().tenantId(), w.nurse2().userId(), wrong(w.nurse2Pin())).outcome())
+                .isEqualTo(com.sahaj.platform.api.PinCheck.Outcome.NOT_SET);
+        JsonNode p = refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin())), 409,
                 "pin-not-set", COLLEAGUE_NOT_SET);
         assertThat(p.toString()).doesNotContain(displayName(w.nurse2()));
         PinRow row = pinRow(w.clinic(), w.nurse2().membershipId());
@@ -211,12 +285,11 @@ class DoseSecondNurseIT extends MarSupport {
         assertThat(row.reason()).isEqualTo("TOO_MANY_LOCKS");
         List<String[]> cleared = audit(w.clinic(), "PLATFORM_PIN_CLEARED_AFTER_LOCKS");
         assertThat(cleared).hasSize(1);
-        assertThat(auditRow(w.clinic(), "PLATFORM_PIN_CLEARED_AFTER_LOCKS", 0).get("checkedByMembershipId").asText())
-                .isEqualTo(w.nurse().membershipId().toString());
+        assertThat(auditRow(w.clinic(), "PLATFORM_PIN_CLEARED_AFTER_LOCKS", 0).get("causedBy").asText()).isEqualTo("SELF");
         // from now on the same text, whatever the PIN, and the right one too
         freshPinAllowance(w.nurse());
-        refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin())), 409, "pin-not-set",
-                COLLEAGUE_NOT_SET);
+        refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), wrong(w.nurse2Pin()))), 409,
+                "pin-not-set", COLLEAGUE_NOT_SET);
         assertThat(doseRows(w.clinic(), w.adm().id())).isZero();
     }
 

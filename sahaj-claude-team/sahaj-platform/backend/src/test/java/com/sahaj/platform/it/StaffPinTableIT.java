@@ -581,7 +581,8 @@ class StaffPinTableIT extends PinTestSupport {
     @Test
     void item20TheGrantsOfTheApplicationRoleAreExactlyTheListedColumnsAndNothingIsOpenToPublic() throws Exception {
         Set<String> update = Set.of("pin_hash", "pepper_version", "failed_count", "locked_until", "lock_count",
-                "lock_window_started_at", "set_at", "not_set_reason", "reset_at", "reset_by", "updated_at", "updated_by", "version");
+                "lock_window_started_at", "set_at", "not_set_reason", "reset_at", "reset_by", "updated_at", "updated_by", "version",
+                "run_has_colleague_try", "lock_by_colleagues");   // SAH-38: 13 columns of SAH-31 plus the two flags (15)
         Set<String> insert = Set.of("membership_id", "pin_hash", "pepper_version", "set_at", "created_by");
         db().asApp(c -> {
             Set<String> updatable = new HashSet<>();
@@ -637,7 +638,10 @@ class StaffPinTableIT extends PinTestSupport {
         });
         asOwner(false, PIN_TABLE, c -> {
             sqlState(err(c, "delete from platform.staff_pin" + WHERE, p.membershipId().toString()), "42501", "append-only");
-            sqlState(err(c, "truncate platform.staff_pin"), "42501", "append-only");
+            // SAH-38: the new event table has a foreign key to staff_pin, so PostgreSQL refuses a plain TRUNCATE of staff_pin before any
+            // trigger runs (0A000); the cascade form reaches the event table, whose statement trigger refuses it for every role
+            sqlState(err(c, "truncate platform.staff_pin"), "0A000", "foreign key");
+            sqlState(err(c, "truncate platform.staff_pin cascade"), "42501", "append-only");
             return null;
         });
         assertThat(pinRow(clinic, p.membershipId())).isEqualTo(before);

@@ -15,7 +15,8 @@ import java.util.UUID;
  * <ul>
  *   <li>{@link StaffPinException} with {@link StaffPinException.Subject#COLLEAGUE}: problem types {@code wrong-pin}
  *       (403), {@code pin-locked} (403, {@code retryAfterSeconds}), {@code pin-not-set} (409; every reason, also the try
- *       that switched the PIN off), {@code rate-limit} (429) and {@code pin-unavailable} (503);</li>
+ *       that switched the PIN off), {@code rate-limit} (429), {@code pin-unavailable} (503) and, from SAH-38, {@code colleague-pin-limit} (429, no
+ *       retryAfterSeconds) and {@code pin-check-failed} (503);</li>
  *   <li>{@link InvalidFieldsException} (400 {@code validation}, detail = the message) on field
  *       {@value #NOT_ELIGIBLE_FIELD}: "Choose a nurse from the list." for {@link PinCheck.Outcome#NOT_ELIGIBLE}.</li>
  * </ul>

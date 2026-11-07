@@ -182,58 +182,13 @@
             </div>
           }
         }
-        <section class="panel surf">
-          @if (l.items.length === 0) {
-            <div class="empty">No one is admitted right now.</div>
-          } @else {
-            <div class="iptbl" role="table" aria-label="Admitted patients">
-              <div class="iptr ipth" role="row">
-                <span role="columnheader">Patient</span>
-                <span role="columnheader">Bed</span>
-                <span role="columnheader">Doctor</span>
-                <span role="columnheader" class="r">Running bill</span>
-                <span role="columnheader" class="r">Deposit</span>
-                <span role="columnheader">Status</span>
-                <span role="columnheader"><span class="sr-only">Open</span></span>
-              </div>
-              @for (a of l.items; track a.id) {
-                <div class="iptr" role="row">
-                  <span role="cell">
-                    <b>{{ a.patientName }}</b>
-                    <small>{{ subline(a) }}</small>
-                  </span>
-                  <span role="cell">
-                    {{ a.bedCode }}
-                    <small>{{ a.categoryName }}</small>
-                  </span>
-                  <span role="cell">{{ a.doctorName }}</span>
-                  <span role="cell" class="r num">{{ formatInrPaise(a.runningBillPaise) }}</span>
-                  <span role="cell" class="r num">{{ formatInrPaise(a.depositPaise) }}</span>
-                  <span role="cell" class="pills">
-                    @for (p of pills(a); track p.text) {
-                      <span [class]="'pill ' + p.css">
-                        @if (p.css === 'p-crit') {
-                          <app-icon name="alert" [size]="12" />
-                        }
-                        {{ p.text }}
-                      </span>
-                    }
-                  </span>
-                  <span role="cell" class="r">
-                    <button
-                      type="button"
-                      mat-stroked-button
-                      [attr.aria-label]="'Open ' + a.patientName"
-                      (click)="open(a)"
-                    >
-                      Open
-                    </button>
-                  </span>
-                </div>
-              }
-            </div>
-          }
-        </section>
+        <app-admitted-panel
+          [list]="l"
+          [staleText]="staleText()"
+          (openAdmission)="openFromCard($event)"
+          (openNursing)="openNursing($event)"
+          (openEmr)="openEmr($event)"
+        />
       }
     </div>
   }

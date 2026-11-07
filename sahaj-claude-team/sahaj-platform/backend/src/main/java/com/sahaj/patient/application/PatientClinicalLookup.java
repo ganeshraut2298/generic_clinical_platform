@@ -5,7 +5,6 @@ import com.sahaj.patient.application.PatientRepository.PatientRow;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -24,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PatientClinicalLookup implements PatientClinicalPort {
 
     /** A merge chain is short (a kept record can itself be merged away later); this only stops a damaged one. */
-    static final int MAX_HOPS = 10;
+    static final int MAX_HOPS = PatientMergeChains.MAX_HOPS;
 
     private final PatientRepository patientRepository;
 
@@ -59,47 +58,9 @@ public class PatientClinicalLookup implements PatientClinicalPort {
     @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
     public Map<UUID, PatientClinical> findAll(UUID tenantId, Collection<UUID> patientIds) {
         Map<UUID, PatientClinical> result = new HashMap<>();
-        if (patientIds.isEmpty()) {
-            return result;
-        }
-        // Where each asked id stands now: the row it has reached and the ids it has passed.
-        Map<UUID, PatientRow> reached = new HashMap<>();
-        Map<UUID, Set<UUID>> passed = new HashMap<>();
-        for (PatientRow row : patientRepository.findByIds(tenantId, patientIds)) {
-            reached.put(row.id(), row);
-            passed.put(row.id(), new HashSet<>(Set.of(row.id())));
-        }
-        for (int hop = 0; hop < MAX_HOPS; hop++) {
-            Set<UUID> wanted = new LinkedHashSet<>();
-            for (Map.Entry<UUID, PatientRow> entry : reached.entrySet()) {
-                UUID next = entry.getValue().mergedIntoId();
-                if (next != null && !passed.get(entry.getKey()).contains(next)) {
-                    wanted.add(next);
-                }
-            }
-            if (wanted.isEmpty()) {
-                break;
-            }
-            Map<UUID, PatientRow> found = new HashMap<>();
-            for (PatientRow row : patientRepository.findByIds(tenantId, wanted)) {
-                found.put(row.id(), row);
-            }
-            for (Map.Entry<UUID, PatientRow> entry : reached.entrySet()) {
-                UUID next = entry.getValue().mergedIntoId();
-                if (next == null || !passed.get(entry.getKey()).add(next)) {
-                    continue;
-                }
-                PatientRow target = found.get(next);
-                if (target != null) {
-                    entry.setValue(target);
-                }
-            }
-        }
-        for (UUID asked : patientIds) {
-            PatientRow row = reached.get(asked);
-            if (row != null) {
-                result.put(asked, clinical(row));
-            }
+        for (Map.Entry<UUID, PatientRow> entry : PatientMergeChains.current(patientRepository, tenantId, patientIds)
+                .entrySet()) {
+            result.put(entry.getKey(), clinical(entry.getValue()));
         }
         return result;
     }

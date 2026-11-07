@@ -147,7 +147,7 @@ class DoseServiceTest extends DoseTestBase {
         DoseResult result = nurseGives(order, given(EIGHT_AM));
 
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_GIVE,
-                "Gave Tab. Paracetamol 650 mg (8 AM dose) · wristband scanned", NURSE);
+                "Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID", NURSE);
         Map<String, Object> after = auditAfter("IPD_DOSE_GIVEN");
         assertThat(after).containsEntry("doseId", result.answer().dose().id()).containsEntry("orderId", order.id())
                 .containsEntry("admissionId", ADMISSION).containsEntry("drugKey", "pcm")
@@ -165,7 +165,7 @@ class DoseServiceTest extends DoseTestBase {
         nurseGives(order, given(TWO_PM));
 
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_GIVE,
-                "Gave Tab. Paracetamol 650 mg (2 PM dose) · wristband scanned", NURSE);
+                "Gave Tab. Paracetamol 650 mg (2 PM dose) · identity checked against UHID", NURSE);
     }
 
     @Test
@@ -527,7 +527,7 @@ class DoseServiceTest extends DoseTestBase {
                 .isInstanceOf(ConflictException.class);
 
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_DENY,
-                "Stopped at the wristband check: scanned UH-000999, expected UH-000123 (Tab. Paracetamol 650 mg)",
+                "Stopped at the identity check: entered UH-000999, expected UH-000123 (Tab. Paracetamol 650 mg)",
                 NURSE);
         verify(events, times(1)).insert(any(), any(), anyString(), anyString(), any());
         Map<String, Object> after = auditAfter("IPD_DOSE_WRISTBAND_MISMATCH");
@@ -559,7 +559,7 @@ class DoseServiceTest extends DoseTestBase {
                 .isInstanceOf(ConflictException.class);
 
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_DENY,
-                "Stopped at the wristband check: scanned text that is not a UHID, expected UH-000123 "
+                "Stopped at the identity check: entered text that is not a UHID, expected UH-000123 "
                         + "(Tab. Paracetamol 650 mg)", NURSE);
         assertThat(auditAfter("IPD_DOSE_WRISTBAND_MISMATCH").toString()).doesNotContain("Ramesh")
                 .doesNotContain("9876543210");
@@ -574,7 +574,7 @@ class DoseServiceTest extends DoseTestBase {
                 .satisfies(e -> assertConflict(e, "wristband-mismatch",
                         "Wristband does not match this patient. Stop. Check the patient before giving anything."));
         verify(events).insert(eq(TENANT), eq(ADMISSION), eq(ClinicalEventRepository.KIND_DENY),
-                org.mockito.ArgumentMatchers.contains("scanned text that is not a UHID"), eq(NURSE));
+                org.mockito.ArgumentMatchers.contains("entered text that is not a UHID"), eq(NURSE));
     }
 
     @ParameterizedTest
@@ -727,7 +727,7 @@ class DoseServiceTest extends DoseTestBase {
         assertThat(stored.highAlert()).isTrue();
         assertThat(stored.secondCheckBy()).isEqualTo(SECOND_NURSE_USER).isNotEqualTo(stored.recordedBy());
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_GIVE,
-                "Gave Inj. Heparin 5,000 IU (8 AM dose) · wristband scanned · second check by Sr. Rupali More", NURSE);
+                "Gave Inj. Heparin 5,000 IU (8 AM dose) · identity checked against UHID · second check by Sr. Rupali More", NURSE);
         Map<String, Object> after = auditAfter("IPD_DOSE_GIVEN");
         assertThat(after).containsEntry("highAlert", true).containsEntry("secondCheckUserId", SECOND_NURSE_USER);
         assertThat(after.toString()).doesNotContain(PIN).doesNotContain("Rupali");
@@ -755,7 +755,7 @@ class DoseServiceTest extends DoseTestBase {
         verifyNoInteractions(staffPin);
         assertThat(doses.inserted.get(0).secondCheckBy()).isNull();
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_GIVE,
-                "Gave Tab. Paracetamol 650 mg (8 AM dose) · wristband scanned", NURSE);
+                "Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID", NURSE);
     }
 
     @ParameterizedTest

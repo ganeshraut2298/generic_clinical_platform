@@ -79,7 +79,7 @@
               data-testid="second-nurse"
               [attr.aria-invalid]="errors().secondNurseId ? 'true' : null"
               [attr.aria-describedby]="errors().secondNurseId ? 'sf-wit-err' : null"
-              (change)="dropError('secondNurseId')"
+              (change)="nurseChosen()"
             >
               <option value="">{{ chooseNurse }}</option>
               @for (n of nurses; track n.membershipId) {
@@ -103,13 +103,21 @@
               data-testid="second-pin"
               [placeholder]="pinPlaceholder"
               [attr.aria-invalid]="errors().secondNursePin ? 'true' : null"
-              [attr.aria-describedby]="errors().secondNursePin ? 'sf-pin-err' : null"
+              [attr.aria-describedby]="pinDescribedBy()"
               (input)="pinEdited()"
             />
             @if (errors().secondNursePin; as message) {
               <span class="err-text" role="alert" id="sf-pin-err" data-testid="pin-error">{{ message }}</span>
             }
           </div>
+        </div>
+        <div id="sf-ward" class="ward-region" aria-live="polite" data-testid="ward-region">
+          @if (showWardLine()) {
+            <div class="notice warn" data-testid="ward-line">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ wardText }}</span>
+            </div>
+          }
         </div>
       </div>
     }

@@ -237,4 +237,31 @@ class StaffPinExceptionTest {
         assertThatThrownBy(() -> StaffPinException.of(new PinCheck(Outcome.OK, 5, null, 0), StaffPinException.Subject.COLLEAGUE))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void thePairLimitIs429WithTheFixedTextAndNoRetryTimeForBothSubjects() {
+        for (StaffPinException.Subject subject : StaffPinException.Subject.values()) {
+            StaffPinException ex = StaffPinException.of(new PinCheck(Outcome.PAIR_LIMIT, 0, null, 99), subject);
+
+            assertThat(ex.kind()).isEqualTo(StaffPinException.Kind.COLLEAGUE_PIN_LIMIT);
+            assertThat(ex.slug()).isEqualTo("colleague-pin-limit");
+            assertThat(ex.status()).isEqualTo(429);
+            assertThat(ex.title()).isEqualTo("Too many wrong PIN tries");
+            assertThat(ex.getMessage()).isEqualTo("Too many wrong PIN tries for this nurse. Choose another nurse.");
+            assertThat(ex.retryAfterSeconds()).as("a guesser is not told when the window reopens").isZero();
+        }
+    }
+
+    @Test
+    void aFailedCheckIs503WithTheFixedTextAndNoRetryTime() {
+        StaffPinException ex = StaffPinException.of(new PinCheck(Outcome.CHECK_FAILED, 0, null, 30),
+                StaffPinException.Subject.COLLEAGUE);
+
+        assertThat(ex.kind()).isEqualTo(StaffPinException.Kind.PIN_CHECK_FAILED);
+        assertThat(ex.slug()).isEqualTo("pin-check-failed");
+        assertThat(ex.status()).isEqualTo(503);
+        assertThat(ex.title()).isEqualTo("PIN check failed");
+        assertThat(ex.getMessage()).isEqualTo("We could not check the PIN. Try again.");
+        assertThat(ex.retryAfterSeconds()).isZero();
+    }
 }

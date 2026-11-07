@@ -6,8 +6,10 @@ import com.sahaj.ipd.application.EscalationBoardRepository.Detail;
 import com.sahaj.ipd.application.SafetyViews.Counts;
 import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState.Status;
+import com.sahaj.ipd.domain.MedicineRound;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -25,16 +27,26 @@ class SafetyRowsTest {
                 null, null, null, null, null, calls, null, null);
     }
 
+    /** The token of escalations alone: no dose line (the SAH-33 token). */
+    private static String token(Collection<Detail> notClosed) {
+        return SafetyRows.changeToken(notClosed, List.of());
+    }
+
+    /** The counts of escalations alone: an empty Medicine round. */
+    private static Counts counts(Collection<Detail> escalations, Instant asOf) {
+        return SafetyRows.counts(escalations, MedicineRound.empty(), asOf);
+    }
+
     // ---- the token: fixed vectors computed outside Java (SHA-256, first 16 bytes, base64url, no padding) ----
 
     @Test
     void anEmptySetIsTheHashOfTheEmptyText() {
-        assertThat(SafetyRows.changeToken(List.of())).isEqualTo("47DEQpj8HBSa-_TImW-5JA");
+        assertThat(token(List.of())).isEqualTo("47DEQpj8HBSa-_TImW-5JA");
     }
 
     @Test
     void oneEscalationIsTheHashOfItsIdColonVersionLine() {
-        assertThat(SafetyRows.changeToken(List.of(detail(ID_1, 3, Status.OPEN, 8, NOW, 0))))
+        assertThat(token(List.of(detail(ID_1, 3, Status.OPEN, 8, NOW, 0))))
                 .isEqualTo("vlRqavTRyNYizjMOcrtR2Q");
     }
 
@@ -43,8 +55,8 @@ class SafetyRowsTest {
         Detail one = detail(ID_1, 3, Status.OPEN, 8, NOW, 0);
         Detail two = detail(ID_2, 1, Status.ACK, 7, NOW, 0);
 
-        assertThat(SafetyRows.changeToken(List.of(one, two))).isEqualTo("Ebon-9CnDtimWcfP_UlepQ");
-        assertThat(SafetyRows.changeToken(List.of(two, one))).isEqualTo("Ebon-9CnDtimWcfP_UlepQ");
+        assertThat(token(List.of(one, two))).isEqualTo("Ebon-9CnDtimWcfP_UlepQ");
+        assertThat(token(List.of(two, one))).isEqualTo("Ebon-9CnDtimWcfP_UlepQ");
     }
 
     @Test
@@ -52,7 +64,7 @@ class SafetyRowsTest {
         List<Detail> many = new ArrayList<>();
         for (int i = 0; i < 40; i++) {
             many.add(detail(UUID.randomUUID(), i, Status.OPEN, 8, NOW, 0));
-            assertThat(SafetyRows.changeToken(many)).hasSize(22).matches("^[A-Za-z0-9_-]{22}$");
+            assertThat(token(many)).hasSize(22).matches("^[A-Za-z0-9_-]{22}$");
         }
     }
 
@@ -60,32 +72,32 @@ class SafetyRowsTest {
     void theTokenChangesWhenAnEscalationJoinsLeavesOrChangesVersion() {
         Detail one = detail(ID_1, 3, Status.OPEN, 8, NOW, 0);
         Detail two = detail(ID_2, 1, Status.ACK, 7, NOW, 0);
-        String both = SafetyRows.changeToken(List.of(one, two));
+        String both = token(List.of(one, two));
 
-        assertThat(SafetyRows.changeToken(List.of(one))).isNotEqualTo(both);
-        assertThat(SafetyRows.changeToken(List.of(two))).isNotEqualTo(both);
+        assertThat(token(List.of(one))).isNotEqualTo(both);
+        assertThat(token(List.of(two))).isNotEqualTo(both);
         Detail oneAfterScoreRise = detail(ID_1, 4, Status.OPEN, 10, NOW, 0);
-        assertThat(SafetyRows.changeToken(List.of(oneAfterScoreRise, two))).isNotEqualTo(both);
+        assertThat(token(List.of(oneAfterScoreRise, two))).isNotEqualTo(both);
         // acknowledge bumps the version
         Detail oneAcknowledged = detail(ID_1, 4, Status.ACK, 8, NOW, 0);
-        assertThat(SafetyRows.changeToken(List.of(oneAcknowledged, two))).isNotEqualTo(both);
+        assertThat(token(List.of(oneAcknowledged, two))).isNotEqualTo(both);
     }
 
     @Test
     void theTokenDoesNotChangeOnASeniorCallOrWhenOnlyTimePasses() {
         Detail before = detail(ID_1, 3, Status.OPEN, 8, NOW, 0);
         Detail afterCall = detail(ID_1, 3, Status.OPEN, 8, NOW, 5);
-        assertThat(SafetyRows.changeToken(List.of(afterCall))).isEqualTo(SafetyRows.changeToken(List.of(before)));
+        assertThat(token(List.of(afterCall))).isEqualTo(token(List.of(before)));
         // the same set read at two clocks: the token has no time in it
-        assertThat(SafetyRows.counts(List.of(before), NOW).changeToken())
-                .isEqualTo(SafetyRows.counts(List.of(before), NOW.plusSeconds(3600)).changeToken());
+        assertThat(counts(List.of(before), NOW).changeToken())
+                .isEqualTo(counts(List.of(before), NOW.plusSeconds(3600)).changeToken());
     }
 
     @Test
     void theTokenIsIndependentOfScoreNamesAndPlan() {
         Detail low = detail(ID_1, 3, Status.OPEN, 5, NOW, 0);
         Detail high = detail(ID_1, 3, Status.OPEN, 12, NOW.minusSeconds(999), 0);
-        assertThat(SafetyRows.changeToken(List.of(low))).isEqualTo(SafetyRows.changeToken(List.of(high)));
+        assertThat(token(List.of(low))).isEqualTo(token(List.of(high)));
     }
 
     // ---- the counts: one function for the board, the summary and the banner ----
@@ -97,19 +109,19 @@ class SafetyRowsTest {
         Detail acked = detail(UUID.randomUUID(), 2, Status.ACK, 8, NOW.minusSeconds(3600), 0);
         Detail closed = detail(UUID.randomUUID(), 2, Status.DONE, 8, NOW.minusSeconds(3600), 0);
 
-        Counts counts = SafetyRows.counts(List.of(pastOpen, freshOpen, acked, closed), NOW);
+        Counts counts = counts(List.of(pastOpen, freshOpen, acked, closed), NOW);
 
         assertThat(counts.open()).isEqualTo(3);
         assertThat(counts.pastTarget()).isEqualTo(1);
         assertThat(counts.asOf()).isEqualTo(NOW);
         List<Detail> live = new ArrayList<>(List.of(pastOpen, freshOpen, acked));
         Collections.reverse(live);
-        assertThat(counts.changeToken()).isEqualTo(SafetyRows.changeToken(live));
+        assertThat(counts.changeToken()).isEqualTo(token(live));
     }
 
     @Test
     void noEscalationsGiveZeroCountsAndTheEmptyToken() {
-        Counts counts = SafetyRows.counts(List.of(), NOW);
+        Counts counts = counts(List.of(), NOW);
 
         assertThat(counts.open()).isZero();
         assertThat(counts.pastTarget()).isZero();
@@ -122,6 +134,6 @@ class SafetyRowsTest {
                 NOW.minusSeconds(3600), UUID.randomUUID(), NOW.minusSeconds(60), null, null, null, null, 0, null,
                 null);
 
-        assertThat(SafetyRows.counts(List.of(reopened), NOW).pastTarget()).isZero();
+        assertThat(counts(List.of(reopened), NOW).pastTarget()).isZero();
     }
 }

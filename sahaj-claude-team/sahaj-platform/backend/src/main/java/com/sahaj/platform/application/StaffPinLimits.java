@@ -12,7 +12,8 @@ import java.util.UUID;
 public interface StaffPinLimits {
 
     /**
-     * 10 FAILED PIN checks per 5 minutes per person ({@code StaffPinPort.check}). Only looks: answers {@code 0} or the
+     * 10 FAILED PIN checks per 5 minutes per person ({@code StaffPinPort.check}; since SAH-38, ADR-014 D7, only the
+     * person's OWN checks: colleague checks no longer read or fill the colleague's bucket). Only looks: answers {@code 0} or the
      * seconds to wait and never uses allowance, so successful checks never count (review R1). Call it before comparing
      * the PIN, and {@link #pinCheckFailed} after a wrong one.
      */
@@ -24,7 +25,8 @@ public interface StaffPinLimits {
     /**
      * Per CALLER: 5 failed colleague checks per 15 minutes and 10 per 24 hours, any colleague (SAH-32, ADR-011 D7). Only
      * looks: answers {@code 0} or the seconds to wait (the longer of the two windows when both are full) and never uses
-     * allowance. Call it before any hash, and {@link #colleagueCheckFailed} after a wrong colleague PIN.
+     * allowance. Call it before any hash, and {@link #colleagueCheckFailed} after a wrong colleague PIN. Still in
+     * memory until HARD-2; the durable limit on one caller and one colleague is the pair cap in the database (SAH-38).
      */
     long colleagueCheckWait(UUID tenantId, UUID callerUserId);
 

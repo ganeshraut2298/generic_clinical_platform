@@ -4,6 +4,7 @@ import { AT_2PM, AT_8AM, AT_8PM, GIVEN_DOSE, MAR_AS_OF, marOf, orderOf, slotOf }
 import {
   GIVE_ERROR,
   NURSING_TABS,
+  COLLEAGUE_PIN_LIMIT,
   classifyGiveError,
   clockText,
   countBadge,
@@ -332,11 +333,12 @@ describe('MAR model', () => {
       });
     });
 
-    it('403 wrong-pin: under Their PIN, focus on the PIN', () => {
+    it('403 wrong-pin: under Their PIN, focus on the PIN, never a count of tries left, no ward line', () => {
       expect(classifyGiveError(apiError(403, 'wrong-pin', 'That PIN is not right. 2 tries left.'))).toEqual({
         kind: 'pin',
-        message: 'That PIN is not right. 2 tries left.',
+        message: 'That PIN is not right.',
         focus: 'pin',
+        ward: false,
       });
     });
 
@@ -350,7 +352,52 @@ describe('MAR model', () => {
     it('409 pin-not-set is the second nurse state, under Their PIN', () => {
       expect(
         classifyGiveError(apiError(409, 'pin-not-set', 'The second nurse has not set a PIN yet. Choose another nurse.')),
-      ).toEqual({ kind: 'pin', message: 'The second nurse has not set a PIN yet. Choose another nurse.', focus: 'nurse' });
+      ).toEqual({ kind: 'pin', message: 'The second nurse has not set a PIN yet. Choose another nurse.', focus: 'nurse', ward: true });
+    });
+
+    describe('the ward line (SAH-38, ADR-014 D10)', () => {
+      const ward = (status: number, slug: string) => {
+        const f = classifyGiveError(apiError(status, slug, 'x'));
+        return f.kind === 'pin' ? f.ward : 'not a pin failure';
+      };
+
+      it('is for pin-locked, pin-not-set, rate-limit and colleague-pin-limit', () => {
+        expect(ward(403, 'pin-locked')).toBe(true);
+        expect(ward(409, 'pin-not-set')).toBe(true);
+        expect(ward(429, 'rate-limit')).toBe(true);
+        expect(ward(429, 'colleague-pin-limit')).toBe(true);
+      });
+
+      it('is not for wrong-pin, pin-unavailable or pin-check-failed', () => {
+        expect(ward(403, 'wrong-pin')).toBe(false);
+        expect(ward(503, 'pin-unavailable')).toBe(false);
+        expect(ward(503, 'pin-check-failed')).toBe(false);
+      });
+    });
+
+    it('429 colleague-pin-limit: T1 under Their PIN, focus on the nurse list, no retry time', () => {
+      expect(
+        classifyGiveError(apiError(429, 'colleague-pin-limit', 'Too many wrong PIN tries for this nurse. Choose another nurse.')),
+      ).toEqual({
+        kind: 'pin',
+        message: 'Too many wrong PIN tries for this nurse. Choose another nurse.',
+        focus: 'nurse',
+        ward: true,
+      });
+    });
+
+    it('429 colleague-pin-limit without a detail still says T1', () => {
+      const f = classifyGiveError(apiError(429, 'colleague-pin-limit', undefined as unknown as string));
+      expect(f).toMatchObject({ kind: 'pin', message: COLLEAGUE_PIN_LIMIT });
+    });
+
+    it('503 pin-check-failed: T7, try again, focus on the PIN (not a lost answer: nothing was recorded)', () => {
+      expect(classifyGiveError(apiError(503, 'pin-check-failed', 'We could not check the PIN. Try again.'))).toEqual({
+        kind: 'pin',
+        message: 'We could not check the PIN. Try again.',
+        focus: 'pin',
+        ward: false,
+      });
     });
 
     it('429 and 503 are PIN refusals too', () => {

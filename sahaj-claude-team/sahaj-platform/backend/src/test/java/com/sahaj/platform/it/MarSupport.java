@@ -3,6 +3,7 @@ package com.sahaj.platform.it;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.sahaj.ipd.application.EscalationBoardRepository;
 import com.sahaj.ipd.application.MedicineOrderRepository;
 import com.sahaj.ipd.application.VitalsRepository;
 import java.sql.PreparedStatement;
@@ -86,6 +87,12 @@ abstract class MarSupport extends MedicineSupport {
     @MockitoSpyBean
     protected VitalsRepository vitalsClock;
 
+    // SAH-35 / SAH-36: the Safety board, its summary and the Admitted list read their asOf through this one. It is part of THIS
+    // context on purpose: a context of its own would add a Hikari pool of 10 connections to the ones the suite keeps open, and
+    // with the nine contexts of the suite that is the whole of max_connections (100) of the local server (seen 7 Nov 2026).
+    @MockitoSpyBean
+    protected EscalationBoardRepository boardClock;
+
     /** The instant the database clock answers while a test has set it; null means the real clock. */
     private static volatile Instant fixedNow;
 
@@ -97,6 +104,7 @@ abstract class MarSupport extends MedicineSupport {
         day = LocalDate.now(IST);
         Mockito.doAnswer(call -> fixedNow != null ? fixedNow : call.callRealMethod()).when(orderClock).databaseNow();
         Mockito.doAnswer(call -> fixedNow != null ? fixedNow : call.callRealMethod()).when(vitalsClock).databaseNow();
+        Mockito.doAnswer(call -> fixedNow != null ? fixedNow : call.callRealMethod()).when(boardClock).databaseNow();
     }
 
     @AfterEach

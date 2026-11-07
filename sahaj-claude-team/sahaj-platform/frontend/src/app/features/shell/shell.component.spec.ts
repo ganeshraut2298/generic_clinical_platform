@@ -9,7 +9,19 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { AuthService } from '../../core/auth/auth.service';
 import { ShellStore } from '../../core/shell/shell.store';
 import { Me } from '../../core/shell/shell.model';
+import { ColleagueTriesNoticeStore } from '../pin/colleague-tries-notice.store';
+import { ColleagueTriesNotice } from '../pin/pin.model';
 import { ShellComponent } from './shell.component';
+
+const NOTICE_URL = '/api/v1/platform/me/pin/colleague-tries';
+const NO_TRIES: ColleagueTriesNotice = {
+  unseenCount: 0,
+  latestAt: null,
+  state: 'SET',
+  lockedUntil: null,
+  notSetReason: null,
+};
+const THREE_TRIES: ColleagueTriesNotice = { ...NO_TRIES, unseenCount: 3, latestAt: '2026-11-07T05:35:12.123456Z' };
 
 const ME: Me = {
   userId: 'u1',
@@ -26,14 +38,20 @@ describe('ShellComponent', () => {
   let authLogout: ReturnType<typeof vi.fn>;
 
   async function open(
-    options: { collapsed?: boolean; name?: string; menuMode?: 'simple' | 'advanced'; menu?: string[] } = {},
+    options: {
+      collapsed?: boolean;
+      name?: string;
+      menuMode?: 'simple' | 'advanced';
+      menu?: string[];
+      notice?: ColleagueTriesNotice | 'fail' | 'hold';
+    } = {},
   ) {
     const me: Me = { ...ME, name: options.name ?? ME.name };
     authLogout = vi.fn().mockReturnValue({ subscribe: (fn?: () => void) => fn?.() });
     TestBed.configureTestingModule({
       providers: [
         provideRouter([
-          { path: 'shell', component: ShellComponent, children: [] },
+          { path: 'shell', component: ShellComponent, children: [{ path: 'next', children: [] }] },
           { path: 'login', children: [] },
         ]),
         provideHttpClient(),
@@ -55,6 +73,16 @@ describe('ShellComponent', () => {
     });
     harness.detectChanges();
     await harness.fixture.whenStable();
+    // SAH-38: the notice is asked for after the first screen is shown (one separate GET).
+    if (options.notice !== 'hold') {
+      const notice = http.expectOne(NOTICE_URL);
+      if (options.notice === 'fail') {
+        notice.flush({}, { status: 500, statusText: 'Server Error' });
+      } else {
+        notice.flush(options.notice ?? NO_TRIES);
+      }
+      harness.detectChanges();
+    }
     return harness.routeNativeElement as HTMLElement;
   }
 
@@ -220,6 +248,95 @@ describe('ShellComponent', () => {
     it('is not in the menu for a role that has the Team page (it sets its PIN on its Team row)', async () => {
       const el = await open({ menu: ['today', 'config'] });
       expect(await openUserMenu(el)).toBeNull();
+    });
+  });
+
+  describe('colleague tries notice (SAH-38, ADR-014 D8)', () => {
+    const banner = (el: HTMLElement) => el.querySelector<HTMLElement>('[data-testid=colleague-tries-banner]');
+    const squash = (node: Element | null | undefined) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('is asked for after the first screen is shown, with one separate GET, and zero tries show no banner', async () => {
+      const el = await open();
+      expect(banner(el)).toBeNull();
+      expect(el.querySelector('[role=status]')).not.toBeNull();
+    });
+
+    it('shows the count in a status region with one button, and names nobody', async () => {
+      const el = await open({ notice: THREE_TRIES });
+      expect(squash(banner(el)!.querySelector('[data-testid=ct-count]'))).toBe(
+        '3 wrong tries of your PIN by colleagues since your last use.',
+      );
+      expect(banner(el)!.closest('[role=status]')).not.toBeNull();
+      expect(banner(el)!.closest('main')).not.toBeNull();
+      expect(Array.from(banner(el)!.querySelectorAll('button')).map((b) => squash(b))).toEqual(['Got it']);
+      expect(banner(el)!.querySelector('[data-testid=ct-state]')).toBeNull();
+    });
+
+    it('"Got it" posts the latest time it showed, closes the banner at once and moves the focus to the main area', async () => {
+      const el = await open({ notice: THREE_TRIES });
+      el.querySelector<HTMLButtonElement>('[data-act=ct-got-it]')!.click();
+      harness.detectChanges();
+      const post = http.expectOne(`${NOTICE_URL}/seen`);
+      expect(post.request.method).toBe('POST');
+      expect(post.request.body).toEqual({ seenThrough: '2026-11-07T05:35:12.123456Z' });
+      post.flush(null, { status: 204, statusText: 'No Content' });
+      expect(banner(el)).toBeNull();
+      expect(document.activeElement).toBe(el.querySelector('main'));
+    });
+
+    it('a failed "Got it" brings the banner back so it can be tapped again (R38-4)', async () => {
+      const el = await open({ notice: THREE_TRIES });
+      el.querySelector<HTMLButtonElement>('[data-act=ct-got-it]')!.click();
+      http.expectOne(`${NOTICE_URL}/seen`).flush({}, { status: 500, statusText: 'Server Error' });
+      harness.detectChanges();
+      expect(banner(el)).not.toBeNull();
+    });
+
+    it('shows the lock line and no "Set my PIN" while the PIN is locked', async () => {
+      const el = await open({ notice: { ...THREE_TRIES, state: 'LOCKED', lockedUntil: '2026-11-07T05:50:00Z' } });
+      expect(squash(el.querySelector('[data-testid=ct-state]'))).toBe('Your PIN is locked until 11:20 AM IST.');
+      expect(el.querySelector('[data-act=ct-set-pin]')).toBeNull();
+    });
+
+    it('shows the switched-off line with "Set my PIN" that opens the existing Set PIN sheet', async () => {
+      const el = await open({ notice: { ...THREE_TRIES, state: 'NOT_SET', notSetReason: 'TOO_MANY_LOCKS' } });
+      expect(squash(el.querySelector('[data-testid=ct-state]'))).toBe('Your PIN was switched off. Set a new one.');
+      const dialog = vi
+        .spyOn(TestBed.inject(MatDialog), 'open')
+        .mockReturnValue({ afterClosed: () => new Subject<unknown>() } as never);
+      el.querySelector<HTMLButtonElement>('[data-act=ct-set-pin]')!.click();
+      expect(dialog.mock.calls[0][0]).toBe(SetPinSheetComponent);
+      expect((dialog.mock.calls[0][1] as { ariaLabelledBy: string }).ariaLabelledBy).toBe('sp-title');
+    });
+
+    it('a failed load shows no banner, is not retried at once, and is retried at the next route change after a minute', async () => {
+      const el = await open({ notice: 'fail' });
+      expect(banner(el)).toBeNull();
+      await harness.navigateByUrl('/shell/next');
+      http.expectNone(NOTICE_URL);
+      const later = Date.now() + 61_000;
+      vi.spyOn(Date, 'now').mockReturnValue(later);
+      await harness.navigateByUrl('/shell');
+      await harness.navigateByUrl('/shell/next');
+      http.expectOne(NOTICE_URL).flush(THREE_TRIES);
+      harness.detectChanges();
+      expect(banner(el)).not.toBeNull();
+    });
+
+    it('a good load is not asked for again at a route change', async () => {
+      await open();
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120_000);
+      await harness.navigateByUrl('/shell/next');
+      http.expectNone(NOTICE_URL);
+    });
+
+    it('forgets the notice when the shell goes away', async () => {
+      await open({ notice: THREE_TRIES });
+      const store = TestBed.inject(ColleagueTriesNoticeStore);
+      harness.fixture.destroy();
+      expect(store.notice()).toBeNull();
     });
   });
 

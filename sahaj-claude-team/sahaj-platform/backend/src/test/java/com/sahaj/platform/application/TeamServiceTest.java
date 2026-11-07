@@ -54,6 +54,7 @@ class TeamServiceTest {
     private StaffPinRepository staffPinRepository;
     private StaffPinOps staffPinOps;
     private StaffPinLimits staffPinLimits;
+    private StaffPinColleagueEventRepository colleagueEvents;
     private TeamService service;
 
     @BeforeEach
@@ -66,8 +67,9 @@ class TeamServiceTest {
         staffPinRepository = mock(StaffPinRepository.class);
         staffPinOps = mock(StaffPinOps.class);
         staffPinLimits = mock(StaffPinLimits.class);
+        colleagueEvents = mock(StaffPinColleagueEventRepository.class);
         service = new TeamService(teamRepository, appUserRepository, doctorProfileRepository,
-                refreshTokenRepository, auditLog, staffPinRepository, staffPinOps, staffPinLimits,
+                refreshTokenRepository, auditLog, staffPinRepository, staffPinOps, staffPinLimits, colleagueEvents,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         when(teamRepository.findByUser(TENANT_ID, OWNER_USER))
@@ -366,8 +368,36 @@ class TeamServiceTest {
 
         List<TeamMemberView> team = service.list(TENANT_ID, OWNER_USER);
 
-        assertThat(team.get(0).pin()).isEqualTo(new TeamMemberView.PinView(PinState.NOT_SET, null, null));
-        assertThat(team.get(1).pin()).isEqualTo(new TeamMemberView.PinView(PinState.NOT_SET, null, null));
+        assertThat(team.get(0).pin()).isEqualTo(new TeamMemberView.PinView(PinState.NOT_SET, null, null, 0));
+        assertThat(team.get(1).pin()).isEqualTo(new TeamMemberView.PinView(PinState.NOT_SET, null, null, 0));
+    }
+
+    @Test
+    void theOwnerSeesTheColleagueTriesOfTheLastSevenDaysOnEveryRowFromOneQuery() {
+        twoMembers();
+        when(staffPinRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                pin(OWNER_MEMBERSHIP, "$2a$12$" + "a".repeat(53), null, null),
+                pin(NURSE_MEMBERSHIP, "$2a$12$" + "b".repeat(53), null, null)));
+        when(colleagueEvents.wrongTriesLast7Days(TENANT_ID)).thenReturn(Map.of(NURSE_MEMBERSHIP, 6));
+
+        List<TeamMemberView> team = service.list(TENANT_ID, OWNER_USER);
+
+        assertThat(team.get(0).pin().colleagueTries7d()).as("none is 0, not null").isZero();
+        assertThat(team.get(1).pin().colleagueTries7d()).isEqualTo(6);
+        verify(colleagueEvents, org.mockito.Mockito.times(1)).wrongTriesLast7Days(TENANT_ID);
+    }
+
+    @Test
+    void anyoneButTheOwnerNeverGetsTheFigureNotEvenOnTheirOwnRowAndNothingIsQueried() {
+        twoMembers();
+        when(staffPinRepository.findAll(TENANT_ID)).thenReturn(List.of(
+                pin(NURSE_MEMBERSHIP, "$2a$12$" + "b".repeat(53), null, null)));
+
+        TeamMemberView own = service.list(TENANT_ID, NURSE_USER).get(1);
+
+        assertThat(own.pin().state()).isEqualTo(PinState.SET);
+        assertThat(own.pin().colleagueTries7d()).isNull();
+        verifyNoInteractions(colleagueEvents);
     }
 
     @Test
@@ -411,11 +441,14 @@ class TeamServiceTest {
         when(staffPinRepository.find(TENANT_ID, NURSE_MEMBERSHIP, false))
                 .thenReturn(Optional.of(pin(NURSE_MEMBERSHIP, null, null, "RESET_BY_OWNER")));
 
+        when(colleagueEvents.wrongTriesLast7Days(TENANT_ID, NURSE_MEMBERSHIP)).thenReturn(3);
+
         TeamMemberView view = service.resetPin(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
 
         verify(staffPinOps).clear(TENANT_ID, OWNER_USER, NURSE_MEMBERSHIP);
         assertThat(view.id()).isEqualTo(NURSE_MEMBERSHIP);
         assertThat(view.pin().state()).isEqualTo(PinState.NOT_SET);
+        assertThat(view.pin().colleagueTries7d()).as("a reset does not clear the owner's evidence").isEqualTo(3);
         assertThat(view.mobileMasked()).isEqualTo("••••••7410");
     }
 

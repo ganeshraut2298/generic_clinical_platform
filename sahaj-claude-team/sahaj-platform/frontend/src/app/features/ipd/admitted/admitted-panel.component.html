@@ -1,0 +1,161 @@
+@if (list().items.length === 0) {
+  <section class="panel surf">
+    <div class="empty">No one is admitted right now.</div>
+  </section>
+} @else {
+  @if (staleText(); as stale) {
+    <div class="notice warn" role="status" data-testid="admitted-stale">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ stale }}</span>
+    </div>
+  }
+
+  <div class="pctools surf" data-testid="admitted-toolbar">
+    <label class="pcq">
+      <app-icon name="search" [size]="15" />
+      <input
+        type="search"
+        class="input"
+        autocomplete="off"
+        data-testid="admitted-search"
+        [placeholder]="searchPlaceholder"
+        [attr.aria-label]="searchLabel"
+        [value]="state.query()"
+        (input)="onQuery($event)"
+      />
+    </label>
+    <label class="sr-only" for="admitted-ward">Ward</label>
+    <select
+      id="admitted-ward"
+      class="input pcsel"
+      data-testid="admitted-ward"
+      [value]="wardValue()"
+      (change)="onWard($event)"
+    >
+      <option [value]="allWards" [selected]="wardValue() === allWards">All wards</option>
+      @for (w of list().wards; track w.id) {
+        <option [value]="w.id" [selected]="wardValue() === w.id">{{ w.name }}</option>
+      }
+    </select>
+    @if (state.view() === 'cards') {
+      <div class="seg pccolseg" role="group" aria-label="Cards per row" data-testid="admitted-cols">
+        @for (n of colsChoices; track n) {
+          <button
+            type="button"
+            [attr.aria-pressed]="state.cols() === n"
+            [attr.data-cols]="n"
+            [title]="n + ' cards per row'"
+            (click)="setCols(n)"
+          >
+            <span [class]="'pccg c' + n" aria-hidden="true">
+              @for (i of dots(n); track i) {
+                <i></i>
+              }
+            </span>
+            {{ n }}
+          </button>
+        }
+      </div>
+    }
+    <div class="seg pcview" role="group" aria-label="View" data-testid="admitted-view">
+      <button
+        type="button"
+        title="Cards"
+        data-view="cards"
+        [attr.aria-pressed]="state.view() === 'cards'"
+        (click)="setView('cards')"
+      >
+        <app-icon name="cards" [size]="15" /><span>Cards</span>
+      </button>
+      <button
+        type="button"
+        title="Table"
+        data-view="table"
+        [attr.aria-pressed]="state.view() === 'table'"
+        (click)="setView('table')"
+      >
+        <app-icon name="rows" [size]="15" /><span>Table</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sr-only" aria-live="polite" data-testid="admitted-announce">{{ announcement() }}</div>
+
+  @if (state.view() === 'cards') {
+    <div [class]="'pcgrid uni cols-' + state.cols()" data-testid="admitted-cards">
+      @for (a of drawn(); track a.id) {
+        <app-patient-card
+          [row]="a"
+          [card]="list().card"
+          [asOf]="list().asOf"
+          (openName)="openDetails(a)"
+          (act)="onAction(a, $event)"
+        />
+      } @empty {
+        <div class="empty pcempty" data-testid="admitted-empty">{{ emptyText }}</div>
+      }
+    </div>
+    @if (more()) {
+      <div class="pcmore" data-testid="admitted-paging">
+        <span class="faint">{{ showing() }}</span>
+        <button type="button" mat-stroked-button data-testid="show-more" (click)="showMore()">
+          Show 24 more
+        </button>
+        <button type="button" mat-button data-testid="show-all" (click)="showAll()">Show all</button>
+      </div>
+    }
+  } @else {
+    <section class="panel surf">
+      @if (matches().length === 0) {
+        <div class="empty" data-testid="admitted-empty">{{ emptyText }}</div>
+      } @else {
+        <div class="iptbl" role="table" aria-label="Admitted patients">
+          <div class="iptr ipth" role="row">
+            <span role="columnheader">Patient</span>
+            <span role="columnheader">Bed</span>
+            <span role="columnheader">Doctor</span>
+            <span role="columnheader" class="r">Running bill</span>
+            <span role="columnheader" class="r">Deposit</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader"><span class="sr-only">Open</span></span>
+          </div>
+          @for (a of matches(); track a.id) {
+            <div class="iptr" role="row">
+              <span role="cell">
+                <b>{{ a.patientName }}</b>
+                <small>{{ subline(a) }}</small>
+              </span>
+              <span role="cell">
+                {{ a.bedCode }}
+                <small>{{ a.categoryName }}</small>
+              </span>
+              <span role="cell">{{ a.doctorName }}</span>
+              <span role="cell" class="r num">{{ formatInrPaise(a.runningBillPaise) }}</span>
+              <span role="cell" class="r num">{{ formatInrPaise(a.depositPaise) }}</span>
+              <span role="cell" class="pills">
+                @for (p of pills(a); track p.text) {
+                  <span [class]="'pill ' + p.css">
+                    @if (p.css === 'p-crit') {
+                      <app-icon name="alert" [size]="12" />
+                    }
+                    {{ p.text }}
+                  </span>
+                }
+              </span>
+              <span role="cell" class="r">
+                <button
+                  type="button"
+                  mat-stroked-button
+                  [attr.aria-label]="'Open ' + a.patientName"
+                  (click)="openDetails(a)"
+                >
+                  Open
+                </button>
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+}

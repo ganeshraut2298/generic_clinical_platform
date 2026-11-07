@@ -6,15 +6,12 @@ import com.sahaj.ipd.application.SafetyViews.Response;
 import com.sahaj.ipd.application.SafetyViews.Row;
 import com.sahaj.ipd.domain.EscalationClock;
 import com.sahaj.ipd.domain.EscalationState.Status;
+import com.sahaj.ipd.domain.Fingerprint;
+import com.sahaj.ipd.domain.MedicineRound;
 import com.sahaj.ipd.domain.ResponseAction;
 import com.sahaj.platform.api.ActorDirectoryPort;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Locale;
@@ -125,11 +122,12 @@ final class SafetyRows {
     }
 
     /**
-     * The counts of a set of escalations: not closed, past target, and the change token of the not closed ones. The
-     * one function behind the board, the summary and the banner, so the three cannot disagree. Closed escalations in
-     * the set are ignored.
+     * The counts of a set of escalations and of the Medicine round: not closed, past target, the dose counts, and the
+     * change token of the not closed escalations plus the dose lines (ADR-012 D3). The one function behind the board,
+     * the summary and the banner, so the three cannot disagree. Closed escalations in the set are ignored. With no dose
+     * in the window ({@link MedicineRound#empty()}) the token is the SAH-33 token.
      */
-    static Counts counts(Collection<Detail> escalations, Instant asOf) {
+    static Counts counts(Collection<Detail> escalations, MedicineRound.Result round, Instant asOf) {
         List<Detail> live = new ArrayList<>();
         int past = 0;
         for (Detail d : escalations) {
@@ -140,29 +138,24 @@ final class SafetyRows {
                 }
             }
         }
-        return new Counts(live.size(), past, changeToken(live), asOf);
+        return new Counts(live.size(), past, round.due(), round.late(), changeToken(live, round.tokenLines()), asOf);
     }
 
     /**
-     * ADR-007 R1: the escalations counted in {@code open} sorted by the canonical lower-case id text; the UTF-8 text
-     * of the lines {@code <id>:<version>} joined by a line feed (empty text for none); SHA-256; the first 16 bytes;
-     * base64url without padding (22 characters). It holds no name, score or text. It changes when an escalation is
-     * raised, acknowledged, closed, re-opened or gets a higher score (all change the set or the version); a senior
-     * call leaves the version alone.
+     * ADR-007 R1 and ADR-012 D3: the escalations counted in {@code notClosed} as the lines {@code <id>:<version>} (id
+     * in canonical lower case), plus the dose lines of {@link MedicineRound.Result#tokenLines()}, all sorted together;
+     * the UTF-8 text of the lines joined by a line feed (empty text for none); SHA-256; the first 16 bytes; base64url
+     * without padding (22 characters, the {@link Fingerprint}). It holds no name, score or text. It changes when an
+     * escalation is raised, acknowledged, closed, re-opened or gets a higher score (all change the set or the version)
+     * or when a dose line changes; a senior call leaves the version alone. With no dose line this is the SAH-33 token.
      */
-    static String changeToken(Collection<Detail> notClosed) {
+    static String changeToken(Collection<Detail> notClosed, Collection<String> doseLines) {
         List<String> lines = new ArrayList<>();
         for (Detail d : notClosed) {
             lines.add(d.id().toString().toLowerCase(Locale.ROOT) + ":" + d.version());
         }
+        lines.addAll(doseLines);
         Collections.sort(lines);
-        byte[] digest;
-        try {
-            byte[] bytes = String.join("\n", lines).getBytes(StandardCharsets.UTF_8);
-            digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(Arrays.copyOf(digest, 16));
+        return Fingerprint.of(lines);
     }
 }

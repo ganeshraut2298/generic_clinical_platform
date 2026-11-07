@@ -48,6 +48,10 @@
   flex-direction: column;
   gap: 8px;
 
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
   label {
     font-size: 0.8rem;
     font-weight: 600;

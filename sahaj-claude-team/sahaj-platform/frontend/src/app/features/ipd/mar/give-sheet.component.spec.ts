@@ -596,7 +596,8 @@ describe('GiveSheetComponent', () => {
       fail(req, 'wrong-pin', 403, 'That PIN is not right. 2 tries left.');
       await settle();
       await tick();
-      expect(squash(q('#sf-pin-err'))).toBe('That PIN is not right. 2 tries left.');
+      // A colleague's wrong try never shows a count (security review S4), whatever the server's text says.
+      expect(squash(q('#sf-pin-err'))).toBe('That PIN is not right.');
       expect(q('#sf-pin-err')!.getAttribute('role')).toBe('alert');
       expect(pin().getAttribute('aria-describedby')).toBe('sf-pin-err');
       expect(pin().getAttribute('aria-invalid')).toBe('true');
@@ -605,7 +606,7 @@ describe('GiveSheetComponent', () => {
       expect(nurse().value).toBe('m-rupali');
       expect(box().value).toBe('PT-00042');
       expect(ref.close).not.toHaveBeenCalled();
-      expect(snack).toHaveBeenCalledWith('That PIN is not right. 2 tries left.', 'Close', expect.anything());
+      expect(snack).toHaveBeenCalledWith('That PIN is not right.', 'Close', expect.anything());
     });
 
     it('locked: the text with the time under the field, the PIN cleared, the focus on the nurse list', async () => {
@@ -656,6 +657,137 @@ describe('GiveSheetComponent', () => {
       (await clickGiven()).error(new ProgressEvent('error'));
       await settle();
       expect(pin().value).toBe('');
+    });
+  });
+
+  describe('SAH-38: pair cap, check failed and the ward line', () => {
+    const T1 = 'Too many wrong PIN tries for this nurse. Choose another nurse.';
+    const T7 = 'We could not check the PIN. Try again.';
+    const WARD =
+      'No second PIN works? Do not give this medicine yet. Choose another nurse, or ask the nurse in charge or the clinic owner. Never share a PIN.';
+    const ward = () => q('[data-testid=ward-line]');
+    const region = () => q('#sf-ward')!;
+
+    async function givenWithPin(over: { mar?: Mar } = {}): Promise<TestRequest> {
+      await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }), ...over });
+      await fillHighAlert();
+      return clickGiven();
+    }
+
+    it('colleague-pin-limit: T1 under Their PIN, no count, entries kept, PIN cleared, focus on the nurse list', async () => {
+      const req = await givenWithPin();
+      fail(req, 'colleague-pin-limit', 429, T1);
+      await settle();
+      await tick();
+      expect(squash(q('#sf-pin-err'))).toBe(T1);
+      expect(q('#sf-pin-err')!.getAttribute('role')).toBe('alert');
+      expect(pin().value).toBe('');
+      expect(nurse().value).toBe('m-rupali');
+      expect(box().value).toBe('PT-00042');
+      expect(said().checked).toBe(true);
+      expect(document.activeElement).toBe(nurse());
+      expect(ref.close).not.toHaveBeenCalled();
+      expect(el().textContent).not.toMatch(/tries left|minutes/);
+    });
+
+    it('pin-check-failed: T7 under Their PIN, PIN cleared, the nurse can try again, no ward line', async () => {
+      const req = await givenWithPin();
+      fail(req, 'pin-check-failed', 503, T7);
+      await settle();
+      await tick();
+      expect(squash(q('#sf-pin-err'))).toBe(T7);
+      expect(pin().value).toBe('');
+      expect(ward()).toBeNull();
+      expect(document.activeElement).toBe(pin());
+      expect(givenButton().disabled).toBe(false);
+      expect(ref.close).not.toHaveBeenCalled();
+    });
+
+    it('the ward line is in a polite live region that is in the page from the start', async () => {
+      await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }) });
+      expect(region().getAttribute('aria-live')).toBe('polite');
+      expect(ward()).toBeNull();
+    });
+
+    for (const [slug, status, detail] of [
+      ['pin-locked', 403, "The second nurse's PIN is locked after 5 wrong tries. Choose another nurse, or try again at 11:20 AM."],
+      ['pin-not-set', 409, 'The second nurse has not set a PIN yet. Choose another nurse.'],
+      ['rate-limit', 429, 'Too many PIN tries in a short time. Try again in a few minutes.'],
+      ['colleague-pin-limit', 429, T1],
+    ] as const) {
+      it(`shows the ward line after ${slug}, with the reason, and the PIN box is described by both`, async () => {
+        fail(await givenWithPin(), slug, status, detail);
+        await settle();
+        expect(squash(ward())).toBe(WARD);
+        expect(region().contains(ward())).toBe(true);
+        expect(squash(q('#sf-pin-err'))).toBe(detail);
+        expect(pin().getAttribute('aria-describedby')).toBe('sf-pin-err sf-ward');
+      });
+    }
+
+    for (const [slug, status, detail] of [
+      ['wrong-pin', 403, 'That PIN is not right.'],
+      ['pin-unavailable', 503, 'PIN checks are not available right now. Try again later.'],
+      ['pin-check-failed', 503, T7],
+    ] as const) {
+      it(`does not show the ward line after ${slug}`, async () => {
+        fail(await givenWithPin(), slug, status, detail);
+        await settle();
+        expect(ward()).toBeNull();
+      });
+    }
+
+    it('hides the line when another nurse is chosen, and gives no bypass while it shows', async () => {
+      fail(await givenWithPin(), 'pin-locked', 403, "The second nurse's PIN is locked after 5 wrong tries.");
+      await settle();
+      expect(ward()).not.toBeNull();
+      const labels = Array.from(el().querySelectorAll('button')).map((b) => squash(b));
+      expect(labels.filter(Boolean)).toEqual(['Record not given', 'Given']);
+      expect(el().textContent).not.toMatch(/give anyway|paper|skip/i);
+      await choose(nurse(), '');
+      expect(ward()).toBeNull();
+    });
+
+    it('hides the line when the next answer is not one of the four', async () => {
+      fail(await givenWithPin(), 'colleague-pin-limit', 429, T1);
+      await settle();
+      expect(ward()).not.toBeNull();
+      await typePin('4821');
+      fail(await clickGiven(), 'wrong-pin', 403, 'That PIN is not right.');
+      await settle();
+      expect(ward()).toBeNull();
+    });
+
+    it('a right PIN after the line records the dose and closes the sheet', async () => {
+      fail(await givenWithPin(), 'colleague-pin-limit', 429, T1);
+      await settle();
+      await choose(nurse(), 'm-nikhil');
+      await typePin('4821');
+      (await clickGiven()).flush(recorded());
+      await settle();
+      expect(ref.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the line at once when there is no other nurse to choose (single-nurse shift)', async () => {
+      await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }), mar: marOf({ secondNurses: [] }) });
+      expect(squash(ward())).toBe(WARD);
+      expect(nurse().options.length).toBe(1);
+      expect(pin().getAttribute('aria-describedby')).toBe('sf-ward');
+    });
+
+    it('never shows the line for a medicine that is not high-alert', async () => {
+      await open({ mar: marOf({ secondNurses: [] }) });
+      expect(ward()).toBeNull();
+      expect(q('#sf-ward')).toBeNull();
+    });
+
+    it('keeps no secret: nothing is written to storage or the console', async () => {
+      const log = vi.spyOn(console, 'log');
+      fail(await givenWithPin(), 'colleague-pin-limit', 429, T1);
+      await settle();
+      expect(log).not.toHaveBeenCalled();
+      expect(localStorage.length).toBe(0);
+      expect(sessionStorage.length).toBe(0);
     });
   });
 

@@ -23,7 +23,16 @@ public record TeamMemberView(UUID id, String name, String mobileMasked, Membersh
     public record DoctorView(String specialty, String degree, String registrationNo, Integer feeRupees) {
     }
 
-    /** {@code TeamMemberPin}: state, when the current PIN was set (SET and LOCKED) and the end of a lock (LOCKED). */
-    public record PinView(PinState state, Instant setAt, Instant lockedUntil) {
+    /**
+     * {@code TeamMemberPin}: state, when the current PIN was set (SET and LOCKED) and the end of a lock (LOCKED).
+     * {@code colleagueTries7d} (SAH-38, ADR-014 D9): wrong tries of this member's PIN by colleagues in the last 7 days;
+     * filled for an owner viewer only, null for everyone else.
+     */
+    public record PinView(PinState state, Instant setAt, Instant lockedUntil, Integer colleagueTries7d) {
+
+        /** A PIN view without the colleague-tries figure (the viewer is not the owner). */
+        public PinView(PinState state, Instant setAt, Instant lockedUntil) {
+            this(state, setAt, lockedUntil, null);
+        }
     }
 }
