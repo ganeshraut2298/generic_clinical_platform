@@ -195,66 +195,96 @@
   }
 }
 
-// Action row at the bottom of every card, tablet-friendly targets (44 px).
-.pcacts {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 4px;
-  margin-top: auto;
-  padding-top: 6px;
-  border-top: 1px solid var(--line-2);
+// 1101-1279 px with four cards per row: the cards are about 205 px wide, so the padding is a little less.
+@media (min-width: 1101px) and (max-width: 1279px) {
+  :host-context(.pcgrid.cols-4) .pc {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 }
 
-.pctb {
+// ---- SAH-37: the other layouts, sections, vital tiles and tones (mockup `.pc.lay-*`, `.vt`, `.vmini`) ----
+.pc.lay-compact {
+  gap: 7px;
+  padding: 11px 12px;
+}
+
+.pchm small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+
+  i {
+    font-style: normal;
+    opacity: 0.5;
+    white-space: pre;
+  }
+}
+
+.pcsec {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
-  min-height: 44px;
-  padding: 4px 2px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1.1;
-  text-align: center;
-  cursor: pointer;
+  gap: 6px;
+}
 
-  &:hover {
-    background: var(--muted-soft);
-    color: var(--ink);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--pri);
-    outline-offset: 1px;
-  }
-  &.pri {
-    background: var(--pri-soft);
-    color: var(--pri-text);
+.pcsec.pcstat {
+  flex-direction: row;
+}
+
+.pcst {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-3);
+}
+
+.pckv .w2 {
+  grid-column: 1 / -1;
+}
+
+.pckv > div {
+  min-width: 0;
+}
+
+.lay-expanded .pckv {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pcflags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pcline {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+
+  i {
+    font-style: normal;
+    opacity: 0.45;
+    white-space: pre;
   }
 }
 
-// Four cards per row: smaller words so the four buttons fit (mockup `.pcgrid.cols-4`).
-:host-context(.pcgrid.cols-4) {
-  .pc {
-    padding: 12px;
-  }
-  .pcacts {
-    gap: 2px;
-  }
-  .pctb {
-    padding-left: 0;
-    padding-right: 0;
+.pcf.good {
+  background: var(--good-soft);
+  color: var(--good);
+}
 
-    span {
-      font-size: 0.64rem;
-      line-height: 1.1;
-      letter-spacing: -0.01em;
-    }
-  }
+.tone-crit {
+  color: var(--crit);
+  font-weight: 600;
+}
+.tone-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.tone-good {
+  color: var(--good);
 }

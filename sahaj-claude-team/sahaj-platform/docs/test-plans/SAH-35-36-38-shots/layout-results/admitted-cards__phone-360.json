@@ -1,0 +1,37 @@
+{
+  "screen": "admitted-cards",
+  "project": "phone-360",
+  "viewport": {
+    "width": 360,
+    "height": 740
+  },
+  "dpr": 1,
+  "columns3": 1,
+  "columns4": null,
+  "findings3": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 1,
+    "small": [
+      "button \"Venkataraghavan Subraman\" 202x20",
+      "button \"Ravi Shah\" 200x20",
+      "button \"Meena Joshi\" 200x20",
+      "button \"Farid Khan\" 199x20",
+      "button \"Geeta Menon\" 200x20",
+      "button \"Sunil Rao\" 200x20"
+    ]
+  },
+  "findings4": null,
+  "calls": {
+    "POST platform/auth/refresh": 1,
+    "GET platform/me": 1,
+    "GET ipd/admissions?status=ADMITTED": 1,
+    "GET platform/me/pin/colleague-tries": 1,
+    "GET ipd/layout": 1,
+    "GET ipd/admission-rules": 1,
+    "GET ipd/pharmacist-checks/summary": 1,
+    "GET ipd/board": 1,
+    "GET e2e/ping": 1
+  },
+  "duplicates": []
+}

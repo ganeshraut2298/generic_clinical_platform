@@ -7,7 +7,7 @@
   />
 
   <div class="calc">
-    <div class="calc-in surf">
+    <div class="calc-in surf" data-surface>
       <div class="field">
         <span class="label" id="today-label">What do you use today?</span>
         <div class="cmpopts" role="group" aria-labelledby="today-label">
@@ -157,7 +157,7 @@
       </div>
     </div>
 
-    <aside class="calc-out surf" aria-live="polite" aria-label="Your clinic with Sahaj">
+    <aside class="calc-out surf" data-surface aria-live="polite" aria-label="Your clinic with Sahaj">
       <span class="eyebrow">Your clinic with Sahaj</span>
       @switch (headline().kind) {
         @case ('custom') {

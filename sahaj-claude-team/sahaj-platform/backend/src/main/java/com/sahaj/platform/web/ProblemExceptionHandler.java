@@ -28,6 +28,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -64,6 +65,16 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String INVALID_OPTION = "Choose a valid option";
 
+    /**
+     * Release audit G-12 and DEC-025: the JSON body fields whose contract text for an unreadable value is "Reload the
+     * page and try again." (a client key, version, time or token the page itself sends, which a person cannot fix by
+     * choosing another option). Every other unreadable field keeps {@link #INVALID_OPTION}. The query parameters
+     * limit and cursor of the same text are read as strings and checked in the services, so they never reach here.
+     */
+    private static final String RELOAD_PAGE = "Reload the page and try again.";
+    private static final Set<String> RELOAD_PAGE_FIELDS = Set.of("seenThrough", "clientKey", "identityUnknown",
+            "version", "seniorCalls", "slotAt", "checkToken", "outcome");
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -98,7 +109,7 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
                     .reduce((first, second) -> first + "." + second)
                     .orElse(null);
             if (field != null) {
-                errors.add(new Problems.FieldError(field, INVALID_OPTION));
+                errors.add(new Problems.FieldError(field, unreadableMessage(field)));
             }
         }
         ProblemDetail problem = errors.isEmpty()
@@ -106,6 +117,12 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
                         "The request body is missing or is not valid JSON.")
                 : Problems.validation(errors);
         return respond(problem, headers);
+    }
+
+    /** The text for an unreadable JSON value of {@code field} (a dotted path); the last name decides. */
+    static String unreadableMessage(String field) {
+        String last = field.substring(field.lastIndexOf('.') + 1);
+        return RELOAD_PAGE_FIELDS.contains(last) ? RELOAD_PAGE : INVALID_OPTION;
     }
 
     /**
@@ -377,17 +394,69 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
         return root instanceof java.sql.SQLException sql ? sql.getSQLState() : "-";
     }
 
+    private static final java.util.Set<String> IDENTIFIER_WORDS =
+            java.util.Set.of("relation", "column", "constraint", "table", "schema", "index");
+    private static final java.util.regex.Pattern SEVERITY_PREFIX = java.util.regex.Pattern.compile("^[A-Z]{4,7}:");
+
     /**
-     * Only the first line of a database error: the primary message ("relation x does not exist"). The
-     * detail lines of a constraint error can quote the row's values, so they are never logged.
+     * Only the first line of a database error, with every submitted value cut off (release audit G-13). Operators
+     * still need the table and constraint names, so a double-quoted identifier is kept when the word before it is
+     * relation, column, constraint, table, schema or index (for example
+     * {@code duplicate key value violates unique constraint "ux_mobile"}). Anything else stops the line: a quoted text
+     * after any other word (PostgreSQL writes {@code invalid input syntax for type uuid: "the-submitted-text"}), any
+     * single-quoted text, and the first colon after the severity prefix, because the pgjdbc wordings write the value
+     * after a colon without quotes ({@code Bad value for type int : 9000000001},
+     * {@code Conversion to type X failed: <value>}, {@code Cannot cast to <type>: <value>}). The first line is also
+     * cut at "Detail" or "Key (" (they quote the row's values). What is left names the kind of fault, never a value.
      */
-    private static String primaryDbMessage(Throwable root) {
+    static String primaryDbMessage(Throwable root) {
         if (!(root instanceof java.sql.SQLException) || root.getMessage() == null) {
             return "-";
         }
         String message = root.getMessage();
         int newline = message.indexOf('\n');
-        return newline < 0 ? message : message.substring(0, newline);
+        String line = newline < 0 ? message : message.substring(0, newline);
+        for (String marker : new String[] {"Detail", "Key ("}) {
+            int at = line.indexOf(marker);
+            if (at >= 0) {
+                line = line.substring(0, at);
+            }
+        }
+        StringBuilder safe = new StringBuilder();
+        int i = 0;
+        java.util.regex.Matcher prefix = SEVERITY_PREFIX.matcher(line);
+        if (prefix.find()) {
+            safe.append(line, 0, prefix.end());
+            i = prefix.end();
+        }
+        while (i < line.length()) {
+            char c = line.charAt(i);
+            if (c == ':' || c == '\'') {
+                break;
+            }
+            if (c == '"') {
+                int close = line.indexOf('"', i + 1);
+                if (close < 0 || !IDENTIFIER_WORDS.contains(lastWord(safe))) {
+                    break;
+                }
+                safe.append(line, i, close + 1);
+                i = close + 1;
+                continue;
+            }
+            safe.append(c);
+            i++;
+        }
+        String result = safe.toString().trim();
+        if (result.endsWith(":")) {
+            result = result.substring(0, result.length() - 1).trim();
+        }
+        return result.isEmpty() ? "-" : result;
+    }
+
+    private static String lastWord(CharSequence text) {
+        String trimmed = text.toString().stripTrailing();
+        int space = trimmed.lastIndexOf(' ');
+        return trimmed.substring(space + 1).toLowerCase(java.util.Locale.ROOT);
     }
 
     private static String firstSahajFrame(Throwable ex) {

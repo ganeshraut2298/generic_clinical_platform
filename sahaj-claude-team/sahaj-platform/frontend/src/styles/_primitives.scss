@@ -86,6 +86,40 @@ button {
   border-radius: 16px;
   box-shadow: var(--shadow-sm);
 }
+// Homepage only (SAH-39): a white or frosted panel painted by a pseudo-element, so it adds no
+// size and no text moves. The pseudo-element paints in the nearest stacking context (.pubwrap),
+// above the background layer and under the block's own text and background.
+:where(.surface-solid, .surface-glass) {
+  position: relative;
+}
+.surface-solid,
+.surface-glass {
+  --surface-bleed-x: 12px;
+  --surface-bleed-y: 10px;
+}
+.surface-solid::before,
+.surface-glass::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: calc(-1 * var(--surface-bleed-y)) calc(-1 * var(--surface-bleed-x));
+  border-radius: var(--surface-radius, var(--r));
+}
+.surface-solid::before {
+  background: var(--surface);
+}
+.surface-glass::before {
+  background: var(--glass-surface);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .surface-glass::before {
+    background: var(--surface);
+  }
+}
+
 .row {
   display: flex;
   gap: 10px;

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Sahaj platform API
   version: 0.1.0
-  description: Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json.
+  description: Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
 servers:
   - url: /api/v1/platform
 security:
@@ -34,6 +34,7 @@ paths:
       responses:
         '201': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/IdResult' } } } }
         '400': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (public endpoint)' }
         '429': { $ref: '#/components/responses/Problem' }
   /auth/otp/request:
     post:
@@ -45,6 +46,7 @@ paths:
       responses:
         '202': { description: Code sent. Never contains the code., content: { application/json: { schema: { type: object, required: [resendAfterSeconds], properties: { resendAfterSeconds: { type: integer, examples: [30] } } } } } }
         '400': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
         '423': { $ref: '#/components/responses/Problem' }
         '429': { $ref: '#/components/responses/Problem' }
   /auth/otp/verify:
@@ -71,6 +73,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
         '423': { $ref: '#/components/responses/Problem' }
   /auth/select-clinic:
     post:
@@ -83,6 +86,7 @@ paths:
         '200': { description: Session started, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
   /auth/refresh:
     post:
       tags: [SAH-3]
@@ -130,6 +134,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /setup/slug-availability:
     get:
       tags: [SAH-4]
@@ -172,6 +177,7 @@ paths:
       responses:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } } }
         '400': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /me/pin:
     get:
       tags: [SAH-31]
@@ -240,6 +246,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
         '409': { $ref: '#/components/responses/Problem', description: 'concurrent-change (retryable)' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '423': { $ref: '#/components/responses/Problem', description: 'otp-locked' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
         '503':
@@ -338,6 +345,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem', description: 'validation (field seenThrough)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /team:
     get:
       tags: [SAH-6]
@@ -363,6 +371,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /team/{id}:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -373,15 +382,17 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/TeamMemberUpdate' } } }
       responses:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/TeamMember' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
     delete:
       tags: [SAH-6]
       description: Removes access. The record stays so past entries keep their name.
       responses:
         '204': { description: Access removed }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -392,6 +403,7 @@ paths:
       tags: [SAH-6]
       responses:
         '200': { description: Switched off, content: { application/json: { schema: { $ref: '#/components/schemas/TeamMember' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -402,6 +414,7 @@ paths:
       tags: [SAH-6]
       responses:
         '200': { description: Switched on, content: { application/json: { schema: { $ref: '#/components/schemas/TeamMember' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -437,6 +450,7 @@ paths:
                 reset:
                   summary: 'Reset of a nurse''s PIN after colleague tries: the 7-day figure (3 before the reset) is unchanged'
                   value: { id: 3f0c9a52-6a1e-4f7e-9d1b-2b8f4e7c1a10, name: Priya Nair, mobileMasked: '••••••3301', role: NURSE, status: ACTIVE, lastLoginAt: '2026-11-06T04:10:00Z', pin: { state: NOT_SET, setAt: null, lockedUntil: null, colleagueTries7d: 3 } }
+        '400': { $ref: '#/components/responses/BadRequest', description: 'bad-request (the {id} path value is not a UUID; title "Bad Request", detail "The request could not be understood. Check it and try again.")' }
         '401': { $ref: '#/components/responses/Problem' }
         '403':
           description: forbidden
@@ -490,6 +504,7 @@ paths:
                       - { kind: LOCKED, at: '2026-11-07T05:35:12Z', byMembershipId: null, byName: null, count: null }
                       - { kind: WRONG_TRIES, at: '2026-11-07T05:35:12Z', byMembershipId: 7a1c2e3f-4b5d-4c6e-8f70-81a2b3c4d5e6, byName: Sunita Pawar, count: 5 }
                       - { kind: WRONG_TRIES, at: '2026-11-05T14:02:00Z', byMembershipId: 9b8a7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d, byName: Meena Kale, count: 1 }
+        '400': { $ref: '#/components/responses/BadRequest', description: 'bad-request (the {id} path value is not a UUID; title "Bad Request", detail "The request could not be understood. Check it and try again.")' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Only the clinic owner can do this.")' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found' }
@@ -509,6 +524,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RolePermission' } } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /clinic/profile:
     get:
       tags: [SAH-7]
@@ -523,6 +539,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/ClinicProfile' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /clinic/holidays:
     get:
       tags: [SAH-7]
@@ -538,6 +555,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /clinic/holidays/{id}:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -545,6 +563,7 @@ paths:
       tags: [SAH-7]
       responses:
         '204': { description: Removed }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
   /specialties:
@@ -562,6 +581,7 @@ paths:
         '200': { description: Applied, content: { application/json: { schema: { $ref: '#/components/schemas/ClinicProfile' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /privacy:
     get:
       tags: [SAH-17]
@@ -576,6 +596,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/PrivacySettings' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /audit-events:
     get:
       tags: [SAH-7]
@@ -619,6 +640,7 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ModulesView' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -628,6 +650,21 @@ components:
     Problem:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    BadRequest:
+      description: 'bad-request: a path value is not of its declared type (an {id} that is not a UUID). Spring''s own text is replaced by a fixed sentence (ProblemExceptionHandler); the submitted value is never echoed; no fieldErrors.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            malformedId: { value: { type: 'https://sahaj.in/problems/bad-request', title: Bad Request, status: 400, detail: The request could not be understood. Check it and try again. } }
+    PayloadTooLarge:
+      description: 'payload-too-large: the request body is over the size limit (RequestBodySizeLimitFilter): 64 KB for a signed-in user (property sahaj.request-body.max-bytes, never below 4 KB; the detail names the configured limit, in KB or, when not a whole number of KB, in bytes), 4 KB on /public/** and for any other request without a signed-in user. The body is not read past the limit and nothing is saved.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            signedIn: { value: { type: 'https://sahaj.in/problems/payload-too-large', title: Request too large, status: 413, detail: The request body must be 64 KB or smaller. } }
+            notSignedIn: { value: { type: 'https://sahaj.in/problems/payload-too-large', title: Request too large, status: 413, detail: The request body must be 4 KB or smaller. } }
   schemas:
     PrivacySettings:
       type: object

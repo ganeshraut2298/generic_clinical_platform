@@ -7,7 +7,7 @@
   @if (store.loading()) {
     <p class="muted" role="status" aria-busy="true">Loading the pharmacist checks</p>
   } @else if (store.loadError(); as message) {
-    <div class="notice err" role="alert" data-testid="pharmacist-error">
+    <div class="notice err" role="alert" tabindex="-1" data-testid="pharmacist-error">
       <app-icon name="alert" [size]="16" />
       <span>{{ message }}</span>
       <button type="button" mat-stroked-button data-act="ph-retry" (click)="reload()">Try again</button>

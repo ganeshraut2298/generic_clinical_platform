@@ -1,17 +1,22 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { By } from '@angular/platform-browser';
+import { Subject, of } from 'rxjs';
+import { ApiError } from '../../core/http/problem-detail';
 import { problemDetailInterceptor } from '../../core/http/problem-detail.interceptor';
+import { EmergencyComponent } from './emergency/emergency.component';
 import { ShellStore } from '../../core/shell/shell.store';
 import { AdmissionDetail, AdmissionList, AdmittedPatientRow, BedBoard } from './ipd.model';
 import { EmrSheetComponent } from './emr/emr-sheet.component';
+import { resolvedStandard } from './card/card-setup.fixtures';
 import { IpdPage } from './ipd.page';
 import { NursingSheetComponent } from './nursing/nursing-sheet.component';
+import { PharmacistStore } from './pharmacist/pharmacist.store';
 import { TOKEN_A, TOKEN_B, boardOf, pageOf } from './safety/safety.fixtures';
 import { AdmissionSafety, SafetyBannerItem } from './safety/safety.model';
 
@@ -63,7 +68,16 @@ function list(partial: Partial<AdmissionList> = {}): AdmissionList {
     safety: null,
     asOf: '2026-10-24T07:30:00Z',
     wards: [{ id: 'w-general', name: 'General ward' }],
-    card: { nursing: true, emr: true, transfer: true, discharge: true, depositLowFlag: true },
+    card: {
+      nursing: true,
+      emr: true,
+      transfer: true,
+      discharge: true,
+      deposit: true,
+      depositLowFlag: true,
+      visibleGroups: ['patient', 'contact', 'clinical', 'vitals', 'billing'],
+    },
+    cardSetup: resolvedStandard(),
     items: [
       ROW,
       { ...ROW, id: 'a2', patientName: 'Ravi Shah', payer: 'Insurance', depositState: 'NOT_NEEDED', depositPaise: 0, runningBillPaise: 450000, admissionType: 'planned', dayNumber: 1 },
@@ -95,7 +109,7 @@ describe('IpdPage', () => {
         provideHttpClientTesting(),
         { provide: ShellStore, useValue: { me: signal({ role }), menu: signal(menu) } },
         { provide: MatDialog, useValue: dialog },
-        { provide: MatSnackBar, useValue: { open: snack } },
+        { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -894,6 +908,82 @@ describe('IpdPage', () => {
         await settle();
       });
 
+      describe('after the list was refused (SAH-40 R-1)', () => {
+        const forbidden = {
+          body: { type: 'https://sahaj.in/problems/forbidden', title: 'x', status: 403, detail: 'No access.' },
+          init: { status: 403, statusText: 'Forbidden' },
+        };
+        const counts = (open: number) => ({
+          open,
+          pastTarget: 2,
+          dosesDue: 0,
+          dosesLate: 0,
+          changeToken: TOKEN_A,
+          asOf: '2026-11-05T05:48:00Z',
+        });
+
+        /**
+         * The Bed board tab: the 60-second summary poll is on its way when the list read (started by
+         * leaving the Safety tab) is refused. The poll answers after the refusal, with other counts.
+         */
+        async function refusedWithPollInFlight(): Promise<{ view: HTMLElement; poll: TestRequest }> {
+          vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+          const view = setup('DOCTOR');
+          await loadOk(list({ safety: safety(2, LATE) }), false);
+          await advance(60_000);
+          const poll = http.expectOne(SUMMARY);
+          const page = fixture.componentInstance as unknown as { selectTab(tab: string): void };
+          page.selectTab('safety');
+          page.selectTab('board');
+          await settle();
+          http.match((r) => r.url === BOARD || r.url === EVENTS);
+          http.expectOne(listUrl).flush(forbidden.body, forbidden.init);
+          await settle();
+          expect(view.querySelector('.notice.err')!.textContent).toContain('No access.');
+          return { view, poll };
+        }
+
+        it('a poll answered after the refusal does not read the list or bring it back', async () => {
+          const { view, poll } = await refusedWithPollInFlight();
+          poll.flush(counts(3));
+          await settle();
+          http.expectNone(listUrl);
+          await advance(180_000);
+          http.expectNone(SUMMARY);
+          http.expectNone(listUrl);
+          expect(view.textContent).not.toContain('Asha Patil');
+          expect(view.querySelector('.notice.err')).not.toBeNull();
+        });
+
+        it('Try again reads the list and the poll runs again', async () => {
+          const { view, poll } = await refusedWithPollInFlight();
+          poll.flush(counts(3));
+          await settle();
+          button(view, 'Try again')!.click();
+          await settle();
+          http.expectOne(listUrl).flush(list({ safety: safety(2, LATE) }));
+          await settle();
+          expect(view.querySelector('.notice.err')).toBeNull();
+          await advance(60_000);
+          http.expectOne(SUMMARY).flush(counts(3));
+          await settle();
+          http.expectOne(listUrl).flush(list({ safety: safety(3, LATE) }));
+          await settle();
+        });
+
+        it('Try again met by another refusal keeps the page closed', async () => {
+          const { view, poll } = await refusedWithPollInFlight();
+          poll.flush(counts(3));
+          button(view, 'Try again')!.click();
+          await settle();
+          http.expectOne(listUrl).flush(forbidden.body, forbidden.init);
+          await settle();
+          await advance(120_000);
+          http.expectNone(SUMMARY);
+          http.expectNone(listUrl);
+        });
+      });
+
       it('reads the list again when the user leaves the Safety tab, so the banner is current', async () => {
         const view = setup('DOCTOR');
         await loadOk(list({ safety: safety(2, LATE) }), false);
@@ -986,6 +1076,34 @@ describe('IpdPage', () => {
       expect(router.url).toBe(url);
     });
 
+    it('opens the sheet at the Running bill and deposit part for the Deposit action, with autoFocus off, when the clinic switched it on (SAH-37 AC40)', async () => {
+      const view = setup('OWNER', false);
+      const withDeposit = list();
+      withDeposit.cardSetup = {
+        ...resolvedStandard(),
+        actions: ['nursing', 'emr', 'transfer', 'discharge', 'deposit'],
+      };
+      await loadOk(withDeposit);
+      view.querySelector<HTMLElement>('app-patient-card [data-act=deposit]')!.click();
+      expect(dialog.open.mock.calls[0][1].data).toEqual({ id: 'a1', startView: 'deposit' });
+      expect(dialog.open.mock.calls[0][1].autoFocus).toBe(false);
+    });
+
+    it('shows Customize card to the owner, and it opens Clinic setup → Patient card (SAH-37 AC62)', async () => {
+      const owner = setup('OWNER', false);
+      await loadOk();
+      const link = owner.querySelector<HTMLAnchorElement>('[data-testid=customize-card]')!;
+      expect(link.textContent!.trim()).toBe('Customize card');
+      expect(link.getAttribute('href')).toBe('/app/config/ipcard');
+    });
+
+    it.each(['NURSE', 'DOCTOR', 'FRONT_DESK'])('has no Customize card button at all for %s', async (role) => {
+      const view = setup(role, false);
+      await loadOk();
+      expect(view.querySelector('[data-testid=customize-card]')).toBeNull();
+      expect(view.textContent).not.toContain('Customize card');
+    });
+
     it('opens the sheet with autoFocus off only for Transfer (F-1), and keeps restoreFocus and the default focus for the others', async () => {
       const view = setup('OWNER', false);
       await loadOk();
@@ -1073,6 +1191,54 @@ describe('IpdPage', () => {
         http.expectOne(listUrl).flush(list({ asOf: '2026-10-24T07:32:00Z' }));
         await settle();
         expect(view.querySelector('[data-testid=admitted-stale]')).toBeNull();
+      });
+
+      it('a 403 on the 60-second reload clears the list and shows the error notice of the first load (G-2)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('DOCTOR');
+        await loadOk(list());
+        expect(names(view).length).toBe(3);
+        await advance(60_000);
+        http
+          .expectOne(listUrl)
+          .flush(
+            { type: 'https://sahaj.in/problems/forbidden', title: 'Forbidden', status: 403, detail: 'You cannot see this.' },
+            { status: 403, statusText: 'Forbidden' },
+          );
+        await settle();
+        expect(names(view)).toEqual([]);
+        expect(view.querySelector('[data-testid=admitted-stale]')).toBeNull();
+        expect(view.querySelector('.notice.err')!.textContent).toContain('You cannot see this.');
+        expect(view.querySelector('.iptbl')).toBeNull();
+      });
+
+      it('a 403 module-off on the 60-second reload clears the list and shows the lock notice (G-2)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('DOCTOR');
+        await loadOk(list());
+        await advance(60_000);
+        http
+          .expectOne(listUrl)
+          .flush(
+            { type: 'https://sahaj.in/problems/module-off', title: 'Module off', status: 403, detail: 'off' },
+            { status: 403, statusText: 'Forbidden' },
+          );
+        await settle();
+        expect(names(view)).toEqual([]);
+        expect(view.textContent).toContain('not on for your clinic');
+        await advance(60_000);
+        http.expectNone(listUrl);
+      });
+
+      it('a network error on the reload keeps the list with the stale line (G-2)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('DOCTOR');
+        await loadOk(list());
+        await advance(60_000);
+        http.expectOne(listUrl).error(new ProgressEvent('error'));
+        await settle();
+        expect(names(view).length).toBe(3);
+        expect(view.querySelector('[data-testid=admitted-stale]')).not.toBeNull();
       });
 
       it('does not reload while the browser tab is hidden and reloads once when it shows again', async () => {
@@ -1256,6 +1422,380 @@ describe('IpdPage', () => {
         expect(view.querySelector('[data-kpi=pharmacist]')).toBeNull();
         expect(view.querySelector('app-pharmacist-panel')).toBeNull();
         http.expectNone((r) => r.url === CHECKS);
+      });
+    });
+
+    describe('refused reads (SAH-40)', () => {
+      const QUEUE_URL = `${IPD}/emergency`;
+      const forbidden = (slug = 'forbidden') => ({
+        body: { type: `https://sahaj.in/problems/${slug}`, title: 'x', status: 403, detail: 'No access.' },
+        init: { status: 403, statusText: 'Forbidden' },
+      });
+      const refuse = (req: TestRequest, slug = 'forbidden') => {
+        const f = forbidden(slug);
+        req.flush(f.body, f.init);
+      };
+      const erQueue = (over: Record<string, unknown> = {}) => ({
+        state: 'on',
+        scale: 3,
+        levels: [{ level: 1, name: 'Red', description: 'Immediate', tone: 'crit', targetMinutes: 5 }],
+        defaultLevel: 1,
+        unknownPatientRegistration: true,
+        baysTotal: 2,
+        baysFree: 1,
+        counts: { writable: true, queue: 7, overTarget: 2 },
+        cases: [
+          {
+            id: 'c1', displayName: 'Meena Joshi', age: 40, sex: 'F', complaint: 'Fall from height', identityPending: false,
+            level: 1, levelName: 'Red', bay: 'ER-1', status: 'WAITING', arrivedAt: '2026-11-05T05:00:00Z',
+            waitingMinutes: 2, targetMinutes: 5, overTarget: false, seenAt: null,
+          },
+        ],
+        canRegister: true,
+        canRetriage: true,
+        canAct: true,
+        canAdmit: true,
+        asOf: '2026-11-05T05:35:00Z',
+        ...over,
+      });
+      const store = () => fixture.debugElement.injector.get(PharmacistStore);
+
+      async function openEmergency(role = 'NURSE') {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup(role, null, ['today', 'emergency', 'ipd'], { tab: 'er' });
+        await loadOk(list({ emergency: { writable: true, queue: 3, overTarget: 1 } }), false);
+        http.expectOne(QUEUE_URL).flush(erQueue());
+        await settle();
+        return view;
+      }
+
+      it('Emergency 403 forbidden: the queue goes, the tile and the tab follow the Admitted list answer (AC 4)', async () => {
+        const view = await openEmergency();
+        expect(view.querySelector('[data-kpi=emergency] .v')!.textContent!.trim()).toBe('7');
+        expect(view.textContent).toContain('Meena Joshi');
+        await advance(60_000);
+        refuse(http.expectOne(QUEUE_URL));
+        await settle();
+        expect(view.textContent).not.toContain('Meena Joshi');
+        expect(view.querySelector('app-emergency .notice.err')!.textContent).toContain('No access.');
+        expect(view.querySelector('[data-kpi=emergency] .v')!.textContent!.trim()).toBe('3');
+        expect(tabs(view)).toContain('Emergency 3');
+        http.expectNone(listUrl);
+      });
+
+      it('Emergency 403 module-off: the lock page shows and nothing of the page stays (AC 2)', async () => {
+        const view = await openEmergency('OWNER');
+        http.match((r) => r.url === SUMMARY || r.url === CHECKS);
+        await advance(60_000);
+        refuse(http.expectOne(QUEUE_URL), 'module-off');
+        await settle();
+        expect(view.querySelector('.lockpage h2')!.textContent).toContain('In-patient care (IPD) is not on for your clinic');
+        expect(view.textContent).not.toContain('Meena Joshi');
+        expect(view.querySelector('[role=tab]')).toBeNull();
+        expect(view.querySelector('[data-kpi=emergency]')).toBeNull();
+        expect(view.querySelector('a[href="/app/config/modules"]')).not.toBeNull();
+        await advance(180_000);
+        http.expectNone(listUrl);
+        http.expectNone(QUEUE_URL);
+      });
+
+      describe('focus when Emergency reports IPD off (SAH-40 R-2)', () => {
+        const moduleOff = () =>
+          new ApiError({ type: 'https://sahaj.in/problems/module-off', title: 'x', status: 403, detail: 'off' });
+        const emit = (focusWasInside: boolean) => {
+          const er = fixture.debugElement.query(By.directive(EmergencyComponent));
+          (er.componentInstance as EmergencyComponent).refused.emit({ error: moduleOff(), focusWasInside });
+        };
+
+        it('moves focus to the lock heading when the Emergency sheet had it (the sheet is already closed)', async () => {
+          const view = await openEmergency('OWNER');
+          http.match((r) => r.url === SUMMARY || r.url === CHECKS);
+          (document.activeElement as HTMLElement | null)?.blur();
+          expect(document.activeElement).toBe(document.body);
+          emit(true);
+          await settle();
+          expect(view.querySelector('.lockpage')).not.toBeNull();
+          expect(document.activeElement).toBe(view.querySelector('#ipd-lock-h'));
+        });
+
+        it('leaves focus alone when it was not on the page or its sheet', async () => {
+          const view = await openEmergency('OWNER');
+          http.match((r) => r.url === SUMMARY || r.url === CHECKS);
+          (document.activeElement as HTMLElement | null)?.blur();
+          emit(false);
+          await settle();
+          expect(view.querySelector('.lockpage')).not.toBeNull();
+          expect(document.activeElement).toBe(document.body);
+        });
+      });
+
+      it('Emergency 403 module-off drops the list held by the page (AC 2, 4)', async () => {
+        const view = await openEmergency();
+        await advance(60_000);
+        refuse(http.expectOne(QUEUE_URL), 'module-off');
+        await settle();
+        expect(view.querySelector('.lockpage')).not.toBeNull();
+        expect(view.querySelector('app-admitted-panel')).toBeNull();
+        expect(view.querySelector('.kpis')).toBeNull();
+      });
+
+      it('an Admitted-list refusal drops the pharmacist rows, not only hides them (AC 20)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('OWNER');
+        await loadOk(list({ safety: open(2) }), true);
+        http.expectOne(SUMMARY).flush(summary(3));
+        await settle();
+        expect(store().waiting()).toBe(3);
+        await advance(60_000);
+        http.expectOne(SUMMARY).flush(summary(3));
+        refuse(http.expectOne(listUrl));
+        await settle();
+        expect(view.querySelector('.notice.err')).not.toBeNull();
+        expect(store().waiting()).toBeNull();
+        expect(store().items()).toEqual([]);
+        expect(store().meta()).toBeNull();
+      });
+
+      it('a pharmacist counts-poll module-off on the owner page clears the list and locks the page (AC 13, 15)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('OWNER');
+        await loadOk(list({ safety: open(2) }), true);
+        http.expectOne(SUMMARY).flush(summary(3));
+        await settle();
+        await advance(60_000);
+        http.match(listUrl);
+        refuse(http.expectOne(SUMMARY), 'module-off');
+        await settle();
+        expect(view.querySelector('.lockpage')).not.toBeNull();
+        expect(view.textContent).not.toContain('Asha Patil');
+        expect(view.querySelector('app-admitted-panel')).toBeNull();
+        await advance(180_000);
+        http.expectNone(listUrl);
+      });
+
+      it('owner: a counts-poll 403 hides the Safety tab number and shows "—" in the tile, never 0 (AC 18)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('OWNER');
+        await loadOk(list({ safety: open(2) }), false);
+        http.expectOne(SUMMARY).flush(summary(3));
+        await settle();
+        view.querySelector<HTMLElement>('#ipd-tab-safety')!.click();
+        await settle();
+        http.expectOne(BOARD).flush(boardOf());
+        http.expectOne((r) => r.url === EVENTS).flush(pageOf());
+        await settle();
+        http.expectOne((r) => r.url === CHECKS).flush(checks(3, []));
+        await settle();
+        expect(tabs(view)[3]).toBe('Safety 5');
+        expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('3');
+
+        await advance(60_000);
+        http.expectOne(BOARD).flush(boardOf());
+        http.expectOne((r) => r.url === EVENTS).flush(pageOf());
+        refuse(http.expectOne(SUMMARY));
+        await settle();
+        expect(tabs(view)[3]).toBe('Safety');
+        expect(view.querySelector('#ipd-tab-safety .c')).toBeNull();
+        expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('—');
+        expect(view.querySelector('[data-testid=pharmacist-error]')!.textContent).toContain('No access.');
+        expect(view.querySelector('[data-testid=pharmacist-empty]')).toBeNull();
+
+        await advance(180_000);
+        http.expectNone(SUMMARY);
+        http.expectNone((r) => r.url === CHECKS);
+        http.match(BOARD);
+        http.match((r) => r.url === EVENTS);
+      });
+
+      it('pharmacist: a counts-poll 403 shows the refusal, not an empty tab (AC 22)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('PHARMACIST', null, ['today', 'ipd']);
+        await settle();
+        http.expectOne((r) => r.url === CHECKS).flush(checks(2, []));
+        await settle();
+        expect(tabs(view)).toEqual(['Safety 2']);
+        await advance(60_000);
+        refuse(http.expectOne(SUMMARY));
+        await settle();
+        expect(tabs(view)).toEqual(['Safety']);
+        expect(view.querySelector('[data-testid=pharmacist-error]')).not.toBeNull();
+        expect(view.querySelector('[data-testid=pharmacist-empty]')).toBeNull();
+        expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('—');
+        await advance(120_000);
+        http.expectNone(SUMMARY);
+        http.expectNone((r) => r.url === CHECKS);
+      });
+
+      it('pharmacist: a counts-poll module-off shows the lock page (AC 13, 22)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        const view = setup('PHARMACIST', null, ['today', 'ipd']);
+        await settle();
+        http.expectOne((r) => r.url === CHECKS).flush(checks(2, []));
+        await settle();
+        await advance(60_000);
+        refuse(http.expectOne(SUMMARY), 'module-off');
+        await settle();
+        expect(view.querySelector('.lockpage h2')!.textContent).toContain('In-patient care (IPD) is not on for your clinic');
+        expect(view.querySelector('[role=tab]')).toBeNull();
+      });
+
+      describe('sheets and toasts when the page is refused (review fixes 3, 4, 5, 6, 8)', () => {
+        interface Sheets {
+          admit(bedId?: string): void;
+          openNursing(id: string): void;
+          openEmr(id: string): void;
+          openAdmission(id: string): void;
+          afterAdmitted(a: AdmissionDetail): void;
+        }
+        let closes: ReturnType<typeof vi.fn>[];
+        const sheets = () => fixture.componentInstance as unknown as Sheets;
+        const dismiss = () => TestBed.inject(MatSnackBar).dismiss as ReturnType<typeof vi.fn>;
+
+        /** The Admitted tab with four page sheets open: Admit, Nursing, EMR and the Admission sheet. */
+        async function withOpenSheets(): Promise<HTMLElement> {
+          vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+          const view = setup('OWNER');
+          await loadOk(list(), true);
+          closes = [];
+          dialog.open.mockImplementation(() => {
+            const closed = new Subject<undefined>();
+            const close = vi.fn(() => closed.next(undefined));
+            closes.push(close);
+            return { afterClosed: () => closed, close };
+          });
+          sheets().admit();
+          sheets().openNursing('a1');
+          sheets().openEmr('a1');
+          sheets().openAdmission('a1');
+          expect(closes).toHaveLength(4);
+          return view;
+        }
+
+        it('IPD off (403 module-off on the list reload) closes every sheet the page opened and dismisses the toast', async () => {
+          const view = await withOpenSheets();
+          await advance(60_000);
+          refuse(http.expectOne(listUrl), 'module-off');
+          await settle();
+          expect(view.querySelector('.lockpage')).not.toBeNull();
+          for (const close of closes) {
+            expect(close).toHaveBeenCalledTimes(1);
+          }
+          expect(dismiss()).toHaveBeenCalled();
+        });
+
+        it('another refusal of the list (403 forbidden) closes every sheet and dismisses the toast', async () => {
+          const view = await withOpenSheets();
+          await advance(60_000);
+          refuse(http.expectOne(listUrl));
+          await settle();
+          expect(view.querySelector('.notice.err')).not.toBeNull();
+          for (const close of closes) {
+            expect(close).toHaveBeenCalledTimes(1);
+          }
+          expect(dismiss()).toHaveBeenCalled();
+        });
+
+        it('a pharmacist counts-poll module-off locks the page and closes the sheets too', async () => {
+          vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+          const view = setup('OWNER');
+          await loadOk(list({ safety: open(2) }), true);
+          http.expectOne(SUMMARY).flush(summary(3));
+          await settle();
+          const closed = new Subject<undefined>();
+          const close = vi.fn(() => closed.next(undefined));
+          dialog.open.mockReturnValue({ afterClosed: () => closed, close });
+          sheets().openNursing('a1');
+          await advance(60_000);
+          http.match(listUrl);
+          refuse(http.expectOne(SUMMARY), 'module-off');
+          await settle();
+          expect(view.querySelector('.lockpage')).not.toBeNull();
+          expect(close).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not close a sheet that the user already closed', async () => {
+          await withOpenSheets();
+          const [first] = closes;
+          (first as unknown as () => void)();
+          expect(first).toHaveBeenCalledTimes(1);
+          await advance(60_000);
+          refuse(http.expectOne(listUrl), 'module-off');
+          await settle();
+          expect(first).toHaveBeenCalledTimes(1);
+          expect(closes[1]).toHaveBeenCalledTimes(1);
+        });
+
+        it('a sheet that saves after the page locked does not read the list again (review fix 4)', async () => {
+          await withOpenSheets();
+          await advance(60_000);
+          refuse(http.expectOne(listUrl), 'module-off');
+          await settle();
+          sheets().afterAdmitted({
+            patientName: 'Asha Patil',
+            bedCode: '101-A',
+            ipNumber: 'IP/26-27/0042',
+            depositPaise: 0,
+          } as AdmissionDetail);
+          http.expectNone(listUrl);
+        });
+
+        it('a Safety board refusal hides the Safety tab number until Try again (review fix 6)', async () => {
+          vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+          const view = setup('OWNER');
+          await loadOk(list({ safety: open(2) }), false);
+          http.expectOne(SUMMARY).flush(summary(3));
+          await settle();
+          view.querySelector<HTMLElement>('#ipd-tab-safety')!.click();
+          await settle();
+          http.expectOne(BOARD).flush(boardOf());
+          http.expectOne((r) => r.url === EVENTS).flush(pageOf());
+          await settle();
+          http.expectOne((r) => r.url === CHECKS).flush(checks(3, []));
+          await settle();
+          expect(tabs(view)[3]).toBe('Safety 5');
+
+          await advance(60_000);
+          http.expectOne(SUMMARY).flush(summary(3));
+          refuse(http.expectOne(BOARD));
+          http.expectOne((r) => r.url === EVENTS);
+          await settle();
+          expect(tabs(view)[3]).toBe('Safety');
+          expect(view.querySelector('#ipd-tab-safety .c')).toBeNull();
+
+          view.querySelector<HTMLElement>('app-safety .notice.err button')!.click();
+          await settle();
+          http.expectOne(BOARD).flush(boardOf());
+          http.expectOne((r) => r.url === EVENTS).flush(pageOf());
+          await settle();
+          http.expectOne((r) => r.url === CHECKS).flush(checks(3, []));
+          await settle();
+          expect(tabs(view)[3]).toBe('Safety 5');
+        });
+
+        it('after Try again on the page the pharmacist count is read at once, not a minute later (review fix 8)', async () => {
+          vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+          const view = setup('OWNER');
+          await loadOk(list({ safety: open(2) }), true);
+          http.expectOne(SUMMARY).flush(summary(3));
+          await settle();
+          await advance(60_000);
+          refuse(http.expectOne(listUrl));
+          http.match(SUMMARY);
+          await settle();
+          view.querySelector<HTMLElement>('.notice.err button')!.click();
+          http.expectOne(listUrl).flush(list({ safety: open(2) }));
+          await settle();
+          http.expectOne(SUMMARY).flush(summary(3));
+        });
+      });
+
+      it('the tile shows "—" before the first count is read, never 0', async () => {
+        const view = setup('PHARMACIST', null, ['today', 'ipd']);
+        await settle();
+        expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('—');
+        http.expectOne((r) => r.url === CHECKS).flush(checks(0, []));
+        await settle();
+        expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('0');
       });
     });
 

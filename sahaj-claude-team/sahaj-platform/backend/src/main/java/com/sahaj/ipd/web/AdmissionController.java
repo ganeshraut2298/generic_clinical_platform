@@ -73,9 +73,10 @@ public class AdmissionController {
 
     @GetMapping("/admissions")
     @PreAuthorize(READERS)
-    public AdmissionList list(@RequestParam(name = "status", required = false) String status) {
+    public AdmissionList list(@RequestParam(name = "status", required = false) String status,
+                              @RequestParam(name = "cardFacts", required = false) String cardFacts) {
         ClinicUser user = ClinicUser.current();
-        return service.list(user.tenantId(), user.userId(), user.role(), status);
+        return service.list(user.tenantId(), user.userId(), user.role(), status, cardFacts);
     }
 
     @PostMapping("/admissions")

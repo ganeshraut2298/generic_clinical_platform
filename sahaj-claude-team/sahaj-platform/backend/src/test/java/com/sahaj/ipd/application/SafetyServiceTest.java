@@ -89,7 +89,8 @@ class SafetyServiceTest {
         roundRepository = mock(MedicineRoundRepository.class);
         service = new SafetyService(board, admissions, events, patients, actors, team,
                 new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue())));
+                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()),
+                        new SkippedOrderWarningsTest.MutableClock()));
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement("on", false, 25));
         when(board.databaseNow()).thenReturn(NOW);
         when(team.findActiveByUserId(eq(TENANT), eq(ACTOR))).thenAnswer(call -> memberRole == null ? Optional.empty()

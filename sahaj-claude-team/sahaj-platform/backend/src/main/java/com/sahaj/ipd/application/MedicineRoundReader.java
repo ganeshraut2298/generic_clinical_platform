@@ -9,6 +9,7 @@ import com.sahaj.ipd.domain.Frequency;
 import com.sahaj.ipd.domain.MedicineRound;
 import com.sahaj.ipd.domain.MedicineRound.Recorded;
 import com.sahaj.ipd.domain.MedicineRound.RoundOrder;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -40,10 +41,12 @@ class MedicineRoundReader {
 
     private final MedicineRoundRepository repository;
     private final MedicineCatalogue catalogue;
+    private final SkippedOrderWarnings warnings;
 
-    MedicineRoundReader(MedicineRoundRepository repository, MedicineCatalogue catalogue) {
+    MedicineRoundReader(MedicineRoundRepository repository, MedicineCatalogue catalogue, Clock clock) {
         this.repository = repository;
         this.catalogue = catalogue;
+        this.warnings = new SkippedOrderWarnings(clock);
     }
 
     MedicineRound.Result read(UUID tenantId, Instant asOf) {
@@ -82,7 +85,9 @@ class MedicineRoundReader {
     }
 
     /** The clinic id, the order id and a fixed cause word: nothing a person or a drug could be read from. */
-    private static void skipped(UUID tenantId, ActiveOrder order, String cause) {
-        log.warn("medicine-round order-skipped tenantId={} orderId={} cause={}", tenantId, order.orderId(), cause);
+    private void skipped(UUID tenantId, ActiveOrder order, String cause) {
+        if (warnings.shouldWarn(tenantId, order.orderId())) {
+            log.warn("medicine-round order-skipped tenantId={} orderId={} cause={}", tenantId, order.orderId(), cause);
+        }
     }
 }

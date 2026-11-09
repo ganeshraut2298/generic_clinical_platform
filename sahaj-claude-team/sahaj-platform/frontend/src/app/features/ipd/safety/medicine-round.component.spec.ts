@@ -35,12 +35,14 @@ describe('MedicineRoundComponent', () => {
   let http: HttpTestingController;
   let closed: Subject<GiveResult | undefined>;
   let dialog: { open: ReturnType<typeof vi.fn> };
+  let sheetClose: ReturnType<typeof vi.fn>;
   let snack: ReturnType<typeof vi.fn>;
   let answered: number;
 
   async function open(round: MedicineRound = roundOf()): Promise<void> {
     closed = new Subject<GiveResult | undefined>();
-    dialog = { open: vi.fn(() => ({ afterClosed: () => closed.asObservable() })) };
+    sheetClose = vi.fn();
+    dialog = { open: vi.fn(() => ({ afterClosed: () => closed.asObservable(), close: sheetClose })) };
     snack = vi.fn();
     answered = 0;
     await TestBed.configureTestingModule({
@@ -243,6 +245,26 @@ describe('MedicineRoundComponent', () => {
       expect(answered).toBe(1);
     });
 
+    it('closes the open Give sheet when the panel is destroyed (the board was refused, SAH-40 D-1)', async () => {
+      await open();
+      gives()[0].click();
+      http.expectOne(MAR_A1).flush(marForLate());
+      await settle();
+      expect(sheetClose).not.toHaveBeenCalled();
+      fixture.destroy();
+      expect(sheetClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes nothing on destroy once the Give sheet is closed', async () => {
+      await open();
+      gives()[0].click();
+      http.expectOne(MAR_A1).flush(marForLate());
+      await settle();
+      closed.next(undefined);
+      fixture.destroy();
+      expect(sheetClose).not.toHaveBeenCalled();
+    });
+
     it('asks the board to reload when the sheet closed because a 409 changed the state', async () => {
       await open();
       gives()[0].click();
@@ -400,13 +422,32 @@ describe('MedicineRoundComponent', () => {
       el().remove();
     });
 
-    it('goes to the panel heading (tabindex -1) when the row is gone', async () => {
+    it('goes to the Give button at the same row index (the next dose) when the row is gone (G-3, AC19)', async () => {
       await open();
       document.body.appendChild(el());
       await giveAndRecord();
       await open2(roundOf({ rows: [ROUND_DUE] }));
       fixture.componentInstance.restoreFocus();
-      expect(document.activeElement).toBe(q('#sf-round-h'));
+      expect(document.activeElement).toBe(gives()[0]);
+      el().remove();
+    });
+
+    it('goes to the Give of the last row when the index is past the end of the reloaded list', async () => {
+      await open();
+      document.body.appendChild(el());
+      gives()[1].click();
+      http.expectOne(MAR_A2).flush(
+        marOf({
+          admissionId: 'a2',
+          orders: [orderOf({ orderId: 'o1', slots: [slotOf({ slotAt: SLOT_1030AM, state: 'DUE' })] })],
+        }),
+      );
+      await settle();
+      closed.next({ reload: true });
+      await open2(roundOf({ rows: [ROUND_LATE] }));
+      fixture.componentInstance.restoreFocus();
+      expect(gives().length).toBe(1);
+      expect(document.activeElement).toBe(gives()[0]);
       el().remove();
     });
 

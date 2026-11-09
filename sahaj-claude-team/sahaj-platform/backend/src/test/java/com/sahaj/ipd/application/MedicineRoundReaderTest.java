@@ -43,7 +43,8 @@ class MedicineRoundReaderTest {
     @BeforeEach
     void setUp() {
         repository = mock(MedicineRoundRepository.class);
-        reader = new MedicineRoundReader(repository, new MedicineCatalogue(SeedCatalogue.catalogue()));
+        reader = new MedicineRoundReader(repository, new MedicineCatalogue(SeedCatalogue.catalogue()),
+                new SkippedOrderWarningsTest.MutableClock());
         when(repository.findDosesBetween(eq(TENANT), anyCollection(), any(), any())).thenReturn(List.of());
         logger = (Logger) LoggerFactory.getLogger(MedicineRoundReader.class);
         appender = new ListAppender<>();
@@ -146,5 +147,43 @@ class MedicineRoundReaderTest {
         reader.read(TENANT, AS_OF);
 
         assertThat(appender.list).isEmpty();
+    }
+
+    // ---- release audit G-14 ----
+
+    @Test
+    void theSameDamagedOrderIsWarnedAboutOncePerTenMinutesNotOnEveryPoll() {
+        SkippedOrderWarningsTest.MutableClock clock = new SkippedOrderWarningsTest.MutableClock();
+        MedicineRoundReader throttled = new MedicineRoundReader(repository,
+                new MedicineCatalogue(SeedCatalogue.catalogue()), clock);
+        ActiveOrder broken = order(MISSING_DRUG, "tds");
+        active(broken);
+
+        throttled.read(TENANT, AS_OF);
+        clock.advance(java.time.Duration.ofSeconds(60));
+        throttled.read(TENANT, AS_OF);
+        clock.advance(java.time.Duration.ofSeconds(60));
+        throttled.read(TENANT, AS_OF);
+
+        assertThat(appender.list).as("three polls, one warning").hasSize(1);
+
+        clock.advance(java.time.Duration.ofMinutes(10));
+        throttled.read(TENANT, AS_OF);
+
+        assertThat(appender.list).as("a new warning after the quiet period").hasSize(2);
+        assertThat(appender.list.get(1).getFormattedMessage()).contains("orderId=" + broken.orderId());
+    }
+
+    @Test
+    void twoDamagedOrdersEachGetTheirOwnSingleWarning() {
+        SkippedOrderWarningsTest.MutableClock clock = new SkippedOrderWarningsTest.MutableClock();
+        MedicineRoundReader throttled = new MedicineRoundReader(repository,
+                new MedicineCatalogue(SeedCatalogue.catalogue()), clock);
+        active(order(MISSING_DRUG, "tds"), order("hep", "every-fortnight"));
+
+        throttled.read(TENANT, AS_OF);
+        throttled.read(TENANT, AS_OF);
+
+        assertThat(appender.list).hasSize(2);
     }
 }

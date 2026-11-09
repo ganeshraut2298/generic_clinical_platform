@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -31,6 +38,7 @@ import {
   TeamMember,
   isDoctorRole,
 } from './team.model';
+import { plainSpaces } from '../../../shared/format/plain-space';
 
 /** `24 Oct 2026, 11:05 AM` in IST, or `Never` when the person has not signed in yet. */
 export function formatLastLogin(iso: string | null | undefined): string {
@@ -47,14 +55,16 @@ export function formatLastLogin(iso: string | null | undefined): string {
     month: 'short',
     year: 'numeric',
   }).format(date);
-  const timePart = new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-    .format(date)
-    .toUpperCase();
+  const timePart = plainSpaces(
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .format(date)
+      .toUpperCase(),
+  );
   return `${datePart}, ${timePart}`;
 }
 
@@ -64,7 +74,9 @@ export function initials(name: string): string {
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+  return (
+    (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  ).toUpperCase();
 }
 
 /**
@@ -265,14 +277,22 @@ export class TeamPage implements OnInit {
 
   protected setActive(member: TeamMember, active: boolean): void {
     const call = active ? this.api.reactivate(member.id) : this.api.deactivate(member.id);
-    this.run(member.id, call, active ? `${member.name} can sign in again` : `${member.name} switched off`);
+    this.run(
+      member.id,
+      call,
+      active ? `${member.name} can sign in again` : `${member.name} switched off`,
+    );
   }
 
   protected changeRole(member: TeamMember, role: Role): void {
     if (role === member.role) {
       return;
     }
-    this.run(member.id, this.api.update(member.id, { role }), `${member.name} is now ${ROLE_LABELS[role]}`);
+    this.run(
+      member.id,
+      this.api.update(member.id, { role }),
+      `${member.name} is now ${ROLE_LABELS[role]}`,
+    );
   }
 
   protected saveRegistration(member: TeamMember, value: string): void {
@@ -352,7 +372,9 @@ export class TeamPage implements OnInit {
         };
         this.members.update((list) =>
           list.map((m) =>
-            m.id === member.id ? { ...m, ...updated, pin: this.afterReset(updated.pin, cleared) } : m,
+            m.id === member.id
+              ? { ...m, ...updated, pin: this.afterReset(updated.pin, cleared) }
+              : m,
           ),
         );
         this.toast(resetToast(member.name));
@@ -362,7 +384,9 @@ export class TeamPage implements OnInit {
 
   /** The server's PIN after a reset; the 7-day count stays when the answer carries none. */
   private afterReset(pin: TeamMemberPin | null | undefined, cleared: TeamMemberPin): TeamMemberPin {
-    return pin ? { ...pin, colleagueTries7d: pin.colleagueTries7d ?? cleared.colleagueTries7d } : cleared;
+    return pin
+      ? { ...pin, colleagueTries7d: pin.colleagueTries7d ?? cleared.colleagueTries7d }
+      : cleared;
   }
 
   /** OWNER: the history of wrong tries by colleagues on this member's PIN (SAH-38, ADR-014 D9). */
@@ -370,13 +394,16 @@ export class TeamPage implements OnInit {
     if (!this.isOwner()) {
       return;
     }
-    this.dialog.open<ColleagueTriesSheetComponent, ColleagueTriesSheetData>(ColleagueTriesSheetComponent, {
-      panelClass: 'sheet-panel',
-      width: '520px',
-      maxWidth: '100vw',
-      ariaLabelledBy: COLLEAGUE_TRIES_TITLE_ID,
-      data: { id: member.id, name: member.name },
-    });
+    this.dialog.open<ColleagueTriesSheetComponent, ColleagueTriesSheetData>(
+      ColleagueTriesSheetComponent,
+      {
+        panelClass: 'sheet-panel',
+        width: '520px',
+        maxWidth: '100vw',
+        ariaLabelledBy: COLLEAGUE_TRIES_TITLE_ID,
+        data: { id: member.id, name: member.name },
+      },
+    );
   }
 
   /** Own row, every role: Set my PIN or Change my PIN opens the Set PIN sheet. */
@@ -385,15 +412,16 @@ export class TeamPage implements OnInit {
       return;
     }
     this.dialog
-      .open<SetPinSheetComponent, undefined, { state: PinState; setAt: string | null; lockedUntil: string | null }>(
+      .open<
         SetPinSheetComponent,
-        {
-          panelClass: 'sheet-panel',
-          width: '520px',
-          maxWidth: '100vw',
-          ariaLabelledBy: 'sp-title',
-        },
-      )
+        undefined,
+        { state: PinState; setAt: string | null; lockedUntil: string | null }
+      >(SetPinSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '520px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'sp-title',
+      })
       .afterClosed()
       .subscribe((status) => {
         if (!status) {

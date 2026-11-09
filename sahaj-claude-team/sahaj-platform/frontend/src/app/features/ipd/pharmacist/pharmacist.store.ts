@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { ApiError } from '../../../core/http/problem-detail';
 import { problemMessage } from '../../config/config-format';
+import { isModuleOff, isRefusal } from '../ipd-refusal';
 import { PharmacistApi } from './pharmacist.api';
 import {
   CHECKS_LOAD_ERROR,
@@ -29,8 +29,12 @@ export const NEXT_PAGE = 50;
  *   read again, so names never travel in a poll.
  * - A reload shows the first page again; rows that left the queue disappear, and "Show more orders"
  *   starts over from the new cursor.
- * - A failed reload keeps the rows and sets `refreshFailed`. IPD off (403 `module-off`) sets
- *   `moduleOff` so the page can show its lock notice.
+ * - A failed reload (network error, 5xx) keeps the rows and sets `refreshFailed`.
+ * - A 403 on any read (the list, "Show more orders" or the counts poll) is a refusal (SAH-40, DEC-025
+ *   G-2): the rows, the cursor, the count and the as-of time leave the memory, and the panel shows the
+ *   notice of the first load; IPD off (403 `module-off`) sets `moduleOff` so the page shows its lock
+ *   notice. While refused the store reads nothing (no poll, no "Show more"), and a verify or reject
+ *   answer is ignored: only `load()` (Try again) starts again.
  */
 @Injectable()
 export class PharmacistStore {
@@ -48,6 +52,8 @@ export class PharmacistStore {
   readonly moreLoading = signal(false);
   readonly moreError = signal<string | null>(null);
   readonly moduleOff = signal(false);
+  /** SAH-40: a read was answered 403; nothing is read again until `load()`. */
+  readonly refused = signal(false);
   /** True while the panel is drawn: only then does a changed summary reload the list. */
   readonly panelShown = signal(false);
 
@@ -61,6 +67,7 @@ export class PharmacistStore {
     this.listSub?.unsubscribe();
     this.moreSub?.unsubscribe();
     this.moreLoading.set(false);
+    this.refused.set(false);
     const first = this.meta() === null;
     if (first) {
       this.loading.set(true);
@@ -70,8 +77,8 @@ export class PharmacistStore {
       next: (checks) => this.apply(checks),
       error: (error: unknown) => {
         this.loading.set(false);
-        if (this.isModuleOff(error)) {
-          this.moduleOff.set(true);
+        if (isRefusal(error)) {
+          this.refuse(error);
         } else if (first) {
           this.loadError.set(problemMessage(error, CHECKS_LOAD_ERROR));
         } else {
@@ -83,6 +90,9 @@ export class PharmacistStore {
 
   /** Takes a first-page answer: from a read, or from the verify and reject answers. */
   apply(checks: PharmacistChecks): void {
+    if (this.refused()) {
+      return;
+    }
     this.moreSub?.unsubscribe();
     this.moreLoading.set(false);
     this.moreError.set(null);
@@ -99,7 +109,7 @@ export class PharmacistStore {
 
   loadMore(): void {
     const cursor = this.nextCursor();
-    if (cursor === null || this.moreLoading()) {
+    if (cursor === null || this.moreLoading() || this.refused()) {
       return;
     }
     this.moreLoading.set(true);
@@ -114,14 +124,18 @@ export class PharmacistStore {
       },
       error: (error: unknown) => {
         this.moreLoading.set(false);
-        this.moreError.set(problemMessage(error, MORE_ERROR));
+        if (isRefusal(error)) {
+          this.refuse(error);
+        } else {
+          this.moreError.set(problemMessage(error, MORE_ERROR));
+        }
       },
     });
   }
 
   /** One summary call (the page runs it every 60 seconds while the browser tab is visible). */
   pollSummary(): void {
-    if (this.summarySub && !this.summarySub.closed) {
+    if (this.refused() || (this.summarySub && !this.summarySub.closed)) {
       return;
     }
     this.summarySub = this.api.summary().subscribe({
@@ -134,11 +148,29 @@ export class PharmacistStore {
         }
       },
       error: (error: unknown) => {
-        if (this.isModuleOff(error)) {
-          this.moduleOff.set(true);
+        if (isRefusal(error)) {
+          this.refuse(error);
         }
       },
     });
+  }
+
+  /**
+   * Empties everything patient-related that the store holds (rows, cursor, count, as-of time, the
+   * last summary) and stops what is in flight. No notice: the page calls this when its own list is
+   * refused (SAH-40).
+   */
+  clear(): void {
+    this.stop();
+    this.meta.set(null);
+    this.items.set([]);
+    this.nextCursor.set(null);
+    this.waiting.set(null);
+    this.lastSummary = null;
+    this.loading.set(false);
+    this.refreshFailed.set(false);
+    this.moreLoading.set(false);
+    this.moreError.set(null);
   }
 
   /** The panel is gone: stop what is in flight. */
@@ -148,7 +180,15 @@ export class PharmacistStore {
     this.summarySub?.unsubscribe();
   }
 
-  private isModuleOff(error: unknown): boolean {
-    return error instanceof ApiError && error.status === 403 && error.problem.type.endsWith('module-off');
+  /** A 403 on a read: clear, then the lock notice (IPD off) or the error notice of the first load. */
+  private refuse(error: unknown): void {
+    this.clear();
+    this.refused.set(true);
+    if (isModuleOff(error)) {
+      this.loadError.set(null);
+      this.moduleOff.set(true);
+    } else {
+      this.loadError.set(problemMessage(error, CHECKS_LOAD_ERROR));
+    }
   }
 }

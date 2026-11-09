@@ -50,4 +50,12 @@ describe('AdmittedViewState', () => {
     state.setWard('w1');
     expect(state.filtering()).toBe(true);
   });
+
+  it('opens with the published Cards per row and keeps the own choice of the person over a later publish (SAH-37 AC54)', () => {
+    state.setPublishedCols(4);
+    expect(state.cols()).toBe(4);
+    state.setCols(2);
+    state.setPublishedCols(3);
+    expect(state.cols()).toBe(2);
+  });
 });

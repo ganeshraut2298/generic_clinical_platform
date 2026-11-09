@@ -1,0 +1,37 @@
+{
+  "screen": "team-page",
+  "project": "zoom125-1366",
+  "viewport": {
+    "width": 1093,
+    "height": 614
+  },
+  "dpr": 1.25,
+  "findings": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 0,
+    "overruns": [],
+    "small": []
+  },
+  "sheetFindings": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 0,
+    "overruns": [],
+    "small": []
+  },
+  "dialog": {
+    "box": "520x549 at 287,33",
+    "footerProblems": []
+  },
+  "calls": {
+    "POST platform/auth/refresh": 1,
+    "GET platform/me": 1,
+    "GET platform/modules": 1,
+    "GET platform/team": 1,
+    "GET platform/role-permissions": 1,
+    "GET platform/me/pin/colleague-tries": 1,
+    "GET e2e/ping": 1,
+    "GET platform/team/m-nurse/pin/colleague-tries": 1
+  }
+}

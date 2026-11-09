@@ -50,6 +50,11 @@ const PATHS = {
   cards: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   rows: 'M4 6h16M4 12h16M4 18h16',
   deposit: 'M3 7h18v10H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M6 10v4M18 10v4',
+  up: 'M12 19V5M6 11l6-6 6 6',
+  down: 'M12 5v14M6 13l6 6 6-6',
+  grip: 'M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01',
+  undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
   shieldu:
     'M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6zM12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4M8.5 15.5a3.5 3.5 0 0 1 7 0',
 } as const;

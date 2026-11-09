@@ -7,7 +7,7 @@ import { problemDetailInterceptor } from '../../../core/http/problem-detail.inte
 import { checksOf } from '../pharmacist/pharmacist.fixtures';
 import { PharmacistStore } from '../pharmacist/pharmacist.store';
 import { SafetyComponent } from './safety.component';
-import { boardOf, eventOf, pageOf } from './safety.fixtures';
+import { boardOf, eventOf, pageOf, problem } from './safety.fixtures';
 
 const IPD = '/api/v1/ipd';
 
@@ -23,7 +23,7 @@ describe('SafetyComponent with the pharmacist check', () => {
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
         PharmacistStore,
-        { provide: MatSnackBar, useValue: { open: vi.fn() } },
+        { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
         { provide: MatDialog, useValue: { open: vi.fn() } },
       ],
     });
@@ -64,5 +64,63 @@ describe('SafetyComponent with the pharmacist check', () => {
     expect(el().querySelector('[data-kpi=pharmacist]')).toBeNull();
     expect(el().querySelector('app-pharmacist-panel')).toBeNull();
     http.expectNone((r) => r.url === `${IPD}/pharmacist-checks`);
+  });
+
+  describe('the Safety board is refused (SAH-40, D-1)', () => {
+    const FORBIDDEN = () => problem('forbidden', 403, 'You cannot see the Safety board.');
+    const REFUSED = { status: 403, statusText: 'Forbidden' };
+
+    it('clears the pharmacist rows held by the page when a reload is refused', async () => {
+      await open(true);
+      checksReq().flush(checksOf({ waiting: 2 }));
+      fixture.detectChanges();
+      expect(store.items().length).toBeGreaterThan(0);
+      (fixture.componentInstance as unknown as { refresh(): void }).refresh();
+      http.expectOne(`${IPD}/safety`).flush(FORBIDDEN(), REFUSED);
+      expect(http.expectOne((r) => r.url === `${IPD}/clinical-events`).cancelled).toBe(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(store.items()).toEqual([]);
+      expect(store.meta()).toBeNull();
+      expect(store.waiting()).toBeNull();
+      expect(store.nextCursor()).toBeNull();
+      expect(el().querySelector('app-pharmacist-panel')).toBeNull();
+      expect(el().querySelector('.notice.err')).not.toBeNull();
+    });
+
+    it('clears them when the first load is refused', async () => {
+      await TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(withInterceptors([problemDetailInterceptor])),
+          provideHttpClientTesting(),
+          PharmacistStore,
+          { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
+          { provide: MatDialog, useValue: { open: vi.fn() } },
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      store = TestBed.inject(PharmacistStore);
+      store.items.set(checksOf().items);
+      store.waiting.set(3);
+      fixture = TestBed.createComponent(SafetyComponent);
+      fixture.componentRef.setInput('showPharmacist', true);
+      fixture.detectChanges();
+      http.expectOne(`${IPD}/safety`).flush(FORBIDDEN(), REFUSED);
+      expect(http.expectOne((r) => r.url === `${IPD}/clinical-events`).cancelled).toBe(true);
+      expect(store.items()).toEqual([]);
+      expect(store.waiting()).toBeNull();
+    });
+
+    it('keeps the pharmacist rows on a 5xx reload (the old board stays)', async () => {
+      await open(true);
+      checksReq().flush(checksOf({ waiting: 2 }));
+      fixture.detectChanges();
+      (fixture.componentInstance as unknown as { refresh(): void }).refresh();
+      http.expectOne(`${IPD}/safety`).flush(problem('server-error', 500, 'x'), { status: 500, statusText: 'x' });
+      http.expectOne((r) => r.url === `${IPD}/clinical-events`);
+      expect(store.items().length).toBeGreaterThan(0);
+      expect(store.waiting()).toBe(2);
+    });
   });
 });

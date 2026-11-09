@@ -26,7 +26,7 @@ describe('IpdAccess', () => {
 
   it('declares the IPD sections in their own group', () => {
     const ipd = CONFIG_SECTIONS.filter((s) => s.requires === 'ipd');
-    expect(ipd.map((s) => s.key)).toEqual(['ipbeds', 'iprates', 'ipadm', 'iper', 'ipdis']);
+    expect(ipd.map((s) => s.key)).toEqual(['ipbeds', 'iprates', 'ipadm', 'iper', 'ipdis', 'ipcard']);
     expect(configSectionByKey('ipadm')?.label).toBe('Admission and deposits');
     expect(ipd.every((s) => s.group === 'In-patients (IPD)')).toBe(true);
     expect(configSectionByKey('ipbeds')?.label).toBe('Wards, rooms and beds');

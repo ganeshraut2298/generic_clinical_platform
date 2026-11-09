@@ -2,6 +2,11 @@
   display: block;
 }
 
+// The surface panel fits the toggle, so the toggle stays where it was (SAH-39).
+.period {
+  width: fit-content;
+}
+
 .grow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);

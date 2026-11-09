@@ -11,6 +11,10 @@
   display: flex;
   flex-direction: column;
   gap: 72px;
+  // Own stacking context above the background layer (SAH-39). Nothing else about the box changes.
+  position: relative;
+  z-index: 10;
+  isolation: isolate;
 }
 
 main {

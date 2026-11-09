@@ -1,0 +1,29 @@
+{
+  "screen": "medicine-round",
+  "project": "layout-1920",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "dpr": 1,
+  "findings": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 0,
+    "overruns": [],
+    "small": []
+  },
+  "calls": {
+    "POST platform/auth/refresh": 1,
+    "GET platform/me": 1,
+    "GET ipd/admissions?status=ADMITTED": 1,
+    "GET platform/me/pin/colleague-tries": 1,
+    "GET ipd/layout": 1,
+    "GET ipd/admission-rules": 1,
+    "GET ipd/board": 1,
+    "GET ipd/safety": 1,
+    "GET ipd/clinical-events?limit=14": 1,
+    "GET e2e/ping": 1
+  },
+  "duplicates": []
+}

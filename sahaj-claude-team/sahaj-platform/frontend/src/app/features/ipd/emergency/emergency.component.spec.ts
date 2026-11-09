@@ -3,7 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
+import { ApiError } from '../../../core/http/problem-detail';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { AdmissionDetail, AdmissionOptions } from '../ipd.model';
 import { EmergencyBadgeStore } from './emergency-badge.store';
@@ -623,6 +624,382 @@ describe('EmergencyComponent', () => {
       fixture.destroy();
       vi.advanceTimersByTime(180_000);
       http.expectNone(QUEUE);
+    });
+  });
+
+  describe('a refused reload (SAH-40)', () => {
+    const FORBIDDEN = 'You can no longer see the emergency queue.';
+    const refusedBy: unknown[] = [];
+    const tick = () => vi.advanceTimersByTime(60_000);
+    const forbid = () =>
+      http.expectOne(QUEUE).flush(problem('forbidden', 403, FORBIDDEN), { status: 403, statusText: 'Forbidden' });
+    const moduleOff = () =>
+      http.expectOne(QUEUE).flush(problem('module-off', 403, 'IPD is off.'), { status: 403, statusText: 'Forbidden' });
+    const notice = () => el().querySelector<HTMLElement>('.notice.err');
+
+    async function openTimed(first: EmergencyQueue = queueOf()) {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      await open(first);
+      refusedBy.length = 0;
+      fixture.componentInstance.refused.subscribe((e) => refusedBy.push(e));
+    }
+
+    it('403 forbidden clears the queue, the form and the note, shows the server message with Try again, and tells the page (AC 1, 4)', async () => {
+      await openTimed();
+      expect(cards().length).toBe(1);
+      tick();
+      forbid();
+      await settle();
+      expect(cards().length).toBe(0);
+      expect(el().querySelector('app-emergency-register')).toBeNull();
+      expect(el().querySelector('[data-testid=er-note]')).toBeNull();
+      expect(text()).not.toContain('Asha Patil');
+      expect(text()).not.toContain('Chest pain');
+      expect(notice()!.getAttribute('role')).toBe('alert');
+      expect(text()).toContain(FORBIDDEN);
+      expect(notice()!.querySelector('button')!.textContent).toContain('Try again');
+      expect(refusedBy.length).toBe(1);
+      expect(TestBed.inject(EmergencyBadgeStore).counts()).toBeNull();
+    });
+
+    it('403 without a message shows the first-load wording', async () => {
+      await openTimed();
+      tick();
+      http
+        .expectOne(QUEUE)
+        .flush({ type: 'https://sahaj.in/problems/forbidden', title: 'forbidden', status: 403 }, { status: 403, statusText: 'Forbidden' });
+      await settle();
+      expect(text()).toContain('We could not load the emergency queue. Try again.');
+    });
+
+    it('403 module-off clears the queue, shows no notice here and tells the page to lock (AC 2)', async () => {
+      await openTimed();
+      tick();
+      moduleOff();
+      await settle();
+      expect(cards().length).toBe(0);
+      expect(notice()).toBeNull();
+      expect(text()).not.toContain('Asha Patil');
+      expect(refusedBy.length).toBe(1);
+      expect((refusedBy[0] as { focusWasInside: boolean }).focusWasInside).toBe(false);
+    });
+
+    it('a network error and a 503 keep the queue with the stale notice and clear nothing (AC 3)', async () => {
+      await openTimed();
+      tick();
+      http.expectOne(QUEUE).error(new ProgressEvent('error'));
+      await settle();
+      expect(cards().length).toBe(1);
+      expect(el().querySelector('[data-testid=er-stale]')).not.toBeNull();
+      tick();
+      http.expectOne(QUEUE).flush(problem('unavailable', 503, 'x'), { status: 503, statusText: 'Unavailable' });
+      await settle();
+      expect(cards().length).toBe(1);
+      expect(notice()).toBeNull();
+      expect(refusedBy.length).toBe(0);
+    });
+
+    it('an empty queue then a 403 shows the refusal, never the empty-queue text (AC 5)', async () => {
+      await openTimed(queueOf({ cases: [], counts: { writable: true, queue: 0, overTarget: 0 } }));
+      expect(text()).toContain('No one in emergency right now.');
+      tick();
+      forbid();
+      await settle();
+      expect(text()).not.toContain('No one in emergency right now.');
+      expect(text()).toContain(FORBIDDEN);
+    });
+
+    it('an action answered 409 case-closed whose reload is 403 clears the queue (AC 6)', async () => {
+      await openTimed();
+      act('release')!.click();
+      http.expectOne(`${QUEUE}/cases/c1/release`).flush(
+        problem('case-closed', 409, 'This patient is no longer in the queue.'),
+        { status: 409, statusText: 'Conflict' },
+      );
+      expect(snack).toHaveBeenCalled();
+      forbid();
+      await settle();
+      expect(cards().length).toBe(0);
+      expect(text()).toContain(FORBIDDEN);
+    });
+
+    it('an action answered 403 shows its toast and reads the queue again, which decides (AC 6)', async () => {
+      await openTimed();
+      act('seen')!.click();
+      http.expectOne(`${QUEUE}/cases/c1/seen`).flush(problem('forbidden', 403, 'Only a nurse can do this.'), {
+        status: 403,
+        statusText: 'Forbidden',
+      });
+      expect(snack).toHaveBeenCalledWith('Only a nurse can do this.', 'Close', expect.anything());
+      http.expectOne(QUEUE).flush(queueOf());
+      await settle();
+      expect(cards().length).toBe(1);
+      expect(notice()).toBeNull();
+    });
+
+    it('Try again loads like the first load, and shows the queue when access is back (AC 7)', async () => {
+      await openTimed();
+      tick();
+      forbid();
+      await settle();
+      notice()!.querySelector('button')!.click();
+      fixture.detectChanges();
+      expect(text()).toContain('Loading the emergency queue');
+      expect(notice()).toBeNull();
+      http.expectOne(QUEUE).flush(queueOf());
+      await settle();
+      expect(cards().length).toBe(1);
+      expect(act('seen')).not.toBeNull();
+      expect(el().querySelector('app-emergency-register')).not.toBeNull();
+    });
+
+    it('Try again shows the refusal again when access is still refused (AC 7)', async () => {
+      await openTimed();
+      tick();
+      forbid();
+      await settle();
+      notice()!.querySelector('button')!.click();
+      forbid();
+      await settle();
+      expect(cards().length).toBe(0);
+      expect(text()).toContain(FORBIDDEN);
+      expect(refusedBy.length).toBe(2);
+    });
+
+    it('an older answer that arrives after the refusal does not bring the queue back (AC 8)', async () => {
+      await openTimed();
+      act('seen')!.click();
+      const seenReq = http.expectOne(`${QUEUE}/cases/c1/seen`);
+      tick();
+      forbid();
+      await settle();
+      seenReq.flush(queueOf({ actedCase: caseOf({ status: 'SEEN' }) }));
+      await settle();
+      expect(cards().length).toBe(0);
+      expect(text()).toContain(FORBIDDEN);
+      expect(snack).not.toHaveBeenCalled();
+      expect(counts.length).toBe(1);
+    });
+
+    it('a registration answer arriving while refused is ignored (AC 8)', async () => {
+      await openTimed();
+      tick();
+      forbid();
+      await settle();
+      const component = fixture.componentInstance as unknown as { onRegistered(q: EmergencyQueue): void };
+      component.onRegistered(queueOf());
+      await settle();
+      expect(cards().length).toBe(0);
+    });
+
+    it('the timer asks for nothing while refused, until Try again (OQ-40-3)', async () => {
+      await openTimed();
+      tick();
+      forbid();
+      await settle();
+      vi.advanceTimersByTime(180_000);
+      http.expectNone(QUEUE);
+      expect(cards().length).toBe(0);
+    });
+
+    it('moves focus to the notice when the focused button is gone (AC 9)', async () => {
+      await openTimed();
+      act('seen')!.focus();
+      expect(document.activeElement).toBe(act('seen'));
+      tick();
+      forbid();
+      await settle();
+      expect(document.activeElement).toBe(notice());
+    });
+
+    it('moves focus to the notice on a repeated refusal when Try again was replaced by the Loading text (review fix 3)', async () => {
+      await openTimed();
+      tick();
+      forbid();
+      await settle();
+      const retry = notice()!.querySelector<HTMLButtonElement>('button')!;
+      retry.focus();
+      retry.click();
+      await settle();
+      expect(document.activeElement).toBe(document.body);
+      forbid();
+      await settle();
+      expect(document.activeElement).toBe(notice());
+    });
+
+    it('does not take the focus on a repeated refusal when the user moved it elsewhere', async () => {
+      await openTimed();
+      tick();
+      forbid();
+      await settle();
+      const other = document.createElement('button');
+      document.body.appendChild(other);
+      const retry = notice()!.querySelector<HTMLButtonElement>('button')!;
+      retry.focus();
+      retry.click();
+      await settle();
+      other.focus();
+      forbid();
+      await settle();
+      expect(document.activeElement).toBe(other);
+      other.remove();
+    });
+
+    describe('an open Admit sheet (review fix 1)', () => {
+      const HANDOFF: EmergencyHandoff = {
+        caseId: 'c1',
+        displayName: 'Asha Patil',
+        age: 56,
+        sex: 'F',
+        mobile: '9876543210',
+        complaint: 'Chest pain for 1 hour',
+        identityPending: false,
+        level: 1,
+        levelName: 'Red',
+        suggestedBedId: 'b3',
+      };
+      let close: ReturnType<typeof vi.fn>;
+      let closed: Subject<AdmissionDetail | null | undefined>;
+
+      async function openSheet() {
+        await openTimed();
+        close = vi.fn(() => closed.next(undefined));
+        closed = new Subject();
+        dialog.open.mockImplementation(() => ({ close, afterClosed: () => closed }));
+        act('admit')!.click();
+        http
+          .expectOne((r) => r.url === `${IPD}/admission-options`)
+          .flush({ doctors: [], beds: [], rules: {}, emergencyCase: HANDOFF });
+        await settle();
+        expect(dialog.open).toHaveBeenCalledTimes(1);
+      }
+
+      it('is closed when the queue read is refused (403 forbidden)', async () => {
+        await openSheet();
+        tick();
+        forbid();
+        await settle();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(cards().length).toBe(0);
+      });
+
+      it('moves focus to the notice when the refusal closes the sheet, as focus was in the overlay (SAH-40 F-1)', async () => {
+        await openSheet();
+        const inSheet = document.createElement('button');
+        const overlay = document.createElement('div');
+        overlay.className = 'cdk-overlay-container';
+        overlay.appendChild(inSheet);
+        document.body.appendChild(overlay);
+        inSheet.focus();
+        expect(document.activeElement).toBe(inSheet);
+        close.mockImplementation(() => {
+          overlay.remove();
+          closed.next(undefined);
+        });
+        tick();
+        forbid();
+        await settle();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(document.activeElement).toBe(notice());
+      });
+
+      it('is closed when IPD is off (403 module-off)', async () => {
+        await openSheet();
+        tick();
+        moduleOff();
+        await settle();
+        expect(close).toHaveBeenCalledTimes(1);
+      });
+
+      it('tells the page that the sheet was open when IPD went off, so it can move focus (SAH-40 R-2)', async () => {
+        await openSheet();
+        tick();
+        moduleOff();
+        await settle();
+        expect(refusedBy.length).toBe(1);
+        expect((refusedBy[0] as { focusWasInside: boolean }).focusWasInside).toBe(true);
+        expect((refusedBy[0] as { error: unknown }).error).toBeInstanceOf(ApiError);
+      });
+
+      it('is closed when the screen is destroyed', async () => {
+        await openSheet();
+        fixture.destroy();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(admitted).toEqual([]);
+      });
+
+      it('is not closed again once the user closed it, and a saved admission still reaches the page', async () => {
+        await openSheet();
+        const admission = { id: 'a1', patientName: 'Asha Patil' } as AdmissionDetail;
+        closed.next(admission);
+        http.expectOne(QUEUE).flush(queueOf());
+        await settle();
+        expect(admitted).toEqual([admission]);
+        tick();
+        forbid();
+        await settle();
+        expect(close).not.toHaveBeenCalled();
+      });
+    });
+
+    it('a refusal dismisses the toast of an action that succeeded (review fix 5)', async () => {
+      await openTimed();
+      const dismiss = vi.fn();
+      snack.mockReturnValue({ dismiss });
+      act('seen')!.click();
+      http.expectOne(`${QUEUE}/cases/c1/seen`).flush(queueOf({ actedCase: caseOf({ status: 'SEEN' }) }));
+      await settle();
+      expect(snack).toHaveBeenCalled();
+      expect(dismiss).not.toHaveBeenCalled();
+      tick();
+      forbid();
+      await settle();
+      expect(dismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not dismiss the message of a refused action (review fix 5)', async () => {
+      await openTimed();
+      const dismiss = vi.fn();
+      snack.mockReturnValue({ dismiss });
+      act('seen')!.click();
+      http.expectOne(`${QUEUE}/cases/c1/seen`).flush(problem('forbidden', 403, 'Only a nurse can do this.'), {
+        status: 403,
+        statusText: 'Forbidden',
+      });
+      forbid();
+      await settle();
+      expect(dismiss).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing to the page after it is destroyed: the reads are cancelled (review fix 7)', async () => {
+      await openTimed();
+      tick();
+      const req = http.expectOne(QUEUE);
+      fixture.destroy();
+      expect(req.cancelled).toBe(true);
+      expect(refusedBy.length).toBe(0);
+      expect(counts.length).toBe(1);
+    });
+
+    it('a first-load 403 module-off also tells the page to lock', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      snack = vi.fn();
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(withInterceptors([problemDetailInterceptor])),
+          provideHttpClientTesting(),
+          { provide: MatSnackBar, useValue: { open: snack } },
+          { provide: MatDialog, useValue: { open: vi.fn() } },
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      fixture = TestBed.createComponent(EmergencyComponent);
+      const seen: unknown[] = [];
+      fixture.componentInstance.refused.subscribe((e) => seen.push(e));
+      fixture.detectChanges();
+      moduleOff();
+      await settle();
+      expect(seen.length).toBe(1);
     });
   });
 

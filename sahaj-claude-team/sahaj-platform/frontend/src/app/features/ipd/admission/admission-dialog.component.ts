@@ -46,8 +46,9 @@ export interface AdmissionDialogData {
   id: string;
   /**
    * SAH-36 (ADR-013 D6). Where the sheet opens when it is started from a patient card: `details` (the
-   * default), `move` (the "Move to another bed" row open and focused) or `discharge` (straight on the
-   * discharge view). In memory only, never in the URL. When the detail says the action is no longer
+   * default), `move` (the "Move to another bed" row open and focused), `discharge` (straight on the
+   * discharge view) or `deposit` (SAH-37: scrolled to the "Running bill and deposit" part, the deposit amount
+   * focused when the user can collect one). In memory only, never in the URL. When the detail says the action is no longer
    * possible the sheet stays on its main view.
    */
   startView?: AdmissionStartView;
@@ -125,6 +126,7 @@ export class AdmissionDialogComponent {
   private freeBedsCall?: Subscription;
   private startApplied = false;
   private focusMoveWhenReady = false;
+  private focusDepositWhenReady = false;
   /** The free-bed read has answered (beds or error), for the card's Transfer focus. */
   private freeBedsAnswered = false;
   /** The dialog has finished opening; its own first focus is done by then. */
@@ -148,6 +150,7 @@ export class AdmissionDialogComponent {
       .subscribe(() => {
         this.dialogOpened = true;
         this.placeMoveFocus();
+        this.placeDepositFocus();
       });
     this.load();
   }
@@ -187,7 +190,28 @@ export class AdmissionDialogComponent {
       this.startDischarge();
     } else if (start === 'move' && admission.canTransfer) {
       this.focusMoveWhenReady = true;
+    } else if (start === 'deposit') {
+      this.focusDepositWhenReady = true;
+      this.placeDepositFocus();
     }
+  }
+
+  /** Started from the card's Deposit: the bill part is in view and the deposit amount takes the focus. */
+  private placeDepositFocus(): void {
+    if (!this.focusDepositWhenReady || !this.dialogOpened) {
+      return;
+    }
+    this.focusDepositWhenReady = false;
+    afterNextRender(
+      () => {
+        const root = this.host.nativeElement;
+        const amount = root.querySelector<HTMLElement>('#ad-amount');
+        const bill = root.querySelector<HTMLElement>('.ipbill');
+        (amount ?? bill)?.scrollIntoView?.({ block: 'nearest' });
+        amount?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   /** Offers the shortfall to the minimum when the deposit is due. */

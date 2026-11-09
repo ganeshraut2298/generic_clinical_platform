@@ -48,10 +48,16 @@ export class AdmissionsApi {
     });
   }
 
-  list(): Observable<AdmissionList> {
-    return this.http.get<AdmissionList>(`${this.baseUrl}/admissions`, {
-      params: new HttpParams().set('status', 'ADMITTED'),
-    });
+  /**
+   * `cardFacts: 'all'` (SAH-37, OWNER only) sends every card fact whatever the published setup says,
+   * for the live preview of Clinic setup → Patient card. Read when that page opens, never polled.
+   */
+  list(options: { cardFacts?: 'all' } = {}): Observable<AdmissionList> {
+    let params = new HttpParams().set('status', 'ADMITTED');
+    if (options.cardFacts) {
+      params = params.set('cardFacts', options.cardFacts);
+    }
+    return this.http.get<AdmissionList>(`${this.baseUrl}/admissions`, { params });
   }
 
   admit(body: AdmissionInput): Observable<AdmissionDetail> {

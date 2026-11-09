@@ -28,6 +28,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*/OFL.txt",
+                "input": "src/assets/fonts",
+                "output": "fonts/licenses"
               }
             ],
             "styles": ["src/styles.scss"]

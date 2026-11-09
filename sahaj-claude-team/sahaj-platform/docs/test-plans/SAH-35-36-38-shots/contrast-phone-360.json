@@ -1,0 +1,115 @@
+{
+  "KPI \"Going home today\" label (.eyebrow)": {
+    "fg": "rgb(102, 119, 143)",
+    "bg": "rgb(247, 249, 252)",
+    "fontPx": 11.52,
+    "weight": "600",
+    "ratio": 4.34
+  },
+  "KPI \"Going home today\" figure (.v)": {
+    "fg": "rgb(15, 31, 58)",
+    "bg": "rgb(247, 249, 252)",
+    "fontPx": 20.48,
+    "weight": "600",
+    "ratio": 15.63
+  },
+  "KPI \"Going home today\" line (.s)": {
+    "fg": "rgb(67, 84, 111)",
+    "bg": "rgb(247, 249, 252)",
+    "fontPx": 12.16,
+    "weight": "400",
+    "ratio": 7.3
+  },
+  "Card flag \"Going home today\" text (.pcf[data-flag=home] .pcft)": {
+    "fg": "rgb(14, 138, 126)",
+    "bg": "rgb(224, 239, 239)",
+    "fontPx": 11.52,
+    "weight": "700",
+    "ratio": 3.6
+  },
+  "Card flag \"Going home today\" tone class": "blue pcf",
+  "Card flag Vitals due (warn)": {
+    "fg": "rgb(150, 90, 0)",
+    "bg": "rgb(246, 235, 215)",
+    "fontPx": 11.52,
+    "weight": "700",
+    "ratio": 4.74
+  },
+  "Card flag Deposit low (crit)": {
+    "fg": "rgb(194, 49, 49)",
+    "bg": "rgb(246, 231, 232)",
+    "fontPx": 11.52,
+    "weight": "700",
+    "ratio": 4.63
+  },
+  "Card flag Allergy (crit)": {
+    "fg": "rgb(194, 49, 49)",
+    "bg": "rgb(246, 231, 232)",
+    "fontPx": 11.52,
+    "weight": "700",
+    "ratio": 4.63
+  },
+  "Card flag EWS (warn)": {
+    "fg": "rgb(150, 90, 0)",
+    "bg": "rgb(246, 235, 215)",
+    "fontPx": 11.52,
+    "weight": "700",
+    "ratio": 4.74
+  },
+  "Card flag Not seen (crit)": {
+    "fg": "rgb(194, 49, 49)",
+    "bg": "rgb(246, 231, 232)",
+    "fontPx": 11.52,
+    "weight": "700",
+    "ratio": 4.63
+  },
+  "Card .pckv dt (\"Admitted on\")": {
+    "fg": "rgb(102, 119, 143)",
+    "bg": "rgb(253, 253, 254)",
+    "fontPx": 10.56,
+    "weight": "600",
+    "ratio": 4.5
+  },
+  "Card .pckv dd": {
+    "fg": "rgb(15, 31, 58)",
+    "bg": "rgb(253, 253, 254)",
+    "fontPx": 13.12,
+    "weight": "400",
+    "ratio": 16.19
+  },
+  "Card identity line (small)": {
+    "fg": "rgb(102, 119, 143)",
+    "bg": "rgb(253, 253, 254)",
+    "fontPx": 12.16,
+    "weight": "400",
+    "ratio": 4.5
+  },
+  "Card bed label (.pcbed small)": {
+    "fg": "rgb(26, 76, 166)",
+    "bg": "rgb(228, 235, 248)",
+    "fontPx": 9.92,
+    "weight": "700",
+    "ratio": 6.7
+  },
+  "Card action label (.pctb span)": {
+    "fg": "rgb(26, 76, 166)",
+    "bg": "rgb(228, 235, 248)",
+    "fontPx": 11.2,
+    "weight": "600",
+    "ratio": 6.7
+  },
+  "Card name": {
+    "fg": "rgb(15, 31, 58)",
+    "bg": "rgb(253, 253, 254)",
+    "fontPx": 16,
+    "weight": "700",
+    "ratio": 16.19
+  },
+  "Stale notice text": {
+    "fg": "rgb(150, 90, 0)",
+    "bg": "rgb(232, 225, 210)",
+    "fontPx": 13.44,
+    "weight": "400",
+    "ratio": 4.28
+  }
+}

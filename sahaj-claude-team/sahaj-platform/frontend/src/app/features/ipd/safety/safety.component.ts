@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   Injector,
   OnInit,
   afterNextRender,
@@ -22,6 +23,8 @@ import { ApiError } from '../../../core/http/problem-detail';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
 import { MedicineRoundComponent } from './medicine-round.component';
+import { PharmacistStore } from '../pharmacist/pharmacist.store';
+import { focusIsLost, isRefusal } from '../ipd-refusal';
 import { PharmacistPanelComponent } from '../pharmacist/pharmacist-panel.component';
 import { PharmacistTileComponent } from '../pharmacist/pharmacist-tile.component';
 import { ResponseSheetComponent, ResponseSheetData } from './response-sheet.component';
@@ -109,10 +112,15 @@ export class SafetyComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly doc = inject(DOCUMENT);
   private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  /** Provided by the IPD page; absent when the board is used alone. Cleared when the board is refused. */
+  private readonly pharmacist = inject(PharmacistStore, { optional: true });
   private readonly roundPanel = viewChild(MedicineRoundComponent);
 
   /** Counts of every board answer: the tab number and the banner of the page follow them. */
   readonly counts = output<SafetyCounts>();
+  /** SAH-40: the board was refused (403); the page drops the counts it holds until Try again. */
+  readonly refused = output<void>();
   /**
    * SAH-31: the owner's Safety tab also has the tile "Pharmacist checks" and the panel "Pharmacist
    * check" (mockup: owner only). The page provides the `PharmacistStore` they read.
@@ -160,8 +168,15 @@ export class SafetyComponent implements OnInit {
   protected readonly time = (event: ClinicalEvent): string =>
     eventTime(event.at, this.eventsAsOf() ?? event.at);
 
+  /** G-2: the board was refused (403); the 60-second reload reads nothing until Try again (DEC-025, SAH-40). */
+  private denied = false;
   private boardSub: Subscription | null = null;
   private eventsSub: Subscription | null = null;
+  private moreSub: Subscription | null = null;
+  /** The open Response sheet: closed at once when the board is refused (no patient name stays). */
+  private responseSheet: { close(): void } | null = null;
+  /** Try again was pressed from inside the board: the focus may fall to the body when its button is replaced. */
+  private retried = false;
 
   ngOnInit(): void {
     this.load();
@@ -169,18 +184,32 @@ export class SafetyComponent implements OnInit {
     this.destroyRef.onDestroy(() => {
       this.boardSub?.unsubscribe();
       this.eventsSub?.unsubscribe();
+      this.moreSub?.unsubscribe();
+      this.closeResponseSheet();
     });
+  }
+
+  private closeResponseSheet(): void {
+    const sheet = this.responseSheet;
+    this.responseSheet = null;
+    sheet?.close();
   }
 
   /** First load, and "Try again": shows Loading. */
   protected load(): void {
+    this.retried = this.host.nativeElement.contains(this.doc.activeElement);
+    this.denied = false;
     this.loading.set(true);
     this.loadError.set(null);
     this.fetchBoard(
       () => this.loading.set(false),
       (error) => {
         this.loading.set(false);
-        this.loadError.set(problemMessage(error, LOAD_ERROR));
+        if (isRefusal(error)) {
+          this.refuse(error);
+        } else {
+          this.loadError.set(problemMessage(error, LOAD_ERROR));
+        }
       },
     );
     this.fetchEvents(false);
@@ -188,20 +217,70 @@ export class SafetyComponent implements OnInit {
 
   /** The 60-second reload: no Loading text; a failure keeps what is on screen. */
   protected refresh(): void {
-    if (this.loading()) {
+    if (this.loading() || this.denied) {
       return;
     }
     this.fetchBoard(
       () => undefined,
-      () => this.refreshFailed.set(true),
+      (error) => this.reloadFailed(error),
     );
     this.fetchEvents(true);
+  }
+
+  /**
+   * A reload (not the first load) failed. A 403 (role changed, removed from the clinic, IPD off) clears
+   * the board and the audit trail and shows the refusal as the first load does; only a network error or
+   * a 5xx keeps the old board with "Could not refresh" (DEC-025 G-2).
+   */
+  private reloadFailed(error: unknown): void {
+    if (isRefusal(error)) {
+      this.refuse(error);
+      return;
+    }
+    this.refreshFailed.set(true);
+  }
+
+  /**
+   * The board was refused (403, forbidden or module-off), on the first load or on a reload (SAH-40, D-1).
+   * Nothing patient-related stays: the board, the audit trail, the pharmacist rows held by the page and
+   * every open sheet of this tab (Response here; Give and Verify or Reject close with the panels that
+   * opened them) go. Reads stop until Try again. Focus goes to the notice when it was on the board or
+   * in a sheet.
+   */
+  private refuse(error: unknown): void {
+    const active = this.doc.activeElement;
+    const focusLost =
+      focusIsLost(this.host.nativeElement, this.doc, this.retried) ||
+      (!!active && active.closest('.cdk-overlay-container') !== null);
+    this.retried = false;
+    this.denied = true;
+    this.boardSub?.unsubscribe();
+    this.eventsSub?.unsubscribe();
+    this.moreSub?.unsubscribe();
+    this.closeResponseSheet();
+    this.snackBar.dismiss();
+    this.pharmacist?.clear();
+    this.board.set(null);
+    this.events.set([]);
+    this.nextCursor.set(null);
+    this.eventsLoading.set(false);
+    this.refreshFailed.set(false);
+    this.actionNotice.set(null);
+    this.loadError.set(problemMessage(error, LOAD_ERROR));
+    this.refused.emit();
+    if (focusLost) {
+      afterNextRender(
+        () => this.host.nativeElement.querySelector<HTMLElement>('.notice.err')?.focus(),
+        { injector: this.injector },
+      );
+    }
   }
 
   private fetchBoard(done: () => void, failed: (error: unknown) => void): void {
     this.boardSub?.unsubscribe();
     this.boardSub = this.api.board().subscribe({
       next: (board) => {
+        this.retried = false;
         this.refreshFailed.set(false);
         this.loadError.set(null);
         this.board.set(board);
@@ -242,9 +321,8 @@ export class SafetyComponent implements OnInit {
     }
     this.eventsLoading.set(true);
     this.eventsError.set(null);
-    this.api
+    this.moreSub = this.api
       .events(NEXT_PAGE, cursor)
-      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (page: ClinicalEventPage) => {
           this.eventsLoading.set(false);
@@ -275,19 +353,26 @@ export class SafetyComponent implements OnInit {
    * reload fails (the old rows stay).
    */
   protected roundAnswered(): void {
+    if (this.denied) {
+      return;
+    }
     this.actionNotice.set(null);
     const focus = () => afterNextRender(() => this.roundPanel()?.restoreFocus(), { injector: this.injector });
-    this.fetchBoard(focus, () => {
-      this.refreshFailed.set(true);
+    this.fetchBoard(focus, (error) => {
+      this.reloadFailed(error);
       focus();
     });
     this.fetchEvents(true);
   }
 
+  /** After an action or a saved sheet; never while refused (only Try again reads). */
   private reloadAll(): void {
+    if (this.denied) {
+      return;
+    }
     this.fetchBoard(
       () => undefined,
-      () => this.refreshFailed.set(true),
+      (error) => this.reloadFailed(error),
     );
     this.fetchEvents(true);
   }
@@ -355,24 +440,28 @@ export class SafetyComponent implements OnInit {
       return;
     }
     const live = computed(() => this.board()?.escalations.find((e) => e.id === row.id) ?? null);
-    this.dialog
-      .open<ResponseSheetComponent, ResponseSheetData, EscalationActionResult | undefined>(
-        ResponseSheetComponent,
-        {
-          panelClass: 'sheet-panel',
-          width: '640px',
-          maxWidth: '100vw',
-          data: {
-            row,
-            actions: board.responseActions,
-            live,
-            onConflict: () => this.reloadAll(),
-          },
+    const sheet = this.dialog.open<ResponseSheetComponent, ResponseSheetData, EscalationActionResult | undefined>(
+      ResponseSheetComponent,
+      {
+        panelClass: 'sheet-panel',
+        width: '640px',
+        maxWidth: '100vw',
+        data: {
+          row,
+          actions: board.responseActions,
+          live,
+          onConflict: () => this.reloadAll(),
         },
-      )
+      },
+    );
+    this.responseSheet = sheet;
+    sheet
       .afterClosed()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((result) => {
+        if (this.responseSheet === sheet) {
+          this.responseSheet = null;
+        }
         if (result) {
           this.actionNotice.set(null);
           this.toast(closedToast(result.escalation.patientName));

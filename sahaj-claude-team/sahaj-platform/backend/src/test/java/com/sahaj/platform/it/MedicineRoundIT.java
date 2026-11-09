@@ -472,6 +472,9 @@ class MedicineRoundIT extends RoundSupport {
         Ward w = ward();
         String pcm = activeOrder(w, "pcm", "od");
         String hep = activeOrder(w, "hep", "od");
+        // release audit G-14: a second hospital with the same damaged medicine gets its own warning (the key is clinic + order)
+        Ward other = ward();
+        String otherHep = activeOrder(other, "hep", "od");
         clockAt(10, 5);
         assertThat(roundKeys(boardOf(w.nurse().auth()))).as("both orders are listed with the full catalogue").hasSize(2);
 
@@ -499,6 +502,7 @@ class MedicineRoundIT extends RoundSupport {
         JsonNode summary;
         JsonNode list;
         String logged;
+        String loggedOther;
         try {
             loadedField.set(bean, damaged);
             try (com.sahaj.platform.support.LogCapture logs = new com.sahaj.platform.support.LogCapture()) {
@@ -506,6 +510,10 @@ class MedicineRoundIT extends RoundSupport {
                 summary = summaryOf(w.nurse().auth());
                 list = ok(HttpMethod.GET, ADMISSIONS, w.nurse().auth(), null, 200);
                 logged = logs.allText();
+            }
+            try (com.sahaj.platform.support.LogCapture logs = new com.sahaj.platform.support.LogCapture()) {
+                boardOf(other.nurse().auth());
+                loggedOther = logs.allText();
             }
         } finally {
             loadedField.set(bean, original);
@@ -520,8 +528,14 @@ class MedicineRoundIT extends RoundSupport {
                 + " cause=DRUG_NOT_IN_CATALOGUE");
         assertThat(logged).as("no patient, bed, drug text or key in the log").doesNotContain(w.adm().name()).doesNotContain(w.adm().mobile())
                 .doesNotContain(w.uhid()).doesNotContain("Heparin").doesNotContain("Paracetamol");
-        assertThat(logged.split("order-skipped", -1).length - 1).as("a warning for every answer that read the round")
-                .isGreaterThanOrEqualTo(3);
+        // release audit G-14: one warning per (clinic, order) per 10 minutes, not one for every answer that reads the round
+        assertThat(logged.split("order-skipped", -1).length - 1).as("one warning across three reads of the same clinic")
+                .isEqualTo(1);
+        assertThat(loggedOther).as("the other hospital's damaged order has its own warning")
+                .contains("medicine-round order-skipped tenantId=" + other.clinic().tenantId() + " orderId=" + otherHep
+                        + " cause=DRUG_NOT_IN_CATALOGUE")
+                .doesNotContain(w.clinic().tenantId().toString());
+        assertThat(loggedOther.split("order-skipped", -1).length - 1).isEqualTo(1);
         // put back: the catalogue is whole again and the damaged order shows
         assertThat(roundKeys(boardOf(w.nurse().auth()))).hasSize(2);
     }

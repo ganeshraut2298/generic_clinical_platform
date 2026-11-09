@@ -50,8 +50,10 @@ import {
  *   be given the sheet does not open: the existing SAH-32 or DEC-018 text is shown in a toast.
  * - After any answer of the server (a dose recorded, a refusal that closes the sheet, a stale
  *   slot) the panel asks the board to reload (`answered`); the board stays on the Safety tab and
- *   then calls `restoreFocus()`: focus goes to the Give button of the same row, or to the panel
- *   heading (tabindex -1) when the row is gone. A cancelled sheet gives the focus back at once.
+ *   then calls `restoreFocus()`: focus goes to the Give button at the same row INDEX of the reloaded
+ *   list (the next dose, because the done row is gone; AC19, ADR-012 D4), to the last row's Give when
+ *   the index is past the end, and to the panel heading (tabindex -1) when the list is empty. A
+ *   cancelled sheet gives the focus back at once (the same index is the same row then).
  * - Names and medicines are on screen only: nothing is logged or stored.
  */
 @Component({
@@ -76,8 +78,18 @@ export class MedicineRoundComponent {
 
   /** Key of the row whose MAR is being read; every Give is off meanwhile (one sheet at a time). */
   protected readonly busyKey = signal<string | null>(null);
-  /** The row that opened the sheet; the focus goes back to it. */
-  private focusKey: string | null = null;
+  /** Position of the row that opened the sheet; the focus goes to the Give at this index. */
+  private focusIndex: number | null = null;
+  /** The open Give sheet: closed with this panel, so a refused board leaves no patient name on screen (SAH-40). */
+  private giveSheet: { close(): void } | null = null;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      const sheet = this.giveSheet;
+      this.giveSheet = null;
+      sheet?.close();
+    });
+  }
 
   protected readonly title = ROUND_TITLE;
   protected readonly headingId = ROUND_HEADING_ID;
@@ -99,7 +111,7 @@ export class MedicineRoundComponent {
       return;
     }
     const key = roundKey(row);
-    this.focusKey = key;
+    this.focusIndex = Math.max(0, this.round().rows.findIndex((r) => roundKey(r) === key));
     this.busyKey.set(key);
     this.api
       .mar(row.admissionId)
@@ -113,8 +125,9 @@ export class MedicineRoundComponent {
             this.answered.emit();
             return;
           }
-          this.dialog
-            .open<GiveSheetComponent, GiveSheetData, GiveResult | undefined>(GiveSheetComponent, {
+          const sheet = this.dialog.open<GiveSheetComponent, GiveSheetData, GiveResult | undefined>(
+            GiveSheetComponent,
+            {
               panelClass: 'sheet-panel',
               width: '640px',
               maxWidth: '100vw',
@@ -122,10 +135,16 @@ export class MedicineRoundComponent {
               // The sheet places the focus itself (the wristband box); the focus trap stays.
               autoFocus: false,
               data: { mar, order: check.order, slot: check.slot },
-            })
+            },
+          );
+          this.giveSheet = sheet;
+          sheet
             .afterClosed()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((result) => {
+              if (this.giveSheet === sheet) {
+                this.giveSheet = null;
+              }
               if (result) {
                 // A dose was recorded (201 or 200), or the server refused with a state change.
                 this.answered.emit();
@@ -144,15 +163,14 @@ export class MedicineRoundComponent {
 
   /** Called by the board once the reloaded rows are drawn (or the reload failed). */
   restoreFocus(): void {
-    const key = this.focusKey;
-    this.focusKey = null;
-    if (key === null) {
+    const index = this.focusIndex;
+    this.focusIndex = null;
+    if (index === null) {
       return;
     }
     const root = this.host.nativeElement;
-    const button = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-testid="round-give"]')).find(
-      (el) => el.dataset['key'] === key,
-    );
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-testid="round-give"]'));
+    const button = buttons[Math.min(index, buttons.length - 1)];
     const target = button && !button.disabled ? button : root.querySelector<HTMLElement>(`#${ROUND_HEADING_ID}`);
     target?.focus();
   }

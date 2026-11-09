@@ -13,7 +13,7 @@
     lead="Your first year is free. Add doctors, staff and branches as you grow, on the same system and patient record."
   />
 
-  <div class="grow surf">
+  <div class="grow surf" data-surface>
     <div>
       <span class="eyebrow">Grow without changing your system</span>
       <div class="sizes">
@@ -50,7 +50,7 @@
     </div>
   </div>
 
-  <div>
+  <div class="period surface-solid" data-surface>
     <mat-button-toggle-group
       class="seg"
       aria-label="Billing period"
@@ -65,7 +65,7 @@
 
   <div class="prices4">
     @for (plan of plans; track plan.key) {
-      <article class="price surf" [class.match]="matches(plan)" [attr.aria-label]="plan.name + ' plan'">
+      <article class="price surf" data-surface [class.match]="matches(plan)" [attr.aria-label]="plan.name + ' plan'">
         <div>
           <span class="eyebrow">{{ plan.eyebrow }}</span>
           <h3>{{ plan.name }}</h3>
@@ -103,5 +103,5 @@
       </article>
     }
   </div>
-  <p class="faint note">{{ note }}</p>
+  <p class="faint note surface-solid" data-surface>{{ note }}</p>
 </section>

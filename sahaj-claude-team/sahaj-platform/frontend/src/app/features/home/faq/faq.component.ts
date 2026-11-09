@@ -43,7 +43,7 @@ export const FAQ: readonly { question: string; answer: string }[] = [
   template: `
     <section class="lp-sect" id="faq" tabindex="-1" aria-labelledby="h-faq">
       <app-section-head headingId="h-faq" eyebrow="Questions" heading="What doctors ask us" />
-      <div class="faq">
+      <div class="faq" data-surface>
         @for (item of items; track item.question; let i = $index) {
           <details class="surf" [open]="i === 0">
             <summary>{{ item.question }}</summary>

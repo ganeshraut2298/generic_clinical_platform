@@ -8,6 +8,7 @@ import {
   classifyGiveError,
   clockText,
   countBadge,
+  isFourDigitPin,
   giveSubtitle,
   giveTitle,
   givenInput,
@@ -471,6 +472,18 @@ describe('MAR model', () => {
     it('a slot of another day shows the day and month', () => {
       const old: DoseRow = { ...GIVEN_DOSE, slotAt: '2026-10-24T14:30:00Z' };
       expect(lastDoseLine(old, MAR_AS_OF)!.text).toBe('Last dose 24 Oct, 8 PM: Given · 8:04 AM · Pawar');
+    });
+  });
+
+  describe('isFourDigitPin (G-9)', () => {
+    it('accepts exactly 4 ASCII digits, leading zeros included', () => {
+      expect(isFourDigitPin('4821')).toBe(true);
+      expect(isFourDigitPin('0042')).toBe(true);
+    });
+    it('refuses anything else', () => {
+      for (const bad of ['', '482', '48211', '48a1', ' 4821', '4821\n', '\u0664\u0668\u0662\u0661']) {
+        expect(isFourDigitPin(bad)).toBe(false);
+      }
     });
   });
 });

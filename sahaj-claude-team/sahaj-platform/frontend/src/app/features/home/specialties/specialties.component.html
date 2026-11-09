@@ -6,7 +6,7 @@
     lead="Pick a specialty to see how the workflow changes. These are configurable templates on one platform, not separate apps."
   />
 
-  <div class="spcards" role="group" aria-label="Specialty">
+  <div class="spcards" data-surface role="group" aria-label="Specialty">
     @for (entry of entries; track entry[0]) {
       <button
         type="button"
@@ -25,7 +25,7 @@
     }
   </div>
 
-  <div class="spprev surf" aria-live="polite">
+  <div class="spprev surf" data-surface aria-live="polite">
     <div class="row between">
       <b>{{ specialty().name }} template</b>
       <span class="faint note">Highlighted stages differ from general practice</span>

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { CONFIG_SECTIONS } from './config-sections';
+import { ipCardLeaveGuard } from './ipd/ipcard/ipcard-leave.guard';
 
 /**
  * Clinic setup (menu key `config`) inside the app shell. Team and access is SAH-6; Overview,
@@ -93,6 +94,12 @@ export const CONFIG_ROUTES: Routes = [
         path: 'ipdis',
         title: 'Discharge · Sahaj',
         loadComponent: () => import('./ipd/ipdis.page').then((m) => m.IpDisPage),
+      },
+      {
+        path: 'ipcard',
+        title: 'Patient card · Sahaj',
+        canDeactivate: [ipCardLeaveGuard],
+        loadComponent: () => import('./ipd/ipcard/ipcard.page').then((m) => m.IpCardPage),
       },
       ...CONFIG_SECTIONS.filter((s) => !s.built).map((s) => ({
         path: s.key,

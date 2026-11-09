@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { KineticBackgroundComponent } from '../../shared/ui/kinetic-background/kinetic-background.component';
 import { CompareSectionComponent } from './compare/compare.component';
 import { FaqSectionComponent } from './faq/faq.component';
 import { FinalCtaComponent } from './final-cta/final-cta.component';
@@ -22,6 +23,7 @@ import { WorkflowSectionComponent } from './workflow/workflow.component';
   selector: 'app-home-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    KineticBackgroundComponent,
     HomeHeaderComponent,
     HeroComponent,
     SetupSectionComponent,
@@ -38,6 +40,7 @@ import { WorkflowSectionComponent } from './workflow/workflow.component';
   ],
   styleUrl: './home.page.scss',
   template: `
+    <app-kinetic-background />
     <div class="pubwrap">
       <app-home-header />
       <main id="main" tabindex="-1">

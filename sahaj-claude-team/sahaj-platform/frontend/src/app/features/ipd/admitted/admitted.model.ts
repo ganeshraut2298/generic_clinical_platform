@@ -1,5 +1,6 @@
 import { formatWhen, istToday } from '../../config/config-format';
 import type { IconName } from '../../../shared/icon/icon.component';
+import type { CardActionKey, CardsPerRow } from '../card/card-setup.model';
 import type { AdmittedCardAbilities, AdmittedPatientRow } from '../ipd.model';
 
 /**
@@ -10,9 +11,9 @@ import type { AdmittedCardAbilities, AdmittedPatientRow } from '../ipd.model';
  */
 
 export type AdmittedView = 'cards' | 'table';
-export type CardsPerRow = 2 | 3 | 4;
+export type { CardsPerRow };
 /** Where the admission sheet opens when it is started from a card (ADR-013 D6). In memory only. */
-export type AdmissionStartView = 'details' | 'move' | 'discharge';
+export type AdmissionStartView = 'details' | 'move' | 'discharge' | 'deposit';
 
 export const PAGE_SIZE = 24;
 export const DEFAULT_COLS: CardsPerRow = 3;
@@ -20,23 +21,37 @@ export const COLS_CHOICES: readonly CardsPerRow[] = [2, 3, 4];
 export const ALL_WARDS = 'all';
 
 export const EMPTY_FILTER_TEXT = 'No patients match these filters.';
+/** The search box takes at most this many characters (DEC-025 G-10). */
+export const SEARCH_MAX_LENGTH = 100;
+/** The polite result line waits this long after the last keystroke (the filter itself is instant). */
+export const SEARCH_ANNOUNCE_MS = 400;
 export const SEARCH_LABEL = 'Search admitted patients';
 export const SEARCH_PLACEHOLDER = 'Name, UHID or bed';
 export const NAME_TOOLTIP = 'Open bill and bed details';
 export const DASH = '—';
 
-/** Action row of the Standard card: order, words and icons (mockup `PC_A`). */
-export type CardAction = 'nursing' | 'emr' | 'transfer' | 'discharge';
+/** Quick actions of the card: order, words and icons (mockup PC_A; the clinic's order comes from the setup). */
+export type CardAction = CardActionKey;
 export const CARD_ACTIONS: readonly { key: CardAction; label: string; icon: IconName }[] = [
   { key: 'nursing', label: 'Nursing', icon: 'nurse' },
   { key: 'emr', label: 'EMR', icon: 'emr' },
   { key: 'transfer', label: 'Transfer', icon: 'swap' },
   { key: 'discharge', label: 'Discharge', icon: 'door' },
+  { key: 'deposit', label: 'Deposit', icon: 'deposit' },
 ];
 
-/** Actions the server allows for this caller, in card order (a false one is not drawn). */
-export function visibleActions(card: AdmittedCardAbilities): typeof CARD_ACTIONS {
-  return CARD_ACTIONS.filter((a) => card[a.key]);
+/**
+ * Actions the server allows for this caller (a false one is not drawn), in the order of the setup
+ * (order: the published quick actions that are on) or, without one, in the default card order.
+ */
+export function visibleActions(
+  card: AdmittedCardAbilities,
+  order?: readonly CardAction[],
+): typeof CARD_ACTIONS {
+  const keys = order ?? CARD_ACTIONS.map((a) => a.key);
+  return keys
+    .map((k) => CARD_ACTIONS.find((a) => a.key === k))
+    .filter((a): a is (typeof CARD_ACTIONS)[number] => !!a && card[a.key]);
 }
 
 export function actionLabel(action: { label: string }, row: Pick<AdmittedPatientRow, 'patientName'>): string {

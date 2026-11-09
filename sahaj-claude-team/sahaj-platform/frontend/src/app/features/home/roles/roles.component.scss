@@ -21,6 +21,9 @@
 }
 
 .member {
+  // The global `.member` choice-row rule (console styles) is transparent and loads after `.surf`.
+  // In the mockup `.surf` wins, so this card is white and no text sits on the page layer (SAH-39).
+  background: var(--surface);
   padding: 14px;
   display: flex;
   flex-direction: column;

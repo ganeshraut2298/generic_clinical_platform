@@ -226,6 +226,20 @@ describe('screen reader and stale-queue text', () => {
     expect(timeOfInstant('not a date')).toBe('');
   });
 
+  it('timeOfInstant writes a plain space before AM/PM when the browser gives U+202F (G-15)', () => {
+    let fake = '';
+    const spy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function () {
+      return { format: () => fake };
+    } as never);
+    try {
+      fake = '11:05\u202Fam';
+      expect(timeOfInstant('2026-11-05T05:35:00Z')).toBe('11:05 AM');
+      expect(staleQueueText('2026-11-05T05:35:00Z')).toBe('Could not refresh the queue. Last updated 11:05 AM IST');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('staleQueueText gives the warning with the last good time, or without it', () => {
     expect(staleQueueText('2026-11-05T05:35:00Z')).toBe('Could not refresh the queue. Last updated 11:05 AM IST');
     expect(staleQueueText(undefined)).toBe('Could not refresh the queue.');

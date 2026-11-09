@@ -58,6 +58,10 @@ sahaj:
   public-enquiry-limit:
     max-requests: ${SAHAJ_ENQUIRY_LIMIT_MAX:5}
     window: ${SAHAJ_ENQUIRY_LIMIT_WINDOW:1h}
+  request-body:
+    # Release audit G-1: largest request body, in bytes, the signed-in /api/v1/** endpoints read; a bigger one answers 413.
+    # The public endpoints keep their own fixed 4 KB cap. Values below 4096 are raised to 4096.
+    max-bytes: ${SAHAJ_MAX_REQUEST_BODY_BYTES:65536}
   jwt:
     # SAH-3 access tokens. A secret, so it has no default: set SAHAJ_JWT_SECRET (32+ characters) in
     # the environment, never in code.

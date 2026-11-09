@@ -4,6 +4,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-section-head',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'surface-solid', 'data-surface': '' },
   styles: `
     :host {
       display: flex;

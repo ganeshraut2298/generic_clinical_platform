@@ -99,7 +99,8 @@ class AdmissionChargeServiceTest {
                 auditLog, team, patients, patientAccess, mock(ActorDirectoryPort.class),
                 new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)), catalog, charges,
                 new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
-                mock(EmergencyService.class), mock(VitalsRepository.class), new AdmittedCards(clinicalPatients, patients, mock(VitalsRepository.class), safety));
+                mock(EmergencyService.class), mock(VitalsRepository.class), new AdmittedCards(clinicalPatients, patients, mock(VitalsRepository.class), safety),
+                new CardSetups(mock(CardSetupRepository.class)));
 
         state("on");
         when(settings.findDepositRules(TENANT)).thenReturn(Optional.empty());
@@ -366,7 +367,7 @@ class AdmissionChargeServiceTest {
                 new ChargeRow(second, "cbc", "CBC", 30_000L, 1),
                 new ChargeRow(second, "cbc", "CBC", 30_000L, 1)));
 
-        AdmissionList list = service.list(TENANT, ACTOR, "NURSE", "ADMITTED");
+        AdmissionList list = service.list(TENANT, ACTOR, "NURSE", "ADMITTED", null);
 
         assertThat(list.items()).extracting(s -> s.runningBillPaise())
                 .containsExactly(480_000L, 540_000L, 480_000L, 480_000L);
@@ -388,7 +389,7 @@ class AdmissionChargeServiceTest {
         // 480,000 against 600,000 is 80 percent: not low at an alert of 90.
         when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row(ADMISSION, "Self", "ADMITTED", 600_000L)));
 
-        AdmissionList list = service.list(TENANT, ACTOR, "OWNER", null);
+        AdmissionList list = service.list(TENANT, ACTOR, "OWNER", null, null);
 
         assertThat(list.alertPercent()).isEqualTo(90);
         assertThat(list.depositAlerts()).isZero();
@@ -399,7 +400,7 @@ class AdmissionChargeServiceTest {
     void emptyListHasNoAlertsAndTheDefaultAlertPercent() {
         when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed());
 
-        AdmissionList list = service.list(TENANT, ACTOR, "OWNER", null);
+        AdmissionList list = service.list(TENANT, ACTOR, "OWNER", null, null);
 
         assertThat(list.depositAlerts()).isZero();
         assertThat(list.alertPercent()).isEqualTo(80);

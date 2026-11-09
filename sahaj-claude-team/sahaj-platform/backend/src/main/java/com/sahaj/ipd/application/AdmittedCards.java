@@ -3,6 +3,9 @@ package com.sahaj.ipd.application;
 import com.sahaj.ipd.application.AdmissionRepository.AdmittedRow;
 import com.sahaj.ipd.application.AdmissionViews.AdmittedClinicalFlags;
 import com.sahaj.ipd.application.AdmissionViews.CardAllergy;
+import com.sahaj.ipd.application.AdmissionViews.CardBpReading;
+import com.sahaj.ipd.application.AdmissionViews.CardLatestVitals;
+import com.sahaj.ipd.application.AdmissionViews.CardReading;
 import com.sahaj.ipd.application.AdmissionViews.CardEscalationFlag;
 import com.sahaj.ipd.application.EscalationBoardRepository.BoardRow;
 import com.sahaj.ipd.application.EscalationBoardRepository.Detail;
@@ -13,16 +16,24 @@ import com.sahaj.ipd.domain.EscalationClock;
 import com.sahaj.ipd.domain.MedicineSafetyCheck;
 import com.sahaj.ipd.domain.MedicineSafetyCheck.AllergyStatus;
 import com.sahaj.ipd.domain.VitalsDue;
+import com.sahaj.ipd.domain.card.CardAccessRule;
+import com.sahaj.ipd.domain.card.CardCatalogue;
+import com.sahaj.ipd.domain.card.VitalMarks;
 import com.sahaj.patient.api.PatientClinicalPort;
 import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import org.springframework.stereotype.Component;
 
 /**
@@ -67,18 +78,77 @@ class AdmittedCards {
      * {@code allergyText} is always null and is never used (the flags are not built for such a caller).
      */
     Map<UUID, PatientClinical> patients(UUID tenantId, Set<UUID> patientIds, boolean clinicalAccess) {
-        if (patientIds.isEmpty()) {
-            return Map.of();
+        return patients(tenantId, patientIds, clinicalAccess, false).byId();
+    }
+
+    /** The listed patients and, when asked for, their mobile numbers keyed by patient id (SAH-37, ADR-015 D6). */
+    record Patients(Map<UUID, PatientClinical> byId, Map<UUID, String> mobiles) {
+
+        @Override
+        public String toString() {
+            return "Patients[redacted]";
         }
+    }
+
+    /**
+     * R2 with the mobile number (SAH-37, ADR-015 D6, O4). The caller has decided that its role may see the contact group
+     * and that the published setup has Mobile on (or the owner asks for every card fact). The non-clinical path reads
+     * {@link PatientLookupPort#findAllCurrent} once and the mobiles come from the same call; a caller with clinical
+     * access (OWNER) costs one more {@code findAllCurrent} batch, and only when {@code wantMobile}. Without
+     * {@code wantMobile} the mobile is never copied out of the summary.
+     */
+    Patients patients(UUID tenantId, Set<UUID> patientIds, boolean clinicalAccess, boolean wantMobile) {
+        if (patientIds.isEmpty()) {
+            return new Patients(Map.of(), Map.of());
+        }
+        Map<UUID, String> mobiles = new HashMap<>();
         if (clinicalAccess) {
-            return clinicalPatients.findAll(tenantId, patientIds);
+            Map<UUID, PatientClinical> clinical = clinicalPatients.findAll(tenantId, patientIds);
+            if (wantMobile) {
+                for (Map.Entry<UUID, PatientSummary> entry : lookup.findAllCurrent(tenantId, patientIds).entrySet()) {
+                    mobiles.put(entry.getKey(), entry.getValue().mobile());
+                }
+            }
+            return new Patients(clinical, mobiles);
         }
         Map<UUID, PatientClinical> identities = new HashMap<>();
         for (Map.Entry<UUID, PatientSummary> entry : lookup.findAllCurrent(tenantId, patientIds).entrySet()) {
             PatientSummary s = entry.getValue();
             identities.put(entry.getKey(), new PatientClinical(s.id(), s.uhid(), s.name(), s.age(), s.sex(), null));
+            if (wantMobile) {
+                mobiles.put(entry.getKey(), s.mobile());
+            }
         }
-        return identities;
+        return new Patients(identities, mobiles);
+    }
+
+    /**
+     * SAH-37 (ADR-015 D6) which new card facts this answer carries: a fact is sent only when the role of the caller may
+     * see its data group and the published setup has the field on in a section that is on (or the owner asked for
+     * {@code cardFacts=all}). The default setup sends none.
+     */
+    record FactsPlan(boolean diagnosis, boolean bp, boolean pulse, boolean spo2, boolean temp, boolean rr,
+                     boolean lastRecorded, boolean mobile) {
+
+        static final FactsPlan NONE = new FactsPlan(false, false, false, false, false, false, false, false);
+
+        /** At least one of the six vitals fields is wanted (the readings variant of R4 runs). */
+        boolean anyVitals() {
+            return bp || pulse || spo2 || temp || rr || lastRecorded;
+        }
+
+        /** {@code fields} are the keys of the fields to send (the shown ones, or every one for cardFacts=all). */
+        static FactsPlan of(Set<String> fields, String tokenRole, String memberRole) {
+            boolean clinical = CardAccessRule.mayView(CardCatalogue.G_CLINICAL, tokenRole, memberRole);
+            boolean vitals = CardAccessRule.mayView(CardCatalogue.G_VITALS, tokenRole, memberRole);
+            boolean contact = CardAccessRule.mayView(CardCatalogue.G_CONTACT, tokenRole, memberRole);
+            return new FactsPlan(clinical && fields.contains(CardCatalogue.DIAGNOSIS),
+                    vitals && fields.contains(CardCatalogue.BP), vitals && fields.contains(CardCatalogue.PULSE),
+                    vitals && fields.contains(CardCatalogue.SPO2), vitals && fields.contains(CardCatalogue.TEMP),
+                    vitals && fields.contains(CardCatalogue.RR),
+                    vitals && fields.contains(CardCatalogue.LAST_RECORDED),
+                    contact && fields.contains(CardCatalogue.MOBILE));
+        }
     }
 
     /** The banner (it is {@code AdmissionList.safety}) and the clinical facts of each admission, by admission id. */
@@ -92,9 +162,30 @@ class AdmittedCards {
      * escalations are read once and feed the banner, the counts, the change token and the card flags, so they agree.
      */
     Clinical clinical(UUID tenantId, Instant asOf, List<AdmittedRow> rows, Map<UUID, PatientClinical> patientMap) {
+        return clinical(tenantId, asOf, rows, patientMap, FactsPlan.NONE, ids -> Map.of());
+    }
+
+    /**
+     * As above, plus the SAH-37 facts of {@code plan}. The readings variant of R4 runs only when the plan wants a
+     * reading or Last recorded (one statement either way); the recorder names are one batch from {@code names}, only
+     * when Last recorded is wanted.
+     */
+    Clinical clinical(UUID tenantId, Instant asOf, List<AdmittedRow> rows, Map<UUID, PatientClinical> patientMap,
+                      FactsPlan plan, Function<Collection<UUID>, Map<UUID, String>> names) {
         List<BoardRow> live = safety.liveEscalations(tenantId);
         Banner banner = safety.banner(tenantId, asOf, live, row -> name(patientMap, row.patientId()));
-        Map<UUID, LatestScore> latest = vitals.findLatestOfAdmitted(tenantId);
+        Map<UUID, LatestScore> latest = plan.anyVitals() ? vitals.findLatestReadingsOfAdmitted(tenantId)
+                : vitals.findLatestOfAdmitted(tenantId);
+        Map<UUID, String> recorders = Map.of();
+        if (plan.lastRecorded()) {
+            Set<UUID> ids = new HashSet<>();
+            for (LatestScore score : latest.values()) {
+                if (score.recordedBy() != null) {
+                    ids.add(score.recordedBy());
+                }
+            }
+            recorders = ids.isEmpty() ? Map.of() : names.apply(ids);
+        }
         Map<UUID, Detail> escalations = new HashMap<>();
         for (BoardRow row : live) {
             // At most one open escalation per admission (SAH-30); should two exist, the first of the board order wins.
@@ -104,7 +195,7 @@ class AdmittedCards {
         for (AdmittedRow row : rows) {
             UUID admissionId = row.admission().id();
             flags.put(admissionId, flags(escalations.get(admissionId), latest.get(admissionId),
-                    patientMap.get(row.admission().patientId()), asOf));
+                    patientMap.get(row.admission().patientId()), asOf, plan, row.admission().reason(), recorders));
         }
         return new Clinical(banner, flags);
     }
@@ -115,13 +206,53 @@ class AdmittedCards {
      * dropped). The allergy text is set only for RECORDED.
      */
     static AdmittedClinicalFlags flags(Detail escalation, LatestScore latest, PatientClinical patient, Instant asOf) {
+        return flags(escalation, latest, patient, asOf, FactsPlan.NONE, null, Map.of());
+    }
+
+    /**
+     * SAH-37: the same flags plus {@code diagnosis} (the reason for admission, "Under evaluation" when blank) and
+     * {@code latestVitals} as far as {@code plan} asks for them. A reading is built only from a readings row; the mark
+     * of each reading is from {@link VitalMarks}. {@code latestVitals} is {@code Optional.empty()} (JSON null) when the
+     * plan wants vitals and none were recorded, and null (absent) when the plan wants none.
+     */
+    static AdmittedClinicalFlags flags(Detail escalation, LatestScore latest, PatientClinical patient, Instant asOf,
+                                       FactsPlan plan, String reason, Map<UUID, String> recorderNames) {
         CardEscalationFlag escalationFlag = escalation == null ? null : new CardEscalationFlag(escalation.status(),
                 EscalationClock.waitingMinutes(EscalationClock.start(escalation.raisedAt(), escalation.reopenedAt()),
                         asOf),
                 escalation.targetMinutes(), SafetyRows.pastTarget(escalation, asOf));
         EwsSummary ews = latest == null ? null : new EwsSummary(latest.ewsScore(), latest.ewsRisk(), latest.recordedAt());
         boolean due = VitalsDue.isDue(true, latest == null ? null : latest.recordedAt(), asOf);
-        return new AdmittedClinicalFlags(escalationFlag, ews, due, allergy(patient));
+        String diagnosis = plan.diagnosis() ? diagnosis(reason) : null;
+        Optional<CardLatestVitals> tiles = null;
+        if (plan.anyVitals()) {
+            tiles = Optional.ofNullable(latest == null ? null : tiles(latest, plan, recorderNames));
+        }
+        return new AdmittedClinicalFlags(escalationFlag, ews, due, allergy(patient), diagnosis, tiles);
+    }
+
+    /** The reason for admission is the Diagnosis of the card; "Under evaluation" when it was left blank. */
+    private static String diagnosis(String reason) {
+        return reason == null || reason.isBlank() ? AdmissionService.DEFAULT_REASON : reason;
+    }
+
+    private static CardLatestVitals tiles(LatestScore latest, FactsPlan plan, Map<UUID, String> recorderNames) {
+        VitalsRepository.Readings r = latest.readings();
+        String recordedBy = null;
+        if (plan.lastRecorded()) {
+            String found = latest.recordedBy() == null ? null : recorderNames.get(latest.recordedBy());
+            recordedBy = found == null ? "Team member" : found;
+        }
+        if (r == null) {
+            return new CardLatestVitals(latest.recordedAt(), recordedBy, null, null, null, null, null);
+        }
+        VitalMarks.Marks marks = VitalMarks.of(r.bpSystolic(), r.pulse(), r.spo2(), r.tempC(), r.rr());
+        return new CardLatestVitals(latest.recordedAt(), recordedBy,
+                plan.bp() ? new CardBpReading(r.bpSystolic(), r.bpDiastolic(), marks.bp()) : null,
+                plan.pulse() ? new CardReading(BigDecimal.valueOf(r.pulse()), marks.pulse()) : null,
+                plan.spo2() ? new CardReading(BigDecimal.valueOf(r.spo2()), marks.spo2()) : null,
+                plan.temp() ? new CardReading(r.tempC(), marks.temp()) : null,
+                plan.rr() ? new CardReading(BigDecimal.valueOf(r.rr()), marks.rr()) : null);
     }
 
     static CardAllergy allergy(PatientClinical patient) {

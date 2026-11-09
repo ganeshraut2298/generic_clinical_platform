@@ -4,7 +4,7 @@ import { TILE_TEXT, TILE_TITLE } from './pharmacist.model';
 
 /**
  * The tile "Pharmacist checks" of the Safety tab (mockup `ipSafety` tiles; SAH-31): the number of
- * orders waiting, in the warn colour above 0, and "Orders waiting before the first dose". The host
+ * orders waiting ("—" when it is not known), in the warn colour above 0, and "Orders waiting before the first dose". The host
  * is `display: contents`, so the tile sits in the page's tile grid like the others.
  */
 @Component({
@@ -21,7 +21,7 @@ import { TILE_TEXT, TILE_TITLE } from './pharmacist.model';
   template: `
     <div class="kpi surf" data-kpi="pharmacist">
       <span class="eyebrow">{{ title }}</span>
-      <span class="v num" [class.warn]="count() > 0" data-testid="pharmacist-waiting">{{ count() }}</span>
+      <span class="v num" [class.warn]="(count() ?? 0) > 0" data-testid="pharmacist-waiting">{{ count() ?? '—' }}</span>
       <span class="s">{{ text }}</span>
     </div>
   `,
@@ -30,5 +30,6 @@ export class PharmacistTileComponent {
   private readonly store = inject(PharmacistStore);
   protected readonly title = TILE_TITLE;
   protected readonly text = TILE_TEXT;
-  protected readonly count = computed(() => this.store.waiting() ?? 0);
+  /** Null while nothing has been read or after a refusal: the tile shows "—", never 0 (SAH-40). */
+  protected readonly count = computed(() => this.store.waiting());
 }

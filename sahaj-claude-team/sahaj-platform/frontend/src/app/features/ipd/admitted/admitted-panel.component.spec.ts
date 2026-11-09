@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AdmissionList } from '../ipd.model';
 import { AdmittedPanelComponent, OpenAdmissionRequest } from './admitted-panel.component';
 import { AdmittedViewState } from './admitted-view.state';
+import { SEARCH_ANNOUNCE_MS } from './admitted.model';
 import {
   ABILITIES_FRONT_DESK,
   ABILITIES_NURSE,
@@ -258,6 +259,18 @@ describe('AdmittedPanelComponent', () => {
     describe('result count in the polite region (R36-4)', () => {
       const announce = (view: HTMLElement) => q(view, '[data-testid=admitted-announce]');
 
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+      /** The polite line waits 400 ms after the last keystroke (G-10). */
+      async function pause(): Promise<void> {
+        vi.advanceTimersByTime(SEARCH_ANNOUNCE_MS);
+        await settle();
+      }
+
       it('keeps one polite region that is empty until the user searches', () => {
         const view = render();
         expect(announce(view).getAttribute('aria-live')).toBe('polite');
@@ -267,23 +280,47 @@ describe('AdmittedPanelComponent', () => {
       it('announces "Showing N of M patients" after a search and after a ward change', async () => {
         const view = render();
         await type(view, 'sun');
+        await pause();
         expect(announce(view).textContent).toBe('Showing 1 of 3 patients');
         await pickWard(view, WARD_A);
         expect(announce(view).textContent).toBe('Showing 1 of 3 patients');
         await type(view, '');
+        await pause();
         expect(announce(view).textContent).toBe('Showing 2 of 3 patients');
+      });
+
+      it('filters at once but announces once, 400 ms after the last keystroke (G-10)', async () => {
+        const view = render();
+        await type(view, 's');
+        await type(view, 'su');
+        await type(view, 'sun');
+        expect(announce(view).textContent).toBe('');
+        expect(view.querySelectorAll('[data-testid=card-name]').length).toBe(1);
+        vi.advanceTimersByTime(SEARCH_ANNOUNCE_MS - 1);
+        await settle();
+        expect(announce(view).textContent).toBe('');
+        vi.advanceTimersByTime(1);
+        await settle();
+        expect(announce(view).textContent).toBe('Showing 1 of 3 patients');
+      });
+
+      it('limits the search box to 100 characters (G-10)', () => {
+        const view = render();
+        expect(q(view, '[data-testid=admitted-search]').getAttribute('maxlength')).toBe('100');
       });
 
       it('announces "Showing all M patients" when the filters are cleared', async () => {
         const view = render();
         await type(view, 'sun');
         await type(view, '');
+        await pause();
         expect(announce(view).textContent).toBe('Showing all 3 patients');
       });
 
       it('announces "No patients match these filters." in the same region for an empty result', async () => {
         const view = render();
         await type(view, 'nobody');
+        await pause();
         expect(announce(view).textContent).toBe('No patients match these filters.');
         await pickWard(view, WARD_EMPTY);
         expect(announce(view).textContent).toBe('No patients match these filters.');
@@ -296,6 +333,7 @@ describe('AdmittedPanelComponent', () => {
         observer.observe(announce(view), { childList: true, characterData: true, subtree: true });
         await type(view, 's');
         await type(view, 'su');
+        await pause();
         await Promise.resolve();
         observer.disconnect();
         expect(seen.every((t) => t !== '')).toBe(true);

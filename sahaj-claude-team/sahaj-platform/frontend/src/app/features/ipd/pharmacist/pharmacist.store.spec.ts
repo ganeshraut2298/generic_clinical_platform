@@ -201,6 +201,202 @@ describe('PharmacistStore', () => {
     });
   });
 
+  describe('a refused read (SAH-40)', () => {
+    const summary = (waiting: number) => ({ waiting, changeToken: TOKEN_1, asOf: '2026-11-06T05:47:00Z' });
+    const forbidden = () => ({ status: 403, statusText: 'Forbidden' });
+    const FORBIDDEN = problem('forbidden', 403, 'You cannot see the pharmacist checks.');
+    const MODULE_OFF = problem('module-off', 403, 'IPD is off.');
+
+    function loaded(waiting = 3, nextCursor: string | null = null) {
+      store.load();
+      list().flush(checksOf({ items: [rowOf(), rowOf({ orderId: 'o2' })], waiting, nextCursor }));
+    }
+
+    function expectCleared() {
+      expect(store.meta()).toBeNull();
+      expect(store.items()).toEqual([]);
+      expect(store.nextCursor()).toBeNull();
+      expect(store.waiting()).toBeNull();
+      expect(store.refreshFailed()).toBe(false);
+      expect(store.moreLoading()).toBe(false);
+      expect(store.moreError()).toBeNull();
+      expect(store.refused()).toBe(true);
+    }
+
+    it('a list reload 403 forbidden clears everything and sets the first-load notice (AC 12)', () => {
+      loaded(3, 'c1');
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      expectCleared();
+      expect(store.loadError()).toBe('You cannot see the pharmacist checks.');
+      expect(store.moduleOff()).toBe(false);
+    });
+
+    it('a list reload 403 without a message uses the first-load wording', () => {
+      loaded();
+      store.load();
+      list().flush({ type: 'https://sahaj.in/problems/forbidden', title: 'forbidden', status: 403 }, forbidden());
+      expect(store.loadError()).toBe('We could not load the pharmacist checks. Try again.');
+    });
+
+    it('a list reload 403 module-off clears everything and sets moduleOff (AC 13)', () => {
+      loaded();
+      store.load();
+      list().flush(MODULE_OFF, forbidden());
+      expectCleared();
+      expect(store.moduleOff()).toBe(true);
+      expect(store.loadError()).toBeNull();
+    });
+
+    it('a list reload that fails on the network or with 503 keeps the rows (AC 14)', () => {
+      loaded();
+      store.load();
+      list().error(new ProgressEvent('error'));
+      expect(store.items()).toHaveLength(2);
+      store.load();
+      list().flush(problem('unavailable', 503, 'x'), { status: 503, statusText: 'x' });
+      expect(store.items()).toHaveLength(2);
+      expect(store.refreshFailed()).toBe(true);
+      expect(store.refused()).toBe(false);
+    });
+
+    it('the first load 403 is a refusal too, with the same visible result', () => {
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      expect(store.refused()).toBe(true);
+      expect(store.loadError()).toBe('You cannot see the pharmacist checks.');
+      expect(store.loading()).toBe(false);
+    });
+
+    it('a counts poll 403 forbidden clears the rows and sets the notice (AC 15)', () => {
+      loaded();
+      store.pollSummary();
+      http.expectOne(SUMMARY).flush(FORBIDDEN, forbidden());
+      expectCleared();
+      expect(store.loadError()).toBe('You cannot see the pharmacist checks.');
+    });
+
+    it('a counts poll 403 module-off clears the rows and sets moduleOff (AC 15)', () => {
+      loaded();
+      store.pollSummary();
+      http.expectOne(SUMMARY).flush(MODULE_OFF, forbidden());
+      expectCleared();
+      expect(store.moduleOff()).toBe(true);
+    });
+
+    it('a counts poll that fails on the network or with 503 clears nothing and shows nothing (AC 15)', () => {
+      loaded();
+      store.pollSummary();
+      http.expectOne(SUMMARY).error(new ProgressEvent('error'));
+      store.pollSummary();
+      http.expectOne(SUMMARY).flush(problem('unavailable', 503, 'x'), { status: 503, statusText: 'x' });
+      expect(store.items()).toHaveLength(2);
+      expect(store.waiting()).toBe(3);
+      expect(store.refused()).toBe(false);
+      expect(store.loadError()).toBeNull();
+      expect(store.refreshFailed()).toBe(false);
+    });
+
+    it('Show more orders 403 forbidden or module-off is a refusal (AC 16)', () => {
+      loaded(5, 'c1');
+      store.loadMore();
+      list().flush(FORBIDDEN, forbidden());
+      expectCleared();
+      expect(store.loadError()).toBe('You cannot see the pharmacist checks.');
+
+      store.load();
+      list().flush(checksOf({ waiting: 5, nextCursor: 'c2' }));
+      store.loadMore();
+      list().flush(MODULE_OFF, forbidden());
+      expectCleared();
+      expect(store.moduleOff()).toBe(true);
+    });
+
+    it('Show more orders that fails on the network keeps the rows and says so (AC 16)', () => {
+      loaded(5, 'c1');
+      store.loadMore();
+      list().error(new ProgressEvent('error'));
+      expect(store.items()).toHaveLength(2);
+      expect(store.moreError()).not.toBeNull();
+      expect(store.refused()).toBe(false);
+    });
+
+    it('reads nothing while refused: no poll and no Show more (OQ-40-3)', () => {
+      loaded(5, 'c1');
+      store.pollSummary();
+      http.expectOne(SUMMARY).flush(FORBIDDEN, forbidden());
+      store.pollSummary();
+      store.loadMore();
+      http.expectNone(SUMMARY);
+      http.expectNone(LIST);
+    });
+
+    it('ignores a verify or reject answer while refused (AC 19)', () => {
+      loaded();
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      store.apply(checksOf({ items: [rowOf()], waiting: 1 }));
+      expectCleared();
+    });
+
+    it('never has a meta, and so never an empty queue, after a refusal (AC 17)', () => {
+      loaded();
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      expect(store.meta()).toBeNull();
+      expect(store.loadError()).not.toBeNull();
+    });
+
+    it('load() after a refusal is a first load and shows the rows when access is back (AC 21)', () => {
+      loaded();
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      store.load();
+      expect(store.refused()).toBe(false);
+      expect(store.loading()).toBe(true);
+      expect(store.loadError()).toBeNull();
+      list().flush(checksOf({ waiting: 1 }));
+      expect(store.items()).toHaveLength(1);
+      expect(store.waiting()).toBe(1);
+    });
+
+    it('load() after a refusal shows the refusal again when access is still refused (AC 21)', () => {
+      loaded();
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      store.load();
+      list().flush(FORBIDDEN, forbidden());
+      expect(store.refused()).toBe(true);
+      expect(store.loadError()).toBe('You cannot see the pharmacist checks.');
+    });
+
+    it('a list answer that was in flight when a poll was refused cannot land afterwards', () => {
+      loaded();
+      store.load();
+      const inFlight = list();
+      store.pollSummary();
+      http.expectOne(SUMMARY).flush(FORBIDDEN, forbidden());
+      expect(inFlight.cancelled).toBe(true);
+      expectCleared();
+    });
+
+    it('clear() empties every field and the last summary, and stops what is in flight', () => {
+      loaded(4, 'c1');
+      store.pollSummary();
+      http.expectOne(SUMMARY).flush(summary(4));
+      store.loadMore();
+      const more = list();
+      store.clear();
+      expect(more.cancelled).toBe(true);
+      expect(store.meta()).toBeNull();
+      expect(store.items()).toEqual([]);
+      expect(store.nextCursor()).toBeNull();
+      expect(store.waiting()).toBeNull();
+      expect(store.refused()).toBe(false);
+      expect(store.loadError()).toBeNull();
+    });
+  });
+
   it('stop cancels what is in flight', () => {
     store.load();
     const req = list();

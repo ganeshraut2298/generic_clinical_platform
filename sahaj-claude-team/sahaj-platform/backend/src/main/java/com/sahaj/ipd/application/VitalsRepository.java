@@ -31,6 +31,14 @@ public interface VitalsRepository {
      */
     Map<UUID, LatestScore> findLatestOfAdmitted(UUID tenantId);
 
+    /**
+     * SAH-37 (ADR-015 D6, R4 extended): the same rows as {@link #findLatestOfAdmitted}, in the same single statement
+     * (one index probe per admission), with the five readings and the recorder id added. Used only when the published
+     * setup switches a reading or Last recorded on (or for the owner's preview); the default card keeps the narrower
+     * read.
+     */
+    Map<UUID, LatestScore> findLatestReadingsOfAdmitted(UUID tenantId);
+
     /** The record stored with this client key, in any admission of the clinic. */
     Optional<VitalsRow> findByClientKey(UUID tenantId, UUID clientKey);
 
@@ -46,12 +54,30 @@ public interface VitalsRepository {
     record Stored(UUID id, Instant recordedAt) {
     }
 
-    /** SAH-36: the latest score of one admission, nothing else of the record (no five values). Clinical data. */
-    record LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt) {
+    /**
+     * SAH-36: the latest score of one admission. SAH-37: {@code readings} and {@code recordedBy} are set only by
+     * {@link #findLatestReadingsOfAdmitted} (null in the score-only read). Clinical data.
+     */
+    record LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt, Readings readings,
+                       UUID recordedBy) {
+
+        /** The score-only row of {@link #findLatestOfAdmitted}. */
+        public LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt) {
+            this(admissionId, ewsScore, ewsRisk, recordedAt, null, null);
+        }
 
         @Override
         public String toString() {
             return "LatestScore[admissionId=" + admissionId + "]";
+        }
+    }
+
+    /** SAH-37: the five readings of one record. Clinical data: nothing in {@code toString}. */
+    record Readings(int bpSystolic, int bpDiastolic, int pulse, int spo2, BigDecimal tempC, int rr) {
+
+        @Override
+        public String toString() {
+            return "Readings[redacted]";
         }
     }
 

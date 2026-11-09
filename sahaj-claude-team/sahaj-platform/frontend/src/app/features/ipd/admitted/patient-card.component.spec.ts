@@ -47,7 +47,8 @@ describe('PatientCardComponent', () => {
     expect(text(view, '[data-testid=card-identity]')).toBe('UHID PT-000042 · 56 · Female');
     expect(text(view, '[data-testid=card-bed]')).toBe('Bed101-A');
     const labels = Array.from(view.querySelectorAll('dt')).map((d) => d.textContent!.trim());
-    expect(labels).toEqual(['Admitted on', 'Length of stay', 'Ward', 'Room', 'Doctor']);
+    // DEC-027: the standard card also carries the locked Allergies line.
+    expect(labels).toEqual(['Admitted on', 'Length of stay', 'Ward', 'Room', 'Doctor', 'Allergies']);
     expect(text(view, '[data-testid=card-admitted-on]')).toBe('22 Oct 2026, 9:20 AM IST');
     expect(text(view, '[data-testid=card-stay]')).toBe('3 days');
     expect(text(view, '[data-testid=card-ward]')).toBe('General ward');
@@ -108,7 +109,7 @@ describe('PatientCardComponent', () => {
     ]);
     const front = render(ROW, ABILITIES_FRONT_DESK);
     expect(Array.from(front.querySelectorAll('.pcacts button')).map((b) => b.textContent!.trim())).toEqual(['Transfer']);
-    const none = render(ROW, { nursing: false, emr: false, transfer: false, discharge: false, depositLowFlag: false });
+    const none = render(ROW, { ...ABILITIES_NURSE, nursing: false, emr: false, transfer: false });
     expect(none.querySelector('.pcacts')).toBeNull();
   });
 

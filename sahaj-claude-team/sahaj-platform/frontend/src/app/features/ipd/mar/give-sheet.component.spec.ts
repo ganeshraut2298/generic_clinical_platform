@@ -293,11 +293,51 @@ describe('GiveSheetComponent', () => {
       req.flush(recorded(), { status: 201, statusText: 'Created' });
     });
 
-    it('high-alert with nothing chosen sends nurse null and the empty PIN: the server answers', async () => {
+    it('high-alert with no second nurse: the contract text under Checked by, focus there, nothing sent (G-9)', async () => {
       await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }) });
       await fillIdentity();
+      await typePin('4821');
+      givenButton().click();
+      await settle();
+      await tick();
+      http.expectNone(`${DOSES}/${order.orderId}/doses`);
+      expect(squash(q('#sf-wit-err'))).toBe(HIGH_ALERT_MESSAGE);
+      expect(nurse().getAttribute('aria-invalid')).toBe('true');
+      expect(q('#sf-pin-err')).toBeNull();
+      expect(document.activeElement).toBe(nurse());
+      // the PIN typed without a nurse is not kept
+      expect(pin().value).toBe('');
+      await choose(nurse(), 'm-rupali');
+      expect(q('#sf-wit-err')).toBeNull();
+    });
+
+    it('high-alert with neither a nurse nor a PIN: the text once, under Their PIN, nothing sent (G-9)', async () => {
+      await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }) });
+      await fillIdentity();
+      givenButton().click();
+      await settle();
+      await tick();
+      http.expectNone(`${DOSES}/${order.orderId}/doses`);
+      expect(squash(q('#sf-pin-err'))).toBe(HIGH_ALERT_MESSAGE);
+      expect(q('#sf-wit-err')).toBeNull();
+      expect(document.activeElement).toBe(pin());
+    });
+
+    it('high-alert with a nurse but a PIN that is not 4 digits: the contract text under Their PIN, nothing sent (G-9)', async () => {
+      await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }) });
+      await fillIdentity();
+      await choose(nurse(), 'm-rupali');
+      await typePin('482');
+      givenButton().click();
+      await settle();
+      await tick();
+      http.expectNone(`${DOSES}/${order.orderId}/doses`);
+      expect(squash(q('#sf-pin-err'))).toBe(HIGH_ALERT_MESSAGE);
+      expect(document.activeElement).toBe(pin());
+      await typePin('4821');
+      expect(q('#sf-pin-err')).toBeNull();
       const req = await clickGiven();
-      expect(bodyOf(req)).toMatchObject({ secondNurseId: null, secondNursePin: '' });
+      expect(bodyOf(req)).toMatchObject({ secondNurseId: 'm-rupali', secondNursePin: '4821' });
       req.flush(recorded(), { status: 201, statusText: 'Created' });
     });
 
@@ -544,9 +584,9 @@ describe('GiveSheetComponent', () => {
       expect(q('#sf-said-err')).toBeNull();
     });
 
-    it('high-alert without nurse or PIN: the message once, under Their PIN', async () => {
+    it('high-alert, the server still answers both fields: the message once, under Their PIN', async () => {
       await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }) });
-      await fillIdentity();
+      await fillHighAlert();
       fail400(await clickGiven(), HIGH_ALERT_MESSAGE, [
         { field: 'secondNurseId', message: HIGH_ALERT_MESSAGE },
         { field: 'secondNursePin', message: HIGH_ALERT_MESSAGE },

@@ -49,6 +49,30 @@ class AdmittedCardsIT extends RoundSupport {
         return instantOf(clinic, "select max(recorded_at) from ipd.vitals where admission_id = '" + admissionId + "'::uuid");
     }
 
+    /**
+     * SAH-37: a front desk answer holds no clinical key and no clinical value. The answer now also carries the published
+     * setup ({@code cardSetup}: section and field keys such as {@code "clinical"}, which are setup names and not facts) and
+     * {@code card.visibleGroups}. The key check therefore runs on the rows ({@code items}) and on everything except
+     * {@code cardSetup}; the groups the front desk may see must not name the clinical or the vitals group.
+     */
+    private void assertNoClinicalForFrontDesk(JsonNode answer) {
+        com.fasterxml.jackson.databind.node.ObjectNode withoutSetup =
+                ((com.fasterxml.jackson.databind.node.ObjectNode) answer).deepCopy();
+        withoutSetup.remove("cardSetup");
+        String items = answer.get("items").toString();
+        String rest = withoutSetup.toString();
+        for (String key : FORBIDDEN_FOR_FRONT_DESK) {
+            assertThat(items).as("front desk rows must not hold " + key).doesNotContain(key);
+            assertThat(rest).as("front desk answer (without the setup) must not hold " + key).doesNotContain(key);
+        }
+        List<String> groups = new ArrayList<>();
+        answer.get("card").get("visibleGroups").forEach(g -> groups.add(g.asText()));
+        assertThat(groups).as("front desk groups").containsExactly("patient", "contact", "billing");
+        for (JsonNode row : answer.get("items")) {
+            assertThat(row.has("clinical")).isFalse();
+        }
+    }
+
     // ---------------- the row facts, the clinical object and the abilities ----------------
 
     @Test
@@ -71,7 +95,8 @@ class AdmittedCardsIT extends RoundSupport {
             assertThat(l.get("wards")).as("every ward, also the empty one, in setup order").hasSize(2);
             assertThat(l.get("wards").get(0).get("id").asText()).isEqualTo(wardId);
             assertThat(l.get("wards").get(1).get("name").asText()).isEqualTo("Second ward");
-            assertThat(keys(l.get("card"))).containsExactlyInAnyOrder("nursing", "emr", "transfer", "discharge", "depositLowFlag");
+            assertThat(keys(l.get("card"))).containsExactlyInAnyOrder("nursing", "emr", "transfer", "discharge", "deposit",
+                    "depositLowFlag", "visibleGroups");
         }
     }
 
@@ -113,11 +138,9 @@ class AdmittedCardsIT extends RoundSupport {
         clockAt(10, 5);
         Staff frontDesk = staff(w.clinic(), "FRONT_DESK");
         String json = raw(frontDesk.auth());
-        for (String key : FORBIDDEN_FOR_FRONT_DESK) {
-            assertThat(json).as("front desk raw JSON must not hold " + key).doesNotContain(key);
-        }
-        assertThat(json).doesNotContain("Penicillin").doesNotContain("HIGH").doesNotContain(escalation);
         JsonNode l = objectMapper.readTree(json);
+        assertNoClinicalForFrontDesk(l);
+        assertThat(json).doesNotContain("Penicillin").doesNotContain("HIGH").doesNotContain(escalation);
         assertThat(l.get("safety").isNull()).isTrue();
         for (JsonNode row : l.get("items")) {
             assertThat(row.has("clinical")).isFalse();
@@ -162,11 +185,9 @@ class AdmittedCardsIT extends RoundSupport {
                     .isIn(keepName, w.adm().name());
         }
         // the raw-JSON front desk check still holds after a merge: no clinical key at all
-        String json = raw(frontDesk.auth());
-        for (String key : FORBIDDEN_FOR_FRONT_DESK) {
-            assertThat(json).as("front desk raw JSON must not hold " + key).doesNotContain(key);
-        }
-        assertThat(objectMapper.readTree(json).get("safety").isNull()).isTrue();
+        JsonNode afterMerge = objectMapper.readTree(raw(frontDesk.auth()));
+        assertNoClinicalForFrontDesk(afterMerge);
+        assertThat(afterMerge.get("safety").isNull()).isTrue();
     }
 
     // ---------------- the role is read again ----------------

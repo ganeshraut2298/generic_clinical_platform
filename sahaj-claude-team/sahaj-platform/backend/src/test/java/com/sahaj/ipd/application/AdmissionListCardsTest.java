@@ -84,6 +84,8 @@ class AdmissionListCardsTest {
     private AuditLog auditLog;
     private EscalationBoardRepository board;
     private VitalsRepository vitals;
+    private CardSetupRepository cardSetupRepository;
+    private ActorDirectoryPort actors;
     private MedicineRoundRepository roundRepository;
     private AdmissionService service;
 
@@ -92,6 +94,7 @@ class AdmissionListCardsTest {
     private String ipdState = "on";
     private final Map<UUID, PatientClinical> patientMap = new HashMap<>();
     private final Map<UUID, LatestScore> latestScores = new HashMap<>();
+    private final Map<UUID, String> mobiles = new HashMap<>();
     private final List<AdmittedRow> placed = new ArrayList<>();
     private final List<BoardRow> live = new ArrayList<>();
     private final List<ActiveOrder> orders = new ArrayList<>();
@@ -109,6 +112,8 @@ class AdmissionListCardsTest {
         auditLog = mock(AuditLog.class);
         board = mock(EscalationBoardRepository.class);
         vitals = mock(VitalsRepository.class);
+        cardSetupRepository = mock(CardSetupRepository.class);
+        actors = mock(ActorDirectoryPort.class);
         roundRepository = mock(MedicineRoundRepository.class);
         DischargeRepository discharges = mock(DischargeRepository.class);
         ChargeRepository charges = mock(ChargeRepository.class);
@@ -116,11 +121,13 @@ class AdmissionListCardsTest {
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
         SafetyService safety = new SafetyService(board, admissions, mock(ClinicalEventRepository.class), lookup,
                 mock(ActorDirectoryPort.class), team, gate,
-                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue())));
+                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()),
+                        new SkippedOrderWarningsTest.MutableClock()));
         service = new AdmissionService(admissions, mock(BedRepository.class), wards, settings, mock(OwnerGuard.class),
-                auditLog, team, lookup, patientAccess, mock(ActorDirectoryPort.class), gate, catalog, charges,
+                auditLog, team, lookup, patientAccess, actors, gate, catalog, charges,
                 new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
-                mock(EmergencyService.class), vitals, new AdmittedCards(clinicalPatients, lookup, vitals, safety));
+                mock(EmergencyService.class), vitals, new AdmittedCards(clinicalPatients, lookup, vitals, safety),
+                new CardSetups(cardSetupRepository));
 
         when(entitlements.forTenant(TENANT)).thenAnswer(call -> new ModuleEntitlement(ipdState, false, 25));
         when(team.findActiveByUserId(TENANT, ACTOR)).thenAnswer(call -> memberRole == null ? Optional.empty()
@@ -137,10 +144,11 @@ class AdmissionListCardsTest {
         when(lookup.findAllCurrent(eq(TENANT), anyCollection())).thenAnswer(call -> {
             Map<UUID, PatientSummary> summaries = new HashMap<>();
             patientMap.forEach((id, p) -> summaries.put(id,
-                    new PatientSummary(p.id(), p.name(), p.age(), p.sex(), null, false, p.uhid())));
+                    new PatientSummary(p.id(), p.name(), p.age(), p.sex(), mobiles.get(id), false, p.uhid())));
             return summaries;
         });
         when(vitals.findLatestOfAdmitted(TENANT)).thenAnswer(call -> Map.copyOf(latestScores));
+        when(vitals.findLatestReadingsOfAdmitted(TENANT)).thenAnswer(call -> Map.copyOf(latestScores));
         when(roundRepository.findActiveOfAdmitted(TENANT)).thenAnswer(call -> List.copyOf(orders));
         when(wards.findWards(TENANT)).thenReturn(List.of(new WardRow(WARD_A, "General ward", "Station 1"),
                 new WardRow(WARD_B, "ICU", "Station 2"), new WardRow(EMPTY_WARD, "Maternity", "Station 3")));
@@ -169,7 +177,15 @@ class AdmissionListCardsTest {
     }
 
     private AdmissionList list(String tokenRole) {
-        return service.list(TENANT, ACTOR, tokenRole, null);
+        return service.list(TENANT, ACTOR, tokenRole, null, null);
+    }
+
+    private static final String[] ALL_GROUPS = {"patient", "contact", "clinical", "vitals", "billing"};
+
+    private static AdmittedCardAbilities card(boolean nursing, boolean emr, boolean transfer, boolean discharge,
+                                              boolean deposit, boolean depositLowFlag, String... groups) {
+        return new AdmittedCardAbilities(nursing, emr, transfer, discharge, deposit, depositLowFlag,
+                java.util.List.of(groups));
     }
 
     private AdmittedPatientRow only(AdmissionList list) {
@@ -305,7 +321,7 @@ class AdmissionListCardsTest {
 
         assertThat(only(list).clinical()).isNull();
         assertThat(list.safety()).isNull();
-        assertThat(list.card()).isEqualTo(new AdmittedCardAbilities(false, false, true, false, false));
+        assertThat(list.card()).isEqualTo(card(false, false, true, false, false, false, "patient"));
     }
 
     @Test
@@ -382,10 +398,10 @@ class AdmissionListCardsTest {
 
     @Test
     void aBadStatusIsA400AfterTheRoleChecks() {
-        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", "DISCHARGED"))
+        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", "DISCHARGED", null))
                 .isInstanceOf(InvalidInputException.class);
         memberRole = "BILLING";
-        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", "DISCHARGED"))
+        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", "DISCHARGED", null))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -565,7 +581,7 @@ class AdmissionListCardsTest {
         orders.add(new ActiveOrder(UUID.randomUUID(), admissionId, placed.get(0).admission().patientId(), "204",
                 "pcm", "od", Instant.parse("2026-11-09T05:00:00Z")));
 
-        AdmissionList list = service.list(TENANT, ACTOR, "NURSE", null);
+        AdmissionList list = service.list(TENANT, ACTOR, "NURSE", null, null);
 
         assertThat(list.safety().counts().dosesLate()).isEqualTo(1);
         assertThat(list.safety().counts().changeToken()).hasSize(22);
@@ -622,19 +638,20 @@ class AdmissionListCardsTest {
     @Test
     void theCardAbilitiesFollowTheRoleAndTheIpdState() {
         memberRole = "NURSE";
-        assertThat(list("NURSE").card()).isEqualTo(new AdmittedCardAbilities(true, true, true, false, false));
+        assertThat(list("NURSE").card()).isEqualTo(card(true, true, true, false, false, false, "patient", "clinical", "vitals"));
         memberRole = "DOCTOR";
-        assertThat(list("DOCTOR").card()).isEqualTo(new AdmittedCardAbilities(true, true, false, true, false));
+        assertThat(list("DOCTOR").card()).isEqualTo(card(true, true, false, true, false, false, "patient", "clinical", "vitals"));
         memberRole = "OWNER";
-        assertThat(list("OWNER").card()).isEqualTo(new AdmittedCardAbilities(true, true, true, true, true));
+        assertThat(list("OWNER").card()).isEqualTo(card(true, true, true, true, true, true, ALL_GROUPS));
         memberRole = "FRONT_DESK";
-        assertThat(list("FRONT_DESK").card()).isEqualTo(new AdmittedCardAbilities(false, false, true, false, true));
+        assertThat(list("FRONT_DESK").card())
+                .isEqualTo(card(false, false, true, false, true, true, "patient", "contact", "billing"));
 
         ipdState = "readonly";
         memberRole = "OWNER";
-        assertThat(list("OWNER").card()).isEqualTo(new AdmittedCardAbilities(true, true, false, false, true));
+        assertThat(list("OWNER").card()).isEqualTo(card(true, true, false, false, false, true, ALL_GROUPS));
         ipdState = "trial";
-        assertThat(list("OWNER").card()).isEqualTo(new AdmittedCardAbilities(true, true, true, true, true));
+        assertThat(list("OWNER").card()).isEqualTo(card(true, true, true, true, true, true, ALL_GROUPS));
     }
 
     @Test
@@ -648,5 +665,334 @@ class AdmissionListCardsTest {
             assertThat(row.depositState()).as(role).isNotNull();
             assertThat(row.runningBillPaise()).as(role).isPositive();
         }
+    }
+
+    // ---- SAH-37: the published setup, the new card facts, cardFacts=all ----
+
+    private static final UUID RECORDER = UUID.randomUUID();
+
+    /** The standard setup with these fields switched on (and Billing switched on when a billing field is named). */
+    private void publishWithFieldsOn(String... keys) {
+        java.util.Set<String> on = java.util.Set.of(keys);
+        java.util.List<com.sahaj.ipd.domain.card.CardSetup.Section> sections = new ArrayList<>();
+        for (com.sahaj.ipd.domain.card.CardSetup.Section s : com.sahaj.ipd.domain.card.CardSetupDefaults.standard()
+                .sections()) {
+            java.util.List<com.sahaj.ipd.domain.card.CardSetup.FieldPlacement> fields = new ArrayList<>();
+            for (com.sahaj.ipd.domain.card.CardSetup.FieldPlacement f : s.fields()) {
+                fields.add(on.contains(f.key())
+                        ? new com.sahaj.ipd.domain.card.CardSetup.FieldPlacement(f.key(), true, "") : f);
+            }
+            boolean billing = s.key().equals("billing") && (on.contains("runningBill") || on.contains("deposit"));
+            sections.add(new com.sahaj.ipd.domain.card.CardSetup.Section(s.key(), billing || s.on(), fields));
+        }
+        com.sahaj.ipd.domain.card.CardSetup setup = new com.sahaj.ipd.domain.card.CardSetup("expanded", 4, sections,
+                com.sahaj.ipd.domain.card.CardSetupDefaults.standard().actions());
+        when(cardSetupRepository.findLatestVersion(TENANT)).thenReturn(Optional.of(
+                new CardSetupRepository.VersionRow(2, CardSetupJson.write(setup), false, List.of("layout", "fields"),
+                        RECORDER, AS_OF)));
+    }
+
+    private UUID admitWithReason(String name, String reason) {
+        UUID admissionId = admit(name, "UH-0001", null);
+        AdmittedRow old = placed.remove(placed.size() - 1);
+        AdmissionRow a = old.admission();
+        placed.add(new AdmittedRow(new AdmissionRow(a.id(), a.ipNumber(), a.patientId(), a.bedId(), a.bedCode(),
+                a.categoryKey(), a.wardName(), a.doctorMembershipId(), a.admissionType(), a.payer(), reason,
+                a.status(), a.admittedAt(), a.depositTotalPaise()), old.wardId(), old.roomName()));
+        return admissionId;
+    }
+
+    private void recordVitals(UUID admissionId) {
+        latestScores.put(admissionId, new LatestScore(admissionId, 5, Risk.MEDIUM, AS_OF.minusSeconds(35 * 60),
+                new VitalsRepository.Readings(85, 60, 95, 96, new java.math.BigDecimal("37.0"), 22), RECORDER));
+    }
+
+    @Test
+    void aClinicThatNeverPublishedGetsTheStandardCardAndNoNewFact() {
+        memberRole = "OWNER";
+        UUID id = admitWithReason("Meena Patil", "Chest pain");
+        recordVitals(id);
+        mobiles.putAll(Map.of(placed.get(0).admission().patientId(), "9876543210"));
+
+        AdmissionList list = list("OWNER");
+
+        assertThat(list.cardSetup().version()).isEqualTo(1);
+        assertThat(list.cardSetup().isStandard()).isTrue();
+        assertThat(list.cardSetup().fallback()).isFalse();
+        assertThat(list.cardSetup().layout()).isEqualTo("standard");
+        assertThat(list.cardSetup().cardsPerRow()).isEqualTo(3);
+        AdmittedPatientRow row = only(list);
+        assertThat(row.clinical().diagnosis()).isNull();
+        assertThat(row.clinical().latestVitals()).isNull();
+        assertThat(row.mobile()).isNull();
+        assertThat(row.clinical().latestEws()).isNotNull();
+        verify(vitals, never()).findLatestReadingsOfAdmitted(any());
+        verify(vitals, times(1)).findLatestOfAdmitted(TENANT);
+        verify(actors, never()).displayNames(any(), any());
+        verify(lookup, never()).findAllCurrent(any(), any());
+    }
+
+    @Test
+    void theDiagnosisIsSentToOwnerDoctorAndNurseOnlyWhenTheSetupSwitchesItOn() {
+        publishWithFieldsOn("diagnosis");
+        admitWithReason("Meena Patil", "Chest pain");
+
+        for (String role : new String[] {"OWNER", "DOCTOR", "NURSE"}) {
+            memberRole = role;
+            assertThat(only(list(role)).clinical().diagnosis()).as(role).isEqualTo("Chest pain");
+        }
+        memberRole = "FRONT_DESK";
+        AdmittedPatientRow frontDesk = only(list("FRONT_DESK"));
+        assertThat(frontDesk.clinical()).isNull();
+        verify(vitals, never()).findLatestReadingsOfAdmitted(any());
+    }
+
+    @Test
+    void aBlankReasonIsUnderEvaluationAndNothingIsSentWhenTheFieldIsOff() {
+        publishWithFieldsOn("diagnosis");
+        admitWithReason("Meena Patil", "  ");
+        memberRole = "DOCTOR";
+
+        assertThat(only(list("DOCTOR")).clinical().diagnosis()).isEqualTo("Under evaluation");
+
+        when(cardSetupRepository.findLatestVersion(TENANT)).thenReturn(Optional.empty());
+        assertThat(only(list("DOCTOR")).clinical().diagnosis()).isNull();
+    }
+
+    @Test
+    void theReadingsAndTheirMarksAreSentOnlyForTheFieldsThatAreOnWithOneBatchOfRecorderNames() {
+        publishWithFieldsOn("bp", "pulse", "lastRecorded");
+        UUID id = admitWithReason("Meena Patil", "x");
+        recordVitals(id);
+        when(actors.displayNames(eq(TENANT), anyCollection())).thenReturn(Map.of(RECORDER, "Sr. Anjali Pawar"));
+        memberRole = "NURSE";
+
+        AdmittedPatientRow row = only(list("NURSE"));
+        AdmissionViews.CardLatestVitals tiles = row.clinical().latestVitals().get();
+
+        assertThat(tiles.bp().systolic()).isEqualTo(85);
+        assertThat(tiles.bp().mark()).isEqualTo(com.sahaj.ipd.domain.card.VitalMarks.Mark.CRITICAL);
+        assertThat(tiles.pulse().value()).isEqualByComparingTo("95");
+        assertThat(tiles.pulse().mark()).isEqualTo(com.sahaj.ipd.domain.card.VitalMarks.Mark.CHECK);
+        assertThat(tiles.spo2()).isNull();
+        assertThat(tiles.temp()).isNull();
+        assertThat(tiles.rr()).isNull();
+        assertThat(tiles.recordedByName()).isEqualTo("Sr. Anjali Pawar");
+        assertThat(tiles.recordedAt()).isEqualTo(AS_OF.minusSeconds(35 * 60));
+        verify(vitals, times(1)).findLatestReadingsOfAdmitted(TENANT);
+        verify(vitals, never()).findLatestOfAdmitted(any());
+        verify(actors, times(1)).displayNames(eq(TENANT), anyCollection());
+    }
+
+    @Test
+    void withoutLastRecordedTheRecorderIsNeverLookedUp() {
+        publishWithFieldsOn("spo2");
+        recordVitals(admitWithReason("Meena Patil", "x"));
+        memberRole = "NURSE";
+
+        AdmissionViews.CardLatestVitals tiles = only(list("NURSE")).clinical().latestVitals().get();
+
+        assertThat(tiles.spo2().value()).isEqualByComparingTo("96");
+        assertThat(tiles.recordedByName()).isNull();
+        verify(actors, never()).displayNames(any(), any());
+    }
+
+    @Test
+    void noVitalsRecordedIsAnEmptyOptionalWhenAReadingIsOn() {
+        publishWithFieldsOn("bp");
+        admitWithReason("Meena Patil", "x");
+        memberRole = "NURSE";
+
+        AdmittedPatientRow row = only(list("NURSE"));
+
+        assertThat(row.clinical().latestVitals()).isEqualTo(Optional.empty());
+        assertThat(row.clinical().latestEws()).isNull();
+    }
+
+    @Test
+    void frontDeskNeverGetsDiagnosisOrVitalsEvenWhenTheSetupShowsThemAndGetsTheMobile() {
+        publishWithFieldsOn("diagnosis", "bp", "pulse", "spo2", "temp", "rr", "lastRecorded", "mobile");
+        UUID id = admitWithReason("Meena Patil", "Chest pain");
+        recordVitals(id);
+        mobiles.put(placed.get(0).admission().patientId(), "9876543210");
+        memberRole = "FRONT_DESK";
+
+        AdmittedPatientRow row = only(list("FRONT_DESK"));
+
+        assertThat(row.clinical()).isNull();
+        assertThat(row.mobile()).contains("9876543210");
+        verify(vitals, never()).findLatestReadingsOfAdmitted(any());
+        verify(vitals, never()).findLatestOfAdmitted(any());
+        verify(lookup, times(1)).findAllCurrent(eq(TENANT), anyCollection());
+        verifyNoInteractions(clinicalPatients);
+    }
+
+    @Test
+    void nurseAndDoctorNeverGetTheMobileEvenWhenTheSetupShowsIt() {
+        publishWithFieldsOn("mobile");
+        admitWithReason("Meena Patil", "x");
+        mobiles.put(placed.get(0).admission().patientId(), "9876543210");
+        for (String role : new String[] {"NURSE", "DOCTOR"}) {
+            memberRole = role;
+            assertThat(only(list(role)).mobile()).as(role).isNull();
+        }
+        verify(lookup, never()).findAllCurrent(any(), any());
+    }
+
+    @Test
+    void theOwnerGetsTheMobileFromOneExtraBatchAndNullWhenTheRecordHasNone() {
+        publishWithFieldsOn("mobile");
+        admitWithReason("Meena Patil", "x");
+        admitWithReason("Raj Kumar", "y");
+        mobiles.put(placed.get(0).admission().patientId(), "9876543210");
+        memberRole = "OWNER";
+
+        AdmissionList list = list("OWNER");
+
+        assertThat(list.items().get(0).mobile()).contains("9876543210");
+        assertThat(list.items().get(1).mobile()).isEqualTo(Optional.empty());
+        verify(lookup, times(1)).findAllCurrent(eq(TENANT), anyCollection());
+    }
+
+    @Test
+    void aFieldInASectionThatIsSwitchedOffIsNotSent() {
+        // Diagnosis moved into the Care team section, which is then switched off.
+        com.sahaj.ipd.domain.card.CardSetup standard = com.sahaj.ipd.domain.card.CardSetupDefaults.standard();
+        java.util.List<com.sahaj.ipd.domain.card.CardSetup.Section> sections = new ArrayList<>();
+        for (com.sahaj.ipd.domain.card.CardSetup.Section s : standard.sections()) {
+            java.util.List<com.sahaj.ipd.domain.card.CardSetup.FieldPlacement> fields = new ArrayList<>(s.fields());
+            fields.removeIf(f -> f.key().equals("diagnosis"));
+            if (s.key().equals("care")) {
+                fields.add(new com.sahaj.ipd.domain.card.CardSetup.FieldPlacement("diagnosis", true, ""));
+            }
+            sections.add(new com.sahaj.ipd.domain.card.CardSetup.Section(s.key(), !s.key().equals("care") && s.on(),
+                    fields));
+        }
+        com.sahaj.ipd.domain.card.CardSetup setup = new com.sahaj.ipd.domain.card.CardSetup("standard", 3, sections,
+                standard.actions());
+        when(cardSetupRepository.findLatestVersion(TENANT)).thenReturn(Optional.of(
+                new CardSetupRepository.VersionRow(2, CardSetupJson.write(setup), false, List.of("fields"), RECORDER,
+                        AS_OF)));
+        admitWithReason("Meena Patil", "Chest pain");
+        memberRole = "DOCTOR";
+
+        AdmissionList list = list("DOCTOR");
+
+        assertThat(only(list).clinical().diagnosis()).isNull();
+        assertThat(list.cardSetup().shownFields()).doesNotContain("diagnosis");
+    }
+
+    @Test
+    void thePublishedSetupIsResolvedWithLabelsOrderAndActions() {
+        publishWithFieldsOn("ipNumber");
+        admitWithReason("Meena Patil", "x");
+        memberRole = "OWNER";
+
+        com.sahaj.ipd.domain.card.ResolvedCardSetup resolved = list("OWNER").cardSetup();
+
+        assertThat(resolved.version()).isEqualTo(2);
+        assertThat(resolved.isStandard()).isFalse();
+        assertThat(resolved.layout()).isEqualTo("expanded");
+        assertThat(resolved.cardsPerRow()).isEqualTo(4);
+        assertThat(resolved.sections().get(0).fields()).extracting(f -> f.key())
+                .containsExactly("name", "uhid", "ageSex", "bed", "ipNumber");
+        assertThat(resolved.actions()).containsExactly("nursing", "emr", "transfer", "discharge");
+    }
+
+    @Test
+    void aStoredSetupThatCannotBeReadShowsTheStandardCardWithTheFallbackFlag() {
+        when(cardSetupRepository.findLatestVersion(TENANT)).thenReturn(Optional.of(
+                new CardSetupRepository.VersionRow(4, "{broken", false, List.of(), RECORDER, AS_OF)));
+        admitWithReason("Meena Patil", "x");
+
+        AdmissionList list = list("NURSE");
+
+        assertThat(list.cardSetup().fallback()).isTrue();
+        assertThat(list.cardSetup().isStandard()).isTrue();
+        assertThat(list.cardSetup().layout()).isEqualTo("standard");
+        assertThat(list.items()).hasSize(1);
+    }
+
+    @Test
+    void aStoredSetupThatLacksAllergiesStillShowsThemOnTheCard() {
+        com.sahaj.ipd.domain.card.CardSetup standard = com.sahaj.ipd.domain.card.CardSetupDefaults.standard();
+        java.util.List<com.sahaj.ipd.domain.card.CardSetup.Section> sections = new ArrayList<>();
+        for (com.sahaj.ipd.domain.card.CardSetup.Section s : standard.sections()) {
+            java.util.List<com.sahaj.ipd.domain.card.CardSetup.FieldPlacement> fields = new ArrayList<>(s.fields());
+            fields.removeIf(f -> f.key().equals("allergies") || f.key().equals("ews"));
+            sections.add(new com.sahaj.ipd.domain.card.CardSetup.Section(s.key(), s.on(), fields));
+        }
+        when(cardSetupRepository.findLatestVersion(TENANT)).thenReturn(Optional.of(new CardSetupRepository.VersionRow(
+                2, CardSetupJson.write(new com.sahaj.ipd.domain.card.CardSetup("compact", 2, sections,
+                        standard.actions())), false, List.of("layout"), RECORDER, AS_OF)));
+
+        com.sahaj.ipd.domain.card.ResolvedCardSetup resolved = list("NURSE").cardSetup();
+
+        assertThat(resolved.layout()).isEqualTo("compact");
+        assertThat(resolved.shownFields()).contains("allergies", "ews", "uhid", "alerts", "name");
+    }
+
+    @Test
+    void cardFactsAllSendsEveryNewFactToTheOwnerWhateverTheSetupSays() {
+        recordVitals(admitWithReason("Meena Patil", "Chest pain"));
+        mobiles.put(placed.get(0).admission().patientId(), "9876543210");
+        when(actors.displayNames(eq(TENANT), anyCollection())).thenReturn(Map.of(RECORDER, "Sr. Anjali Pawar"));
+        memberRole = "OWNER";
+
+        AdmissionList list = service.list(TENANT, ACTOR, "OWNER", null, "all");
+
+        AdmittedPatientRow row = only(list);
+        assertThat(row.clinical().diagnosis()).isEqualTo("Chest pain");
+        AdmissionViews.CardLatestVitals tiles = row.clinical().latestVitals().get();
+        assertThat(tiles.bp()).isNotNull();
+        assertThat(tiles.pulse()).isNotNull();
+        assertThat(tiles.spo2()).isNotNull();
+        assertThat(tiles.temp()).isNotNull();
+        assertThat(tiles.rr()).isNotNull();
+        assertThat(tiles.recordedByName()).isEqualTo("Sr. Anjali Pawar");
+        assertThat(row.mobile()).contains("9876543210");
+        // the setup itself is still the published one
+        assertThat(list.cardSetup().version()).isEqualTo(1);
+    }
+
+    @Test
+    void cardFactsAllIsForTheOwnerOnlyTokenRoleAndMembershipBoth() {
+        admitWithReason("Meena Patil", "x");
+        for (String role : new String[] {"NURSE", "DOCTOR", "FRONT_DESK"}) {
+            memberRole = role;
+            assertThatThrownBy(() -> service.list(TENANT, ACTOR, role, null, "all"))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessage("Only the clinic owner can preview the card setup.");
+        }
+        memberRole = "NURSE";
+        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", null, "all"))
+                .isInstanceOf(AccessDeniedException.class);
+        memberRole = "OWNER";
+        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "NURSE", null, "all"))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(vitals, never()).findLatestReadingsOfAdmitted(any());
+    }
+
+    @Test
+    void cardFactsSetupIsTheDefaultAndAnyOtherValueIs400() {
+        admitWithReason("Meena Patil", "x");
+        memberRole = "OWNER";
+
+        assertThat(service.list(TENANT, ACTOR, "OWNER", null, "setup").items()).hasSize(1);
+        assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", null, "everything"))
+                .isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    void theListWritesNothingAndReadsTheSetupOncePerAnswer() {
+        publishWithFieldsOn("diagnosis");
+        admitWithReason("Meena Patil", "x");
+        memberRole = "OWNER";
+
+        list("OWNER");
+
+        verify(cardSetupRepository, times(1)).findLatestVersion(TENANT);
+        verify(cardSetupRepository, never()).findDraft(any());
+        verifyNoInteractions(auditLog, patientAccess);
     }
 }

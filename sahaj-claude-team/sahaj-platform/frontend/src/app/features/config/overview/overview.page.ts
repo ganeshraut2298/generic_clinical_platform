@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Observable, catchError, of } from 'rxjs';
+import { CardSetupApi } from '../../ipd/card/card-setup.api';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { CONFIG_SECTIONS } from '../config-sections';
@@ -37,6 +38,9 @@ export class OverviewPage implements OnInit {
   private readonly team = inject(TeamApi);
   private readonly store = inject(ShellStore);
   private readonly ipdAccess = inject(IpdAccess);
+  private readonly cardApi = inject(CardSetupApi);
+  private tileData: TileData | null = null;
+  private cardRequested = false;
 
   protected readonly formatWhen = formatWhen;
   protected readonly describeAction = describeAction;
@@ -56,6 +60,15 @@ export class OverviewPage implements OnInit {
   protected readonly tiles = computed(() =>
     CONFIG_SECTIONS.filter((s) => s.key !== 'home' && this.ipdAccess.visible(s)),
   );
+
+  constructor() {
+    // SAH-37 (AC15): the Patient card tile line needs the card setup, which only a clinic with IPD has.
+    effect(() => {
+      if (this.ipdAccess.available()) {
+        untracked(() => this.loadCardTile());
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.loadTiles();
@@ -82,6 +95,7 @@ export class OverviewPage implements OnInit {
   /** Each tile's line comes from its own call, so one failing call only empties one line. */
   private loadTiles(): void {
     const data: TileData = {
+      cardSetup: null,
       profile: null,
       holidays: null,
       members: null,
@@ -89,6 +103,7 @@ export class OverviewPage implements OnInit {
       fees: null,
       paper: null,
     };
+    this.tileData = data;
     const fill = <K extends keyof TileData>(key: K, call: Observable<TileData[K]>) =>
       call.pipe(catchError(() => of(null))).subscribe((value) => {
         data[key] = value as TileData[K];
@@ -100,5 +115,28 @@ export class OverviewPage implements OnInit {
     fill('members', this.team.list());
     fill('fees', this.opd.getFeeSettings());
     fill('paper', this.opd.getCasePaperSettings());
+    if (this.cardRequested) {
+      this.cardRequested = false;
+      this.loadCardTile();
+    }
+  }
+
+  private loadCardTile(): void {
+    const data = this.tileData;
+    if (!data) {
+      // The effect ran before ngOnInit: the tile data does not exist yet; loadTiles asks again.
+      this.cardRequested = true;
+      return;
+    }
+    if (data.cardSetup) {
+      return;
+    }
+    this.cardApi
+      .get()
+      .pipe(catchError(() => of(null)))
+      .subscribe((view) => {
+        data.cardSetup = view;
+        this.summaries.set(tileSummaries(data));
+      });
   }
 }

@@ -14,7 +14,7 @@
   />
 
   <div class="wfb">
-    <div class="palette surf">
+    <div class="palette surf" data-surface>
       <span class="eyebrow">Add a stage</span>
       @for (key of palette; track key) {
         <button type="button" class="pal" [disabled]="has(key)" (click)="add(key)">
@@ -24,7 +24,7 @@
       }
     </div>
 
-    <div class="canvas surf">
+    <div class="canvas surf" data-surface>
       <div class="wfbar">
         <div>
           <b>General practice · New visit</b>

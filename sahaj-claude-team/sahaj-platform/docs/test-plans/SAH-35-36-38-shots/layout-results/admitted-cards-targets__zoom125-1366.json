@@ -1,0 +1,11 @@
+{
+  "screen": "admitted-cards-targets",
+  "project": "zoom125-1366",
+  "viewport": {
+    "width": 1093,
+    "height": 614
+  },
+  "dpr": 1.25,
+  "small3": [],
+  "small4": []
+}

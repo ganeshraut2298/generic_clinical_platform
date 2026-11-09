@@ -3,6 +3,7 @@
  * Emergency and triage setup). Names, ages, mobiles and complaints are shown on screen only: they
  * never go to a log, the URL or storage.
  */
+import { plainSpaces } from '../../../shared/format/plain-space';
 export type TriageScale = 3 | 5;
 export type TriageLevel = 1 | 2 | 3 | 4 | 5;
 export type EmergencyTone = 'crit' | 'warn' | 'good';
@@ -75,7 +76,9 @@ export interface EmergencyQueue {
 }
 
 /** Type guard: the full card has a `displayName`; the reference never does. */
-export function isFullCase(acted: EmergencyCase | EmergencyCaseRef | null | undefined): acted is EmergencyCase {
+export function isFullCase(
+  acted: EmergencyCase | EmergencyCaseRef | null | undefined,
+): acted is EmergencyCase {
   return !!acted && typeof (acted as Partial<EmergencyCase>).displayName === 'string';
 }
 
@@ -167,14 +170,16 @@ export function timeOfInstant(instant: string | null | undefined): string {
   if (!date || Number.isNaN(date.getTime())) {
     return '';
   }
-  return new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-    .format(date)
-    .toUpperCase();
+  return plainSpaces(
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .format(date)
+      .toUpperCase(),
+  );
 }
 
 /** Warning after a failed 60-second reload: the screen keeps the last good answer. */
@@ -244,7 +249,10 @@ export function parseAge(text: string): number | null | undefined {
 }
 
 /** The messages of AC4 and `POST /emergency/cases`; the server checks everything again. */
-export function validateRegistration(draft: RegistrationDraft, unknownAllowed: boolean): RegistrationErrors {
+export function validateRegistration(
+  draft: RegistrationDraft,
+  unknownAllowed: boolean,
+): RegistrationErrors {
   const errors: RegistrationErrors = {};
   const name = draft.name.trim();
   if (!(draft.unknown && unknownAllowed)) {

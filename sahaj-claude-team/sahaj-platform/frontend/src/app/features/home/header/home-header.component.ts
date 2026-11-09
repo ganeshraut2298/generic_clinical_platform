@@ -22,7 +22,7 @@ export const SECTION_LINKS = [
     <button type="button" class="skip" (click)="scroll.section('main')">
       Skip to main content
     </button>
-    <header class="lnav surf">
+    <header class="lnav surf" data-surface data-dot-exclude>
       <div class="brand">
         <div class="logo">
           <svg

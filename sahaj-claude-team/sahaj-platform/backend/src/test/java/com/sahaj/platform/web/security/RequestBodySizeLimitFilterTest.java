@@ -16,9 +16,20 @@ class RequestBodySizeLimitFilterTest {
     private final RequestBodySizeLimitFilter filter =
             new RequestBodySizeLimitFilter(new ProblemJsonWriter(new ObjectMapper()));
 
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private static void signIn() {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "user", null, java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OWNER"))));
+    }
+
     @Test
-    void ignoresPathsOutsideThePublicPrefix() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/platform/me");
+    void ignoresPathsOutsideTheApi() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
         assertThat(filter.shouldNotFilter(request)).isTrue();
     }
 
@@ -62,5 +73,246 @@ class RequestBodySizeLimitFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(seenByChain[0]).isEqualTo(body);
+    }
+
+    // ---- release audit G-1: signed-in endpoints ----
+
+    private static final long SIGNED_IN_LIMIT = 64 * 1024;
+
+    private static MockHttpServletRequest postOf(String path, int bytes) {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+        request.setContent("a".repeat(bytes).getBytes(StandardCharsets.UTF_8));
+        return request;
+    }
+
+    private static FilterChain mustNotRun() {
+        return (req, res) -> {
+            throw new AssertionError("the chain must not run for an oversized body");
+        };
+    }
+
+    @Test
+    void guardsEveryApiPathButNotOtherPaths() {
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("POST", "/api/v1/ipd/admissions/x/doses")))
+                .isFalse();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("POST", "/actuator/health"))).isTrue();
+    }
+
+    @Test
+    void aSignedInBodyOfExactlyTheLimitGoesThrough() throws Exception {
+        signIn();
+        MockHttpServletRequest request = postOf("/api/v1/ipd/doses", (int) SIGNED_IN_LIMIT);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        int[] seen = new int[1];
+
+        filter.doFilter(request, response, (req, res) -> seen[0] = StreamUtils.copyToByteArray(req.getInputStream()).length);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(seen[0]).isEqualTo((int) SIGNED_IN_LIMIT);
+    }
+
+    @Test
+    void aSignedInBodyOverTheLimitAnswers413ProblemJsonByDeclaredLength() throws Exception {
+        signIn();
+        MockHttpServletRequest request = postOf("/api/v1/ipd/doses", (int) SIGNED_IN_LIMIT + 1);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+        assertThat(response.getContentType()).startsWith("application/problem+json");
+        assertThat(response.getContentAsString()).contains("payload-too-large").contains("Request too large")
+                .contains("The request body must be 64 KB or smaller.");
+    }
+
+    @Test
+    void aSignedInChunkedBodyWithNoDeclaredLengthIsStoppedAtTheLimit() throws Exception {
+        signIn();
+        long[] bytesPulled = new long[1];
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/ipd/seen") {
+            @Override
+            public jakarta.servlet.ServletInputStream getInputStream() {
+                return new jakarta.servlet.ServletInputStream() {
+                    @Override
+                    public int read() {
+                        bytesPulled[0]++;
+                        return 'a';
+                    }
+
+                    @Override
+                    public int read(byte[] b, int off, int len) {
+                        bytesPulled[0] += len;
+                        java.util.Arrays.fill(b, off, off + len, (byte) 'a');
+                        return len;
+                    }
+
+                    @Override
+                    public boolean isFinished() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isReady() {
+                        return true;
+                    }
+
+                    @Override
+                    public void setReadListener(jakarta.servlet.ReadListener readListener) {
+                    }
+                };
+            }
+        };
+        // no content length is declared, as with Transfer-Encoding: chunked
+        assertThat(request.getContentLengthLong()).isEqualTo(-1);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+        assertThat(response.getContentType()).startsWith("application/problem+json");
+        assertThat(bytesPulled[0]).as("reading stopped just past the cap, an endless stream is not read").isLessThan(SIGNED_IN_LIMIT + 8192);
+    }
+
+    // ---- security review #3: no principal means the 4 KB cap ----
+
+    @Test
+    void aCallerWithNoPrincipalGetsThe4KbCapOnANonPublicPath() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(postOf("/api/v1/ipd/doses", 5000), response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+        assertThat(response.getContentAsString()).contains("The request body must be 4 KB or smaller.");
+    }
+
+    @Test
+    void anAnonymousAuthenticationAlsoGetsThe4KbCap() throws Exception {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.AnonymousAuthenticationToken("key", "anonymous",
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_ANONYMOUS"))));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(postOf("/api/v1/ipd/doses", 5000), response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+    }
+
+    @Test
+    void aChunkedBodyWithNoPrincipalIsStoppedAtTheFourKbCap() throws Exception {
+        long[] bytesPulled = new long[1];
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/ipd/seen") {
+            @Override
+            public jakarta.servlet.ServletInputStream getInputStream() {
+                return new jakarta.servlet.ServletInputStream() {
+                    @Override
+                    public int read() {
+                        bytesPulled[0]++;
+                        return 'a';
+                    }
+
+                    @Override
+                    public int read(byte[] b, int off, int len) {
+                        bytesPulled[0] += len;
+                        java.util.Arrays.fill(b, off, off + len, (byte) 'a');
+                        return len;
+                    }
+
+                    @Override
+                    public boolean isFinished() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isReady() {
+                        return true;
+                    }
+
+                    @Override
+                    public void setReadListener(jakarta.servlet.ReadListener readListener) {
+                    }
+                };
+            }
+        };
+        assertThat(request.getContentLengthLong()).isEqualTo(-1);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+        assertThat(bytesPulled[0]).as("an anonymous caller is read for no more than about 4 KB")
+                .isLessThanOrEqualTo(RequestBodySizeLimitFilter.MAX_BODY_BYTES + 4096);
+    }
+
+    @Test
+    void aSignedInCallerKeepsThe64KbCap() throws Exception {
+        signIn();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(postOf("/api/v1/ipd/doses", 5000), response, (req, res) -> { });
+
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void thePublicCapStaysAt4KbEvenWhenTheSignedInCapIsHigher() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(postOf("/api/v1/platform/public/sales-enquiries", 5000), response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+        assertThat(response.getContentAsString()).contains("The request body must be 4 KB or smaller.");
+    }
+
+    @Test
+    void aPercentEncodedPublicPathStillGetsThePublicCap() throws Exception {
+        MockHttpServletRequest request = postOf("/api/v1/platform/public/sales-enquiries", 5000);
+        request.setRequestURI("/api/v1/platform/%70ublic/sales-enquiries");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+    }
+
+    @Test
+    void theSignedInCapIsConfigurable() throws Exception {
+        signIn();
+        RequestBodySizeLimitFilter small =
+                new RequestBodySizeLimitFilter(new ProblemJsonWriter(new ObjectMapper()), 8 * 1024);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        small.doFilter(postOf("/api/v1/ipd/doses", 8 * 1024 + 1), response, mustNotRun());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+        assertThat(response.getContentAsString()).contains("The request body must be 8 KB or smaller.");
+    }
+
+    @Test
+    void aCapBelowThePublicCapIsRaisedToIt() throws Exception {
+        RequestBodySizeLimitFilter tiny = new RequestBodySizeLimitFilter(new ProblemJsonWriter(new ObjectMapper()), 10);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        tiny.doFilter(postOf("/api/v1/ipd/doses", 4096), response, (req, res) -> { });
+
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void aRequestWithNoBodyGoesThrough() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/ipd/admissions");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        boolean[] ran = new boolean[1];
+
+        filter.doFilter(request, response, (req, res) -> ran[0] = true);
+
+        assertThat(ran[0]).isTrue();
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void describeShowsWholeKilobytesOrBytes() {
+        assertThat(RequestBodySizeLimitFilter.describe(65536)).isEqualTo("64 KB");
+        assertThat(RequestBodySizeLimitFilter.describe(5000)).isEqualTo("5000 bytes");
     }
 }

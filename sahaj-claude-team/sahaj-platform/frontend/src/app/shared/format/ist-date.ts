@@ -2,6 +2,7 @@
  * Calendar-day helpers in `Asia/Kolkata`, independent of the device time zone. Shared by any
  * feature that needs "today"/"tomorrow" as a plain date, such as Appointments (SAH-11).
  */
+import { plainSpaces } from './plain-space';
 
 /** Today in India as `YYYY-MM-DD`. */
 export function istToday(now: Date = new Date()): string {
@@ -77,13 +78,15 @@ export function formatDisplayDateTimeOfInstant(instant: string | null | undefine
   if (Number.isNaN(date.getTime())) {
     return '';
   }
-  const time = new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-    .format(date)
-    .toUpperCase();
+  const time = plainSpaces(
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .format(date)
+      .toUpperCase(),
+  );
   return `${formatDisplayDate(istToday(date))}, ${time}`;
 }

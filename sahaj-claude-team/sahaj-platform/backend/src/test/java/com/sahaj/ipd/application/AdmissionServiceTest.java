@@ -124,7 +124,8 @@ class AdmissionServiceTest {
         service = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team, patients,
                 patientAccess, actors, new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
                 catalog, charges, new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
-                emergency, vitals, new AdmittedCards(clinicalPatients, patients, vitals, safety));
+                emergency, vitals, new AdmittedCards(clinicalPatients, patients, vitals, safety),
+                new CardSetups(mock(CardSetupRepository.class)));
 
         state("on");
         freeBed = new BedRow(BED, WARD, null, "101-A", "gen", "free");
@@ -154,7 +155,7 @@ class AdmissionServiceTest {
     /** SAH-36: the list needs the caller's active membership (the role is read again), so each call sets it first. */
     private AdmissionList listAs(String role, String status) {
         membershipIs(role, true);
-        return service.list(TENANT, ACTOR, role, status);
+        return service.list(TENANT, ACTOR, role, status, null);
     }
 
     private static List<AdmittedRow> placed(AdmissionRow... rows) {

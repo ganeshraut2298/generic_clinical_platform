@@ -5,6 +5,7 @@ import com.sahaj.platform.application.admin.AdminTokenService;
 import com.sahaj.platform.infrastructure.admin.AdminAuthentication;
 import com.sahaj.platform.infrastructure.admin.AdminPrincipal;
 import com.sahaj.platform.infrastructure.security.ProblemJsonWriter;
+import com.sahaj.platform.infrastructure.security.RequestLogContextFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -62,6 +63,7 @@ class AdminJwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 if (live) {
+                    RequestLogContextFilter.recordUser(claims.adminId());
                     org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
                             new AdminAuthentication(new AdminPrincipal(claims.adminId(), claims.sessionId())));
                 } else {

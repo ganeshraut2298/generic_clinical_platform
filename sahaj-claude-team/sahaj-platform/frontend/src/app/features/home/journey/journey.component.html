@@ -13,29 +13,31 @@
     lead="Follow one visit through the clinic. Pick any stage to see the screen used there."
   />
 
-  <div class="jrail-wrap">
-    <div class="jrail">
-      <span class="jline"></span>
-      <span class="jprog" [style.width.%]="(current() / last) * 86"></span>
-      <span class="jrec" [style.left.%]="((current() + 0.5) / stages.length) * 100" aria-hidden="true"
-        >Sunita · T-19</span
-      >
-      @for (stage of stages; track stage; let i = $index) {
-        <button
-          type="button"
-          class="jst"
-          [class.done]="i < current()"
-          [class.cur]="i === current()"
-          [attr.aria-current]="i === current() ? 'step' : null"
-          (click)="go(i)"
+  <div class="surface-solid" data-surface>
+    <div class="jrail-wrap">
+      <div class="jrail">
+        <span class="jline"></span>
+        <span class="jprog" [style.width.%]="(current() / last) * 86"></span>
+        <span class="jrec" [style.left.%]="((current() + 0.5) / stages.length) * 100" aria-hidden="true"
+          >Sunita · T-19</span
         >
-          <span class="jd"></span>{{ stage }}
-        </button>
-      }
+        @for (stage of stages; track stage; let i = $index) {
+          <button
+            type="button"
+            class="jst"
+            [class.done]="i < current()"
+            [class.cur]="i === current()"
+            [attr.aria-current]="i === current() ? 'step' : null"
+            (click)="go(i)"
+          >
+            <span class="jd"></span>{{ stage }}
+          </button>
+        }
+      </div>
     </div>
   </div>
 
-  <div class="jdetail surf">
+  <div class="jdetail surf" data-surface>
     @for (shown of [current()]; track shown) {
       <div class="jui">
         <span class="eyebrow">{{ shown + 1 }} · {{ stages[shown] }}</span>

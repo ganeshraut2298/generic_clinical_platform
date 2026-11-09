@@ -18,6 +18,21 @@ describe('config-format', () => {
     expect(formatWhen(null)).toBe('');
   });
 
+  it('writes a plain space before AM/PM when the browser gives U+202F or U+00A0 (G-15)', () => {
+    let fake = '';
+    const spy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function () {
+      return { format: () => fake };
+    } as never);
+    try {
+      fake = '11:05\u202Fam';
+      expect(formatWhen('2026-10-24T05:35:00Z')?.endsWith(', 11:05 AM')).toBe(true);
+      fake = '11:05\u00A0pm';
+      expect(formatWhen('2026-10-24T05:35:00Z')?.endsWith(', 11:05 PM')).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('turns an action code into a sentence and leaves a sentence alone', () => {
     expect(describeAction('clinic.profile_updated')).toBe('Clinic profile updated');
     expect(describeAction('Clinic logo removed')).toBe('Clinic logo removed');

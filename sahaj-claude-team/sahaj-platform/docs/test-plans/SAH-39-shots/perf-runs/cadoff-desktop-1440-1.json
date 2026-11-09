@@ -1,0 +1,46 @@
+{
+  "project": "desktop-1440",
+  "cpuThrottle": 4,
+  "proposalMs": 8,
+  "order": "layer off first",
+  "layerOn": {
+    "layer": "on",
+    "syntheticPointerMoves": 55,
+    "pageFrames": 54,
+    "msBetweenPageFrames": {
+      "mean": 95.37,
+      "p95": 216.7,
+      "max": 216.7
+    },
+    "pageFramesOver33ms": 53,
+    "layerFrames": 54,
+    "layerFrameMs": {
+      "median": 3,
+      "p95": 6.7,
+      "max": 10.6
+    },
+    "layerFramesOver8ms": 1,
+    "longTasks": 6,
+    "mainThreadBusyPercent": 48
+  },
+  "layerOff": {
+    "layer": "off (control)",
+    "syntheticPointerMoves": 118,
+    "pageFrames": 117,
+    "msBetweenPageFrames": {
+      "mean": 42.73,
+      "p95": 83.3,
+      "max": 133.3
+    },
+    "pageFramesOver33ms": 46,
+    "layerFrames": 0,
+    "layerFrameMs": {
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "layerFramesOver8ms": 0,
+    "longTasks": 5,
+    "mainThreadBusyPercent": 66
+  }
+}

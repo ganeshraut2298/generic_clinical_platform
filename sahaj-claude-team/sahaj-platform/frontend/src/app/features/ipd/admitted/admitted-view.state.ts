@@ -10,7 +10,11 @@ import { ALL_WARDS, AdmittedView, CardsPerRow, DEFAULT_COLS, PAGE_SIZE } from '.
 @Injectable()
 export class AdmittedViewState {
   readonly view = signal<AdmittedView>('cards');
-  readonly cols = signal<CardsPerRow>(DEFAULT_COLS);
+  /** The person's own choice for this visit (SAH-36 AC1); null until they choose. */
+  private readonly chosenCols = signal<CardsPerRow | null>(null);
+  /** SAH-37. The clinic's published "Cards per row"; the grid opens with it. */
+  readonly publishedCols = signal<CardsPerRow>(DEFAULT_COLS);
+  readonly cols = computed<CardsPerRow>(() => this.chosenCols() ?? this.publishedCols());
   readonly query = signal('');
   readonly ward = signal(ALL_WARDS);
   readonly limit = signal(PAGE_SIZE);
@@ -24,7 +28,12 @@ export class AdmittedViewState {
   }
 
   setCols(cols: CardsPerRow): void {
-    this.cols.set(cols);
+    this.chosenCols.set(cols);
+  }
+
+  /** The published setup of the latest list answer; the person's own choice still wins. */
+  setPublishedCols(cols: CardsPerRow): void {
+    this.publishedCols.set(cols);
   }
 
   setQuery(text: string): void {

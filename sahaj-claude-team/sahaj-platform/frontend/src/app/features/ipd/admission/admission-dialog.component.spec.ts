@@ -1067,7 +1067,7 @@ describe('AdmissionDialogComponent', () => {
     };
 
     async function setupAt(
-      startView: 'details' | 'move' | 'discharge' | undefined,
+      startView: 'details' | 'move' | 'discharge' | 'deposit' | undefined,
       detail: AdmissionDetail,
       free: AdmissionBedOption[] = FREE_BEDS,
       openWhen: 'before-read' | 'after-read' | 'never' = 'before-read',
@@ -1148,6 +1148,21 @@ describe('AdmissionDialogComponent', () => {
     it('focuses the Move row itself when there is no free bed and the dialog opens after the read (F-1)', async () => {
       await setupAt('move', MOVABLE, [], 'after-read');
       expect(document.activeElement).toBe(el().querySelector('#ad-move-row'));
+    });
+
+    it('focuses the deposit amount for `deposit` once the dialog has opened and the admission has loaded (SAH-37 AC40)', async () => {
+      const collectable: AdmissionDetail = { ...MOVABLE, canCollectDeposit: true, canTransfer: false };
+      await setupAt('deposit', collectable, FREE_BEDS, 'never');
+      expect(document.activeElement).not.toBe(el().querySelector('#ad-amount'));
+      await open();
+      expect(document.activeElement).toBe(el().querySelector('#ad-amount'));
+    });
+
+    it('keeps the main view and the dialog\'s own focus for `deposit` when the user cannot collect a deposit', async () => {
+      await setupAt('deposit', { ...MOVABLE, canTransfer: false }, FREE_BEDS, 'after-read');
+      expect(el().querySelector('#ad-amount')).toBeNull();
+      expect(el().querySelector('#ads')!.textContent).toContain('Asha Patil');
+      expect(document.activeElement).toBe(closeButton);
     });
 
     it('does not move the focus away from the dialog for details, whichever comes first', async () => {

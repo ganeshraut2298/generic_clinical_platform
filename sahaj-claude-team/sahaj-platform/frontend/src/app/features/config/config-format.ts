@@ -1,7 +1,8 @@
 import { ApiError } from '../../core/http/problem-detail';
 import { formatDisplayDate } from '../../shared/format/ist-date';
+import { plainSpaces } from '../../shared/format/plain-space';
 
-const MONTHS =['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** Today in India as `YYYY-MM-DD`, whatever the device time zone. */
@@ -58,14 +59,16 @@ export function formatWhen(iso: string | null | undefined): string {
     month: 'short',
     year: 'numeric',
   }).format(date);
-  const time = new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-    .format(date)
-    .toUpperCase();
+  const time = plainSpaces(
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .format(date)
+      .toUpperCase(),
+  );
   return `${day}, ${time}`;
 }
 

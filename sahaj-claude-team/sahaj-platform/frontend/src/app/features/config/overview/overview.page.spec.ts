@@ -5,6 +5,9 @@ import { provideRouter } from '@angular/router';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
+import { ownerView, standardSetup } from '../../ipd/card/card-setup.fixtures';
+import { IpdAccess } from '../ipd/ipd-access';
+import { ModulesView } from '../modules/modules.model';
 import { OverviewPage } from './overview.page';
 
 const PLATFORM = '/api/v1/platform';
@@ -94,5 +97,41 @@ describe('OverviewPage', () => {
     expect(el.textContent).toContain('Only the owner sees setup progress');
     expect(el.querySelector('.ring')).toBeNull();
     expect(el.querySelectorAll('.tile').length).toBe(11);
+  });
+
+  it('shows the Patient card tile line, with " · draft" for the owner, once IPD is available (SAH-37 AC15)', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailInterceptor])),
+        provideHttpClientTesting(),
+        { provide: ShellStore, useValue: { me: () => ({ userId: 'u1', role: 'OWNER' }) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    TestBed.inject(IpdAccess).set({ ipd: { state: 'on' } } as ModulesView);
+    fixture = TestBed.createComponent(OverviewPage);
+    fixture.detectChanges();
+    http.expectOne(`${PLATFORM}/setup/overview`).flush(OVERVIEW);
+    http.expectOne((r) => r.url === `${PLATFORM}/audit-events`).flush([]);
+    answerTiles();
+    fixture.detectChanges();
+    const saved = { ...standardSetup(), layout: 'compact' as const };
+    http.expectOne('/api/v1/ipd/card-setup').flush(
+      ownerView({
+        draft: { revision: 1, baseVersion: 1, setup: saved, savedAt: '2026-11-09T05:35:00Z', savedByName: 'Dr. Owner', changedParts: ['layout'] },
+      }),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const tile = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.tile')).find((t) =>
+      t.textContent?.includes('Patient card'),
+    )!;
+    expect(tile.textContent).toContain('Standard · Sahaj default · v1 · draft');
+  });
+
+  it('asks nothing about the Patient card while IPD is not known to be available', async () => {
+    await open('OWNER');
+    http.expectNone('/api/v1/ipd/card-setup');
   });
 });

@@ -3,6 +3,7 @@
  * `TeamMemberPin` in docs/api/platform.yaml. The PIN, the code and the hash are never in a model
  * that is kept: they live in a form control until the request is sent, and are cleared after.
  */
+import { plainSpaces } from '../../shared/format/plain-space';
 export type PinState = 'NOT_SET' | 'SET' | 'LOCKED';
 export type NotSetReason = 'RESET_BY_OWNER' | 'TOO_MANY_LOCKS';
 
@@ -172,14 +173,16 @@ export function istClockText(instant: string | null | undefined): string {
   if (!date || Number.isNaN(date.getTime())) {
     return '';
   }
-  return new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-    .format(date)
-    .toUpperCase();
+  return plainSpaces(
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .format(date)
+      .toUpperCase(),
+  );
 }
 
 /** T3: the PIN state line of the banner; null when the state needs no line. */
@@ -196,7 +199,9 @@ export function noticeStateLine(notice: ColleagueTriesNotice): string | null {
 
 /** T4 and T4b: the owner's row line. Shown only above 0. */
 export const colleagueTriesRowText = (count: number): string =>
-  count === 1 ? '1 wrong try by a colleague in 7 days' : `${count} wrong tries by colleagues in 7 days`;
+  count === 1
+    ? '1 wrong try by a colleague in 7 days'
+    : `${count} wrong tries by colleagues in 7 days`;
 
 /** T11: the history sheet title. */
 export const colleagueTriesSheetTitle = (name: string): string => `Wrong PIN tries · ${name}`;

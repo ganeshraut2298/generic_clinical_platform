@@ -30,6 +30,7 @@ import {
   GIVE_FIELD_ORDER,
   GiveErrors,
   GiveField,
+  HIGH_ALERT_SECOND_CHECK,
   Mar,
   MarOrder,
   MarSlot,
@@ -48,6 +49,7 @@ import {
   givenInput,
   givenToast,
   highAlertStepTitle,
+  isFourDigitPin,
   mismatchLine,
   mismatchToast,
   notGivenInput,
@@ -236,7 +238,37 @@ export class GiveSheetComponent {
       return;
     }
     const entered = this.form.getRawValue();
+    if (this.highAlert && !this.secondCheckComplete(entered)) {
+      return;
+    }
     this.send((key) => givenInput(key, this.data.slot, this.highAlert, entered));
+  }
+
+  /**
+   * DEC-025 G-9: a high-alert GIVEN needs a second nurse and a 4-digit PIN. When one is missing the
+   * contract's text shows under that field (under the PIN when both are missing), the focus goes there
+   * and nothing is sent. The server stays
+   * the authority and checks again.
+   */
+  private secondCheckComplete(entered: { nurse: string; pin: string }): boolean {
+    // Like the server's answer for both missing: the one text goes under the PIN.
+    const field: GiveField | null = !isFourDigitPin(entered.pin)
+      ? 'secondNursePin'
+      : !entered.nurse
+        ? 'secondNurseId'
+        : null;
+    if (field === null) {
+      return true;
+    }
+    if (field === 'secondNurseId') {
+      // No second nurse: the PIN typed so far is not kept while the nurse is chosen.
+      this.clearPin();
+    }
+    this.errors.set({ [field]: HIGH_ALERT_SECOND_CHECK });
+    this.mismatch.set(false);
+    this.failure.set(null);
+    this.focusLater(FIELD_CONTROL[field]);
+    return false;
   }
 
   protected notGiven(): void {

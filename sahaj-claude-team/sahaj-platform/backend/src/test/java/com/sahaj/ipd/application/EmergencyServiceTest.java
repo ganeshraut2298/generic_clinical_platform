@@ -1390,7 +1390,7 @@ class EmergencyServiceTest {
             assertThat(tx.isolation()).as(name).isEqualTo(Isolation.REPEATABLE_READ);
         }
         Transactional list = AdmissionService.class
-                .getMethod("list", UUID.class, UUID.class, String.class, String.class).getAnnotation(Transactional.class);
+                .getMethod("list", UUID.class, UUID.class, String.class, String.class, String.class).getAnnotation(Transactional.class);
         assertThat(list.readOnly()).isTrue();
         assertThat(list.isolation()).isEqualTo(Isolation.REPEATABLE_READ);
         // the hand-off read writes one audit row, so it is read-write; still one snapshot

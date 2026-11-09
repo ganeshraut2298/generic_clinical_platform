@@ -1,0 +1,33 @@
+{
+  "screen": "colleague-banner",
+  "project": "layout-1024",
+  "viewport": {
+    "width": 1024,
+    "height": 768
+  },
+  "dpr": 1,
+  "findings": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 0,
+    "overruns": [],
+    "small": []
+  },
+  "dialog": {
+    "box": "520x226 at 252,271",
+    "footerProblems": []
+  },
+  "noticeGets": 1,
+  "calls": {
+    "POST platform/auth/refresh": 1,
+    "GET platform/me": 1,
+    "GET ipd/admissions?status=ADMITTED": 1,
+    "GET platform/me/pin/colleague-tries": 1,
+    "GET ipd/layout": 1,
+    "GET ipd/admission-rules": 1,
+    "GET ipd/board": 1,
+    "GET e2e/ping": 1,
+    "GET platform/me/pin": 1,
+    "POST platform/me/pin/colleague-tries/seen": 1
+  }
+}

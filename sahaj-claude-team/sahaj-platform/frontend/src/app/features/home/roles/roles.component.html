@@ -13,7 +13,7 @@
     lead="Each step of a visit goes to the right person. Each person sees only what their role allows."
   />
 
-  <div class="visit surf">
+  <div class="visit surf" data-surface>
     <span class="tokchip">T-19</span>
     <b>Sunita Patil · 42 F · New visit</b>
     <span class="muted status" aria-live="polite">{{ status() }}</span>
@@ -31,7 +31,7 @@
   </div>
 
   @if (focused(); as member) {
-    <div class="notice info">
+    <div class="notice info surface-solid" data-surface>
       <app-icon name="lock" [size]="16" />
       <span>{{ viewText[member] }}</span>
     </div>
@@ -39,7 +39,7 @@
 
   <div class="team">
     @for (member of members; track member; let i = $index) {
-      <div class="member surf" [class.dim]="focused() && focused() !== member">
+      <div class="member surf" data-surface [class.dim]="focused() && focused() !== member">
         <div class="mtop">
           <app-character [person]="member" [pose]="poses[member]" [delay]="i * 0.4" />
           <div>

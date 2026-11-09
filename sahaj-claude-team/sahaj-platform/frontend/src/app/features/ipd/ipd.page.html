@@ -14,7 +14,7 @@
 @if (locked()) {
   <section class="panel surf lockpage">
     <span class="lockic"><app-icon name="lock" [size]="26" /></span>
-    <h2>In-patient care (IPD) is not on for your clinic</h2>
+    <h2 id="ipd-lock-h" tabindex="-1">In-patient care (IPD) is not on for your clinic</h2>
     <p class="muted">
       Switch it on to admit patients, take deposits and see who is in a bed.
     </p>
@@ -159,11 +159,15 @@
 
     <div role="tabpanel" id="ipd-panel" tabindex="0" [attr.aria-labelledby]="'ipd-tab-' + activeTab()" class="tabpanel">
       @if (activeTab() === 'er') {
-        <app-emergency (counts)="onEmergencyCounts($event)" (admitted)="afterAdmitted($event)" />
+        <app-emergency
+          (counts)="onEmergencyCounts($event)"
+          (refused)="onEmergencyRefused($event)"
+          (admitted)="afterAdmitted($event)"
+        />
       } @else if (noBeds()) {
         <ng-container [ngTemplateOutlet]="setup" />
       } @else if (activeTab() === 'safety') {
-        <app-safety (counts)="onSafetyCounts($event)" [showPharmacist]="isOwner()" />
+        <app-safety (counts)="onSafetyCounts($event)" (refused)="onSafetyRefused()" [showPharmacist]="isOwner()" />
       } @else if (activeTab() === 'board') {
         <app-bed-board
           (openAdmission)="openAdmission($event)"
@@ -185,6 +189,7 @@
         <app-admitted-panel
           [list]="l"
           [staleText]="staleText()"
+          [isOwner]="isOwner()"
           (openAdmission)="openFromCard($event)"
           (openNursing)="openNursing($event)"
           (openEmr)="openEmr($event)"

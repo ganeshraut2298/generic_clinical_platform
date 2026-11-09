@@ -16,6 +16,7 @@ import { EnquirySheet } from '../enquiry/enquiry-sheet.service';
   template: `
     <section
       class="final surf"
+      data-surface
       aria-labelledby="h-final"
       appInView
       (inViewChange)="inView.set($event)"

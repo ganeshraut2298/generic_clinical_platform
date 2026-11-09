@@ -114,6 +114,9 @@ export const STEP_ONE = '1 · Confirm the patient with two identifiers';
 export const WRISTBAND_LABEL = 'Wristband MRN';
 export const WRISTBAND_PLACEHOLDER = 'Scan the wristband or type the MRN';
 export const SAID_LABEL = 'The patient said their name and date of birth, or a relative confirmed them';
+/** The contract's text (docs/api/ipd.yaml, `secondNurseId` and `secondNursePin`), also shown before sending (DEC-025 G-9). */
+export const HIGH_ALERT_SECOND_CHECK =
+  'High-alert medicine: a second nurse must check it and enter a 4-digit PIN.';
 export const SECOND_NURSE_SMALL = 'A second nurse checks the drug, dose, patient and route, then enters their PIN.';
 export const CHECKED_BY_LABEL = 'Checked by';
 export const CHOOSE_NURSE = 'Choose a nurse';
@@ -357,6 +360,11 @@ const RELOAD_SLUGS = [
   'not-admitted',
   'ipd-readonly',
 ] as const;
+
+/** Exactly 4 ASCII digits, as the server requires of `secondNursePin`. */
+export function isFourDigitPin(pin: string): boolean {
+  return /^[0-9]{4}$/.test(pin);
+}
 
 const BEDSIDE_FIELDS: readonly string[] = GIVE_FIELD_ORDER;
 

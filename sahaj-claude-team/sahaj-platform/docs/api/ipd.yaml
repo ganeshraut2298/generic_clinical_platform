@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Sahaj IPD API
   version: 0.1.0
-  description: 'Phase 1 contract, SAH-22 (wards, rooms, beds, bed categories and charges), SAH-23 to SAH-27 (admissions, board, charges, transfer, discharge), SAH-28 (emergency queue, triage and Emergency setup; ADR-005) and SAH-30 (nursing vitals, nursing notes and early warning score; ADR-006) and SAH-33 (Safety board: early warning escalations and the clinical audit trail; ADR-007) and SAH-31 (medicine orders with safety checks, EMR sheet and the pharmacist check; ADR-009) and SAH-32 (Medicines (MAR) tab of the Nursing sheet and giving a dose with the bedside checks; ADR-011) and SAH-35 (Medicine round on the Safety board: doses due or overdue across admitted patients, dose counts on the Safety tab; ADR-012) and SAH-36 (Admitted patients as uniform cards: card facts, role-gated clinical flags and card abilities on GET /admissions; ADR-013). Every call answers 401 (problem type unauthorized) without a valid session, and 403 (problem type module-off, "In-patients (IPD) is not switched on for your clinic.") when IPD is Off for the clinic; every write answers 409 (ipd-readonly, "IPD is read-only. Nothing can be changed.") when IPD is Read-only. SAH-22 reads are for any clinic role and its writes are OWNER only; from SAH-23 the roles are stated on each operation, and a role outside them answers 403 (problem type forbidden). Another clinic''s record answers 404 (row-level security). Money is integer paise. Calendar dates are Asia/Kolkata (IST) dates as YYYY-MM-DD strings; instants are date-time. Errors are RFC 9457 application/problem+json; the type is https://sahaj.in/problems/<slug> and the slugs below are written without the prefix.'
+  description: 'Phase 1 contract, SAH-22 (wards, rooms, beds, bed categories and charges), SAH-23 to SAH-27 (admissions, board, charges, transfer, discharge), SAH-28 (emergency queue, triage and Emergency setup; ADR-005) and SAH-30 (nursing vitals, nursing notes and early warning score; ADR-006) and SAH-33 (Safety board: early warning escalations and the clinical audit trail; ADR-007) and SAH-31 (medicine orders with safety checks, EMR sheet and the pharmacist check; ADR-009) and SAH-32 (Medicines (MAR) tab of the Nursing sheet and giving a dose with the bedside checks; ADR-011) and SAH-35 (Medicine round on the Safety board: doses due or overdue across admitted patients, dose counts on the Safety tab; ADR-012) and SAH-36 (Admitted patients as uniform cards: card facts, role-gated clinical flags and card abilities on GET /admissions; ADR-013) and SAH-37 (Clinic setup > Patient card: live setup, versions and one draft per clinic, locked safety items checked by the server; the Admitted cards follow the published setup; ADR-015) and SAH-29 (Packages, read-only slice decided by the human on 9 Nov 2026: the Packages list of Clinic setup > Admission and deposits, the package copy on an admission and the package lines of the running bill; docs/architecture/SAH-29-ipd-packages.md; there is no endpoint that creates, changes or attaches a package). Every call answers 401 (problem type unauthorized) without a valid session, and 403 (problem type module-off, "In-patients (IPD) is not switched on for your clinic.") when IPD is Off for the clinic; every write answers 409 (ipd-readonly, "IPD is read-only. Nothing can be changed.") when IPD is Read-only. SAH-22 reads are for any clinic role and its writes are OWNER only; from SAH-23 the roles are stated on each operation, and a role outside them answers 403 (problem type forbidden). Another clinic''s record answers 404 (row-level security). Money is integer paise. Calendar dates are Asia/Kolkata (IST) dates as YYYY-MM-DD strings; instants are date-time. Errors are RFC 9457 application/problem+json; the type is https://sahaj.in/problems/<slug> and the slugs below are written without the prefix. Two general rules apply to every operation (release audit DEC-025, code review #2): (1) an {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large", detail "The request body must be 64 KB or smaller."); the limit is 64 KB for a signed-in user (property sahaj.request-body.max-bytes, never below 4 KB; the detail names the configured limit) and 4 KB for any request without a signed-in user, where the detail reads "4 KB". It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.'
 servers:
   - url: /api/v1/ipd
 security:
@@ -26,6 +26,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /wards/{id}/rooms:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -34,6 +35,7 @@ paths:
       description: Adds a room named Room (highest room number in the ward + 1), or 100 x the ward position + 1.
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/IpdLayout' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -50,6 +52,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /beds/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -60,15 +63,17 @@ paths:
         content: { application/json: { schema: { type: object, required: [categoryKey], properties: { categoryKey: { $ref: '#/components/schemas/CategoryKey' } } } } }
       responses:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/IpdLayout' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
     delete:
       tags: [SAH-22]
       description: 409 problem type bed-occupied when a patient is in the bed.
       responses:
         '200': { description: Removed, content: { application/json: { schema: { $ref: '#/components/schemas/IpdLayout' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -84,6 +89,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /categories/{key}:
     parameters:
       - { name: key, in: path, required: true, schema: { $ref: '#/components/schemas/CategoryKey' } }
@@ -98,6 +104,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /charges:
     put:
       tags: [SAH-22]
@@ -109,6 +116,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admission-rules:
     get:
       tags: [SAH-23]
@@ -127,6 +135,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admission-rules/confirm:
     post:
       tags: [SAH-23]
@@ -150,14 +159,19 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
   /admissions:
     get:
-      tags: [SAH-23, SAH-27, SAH-28, SAH-33, SAH-35, SAH-36]
-      description: 'OWNER, FRONT_DESK, NURSE, DOCTOR. Admitted patients only: a discharged patient leaves the list, the Admitted count and the deposit alert count (SAH-27). There is no discharged list (OQ-27-6). SAH-28: the answer also carries emergency (EmergencyCounts) for the second tile "Emergency" and the count on the Emergency tab of Beds and admissions. SAH-33 (ADR-007 D8): the answer also carries safety (AdmissionSafety) for OWNER, DOCTOR and NURSE, null for every other role: the count on the Safety tab and the red banner "Open safety board" at the top of the Admitted patients tab. The role for safety is the token role and the role re-read from the active membership (platform.api TeamMemberPort.findActiveByUserId); safety is null unless both are OWNER, DOCTOR or NURSE. Writes no record-access row (a list). SAH-36 (ADR-013): the same answer feeds the Cards and the Table view of the Admitted tab. The rows are AdmittedPatientRow (uhid, wardId, roomName, and clinical only for OWNER, DOCTOR and NURSE: absent, not null, for every other role); the list carries asOf, wards (ward filter) and card (action abilities, once per list). One read-only REPEATABLE READ transaction, one asOf (database clock), a fixed number of set queries whatever the number of patients (ADR-013 D2); never one request per patient. The membership is re-read once, first: no active membership, or a membership role other than OWNER, FRONT_DESK, NURSE or DOCTOR, answers 403 forbidden (ADR-013 D3; a tightening). No search, ward, limit or cursor parameter: search, ward filter and "Show 24 more" work on the device over the whole loaded list, and the typed search text is never sent (ADR-013 D8). Still writes no record-access row, on first load or on reload (ADR-013 D10; OQ-36-7, human to confirm). The client reloads it every 60 seconds while the Admitted tab and the browser tab are visible, and after any change; on that tab this reload replaces the GET /safety/summary poll (ADR-013 D7). Never logged (names, UHID, allergy text, scores).'
+      tags: [SAH-23, SAH-27, SAH-28, SAH-33, SAH-35, SAH-36, SAH-37]
+      description: 'OWNER, FRONT_DESK, NURSE, DOCTOR. Admitted patients only: a discharged patient leaves the list, the Admitted count and the deposit alert count (SAH-27). There is no discharged list (OQ-27-6). SAH-28: the answer also carries emergency (EmergencyCounts) for the second tile "Emergency" and the count on the Emergency tab of Beds and admissions. SAH-33 (ADR-007 D8): the answer also carries safety (AdmissionSafety) for OWNER, DOCTOR and NURSE, null for every other role: the count on the Safety tab and the red banner "Open safety board" at the top of the Admitted patients tab. The role for safety is the token role and the role re-read from the active membership (platform.api TeamMemberPort.findActiveByUserId); safety is null unless both are OWNER, DOCTOR or NURSE. Writes no record-access row (a list). SAH-36 (ADR-013): the same answer feeds the Cards and the Table view of the Admitted tab. The rows are AdmittedPatientRow (uhid, wardId, roomName, and clinical only for OWNER, DOCTOR and NURSE: absent, not null, for every other role); the list carries asOf, wards (ward filter) and card (action abilities, once per list). One read-only REPEATABLE READ transaction, one asOf (database clock), a fixed number of set queries whatever the number of patients (ADR-013 D2); never one request per patient. The membership is re-read once, first: no active membership, or a membership role other than OWNER, FRONT_DESK, NURSE or DOCTOR, answers 403 forbidden (ADR-013 D3; a tightening). No search, ward, limit or cursor parameter: search, ward filter and "Show 24 more" work on the device over the whole loaded list, and the typed search text is never sent (ADR-013 D8). Still writes no record-access row, on first load or on reload (ADR-013 D10; OQ-36-7, human to confirm). The client reloads it every 60 seconds while the Admitted tab and the browser tab are visible, and after any change; on that tab this reload replaces the GET /safety/summary poll (ADR-013 D7). Never logged (names, UHID, allergy text, scores). SAH-37 (ADR-015 D4, D6): the answer also carries cardSetup (the published card setup, repaired and resolved; read in the same transaction, so the facts and the setup of one answer always agree, AC60), card.visibleGroups and card.deposit. The new card facts (clinical.diagnosis, clinical.latestVitals, mobile) are sent only when both the caller may see their data group (token role and membership role; CardDataGroup) and, with cardFacts=setup, the published setup has the field switched on in a section that is on; otherwise they are absent (not null). With the Sahaj standard setup none of them is sent. A fixed number of set queries still: at most one more for the live setup, one batch of recorder names (only when Last recorded is on) and one batch patient read for the owner''s mobile (only when Mobile is on and the caller is OWNER). Still no record-access row. Never logged (diagnosis, readings, mobile).'
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [ADMITTED], default: ADMITTED } }
+        - name: cardFacts
+          in: query
+          required: false
+          schema: { type: string, enum: [setup, all], default: setup }
+          description: 'SAH-37 (ADR-015 D6, D7). setup (default; the Admitted page and its 60-second reload): new card facts only for fields the published setup switches on. all: every new card fact the caller may see, whatever the setup says; OWNER only (token role and membership role), for the live preview of Clinic setup > Patient card, read when that page opens and on Try again, never polled; any other role 403 forbidden ("Only the clinic owner can preview the card setup."). Any other value 400 bad-request.'
       responses:
         '200': { description: Admitted patients with bed counts, content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionList' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'status or cardFacts is not one of its values (as today for status; components/responses/BadRequest shape)' }
+        '403': { $ref: '#/components/responses/Problem', description: 'module-off; forbidden (role or membership outside OWNER, FRONT_DESK, NURSE, DOCTOR; or cardFacts=all from a role other than OWNER)' }
     post:
       tags: [SAH-23, SAH-28]
       description: 'OWNER, FRONT_DESK, NURSE. Check order and messages: patient exists (404); not already admitted (409 already-admitted); doctor is an active doctor (400); bed exists and is free (409 bed-not-free); consent signed (400); deposit at least the minimum when payer is Self unless emergency and the clinic allows emergency without deposit (400). One transaction: IP number, admission, bed occupied, first deposit. SAH-28: with emergencyCaseId (Admit from an emergency card) the case is checked first, after the clinic IPD advisory lock is taken and before the patient check: case not found or another clinic''s 404 not-found; case not Waiting or Seen 409 case-closed ("This patient is no longer in the queue."; also when someone released, referred or admitted it while the sheet was open). The case row is locked for update. Then the SAH-23 order runs unchanged (admissionType is not forced; the sheet only preselects Emergency). In the same transaction: the admission is stored with source EMERGENCY (DIRECT without emergencyCaseId), and the case becomes ADMITTED with closedAt (the database clock read after the clinic lock, clock_timestamp(); ADR-005 D6), closedBy, admissionId and patientId = the admitted patient, which frees its bay, and its mobile is cleared (set to null) in the same update (security review M1(a); the patient record now holds the mobile); audits IPD_ADMITTED (source EMERGENCY) and IPD_ER_ADMITTED (case id, admission id, level, bay, closedAt; never the name, mobile, age or complaint). Any later failure rolls both back, and the case stays in the queue. Cancelling the sheet sends nothing.'
@@ -170,6 +184,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admissions/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -178,6 +193,7 @@ paths:
       description: 'OWNER, FRONT_DESK, NURSE, DOCTOR. SAH-27: a DISCHARGED admission stays readable (also in Read-only state) with its frozen final bill, discharge type, signature and settlement; nothing on it can be changed, and a deposit, charge, transfer, sign-off or second discharge on it answers 409 not-admitted. After a lost answer to the discharge button the client reloads this to see the discharged state (AC15).'
       responses:
         '200': { description: Admission, content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionDetail' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -192,10 +208,11 @@ paths:
         content: { application/json: { schema: { type: object, required: [amountPaise, mode], properties: { amountPaise: { type: integer, minimum: 100, maximum: 100000000, description: Whole rupees (multiple of 100). }, mode: { $ref: '#/components/schemas/PayMode' } } } } }
       responses:
         '200': { description: Updated admission, content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionDetail' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /transfer-rules:
     get:
       tags: [SAH-26]
@@ -214,21 +231,31 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+  /packages:
+    get:
+      tags: [SAH-29]
+      description: 'Clinic setup > Admission and deposits, panel "Packages" under "Bed transfer rules" (mockup cfgIpAdm, S.ipd.pkgs). Read-only: there is no create, change, remove or attach endpoint in this slice (human decision 9 Nov 2026; OQ-29-1 and OQ-29-2 are future work); packages are set through the database. OWNER, FRONT_DESK, NURSE, DOCTOR (the same check as GET /admission-rules, the other reads of this page); any other role 403 forbidden. Check order: role 403 forbidden; module Off 403 module-off. Allowed in Trial, On and Read-only. Answers the clinic''s active packages (ipd.package.active true) in the order they were created (created_at, then id); row-level security limits it to the caller''s clinic, so another clinic''s packages are never listed. A clinic with no package answers 200 with items empty (the empty panel is OQ-29-3). Not paged: packages are set by hand in the database and a clinic has few (paging comes with the write endpoints of OQ-29-1). Writes nothing: no audit row and no record-access row (no patient data). Never logged beyond the count.'
+      responses:
+        '200': { description: 'The clinic''s packages', content: { application/json: { schema: { $ref: '#/components/schemas/PackageList' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (role outside OWNER, FRONT_DESK, NURSE, DOCTOR) or module-off' }
   /admissions/{id}/transfer:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
     post:
-      tags: [SAH-26]
-      description: 'OWNER, FRONT_DESK, NURSE. Check order: admission exists (404) and is Admitted (409 not-admitted); target bed exists (404) and is not the current bed (400); target bed is Available (409 bed-not-free, "That bed is no longer free. Pick another."); owner rule for a higher category (403 owner-approval-needed, "Moving to <category> needs the owner''s approval. Ask the clinic owner."). One transaction: admission bed, new bed Occupied, old bed Cleaning, transfer row (append-only), audit IPD_BED_TRANSFER (ids, codes, categories, segment days, rule values; never name or reason). Module off 403 module-off; Read-only 409 ipd-readonly. Messages: same bed 400 field toBedId "The patient is already in this bed. Pick another."; not admitted 409 "This patient is not admitted any more. The patient cannot be moved." Problem types: owner-approval-needed (403), bed-not-free, not-admitted, ipd-readonly (409). Free beds are ordered by category, then room creation order (no-room beds last), then code.'
+      tags: [SAH-26, SAH-29]
+      description: 'SAH-29 (AC5; OQ-26-4, as the mockup): for an admission with a package the transfer works exactly as below (same checks, same transfer row, same audit), but the running bill of a package admission never shows bed-transfer segments, so the bed difference is not billed; the days beyond the package are billed at the rate of the bed the patient is in now (RunningBill). OWNER, FRONT_DESK, NURSE. Check order: admission exists (404) and is Admitted (409 not-admitted); target bed exists (404) and is not the current bed (400); target bed is Available (409 bed-not-free, "That bed is no longer free. Pick another."); owner rule for a higher category (403 owner-approval-needed, "Moving to <category> needs the owner''s approval. Ask the clinic owner."). One transaction: admission bed, new bed Occupied, old bed Cleaning, transfer row (append-only), audit IPD_BED_TRANSFER (ids, codes, categories, segment days, rule values; never name or reason). Module off 403 module-off; Read-only 409 ipd-readonly. Messages: same bed 400 field toBedId "The patient is already in this bed. Pick another."; not admitted 409 "This patient is not admitted any more. The patient cannot be moved." Problem types: owner-approval-needed (403), bed-not-free, not-admitted, ipd-readonly (409). Free beds are ordered by category, then room creation order (no-room beds last), then code.'
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [toBedId], properties: { toBedId: { type: string, format: uuid }, reason: { type: [string, 'null'], enum: ['Needs closer monitoring', 'Moving to a step-down bed', 'Patient or family request', 'Isolation', null], description: 'Optional; stored, not shown.' } } } } }
       responses:
         '200': { description: Updated admission with the new bed and the bill split by bed category, content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionDetail' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /board:
     get:
       tags: [SAH-24]
@@ -244,6 +271,7 @@ paths:
       description: OWNER, FRONT_DESK, NURSE. From Cleaning or Blocked to Available. Any other state is 409 problem type bed-state.
       responses:
         '200': { description: Updated board, content: { application/json: { schema: { $ref: '#/components/schemas/BedBoard' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -255,6 +283,7 @@ paths:
       description: OWNER, FRONT_DESK, NURSE. From Cleaning to Blocked only. Any other state is 409 problem type bed-state.
       responses:
         '200': { description: Updated board, content: { application/json: { schema: { $ref: '#/components/schemas/BedBoard' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
@@ -276,10 +305,11 @@ paths:
         content: { application/json: { schema: { type: object, required: [serviceKey], properties: { serviceKey: { $ref: '#/components/schemas/ChargeServiceKey' } } } } }
       responses:
         '200': { description: Updated admission with the bill, content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionDetail' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /discharge-settings:
     get:
       tags: [SAH-27]
@@ -300,6 +330,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admissions/{id}/discharge:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -308,6 +339,7 @@ paths:
       description: 'Data for the Discharge sheet (mockup openDis). OWNER, FRONT_DESK, NURSE, DOCTOR. Changes no IPD data and never creates a settings row. Check order: module Off 403 module-off; role 403 forbidden; admission not found or another clinic''s 404; not Admitted 409 not-admitted ("This patient is not admitted any more."). After the 404 and not-admitted checks pass, writes one patient.record_access row through patient.api (the sheet returns the patient name and the diagnosis; ADR-004 review decision a). A 403, 404 or 409 answer writes nothing. Allowed in Read-only state (the flags canSign, canDischarge and canRefund are then false). The bill is the running bill as it is now (SAH-25/26), computed by the server. SAH-33 (ADR-007 D6): openEscalation tells the sheet that the admission has an early warning escalation that is not closed (status OPEN or ACK), for the warning shown before the button is pressed (DischargeSheet.openEscalation); it is a boolean only, with no score, because FRONT_DESK opens the sheet. SAH-33 review fix (security review SAH-33 M1, ADR-007 R2): signoffBeforeEscalation tells the sheet that the latest sign-off is not later than the start of the response clock of that escalation, so it does not cover it (DischargeSheet.signoffBeforeEscalation).'
       responses:
         '200': { description: Discharge sheet, content: { application/json: { schema: { $ref: '#/components/schemas/DischargeSheet' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -320,11 +352,12 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/DischargeInput' } } }
       responses:
         '200': { description: The discharged admission with the frozen final bill, content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionDetail' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem', description: 'not-admitted, ipd-readonly, summary-not-signed, escalation-open (SAH-33: an escalation not closed and the signed type is normal; or the type is death, lama or referred and the sign-off is not later than the escalation''s response clock start), bill-changed' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admissions/{id}/discharge/signoff:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -336,11 +369,12 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/DischargeSignoffInput' } } }
       responses:
         '200': { description: The sheet with the new signature, content: { application/json: { schema: { $ref: '#/components/schemas/DischargeSheet' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admissions/{id}/nursing:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -368,6 +402,7 @@ paths:
         and is not polled; its "ago" texts do not tick while it is open (mockup).
       responses:
         '200': { description: The Nursing sheet, content: { application/json: { schema: { $ref: '#/components/schemas/NursingSheet' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role, or the role re-read from the membership, is not OWNER, NURSE or DOCTOR) or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (admission missing, another clinic''s, or its patient missing)' }
@@ -464,11 +499,12 @@ paths:
       responses:
         '200': { description: 'Repeat of a clientKey already used for this admission, with the same values: the sheet now and the first record; only the record-access row is written', content: { application/json: { schema: { $ref: '#/components/schemas/VitalsSaved' } } } }
         '201': { description: 'Saved: the sheet after the save, the saved record and the escalation outcome', content: { application/json: { schema: { $ref: '#/components/schemas/VitalsSaved' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on bp, pulse, spo2, temp, rr, note, or clientKey: missing, not a UUID, or used for another admission)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on bp, pulse, spo2, temp, rr, note, or clientKey: missing, not a UUID, or used for another admission); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role, or the role re-read from the membership, is not OWNER or NURSE) or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (admission missing, another clinic''s, or its patient missing)' }
         '409': { $ref: '#/components/responses/Problem', description: 'ipd-readonly; client-key-reused ("This reading was already saved with different values. Reload the page and try again."); not-admitted' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /emergency:
     get:
       tags: [SAH-28]
@@ -572,6 +608,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /emergency/cases/{id}/seen:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -588,6 +625,7 @@ paths:
         "<displayName> seen by the duty doctor".
       responses:
         '200': { description: 'The queue with actedCase', content: { application/json: { schema: { $ref: '#/components/schemas/EmergencyQueue' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -614,11 +652,12 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/EmergencyLevelInput' } } }
       responses:
         '200': { description: 'The queue with actedCase', content: { application/json: { schema: { $ref: '#/components/schemas/EmergencyQueue' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /emergency/cases/{id}/release:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -636,6 +675,7 @@ paths:
         id, level, bay, closedAt). Toast "<displayName> treated and released".
       responses:
         '200': { description: 'The queue with actedCase (now RELEASED)', content: { application/json: { schema: { $ref: '#/components/schemas/EmergencyQueue' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -653,6 +693,7 @@ paths:
         closedAt). Toast "<displayName> referred out".
       responses:
         '200': { description: 'The queue with actedCase (now REFERRED)', content: { application/json: { schema: { $ref: '#/components/schemas/EmergencyQueue' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -705,6 +746,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /safety:
     get:
       tags: [SAH-33, SAH-35]
@@ -812,11 +854,12 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/EscalationVersionInput' } } }
       responses:
         '200': { description: 'Acknowledged (or a replay): the row in its new state', content: { application/json: { schema: { $ref: '#/components/schemas/EscalationActionResult' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role or membership role not OWNER or DOCTOR) or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (escalation missing or another clinic''s, patient not admitted, or patient record missing)' }
         '409': { $ref: '#/components/responses/Problem', description: 'escalation-state (already acknowledged or closed) or escalation-changed (stale version)' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /escalations/{id}/respond:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -857,11 +900,12 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/EscalationResponseInput' } } }
       responses:
         '200': { description: 'Closed (or a replay): the row in its new state', content: { application/json: { schema: { $ref: '#/components/schemas/EscalationActionResult' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on version, action, note)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on version, action, note); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role or membership role not OWNER or DOCTOR) or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (escalation missing or another clinic''s, patient not admitted, or patient record missing)' }
         '409': { $ref: '#/components/responses/Problem', description: 'escalation-state (already closed) or escalation-changed (stale version)' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /escalations/{id}/call-senior:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -909,11 +953,12 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/SeniorCallInput' } } }
       responses:
         '200': { description: 'Call recorded (or a replay): the row in its new state', content: { application/json: { schema: { $ref: '#/components/schemas/EscalationActionResult' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (the operation''s own field errors); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role or membership role not NURSE) or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (escalation missing or another clinic''s, patient not admitted, or patient record missing)' }
         '409': { $ref: '#/components/responses/Problem', description: 'escalation-state (acknowledged, closed, or the senior-call count is at its cap of 32,767) or escalation-changed (stale version, or a sent seniorCalls above the stored count)' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /clinical-events:
     get:
       tags: [SAH-33]
@@ -966,6 +1011,7 @@ paths:
         answers return the same EmrSheet without a new view entry (mockup keep flag). Never logged.
       responses:
         '200': { description: The EMR sheet, content: { application/json: { schema: { $ref: '#/components/schemas/EmrSheet' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Clinical details are hidden for your role.") or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (admission missing or another clinic''s, or its patient missing)' }
@@ -1077,11 +1123,12 @@ paths:
                       checkToken: Qm9yZGVyLWNoZWNrLXRva2
                     sheet: { admissionId: 6c1b8e8e-0d0a-4b8e-9a52-7f0f3c1d2e33 }
         '201': { description: 'Placed (outcome PLACED): status Pharmacist check', content: { application/json: { schema: { $ref: '#/components/schemas/MedicineOrderAnswer' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on clientKey, drugKey, frequencyKey, overrideReasonKey, checkToken; or clientKey used for another admission)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on clientKey, drugKey, frequencyKey, overrideReasonKey, checkToken; or clientKey used for another admission); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Only a doctor can do this.") or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (admission missing or another clinic''s, or its patient missing)' }
         '409': { $ref: '#/components/responses/Problem', description: 'ipd-readonly; not-admitted; client-key-reused' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /medicine-orders/{id}/stop:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid }, description: 'The order id (MedicineOrderRow.id).' }
@@ -1108,6 +1155,7 @@ paths:
         the client shows the detail and reloads the sheet (GET /admissions/{id}/emr).
       responses:
         '200': { description: 'Stopped (or a repeat by the same user): the EMR sheet now', content: { application/json: { schema: { $ref: '#/components/schemas/EmrSheet' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Only a doctor can do this.") or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (order missing or another clinic''s, or the patient record missing)' }
@@ -1234,7 +1282,7 @@ paths:
                 value: { pin: '4821', checkToken: Qm9yZGVyLWNoZWNrLXRva2 }
       responses:
         '200': { description: 'Verified (or a repeat by the same user): the result and the first page of the queue now', content: { application/json: { schema: { $ref: '#/components/schemas/PharmacistActionResult' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on pin, checkToken)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on pin, checkToken); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403':
           description: 'forbidden; module-off; self-verification; wrong-pin; pin-locked (the 5th wrong try that causes the first or second lock within 24 hours, or any try while locked)'
@@ -1253,6 +1301,7 @@ paths:
               examples:
                 pinNotSet: { value: { type: 'https://sahaj.in/problems/pin-not-set', title: No PIN set, status: 409, detail: 'You have not set your PIN yet. Set your PIN, then try again.' } }
                 pinSwitchedOff: { summary: 'The 5th wrong try that causes the third lock within 24 hours, and every try after it until a new PIN is set', value: { type: 'https://sahaj.in/problems/pin-not-set', title: No PIN set, status: 409, detail: 'Your PIN was switched off after too many wrong tries. Set a new one, then try again.' } }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit (platform PIN limit; retryAfterSeconds)' }
         '503': { $ref: '#/components/responses/Problem', description: 'pin-unavailable (SAHAJ_PIN_PEPPER not set; fail closed)' }
   /medicine-orders/{id}/reject:
@@ -1287,11 +1336,12 @@ paths:
                 value: { reasonKey: INTERACTION_RISK }
       responses:
         '200': { description: 'Rejected (or a repeat by the same user): the result and the first page of the queue now', content: { application/json: { schema: { $ref: '#/components/schemas/PharmacistActionResult' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (field reasonKey)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (field reasonKey); or bad-request when the {id} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or module-off' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem', description: 'not-admitted; order-state' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
   /admissions/{id}/mar:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1371,6 +1421,7 @@ paths:
                       - { key: NIL_BY_MOUTH, label: Nil by mouth }
                       - { key: NOT_AVAILABLE, label: Medicine not available }
                       - { key: AWAY_FROM_WARD, label: Patient away from the ward }
+        '400': { $ref: '#/components/responses/BadRequest', description: 'bad-request (the {id} path value is not a UUID; title "Bad Request", detail "The request could not be understood. Check it and try again.")' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (token role, or the role re-read from the membership, is not OWNER, NURSE or DOCTOR), detail "You cannot open the medicine round." (contract wording, as built: DoseRules.MAR_HIDDEN; the button is not offered to these roles, so the text is seen only by a direct API call); or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (admission missing or another clinic''s, or its patient missing)' }
@@ -1524,13 +1575,14 @@ paths:
         '200': { description: 'Replay of a dose already recorded with this clientKey and the same values: the stored dose and the MAR now; only the record-access row is written', content: { application/json: { schema: { $ref: '#/components/schemas/DoseRecorded' } } } }
         '201': { description: 'Recorded: the dose and the MAR after the save', content: { application/json: { schema: { $ref: '#/components/schemas/DoseRecorded' } } } }
         '400':
-          description: 'validation (fieldErrors on clientKey, slotAt, outcome, wristband, identityConfirmed, secondNurseId, secondNursePin, reasonKey; one bedside message at a time in the order of AC6)'
+          description: 'validation (fieldErrors on clientKey, slotAt, outcome, wristband, identityConfirmed, secondNurseId, secondNursePin, reasonKey; one bedside message at a time in the order of AC6); or bad-request when the {id} path value is not a UUID (type https://sahaj.in/problems/bad-request, title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors)'
           content:
             application/problem+json:
               schema: { type: object }
               examples:
                 scanFirst: { value: { type: 'https://sahaj.in/problems/validation', title: Check the details, status: 400, detail: Scan the wristband first., fieldErrors: [{ field: wristband, message: Scan the wristband first. }] } }
                 sameNurse: { value: { type: 'https://sahaj.in/problems/validation', title: Check the details, status: 400, detail: The second check must be a different nurse., fieldErrors: [{ field: secondNurseId, message: The second check must be a different nurse. }] } }
+                malformedId: { summary: 'The {id} path value is not a UUID (components/responses/BadRequest)', value: { type: 'https://sahaj.in/problems/bad-request', title: Bad Request, status: 400, detail: The request could not be understood. Check it and try again. } }
         '401': { $ref: '#/components/responses/Problem' }
         '403':
           description: 'forbidden ("Only nurses and the clinic owner can give medicines."); module-off; wrong-pin and pin-locked (the second nurse''s PIN)'
@@ -1550,6 +1602,7 @@ paths:
                 mismatch: { value: { type: 'https://sahaj.in/problems/wristband-mismatch', title: Wristband does not match, status: 409, detail: Wristband does not match this patient. Stop. Check the patient before giving anything. } }
                 recorded: { value: { type: 'https://sahaj.in/problems/dose-recorded', title: Dose already recorded, status: 409, detail: This dose is already recorded. } }
                 notVerified: { value: { type: 'https://sahaj.in/problems/order-not-verified', title: Order not checked, status: 409, detail: This order is not checked by the pharmacist yet. } }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '429':
           description: 'rate-limit (the caller''s colleague PIN limit; retryAfterSeconds); colleague-pin-limit (SAH-38 pair cap; no retryAfterSeconds)'
           content:
@@ -1564,6 +1617,66 @@ paths:
               schema: { type: object }
               examples:
                 checkFailed: { value: { type: 'https://sahaj.in/problems/pin-check-failed', title: PIN check failed, status: 503, detail: We could not check the PIN. Try again. } }
+  /card-setup:
+    get:
+      tags: [SAH-37]
+      description: 'Clinic setup > Patient card (mockup cfgIpCard, pcBar, Published versions; ADR-015). OWNER, FRONT_DESK, NURSE, DOCTOR (token role and the role re-read from the active membership, both); BILLING, PHARMACIST, VISITING_DOCTOR and every other role 403 forbidden. Check order: role 403 forbidden; module Off 403 module-off; membership re-read 403 forbidden. Allowed in Trial, On and Read-only. Answers the catalogue, the Sahaj standard setup, the templates and the live setup for every allowed role; draft and versions only for OWNER (absent, not null, for the other roles, which never see an unpublished draft: AC10). A clinic that never published gets the standard setup as v1; reading never creates a row. A stored setup is repaired before it is answered (ADR-015 D3: locked items put back, unknown keys dropped, new catalogue items added); the stored row is not rewritten. Writes nothing, no record-access row (no patient data). The Overview tile line "<Layout> · Sahaj default|customized · v<n>[ · draft]" comes from live and draft.'
+      responses:
+        '200': { description: The card setup, content: { application/json: { schema: { $ref: '#/components/schemas/CardSetupView' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or module-off' }
+  /card-setup/draft:
+    put:
+      tags: [SAH-37]
+      description: 'Save draft (mockup pcsave). OWNER only (token role and the membership role re-read in the transaction; a demoted owner 403 forbidden, nothing stored). Check order: role 403 forbidden; module Off 403 module-off; body 400 validation (every rule of CardSetup, all field errors together; detail is the first message; nothing stored); IPD Read-only 409 ipd-readonly; then, under the clinic IPD advisory lock (ADR-015 D5), 409 card-setup-changed when the live version is not baseVersion, or a draft exists and its revision is not draftRevision, or no draft exists and draftRevision is not null. When the setup (canonical form) equals the live setup, any stored draft is removed, no history line is written and the answer has draft null (AC8: no draft pill). Otherwise the draft is stored with revision + 1 (1 for a new draft), savedAt and savedBy, and one Clinic setup change-history line is written in the same transaction (platform.api AuditLog, action IPD_CARD_DRAFT_SAVED, entity type IPD_CONFIG; after: liveVersion, draftRevision, changedParts; never labels or patient data). Toast (client): "Draft saved. Staff still see the live card until you publish."'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CardSetupWrite' } } }
+      responses:
+        '200': { description: 'The setup view after the save (draft with the new revision, or null)', content: { application/json: { schema: { $ref: '#/components/schemas/CardSetupView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors; messages in CardSetup and docs/architecture/SAH-37-patient-card-setup.md section 4); or bad-request for a body that cannot be read (components/responses/BadRequest)' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Only the clinic owner can change the patient card.") or module-off' }
+        '409':
+          description: 'ipd-readonly ("IPD is read-only. Nothing can be changed."); card-setup-changed'
+          content:
+            application/problem+json:
+              schema: { type: object }
+              examples:
+                changed: { value: { type: 'https://sahaj.in/problems/card-setup-changed', title: Card setup changed, status: 409, detail: The card setup was changed by someone else. Reload to see it. } }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+    delete:
+      tags: [SAH-37]
+      description: 'Discard draft (mockup pcdiscard). OWNER only (membership re-read). Check order: role 403 forbidden; module Off 403 module-off; draftRevision missing or not an integer 400 bad-request; Read-only 409 ipd-readonly; under the clinic IPD advisory lock: a draft exists and its revision is not draftRevision 409 card-setup-changed (another owner saved a newer draft; it is not discarded). No draft: 200, nothing to do. Otherwise the draft row is deleted; the live setup is unchanged. No history line (OQ-37-9, as the mockup cfgLog). Toast (client): "Draft discarded. The live card is unchanged."'
+      parameters:
+        - { name: draftRevision, in: query, required: true, schema: { type: integer, format: int64, minimum: 1 }, description: 'The draft revision the editor loaded (CardDraft.revision).' }
+      responses:
+        '200': { description: 'The setup view, draft null', content: { application/json: { schema: { $ref: '#/components/schemas/CardSetupView' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or module-off' }
+        '409': { $ref: '#/components/responses/Problem', description: 'ipd-readonly; card-setup-changed ("The card setup was changed by someone else. Reload to see it.")' }
+  /card-setup/publish:
+    post:
+      tags: [SAH-37]
+      description: 'Publish (mockup pcpublish). OWNER only (membership re-read). The body carries the editor''s setup (saved or not) and the tokens it loaded. Check order: role 403 forbidden; module Off 403 module-off; body 400 validation (as PUT /card-setup/draft); Read-only 409 ipd-readonly; under the clinic IPD advisory lock: the tokens as PUT /card-setup/draft 409 card-setup-changed; the setup (canonical form) equals the live setup 409 card-setup-unchanged ("There are no changes to publish."). Then, in one transaction: insert version live + 1 (2 for the first publish) with the canonical setup, isStandard, changedParts, publishedBy and publishedAt; delete the draft; one Clinic setup change-history line (AuditLog IPD_CARD_PUBLISHED, entity type IPD_CONFIG; before: version n - 1; after: version n, changedParts, isStandard). A unique-index clash on the version (a second publish that slipped past the lock) answers 409 card-setup-changed, never 500. A double tap makes one version: the second request carries the old baseVersion and gets 409 (AC8). Staff see the new card at their next list reload, at most 60 seconds (OQ-37-7); no push, no notification. Toast (client): "Patient card v<n> is live for every role. <Changed parts> updated."'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CardSetupWrite' } } }
+      responses:
+        '200': { description: 'The setup view after the publish (live is the new version, draft null)', content: { application/json: { schema: { $ref: '#/components/schemas/CardSetupView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors); or bad-request for a body that cannot be read (components/responses/BadRequest)' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Only the clinic owner can change the patient card.") or module-off' }
+        '409':
+          description: 'ipd-readonly; card-setup-changed; card-setup-unchanged'
+          content:
+            application/problem+json:
+              schema: { type: object }
+              examples:
+                changed: { value: { type: 'https://sahaj.in/problems/card-setup-changed', title: Card setup changed, status: 409, detail: The card setup was changed by someone else. Reload to see it. } }
+                unchanged: { value: { type: 'https://sahaj.in/problems/card-setup-unchanged', title: Nothing to publish, status: 409, detail: There are no changes to publish. } }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -1583,6 +1696,35 @@ components:
               fieldErrors:
                 type: array
                 items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+    BadRequest:
+      description: 'bad-request: a path value is not of its declared type (an {id} that is not a UUID). Spring''s own text is replaced by a fixed sentence (ProblemExceptionHandler); the submitted value is never echoed; no fieldErrors.'
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            properties:
+              type: { type: string, const: 'https://sahaj.in/problems/bad-request' }
+              title: { type: string, const: Bad Request }
+              status: { type: integer, const: 400 }
+              detail: { type: string, const: The request could not be understood. Check it and try again. }
+          examples:
+            malformedId: { value: { type: 'https://sahaj.in/problems/bad-request', title: Bad Request, status: 400, detail: The request could not be understood. Check it and try again. } }
+    PayloadTooLarge:
+      description: 'payload-too-large: the request body is over the size limit (RequestBodySizeLimitFilter): 64 KB for a signed-in user (property sahaj.request-body.max-bytes, never below 4 KB; the detail names the configured limit, in KB or, when not a whole number of KB, in bytes), 4 KB for any request without a signed-in user. The body is not read past the limit and nothing is saved.'
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status, detail]
+            properties:
+              type: { type: string, const: 'https://sahaj.in/problems/payload-too-large' }
+              title: { type: string, const: Request too large }
+              status: { type: integer, const: 413 }
+              detail: { type: string, examples: [The request body must be 64 KB or smaller., The request body must be 4 KB or smaller.] }
+          examples:
+            signedIn: { value: { type: 'https://sahaj.in/problems/payload-too-large', title: Request too large, status: 413, detail: The request body must be 64 KB or smaller. } }
+            notSignedIn: { value: { type: 'https://sahaj.in/problems/payload-too-large', title: Request too large, status: 413, detail: The request body must be 4 KB or smaller. } }
   schemas:
     CategoryKey:
       type: string
@@ -1740,8 +1882,9 @@ components:
         goingHomeToday: { type: boolean, description: 'SAH-27 (assumption OQ-27-5). True when the admission is ADMITTED and has a discharge sign-off whose signedAt falls on today''s IST date. Drives the teal pill "Going home today" in the Status column (instead of the Insurance, Corporate and Deposit pills (the mockup is exclusive)). Always false for a DISCHARGED admission.' }
     AdmissionList:
       type: object
-      required: [bedsTotal, bedsOccupied, bedsAvailable, canAdmit, depositAlerts, alertPercent, dischargedToday, goingHomeToday, emergency, safety, asOf, wards, card, items]
+      required: [bedsTotal, bedsOccupied, bedsAvailable, canAdmit, depositAlerts, alertPercent, dischargedToday, goingHomeToday, emergency, safety, asOf, wards, card, cardSetup, items]
       properties:
+        cardSetup: { $ref: '#/components/schemas/ResolvedCardSetup', description: 'SAH-37 (ADR-015 D4). The published card setup the Cards view draws, for every allowed role, read in the same transaction as the rows. The Sahaj standard setup (v1) when the clinic never published.' }
         asOf: { type: string, format: date-time, description: 'SAH-36 (ADR-013 D2, D7). Database clock (clock_timestamp()) of this answer, read once; base of every minute count and of vitalsDue in the rows. The time in "Could not refresh. Showing data from <asOf as 11:05 AM>." when a 60-second reload fails (the last answer stays on screen). For every role (FRONT_DESK has no safety.counts.asOf).' }
         wards: { type: array, items: { $ref: '#/components/schemas/WardOption' }, description: 'SAH-36 (story 2, AC14, AC20, AC21). Every ward of the clinic, in the order of IpdLayout.wards (the Beds setup), also wards with no admitted patient, for the select "Ward" after the option "All wards". Filtering is on the device by AdmittedPatientRow.wardId.' }
         card: { $ref: '#/components/schemas/AdmittedCardAbilities', description: 'SAH-36 (story 5; ADR-013 D5). What the card shows for this caller, once for the whole list (every listed patient is ADMITTED, so abilities depend only on the role and the IPD state).' }
@@ -1774,8 +1917,14 @@ components:
         state and admission status again, unchanged. Action row order on the card: Nursing (primary), EMR,
         Transfer, Discharge, each with its icon and word (nurse, emr, swap, door icons), at least 44 px, with the
         accessible name "<Action> for <patientName>". When no action is true the row is not drawn.
-      required: [nursing, emr, transfer, discharge, depositLowFlag]
+      required: [nursing, emr, transfer, discharge, deposit, depositLowFlag, visibleGroups]
       properties:
+        deposit: { type: boolean, description: 'SAH-37 (rule 10, AC40). OWNER, FRONT_DESK; IPD Trial or On (false in Read-only). The quick action "Deposit" (deposit icon), shown only when it is also switched on in cardSetup.actions; opens the admission sheet of SAH-23 at its "Running bill and deposit" part (start view, ADR-013 D6). Every ability is computed from CardAccessRule (ADR-015 D3), the same rule the catalogue''s "who" line is serialised from. An action is shown when it is in cardSetup.actions and its ability is true; the setup never grants.' }
+        visibleGroups:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/CardDataGroup' }
+          description: 'SAH-37 (rule 11, AC56; ADR-015 D4). The data groups this caller may see on the card (token role and membership role): OWNER all five; FRONT_DESK patient, contact, billing; NURSE and DOCTOR patient, clinical, vitals. The card draws a field only when its group is listed (billing fields are in every row for the unchanged Table view; a display rule for them, ADR-013 D3). A section with no field to draw is not drawn.'
         nursing: { type: boolean, description: 'OWNER, NURSE, DOCTOR; IPD Trial, On or Read-only. Opens the Nursing sheet of SAH-30/32 for the row (GET /admissions/{id}/nursing, record access as today); closing it returns focus to this button.' }
         emr: { type: boolean, description: 'OWNER, NURSE, DOCTOR; IPD Trial, On or Read-only. Opens the EMR sheet of SAH-31 (GET /admissions/{id}/emr, record access and view event as today); closing it returns focus to this button.' }
         transfer: { type: boolean, description: 'OWNER, NURSE, FRONT_DESK; IPD Trial or On (false in Read-only). Opens the admission sheet of SAH-23 (GET /admissions/{id}) with the "Move to another bed" row of SAH-26 open and focused (ADR-013 D6; no separate Transfer sheet and no reason field, OQ-36-11). When the detail answer has canTransfer false the sheet opens on its main view.' }
@@ -1808,6 +1957,7 @@ components:
             wardId: { type: string, format: uuid, description: 'Ward of the current bed; the value matched by the ward filter (ward names are not used as keys).' }
             roomName: { type: [string, 'null'], maxLength: 80, description: 'Room of the current bed; null when the bed has no room or the clinic uses no rooms (IpdLayout.roomLevel false), shown as "—" (ADR-013 Q7).' }
             clinical: { $ref: '#/components/schemas/AdmittedClinicalFlags', description: 'Present only when the token role and the role re-read from the active membership are both OWNER, DOCTOR or NURSE. For every other caller (FRONT_DESK) the property is absent from the JSON: not null, not an empty object (AC34; ADR-013 D3).' }
+            mobile: { type: [string, 'null'], maxLength: 20, description: 'SAH-37 (field Mobile, group contact; ADR-015 D6). The patient''s mobile number from the patient record (patient.api PatientLookupPort.findAllCurrent, one batch). Present only when the token role and the membership role are both OWNER or FRONT_DESK and (cardFacts=setup) the published setup has Mobile on in a section that is on, or cardFacts=all; absent otherwise (never sent to NURSE or DOCTOR). Null when the record has no mobile (card "—"). Never logged.' }
     AdmittedClinicalFlags:
       type: object
       description: >-
@@ -1833,6 +1983,8 @@ components:
         latestEws: { oneOf: [{ $ref: '#/components/schemas/EwsSummary' }, { type: 'null' }], description: 'Score and risk of the latest vitals record (recordedAt descending, then id descending; same rule as AdmissionDetail.latestEws); null when no vitals were recorded. No flag for LOW.' }
         vitalsDue: { type: boolean, description: 'Same rule and function as AdmissionDetail.vitalsDue (SAH-30 AC10): no vitals yet, or more than 240 whole minutes from the latest recordedAt to AdmissionList.asOf.' }
         allergy: { $ref: '#/components/schemas/CardAllergy' }
+        diagnosis: { type: string, minLength: 1, maxLength: 200, description: 'SAH-37 (field Diagnosis, group clinical; ADR-015 D6). The reason for admission (ipd.admission.reason, "Under evaluation" when it was left blank; the same value as DischargeSheet.diagnosis and EmrSheet.diagnosis). Present only when (cardFacts=setup) the published setup has Diagnosis on, or cardFacts=all; absent otherwise. Clinical text: on screen only, never logged.' }
+        latestVitals: { oneOf: [{ $ref: '#/components/schemas/CardLatestVitals' }, { type: 'null' }], description: 'SAH-37 (fields BP, Pulse, SpO₂, Temp, RR, Last recorded; group vitals; ADR-015 D6). The latest vitals record (the same record as latestEws). Present only when (cardFacts=setup) the published setup has at least one of those six fields on, or cardFacts=all; absent otherwise. Null when no vitals were recorded (card "No vitals recorded yet"; Last recorded "Not recorded" in amber).' }
     CardEscalationFlag:
       type: object
       description: 'SAH-36. The open escalation of one admitted patient for the card flag; values from EscalationClock at AdmissionList.asOf (ADR-007 D5), equal to the EscalationRow of the Safety board at the same snapshot. No id, score or names (the card does not act on it; Acknowledge and Call senior stay on the Safety board).'
@@ -1863,8 +2015,9 @@ components:
       allOf:
         - $ref: '#/components/schemas/AdmissionRow'
         - type: object
-          required: [reason, deposits, canCollectDeposit, bill, canAddCharge, canTransfer, transferRules, status, dischargedAt, canStartDischarge, discharge, finalBill, canOpenNursing, vitalsDue, latestEws, canOpenEmr]
+          required: [reason, deposits, canCollectDeposit, bill, canAddCharge, canTransfer, transferRules, status, dischargedAt, canStartDischarge, discharge, finalBill, canOpenNursing, vitalsDue, latestEws, canOpenEmr, package]
           properties:
+            package: { oneOf: [{ $ref: '#/components/schemas/AdmissionPackage' }, { type: 'null' }], description: 'SAH-29 (AC2). The admission''s own copy of the package taken when it was attached (ipd.admission package columns); null when the admission has no package. Later changes to the package list never change it. Sent to all four roles (they already see the bill). The sheet draws no separate field for it: the Summary strip shows no new field (AC4); the package shows only as the bill lines of RunningBill. Same value for a DISCHARGED admission (its bill comes from finalBill).' }
             canOpenEmr: { type: boolean, description: 'SAH-31 (AC1, OQ-31-7; ADR-009 D11). Shows the footer button "EMR" (emr icon) of the admission sheet, which opens the EMR sheet (GET /admissions/{id}/emr): true when the token role and the role re-read from the active membership are both OWNER, DOCTOR or NURSE, the admission is ADMITTED and IPD is Trial, On or Read-only (Read-only added to the story so a doctor can still read and stop medicines; ADR-009 Q6); false otherwise, and always false for a DISCHARGED admission and for FRONT_DESK, BILLING and every other role.' }
             canOpenNursing: { type: boolean, description: 'SAH-30. Shows the footer button "Nursing" (nurse icon) that opens the Nursing sheet: true for OWNER, NURSE and DOCTOR in Trial, On and Read-only state, for an ADMITTED or a DISCHARGED admission (AC1, AC11); false for every other role. Whether the sheet can save is NursingSheet.canRecord.' }
             vitalsDue: { type: [boolean, 'null'], description: 'SAH-30 (AC10), for the later patient card. True when the admission is ADMITTED and has no vitals, or the whole minutes from its latest vitals recordedAt to the read time (the database clock, clock_timestamp(), never the application clock; review M1) (rounded down) are more than 240 (mockup pcDue); false otherwise and always false for a DISCHARGED admission. Null for a role without vitals access (FRONT_DESK; ADR-006 Q6). The Nursing sheet shows no flag for it.' }
@@ -1959,9 +2112,28 @@ components:
         unitPaise: { type: integer }
         qty: { type: integer }
         amountPaise: { type: integer, description: unitPaise times qty. }
-        segment: { type: boolean, description: 'SAH-26. True for a line of a bed the patient was moved away from ("Bed · General (before transfer)", "Doctor visits · General rate"). Absent or false otherwise.' }
+        segment: { type: boolean, description: 'SAH-26. True for a line of a bed the patient was moved away from ("Bed · General (before transfer)", "Doctor visits · General rate"). Absent or false otherwise. Always false on a package admission (SAH-29: no segment lines).' }
     RunningBill:
       type: object
+      description: >-
+        SAH-25/26, SAH-29. Worked out by the server on read (one function for the sheet, the Admitted list, the
+        Deposit low pill, the Deposit alerts tile and the board flag, so the numbers agree; never stored before
+        discharge). billDays is the SAH-25 rule "Bed day counted". Without a package the lines are as SAH-25/26.
+        With a package (AdmissionDetail.package not null; AC3, mockup ipLines) the lines are, in this order, and a
+        line with quantity 0 is dropped:
+        (1) "Package · <package.name> (bed, nursing and surgeon for <package.includedDays> days)", qty 1, unitPaise
+        package.pricePaise (the copy on the admission; the package price counts from the first day, AC4; the text
+        is the mockup template, also for 0 and 1 days: OQ-29-4);
+        (2) "Bed · <categoryName> beyond the package", unitPaise the bed charge a day of the category of the bed the
+        patient is in now (no multiplier), qty = max(0, billDays - max(1, package.includedDays)) (a day-care package,
+        0 days, includes 1 bed day);
+        (3) the extra charges of SAH-25, one line per service and base price in order of first charge, named
+        "<service> · not in package", unitPaise = base price x multiplier of the current category, half-up to whole
+        paise, amount = unitPaise x qty (as SAH-25; earlier charges are re-priced after a transfer, OQ-29-5).
+        A package admission has no "Doctor visits" line, no "Nursing care" line and no bed-transfer segment lines
+        (segment false everywhere), whatever ipd.bed_transfer holds. categoryName, multiplier and therefore the heading
+        note of the Running bill panel ("Bed day counted at midnight · <categoryName> rate ×<multiplier> on
+        services") are unchanged. totalPaise, depositPercent and AdmissionRow.depositLow use these lines.
       required: [billDays, bedDayCut, categoryName, multiplier, lines, totalPaise, paidPaise, depositPercent]
       properties:
         billDays: { type: integer }
@@ -1973,6 +2145,33 @@ components:
         paidPaise: { type: integer }
         depositPercent: { type: [integer, 'null'], description: 'Bill as a share of the deposit, rounded; null when there is no deposit.' }
         alertPercent: { type: integer }
+    AdmissionPackage:
+      type: object
+      description: 'SAH-29 (AC2). The copy of a package kept on one admission (ipd.admission.package_name, package_price_paise, package_days; all three set or none). Not a link to ipd.package: changing or switching off the package later never changes it.'
+      required: [name, pricePaise, includedDays]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80, description: 'Package name as it was when attached. Not patient data.' }
+        pricePaise: { type: integer, minimum: 0, maximum: 100000000, multipleOf: 100, description: 'Package price in paise, whole rupees (at most ₹10,00,000).' }
+        includedDays: { type: integer, minimum: 0, maximum: 60, description: 'Bed days included; 0 = day-care (the bill counts it as 1 bed day).' }
+    IpdPackage:
+      type: object
+      description: >-
+        SAH-29 (AC1). One row of the Packages panel (mockup cfgIpAdm): a chip "<includedDays> days" (the mockup
+        template, also "1 days" for 1; OQ-29-4) or "Day-care" when includedDays is 0; the name in bold; the fixed small
+        text "Bed, nursing and surgeon included · extra days and exclusions at normal rates" (client constant, not
+        sent); the price at the right as "₹45,000". No action on the row.
+      required: [id, name, pricePaise, includedDays]
+      properties:
+        id: { type: string, format: uuid, description: 'Row key only; nothing in this slice takes it as input.' }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        pricePaise: { type: integer, minimum: 0, maximum: 100000000, multipleOf: 100, description: 'Whole rupees, in paise.' }
+        includedDays: { type: integer, minimum: 0, maximum: 60, description: '0 = day-care.' }
+    PackageList:
+      type: object
+      description: 'SAH-29. The answer of GET /packages.'
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/IpdPackage' }, description: 'Active packages of the clinic in the order they were created (created_at, then id). Empty when the clinic has none (OQ-29-3).' }
     TransferRules:
       type: object
       required: [upgradeNeedsOwner, newRateFrom]
@@ -2048,7 +2247,7 @@ components:
         types: { type: array, items: { $ref: '#/components/schemas/DischargeTypeOption' } }
         templates: { type: array, items: { $ref: '#/components/schemas/DischargeTemplateOption' } }
         defaultType: { $ref: '#/components/schemas/DischargeType' }
-        defaultTemplateKey: { $ref: '#/components/schemas/DischargeTemplateKey', description: 'The template of Discharge setup; when none is chosen: maternity for a maternity admission, daycare for a daycare admission, surgical for an admission with a package (SAH-29; no admission has one until then), otherwise general.' }
+        defaultTemplateKey: { $ref: '#/components/schemas/DischargeTemplateKey', description: 'The template of Discharge setup; when none is chosen: maternity for a maternity admission, daycare for a daycare admission, surgical for an admission with a package (SAH-29: AdmissionDetail.package not null; mockup ipdis), otherwise general.' }
         signature: { oneOf: [{ $ref: '#/components/schemas/DischargeSignature' }, { type: 'null' }], description: 'The latest sign-off, or null when nobody has signed.' }
         canSign: { type: boolean, description: 'True for DOCTOR and OWNER when IPD is not read-only (OQ-27-1); others see the checkbox disabled.' }
         canDischarge: { type: boolean, description: 'True for OWNER and FRONT_DESK when IPD is not read-only (OQ-27-1).' }
@@ -3205,3 +3404,246 @@ components:
         replayed: { type: boolean, description: 'True when an earlier request with the same clientKey recorded this dose; nothing was written by this request except a record-access row.' }
         dose: { $ref: '#/components/schemas/DoseRow' }
         mar: { $ref: '#/components/schemas/Mar', description: 'The MAR now (asOf after the save).' }
+    VitalMark:
+      type: string
+      enum: [CHECK, CRITICAL]
+      description: 'SAH-37 (rule 20, DEC-027 point 5, OQ-37-11; ADR-015 D6). Mark of one vital tile, from the SAH-30 per-parameter points of EarlyWarningScore (ADR-006 D3), never from a new limit and never in the browser: 3 points CRITICAL (word "Critical", title "Critical"), 1 or 2 points CHECK (word "Check", title "Outside normal range"), 0 points no mark (property absent). Colour is never the only signal. Clinical sign-off of the bands (OQ-30-6) covers it; go-live condition: a clinician signs off the tile marks (DEC-027).'
+    CardReading:
+      type: object
+      required: [value]
+      properties:
+        value: { type: number, description: 'Pulse /min, SpO₂ %, RR /min as whole numbers; Temp °C with one decimal (multipleOf 0.1).' }
+        mark: { $ref: '#/components/schemas/VitalMark', description: 'Absent when the reading scores 0 points.' }
+    CardBpReading:
+      type: object
+      required: [systolic, diastolic]
+      properties:
+        systolic: { type: integer, minimum: 40, maximum: 300 }
+        diastolic: { type: integer, minimum: 20, maximum: 200, description: Shown; not scored. }
+        mark: { $ref: '#/components/schemas/VitalMark', description: 'From the systolic points only (diastolic is not scored). Absent at 0 points.' }
+    CardLatestVitals:
+      type: object
+      description: 'SAH-37 (ADR-015 D6). The latest vitals record of an admitted patient for the card (recordedAt descending, then id descending; the record behind AdmittedClinicalFlags.latestEws), read in the existing batch read R4 (no call per patient). Each reading is present only when its field is switched on in the published setup (or cardFacts=all); absent otherwise. Tile text: "<value> <unit>", "—" when the field is on but the reading is absent for this caller. Clinical data: on screen only, never logged or audited.'
+      required: [recordedAt]
+      properties:
+        recordedAt: { type: string, format: date-time, description: 'Database time of the save. Last recorded "<N> min ago" (mockup pcAgo: "2 h 5 min ago" from 60 minutes) from AdmissionList.asOf minus recordedAt, never the device clock.' }
+        recordedByName: { type: string, description: 'Present only when Last recorded is on (or cardFacts=all). Display name of the user who saved it (platform.api ActorDirectoryPort.displayNames, one batch; "Team member" when the name cannot be found). Shown "<ago> · <recordedByName>".' }
+        bp: { $ref: '#/components/schemas/CardBpReading', description: 'Present when BP is on. Shown "136/84 mmHg".' }
+        pulse: { $ref: '#/components/schemas/CardReading', description: 'Present when Pulse is on. "/min".' }
+        spo2: { $ref: '#/components/schemas/CardReading', description: 'Present when SpO₂ is on. "%".' }
+        temp: { $ref: '#/components/schemas/CardReading', description: 'Present when Temp is on. "°C", one decimal.' }
+        rr: { $ref: '#/components/schemas/CardReading', description: 'Present when RR is on. "/min".' }
+    CardLayout:
+      type: string
+      enum: [compact, standard, expanded]
+      description: 'SAH-37 (rule 5, mockup PC_LAY). compact "Compact" "Key facts on one line, icon actions. Fits 4–5 cards a row."; standard "Standard" "Sections with labels and vital tiles. The Sahaj default."; expanded "Expanded" "Every field and section titles." (no Last nursing note, DEC-027 point 4).'
+    CardSectionKey:
+      type: string
+      enum: [header, status, stay, care, vitals, clinical, billing]
+      description: 'SAH-37 (mockup PC_S). header Card header (locked: always on, always first), status Workflow status (safety), stay Admission and bed, care Care team, vitals Vitals (safety), clinical Clinical (safety), billing Billing.'
+    CardFieldKey:
+      type: string
+      enum: [name, uhid, ageSex, bed, ipNumber, mobile, alerts, admittedOn, lengthOfStay, ward, room, admissionType, doctor, bp, pulse, spo2, temp, rr, ews, lastRecorded, diagnosis, allergies, runningBill, deposit, payer]
+      description: 'SAH-37 (mockup PC_F; only fields with data in phase 1, OQ-37-3: no Workflow stage, no Assigned nurse). Standard names, groups and safety flags in CardCatalogue.fields; the table is in docs/architecture/SAH-37-patient-card-setup.md section 1.'
+    CardActionKey:
+      type: string
+      enum: [nursing, emr, transfer, discharge, deposit]
+      description: 'SAH-37 (mockup PC_A; no Case paper, no Update stage, OQ-37-3).'
+    CardDataGroup:
+      type: string
+      enum: [patient, contact, clinical, vitals, billing]
+      description: 'SAH-37 (rule 11, mockup PC_G). patient "Patient and admission": OWNER, FRONT_DESK, NURSE, DOCTOR; contact "Contact details": OWNER, FRONT_DESK; clinical "Clinical details": OWNER, DOCTOR, NURSE; vitals "Vitals and early warning": OWNER, DOCTOR, NURSE; billing "Billing": OWNER, FRONT_DESK. Fixed (no Roles and access in phase 1); it only narrows what the server already allows.'
+    CardRole:
+      type: string
+      enum: [OWNER, DOCTOR, NURSE, FRONT_DESK]
+      description: 'SAH-37. The roles that have the Admitted list; the "View as" choices of the preview ("Owner / Admin", "Doctor", "Nurse", "Front desk"; OQ-37-4).'
+    CardFieldPlacement:
+      type: object
+      additionalProperties: false
+      required: [key, on, label]
+      properties:
+        key: { $ref: '#/components/schemas/CardFieldKey' }
+        on: { type: boolean, description: 'Patient name, UHID, Alerts, Early warning, Allergies: must be true ("<Field> is a safety field and cannot be hidden."; Patient name "Patient name stays first in the Card header.").' }
+        label:
+          type: string
+          maxLength: 400
+          description: 'The owner''s own name for the field; "" keeps the standard name. Stored trimmed and NFC-normalised. Rules (400 validation, field setup.sections[i].fields[j].label): over 400 UTF-16 units refused before normalisation, then more than 40 code points "Keep the label to 40 characters."; a control or text-direction character "Label cannot contain control or text-direction characters"; Patient name, UHID, Alerts, Early warning and Allergies must be "" or their standard name ("The label of <Field> cannot be changed."; DEC-027 point 2). Plain text, shown as typed (never markup).'
+    CardSection:
+      type: object
+      additionalProperties: false
+      required: [key, on, fields]
+      properties:
+        key: { $ref: '#/components/schemas/CardSectionKey' }
+        on: { type: boolean, description: 'header, status, vitals and clinical must be true ("The <Section> section is a safety section and stays on."; header "The Card header section is always first and always on."). A section that holds a safety field must be on ("<Field> is a safety field. Move it to a section that is switched on.").' }
+        fields: { type: array, maxItems: 25, items: { $ref: '#/components/schemas/CardFieldPlacement' }, description: 'In card order. May be empty ("Drop a field here"). Patient name only in header, first.' }
+    CardActionPlacement:
+      type: object
+      additionalProperties: false
+      required: [key, on]
+      properties:
+        key: { $ref: '#/components/schemas/CardActionKey' }
+        on: { type: boolean }
+    CardSetup:
+      type: object
+      additionalProperties: false
+      description: >-
+        SAH-37 (ADR-015 D3). One card setup in canonical form (stored, edited and sent back whole). Validated
+        on Save draft and Publish (all errors together, 400 validation with fieldErrors, nothing stored):
+        layout "Choose Compact, Standard or Expanded."; cardsPerRow "Choose 2, 3 or 4 cards per row.";
+        sections: exactly the 7 CardSectionKey values, each once ("Unknown section.", "Each section can appear
+        only once.", "The <Section> section is missing."), header first; fields: exactly the 25 CardFieldKey
+        values once across all sections ("Unknown field.", "Each field can appear only once.", "<Field> is
+        missing from the card setup."); actions: exactly the 5 CardActionKey values, each once ("Unknown quick
+        action.", "Each quick action can appear only once.", "The <Action> quick action is missing."); and the
+        locked-item, label and placement rules of CardSection and CardFieldPlacement. Full table:
+        docs/architecture/SAH-37-patient-card-setup.md section 4. Holds no patient data.
+      required: [layout, cardsPerRow, sections, actions]
+      properties:
+        layout: { $ref: '#/components/schemas/CardLayout' }
+        cardsPerRow: { type: integer, enum: [2, 3, 4], description: 'Default cards per row on a desktop (rule 5). Each person may switch it for the visit (SAH-36); tablets 2, phones 1.' }
+        sections: { type: array, minItems: 7, maxItems: 7, items: { $ref: '#/components/schemas/CardSection' }, description: In card order. }
+        actions: { type: array, minItems: 5, maxItems: 5, items: { $ref: '#/components/schemas/CardActionPlacement' }, description: 'In card order; default Nursing, EMR, Transfer, Discharge on, Deposit off.' }
+    CardSetupWrite:
+      type: object
+      additionalProperties: false
+      description: 'SAH-37. Body of PUT /card-setup/draft and POST /card-setup/publish (ADR-015 D5). The tokens are those of the CardSetupView the editor loaded or last received.'
+      required: [baseVersion, draftRevision, setup]
+      properties:
+        baseVersion: { type: integer, minimum: 1, description: 'CardLive.version when the editor loaded. Differs from the live version now: 409 card-setup-changed.' }
+        draftRevision: { type: [integer, 'null'], format: int64, minimum: 1, description: 'CardDraft.revision when the editor loaded, null when there was no draft. A stored draft with another revision, or no stored draft while this is not null: 409 card-setup-changed.' }
+        setup: { $ref: '#/components/schemas/CardSetup' }
+    CardChangedPart:
+      type: string
+      enum: [layout, sections, fields, quickActions]
+      description: 'SAH-37 (mockup pcChanges). layout: layout or cards per row; sections: section order or on/off; fields: any field''s section, order, on/off or label; quickActions: order or on/off. Words on screen: layout, sections, fields, quick actions ("Layout, fields updated.", "Changed: layout, fields").'
+    CardCatalogueSection:
+      type: object
+      required: [key, name, description, locked, safety]
+      properties:
+        key: { $ref: '#/components/schemas/CardSectionKey' }
+        name: { type: string }
+        description: { type: string, description: 'Setup row text, for example "Name, identifiers and bed · always first".' }
+        locked: { type: boolean, description: 'Card header: "Always on" pill, lock icon, fixed first, no switch.' }
+        safety: { type: boolean, description: 'Workflow status, Vitals, Clinical: "Safety · always on" pill (green) instead of a switch.' }
+    CardCatalogueField:
+      type: object
+      required: [key, name, group, required, safety, allowedSections]
+      properties:
+        key: { $ref: '#/components/schemas/CardFieldKey' }
+        name: { type: string, description: 'Standard name, also the label placeholder ("Label for <name>").' }
+        group: { $ref: '#/components/schemas/CardDataGroup' }
+        required: { type: boolean, description: 'Patient name only: pill "Required", fixed first in the Card header.' }
+        safety: { type: boolean, description: 'UHID, Alerts, Early warning, Allergies: pill "Safety · always on", tooltip "Patient safety: cannot be hidden", label box disabled.' }
+        allowedSections: { type: array, items: { $ref: '#/components/schemas/CardSectionKey' }, description: 'Patient name: header only; every other field: all sections.' }
+        unit: { type: string, description: 'Vital readings only: mmHg, /min, %, °C, /min.' }
+    CardCatalogueGroup:
+      type: object
+      required: [key, name, visibleTo]
+      properties:
+        key: { $ref: '#/components/schemas/CardDataGroup' }
+        name: { type: string, description: 'Patient and admission, Contact details, Clinical details, Vitals and early warning, Billing.' }
+        visibleTo: { type: array, items: { $ref: '#/components/schemas/CardRole' }, description: 'From CardAccessRule (the rule GET /admissions enforces). The preview hides a field whose group does not list the "View as" role.' }
+    CardCatalogueAction:
+      type: object
+      required: [key, name, icon, description, usableBy, allowedInReadOnly]
+      properties:
+        key: { $ref: '#/components/schemas/CardActionKey' }
+        name: { type: string }
+        icon: { type: string, enum: [nurse, emr, swap, door, deposit] }
+        description: { type: string, description: 'For example "Record vitals and a nursing note".' }
+        usableBy: { type: array, items: { $ref: '#/components/schemas/CardRole' }, description: 'The "who" line (shield icon), read-only: Nursing and EMR OWNER, NURSE, DOCTOR; Transfer OWNER, NURSE, FRONT_DESK; Discharge OWNER, DOCTOR; Deposit OWNER, FRONT_DESK. From CardAccessRule, the same rule as AdmittedCardAbilities (single copy, ADR-015 D3). No "Change who can use each action" button.' }
+        allowedInReadOnly: { type: boolean, description: 'Nursing, EMR true; Transfer, Discharge, Deposit false.' }
+    CardCatalogue:
+      type: object
+      description: 'SAH-37 (ADR-015 D3). Fixed Sahaj content serialised from the server constants: the setup editor, the preview and the "who" line read it; the browser holds no copy.'
+      required: [sections, fields, groups, actions, viewAsRoles, labelMaxLength]
+      properties:
+        sections: { type: array, items: { $ref: '#/components/schemas/CardCatalogueSection' } }
+        fields: { type: array, items: { $ref: '#/components/schemas/CardCatalogueField' } }
+        groups: { type: array, items: { $ref: '#/components/schemas/CardCatalogueGroup' } }
+        actions: { type: array, items: { $ref: '#/components/schemas/CardCatalogueAction' } }
+        viewAsRoles: { type: array, items: { $ref: '#/components/schemas/CardRole' }, description: 'OWNER, DOCTOR, NURSE, FRONT_DESK; default "View as" is NURSE.' }
+        labelMaxLength: { type: integer, const: 40 }
+    CardTemplate:
+      type: object
+      description: 'SAH-37 (rule 6, mockup PC_PRESET). Applied by the editor to its draft: the draft''s layout, sections and actions become those of the template; cardsPerRow is kept. Toast "<Template> template applied to your draft. Publish to use it.".'
+      required: [key, name, description, layout, sections, actions]
+      properties:
+        key: { type: string, enum: [smallClinic, nursingHome, hospital] }
+        name: { type: string, description: 'Small clinic, Nursing home, Hospital.' }
+        description: { type: string, description: '"Compact card, no billing", "Standard card with deposit action", "Expanded card, billing section, all actions".' }
+        layout: { $ref: '#/components/schemas/CardLayout' }
+        sections: { type: array, items: { $ref: '#/components/schemas/CardSection' } }
+        actions: { type: array, items: { $ref: '#/components/schemas/CardActionPlacement' } }
+    CardLive:
+      type: object
+      required: [version, isStandard, setup, publishedAt, publishedByName]
+      properties:
+        version: { type: integer, minimum: 1, description: '1 = the Sahaj standard card the clinic started with (never stored).' }
+        isStandard: { type: boolean, description: 'Pill "Sahaj standard card · v<n> live" (teal) when true, "Customized · v<n> live" (blue) otherwise; Overview tile "Sahaj default" / "customized".' }
+        setup: { $ref: '#/components/schemas/CardSetup', description: Repaired on read. }
+        publishedAt: { type: [string, 'null'], format: date-time, description: 'Null for v1.' }
+        publishedByName: { type: [string, 'null'], description: 'Null for v1 (shown "Sahaj").' }
+    CardDraft:
+      type: object
+      required: [revision, baseVersion, setup, savedAt, savedByName, changedParts]
+      properties:
+        revision: { type: integer, format: int64, minimum: 1, description: 'Send back as draftRevision.' }
+        baseVersion: { type: integer, minimum: 1, description: 'The live version the draft was saved against.' }
+        setup: { $ref: '#/components/schemas/CardSetup', description: Repaired on read. }
+        savedAt: { type: string, format: date-time, description: '"· saved 11:05 AM" (IST).' }
+        savedByName: { type: string }
+        changedParts: { type: array, minItems: 1, items: { $ref: '#/components/schemas/CardChangedPart' }, description: 'Against the live setup; "Draft · N change(s) not published".' }
+    CardVersion:
+      type: object
+      required: [version, summary, isStandard, changedParts, publishedAt, publishedByName, live]
+      properties:
+        version: { type: integer, minimum: 1 }
+        summary: { type: string, description: '"Sahaj standard patient card (default)" for v1; "Back to the Sahaj standard card" when isStandard; otherwise "Changed: <parts>".' }
+        isStandard: { type: boolean }
+        changedParts: { type: array, items: { $ref: '#/components/schemas/CardChangedPart' }, description: Empty for v1. }
+        publishedAt: { type: [string, 'null'], format: date-time, description: 'Null for v1 ("When the clinic was created"); else "24 Oct 2026, 11:05 AM IST".' }
+        publishedByName: { type: [string, 'null'], description: 'Null for v1 ("Sahaj").' }
+        live: { type: boolean, description: 'True for the newest only (pill "Live").' }
+    CardSetupView:
+      type: object
+      description: 'SAH-37. Answer of every /card-setup operation. draft and versions are present only for OWNER (token role and membership role); for FRONT_DESK, NURSE and DOCTOR they are absent from the JSON (not null).'
+      required: [catalogue, standard, templates, live, canEdit, readOnlyReason, state]
+      properties:
+        catalogue: { $ref: '#/components/schemas/CardCatalogue' }
+        standard: { $ref: '#/components/schemas/CardSetup', description: 'The Sahaj standard setup (DEC-027: the SAH-36 card plus the locked Allergies and Early warning lines; readings, Last recorded and Diagnosis off; Billing off; Deposit action off; Standard, 3 per row). Reset to default replaces the editor''s draft with it ("Draft reset to the Sahaj standard card. Publish to apply it.").' }
+        templates: { type: array, items: { $ref: '#/components/schemas/CardTemplate' } }
+        live: { $ref: '#/components/schemas/CardLive' }
+        draft: { oneOf: [{ $ref: '#/components/schemas/CardDraft' }, { type: 'null' }], description: 'OWNER only; null when there is no draft (a draft equal to live is never kept).' }
+        versions: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/CardVersion' }, description: 'OWNER only. Newest first, at most 50; v1 is the last row once fewer than 50 versions were published. No restore.' }
+        canEdit: { type: boolean, description: 'True only for OWNER when IPD is Trial or On. False: every control disabled; Save, Discard, Reset and Publish not offered.' }
+        readOnlyReason: { type: [string, 'null'], enum: [ROLE, IPD_READONLY, null], description: 'ROLE: foot text "set by the clinic owner". IPD_READONLY: the existing IPD Read-only message. Null when canEdit.' }
+        state: { type: string, enum: [trial, on, readonly], description: 'IPD state, for the preview''s action rule (allowedInReadOnly).' }
+    ResolvedCardSection:
+      type: object
+      required: [key, name, fields]
+      properties:
+        key: { $ref: '#/components/schemas/CardSectionKey' }
+        name: { type: string, description: 'Section title in the Expanded layout.' }
+        fields:
+          type: array
+          items:
+            type: object
+            required: [key, label, group, safety]
+            properties:
+              key: { $ref: '#/components/schemas/CardFieldKey' }
+              label: { type: string, maxLength: 40, description: 'The owner''s label, or the standard name when it is empty. Plain text.' }
+              group: { $ref: '#/components/schemas/CardDataGroup' }
+              safety: { type: boolean }
+    ResolvedCardSetup:
+      type: object
+      description: 'SAH-37 (ADR-015 D4, D8). The published setup ready to draw: repaired, only sections and fields that are on, labels resolved, in card order; actions that are on, in order. The shared card component draws it; a field is drawn only when its group is in AdmissionList.card.visibleGroups and an action only when its ability in AdmissionList.card is true. A client that cannot read it draws the Sahaj standard card with the notice "Could not load the card setup. Showing the standard card.".'
+      required: [version, isStandard, fallback, layout, cardsPerRow, sections, actions]
+      properties:
+        version: { type: integer, minimum: 1 }
+        isStandard: { type: boolean }
+        fallback: { type: boolean, description: 'True when the stored live setup could not be read and the standard setup is answered instead; the page shows "Could not load the card setup. Showing the standard card.".' }
+        layout: { $ref: '#/components/schemas/CardLayout' }
+        cardsPerRow: { type: integer, enum: [2, 3, 4], description: 'The opening "Cards per row" on a desktop; the person''s own choice during the visit wins (SAH-36 AC1).' }
+        sections: { type: array, items: { $ref: '#/components/schemas/ResolvedCardSection' } }
+        actions: { type: array, items: { $ref: '#/components/schemas/CardActionKey' } }

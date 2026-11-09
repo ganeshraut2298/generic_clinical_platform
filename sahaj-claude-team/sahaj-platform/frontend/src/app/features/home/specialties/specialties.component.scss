@@ -26,7 +26,8 @@
   &[aria-pressed='true'] {
     border: 2px solid var(--pri);
     padding: 13px;
-    background: var(--pri-soft);
+    // The tint is translucent: lay it on white so the text never sits on the page layer (SAH-39).
+    background: linear-gradient(var(--pri-soft), var(--pri-soft)), var(--surface);
   }
 }
 

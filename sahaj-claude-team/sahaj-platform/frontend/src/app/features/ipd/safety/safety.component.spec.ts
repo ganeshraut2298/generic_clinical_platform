@@ -3,7 +3,7 @@ import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@a
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { SAFETY_REFRESH_MS, SafetyComponent } from './safety.component';
 import { marOf, orderOf, slotOf } from '../mar/mar.fixtures';
@@ -89,7 +89,7 @@ describe('SafetyComponent', () => {
       providers: [
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
-        { provide: MatSnackBar, useValue: { open: snack } },
+        { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
         { provide: MatDialog, useValue: dialog },
       ],
     });
@@ -554,7 +554,7 @@ describe('SafetyComponent', () => {
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
-          { provide: MatSnackBar, useValue: { open: vi.fn() } },
+          { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },
         ],
       });
@@ -605,7 +605,7 @@ describe('SafetyComponent', () => {
         providers: [
           provideHttpClient(withInterceptors([problemDetailInterceptor])),
           provideHttpClientTesting(),
-          { provide: MatSnackBar, useValue: { open: vi.fn() } },
+          { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },
         ],
       });
@@ -676,7 +676,7 @@ describe('SafetyComponent', () => {
       expect(roundRows().length).toBe(2);
     });
 
-    it('Give: one MAR read, then the Give sheet; after a dose the board reloads, the user stays, focus goes to the heading when the row is gone', async () => {
+    it('Give: one MAR read, then the Give sheet; after a dose the board reloads, the user stays, focus goes to the Give of the next row when the row is gone', async () => {
       await open();
       dialog.open.mockReturnValue({ afterClosed: () => of({ mar: marForLate() }) });
       document.body.appendChild(el());
@@ -688,7 +688,7 @@ describe('SafetyComponent', () => {
       expect(roundRows().length).toBe(1);
       expect(el().querySelector('[data-kpi=doses] .v')!.textContent!.trim()).toBe('1');
       await afterTick();
-      expect(document.activeElement).toBe(el().querySelector('#sf-round-h'));
+      expect(document.activeElement).toBe(gives()[0]);
       expect(counts.at(-1)!.dosesLate).toBe(0);
       el().remove();
     });
@@ -766,7 +766,7 @@ describe('SafetyComponent', () => {
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
-          { provide: MatSnackBar, useValue: { open: vi.fn() } },
+          { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },
         ],
       });
@@ -862,6 +862,295 @@ describe('SafetyComponent', () => {
       eventsReq().flush(pageOf());
       await settle();
       expect(el().querySelector('[data-testid=safety-stale]')).toBeNull();
+    });
+
+    it('a 403 on the 60-second reload clears the board and shows the refusal of the first load (G-2)', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      await open(boardOf({ escalations: [ROW] }));
+      expect(rows().length).toBe(1);
+      vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+      http.expectOne(BOARD).flush(problem('forbidden', 403, 'You cannot see the Safety board.'), { status: 403, statusText: 'Forbidden' });
+      expect(eventsReq().cancelled, 'the audit-trail reload is dropped too').toBe(true);
+      await settle();
+      expect(rows().length).toBe(0);
+      expect(el().querySelector('[data-testid=safety-stale]')).toBeNull();
+      expect(squash(el().querySelector('.notice.err'))).toContain('You cannot see the Safety board.');
+      expect(el().querySelector('[data-testid=safety-board]')).toBeNull();
+    });
+
+    it('a 403 module-off on the reload clears the board and shows the server message (G-2)', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      await open(boardOf({ escalations: [ROW] }));
+      vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+      http.expectOne(BOARD).flush(problem('module-off', 403, 'In-patient care is off.'), { status: 403, statusText: 'Forbidden' });
+      eventsReq();
+      await settle();
+      expect(rows().length).toBe(0);
+      expect(squash(el().querySelector('.notice.err'))).toContain('In-patient care is off.');
+    });
+
+    it('reads nothing on later ticks after a 403 until Try again, then loads as the first load (SAH-40, rule 6)', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      await open(boardOf({ escalations: [ROW] }));
+      vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+      http.expectOne(BOARD).flush(problem('forbidden', 403, 'You cannot see the Safety board.'), { status: 403, statusText: 'Forbidden' });
+      eventsReq();
+      await settle();
+      expect(rows().length).toBe(0);
+
+      vi.advanceTimersByTime(SAFETY_REFRESH_MS * 3);
+      http.expectNone(BOARD);
+      http.expectNone((r) => r.url === EVENTS);
+      await settle();
+      expect(rows().length).toBe(0);
+      expect(squash(el().querySelector('.notice.err'))).toContain('You cannot see the Safety board.');
+
+      el().querySelector<HTMLButtonElement>('.notice.err button')!.click();
+      await settle();
+      expect(el().textContent).toContain('Loading the Safety board');
+      http.expectOne(BOARD).flush(boardOf({ escalations: [ROW] }));
+      eventsReq().flush(pageOf());
+      await settle();
+      expect(rows().length).toBe(1);
+
+      vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+      http.expectOne(BOARD).flush(boardOf({ escalations: [ROW] }));
+      eventsReq().flush(pageOf());
+    });
+
+    describe('after a refusal nothing reads or stays open (SAH-40, D-1)', () => {
+      const FORBIDDEN = () => problem('forbidden', 403, 'You cannot see the Safety board.');
+      const REFUSED = { status: 403, statusText: 'Forbidden' };
+      let closed: Subject<EscalationActionResult | undefined>;
+      let sheetClose: ReturnType<typeof vi.fn>;
+
+      /** Opens the Response sheet of e1 with a sheet that stays open until `closed` emits. */
+      async function withOpenSheet(): Promise<{ data: { onConflict: () => void } }> {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf({ escalations: [ROW] }));
+        closed = new Subject<EscalationActionResult | undefined>();
+        sheetClose = vi.fn();
+        dialog.open.mockReturnValue({ afterClosed: () => closed.asObservable(), close: sheetClose });
+        act('e1', 'sfresp')!.click();
+        return dialog.open.mock.calls[0][1] as { data: { onConflict: () => void } };
+      }
+
+      async function refuseByTimer(): Promise<void> {
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+        http.expectOne(BOARD).flush(FORBIDDEN(), REFUSED);
+        eventsReq();
+        await settle();
+      }
+
+      const roundAnswered = () =>
+        (fixture.componentInstance as unknown as { roundAnswered(): void }).roundAnswered();
+
+      it('closes the open Response sheet when a reload is refused', async () => {
+        await withOpenSheet();
+        expect(sheetClose).not.toHaveBeenCalled();
+        await refuseByTimer();
+        expect(sheetClose).toHaveBeenCalledTimes(1);
+        expect(rows().length).toBe(0);
+        expect(squash(el().querySelector('.notice.err'))).toContain('You cannot see the Safety board.');
+      });
+
+      it('closes the open Response sheet when the board is refused module-off too', async () => {
+        await withOpenSheet();
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+        http.expectOne(BOARD).flush(problem('module-off', 403, 'In-patient care is off.'), REFUSED);
+        eventsReq();
+        await settle();
+        expect(sheetClose).toHaveBeenCalledTimes(1);
+      });
+
+      it('closes no sheet on a 5xx (the old board stays)', async () => {
+        await withOpenSheet();
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+        http.expectOne(BOARD).flush(problem('server-error', 500, 'x'), { status: 500, statusText: 'x' });
+        eventsReq();
+        await settle();
+        expect(sheetClose).not.toHaveBeenCalled();
+        expect(rows().length).toBe(1);
+      });
+
+      it('does not read the board when the sheet reports a conflict after the refusal', async () => {
+        const config = await withOpenSheet();
+        await refuseByTimer();
+        config.data.onConflict();
+        http.expectNone(BOARD);
+        http.expectNone((r) => r.url === EVENTS);
+      });
+
+      it('does not read the board when a sheet saves after the refusal, and the notice stays', async () => {
+        await withOpenSheet();
+        await refuseByTimer();
+        closed.next(result({ ...DONE, id: 'e1', patientName: 'Asha Patil' }));
+        await settle();
+        http.expectNone(BOARD);
+        http.expectNone((r) => r.url === EVENTS);
+        expect(rows().length).toBe(0);
+        expect(squash(el().querySelector('.notice.err'))).toContain('You cannot see the Safety board.');
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS * 2);
+        http.expectNone(BOARD);
+      });
+
+      it('does not read the board when an action answers 409 after the refusal', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf({ escalations: [ROW] }));
+        act('e1', 'sfack')!.click();
+        const call = http.expectOne(`${IPD}/escalations/e1/acknowledge`);
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+        http.expectOne(BOARD).flush(FORBIDDEN(), REFUSED);
+        eventsReq();
+        call.flush(problem('escalation-state', 409, 'This escalation is already closed.'), {
+          status: 409,
+          statusText: 'Conflict',
+        });
+        await settle();
+        http.expectNone(BOARD);
+        expect(rows().length).toBe(0);
+      });
+
+      it('does not read the board when the Medicine round answers after the refusal', async () => {
+        await withOpenSheet();
+        await refuseByTimer();
+        roundAnswered();
+        await settle();
+        http.expectNone(BOARD);
+        http.expectNone((r) => r.url === EVENTS);
+        expect(el().querySelector('[data-testid=safety-board]')).toBeNull();
+        expect(squash(el().querySelector('.notice.err'))).toContain('You cannot see the Safety board.');
+      });
+
+      it('reads again only after Try again, and the timer then goes on reading', async () => {
+        const config = await withOpenSheet();
+        await refuseByTimer();
+        config.data.onConflict();
+        http.expectNone(BOARD);
+        el().querySelector<HTMLButtonElement>('.notice.err button')!.click();
+        http.expectOne(BOARD).flush(boardOf({ escalations: [ROW] }));
+        eventsReq().flush(pageOf());
+        await settle();
+        expect(rows().length).toBe(1);
+        config.data.onConflict();
+        http.expectOne(BOARD).flush(boardOf({ escalations: [ROW] }));
+        eventsReq().flush(pageOf());
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+        http.expectOne(BOARD).flush(boardOf({ escalations: [ROW] }));
+        eventsReq().flush(pageOf());
+      });
+
+      it('drops the answer of "Show earlier entries" that arrives after the refusal', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf(), pageOf([eventOf({ id: 'x1' })], 'cur1'));
+        el().querySelector<HTMLButtonElement>('[data-act=events-more]')!.click();
+        const more = eventsReq();
+        await refuseByTimer();
+        expect(more.cancelled).toBe(true);
+        expect(el().querySelectorAll('.sfai').length).toBe(0);
+      });
+
+      it('refuses the same way on the first load: no board, a notice with Try again, no reads', async () => {
+        snack = vi.fn();
+        dialog = { open: vi.fn() };
+        TestBed.configureTestingModule({
+          providers: [
+            provideHttpClient(withInterceptors([problemDetailInterceptor])),
+            provideHttpClientTesting(),
+            { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
+            { provide: MatDialog, useValue: dialog },
+          ],
+        });
+        http = TestBed.inject(HttpTestingController);
+        fixture = TestBed.createComponent(SafetyComponent);
+        fixture.detectChanges();
+        http.expectOne(BOARD).flush(FORBIDDEN(), REFUSED);
+        expect(eventsReq().cancelled).toBe(true);
+        await settle();
+        expect(squash(el().querySelector('.notice.err'))).toContain('You cannot see the Safety board.');
+        roundAnswered();
+        http.expectNone(BOARD);
+      });
+
+      it('moves focus to the notice when it was on the board', async () => {
+        await withOpenSheet();
+        document.body.appendChild(el());
+        const button = act('e1', 'sfresp')!;
+        button.focus();
+        expect(document.activeElement).toBe(button);
+        await refuseByTimer();
+        const notice = el().querySelector<HTMLElement>('.notice.err')!;
+        expect(notice.getAttribute('tabindex')).toBe('-1');
+        expect(document.activeElement).toBe(notice);
+        el().remove();
+      });
+
+      it('closes the open Response sheet when the board is destroyed (review fix 3)', async () => {
+        await withOpenSheet();
+        expect(sheetClose).not.toHaveBeenCalled();
+        fixture.destroy();
+        expect(sheetClose).toHaveBeenCalledTimes(1);
+      });
+
+      it('closes nothing on destroy once the Response sheet is closed', async () => {
+        await withOpenSheet();
+        closed.next(undefined);
+        fixture.destroy();
+        expect(sheetClose).not.toHaveBeenCalled();
+      });
+
+      it('tells the page about every refusal, and dismisses the toast of an earlier success (review fix 5, 6)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf({ escalations: [ROW] }));
+        let refusals = 0;
+        fixture.componentInstance.refused.subscribe(() => refusals++);
+        const dismiss = TestBed.inject(MatSnackBar).dismiss as ReturnType<typeof vi.fn>;
+        await refuseByTimer();
+        expect(refusals).toBe(1);
+        expect(dismiss).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not tell the page about a failed reload that is not a refusal', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf({ escalations: [ROW] }));
+        let refusals = 0;
+        fixture.componentInstance.refused.subscribe(() => refusals++);
+        vi.advanceTimersByTime(SAFETY_REFRESH_MS);
+        http.expectOne(BOARD).flush(problem('server-error', 500, 'x'), { status: 500, statusText: 'x' });
+        eventsReq();
+        await settle();
+        expect(refusals).toBe(0);
+      });
+
+      it('moves focus to the notice on a repeated refusal when Try again was replaced by the Loading text (review fix 3)', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf({ escalations: [ROW] }));
+        document.body.appendChild(el());
+        await refuseByTimer();
+        const retry = el().querySelector<HTMLButtonElement>('.notice.err button')!;
+        retry.focus();
+        retry.click();
+        await settle();
+        expect(document.activeElement).toBe(document.body);
+        http.expectOne(BOARD).flush(FORBIDDEN(), REFUSED);
+        eventsReq();
+        await settle();
+        expect(document.activeElement).toBe(el().querySelector('.notice.err'));
+        el().remove();
+      });
+
+      it('leaves focus alone when it was outside the board', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        await open(boardOf({ escalations: [ROW] }));
+        document.body.appendChild(el());
+        const outside = document.createElement('button');
+        document.body.appendChild(outside);
+        outside.focus();
+        await refuseByTimer();
+        expect(document.activeElement).toBe(outside);
+        outside.remove();
+        el().remove();
+      });
     });
 
     it('stops the timer when it is destroyed', async () => {

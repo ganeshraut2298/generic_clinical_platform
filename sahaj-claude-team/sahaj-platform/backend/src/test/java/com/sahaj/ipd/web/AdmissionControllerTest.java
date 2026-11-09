@@ -23,6 +23,8 @@ import com.sahaj.ipd.application.AdmissionViews.WardOption;
 import com.sahaj.ipd.application.VitalsViews.EwsSummary;
 import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState;
+import com.sahaj.ipd.domain.card.CardSetupDefaults;
+import com.sahaj.ipd.domain.card.ResolvedCardSetup;
 import com.sahaj.ipd.domain.MedicineSafetyCheck.AllergyStatus;
 import com.sahaj.ipd.application.AdmissionViews.BedOption;
 import com.sahaj.ipd.application.AdmissionViews.CategoryAdds;
@@ -49,6 +51,7 @@ import com.sahaj.platform.web.security.SecurityConfig;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -199,12 +202,12 @@ class AdmissionControllerTest {
         Summary row = new Summary(ADMISSION_ID, "IP/26-27/0042", PATIENT_ID, "Test Patient", 56, "M", "Dr Test",
                 "101-A", "General", "General ward", "planned", "Self", 3, 1_000_000L, 1_000_000L, "OK",
                 Instant.parse("2026-11-09T05:30:00Z"), 850_000L, true, false);
-        when(service.list(TENANT_ID, USER_ID, "DOCTOR", "ADMITTED")).thenReturn(new AdmissionList(4, 1, 3, false, 1,
+        when(service.list(TENANT_ID, USER_ID, "DOCTOR", "ADMITTED", null)).thenReturn(new AdmissionList(4, 1, 3, false, 1,
                 80, 0, 0, new EmergencyViews.Counts(true, 2, 1),
                 new SafetyViews.Banner(new SafetyViews.Counts(1, 1, 2, 1, "AAAAAAAAAAAAAAAAAAAAAA", Instant.parse("2026-11-09T06:00:00Z")),
                         List.of(new SafetyViews.BannerItem(UUID.randomUUID(), ADMISSION_ID, "Test Patient", 8))),
                 Instant.parse("2026-11-09T06:00:00Z"), List.of(new WardOption(WARD_ID, "General ward")),
-                new AdmittedCardAbilities(true, true, false, true, false),
+                abilities(true, true, false, true, false, false, "patient", "clinical", "vitals"), STANDARD,
                 List.of(AdmittedPatientRow.of(row, "UH-0001", WARD_ID, "Room 1", flags()))));
 
         mockMvc.perform(get(URL + "/admissions?status=ADMITTED").with(as("DOCTOR")))
@@ -250,16 +253,23 @@ class AdmissionControllerTest {
 
     private AdmissionList cardList(AdmittedClinicalFlags clinical, AdmittedCardAbilities abilities) {
         return new AdmissionList(4, 1, 3, true, 1, 80, 0, 0, new EmergencyViews.Counts(true, 0, 0), null,
-                Instant.parse("2026-11-09T06:00:00Z"), List.of(new WardOption(WARD_ID, "General ward")), abilities,
+                Instant.parse("2026-11-09T06:00:00Z"), List.of(new WardOption(WARD_ID, "General ward")), abilities, STANDARD,
                 List.of(AdmittedPatientRow.of(summary(), null, WARD_ID, null, clinical)));
+    }
+
+    private static final ResolvedCardSetup STANDARD = ResolvedCardSetup.of(1, true, false, CardSetupDefaults.standard());
+
+    private static AdmittedCardAbilities abilities(boolean nursing, boolean emr, boolean transfer, boolean discharge,
+                                                   boolean deposit, boolean depositLowFlag, String... groups) {
+        return new AdmittedCardAbilities(nursing, emr, transfer, discharge, deposit, depositLowFlag, List.of(groups));
     }
 
     @Test
     void theCardFactsAreInTheJsonForAClinicalRoleAndNullMeansNoneExists() throws Exception {
         AdmittedClinicalFlags none = new AdmittedClinicalFlags(null, null, false,
                 new CardAllergy(AllergyStatus.NONE_KNOWN, null));
-        when(service.list(TENANT_ID, USER_ID, "NURSE", null)).thenReturn(
-                cardList(none, new AdmittedCardAbilities(true, true, true, false, false)));
+        when(service.list(TENANT_ID, USER_ID, "NURSE", null, null)).thenReturn(
+                cardList(none, abilities(true, true, true, false, false, false, "patient", "clinical", "vitals")));
 
         String body = mockMvc.perform(get(URL + "/admissions").with(as("NURSE")))
                 .andExpect(status().isOk())
@@ -286,8 +296,8 @@ class AdmissionControllerTest {
 
     @Test
     void theRecordedAllergyTextAndTheEscalationMinutesAreInTheJson() throws Exception {
-        when(service.list(TENANT_ID, USER_ID, "DOCTOR", null)).thenReturn(
-                cardList(flags(), new AdmittedCardAbilities(true, true, false, true, false)));
+        when(service.list(TENANT_ID, USER_ID, "DOCTOR", null, null)).thenReturn(
+                cardList(flags(), abilities(true, true, false, true, false, false, "patient", "clinical", "vitals")));
 
         mockMvc.perform(get(URL + "/admissions").with(as("DOCTOR")))
                 .andExpect(status().isOk())
@@ -305,8 +315,8 @@ class AdmissionControllerTest {
     /** AC34: for FRONT_DESK the property is absent from the raw JSON, not null and not an empty object. */
     @Test
     void theClinicalPropertyIsAbsentFromTheRawJsonForFrontDesk() throws Exception {
-        when(service.list(TENANT_ID, USER_ID, "FRONT_DESK", null)).thenReturn(
-                cardList(null, new AdmittedCardAbilities(false, false, true, false, true)));
+        when(service.list(TENANT_ID, USER_ID, "FRONT_DESK", null, null)).thenReturn(
+                cardList(null, abilities(false, false, true, false, true, true, "patient", "contact", "billing")));
 
         String body = mockMvc.perform(get(URL + "/admissions").with(as("FRONT_DESK")))
                 .andExpect(status().isOk())
@@ -316,13 +326,16 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.card.depositLowFlag").value(true))
                 .andReturn().getResponse().getContentAsString();
 
-        org.assertj.core.api.Assertions.assertThat(body)
-                .doesNotContain("clinical", "escalation", "latestEws", "vitalsDue", "allergy");
+        // SAH-37: the answer also holds cardSetup and card.visibleGroups, which name the data group "clinical"; the
+        // rows themselves carry none of the clinical, vitals, diagnosis or mobile properties.
+        String items = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).get("items").toString();
+        org.assertj.core.api.Assertions.assertThat(items).doesNotContain("clinical", "escalation", "latestEws",
+                "vitalsDue", "allergy", "diagnosis", "latestVitals", "mobile");
     }
 
     @Test
     void badStatusFilterAnswers400() throws Exception {
-        when(service.list(any(), any(), any(), eq("DISCHARGED")))
+        when(service.list(any(), any(), any(), eq("DISCHARGED"), any()))
                 .thenThrow(new InvalidInputException("status", "Only the Admitted list is available"));
 
         mockMvc.perform(get(URL + "/admissions?status=DISCHARGED").with(as("OWNER")))
@@ -518,5 +531,109 @@ class AdmissionControllerTest {
                 .andExpect(jsonPath("$.type").value(Matchers.endsWith("ipd-readonly")));
         mockMvc.perform(post(url).with(as("OWNER")).contentType(JSON).content(body))
                 .andExpect(status().isForbidden());
+    }
+
+    // ---- SAH-37 ----
+
+    private AdmissionList listOf(AdmittedPatientRow row, AdmittedCardAbilities abilities) {
+        return new AdmissionList(4, 1, 3, true, 1, 80, 0, 0, new EmergencyViews.Counts(true, 0, 0), null,
+                Instant.parse("2026-11-09T06:00:00Z"), List.of(new WardOption(WARD_ID, "General ward")), abilities,
+                STANDARD, List.of(row));
+    }
+
+    @Test
+    void cardFactsIsPassedToTheServiceAndOnlyTheFirstTwoValuesAreTheContracts() throws Exception {
+        when(service.list(TENANT_ID, USER_ID, "OWNER", null, "all")).thenReturn(
+                cardList(flags(), abilities(true, true, true, true, true, true, "patient", "contact", "clinical",
+                        "vitals", "billing")));
+
+        mockMvc.perform(get(URL + "/admissions?cardFacts=all").with(as("OWNER"))).andExpect(status().isOk());
+
+        verify(service).list(TENANT_ID, USER_ID, "OWNER", null, "all");
+    }
+
+    @Test
+    void aWrongCardFactsValueAndANonOwnerPreviewAreRefusedByTheService() throws Exception {
+        when(service.list(any(), any(), eq("NURSE"), any(), eq("all")))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException(
+                        "Only the clinic owner can preview the card setup."));
+        when(service.list(any(), any(), eq("OWNER"), any(), eq("everything")))
+                .thenThrow(new InvalidInputException("cardFacts", "Use cardFacts=setup or cardFacts=all"));
+
+        mockMvc.perform(get(URL + "/admissions?cardFacts=all").with(as("NURSE"))).andExpect(status().isForbidden());
+        mockMvc.perform(get(URL + "/admissions?cardFacts=everything").with(as("OWNER")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void theNewCardFactsAreAbsentWhenNotSentNullWhenNoneExistsAndTheValueWhenSent() throws Exception {
+        AdmittedClinicalFlags none = new AdmittedClinicalFlags(null, null, true,
+                new CardAllergy(AllergyStatus.NOT_RECORDED, null));
+        AdmittedClinicalFlags full = new AdmittedClinicalFlags(null, null, true,
+                new CardAllergy(AllergyStatus.NOT_RECORDED, null), "Chest pain", Optional.empty());
+        AdmittedClinicalFlags withTiles = new AdmittedClinicalFlags(null, null, true,
+                new CardAllergy(AllergyStatus.NOT_RECORDED, null), "Chest pain",
+                Optional.of(new com.sahaj.ipd.application.AdmissionViews.CardLatestVitals(Instant.parse("2026-11-09T05:25:00Z"), "Sr. Anjali Pawar",
+                        new com.sahaj.ipd.application.AdmissionViews.CardBpReading(85, 60, com.sahaj.ipd.domain.card.VitalMarks.Mark.CRITICAL),
+                        new com.sahaj.ipd.application.AdmissionViews.CardReading(new BigDecimal("95"), com.sahaj.ipd.domain.card.VitalMarks.Mark.CHECK),
+                        new com.sahaj.ipd.application.AdmissionViews.CardReading(new BigDecimal("96"), null),
+                        new com.sahaj.ipd.application.AdmissionViews.CardReading(new BigDecimal("37.0"), null), null)));
+        AdmittedCardAbilities abilities = abilities(true, true, true, false, false, false, "patient", "clinical",
+                "vitals");
+
+        when(service.list(TENANT_ID, USER_ID, "NURSE", null, null)).thenReturn(
+                listOf(AdmittedPatientRow.of(summary(), null, WARD_ID, null, none), abilities));
+        String absent = mockMvc.perform(get(URL + "/admissions").with(as("NURSE"))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(absent).doesNotContain("diagnosis", "latestVitals", "mobile");
+
+        when(service.list(TENANT_ID, USER_ID, "NURSE", null, null)).thenReturn(
+                listOf(AdmittedPatientRow.of(summary(), null, WARD_ID, null, full, Optional.empty()), abilities));
+        String nulls = mockMvc.perform(get(URL + "/admissions").with(as("NURSE"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].clinical.diagnosis").value("Chest pain"))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.items[0].mobile").value(Matchers.nullValue()))
+                .andReturn().getResponse().getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(nulls).contains("\"latestVitals\":null", "\"mobile\":null");
+
+        when(service.list(TENANT_ID, USER_ID, "NURSE", null, null)).thenReturn(
+                listOf(AdmittedPatientRow.of(summary(), null, WARD_ID, null, withTiles, Optional.of("9876543210")),
+                        abilities));
+        mockMvc.perform(get(URL + "/admissions").with(as("NURSE"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].mobile").value("9876543210"))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.recordedAt").value("2026-11-09T05:25:00Z"))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.recordedByName").value("Sr. Anjali Pawar"))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.bp.systolic").value(85))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.bp.diastolic").value(60))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.bp.mark").value("CRITICAL"))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.pulse.value").value(95))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.pulse.mark").value("CHECK"))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.spo2.value").value(96))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.spo2.mark").doesNotExist())
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.temp.value").value(37.0))
+                .andExpect(jsonPath("$.items[0].clinical.latestVitals.rr").doesNotExist());
+    }
+
+    @Test
+    void thePublishedSetupAndTheCardAbilitiesAreInTheAnswer() throws Exception {
+        when(service.list(TENANT_ID, USER_ID, "FRONT_DESK", null, null)).thenReturn(listOf(
+                AdmittedPatientRow.of(summary(), null, WARD_ID, null, null),
+                abilities(false, false, true, false, true, true, "patient", "contact", "billing")));
+
+        mockMvc.perform(get(URL + "/admissions").with(as("FRONT_DESK"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.cardSetup.version").value(1))
+                .andExpect(jsonPath("$.cardSetup.isStandard").value(true))
+                .andExpect(jsonPath("$.cardSetup.fallback").value(false))
+                .andExpect(jsonPath("$.cardSetup.layout").value("standard"))
+                .andExpect(jsonPath("$.cardSetup.cardsPerRow").value(3))
+                .andExpect(jsonPath("$.cardSetup.sections[0].key").value("header"))
+                .andExpect(jsonPath("$.cardSetup.sections[0].name").value("Card header"))
+                .andExpect(jsonPath("$.cardSetup.sections[0].fields[0].key").value("name"))
+                .andExpect(jsonPath("$.cardSetup.sections[0].fields[0].label").value("Patient name"))
+                .andExpect(jsonPath("$.cardSetup.sections[0].fields[0].group").value("patient"))
+                .andExpect(jsonPath("$.cardSetup.sections[0].fields[0].safety").value(false))
+                .andExpect(jsonPath("$.cardSetup.actions[0]").value("nursing"))
+                .andExpect(jsonPath("$.card.deposit").value(true))
+                .andExpect(jsonPath("$.card.visibleGroups[1]").value("contact"));
     }
 }

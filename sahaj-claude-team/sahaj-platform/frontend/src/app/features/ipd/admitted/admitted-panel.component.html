@@ -10,6 +10,13 @@
     </div>
   }
 
+  @if (setupNotice(); as notice) {
+    <div class="notice warn" role="status" data-testid="card-setup-notice">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ notice }}</span>
+    </div>
+  }
+
   <div class="pctools surf" data-testid="admitted-toolbar">
     <label class="pcq">
       <app-icon name="search" [size]="15" />
@@ -17,6 +24,7 @@
         type="search"
         class="input"
         autocomplete="off"
+        [attr.maxlength]="searchMax"
         data-testid="admitted-search"
         [placeholder]="searchPlaceholder"
         [attr.aria-label]="searchLabel"
@@ -77,17 +85,23 @@
         <app-icon name="rows" [size]="15" /><span>Table</span>
       </button>
     </div>
+    @if (isOwner()) {
+      <a mat-button class="pccustom" routerLink="/app/config/ipcard" data-testid="customize-card">
+        <app-icon name="sliders" [size]="14" /> Customize card
+      </a>
+    }
   </div>
 
   <div class="sr-only" aria-live="polite" data-testid="admitted-announce">{{ announcement() }}</div>
 
   @if (state.view() === 'cards') {
-    <div [class]="'pcgrid uni cols-' + state.cols()" data-testid="admitted-cards">
+    <div [class]="'pcgrid uni cols-' + state.cols() + ' lay-' + layout()" data-testid="admitted-cards">
       @for (a of drawn(); track a.id) {
         <app-patient-card
           [row]="a"
           [card]="list().card"
           [asOf]="list().asOf"
+          [setup]="setup()"
           (openName)="openDetails(a)"
           (act)="onAction(a, $event)"
         />
@@ -104,6 +118,7 @@
         <button type="button" mat-button data-testid="show-all" (click)="showAll()">Show all</button>
       </div>
     }
+    <p class="faint pcfoot" data-testid="card-foot">{{ footText() }}</p>
   } @else {
     <section class="panel surf">
       @if (matches().length === 0) {

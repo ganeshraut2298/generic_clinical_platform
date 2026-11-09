@@ -213,6 +213,21 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = [
     requires: 'ipd',
   },
   {
+    key: 'ipcard',
+    group: 'In-patients (IPD)',
+    label: 'Patient card',
+    icon: 'cards',
+    what: "What each admitted patient's card shows: layout, sections, fields and quick actions. Changes go live when you publish.",
+    affects: ['Doctor', 'Nurse', 'Front desk'],
+    tips: [
+      'Most clinics use the standard card as it is. Change it only when staff keep asking for the same missing detail.',
+      'Fewer fields read faster on a ward round. Hide what nobody looks at.',
+      'Publish after the evening round, so the next shift starts with the new card.',
+    ],
+    built: true,
+    requires: 'ipd',
+  },
+  {
     key: 'whatsapp',
     group: 'Patients and data',
     label: 'WhatsApp messages',

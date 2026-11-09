@@ -14,7 +14,7 @@
   />
 
   <div class="trust3">
-    <div class="tpanel surf">
+    <div class="tpanel surf" data-surface>
       <div class="row top">
         <div>
           <b>Signed clinical note</b>
@@ -41,7 +41,7 @@
       <p class="faint small">Edits after signing create a new version. The old one is kept.</p>
     </div>
 
-    <div class="tpanel surf">
+    <div class="tpanel surf" data-surface>
       <div class="row top">
         <div>
           <b>Access by role</b>
@@ -95,7 +95,7 @@
       </p>
     </div>
 
-    <div class="tpanel surf">
+    <div class="tpanel surf" data-surface>
       <b>History of every change</b>
       <small class="faint block pull-up">Who did what, and when</small>
       <ol class="audit">
@@ -111,7 +111,7 @@
     </div>
   </div>
 
-  <div class="tpoints">
+  <div class="tpoints surface-solid" data-surface>
     @for (point of points; track point.text) {
       <div><app-icon [name]="point.icon" [size]="16" /><span>{{ point.text }}</span></div>
     }

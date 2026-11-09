@@ -137,13 +137,27 @@ describe('admitted.model', () => {
   });
 
   describe('visibleActions', () => {
-    it('draws only what the server allows, in the order Nursing, EMR, Transfer, Discharge', () => {
-      expect(visibleActions(ABILITIES_OWNER).map((a) => a.label)).toEqual(['Nursing', 'EMR', 'Transfer', 'Discharge']);
+    it('draws only what the server allows, in the default order', () => {
+      expect(visibleActions(ABILITIES_OWNER).map((a) => a.label)).toEqual([
+        'Nursing',
+        'EMR',
+        'Transfer',
+        'Discharge',
+        'Deposit',
+      ]);
       expect(visibleActions(ABILITIES_NURSE).map((a) => a.label)).toEqual(['Nursing', 'EMR', 'Transfer']);
-      expect(visibleActions(ABILITIES_FRONT_DESK).map((a) => a.label)).toEqual(['Transfer']);
+      expect(visibleActions(ABILITIES_FRONT_DESK).map((a) => a.label)).toEqual(['Transfer', 'Deposit']);
       expect(
-        visibleActions({ nursing: false, emr: false, transfer: false, discharge: false, depositLowFlag: true }),
+        visibleActions({ ...ABILITIES_OWNER, nursing: false, emr: false, transfer: false, discharge: false, deposit: false }),
       ).toEqual([]);
+    });
+
+    it('follows the order of the published setup and never adds what the server does not allow (AC41, AC39)', () => {
+      expect(visibleActions(ABILITIES_OWNER, ['discharge', 'nursing']).map((a) => a.label)).toEqual([
+        'Discharge',
+        'Nursing',
+      ]);
+      expect(visibleActions(ABILITIES_NURSE, ['discharge', 'deposit', 'emr']).map((a) => a.label)).toEqual(['EMR']);
     });
   });
 

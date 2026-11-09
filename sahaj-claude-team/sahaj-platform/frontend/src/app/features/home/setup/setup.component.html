@@ -14,7 +14,7 @@
   />
 
   <div class="setup">
-    <ol class="ssteps surf" aria-label="Setup steps">
+    <ol class="ssteps surf" data-surface aria-label="Setup steps">
       @for (step of steps; track step; let i = $index) {
         <li>
           <button
@@ -38,7 +38,7 @@
       }
     </ol>
 
-    <div class="spanel surf">
+    <div class="spanel surf" data-surface>
       <div class="prog">
         <div
           class="meter"

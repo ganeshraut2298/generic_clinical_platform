@@ -194,6 +194,7 @@ class AdmittedCardsTest {
 
     private static ObjectMapper mapper() {
         return new ObjectMapper().registerModule(new JavaTimeModule())
+                .registerModule(new com.fasterxml.jackson.datatype.jdk8.Jdk8Module())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
@@ -247,5 +248,168 @@ class AdmittedCardsTest {
                 "General ward");
         assertThat(row.toString()).contains(ADMISSION.toString());
         assertThat(placed.toString()).contains(ADMISSION.toString());
+    }
+
+    // ---- SAH-37: new card facts, role-gated and set-gated ----
+
+    private static final UUID RECORDER = UUID.randomUUID();
+
+    private static LatestScore readings(Instant at) {
+        return new LatestScore(ADMISSION, 5, Risk.MEDIUM, at,
+                new VitalsRepository.Readings(85, 60, 95, 96, new java.math.BigDecimal("37.0"), 22), RECORDER);
+    }
+
+    private static AdmittedCards.FactsPlan plan(String... fields) {
+        return AdmittedCards.FactsPlan.of(java.util.Set.of(fields), "OWNER", "OWNER");
+    }
+
+    private static ObjectMapper springLikeMapper() {
+        return mapper().registerModule(new com.fasterxml.jackson.datatype.jdk8.Jdk8Module());
+    }
+
+    @Test
+    void theFactsPlanFollowsTheDataGroupOfTheRoleAndTheShownFields() {
+        java.util.Set<String> all = java.util.Set.copyOf(com.sahaj.ipd.domain.card.CardCatalogue.fieldKeys());
+
+        assertThat(AdmittedCards.FactsPlan.of(all, "OWNER", "OWNER")).isEqualTo(
+                new AdmittedCards.FactsPlan(true, true, true, true, true, true, true, true));
+        assertThat(AdmittedCards.FactsPlan.of(all, "NURSE", "NURSE")).isEqualTo(
+                new AdmittedCards.FactsPlan(true, true, true, true, true, true, true, false));
+        assertThat(AdmittedCards.FactsPlan.of(all, "DOCTOR", "DOCTOR")).isEqualTo(
+                new AdmittedCards.FactsPlan(true, true, true, true, true, true, true, false));
+        assertThat(AdmittedCards.FactsPlan.of(all, "FRONT_DESK", "FRONT_DESK")).isEqualTo(
+                new AdmittedCards.FactsPlan(false, false, false, false, false, false, false, true));
+        // the token says OWNER but the membership now says NURSE: only what both allow
+        assertThat(AdmittedCards.FactsPlan.of(all, "OWNER", "NURSE")).isEqualTo(
+                new AdmittedCards.FactsPlan(true, true, true, true, true, true, true, false));
+        assertThat(AdmittedCards.FactsPlan.of(all, "OWNER", "FRONT_DESK")).isEqualTo(
+                new AdmittedCards.FactsPlan(false, false, false, false, false, false, false, true));
+        assertThat(AdmittedCards.FactsPlan.of(all, "BILLING", "BILLING")).isEqualTo(AdmittedCards.FactsPlan.NONE);
+        assertThat(AdmittedCards.FactsPlan.of(java.util.Set.of("name", "uhid", "ews", "allergies"), "OWNER", "OWNER"))
+                .isEqualTo(AdmittedCards.FactsPlan.NONE);
+        assertThat(AdmittedCards.FactsPlan.NONE.anyVitals()).isFalse();
+        assertThat(plan("lastRecorded").anyVitals()).isTrue();
+    }
+
+    @Test
+    void withoutAPlanNoNewFactIsInTheRawJson() throws Exception {
+        AdmittedClinicalFlags flags = AdmittedCards.flags(null, readings(AS_OF.minusSeconds(60)), patient("x"), AS_OF);
+
+        String json = springLikeMapper().writeValueAsString(AdmittedPatientRow.of(summary(), "UH-0001",
+                UUID.randomUUID(), "R1", flags));
+
+        assertThat(json).doesNotContain("diagnosis", "latestVitals", "mobile");
+        assertThat(springLikeMapper().readTree(json).get("clinical").has("latestEws")).isTrue();
+    }
+
+    @Test
+    void theDiagnosisIsTheReasonAndUnderEvaluationWhenBlank() {
+        AdmittedClinicalFlags flags = AdmittedCards.flags(null, null, patient(null), AS_OF, plan("diagnosis"),
+                "Chest pain", java.util.Map.of());
+        AdmittedClinicalFlags blank = AdmittedCards.flags(null, null, patient(null), AS_OF, plan("diagnosis"), " ",
+                java.util.Map.of());
+        AdmittedClinicalFlags off = AdmittedCards.flags(null, null, patient(null), AS_OF, plan("bp"), "Chest pain",
+                java.util.Map.of());
+
+        assertThat(flags.diagnosis()).isEqualTo("Chest pain");
+        assertThat(blank.diagnosis()).isEqualTo("Under evaluation");
+        assertThat(off.diagnosis()).isNull();
+        assertThat(flags.toString()).doesNotContain("Chest");
+    }
+
+    @Test
+    void eachReadingIsPresentOnlyWhenItsFieldIsOnAndCarriesTheSah30Mark() throws Exception {
+        AdmittedClinicalFlags flags = AdmittedCards.flags(null, readings(AS_OF.minusSeconds(120)), patient(null), AS_OF,
+                plan("bp", "pulse", "spo2", "temp", "rr", "lastRecorded"), "x",
+                java.util.Map.of(RECORDER, "Sr. Anjali Pawar"));
+
+        JsonNode row = springLikeMapper().valueToTree(AdmittedPatientRow.of(summary(), "UH-0001", UUID.randomUUID(),
+                null, flags));
+        JsonNode tiles = row.get("clinical").get("latestVitals");
+
+        assertThat(tiles.get("recordedAt").asText()).isEqualTo("2026-11-11T05:58:00Z");
+        assertThat(tiles.get("recordedByName").asText()).isEqualTo("Sr. Anjali Pawar");
+        assertThat(tiles.get("bp").get("systolic").asInt()).isEqualTo(85);
+        assertThat(tiles.get("bp").get("diastolic").asInt()).isEqualTo(60);
+        assertThat(tiles.get("bp").get("mark").asText()).isEqualTo("CRITICAL");
+        assertThat(tiles.get("pulse").get("value").asInt()).isEqualTo(95);
+        assertThat(tiles.get("pulse").get("mark").asText()).isEqualTo("CHECK");
+        assertThat(tiles.get("spo2").get("value").asInt()).isEqualTo(96);
+        assertThat(tiles.get("spo2").has("mark")).as("0 points: no mark").isFalse();
+        assertThat(tiles.get("temp").get("value").decimalValue()).isEqualByComparingTo("37.0");
+        assertThat(tiles.get("temp").has("mark")).isFalse();
+        assertThat(tiles.get("rr").get("value").asInt()).isEqualTo(22);
+        assertThat(tiles.get("rr").get("mark").asText()).isEqualTo("CHECK");
+        assertThat(row.get("clinical").get("latestEws").get("score").asInt()).isEqualTo(5);
+    }
+
+    @Test
+    void aReadingThatIsOffIsAbsentAndNeitherRecorderNorOtherReadingsLeak() throws Exception {
+        AdmittedClinicalFlags flags = AdmittedCards.flags(null, readings(AS_OF.minusSeconds(120)), patient(null), AS_OF,
+                plan("spo2"), "x", java.util.Map.of(RECORDER, "Sr. Anjali Pawar"));
+
+        JsonNode tiles = springLikeMapper().valueToTree(AdmittedPatientRow.of(summary(), "UH-0001", UUID.randomUUID(),
+                null, flags)).get("clinical").get("latestVitals");
+
+        assertThat(tiles.has("spo2")).isTrue();
+        assertThat(tiles.has("bp")).isFalse();
+        assertThat(tiles.has("pulse")).isFalse();
+        assertThat(tiles.has("temp")).isFalse();
+        assertThat(tiles.has("rr")).isFalse();
+        assertThat(tiles.has("recordedByName")).as("Last recorded is off").isFalse();
+        assertThat(tiles.toString()).doesNotContain("Anjali");
+    }
+
+    @Test
+    void noVitalsEverRecordedIsNullWhenAReadingIsOnAndAbsentWhenNoneIs() throws Exception {
+        AdmittedClinicalFlags wanted = AdmittedCards.flags(null, null, patient(null), AS_OF, plan("bp"), "x",
+                java.util.Map.of());
+        AdmittedClinicalFlags notWanted = AdmittedCards.flags(null, null, patient(null), AS_OF, plan("diagnosis"), "x",
+                java.util.Map.of());
+
+        JsonNode withNull = springLikeMapper().valueToTree(AdmittedPatientRow.of(summary(), "UH-0001",
+                UUID.randomUUID(), null, wanted)).get("clinical");
+        JsonNode without = springLikeMapper().valueToTree(AdmittedPatientRow.of(summary(), "UH-0001",
+                UUID.randomUUID(), null, notWanted)).get("clinical");
+
+        assertThat(withNull.has("latestVitals")).isTrue();
+        assertThat(withNull.get("latestVitals").isNull()).isTrue();
+        assertThat(without.has("latestVitals")).isFalse();
+    }
+
+    @Test
+    void aMissingRecorderNameIsTeamMember() {
+        AdmittedClinicalFlags flags = AdmittedCards.flags(null, readings(AS_OF.minusSeconds(60)), patient(null), AS_OF,
+                plan("lastRecorded"), "x", java.util.Map.of());
+
+        assertThat(flags.latestVitals().get().recordedByName()).isEqualTo("Team member");
+        assertThat(flags.latestVitals().get().bp()).isNull();
+    }
+
+    @Test
+    void theMobileIsAbsentWhenNotSentNullWhenTheRecordHasNoneAndTheNumberWhenSent() throws Exception {
+        AdmittedPatientRow absent = AdmittedPatientRow.of(summary(), "UH-0001", UUID.randomUUID(), null, null);
+        AdmittedPatientRow none = AdmittedPatientRow.of(summary(), "UH-0001", UUID.randomUUID(), null, null,
+                java.util.Optional.empty());
+        AdmittedPatientRow sent = AdmittedPatientRow.of(summary(), "UH-0001", UUID.randomUUID(), null, null,
+                java.util.Optional.of("9876543210"));
+
+        assertThat(springLikeMapper().valueToTree(absent).has("mobile")).isFalse();
+        JsonNode noneJson = springLikeMapper().valueToTree(none);
+        assertThat(noneJson.has("mobile")).isTrue();
+        assertThat(noneJson.get("mobile").isNull()).isTrue();
+        assertThat(springLikeMapper().valueToTree(sent).get("mobile").asText()).isEqualTo("9876543210");
+        assertThat(sent.toString()).doesNotContain("9876543210");
+    }
+
+    @Test
+    void theNewFactsNeverReachToString() {
+        AdmittedClinicalFlags flags = AdmittedCards.flags(null, readings(AS_OF.minusSeconds(60)), patient(null), AS_OF,
+                plan("diagnosis", "bp", "lastRecorded"), "Chest pain", java.util.Map.of(RECORDER, "Sr. Anjali Pawar"));
+
+        String text = flags + " " + flags.latestVitals().get() + " " + flags.latestVitals().get().bp() + " "
+                + readings(AS_OF);
+
+        assertThat(text).doesNotContain("Chest", "Anjali", "37.0");
     }
 }

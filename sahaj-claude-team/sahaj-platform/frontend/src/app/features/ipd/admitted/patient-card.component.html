@@ -1,79 +1,151 @@
-<article class="pc" [class.pc-crit]="critical()" [attr.aria-label]="label()" data-testid="patient-card" [attr.data-id]="row().id">
+<ng-template #val let-item>
+  @if (item.value.flags; as flags) {
+    @if (flags.length === 0) {
+      <span class="faint">None</span>
+    } @else {
+      <span class="pcflags">
+        @for (f of flags; track f.kind) {
+          <span [class]="'pcf ' + f.tone" [title]="f.title">
+            <app-icon [name]="f.icon" [size]="11" />
+            <span class="pcft">{{ f.text }}</span>
+          </span>
+        }
+      </span>
+    }
+  } @else if (item.value.chip) {
+    <span [class]="'pcf ' + item.value.tone">{{ item.value.text }}</span>
+  } @else if (item.value.tone) {
+    <span [class]="'tone-' + item.value.tone">{{ item.value.text }}</span>
+  } @else {
+    {{ item.value.text }}
+  }
+</ng-template>
+
+<ng-template #lineVal let-item>
+  @if (item.value.flags || item.value.chip) {
+    <ng-container [ngTemplateOutlet]="val" [ngTemplateOutletContext]="{ $implicit: item }" />
+  } @else if (item.value.tone) {
+    <span [class]="'tone-' + item.value.tone">{{ item.lineText }}</span>
+  } @else {
+    {{ item.lineText }}
+  }
+</ng-template>
+
+<article
+  [class]="cardClass()"
+  [attr.aria-label]="view().ariaLabel"
+  data-testid="patient-card"
+  [attr.data-id]="row().id"
+  [attr.data-layout]="layout()"
+>
   <div class="pch">
-    <span class="pav" [class.f]="female()" aria-hidden="true">{{ initials() }}</span>
+    <span class="pav" [class.f]="view().female" aria-hidden="true">{{ view().initials }}</span>
     <div class="pchm">
-      <button
-        type="button"
-        class="pcn"
-        [title]="nameTooltip"
-        data-testid="card-name"
-        (click)="openName.emit()"
-      >
-        <span class="cut">{{ row().patientName }}</span>
-      </button>
-      <small data-testid="card-identity">{{ identity() }}</small>
-    </div>
-    <span class="pcbed" data-testid="card-bed">
-      <small>Bed</small>
-      <b>{{ row().bedCode }}</b>
-    </span>
-  </div>
-
-  <div class="pcsec pcstat" data-testid="card-flags">
-    @for (f of flags().shown; track f.kind) {
-      <span [class]="'pcf ' + f.tone" [attr.data-flag]="f.kind" [title]="f.title">
-        <app-icon [name]="f.icon" [size]="11" />
-        <span class="pcft">{{ f.text }}</span>
-      </span>
-    }
-    @if (flags().folded.length > 0) {
-      <span class="pcf grey pcmorec" data-flag="more" [title]="foldedLabel()">
-        <span aria-hidden="true">+{{ flags().folded.length }}</span>
-        <span class="sr-only">{{ foldedLabel() }}</span>
-      </span>
-    }
-  </div>
-
-  <dl class="pckv">
-    <div>
-      <dt>Admitted on</dt>
-      <dd [title]="admittedOn()" data-testid="card-admitted-on">{{ admittedOn() }}</dd>
-    </div>
-    <div>
-      <dt>Length of stay</dt>
-      <dd [title]="stay()" data-testid="card-stay">{{ stay() }}</dd>
-    </div>
-    <div>
-      <dt>Ward</dt>
-      <dd [title]="row().wardName" data-testid="card-ward">{{ row().wardName }}</dd>
-    </div>
-    <div>
-      <dt>Room</dt>
-      <dd [title]="room()" data-testid="card-room">{{ room() }}</dd>
-    </div>
-  </dl>
-  <dl class="pckv">
-    <div>
-      <dt>Doctor</dt>
-      <dd [title]="row().doctorName" data-testid="card-doctor">{{ row().doctorName }}</dd>
-    </div>
-  </dl>
-
-  @if (actions().length > 0) {
-    <div class="pcacts" data-testid="card-actions">
-      @for (a of actions(); track a.key) {
+      @if (preview()) {
+        <b class="pcn" data-testid="card-name"><span class="cut">{{ view().name }}</span></b>
+      } @else {
         <button
           type="button"
-          class="pctb"
-          [class.pri]="a.key === 'nursing'"
-          [attr.aria-label]="actionName(a)"
-          [attr.data-act]="a.key"
-          (click)="act.emit(a.key)"
+          class="pcn"
+          [title]="nameTooltip"
+          data-testid="card-name"
+          (click)="openDetails()"
         >
-          <app-icon [name]="a.icon" [size]="17" />
-          <span>{{ a.label }}</span>
+          <span class="cut">{{ view().name }}</span>
         </button>
       }
+      @if (view().identity.length > 0) {
+        <small data-testid="card-identity">
+          @for (p of view().identity; track p.key; let last = $last) {
+            <span [title]="p.label">{{ p.text }}</span>
+            @if (!last) {
+              <i aria-hidden="true"> · </i>
+            }
+          }
+        </small>
+      }
     </div>
+    @if (view().bed; as bed) {
+      <span class="pcbed" data-testid="card-bed" [title]="bed.label">
+        <small>{{ bed.label }}</small>
+        <b>{{ bed.value }}</b>
+      </span>
+    }
+  </div>
+
+  @for (s of view().sections; track s.key) {
+    @switch (s.kind) {
+      @case ('status') {
+        <div class="pcsec pcstat" data-testid="card-flags">
+          @if (s.alerts; as a) {
+            @for (f of a.shown; track f.kind) {
+              <span [class]="'pcf ' + f.tone" [attr.data-flag]="f.kind" [title]="f.title">
+                <app-icon [name]="f.icon" [size]="11" />
+                <span class="pcft">{{ f.text }}</span>
+              </span>
+            }
+            @if (a.folded.length > 0) {
+              <span class="pcf grey pcmorec" data-flag="more" [title]="foldedLabel(a.folded)">
+                <span aria-hidden="true">+{{ a.folded.length }}</span>
+                <span class="sr-only">{{ foldedLabel(a.folded) }}</span>
+              </span>
+            }
+          }
+          @for (c of s.chips; track c.key) {
+            <span class="pcf grey" [title]="c.label"
+              >{{ c.label }}:
+              <ng-container [ngTemplateOutlet]="val" [ngTemplateOutletContext]="{ $implicit: c }"
+            /></span>
+          }
+        </div>
+      }
+      @case ('vitals') {
+        <app-card-vitals [section]="s" [layout]="layout()" />
+      }
+      @default {
+        @if (layout() === 'compact') {
+          <p class="pcline" [attr.data-section]="s.key">
+            @for (i of s.items; track i.key; let last = $last) {
+              <span [title]="i.label" [attr.data-testid]="i.testId"
+                >@if (i.key !== 'allergies') {
+                  <span class="sr-only">{{ i.label }} </span>
+                }<ng-container
+                  [ngTemplateOutlet]="lineVal"
+                  [ngTemplateOutletContext]="{ $implicit: i }"
+              /></span>
+              @if (!last) {
+                <i aria-hidden="true"> · </i>
+              }
+            }
+          </p>
+        } @else {
+          <div class="pcsec" [attr.data-section]="s.key">
+            @if (layout() === 'expanded') {
+              <div class="pcst">{{ s.title }}</div>
+            }
+            <dl class="pckv">
+              @for (i of s.items; track i.key) {
+                <div [class.w2]="i.wide">
+                  <dt>{{ i.label }}</dt>
+                  <dd [title]="i.value.text" [attr.data-testid]="i.testId">
+                    <ng-container
+                      [ngTemplateOutlet]="val"
+                      [ngTemplateOutletContext]="{ $implicit: i }"
+                    />
+                  </dd>
+                </div>
+              }
+            </dl>
+          </div>
+        }
+      }
+    }
   }
+
+  <app-card-actions
+    [actions]="view().actions"
+    [layout]="layout()"
+    [preview]="preview()"
+    (act)="press($event)"
+  />
 </article>

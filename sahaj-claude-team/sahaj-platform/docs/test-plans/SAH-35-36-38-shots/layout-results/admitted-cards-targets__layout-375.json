@@ -1,0 +1,11 @@
+{
+  "screen": "admitted-cards-targets",
+  "project": "layout-375",
+  "viewport": {
+    "width": 375,
+    "height": 667
+  },
+  "dpr": 1,
+  "small3": [],
+  "small4": null
+}

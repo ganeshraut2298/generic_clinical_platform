@@ -25,7 +25,7 @@ import { RouterLink } from '@angular/router';
     }
   `,
   template: `
-    <footer>
+    <footer class="surface-solid" data-surface>
       <span>
         Sahaj · made for Indian clinics, from Pune ·
         <a routerLink="/admin">Sahaj team sign-in</a>

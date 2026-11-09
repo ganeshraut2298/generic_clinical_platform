@@ -58,7 +58,7 @@ class MedicineRoundInvariantTest extends DoseTestBase {
                 return found;
             }
         };
-        reader = new MedicineRoundReader(repository, catalogue);
+        reader = new MedicineRoundReader(repository, catalogue, new SkippedOrderWarningsTest.MutableClock());
     }
 
     private void seedWard() {

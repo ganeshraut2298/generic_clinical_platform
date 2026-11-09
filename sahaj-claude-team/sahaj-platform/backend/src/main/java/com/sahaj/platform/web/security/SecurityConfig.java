@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sahaj.platform.application.TokenService;
 import com.sahaj.platform.infrastructure.ratelimit.PublicEnquiryLimitProperties;
 import com.sahaj.platform.infrastructure.ratelimit.SlidingWindowRateLimiter;
+import com.sahaj.platform.infrastructure.security.AccessLogFilter;
 import com.sahaj.platform.infrastructure.security.CachedActiveMembershipChecker;
 import com.sahaj.platform.infrastructure.security.JwtAuthenticationFilter;
 import com.sahaj.platform.infrastructure.security.ProblemJsonWriter;
@@ -127,7 +128,9 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, ProblemJsonWriter problemWriter,
-                                             JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+                                             JwtAuthenticationFilter jwtAuthenticationFilter,
+                                             @Value("${sahaj.request-body.max-bytes:65536}") long maxBodyBytes)
+            throws Exception {
         AuthenticationEntryPoint entryPoint = (request, response, ex) -> {
             response.setHeader("WWW-Authenticate", "Bearer");
             problemWriter.write(response, Problems.unauthorized());
@@ -157,7 +160,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .addFilterAfter(jwtAuthenticationFilter, AnonymousAuthenticationFilter.class)
                 .addFilterAfter(new RequestLogContextFilter(), JwtAuthenticationFilter.class)
-                .addFilterAfter(new RequestBodySizeLimitFilter(problemWriter), RequestLogContextFilter.class);
+                .addFilterAfter(new AccessLogFilter(), RequestLogContextFilter.class)
+                .addFilterAfter(new RequestBodySizeLimitFilter(problemWriter, maxBodyBytes), AccessLogFilter.class);
         return http.build();
     }
 }

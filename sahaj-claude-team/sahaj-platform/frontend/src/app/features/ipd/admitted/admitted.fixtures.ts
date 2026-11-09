@@ -1,3 +1,4 @@
+import { resolvedStandard } from '../card/card-setup.fixtures';
 import { AdmissionList, AdmittedCardAbilities, AdmittedClinicalFlags, AdmittedPatientRow } from '../ipd.model';
 
 /**
@@ -49,7 +50,9 @@ export const ABILITIES_NURSE: AdmittedCardAbilities = {
   emr: true,
   transfer: true,
   discharge: false,
+  deposit: false,
   depositLowFlag: false,
+  visibleGroups: ['patient', 'clinical', 'vitals'],
 };
 
 export const ABILITIES_FRONT_DESK: AdmittedCardAbilities = {
@@ -57,7 +60,9 @@ export const ABILITIES_FRONT_DESK: AdmittedCardAbilities = {
   emr: false,
   transfer: true,
   discharge: false,
+  deposit: true,
   depositLowFlag: true,
+  visibleGroups: ['patient', 'contact', 'billing'],
 };
 
 export const ABILITIES_OWNER: AdmittedCardAbilities = {
@@ -65,7 +70,9 @@ export const ABILITIES_OWNER: AdmittedCardAbilities = {
   emr: true,
   transfer: true,
   discharge: true,
+  deposit: true,
   depositLowFlag: true,
+  visibleGroups: ['patient', 'contact', 'clinical', 'vitals', 'billing'],
 };
 
 /** A row for FRONT_DESK: the `clinical` property is absent (not null), as the server sends it. */
@@ -112,6 +119,7 @@ export function listOf(partial: Partial<AdmissionList> = {}): AdmissionList {
       { id: WARD_EMPTY, name: 'Maternity ward' },
     ],
     card: ABILITIES_NURSE,
+    cardSetup: resolvedStandard(),
     items: [
       ROW,
       rowOf({

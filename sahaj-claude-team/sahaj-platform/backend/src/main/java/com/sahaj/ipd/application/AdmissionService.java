@@ -30,6 +30,9 @@ import com.sahaj.ipd.application.IpdSettingsRepository.CategoryRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.ConfigRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.DepositRules;
 import com.sahaj.ipd.application.WardRepository.WardRow;
+import com.sahaj.ipd.application.AdmittedCards.FactsPlan;
+import com.sahaj.ipd.domain.card.CardCatalogue;
+import com.sahaj.ipd.domain.card.ResolvedCardSetup;
 import com.sahaj.patient.api.PatientAccessPort;
 import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.patient.api.PatientLookupPort;
@@ -116,13 +119,15 @@ public class AdmissionService {
     private final EmergencyService emergency;
     private final VitalsRepository vitals;
     private final AdmittedCards cards;
+    private final CardSetups cardSetups;
 
     AdmissionService(AdmissionRepository admissions, BedRepository beds, WardRepository wards,
                      IpdSettingsRepository settings, OwnerGuard ownerGuard, AuditLog auditLog, TeamMemberPort team,
                      PatientLookupPort patients, PatientAccessPort patientAccess, ActorDirectoryPort actors,
                      IpdGate gate, IpdCatalog catalog, ChargeRepository charges, IpdBilling billing,
                      DischargeRepository discharges, EmergencyService emergency, VitalsRepository vitals,
-                     AdmittedCards cards) {
+                     AdmittedCards cards, CardSetups cardSetups) {
+        this.cardSetups = cardSetups;
         this.cards = cards;
         this.vitals = vitals;
         this.emergency = emergency;
@@ -235,7 +240,7 @@ public class AdmissionService {
      * OWNER, DOCTOR or NURSE.
      */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public AdmissionList list(UUID tenantId, UUID actor, String role, String status) {
+    public AdmissionList list(UUID tenantId, UUID actor, String role, String status, String cardFacts) {
         ModuleEntitlement ent = gate.check(tenantId, false);
         SafetySupport.requireRole(role, AdmittedCardRules.LIST_ROLES, AdmittedCardRules.FORBIDDEN_MESSAGE);
         String memberRole = SafetySupport.membershipRole(team, tenantId, actor, AdmittedCardRules.LIST_ROLES,
@@ -243,6 +248,12 @@ public class AdmissionService {
         if (status != null && !"ADMITTED".equals(status)) {
             throw new InvalidInputException("status", "Only the Admitted list is available");
         }
+        boolean allFacts = allCardFacts(cardFacts, role, memberRole);
+        // SAH-37 (ADR-015 D4, D6): the published setup is read in this snapshot (R7); it decides which new card facts
+        // are sent.
+        ResolvedCardSetup cardSetup = cardSetups.live(tenantId).resolved();
+        FactsPlan plan = FactsPlan.of(allFacts ? Set.copyOf(CardCatalogue.fieldKeys()) : cardSetup.shownFields(), role,
+                memberRole);
         Instant asOf = cards.asOf();
         List<BedRow> allBeds = beds.findAll(tenantId);
         int occupied = (int) allBeds.stream().filter(b -> "occ".equals(b.status())).count();
@@ -261,7 +272,8 @@ public class AdmissionService {
         }
         // ADR-013 D15: decided once, from the membership re-read above, before any patient read.
         boolean clinicalAccess = AdmittedCardRules.clinical(role, memberRole);
-        Map<UUID, PatientClinical> patientMap = cards.patients(tenantId, patientIds, clinicalAccess);
+        AdmittedCards.Patients loaded = cards.patients(tenantId, patientIds, clinicalAccess, plan.mobile());
+        Map<UUID, PatientClinical> patientMap = loaded.byId();
         lookups.preloadDoctors(tenantId, admitted);
         // SAH-25: one query for the charges of all admitted patients; the deposit sums come with the rows.
         Batch batch = billing.forAdmitted(tenantId, now, rules.alertPercent(), catalog.categories(tenantId), config);
@@ -271,7 +283,8 @@ public class AdmissionService {
         // SAH-33, SAH-36: the Safety tab count, the banner and the clinical facts of the cards, for OWNER, DOCTOR and
         // NURSE only, from the same snapshot and the same escalation rows; null / absent for every other role.
         AdmittedCards.Clinical clinical = clinicalAccess
-                ? cards.clinical(tenantId, asOf, placed, patientMap) : AdmittedCards.Clinical.NONE;
+                ? cards.clinical(tenantId, asOf, placed, patientMap, plan, ids -> actors.displayNames(tenantId, ids))
+                : AdmittedCards.Clinical.NONE;
         List<AdmittedPatientRow> items = new ArrayList<>();
         int alerts = 0;
         int goingHome = 0;
@@ -290,7 +303,8 @@ public class AdmissionService {
                 goingHome++;
             }
             items.add(AdmittedPatientRow.of(summary, patient == null ? null : patient.uhid(), placedRow.wardId(),
-                    roomLevel ? placedRow.roomName() : null, clinical.flags().get(row.id())));
+                    roomLevel ? placedRow.roomName() : null, clinical.flags().get(row.id()),
+                    plan.mobile() ? Optional.ofNullable(loaded.mobiles().get(row.patientId())) : null));
         }
         boolean canAdmit = ADMIT_ROLES.contains(role) && !"readonly".equals(ent.ipdState());
         Instant dayStart = today.atStartOfDay(RunningBill.IST).toInstant();
@@ -304,7 +318,7 @@ public class AdmissionService {
         }
         return new AdmissionList(allBeds.size(), occupied, available, canAdmit, alerts, rules.alertPercent(),
                 dischargedToday, goingHome, emergencyCounts, clinical.banner(), asOf, List.copyOf(wardOptions),
-                AdmittedCardRules.abilities(role, memberRole, ent.ipdState()), List.copyOf(items));
+                AdmittedCardRules.abilities(role, memberRole, ent.ipdState()), cardSetup, List.copyOf(items));
     }
 
     /**
@@ -495,6 +509,23 @@ public class AdmissionService {
     }
 
     // ---- helpers ----
+
+    /**
+     * SAH-37 (ADR-015 D6): {@code cardFacts} is "setup" (default) or "all". "all" is for the owner's live preview only (token
+     * role and membership role both OWNER, else 403 forbidden); any other value is a 400.
+     */
+    private static boolean allCardFacts(String cardFacts, String role, String memberRole) {
+        if (cardFacts == null || "setup".equals(cardFacts)) {
+            return false;
+        }
+        if (!"all".equals(cardFacts)) {
+            throw new InvalidInputException("cardFacts", "Use cardFacts=setup or cardFacts=all");
+        }
+        if (!AdmittedCardRules.both(Set.of("OWNER"), role, memberRole)) {
+            throw new AccessDeniedException("Only the clinic owner can preview the card setup.");
+        }
+        return true;
+    }
 
     private static void requireRole(String role, Set<String> allowed, String message) {
         if (role == null || !allowed.contains(role)) {

@@ -1,0 +1,58 @@
+{
+  "screen": "team-page",
+  "project": "desktop-1440",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "findings": {
+    "sideScroll": 0,
+    "clipped": [
+      "button \"\" 44>40",
+      "button \"\" 44>40",
+      "div \"Rahul Deshmukh Pharmacist · ••••••7410 · Last logi\" 176>163",
+      "small \"Pharmacist · ••••••7410 · Last login 6 Nov 2026, 9\" 176>163",
+      "button \"\" 44>40",
+      "button \"\" 44>40",
+      "button \"\" 44>40"
+    ],
+    "ellipsis": 0,
+    "small": [
+      "input \"\" 169x22",
+      "button \"Add visiting doctor\" 164x38",
+      "input#mat-input-0 \"\" 188x20",
+      "button \"\" 40x23",
+      "button \"Add staff\" 103x38",
+      "button \"\" 40x23",
+      "button \"\" 40x23",
+      "button \"Remove access\" 124x38",
+      "button \"\" 40x23",
+      "button \"Remove access\" 124x38",
+      "button \"\" 40x23",
+      "button \"Remove access\" 124x38"
+    ]
+  },
+  "sheetFindings": {
+    "sideScroll": 0,
+    "clipped": [
+      "button[act=ct-x] \"\" 46>44"
+    ],
+    "ellipsis": 0,
+    "small": []
+  },
+  "dialog": {
+    "box": "520x549 at 460,176",
+    "footerProblems": []
+  },
+  "calls": {
+    "POST platform/auth/refresh": 1,
+    "GET platform/me": 1,
+    "GET platform/modules": 1,
+    "GET platform/team": 1,
+    "GET platform/role-permissions": 1,
+    "GET platform/me/pin/colleague-tries": 1,
+    "GET e2e/ping": 1,
+    "GET platform/team/m-nurse/pin/colleague-tries": 1
+  }
+}

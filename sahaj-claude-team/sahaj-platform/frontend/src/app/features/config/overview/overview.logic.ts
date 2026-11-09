@@ -1,3 +1,5 @@
+import { tileLine } from '../../ipd/card/card-setup.logic';
+import type { CardSetupView } from '../../ipd/card/card-setup.model';
 import { CasePaperSettings, FeeSettings, FeeTiming } from '../opd/opd.model';
 import { ClinicProfile, Holiday, SetupCheck, Specialty } from '../platform/clinic.model';
 import { TeamMember, isDoctorRole } from '../team/team.model';
@@ -76,6 +78,8 @@ export interface TileData {
   specialties: Specialty[] | null;
   fees: FeeSettings | null;
   paper: CasePaperSettings | null;
+  /** SAH-37. Only read when IPD is available. */
+  cardSetup?: CardSetupView | null;
 }
 
 const LANGUAGE_TEXT = { mr: 'English + मराठी', hi: 'English + हिंदी' } as const;
@@ -105,6 +109,15 @@ export function tileSummaries(data: TileData): Record<string, string> {
   if (data.fees) {
     const free = data.fees.followUpFee === 'free' ? 'free follow-up' : 'follow-up';
     out['fees'] = `${TIMING_TEXT[data.fees.feeTiming]} · ${free} ${data.fees.followUpDays} days`;
+  }
+  if (data.cardSetup) {
+    const { live, draft } = data.cardSetup;
+    out['ipcard'] = tileLine({
+      layout: live.setup.layout,
+      isStandard: live.isStandard,
+      version: live.version,
+      hasDraft: !!draft,
+    });
   }
   return out;
 }

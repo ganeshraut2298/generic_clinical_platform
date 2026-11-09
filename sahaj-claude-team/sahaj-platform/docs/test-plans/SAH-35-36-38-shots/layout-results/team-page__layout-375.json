@@ -1,0 +1,40 @@
+{
+  "screen": "team-page",
+  "project": "layout-375",
+  "viewport": {
+    "width": 375,
+    "height": 667
+  },
+  "dpr": 1,
+  "findings": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 0,
+    "overruns": [
+      "div \"Kavita More Front desk · ••••••7410 · Last login 6\" 176>163",
+      "small \"Front desk · ••••••7410 · Last login 6 Nov 2026, 9\" 176>163"
+    ],
+    "small": []
+  },
+  "sheetFindings": {
+    "sideScroll": 0,
+    "clipped": [],
+    "ellipsis": 0,
+    "overruns": [],
+    "small": []
+  },
+  "dialog": {
+    "box": "375x541 at 0,126",
+    "footerProblems": []
+  },
+  "calls": {
+    "POST platform/auth/refresh": 1,
+    "GET platform/me": 1,
+    "GET platform/modules": 1,
+    "GET platform/team": 1,
+    "GET platform/role-permissions": 1,
+    "GET platform/me/pin/colleague-tries": 1,
+    "GET e2e/ping": 1,
+    "GET platform/team/m-nurse/pin/colleague-tries": 1
+  }
+}

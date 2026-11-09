@@ -4,6 +4,7 @@ import type { EmergencyCounts, EmergencyHandoff } from './emergency/emergency.mo
 import type { AllergyStatus } from './emr/emr.model';
 import type { EwsSummary } from './nursing/nursing.model';
 import type { AdmissionSafety } from './safety/safety.model';
+import type { CardDataGroup, CardLatestVitals, ResolvedCardSetup } from './card/card-setup.model';
 
 /** Types for the SAH-23 endpoints in `docs/api/ipd.yaml`. Money is integer paise. */
 export type AdmissionType = 'planned' | 'emergency' | 'daycare' | 'maternity';
@@ -117,6 +118,8 @@ export interface AdmissionList {
   wards: WardOption[];
   /** SAH-36. What the card shows for this caller, once for the whole list. */
   card: AdmittedCardAbilities;
+  /** SAH-37. The published card setup the Cards view draws (read in the same snapshot as the rows). */
+  cardSetup: ResolvedCardSetup;
   items: AdmittedPatientRow[];
 }
 
@@ -132,7 +135,11 @@ export interface AdmittedCardAbilities {
   emr: boolean;
   transfer: boolean;
   discharge: boolean;
+  /** SAH-37. OWNER, FRONT_DESK; not in Read-only. The quick action Deposit. */
+  deposit: boolean;
   depositLowFlag: boolean;
+  /** SAH-37. The data groups this caller may see on the card. */
+  visibleGroups: CardDataGroup[];
 }
 
 /** SAH-36 `CardEscalationFlag`: the open escalation of one patient (status OPEN or ACK). */
@@ -155,6 +162,10 @@ export interface AdmittedClinicalFlags {
   latestEws: EwsSummary | null;
   vitalsDue: boolean;
   allergy: CardAllergy;
+  /** SAH-37. Present only when the published setup shows Diagnosis (or `cardFacts=all`). */
+  diagnosis?: string;
+  /** SAH-37. Present only when a vital reading or Last recorded is shown; null when none was recorded. */
+  latestVitals?: CardLatestVitals | null;
 }
 
 /** SAH-36 `AdmittedPatientRow`: `AdmissionRow` plus the card facts. */
@@ -163,6 +174,8 @@ export interface AdmittedPatientRow extends AdmissionRow {
   wardId: string;
   roomName: string | null;
   clinical?: AdmittedClinicalFlags;
+  /** SAH-37. OWNER and FRONT_DESK only, and only when the setup shows Mobile (absent otherwise). */
+  mobile?: string | null;
 }
 
 export interface DepositEntry {

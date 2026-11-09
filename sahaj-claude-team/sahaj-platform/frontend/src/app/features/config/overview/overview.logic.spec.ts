@@ -1,3 +1,4 @@
+import { ownerView, standardSetup, staffView } from '../../ipd/card/card-setup.fixtures';
 import { SetupCheck } from '../platform/clinic.model';
 import { fixTarget, sortChecks, summarise, tileSummaries, todoBySection } from './overview.logic';
 
@@ -67,5 +68,20 @@ describe('overview logic', () => {
     expect(lines['fees']).toBe('Fee after consultation · free follow-up 6 days');
     expect(lines['paper']).toBe('A5 · English + मराठी');
     expect(lines['team']).toBeUndefined();
+    expect(lines['ipcard']).toBeUndefined();
+  });
+
+  it('writes the Patient card line from the live setup, with the draft marker (SAH-37 AC15)', () => {
+    const none = { profile: null, holidays: null, members: null, specialties: null, fees: null, paper: null };
+    expect(tileSummaries({ ...none, cardSetup: ownerView() })['ipcard']).toBe('Standard · Sahaj default · v1');
+    const saved = { ...standardSetup(), layout: 'compact' as const };
+    const withDraft = ownerView({
+      draft: { revision: 1, baseVersion: 1, setup: saved, savedAt: '2026-11-09T05:35:00Z', savedByName: 'Dr. Owner', changedParts: ['layout'] },
+    });
+    expect(tileSummaries({ ...none, cardSetup: withDraft })['ipcard']).toBe('Standard · Sahaj default · v1 · draft');
+    const custom = ownerView({ live: { version: 3, isStandard: false, setup: saved, publishedAt: null, publishedByName: null } });
+    expect(tileSummaries({ ...none, cardSetup: custom })['ipcard']).toBe('Compact · customized · v3');
+    const staff = staffView();
+    expect(tileSummaries({ ...none, cardSetup: staff })['ipcard']).toBe('Standard · Sahaj default · v1');
   });
 });

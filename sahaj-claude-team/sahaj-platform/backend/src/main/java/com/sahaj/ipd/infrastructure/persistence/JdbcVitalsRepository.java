@@ -44,6 +44,21 @@ public class JdbcVitalsRepository implements VitalsRepository {
                 limit 1) v
             where a.tenant_id = :tenantId and a.status = 'ADMITTED'
             """;
+    // SAH-37 (ADR-015 D6): the same probe with the five readings and the recorder added; run only when the published
+    // setup switches a reading or Last recorded on, or for the owner's preview.
+    private static final String FIND_LATEST_READINGS_OF_ADMITTED = """
+            select v.admission_id, v.ews_score, v.ews_risk, v.recorded_at, v.bp_systolic, v.bp_diastolic, v.pulse,
+                   v.spo2, v.temp_c, v.rr, v.recorded_by
+            from ipd.admission a
+            cross join lateral (
+                select x.admission_id, x.ews_score, x.ews_risk, x.recorded_at, x.bp_systolic, x.bp_diastolic,
+                       x.pulse, x.spo2, x.temp_c, x.rr, x.recorded_by
+                from ipd.vitals x
+                where x.tenant_id = a.tenant_id and x.admission_id = a.id
+                order by x.recorded_at desc, x.id desc
+                limit 1) v
+            where a.tenant_id = :tenantId and a.status = 'ADMITTED'
+            """;
     private static final String FIND_BY_CLIENT_KEY = "select " + COLUMNS + """
             from ipd.vitals v
             where v.tenant_id = :tenantId and v.client_key = :clientKey
@@ -93,6 +108,20 @@ public class JdbcVitalsRepository implements VitalsRepository {
                 .query((rs, rowNum) -> new LatestScore(rs.getObject("admission_id", UUID.class),
                         rs.getInt("ews_score"), Risk.valueOf(rs.getString("ews_risk")),
                         rs.getObject("recorded_at", OffsetDateTime.class).toInstant()))
+                .list().forEach(row -> latest.put(row.admissionId(), row));
+        return latest;
+    }
+
+    @Override
+    public Map<UUID, LatestScore> findLatestReadingsOfAdmitted(UUID tenantId) {
+        Map<UUID, LatestScore> latest = new HashMap<>();
+        jdbc.sql(FIND_LATEST_READINGS_OF_ADMITTED).param("tenantId", tenantId)
+                .query((rs, rowNum) -> new LatestScore(rs.getObject("admission_id", UUID.class),
+                        rs.getInt("ews_score"), Risk.valueOf(rs.getString("ews_risk")),
+                        rs.getObject("recorded_at", OffsetDateTime.class).toInstant(),
+                        new Readings(rs.getInt("bp_systolic"), rs.getInt("bp_diastolic"), rs.getInt("pulse"),
+                                rs.getInt("spo2"), rs.getBigDecimal("temp_c"), rs.getInt("rr")),
+                        rs.getObject("recorded_by", UUID.class)))
                 .list().forEach(row -> latest.put(row.admissionId(), row));
         return latest;
     }
