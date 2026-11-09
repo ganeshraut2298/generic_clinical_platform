@@ -1,0 +1,117 @@
+<section class="panel glass" data-testid="pc-fields">
+  <div>
+    <h2>Fields</h2>
+    <small class="faint">
+      Drag a field to reorder it or move it to another section. Type a new label to rename it; leave
+      it empty to keep the standard name.
+    </small>
+  </div>
+  @for (g of groups(); track g.section.key) {
+    <div
+      class="pcfsec"
+      [class.off]="!g.section.on"
+      [class.over]="over() === g.section.key"
+      [attr.data-section]="g.section.key"
+      (dragover)="onDragOverSection($event, g.section.key)"
+      (drop)="onDropSection($event, g.section.key)"
+    >
+      <div class="pcfsh">
+        <b>{{ g.name }}</b>
+        @if (!g.section.on) {
+          <span class="pill p-wait">Section off</span>
+        }
+      </div>
+      <div class="pclist">
+        @for (r of g.rows; track r.field.key) {
+          <div
+            #row
+            class="pcrow"
+            [class.off]="!r.field.on"
+            [class.dragging]="dragged() === r.field.key"
+            [class.over]="over() === r.field.key"
+            [attr.data-row]="r.field.key"
+            (dragover)="onDragOverRow($event, r.field.key)"
+            (drop)="onDropRow($event, g.section.key, r.field.key)"
+          >
+            @if (r.cat.required) {
+              <span class="pcgrip fixed" title="Fixed position"
+                ><app-icon name="lock" [size]="13"
+              /></span>
+            } @else {
+              <span
+                class="pcgrip"
+                title="Drag to reorder"
+                aria-hidden="true"
+                [attr.draggable]="store.locked() ? null : true"
+                (dragstart)="onDragStart($event, r.field.key, row)"
+                (dragend)="onDragEnd()"
+              >
+                <app-icon name="grip" [size]="15" />
+              </span>
+            }
+            <span class="pcrm">
+              <input
+                class="input pclbl"
+                type="text"
+                autocomplete="off"
+                [attr.maxlength]="maxLength()"
+                [value]="r.labelLocked ? r.cat.name : r.field.label"
+                [placeholder]="r.cat.name"
+                [attr.aria-label]="'Label for ' + r.cat.name"
+                [attr.data-label]="r.field.key"
+                [disabled]="store.locked() || r.labelLocked"
+                (input)="onLabel(r.field.key, $event)"
+                (change)="onLabelDone(r.field.key, $event)"
+              />
+              <small>{{ r.line }}</small>
+            </span>
+            @if (r.cat.required) {
+              <span class="pill p-wait">Required</span>
+            } @else if (r.cat.safety) {
+              <span class="pill p-good" title="Patient safety: cannot be hidden">
+                <app-icon name="lock" [size]="11" /> Safety · always on
+              </span>
+            } @else {
+              <button
+                type="button"
+                class="sw"
+                role="switch"
+                [attr.aria-checked]="r.field.on"
+                [attr.aria-label]="'Show ' + r.cat.name"
+                [attr.data-switch]="r.field.key"
+                [disabled]="store.locked()"
+                (click)="store.toggleField(r.field.key)"
+              ></button>
+            }
+            <span class="pcmv">
+              @if (!r.cat.required) {
+                <button
+                  type="button"
+                  class="iconbtn sm"
+                  data-move="up"
+                  [attr.aria-label]="'Move up ' + r.cat.name"
+                  [disabled]="store.locked() || !r.canUp"
+                  (click)="move(r.field.key, -1)"
+                >
+                  <app-icon name="up" [size]="13" />
+                </button>
+                <button
+                  type="button"
+                  class="iconbtn sm"
+                  data-move="down"
+                  [attr.aria-label]="'Move down ' + r.cat.name"
+                  [disabled]="store.locked() || !r.canDown"
+                  (click)="move(r.field.key, 1)"
+                >
+                  <app-icon name="down" [size]="13" />
+                </button>
+              }
+            </span>
+          </div>
+        } @empty {
+          <div class="pcempty">Drop a field here</div>
+        }
+      </div>
+    </div>
+  }
+</section>

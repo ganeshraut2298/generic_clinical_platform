@@ -1,0 +1,42 @@
+{
+  "project": "desktop-1440",
+  "cpuThrottle": 4,
+  "proposalMs": 8,
+  "note": "layerFrameMs = JS time inside the layer frame callback (canvas calls on the main thread, not GPU raster) under a 4x CPU throttle. The control is the same page and sweep with the layer switched off.",
+  "layerOn": {
+    "layer": "on",
+    "seconds": 4.2,
+    "mouseMovesDone": 15,
+    "movesPerSecond": 3.5,
+    "layerFrames": 41,
+    "layerFrameMs": {
+      "median": 0.8,
+      "p95": 5.2,
+      "max": 17
+    },
+    "otherRafCallbacks": 3,
+    "meanMsBetweenLayerFrames": 101.3,
+    "longTasks": 11,
+    "longTasksPerSecond": 2.6,
+    "mainThreadBusyPercent": 91,
+    "scriptPercent": 3
+  },
+  "layerOff": {
+    "layer": "off (control, same page without the layer)",
+    "seconds": 4.2,
+    "mouseMovesDone": 14,
+    "movesPerSecond": 3.3,
+    "layerFrames": 0,
+    "layerFrameMs": {
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "otherRafCallbacks": 2,
+    "meanMsBetweenLayerFrames": 0,
+    "longTasks": 2,
+    "longTasksPerSecond": 0.5,
+    "mainThreadBusyPercent": 83,
+    "scriptPercent": 2
+  }
+}

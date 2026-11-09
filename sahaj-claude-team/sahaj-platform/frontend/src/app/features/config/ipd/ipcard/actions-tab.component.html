@@ -1,0 +1,74 @@
+<section class="panel glass" data-testid="pc-actions">
+  <div>
+    <h2>Quick actions</h2>
+    <small class="faint">
+      Shown at the bottom of each card, in this order. Each role sees only the actions it is allowed
+      to use.
+    </small>
+  </div>
+  <div class="pclist">
+    @for (r of rows(); track r.action.key) {
+      <div
+        #row
+        class="pcrow"
+        [class.off]="!r.action.on"
+        [class.dragging]="dragged() === r.action.key"
+        [class.over]="over() === r.action.key"
+        [attr.data-row]="r.action.key"
+        (dragover)="onDragOver($event, r.action.key)"
+        (drop)="onDrop($event, r.action.key)"
+      >
+        <span
+          class="pcgrip"
+          title="Drag to reorder"
+          aria-hidden="true"
+          [attr.draggable]="store.locked() ? null : true"
+          (dragstart)="onDragStart($event, r.action.key, row)"
+          (dragend)="onDragEnd()"
+        >
+          <app-icon name="grip" [size]="15" />
+        </span>
+        <span class="ti"><app-icon [name]="r.icon" [size]="16" /></span>
+        <span class="pcrm">
+          <b>{{ r.cat.name }}</b>
+          <small>{{ r.cat.description }}</small>
+          <small class="pcwho" data-testid="pc-who"
+            ><app-icon name="shieldu" [size]="11" /> {{ r.who }}</small
+          >
+        </span>
+        <button
+          type="button"
+          class="sw"
+          role="switch"
+          [attr.aria-checked]="r.action.on"
+          [attr.aria-label]="'Show ' + r.cat.name"
+          [attr.data-switch]="r.action.key"
+          [disabled]="store.locked()"
+          (click)="store.toggleAction(r.action.key)"
+        ></button>
+        <span class="pcmv">
+          <button
+            type="button"
+            class="iconbtn sm"
+            data-move="up"
+            [attr.aria-label]="'Move up ' + r.cat.name"
+            [disabled]="store.locked() || !r.canUp"
+            (click)="move(r.action.key, -1)"
+          >
+            <app-icon name="up" [size]="13" />
+          </button>
+          <button
+            type="button"
+            class="iconbtn sm"
+            data-move="down"
+            [attr.aria-label]="'Move down ' + r.cat.name"
+            [disabled]="store.locked() || !r.canDown"
+            (click)="move(r.action.key, 1)"
+          >
+            <app-icon name="down" [size]="13" />
+          </button>
+        </span>
+      </div>
+    }
+  </div>
+</section>

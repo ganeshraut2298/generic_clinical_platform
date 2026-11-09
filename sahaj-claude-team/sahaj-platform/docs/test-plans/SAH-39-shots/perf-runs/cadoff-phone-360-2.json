@@ -1,0 +1,46 @@
+{
+  "project": "phone-360",
+  "cpuThrottle": 4,
+  "proposalMs": 8,
+  "order": "layer off first",
+  "layerOn": {
+    "layer": "on",
+    "syntheticPointerMoves": 228,
+    "pageFrames": 227,
+    "msBetweenPageFrames": {
+      "mean": 22.02,
+      "p95": 33.4,
+      "max": 50.1
+    },
+    "pageFramesOver33ms": 4,
+    "layerFrames": 227,
+    "layerFrameMs": {
+      "median": 1.6,
+      "p95": 2.7,
+      "max": 12.3
+    },
+    "layerFramesOver8ms": 2,
+    "longTasks": 0,
+    "mainThreadBusyPercent": 90
+  },
+  "layerOff": {
+    "layer": "off (control)",
+    "syntheticPointerMoves": 295,
+    "pageFrames": 294,
+    "msBetweenPageFrames": {
+      "mean": 17.01,
+      "p95": 16.8,
+      "max": 50
+    },
+    "pageFramesOver33ms": 1,
+    "layerFrames": 0,
+    "layerFrameMs": {
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "layerFramesOver8ms": 0,
+    "longTasks": 1,
+    "mainThreadBusyPercent": 87
+  }
+}

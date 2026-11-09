@@ -1,0 +1,42 @@
+{
+  "project": "phone-360",
+  "cpuThrottle": 4,
+  "proposalMs": 8,
+  "note": "layerFrameMs = JS time inside the layer frame callback (canvas calls on the main thread, not GPU raster) under a 4x CPU throttle. The control is the same page and sweep with the layer switched off.",
+  "layerOn": {
+    "layer": "on",
+    "seconds": 4.2,
+    "mouseMovesDone": 27,
+    "movesPerSecond": 6.4,
+    "layerFrames": 83,
+    "layerFrameMs": {
+      "median": 1,
+      "p95": 2.8,
+      "max": 16.5
+    },
+    "otherRafCallbacks": 5,
+    "meanMsBetweenLayerFrames": 50.2,
+    "longTasks": 1,
+    "longTasksPerSecond": 0.2,
+    "mainThreadBusyPercent": 97,
+    "scriptPercent": 3
+  },
+  "layerOff": {
+    "layer": "off (control, same page without the layer)",
+    "seconds": 4,
+    "mouseMovesDone": 24,
+    "movesPerSecond": 6,
+    "layerFrames": 0,
+    "layerFrameMs": {
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "otherRafCallbacks": 3,
+    "meanMsBetweenLayerFrames": 0,
+    "longTasks": 0,
+    "longTasksPerSecond": 0,
+    "mainThreadBusyPercent": 96,
+    "scriptPercent": 0
+  }
+}

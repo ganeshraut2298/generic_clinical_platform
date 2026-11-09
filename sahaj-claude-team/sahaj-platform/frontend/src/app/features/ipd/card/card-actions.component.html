@@ -1,0 +1,58 @@
+@if (actions().length > 0) {
+  <div
+    class="pcacts"
+    [class.tool]="layout() === 'standard'"
+    [class.ic]="layout() === 'compact'"
+    [class.ex]="layout() === 'expanded'"
+    data-testid="card-actions"
+  >
+    @for (a of actions(); track a.key) {
+      @switch (layout()) {
+        @case ('compact') {
+          <button
+            type="button"
+            class="pcib"
+            [title]="a.label"
+            [attr.aria-label]="a.name"
+            [attr.data-act]="a.key"
+            [attr.tabindex]="preview() ? -1 : null"
+            [attr.aria-disabled]="preview() ? true : null"
+            (click)="press(a.key)"
+          >
+            <app-icon [name]="a.icon" [size]="16" />
+          </button>
+        }
+        @case ('expanded') {
+          <button
+            type="button"
+            class="pcbtn"
+            [class.pri]="a.primary"
+            [attr.aria-label]="a.name"
+            [attr.data-act]="a.key"
+            [attr.tabindex]="preview() ? -1 : null"
+            [attr.aria-disabled]="preview() ? true : null"
+            (click)="press(a.key)"
+          >
+            <app-icon [name]="a.icon" [size]="14" />
+            <span>{{ a.label }}</span>
+          </button>
+        }
+        @default {
+          <button
+            type="button"
+            class="pctb"
+            [class.pri]="a.primary"
+            [attr.aria-label]="a.name"
+            [attr.data-act]="a.key"
+            [attr.tabindex]="preview() ? -1 : null"
+            [attr.aria-disabled]="preview() ? true : null"
+            (click)="press(a.key)"
+          >
+            <app-icon [name]="a.icon" [size]="17" />
+            <span>{{ a.label }}</span>
+          </button>
+        }
+      }
+    }
+  </div>
+}

@@ -1,0 +1,75 @@
+<ng-template #val let-item>
+  @if (item.value.chip) {
+    <span [class]="'pcf ' + item.value.tone">{{ item.value.text }}</span>
+  } @else if (item.value.tone) {
+    <span [class]="'tone-' + item.value.tone">{{ item.value.text }}</span>
+  } @else {
+    {{ item.value.text }}
+  }
+</ng-template>
+
+<div class="pcsec" data-testid="card-vitals">
+  @if (layout() === 'expanded') {
+    <div class="pcst">{{ section().title }}</div>
+  }
+  @if (section().noVitals) {
+    <div class="pcnov" data-testid="card-no-vitals">
+      <app-icon name="heart" [size]="14" /> No vitals recorded yet
+    </div>
+  } @else if (layout() === 'compact') {
+    <div class="vmini">
+      @for (t of section().minis; track t.key) {
+        <span
+          [class.v-warn]="t.mark === 'CHECK'"
+          [class.v-crit]="t.mark === 'CRITICAL'"
+          [attr.title]="t.markTitle || t.label"
+          [attr.data-vital]="t.key"
+        >
+          {{ t.label }} <b class="num">{{ t.value }}</b>
+          @if (t.mark) {
+            <em> {{ t.markWord }}</em>
+          }
+        </span>
+      }
+      @for (i of section().foot; track i.key) {
+        @if (i.key === 'ews') {
+          <span [title]="i.label" data-vital="ews">
+            {{ i.label }}{{ ' '
+            }}<ng-container [ngTemplateOutlet]="val" [ngTemplateOutletContext]="{ $implicit: i }" />
+          </span>
+        }
+      }
+    </div>
+  } @else if (section().tiles.length > 0) {
+    <div class="vts">
+      @for (t of section().tiles; track t.key) {
+        <div
+          class="vt"
+          [class.v-warn]="t.mark === 'CHECK'"
+          [class.v-crit]="t.mark === 'CRITICAL'"
+          [attr.title]="t.markTitle || null"
+          [attr.data-vital]="t.key"
+        >
+          <small>{{ t.label }}</small>
+          <b class="num"
+            >{{ t.value }}<span>{{ t.unit }}</span></b
+          >
+          @if (t.mark) {
+            <em>{{ t.markWord }}</em>
+          }
+        </div>
+      }
+    </div>
+  }
+  @if (layout() !== 'compact' && section().foot.length > 0) {
+    <div class="vfoot">
+      @for (i of section().foot; track i.key) {
+        <span [attr.data-testid]="i.testId"
+          ><small>{{ i.label }}</small
+          >{{ ' '
+          }}<ng-container [ngTemplateOutlet]="val" [ngTemplateOutletContext]="{ $implicit: i }"
+        /></span>
+      }
+    </div>
+  }
+</div>

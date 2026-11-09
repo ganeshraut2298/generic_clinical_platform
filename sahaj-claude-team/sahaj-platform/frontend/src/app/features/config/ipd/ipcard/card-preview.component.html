@@ -1,0 +1,68 @@
+<div class="pcpvh">
+  <div>
+    <b>Live preview</b>
+    <small data-testid="pc-showing">{{
+      store.showingDraft() ? 'Showing your draft' : 'Showing the live card'
+    }}</small>
+  </div>
+  <div class="seg" role="group" aria-label="Device" data-testid="pc-device">
+    @for (d of devices; track d.key) {
+      <button
+        type="button"
+        [attr.aria-pressed]="store.device() === d.key"
+        [attr.data-device]="d.key"
+        (click)="store.setDevice(d.key)"
+      >
+        {{ d.label }}
+      </button>
+    }
+  </div>
+</div>
+
+<div class="pcpvc">
+  <div class="field">
+    <label for="pc-view-as">View as</label>
+    <select id="pc-view-as" class="input" data-testid="pc-view-as" (change)="onRole($event)">
+      @for (r of roles(); track r) {
+        <option [value]="r" [selected]="store.role() === r">{{ roleName[r] }}</option>
+      }
+    </select>
+  </div>
+  <div class="field">
+    <label for="pc-patient">Patient</label>
+    <select id="pc-patient" class="input" data-testid="pc-patient" (change)="onPatient($event)">
+      @for (p of store.previewRows(); track p.id) {
+        <option [value]="p.id" [selected]="selectedId() === p.id">
+          {{ p.patientName }} · {{ p.bedCode }}
+        </option>
+      }
+    </select>
+  </div>
+</div>
+
+@if (store.patientsFailed()) {
+  <div class="notice warn slim" role="status" data-testid="pc-patients-error">
+    <app-icon name="alert" [size]="14" />
+    <span>{{ patientsError }}</span>
+  </div>
+}
+
+@if (store.resolved(); as setup) {
+  @if (store.previewCard(); as abilities) {
+    <div class="pcframe" [class.tablet]="store.device() === 'tablet'" data-testid="pc-frame">
+      <app-patient-card
+        [row]="store.previewDrawnRow()"
+        [card]="abilities"
+        [asOf]="store.previewAsOf()"
+        [setup]="setup"
+        [preview]="true"
+      />
+    </div>
+  }
+}
+
+@if (store.hiddenLine(); as hidden) {
+  <div class="pchid" data-testid="pc-hidden"><app-icon name="lock" [size]="12" /> {{ hidden }}</div>
+}
+
+<p class="faint note" data-testid="pc-note">{{ note() }}</p>

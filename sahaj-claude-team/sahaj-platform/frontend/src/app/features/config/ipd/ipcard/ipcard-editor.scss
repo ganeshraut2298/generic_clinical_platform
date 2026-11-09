@@ -1,0 +1,267 @@
+// Shared by the three editor tabs of Clinic setup → Patient card (mockup `.pcpresets`, `.pclays`,
+// `.pclist`, `.pcrow`, `.pcfsec`).
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+h2 {
+  font-size: 0.95rem;
+}
+
+.pcpresets,
+.pclays {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tmpl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 12px;
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  color: var(--ink);
+
+  small {
+    color: var(--ink-2);
+    font-size: 0.76rem;
+  }
+  &:hover:not(:disabled) {
+    border-color: var(--pri);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.pclay {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  text-align: left;
+  min-height: 44px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--glass-hi);
+  color: var(--ink);
+
+  small {
+    color: var(--ink-2);
+    font-size: 0.76rem;
+  }
+  &.on {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+  }
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  .tick {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    color: var(--pri-text);
+  }
+}
+
+.pcthumb {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  height: 46px;
+  padding: 5px;
+  border-radius: 8px;
+  background: var(--muted-soft);
+  margin-bottom: 4px;
+
+  i {
+    background: var(--line);
+    border-radius: 3px;
+  }
+  &.t-compact {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  &.t-standard {
+    grid-template-columns: repeat(3, 1fr);
+
+    i:nth-child(4) {
+      display: none;
+    }
+  }
+  &.t-expanded {
+    grid-template-columns: repeat(2, 1fr);
+
+    i:nth-child(n + 3) {
+      display: none;
+    }
+  }
+}
+
+.pclay.on .pcthumb i {
+  background: color-mix(in srgb, var(--pri) 45%, transparent);
+}
+
+.bkrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-2);
+
+  small {
+    display: block;
+    color: var(--ink-3);
+    font-size: 0.78rem;
+  }
+}
+
+.cols button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.pclist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pcrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  transition:
+    box-shadow 0.12s,
+    opacity 0.12s;
+
+  &.off {
+    background: var(--muted-soft);
+  }
+  &.off .pcrm b,
+  &.off .pcrm .input {
+    opacity: 0.6;
+  }
+  &.dragging {
+    opacity: 0.4;
+  }
+  &.over {
+    box-shadow: 0 0 0 2px var(--pri);
+  }
+}
+
+.pcgrip {
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-height: 44px;
+  flex: none;
+  cursor: grab;
+
+  &.fixed {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.pcrm {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+
+  small {
+    font-size: 0.74rem;
+    color: var(--ink-3);
+  }
+  .pclbl {
+    min-height: 44px;
+    padding: 4px 10px;
+    font-weight: 600;
+  }
+}
+
+.pcwho {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pcmv {
+  display: flex;
+  gap: 2px;
+  flex: none;
+  min-width: 80px;
+  justify-content: flex-end;
+
+  .iconbtn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.ti {
+  flex: none;
+  color: var(--pri-text);
+}
+
+.pcfsec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+
+  &.off {
+    opacity: 0.75;
+  }
+  &.over {
+    box-shadow: 0 0 0 2px var(--pri);
+  }
+}
+
+.pcfsh {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.86rem;
+}
+
+.pcempty {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  border-radius: 10px;
+  background: var(--muted-soft);
+}
+
+@media (max-width: 700px) {
+  .pcpresets,
+  .pclays {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

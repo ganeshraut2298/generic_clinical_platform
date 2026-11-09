@@ -1,0 +1,172 @@
+@if (store.gate() !== 'ready') {
+  <app-ipd-gate [gate]="store.gate()" (retry)="store.retry()" />
+} @else if (store.loading() || (!store.view() && !store.loadError())) {
+  <section class="panel surf" aria-busy="true">
+    <p class="muted">Loading the patient card</p>
+  </section>
+} @else if (store.loadError(); as message) {
+  <section class="panel surf">
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button data-act="try-again" (click)="store.retry()">
+        Try again
+      </button>
+    </div>
+  </section>
+} @else if (store.live(); as live) {
+  <div id="f-ipcard" class="pccfg">
+    <div class="pcbar glass" data-testid="pc-bar">
+      <div class="pcbs">
+        <span
+          class="pill"
+          [class.p-teal]="live.isStandard"
+          [class.p-blue]="!live.isStandard"
+          data-testid="pc-live"
+        >
+          {{ live.isStandard ? 'Sahaj standard card' : 'Customized' }} · v{{ live.version }} live
+        </span>
+        @if (store.dirty()) {
+          <span class="pill p-warn" data-testid="pc-draft">
+            <app-icon name="edit" [size]="12" /> {{ pillText() }}
+          </span>
+        } @else {
+          <span class="faint nochg" data-testid="pc-nochange">No unpublished changes</span>
+        }
+      </div>
+      @if (store.readOnlyReason() !== 'IPD_READONLY') {
+        <div class="pcba">
+          <button
+            type="button"
+            mat-stroked-button
+            data-act="reset"
+            [disabled]="store.locked() || store.isDefault()"
+            [attr.title]="store.isDefault() ? 'Already the default' : null"
+            (click)="store.reset()"
+          >
+            <app-icon name="undo" [size]="14" /> Reset to default
+          </button>
+          @if (store.dirty() && store.canEdit()) {
+            <button
+              type="button"
+              mat-stroked-button
+              data-act="discard"
+              [disabled]="store.locked()"
+              (click)="store.discard()"
+            >
+              Discard draft
+            </button>
+            <button
+              type="button"
+              mat-stroked-button
+              data-act="save"
+              [disabled]="store.locked()"
+              (click)="store.saveDraft()"
+            >
+              {{ store.busy() === 'save' ? 'Saving' : 'Save draft' }}
+            </button>
+          }
+          <button
+            type="button"
+            mat-flat-button
+            data-act="publish"
+            [disabled]="store.locked() || !store.dirty()"
+            (click)="store.publish()"
+          >
+            <app-icon name="send" [size]="14" />
+            {{ store.busy() === 'publish' ? 'Publishing' : 'Publish' }}
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (readOnlyText(); as text) {
+      <div class="notice warn" role="status" data-testid="pc-readonly">
+        <app-icon name="lock" [size]="16" />
+        <span>{{ text }}</span>
+      </div>
+    }
+
+    @if (store.problem(); as p) {
+      <div class="notice err" role="alert" data-testid="pc-problem">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ p.text }}</span>
+        @if (p.conflict) {
+          <button type="button" mat-stroked-button data-act="reload" (click)="store.reload()">
+            Reload
+          </button>
+        }
+      </div>
+    }
+
+    <div class="tabs" role="tablist" aria-label="Patient card setup">
+      @for (t of tabs; track t.key) {
+        <button
+          type="button"
+          role="tab"
+          [id]="'pc-tab-' + t.key"
+          aria-controls="pc-panel"
+          [attr.aria-selected]="tab() === t.key"
+          [attr.tabindex]="tab() === t.key ? 0 : -1"
+          (click)="selectTab(t.key)"
+          (keydown)="onTabKeydown($event)"
+        >
+          {{ t.label }}
+        </button>
+      }
+    </div>
+
+    <div class="pcsplit">
+      <div
+        class="pced"
+        role="tabpanel"
+        id="pc-panel"
+        [attr.aria-labelledby]="'pc-tab-' + tab()"
+        tabindex="0"
+      >
+        @switch (tab()) {
+          @case ('fields') {
+            <app-card-fields-tab />
+          }
+          @case ('actions') {
+            <app-card-actions-tab />
+          }
+          @default {
+            <app-card-layout-tab />
+          }
+        }
+      </div>
+      <aside class="pcpv glass" aria-label="Live preview" data-testid="pc-preview">
+        <app-card-preview />
+      </aside>
+    </div>
+
+    @if (store.versions(); as versions) {
+      <section class="panel glass" data-testid="pc-versions">
+        <div class="panel-h">
+          <h2>Published versions</h2>
+          <small class="faint">Every publish is kept. The list uses the latest.</small>
+        </div>
+        <div class="list">
+          @for (v of versions; track v.version) {
+            <div class="li" [attr.data-version]="v.version">
+              <span class="tokchip">v{{ v.version }}</span>
+              <div class="main">
+                <b>{{ v.summary }}</b>
+                <small>{{ v.publishedByName ?? 'Sahaj' }} · {{ versionWhen(v.publishedAt) }}</small>
+              </div>
+              @if (v.live) {
+                <span class="pill p-good">Live</span>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <p class="faint pcfoot" data-testid="pc-foot">{{ footText() }}</p>
+    <div class="sr-only" aria-live="polite" data-testid="pc-announce">
+      {{ store.announcement() }}
+    </div>
+  </div>
+}

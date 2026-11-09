@@ -1,0 +1,66 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pcpvh {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  > div:first-child {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    font-size: 0.74rem;
+    color: var(--ink-3);
+  }
+  .seg button {
+    min-height: 44px;
+  }
+}
+
+.pcpvc {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+
+  .input {
+    min-height: 44px;
+  }
+}
+
+.pcframe {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 10px, var(--line-2) 10px 11px), var(--bg);
+
+  app-patient-card {
+    width: 100%;
+  }
+  &.tablet app-patient-card {
+    max-width: 300px;
+  }
+}
+
+.pchid {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.76rem;
+}

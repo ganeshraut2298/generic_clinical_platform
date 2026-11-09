@@ -1,0 +1,85 @@
+// Clinic setup → Patient card (mockup `.pcbar`, `.pcsplit`, `.pced`, `.pcpv`).
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.pccfg {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pcbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+}
+
+.pcbs,
+.pcba {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.nochg {
+  font-size: 0.8rem;
+}
+
+.pcba button {
+  min-height: 44px;
+}
+
+.tabs button {
+  min-height: 44px;
+}
+
+.pcsplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 400px);
+  gap: 14px;
+  align-items: start;
+}
+
+.pced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pcpv {
+  position: sticky;
+  top: 130px;
+  padding: 14px;
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pcfoot {
+  margin: 0;
+  font-size: 0.76rem;
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  .pcsplit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pcpv {
+    position: static;
+  }
+}

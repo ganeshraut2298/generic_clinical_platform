@@ -1,0 +1,161 @@
+@if (store.editor(); as e) {
+  <section class="panel glass" data-testid="pc-templates">
+    <div>
+      <h2>Start from a template</h2>
+      <small class="faint"
+        >New clinics get the Sahaj standard card automatically. A template only changes your
+        draft.</small
+      >
+    </div>
+    <div class="pcpresets">
+      @for (t of store.templates(); track t.key) {
+        <button
+          type="button"
+          class="tmpl"
+          [attr.data-template]="t.key"
+          [disabled]="store.locked()"
+          (click)="store.applyTemplateByKey(t.key)"
+        >
+          <b>{{ t.name }}</b>
+          <small>{{ t.description }}</small>
+        </button>
+      }
+    </div>
+  </section>
+
+  <section class="panel glass" data-testid="pc-layouts">
+    <h2>Card layout</h2>
+    <div class="pclays">
+      @for (l of layouts; track l) {
+        <button
+          type="button"
+          class="pclay"
+          [class.on]="e.layout === l"
+          [attr.aria-pressed]="e.layout === l"
+          [attr.data-layout]="l"
+          [disabled]="store.locked()"
+          (click)="store.setLayout(l)"
+        >
+          @if (e.layout === l) {
+            <app-icon class="tick" name="check" [size]="16" />
+          }
+          <span [class]="'pcthumb t-' + l" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <b>{{ layoutName[l] }}</b>
+          <small>{{ layoutText[l] }}</small>
+        </button>
+      }
+    </div>
+    <div class="bkrow">
+      <div>
+        <b id="pc-cols-label">Cards per row</b>
+        <small
+          >Default on desktop. Each person can switch it on the patient list; tablets show 2, phones
+          1.</small
+        >
+      </div>
+      <div class="seg cols" role="group" aria-labelledby="pc-cols-label" data-testid="pc-cols">
+        @for (n of colsOptions; track n) {
+          <button
+            type="button"
+            [attr.aria-pressed]="e.cardsPerRow === n"
+            [attr.data-cols]="n"
+            [disabled]="store.locked()"
+            (click)="store.setCols(n)"
+          >
+            {{ n }}
+          </button>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="panel glass" data-testid="pc-sections">
+    <div>
+      <h2>Sections</h2>
+      <small class="faint"
+        >Drag to change the order, or use the arrows. Switch off a section to hide it from every
+        card.</small
+      >
+    </div>
+    <div class="pclist">
+      @if (header(); as h) {
+        <div class="pcrow" [attr.data-row]="h.section.key">
+          <span class="pcgrip fixed" title="Fixed position"
+            ><app-icon name="lock" [size]="13"
+          /></span>
+          <span class="pcrm">
+            <b>{{ h.cat.name }}</b>
+            <small>{{ h.cat.description }} · {{ h.summary }}</small>
+          </span>
+          <span class="pill p-wait">Always on</span>
+          <span class="pcmv"></span>
+        </div>
+      }
+      @for (r of rest(); track r.section.key) {
+        <div
+          #row
+          class="pcrow"
+          [class.off]="!r.section.on"
+          [class.dragging]="dragged() === r.section.key"
+          [class.over]="over() === r.section.key"
+          [attr.data-row]="r.section.key"
+          (dragover)="onDragOver($event, r.section.key)"
+          (drop)="onDrop($event, r.section.key)"
+        >
+          <span
+            class="pcgrip"
+            title="Drag to reorder"
+            aria-hidden="true"
+            [attr.draggable]="store.locked() ? null : true"
+            (dragstart)="onDragStart($event, r.section.key, row)"
+            (dragend)="onDragEnd()"
+          >
+            <app-icon name="grip" [size]="15" />
+          </span>
+          <span class="pcrm">
+            <b>{{ r.cat.name }}</b>
+            <small>{{ r.cat.description }} · {{ r.summary }}</small>
+          </span>
+          @if (r.cat.safety) {
+            <span class="pill p-good" title="Patient safety: cannot be hidden">
+              <app-icon name="lock" [size]="11" /> Safety · always on
+            </span>
+          } @else {
+            <button
+              type="button"
+              class="sw"
+              role="switch"
+              [attr.aria-checked]="r.section.on"
+              [attr.aria-label]="'Show ' + r.cat.name"
+              [attr.data-switch]="r.section.key"
+              [disabled]="store.locked()"
+              (click)="store.toggleSection(r.section.key)"
+            ></button>
+          }
+          <span class="pcmv">
+            <button
+              type="button"
+              class="iconbtn sm"
+              data-move="up"
+              [attr.aria-label]="'Move up ' + r.cat.name"
+              [disabled]="store.locked() || !r.canUp"
+              (click)="move(r.section.key, -1)"
+            >
+              <app-icon name="up" [size]="13" />
+            </button>
+            <button
+              type="button"
+              class="iconbtn sm"
+              data-move="down"
+              [attr.aria-label]="'Move down ' + r.cat.name"
+              [disabled]="store.locked() || !r.canDown"
+              (click)="move(r.section.key, 1)"
+            >
+              <app-icon name="down" [size]="13" />
+            </button>
+          </span>
+        </div>
+      }
+    </div>
+  </section>
+}

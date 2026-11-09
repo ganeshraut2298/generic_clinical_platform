@@ -1,0 +1,149 @@
+// Action row at the bottom of every card, tablet-friendly targets (44 px). Standard: icon over word;
+// Compact: icon only; Expanded: icon and word (mockup pcacts, pctb, pcib).
+:host {
+  display: contents;
+}
+
+.pcacts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-2);
+}
+
+.pctb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--muted-soft);
+    color: var(--ink);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 1px;
+  }
+  &.pri {
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+}
+
+// Four cards per row: smaller words so the four buttons fit (mockup `.pcgrid.cols-4`). Only where four
+// columns are really drawn: the grid becomes 2 columns at 1100 px and 1 at 700 px (admitted-panel.component.scss),
+// and there the normal button text and padding apply (DEC-025 G-6).
+// Width check at 1366 px: about 1078 px of content gives a card of about 260 px, 236 px inside the 12 px padding,
+// so each of the four buttons is about 57 px wide; "Discharge" at 0.64rem (10.2 px, semibold) is about 51 px.
+@media (min-width: 1101px) {
+  :host-context(.pcgrid.cols-4) {
+    .pcacts {
+      gap: 2px;
+    }
+    .pctb {
+      padding-left: 0;
+      padding-right: 0;
+
+      span {
+        font-size: 0.64rem;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+      }
+    }
+  }
+}
+
+// Compact: icon-only actions, 44 px targets.
+.pcacts.ic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pcib {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--glass-hi);
+  color: var(--ink-2);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--pri-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 1px;
+  }
+}
+
+// Expanded: icon and word buttons.
+.pcacts.ex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pcbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--glass-hi);
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.pri {
+    background: var(--pri-soft);
+    border-color: transparent;
+    color: var(--pri-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 1px;
+  }
+}
+
+// The live preview draws the same buttons but they do nothing.
+[aria-disabled='true'] {
+  pointer-events: none;
+}
+
+// 1101-1279 px with four cards per row: a little less spacing keeps "Transfer" and "Discharge" whole.
+@media (min-width: 1101px) and (max-width: 1279px) {
+  :host-context(.pcgrid.cols-4) {
+    .pcacts {
+      gap: 0;
+    }
+    .pctb span {
+      font-size: 0.6rem;
+      letter-spacing: -0.03em;
+    }
+  }
+}
