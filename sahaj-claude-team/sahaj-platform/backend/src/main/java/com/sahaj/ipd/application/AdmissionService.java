@@ -31,6 +31,7 @@ import com.sahaj.ipd.application.IpdSettingsRepository.ConfigRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.DepositRules;
 import com.sahaj.ipd.application.WardRepository.WardRow;
 import com.sahaj.ipd.application.AdmittedCards.FactsPlan;
+import com.sahaj.ipd.domain.card.CardAccessRule;
 import com.sahaj.ipd.domain.card.CardCatalogue;
 import com.sahaj.ipd.domain.card.ResolvedCardSetup;
 import com.sahaj.patient.api.PatientAccessPort;
@@ -94,7 +95,6 @@ public class AdmissionService {
      */
     static final Set<String> FLOOR_ROLES = Set.of("OWNER", "FRONT_DESK", "NURSE");
     private static final Set<String> ADMIT_ROLES = FLOOR_ROLES;
-    private static final Set<String> DEPOSIT_ROLES = Set.of("OWNER", "FRONT_DESK");
     private static final Set<String> CHARGE_ROLES = FLOOR_ROLES;
     /** SAH-26: who may move a patient to another bed. */
     static final Set<String> TRANSFER_ROLES = FLOOR_ROLES;
@@ -431,7 +431,8 @@ public class AdmissionService {
     public Detail addDeposit(UUID tenantId, UUID actor, String role, UUID admissionId,
                              Long amountPaise, String mode) {
         // Defence in depth (security review L1), as in addCharge.
-        requireRole(role, DEPOSIT_ROLES, "You cannot collect a deposit.");
+        // Who may collect a deposit: the one copy is CardAccessRule.DEPOSIT, also behind the card's Deposit action.
+        requireRole(role, CardAccessRule.DEPOSIT, "You cannot collect a deposit.");
         ModuleEntitlement ent = gate.check(tenantId, true);
         if (amountPaise == null || amountPaise < RUPEE || amountPaise > MAX_PAISE || amountPaise % RUPEE != 0) {
             throw new InvalidInputException("amountPaise", "Enter whole rupees, at least ₹1 and at most ₹10,00,000");
@@ -522,7 +523,7 @@ public class AdmissionService {
             throw new InvalidInputException("cardFacts", "Use cardFacts=setup or cardFacts=all");
         }
         if (!AdmittedCardRules.both(Set.of("OWNER"), role, memberRole)) {
-            throw new AccessDeniedException("Only the clinic owner can preview the card setup.");
+            throw new AccessDeniedException(SafetySupport.FORBIDDEN);
         }
         return true;
     }
@@ -628,7 +629,7 @@ public class AdmissionService {
                     lookups.collector(tenantId, d.collectedBy())));
         }
         String state = ent.ipdState();
-        boolean canCollect = DEPOSIT_ROLES.contains(role) && ("trial".equals(state) || "on".equals(state))
+        boolean canCollect = CardAccessRule.DEPOSIT.contains(role) && ("trial".equals(state) || "on".equals(state))
                 && "ADMITTED".equals(row.status());
         boolean canAddCharge = CHARGE_ROLES.contains(role) && !"readonly".equals(state)
                 && "ADMITTED".equals(row.status());

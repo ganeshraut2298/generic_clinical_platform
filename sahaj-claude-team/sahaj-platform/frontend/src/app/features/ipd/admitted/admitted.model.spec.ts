@@ -66,6 +66,18 @@ describe('admitted.model', () => {
       expect(ids(filterRows(rows, 'zzz', ALL_WARDS))).toEqual([]);
     });
 
+    it('matches an accent typed in either form (G-10)', () => {
+      const accented = [
+        rowOf({ id: '1', patientName: 'Jos\u{E9} Rao', uhid: 'PT-1', bedCode: '1-A', ipNumber: 'IP/1', wardId: WARD_A }),
+        rowOf({ id: '2', patientName: 'Ravi Shah', uhid: 'PT-2', bedCode: '2-A', ipNumber: 'IP/2', wardId: WARD_A }),
+      ];
+      expect(ids(filterRows(accented, 'jose\u{301}', ALL_WARDS))).toEqual(['1']);
+      expect(ids(filterRows(accented, 'JOS\u{C9}', ALL_WARDS))).toEqual(['1']);
+      expect(ids(filterRows(accented, 'jos\u{E9}', ALL_WARDS))).toEqual(['1']);
+      const decomposed = [rowOf({ id: '3', patientName: 'Jose\u{301} Rao', uhid: null, bedCode: '3-A', ipNumber: 'IP/3', wardId: WARD_A })];
+      expect(ids(filterRows(decomposed, 'jos\u{E9}', ALL_WARDS))).toEqual(['3']);
+    });
+
     it('filters by ward id and needs both the ward and the text to match', () => {
       expect(ids(filterRows(rows, '', WARD_A))).toEqual(['1', '3']);
       expect(ids(filterRows(rows, 'ravi', WARD_A))).toEqual([]);

@@ -63,6 +63,11 @@ class CardSetupServiceTest {
     private static final UUID OWNER = UUID.randomUUID();
     private static final Instant NOW = Instant.parse("2026-11-09T05:30:00Z");
     private static final ObjectMapper JSON = new ObjectMapper();
+    /**
+     * The revision of a first draft saved at the fixed clock: the clock in microseconds since 1970, an opaque token that
+     * does not start at 1. A second save at the same instant is one more.
+     */
+    private static final long REV1 = NOW.getEpochSecond() * 1_000_000L;
 
     private FakeRepository repository;
     private WardRepository wards;
@@ -70,6 +75,7 @@ class CardSetupServiceTest {
     private AuditLog auditLog;
     private TeamMemberPort team;
     private ActorDirectoryPort actors;
+    private ModuleEntitlementPort entitlementPort;
     private CardSetupService service;
     private String ipdState = "on";
     private String memberRole = "OWNER";
@@ -87,8 +93,13 @@ class CardSetupServiceTest {
         when(team.findActiveByUserId(eq(TENANT), any())).thenAnswer(call -> Optional.of(
                 new TeamMember(UUID.randomUUID(), "Member", memberRole, true, 0L)));
         when(actors.displayNames(eq(TENANT), anyCollection())).thenReturn(Map.of(OWNER, "Dr Owner"));
-        service = new CardSetupService(repository, new CardSetups(repository),
-                new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)), wards, ownerGuard, auditLog, team,
+        entitlementPort = entitlements;
+        service = serviceAt(NOW);
+    }
+
+    private CardSetupService serviceAt(Instant now) {
+        return new CardSetupService(repository, new CardSetups(repository),
+                new IpdGate(entitlementPort, Clock.fixed(now, ZoneOffset.UTC)), wards, ownerGuard, auditLog, team,
                 actors);
     }
 
@@ -109,6 +120,20 @@ class CardSetupServiceTest {
             sections.add(new Section(s.key(), s.on(), fields));
         }
         return new CardSetup("standard", 3, sections, standard().actions());
+    }
+
+    /** The setup with the given fields switched on (their sections keep their own state). */
+    private static CardSetup switchedOn(CardSetup base, String... keys) {
+        List<String> wanted = List.of(keys);
+        List<Section> sections = new ArrayList<>();
+        for (Section s : base.sections()) {
+            List<FieldPlacement> fields = new ArrayList<>();
+            for (FieldPlacement f : s.fields()) {
+                fields.add(wanted.contains(f.key()) ? new FieldPlacement(f.key(), true, f.label()) : f);
+            }
+            sections.add(new Section(s.key(), s.on(), fields));
+        }
+        return new CardSetup(base.layout(), base.cardsPerRow(), sections, base.actions());
     }
 
     private static CardSetup compact(CardSetup base) {
@@ -252,17 +277,61 @@ class CardSetupServiceTest {
         assertThat(live.resolved().fallback()).isTrue();
     }
 
+    @Test
+    void aStoredVersionOfTheKnownShapeIsReadAndIsNotAFallback() {
+        repository.versions.add(new VersionRow(2, CardSetupJson.write(labelled("Wing")), false, List.of("fields"),
+                OWNER, NOW, CardSetupRepository.SCHEMA_VERSION));
+
+        CardSetups.Live live = new CardSetups(repository).live(TENANT);
+
+        assertThat(live.fallback()).isFalse();
+        assertThat(live.setup()).isEqualTo(labelled("Wing"));
+    }
+
+    @Test
+    void aStoredVersionWithAHigherSchemaVersionGivesTheStandardSetupWithFallback() {
+        // a valid document, but written by a newer build: it is not read at all
+        repository.versions.add(new VersionRow(4, CardSetupJson.write(labelled("Wing")), false, List.of("fields"),
+                OWNER, NOW, CardSetupRepository.SCHEMA_VERSION + 1));
+
+        CardSetups.Live live = new CardSetups(repository).live(TENANT);
+
+        assertThat(live.fallback()).isTrue();
+        assertThat(live.setup()).isEqualTo(standard());
+        assertThat(live.version()).isEqualTo(4);
+        assertThat(live.resolved().fallback()).isTrue();
+    }
+
+    @Test
+    void aStoredDraftWithAHigherSchemaVersionIsShownAsTheStandardSetup() {
+        repository.draft = new DraftRow(CardSetupJson.write(labelled("Wing")), 1, REV1, OWNER, NOW,
+                CardSetupRepository.SCHEMA_VERSION + 1);
+        assertThat(CardSetups.draftSetup(repository.draft)).isEqualTo(standard());
+
+        repository.draft = new DraftRow(CardSetupJson.write(labelled("Wing")), 1, REV1, OWNER, NOW,
+                CardSetupRepository.SCHEMA_VERSION);
+        assertThat(CardSetups.draftSetup(repository.draft)).isEqualTo(labelled("Wing"));
+    }
+
+    @Test
+    void theSchemaVersionThisBuildKnowsIsOneAndOnlyAHigherNumberIsUnknown() {
+        assertThat(CardSetupRepository.SCHEMA_VERSION).isEqualTo(1);
+        assertThat(CardSetups.knownShape(1)).isTrue();
+        assertThat(CardSetups.knownShape(2)).isFalse();
+        assertThat(CardSetups.knownShape(Short.MAX_VALUE)).isFalse();
+    }
+
     // ---- save draft ----
 
     @Test
-    void theFirstSaveStoresRevisionOneAgainstTheLiveVersionAndWritesOneHistoryLine() {
+    void theFirstSaveStoresAClockRevisionAgainstTheLiveVersionAndWritesOneHistoryLine() {
         CardSetupView view = save(1, null, labelled("Wing"));
 
-        assertThat(repository.draft.revision()).isEqualTo(1L);
+        assertThat(repository.draft.revision()).isEqualTo(REV1);
         assertThat(repository.draft.baseVersion()).isEqualTo(1);
         assertThat(repository.draft.savedBy()).isEqualTo(OWNER);
         CardDraft draft = view.draft().get();
-        assertThat(draft.revision()).isEqualTo(1L);
+        assertThat(draft.revision()).isEqualTo(REV1);
         assertThat(draft.baseVersion()).isEqualTo(1);
         assertThat(draft.changedParts()).containsExactly("fields");
         assertThat(draft.savedByName()).isEqualTo("Dr Owner");
@@ -276,7 +345,7 @@ class CardSetupServiceTest {
         order.verify(auditLog).record(eq("IPD_CARD_DRAFT_SAVED"), eq("IPD_CONFIG"), eq(null), before.capture(),
                 after.capture());
         assertThat(before.getValue()).containsEntry("liveVersion", 1);
-        assertThat(after.getValue()).containsEntry("liveVersion", 1).containsEntry("draftRevision", 1L)
+        assertThat(after.getValue()).containsEntry("liveVersion", 1).containsEntry("draftRevision", REV1)
                 .containsEntry("changedParts", List.of("fields"));
     }
 
@@ -294,18 +363,92 @@ class CardSetupServiceTest {
     @Test
     void everySaveBumpsTheRevisionAndKeepsOneRow() {
         save(1, null, labelled("Wing"));
-        CardSetupView second = save(1, 1L, labelled("Block"));
+        CardSetupView second = save(1, REV1, labelled("Block"));
 
-        assertThat(repository.draft.revision()).isEqualTo(2L);
-        assertThat(second.draft().get().revision()).isEqualTo(2L);
+        assertThat(repository.draft.revision()).isEqualTo(REV1 + 1);
+        assertThat(second.draft().get().revision()).isEqualTo(REV1 + 1);
         assertThat(repository.draftWrites).isEqualTo(2);
+    }
+
+    @Test
+    void aStaleEditorCannotOverwriteDiscardOrPublishOverADraftThatAnotherOwnerStartedAgain() {
+        // Owner A holds (base 1, revision a). B discards and starts a new draft on the same base (AC12).
+        long a = save(1, null, labelled("Wing")).draft().get().revision();
+        service.discardDraft(TENANT, OWNER, "OWNER", a);
+        assertThat(repository.draft).isNull();
+        // the clock has moved on by the time B saves again
+        service = serviceAt(NOW.plusSeconds(30));
+        long b = save(1, null, labelled("Block")).draft().get().revision();
+        assertThat(b).isGreaterThan(a).isNotEqualTo(1L);
+
+        assertChanged(() -> save(1, a, labelled("Other")));
+        assertChanged(() -> publish(1, a, labelled("Other")));
+        assertChanged(() -> service.discardDraft(TENANT, OWNER, "OWNER", a));
+
+        assertThat(repository.draft.revision()).isEqualTo(b);
+        assertThat(repository.versions).isEmpty();
+        assertThat(CardSetupJson.read(repository.draft.setupJson()).get().sections().get(2).fields().get(2).label())
+                .isEqualTo("Block");
+    }
+
+    @Test
+    void aSaveEqualToTheLiveSetupAndAPublishAlsoNeverLetAStaleRevisionMatchTheNextDraft() {
+        long a = save(1, null, labelled("Wing")).draft().get().revision();
+        save(1, a, standard());
+        assertThat(repository.draft).isNull();
+        service = serviceAt(NOW.plusSeconds(30));
+        long b = save(1, null, labelled("Block")).draft().get().revision();
+
+        assertChanged(() -> save(1, a, labelled("Other")));
+
+        service = serviceAt(NOW.plusSeconds(60));
+        publish(1, b, labelled("Block"));
+        service = serviceAt(NOW.plusSeconds(90));
+        long c = save(2, null, labelled("Third")).draft().get().revision();
+        assertThat(c).isGreaterThan(b);
+        assertChanged(() -> save(2, b, labelled("Other")));
+    }
+
+    @Test
+    void theNextRevisionIsTheClockInMicrosecondsAndAtLeastOneMoreThanTheDraftItReplaces() {
+        Instant at = Instant.parse("2026-11-09T05:30:00.123456789Z");
+        long micros = at.getEpochSecond() * 1_000_000L + 123_456L;
+        DraftRow old = new DraftRow("{}", 1, 7L, OWNER, NOW);
+        DraftRow future = new DraftRow("{}", 1, micros + 5, OWNER, NOW);
+
+        assertThat(CardSetupService.nextRevision(Optional.empty(), at)).isEqualTo(micros);
+        assertThat(CardSetupService.nextRevision(Optional.of(old), at)).isEqualTo(micros);
+        assertThat(CardSetupService.nextRevision(Optional.of(future), at)).isEqualTo(micros + 6);
+        // a browser holds integers exactly up to 2^53; the clock in microseconds stays far below it
+        assertThat(micros).isLessThan(1L << 53);
+    }
+
+    @Test
+    void aSaveOfTheSameDraftAgainChangesNothingAndWritesNoHistoryLine() {
+        save(1, null, labelled("Wing"));
+
+        CardSetupView again = save(1, REV1, labelled("Wing"));
+
+        assertThat(again.draft().get().revision()).isEqualTo(REV1);
+        assertThat(repository.draft.revision()).isEqualTo(REV1);
+        assertThat(repository.draftWrites).isEqualTo(1);
+        verify(auditLog, org.mockito.Mockito.times(1)).record(eq("IPD_CARD_DRAFT_SAVED"), any(), any(), any(), any());
+        verify(wards, org.mockito.Mockito.times(2)).lockTenant(TENANT);
+    }
+
+    @Test
+    void aDraftThatIsNotTheSameDraftStillWritesItsHistoryLine() {
+        save(1, null, labelled("Wing"));
+        save(1, REV1, labelled("Block"));
+
+        verify(auditLog, org.mockito.Mockito.times(2)).record(eq("IPD_CARD_DRAFT_SAVED"), any(), any(), any(), any());
     }
 
     @Test
     void aSetupEqualToTheLiveOneRemovesTheDraftAndWritesNoHistoryLine() {
         save(1, null, labelled("Wing"));
 
-        CardSetupView view = save(1, 1L, standard());
+        CardSetupView view = save(1, REV1, standard());
 
         assertThat(repository.draft).isNull();
         assertThat(view.draft()).isEqualTo(Optional.empty());
@@ -334,11 +477,11 @@ class CardSetupServiceTest {
     @Test
     void aStaleDraftRevisionIsRefusedAndTheNewerDraftIsKept() {
         save(1, null, labelled("Wing"));
-        save(1, 1L, labelled("Block"));
+        save(1, REV1, labelled("Block"));
 
-        assertChanged(() -> save(1, 1L, labelled("Other")));
+        assertChanged(() -> save(1, REV1, labelled("Other")));
 
-        assertThat(repository.draft.revision()).isEqualTo(2L);
+        assertThat(repository.draft.revision()).isEqualTo(REV1 + 1);
         assertThat(CardSetupJson.read(repository.draft.setupJson()).get().sections().get(2).fields().get(2).label())
                 .isEqualTo("Block");
     }
@@ -352,14 +495,6 @@ class CardSetupServiceTest {
 
     @Test
     void anEditorHoldingADraftThatWasDiscardedOrPublishedIsRefused() {
-        assertChanged(() -> save(1, 1L, labelled("Block")));
-    }
-
-    @Test
-    void theBaseVersionOfTheStoredDraftIsComparedToo() {
-        // The revision restarts at 1 after a discard, so a draft of an older base version must not match.
-        repository.draft = new DraftRow(CardSetupJson.write(labelled("Wing")), 2, 1L, OWNER, NOW);
-
         assertChanged(() -> save(1, 1L, labelled("Block")));
     }
 
@@ -480,7 +615,7 @@ class CardSetupServiceTest {
     void discardRemovesTheDraftKeepsTheLiveSetupAndWritesNoHistoryLine() {
         save(1, null, labelled("Wing"));
 
-        CardSetupView view = service.discardDraft(TENANT, OWNER, "OWNER", 1L);
+        CardSetupView view = service.discardDraft(TENANT, OWNER, "OWNER", REV1);
 
         assertThat(repository.draft).isNull();
         assertThat(view.draft()).isEqualTo(Optional.empty());
@@ -499,11 +634,11 @@ class CardSetupServiceTest {
     @Test
     void discardWithAnotherRevisionIsAConflictAndTheNewerDraftIsKept() {
         save(1, null, labelled("Wing"));
-        save(1, 1L, labelled("Block"));
+        save(1, REV1, labelled("Block"));
 
-        assertChanged(() -> service.discardDraft(TENANT, OWNER, "OWNER", 1L));
+        assertChanged(() -> service.discardDraft(TENANT, OWNER, "OWNER", REV1));
 
-        assertThat(repository.draft.revision()).isEqualTo(2L);
+        assertThat(repository.draft.revision()).isEqualTo(REV1 + 1);
     }
 
     @Test
@@ -520,7 +655,7 @@ class CardSetupServiceTest {
     void theFirstPublishIsVersionTwoDeletesTheDraftAndWritesOneHistoryLine() {
         save(1, null, labelled("Wing"));
 
-        CardSetupView view = publish(1, 1L, labelled("Wing"));
+        CardSetupView view = publish(1, REV1, labelled("Wing"));
 
         assertThat(repository.versions).hasSize(1);
         VersionRow row = repository.versions.get(0);
@@ -546,6 +681,42 @@ class CardSetupServiceTest {
         assertThat(after.getValue()).containsEntry("version", 2).containsEntry("isStandard", false)
                 .containsEntry("changedParts", List.of("fields"));
         assertThat(after.getValue().toString()).doesNotContain("Wing");
+    }
+
+    @Test
+    void thePublishLineNamesTheSensitiveFactsSwitchedOnAsKeysAndNeverALabel() {
+        publish(1, null, switchedOn(labelled("Secret wing name"), "mobile", "diagnosis", "bp", "lastRecorded"));
+
+        ArgumentCaptor<Map<String, Object>> after = captor();
+        verify(auditLog).record(eq("IPD_CARD_PUBLISHED"), any(), any(), any(), after.capture());
+        assertThat(after.getValue().get("factsOn")).isEqualTo(List.of("diagnosis", "bp", "lastRecorded", "mobile"));
+        assertThat(after.getValue().toString()).doesNotContain("Secret").doesNotContain("Wing");
+        assertThat(after.getValue().keySet()).containsExactlyInAnyOrder("version", "changedParts", "isStandard",
+                "factsOn");
+    }
+
+    @Test
+    void thePublishLineHasAnEmptyFactsListForTheDefaultCardAndSkipsFieldsInASectionThatIsOff() {
+        publish(1, null, labelled("Wing"));
+        ArgumentCaptor<Map<String, Object>> first = captor();
+        verify(auditLog).record(eq("IPD_CARD_PUBLISHED"), any(), any(), any(), first.capture());
+        assertThat(first.getValue().get("factsOn")).isEqualTo(List.of());
+
+        // the facts come out in catalogue order, whatever the order they were switched on
+        assertThat(CardSetupService.factsOn(standard())).isEmpty();
+        assertThat(CardSetupService.factsOn(switchedOn(standard(), "pulse", "temp", "rr", "spo2")))
+                .containsExactly("pulse", "spo2", "temp", "rr");
+    }
+
+    @Test
+    void aSensitiveFieldInASectionThatIsSwitchedOffIsNotCountedAsOn() {
+        List<Section> sections = new ArrayList<>();
+        for (Section s : switchedOn(standard(), "bp", "diagnosis").sections()) {
+            sections.add(s.key().equals("vitals") ? new Section(s.key(), false, s.fields()) : s);
+        }
+
+        assertThat(CardSetupService.factsOn(new CardSetup("standard", 3, sections, standard().actions())))
+                .containsExactly("diagnosis");
     }
 
     @Test
@@ -578,9 +749,9 @@ class CardSetupServiceTest {
     @Test
     void aStaleDraftRevisionBlocksPublish() {
         save(1, null, labelled("Wing"));
-        save(1, 1L, labelled("Block"));
+        save(1, REV1, labelled("Block"));
 
-        assertChanged(() -> publish(1, 1L, labelled("Wing")));
+        assertChanged(() -> publish(1, REV1, labelled("Wing")));
 
         assertThat(repository.versions).isEmpty();
         assertThat(repository.draft).isNotNull();

@@ -100,6 +100,21 @@ abstract class CardSetupSupport extends RoundSupport {
         return publishOk(clinic.owner(), v.get("live").get("version").asInt(), revision, setup);
     }
 
+    /** The draft revision of an answer that holds a draft: an opaque token (ADR-015 amendment A2), never assumed to be 1, 2, 3. */
+    protected static long revisionOf(JsonNode answer) {
+        return answer.get("draft").get("revision").asLong();
+    }
+
+    /** The shared forbidden text (contract amendment A1 of ADR-015): the same words for every card-setup operation and for cardFacts. */
+    protected static final String FORBIDDEN_TEXT = "You do not have access to this.";
+
+    protected JsonNode forbiddenOf(ResultActions actions) throws Exception {
+        JsonNode p = problem(actions, 403);
+        assertType(p, "forbidden");
+        assertThat(p.get("detail").asText()).as("the shared 403 text, not the old owner-only text").isEqualTo(FORBIDDEN_TEXT);
+        return p;
+    }
+
     protected JsonNode conflictOf(ResultActions actions) throws Exception {
         JsonNode p = problem(actions, 409);
         assertType(p, "card-setup-changed");

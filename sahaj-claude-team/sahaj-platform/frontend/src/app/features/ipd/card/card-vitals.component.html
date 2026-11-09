@@ -45,6 +45,7 @@
       @for (t of section().tiles; track t.key) {
         <div
           class="vt"
+          [class.k-bp]="t.key === 'bp'"
           [class.v-warn]="t.mark === 'CHECK'"
           [class.v-crit]="t.mark === 'CRITICAL'"
           [attr.title]="t.markTitle || null"

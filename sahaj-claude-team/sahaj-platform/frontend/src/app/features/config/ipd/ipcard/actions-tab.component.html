@@ -42,6 +42,7 @@
           role="switch"
           [attr.aria-checked]="r.action.on"
           [attr.aria-label]="'Show ' + r.cat.name"
+          [attr.title]="'Show ' + r.cat.name"
           [attr.data-switch]="r.action.key"
           [disabled]="store.locked()"
           (click)="store.toggleAction(r.action.key)"
@@ -52,6 +53,7 @@
             class="iconbtn sm"
             data-move="up"
             [attr.aria-label]="'Move up ' + r.cat.name"
+            [attr.title]="'Move up ' + r.cat.name"
             [disabled]="store.locked() || !r.canUp"
             (click)="move(r.action.key, -1)"
           >
@@ -62,6 +64,7 @@
             class="iconbtn sm"
             data-move="down"
             [attr.aria-label]="'Move down ' + r.cat.name"
+            [attr.title]="'Move down ' + r.cat.name"
             [disabled]="store.locked() || !r.canDown"
             (click)="move(r.action.key, 1)"
           >

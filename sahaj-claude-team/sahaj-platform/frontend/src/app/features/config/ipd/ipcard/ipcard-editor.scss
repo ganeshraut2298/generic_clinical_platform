@@ -5,6 +5,7 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  container: pced / inline-size;
 }
 
 h2 {
@@ -203,6 +204,22 @@ h2 {
   }
 }
 
+// A row with a label box keeps the box wide enough to read and type in (D-1, D-2).
+.pcrow.lbl .pcrm {
+  min-width: 160px;
+}
+
+// Error style of the mockup: .ferr (mockup line 1447) and .input.bad (line 1446).
+.ferr {
+  color: var(--crit);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.pcrm .input.bad {
+  border-color: var(--crit);
+  box-shadow: 0 0 0 3px var(--crit-soft);
+}
+
 .pcwho {
   display: flex;
   gap: 4px;
@@ -213,12 +230,44 @@ h2 {
   display: flex;
   gap: 2px;
   flex: none;
-  min-width: 80px;
+  min-width: 88px;
   justify-content: flex-end;
 
   .iconbtn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+// Narrow editor (a phone, or a small container): the label box takes the whole row and the switch and
+// the arrows sit on a second line, so "Early warning" never breaks one word per line (D-2).
+@container pced (max-width: 479px) {
+  .pcrow.lbl {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'grip rm rm'
+      '. ctl mv';
+    row-gap: 4px;
+    column-gap: 10px;
+    align-items: center;
+
+    .pcgrip {
+      grid-area: grip;
+      align-self: start;
+    }
+    .pcrm {
+      grid-area: rm;
+      min-width: 0;
+    }
+    > .sw,
+    > .pill {
+      grid-area: ctl;
+      justify-self: start;
+    }
+    .pcmv {
+      grid-area: mv;
+    }
   }
 }
 

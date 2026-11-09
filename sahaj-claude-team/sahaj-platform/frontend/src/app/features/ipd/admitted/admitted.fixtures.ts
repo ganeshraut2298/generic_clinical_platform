@@ -9,16 +9,30 @@ export const WARD_A = '11111111-1111-4111-8111-111111111111';
 export const WARD_B = '22222222-2222-4222-8222-222222222222';
 export const WARD_EMPTY = '33333333-3333-4333-8333-333333333333';
 
+/**
+ * The shared constants below are deep-frozen: a spec that changes one throws at once instead of leaking the
+ * change into the next spec of the same worker (the flaky admitted.model.spec of SAH-37 came from
+ * `listOf().items[0].clinical = ...`, which rewrote ROW for every later spec). To change a row, build a copy
+ * with `rowOf({...})`; `listOf()` hands out fresh copies.
+ */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.values(value as object).forEach(deepFreeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 export const AS_OF = '2026-10-24T07:30:00Z'; // 24 Oct 2026, 1:00 PM IST
 
-export const CLINICAL_QUIET: AdmittedClinicalFlags = {
+export const CLINICAL_QUIET: AdmittedClinicalFlags = deepFreeze({
   escalation: null,
   latestEws: null,
   vitalsDue: false,
   allergy: { status: 'NOT_RECORDED' },
-};
+} as AdmittedClinicalFlags);
 
-export const ROW: AdmittedPatientRow = {
+export const ROW: AdmittedPatientRow = deepFreeze<AdmittedPatientRow>({
   id: 'a1',
   ipNumber: 'IP/26-27/0042',
   patientId: 'p1',
@@ -43,7 +57,7 @@ export const ROW: AdmittedPatientRow = {
   wardId: WARD_A,
   roomName: 'Room 1',
   clinical: CLINICAL_QUIET,
-};
+});
 
 export const ABILITIES_NURSE: AdmittedCardAbilities = {
   nursing: true,
@@ -83,7 +97,8 @@ export function withoutClinical(row: AdmittedPatientRow): AdmittedPatientRow {
 }
 
 export function rowOf(partial: Partial<AdmittedPatientRow> = {}): AdmittedPatientRow {
-  return { ...ROW, ...partial };
+  // A deep copy, so no spec can reach the shared ROW through a nested object such as `clinical`.
+  return { ...structuredClone(ROW), ...partial };
 }
 
 /** `count` generated patients in WARD_A / WARD_B alternately, ids `g1`..`g<count>`. */
@@ -121,7 +136,7 @@ export function listOf(partial: Partial<AdmissionList> = {}): AdmissionList {
     card: ABILITIES_NURSE,
     cardSetup: resolvedStandard(),
     items: [
-      ROW,
+      rowOf(),
       rowOf({
         id: 'a2',
         ipNumber: 'IP/26-27/0043',

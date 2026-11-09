@@ -52,12 +52,93 @@ describe('card-setup.logic', () => {
       expect(canonicalSetup(b).sections[2].fields[0].label).toBe('Date in');
     });
 
+    describe('canonical form with the catalogue (G-3)', () => {
+      const label = (s: CardSetup, key: string) =>
+        s.sections.flatMap((x) => x.fields).find((f) => f.key === key)!.label;
+      const typed = (key: 'bed' | 'doctor', text: string): CardSetup => {
+        const s = standardSetup();
+        s.sections.flatMap((x) => x.fields).find((f) => f.key === key)!.label = text;
+        return s;
+      };
+
+      it.each([
+        ['bed', 'Bed', ''],
+        ['bed', ' Bed ', ''],
+        ['bed', '\u{A0}Bed\u{3000}', ''],
+        ['bed', 'bed', 'bed'],
+        ['bed', 'BED', 'BED'],
+        ['bed', 'Bed ', ''],
+        ['bed', 'Bed 2', 'Bed 2'],
+        ['doctor', 'Doctor', ''],
+        ['doctor', 'Consultant', 'Consultant'],
+        ['doctor', '', ''],
+      ] as const)(
+        'a label %s typed as %j is sent as %j (the own standard name only, case-sensitive)',
+        (key, text, sent) => {
+          expect(label(canonicalSetup(typed(key, text), CATALOGUE), key)).toBe(sent);
+        },
+      );
+
+      it('does not change the setup it is given', () => {
+        const s = typed('bed', 'Bed');
+        canonicalSetup(s, CATALOGUE);
+        expect(label(s, 'bed')).toBe('Bed');
+      });
+
+      it('counts the own name as no change: same setup, no changed part', () => {
+        const live = standardSetup();
+        const edit = typed('bed', 'Bed');
+        expect(sameSetup(edit, live, CATALOGUE)).toBe(true);
+        expect(changedParts(edit, live, CATALOGUE)).toEqual([]);
+      });
+
+      it('counts a case or spacing variant, or another word, as a change (as the server)', () => {
+        const live = standardSetup();
+        expect(sameSetup(typed('bed', 'bed'), live, CATALOGUE)).toBe(false);
+        expect(changedParts(typed('bed', 'bed'), live, CATALOGUE)).toEqual(['fields']);
+        expect(changedParts(typed('bed', 'Cot'), live, CATALOGUE)).toEqual(['fields']);
+      });
+
+      it('keeps the old behaviour without the catalogue (trim only)', () => {
+        expect(sameSetup(typed('bed', 'Bed'), standardSetup())).toBe(false);
+        expect(label(canonicalSetup(typed('bed', ' Bed '), undefined), 'bed')).toBe('Bed');
+      });
+
+      it('is the same for a label put back to the own name after a custom label', () => {
+        const live = typed('doctor', 'Consultant');
+        const edit = typed('doctor', 'Doctor');
+        expect(changedParts(edit, live, CATALOGUE)).toEqual(['fields']);
+        expect(sameSetup(edit, standardSetup(), CATALOGUE)).toBe(true);
+      });
+    });
+
+    describe('typing a label (AC31)', () => {
+      const typedLabel = (text: string) =>
+        setFieldLabel(standardSetup(), CATALOGUE, 'doctor', text)
+          .sections.flatMap((x) => x.fields)
+          .find((f) => f.key === 'doctor')!.label;
+
+      it('stops at 40 UTF-16 units', () => {
+        expect(typedLabel('a'.repeat(45))).toBe('a'.repeat(40));
+      });
+
+      it('never cuts a character made of two units in half', () => {
+        const emoji = '\u{1F600}';
+        expect(typedLabel(emoji.repeat(25))).toBe(emoji.repeat(20));
+        expect(typedLabel('a' + emoji.repeat(25))).toBe('a' + emoji.repeat(19));
+      });
+
+      it('keeps a label of exactly 40 units whole', () => {
+        expect(typedLabel('\u{1F600}'.repeat(20))).toBe('\u{1F600}'.repeat(20));
+      });
+    });
+
     it('names the parts that differ in the order layout, sections, fields, quickActions (AC3)', () => {
       const live = standardSetup();
       expect(changedParts(live, live)).toEqual([]);
       expect(changedParts(setCardsPerRow(live, 4), live)).toEqual(['layout']);
       expect(changedParts(setLayout(live, 'compact'), live)).toEqual(['layout']);
-      expect(changedParts(moveSectionBy(live, 'care', 1), live)).toEqual(['sections', 'fields']);
+      expect(changedParts(moveSectionBy(live, 'care', 1), live)).toEqual(['sections']);
       expect(changedParts(must(toggleSection(live, CATALOGUE, 'billing')).setup, live)).toEqual([
         'sections',
       ]);
@@ -67,6 +148,31 @@ describe('card-setup.logic', () => {
       expect(changedParts(toggleAction(live, 'deposit'), live)).toEqual(['quickActions']);
       const many = toggleAction(setLayout(live, 'expanded'), 'deposit');
       expect(changedParts(many, live)).toEqual(['layout', 'quickActions']);
+    });
+
+    it('counts moving a section alone as one change, as the server does (QA defect D2)', () => {
+      const live = standardSetup();
+      expect(changedParts(moveSectionBy(live, 'care', 1), live)).toEqual(['sections']);
+      expect(changedParts(moveSection(live, 'billing', 1), live)).toEqual(['sections']);
+      // moved there and back: nothing differs
+      const back = moveSectionBy(moveSectionBy(live, 'care', 1), 'care', -1);
+      expect(changedParts(back, live)).toEqual([]);
+    });
+
+    it('still names fields when a field moves, switches or is renamed, even if a section moved too', () => {
+      const live = standardSetup();
+      const moved = moveSectionBy(live, 'care', 1);
+      const fieldMoved = must(moveField(live, CATALOGUE, 'doctor', 'stay', 0)).setup;
+      expect(changedParts(fieldMoved, live)).toEqual(['fields']);
+      expect(changedParts(moveSectionBy(fieldMoved, 'care', 1), live)).toEqual(['sections', 'fields']);
+      expect(changedParts(setFieldLabel(moved, CATALOGUE, 'doctor', 'Consultant'), live)).toEqual([
+        'sections',
+        'fields',
+      ]);
+      expect(changedParts(must(toggleField(moved, CATALOGUE, 'ipNumber')).setup, live)).toEqual([
+        'sections',
+        'fields',
+      ]);
     });
 
     it('counts a switch changed and changed back as no change (AC8)', () => {

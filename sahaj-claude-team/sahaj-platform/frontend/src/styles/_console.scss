@@ -43,15 +43,15 @@
   }
 }
 
-// The work area. Routed page hosts are its children and stack with the page gap.
+// The work area. Routed page hosts are its children and stack with the page gap. Fluid: it fills the
+// space beside the rail, so expanding or collapsing the rail never changes the side margins (see
+// `_shell.scss`).
 .shell main.page {
   display: flex;
   flex-direction: column;
   gap: 12px;
   flex: 1;
   width: 100%;
-  max-width: var(--page-max, 1680px);
-  margin: 0 auto;
   padding: 14px 20px 8px;
   min-width: 0;
 

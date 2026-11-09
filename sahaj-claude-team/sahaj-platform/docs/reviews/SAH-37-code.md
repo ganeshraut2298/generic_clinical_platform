@@ -34,3 +34,46 @@ Reviewer: code-reviewer, read-only. Date: 9 Nov 2026. The review was done by rea
 
 ## Open before merge
 Re-check the 2 CardFactsIT failures that were open at the time of the review. Security finding 4 explains the empty mobile: it is a product defect, because the patient lookup returns no mobiles.
+
+## Re-check after the fix pass (9 Nov 2026): APPROVE WITH COMMENTS
+Reviewed by reading only, while the backend developer's gate was still running. There is no Blocker and no Major finding.
+
+**Closed:** #1 to #7, #9, #10 and #11. #8 and #12 stay accepted. #13 is QA's test flip, still to do.
+- #1: `nextRevision` gives the clock in microseconds and at least the replaced revision plus 1. The dead `baseVersion` branch is gone.
+- #2: the dead constants are gone.
+- #3: `draftActions` shows Save and Discard when there are edits or a server draft.
+- #4: repair applies the validator's TextRules.
+- #5: `CardAccessRule.DEPOSIT` is the single copy, with a parity test.
+- #6: the Overview call is limited to the four roles.
+- #7: scalar coercion is off.
+- #9: the draft handling is clear.
+- #10: the safety copy spec compares with the fixture.
+- #11: `inert` on the preview.
+
+**Regression checks passed:**
+- The mobile lookup: a separate method on the patient api, called only when needed (`never()` verified), and `findAllCurrent` is free of mobiles.
+- `factsOn` has keys only.
+- An unchanged draft writes nothing.
+- `toString` is without labels.
+- The fixture freeze, with no assertion weakened.
+- QA's D2 fix matches the server's `changedParts`.
+
+**Width fix:**
+- The root cause is correct: the 1680 px cap centred in the work area, with the rail collapsed.
+- The mockup's last rule is fluid, so the fix follows the mockup.
+- DEC-013 discloses the deviation from option B.
+- Risk: long lines at 2560 px. The guard spec reads the styles as text only; QA's e2e carries the layout proof.
+
+**Still open (none block merge):**
+| # | Sev | File:line | Finding | Owner | Tech lead decision |
+|---|---|---|---|---|---|
+| 14 | Nit | ipcard.page.spec.ts:165, 667, 676-682 | The specs still use the old owner-only 403 texts. | angular-developer | FIX (tiny), same as security R2 |
+| 15 | Nit | docs/api/ipd.yaml (Save draft); the SQL column comment | The contract says the revision "changes on every save", but an unchanged save keeps it. The SQL comment is stale. | solution-architect | FIX: one sentence in the contract. Accept the SQL comment. |
+| 16 | Nit | CardSetupService.java:133 | A redundant always-true comparison. | java-developer | Optional |
+| 17 | Nit | card-setup.model.spec.ts | The reference is the hand-written fixture, not a server answer. | — | Accepted |
+| 18 | Info | `nextRevision` | The clock assumption is documented. | — | None |
+
+QA still has to re-run CardFactsIT and CardSetupStoredIT, flip the revision test, run the section-move witness and the width tests, and re-check the Save draft specs.
+
+## Closure (9 Nov 2026)
+#13 is closed: QA flipped the known-gap test. #14 is closed: the 403 mocks use the shared text. #15 is closed: the contract now says an unchanged save keeps its revision. The backend gate passed (unit 3,495, integration 1,758, 0 failed), and so did lint, the frontend unit tests (2,439) and the build. Verdict stays **APPROVE WITH COMMENTS**, with nothing open except accepted nits.

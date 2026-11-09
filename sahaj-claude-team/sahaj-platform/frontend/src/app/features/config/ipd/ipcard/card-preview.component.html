@@ -49,7 +49,12 @@
 
 @if (store.resolved(); as setup) {
   @if (store.previewCard(); as abilities) {
-    <div class="pcframe" [class.tablet]="store.device() === 'tablet'" data-testid="pc-frame">
+    <div
+      class="pcframe"
+      [class.tablet]="store.device() === 'tablet'"
+      data-testid="pc-frame"
+      inert
+    >
       <app-patient-card
         [row]="store.previewDrawnRow()"
         [card]="abilities"

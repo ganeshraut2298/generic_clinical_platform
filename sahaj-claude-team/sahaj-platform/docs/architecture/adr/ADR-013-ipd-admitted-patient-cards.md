@@ -6,6 +6,7 @@ Module: ipd only (existing `platform.api` and `patient.api` ports; no new depend
 Status: PROPOSED (7 Nov 2026), with the SAH-36 contract. Accepted when the human approves `contract`. `docs/approvals.md` has no `stories` or `contract` line for SAH-36; work proceeds under DEC-014, DEC-015 and DEC-021 on the business analyst's proposed answers (OQ-36-1 to OQ-36-13).
 Deciders: Ganesh (human), tech-lead; recorded by solution-architect
 Related: `docs/requirements/SAH-36.md`, `docs/stories/SAH-36.md`, DEC-021, ADR-012 (D1 dose reads in `GET /admissions`, D3 `SafetyCounts`), ADR-007 (D5 `EscalationClock`, D8 banner and polling, D12 record access, R1 change token), ADR-009 (D2 allergy status, D7 pharmacist-list record access, D9 `PatientClinicalPort`), ADR-006 (vitals, `vitalsDue` rule), ADR-005 (D3 counts-only polls, D6 REPEATABLE READ answers), DEC-014, DEC-015, DEC-017, `docs/api/ipd.yaml`
+Amended by: `docs/architecture/adr/ADR-015-ipd-patient-card-setup.md` (SAH-37; D6 and A3 amend D15: mobile on the list only through a separate explicit `PatientLookupPort` mobile read, OWNER and FRONT_DESK, when the card setup needs it; `findAllCurrent` stays free of mobiles)
 
 ## Context
 

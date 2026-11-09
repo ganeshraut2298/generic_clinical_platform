@@ -369,12 +369,12 @@ class CardFactsIT extends CardSetupSupport {
                     : "NURSE".equals(role) ? w.nurse().auth() : staff(clinic, role).auth();
             String text = raw(who, ADMISSIONS + "?cardFacts=all");
             assertThat(text).as(role).doesNotContain("Fever").doesNotContain("\"latestVitals\"");
-            assertType(problem(call(HttpMethod.GET, ADMISSIONS + "?cardFacts=all", who, null), 403), "forbidden");
+            forbiddenOf(call(HttpMethod.GET, ADMISSIONS + "?cardFacts=all", who, null));
         }
         // an owner token on a person who is no longer the owner
         Staff demoted = secondOwner(clinic);
         setMembershipRole(clinic, demoted.userId(), "NURSE");
-        assertType(problem(call(HttpMethod.GET, ADMISSIONS + "?cardFacts=all", demoted.auth(), null), 403), "forbidden");
+        forbiddenOf(call(HttpMethod.GET, ADMISSIONS + "?cardFacts=all", demoted.auth(), null));
         assertThat(count(clinic, "select count(*) from patient.record_access")).as("no record-access row").isEqualTo(access);
     }
 

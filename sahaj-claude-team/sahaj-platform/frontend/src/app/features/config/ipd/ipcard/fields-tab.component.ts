@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { IconComponent } from '../../../../shared/icon/icon.component';
+import { hasControlOrBidi, stripEdges } from '../../../ipd/card/card-label.rules';
 import { canMoveField, groupName, labelLocked } from '../../../ipd/card/card-setup.logic';
 import {
   CardCatalogueField,
@@ -27,6 +28,8 @@ interface FieldRow {
   labelLocked: boolean;
   canUp: boolean;
   canDown: boolean;
+  /** Message under the label box (the server's, else the browser's once the box was left); null when none. */
+  message: string | null;
 }
 
 interface FieldGroup {
@@ -55,6 +58,7 @@ export class CardFieldsTabComponent {
   protected readonly groups = computed<FieldGroup[]>(() => {
     const e = this.store.editor();
     const c = this.store.catalogue();
+    const messages = this.store.labelMessages();
     if (!e || !c) {
       return [];
     }
@@ -70,6 +74,7 @@ export class CardFieldsTabComponent {
           labelLocked: labelLocked(c, field.key),
           canUp: canMoveField(e, c, field.key, -1),
           canDown: canMoveField(e, c, field.key, 1),
+          message: messages.get(field.key) ?? null,
         };
       }),
     }));
@@ -89,12 +94,15 @@ export class CardFieldsTabComponent {
     this.store.setLabel(key, (event.target as HTMLInputElement).value);
   }
 
-  /** On leaving the box the label is trimmed (an empty label keeps the standard name). */
+  /**
+   * When the box is left the label is stripped at both ends (an empty label keeps the standard name). A label
+   * with a control or text-direction character is left as typed, so the message can tell the owner.
+   */
   protected onLabelDone(key: CardFieldKey, event: Event): void {
     const box = event.target as HTMLInputElement;
-    const trimmed = box.value.trim();
-    box.value = trimmed;
-    this.store.setLabel(key, trimmed);
+    const done = hasControlOrBidi(box.value) ? box.value : stripEdges(box.value);
+    box.value = done;
+    this.store.setLabel(key, done);
   }
 
   protected onDragStart(event: DragEvent, key: CardFieldKey, row: HTMLElement): void {

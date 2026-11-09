@@ -28,6 +28,10 @@ In scope (everything the mockup's Patient card section shows, except what is lis
 9. The locked safety fields and sections of the mockup (rule 9), enforced by the server.
 10. The Admitted cards using the published setup: layouts Compact, Standard and Expanded, the sections, fields, labels and actions chosen; the default "Cards per row"; the owner-only "Customize card" button.
 
+Scope notes added by the release audit (DEC-032, 9 Nov 2026):
+- The inline error line under a label box is a state the Patient card mockup does not draw. It reuses the mockup's existing error style (`.ferr`) and was approved by the human on 9 Nov 2026 (DEC-032).
+- V15 (rule 22) is stricter than the mockup and was not in the original stories. It was approved by the human on 9 Nov 2026 (DEC-032).
+
 Out of scope (each is a separate story or a human decision):
 - **Clinic setup → Roles and access and ward scoping** (OQ-33-2, OQ-30-3). The mockup's patient-scope switches (All / In their wards / Assigned to them), the data matrix (Hidden, View, Edit per role) and the action matrix are not built. Who sees which data and which action is the **fixed rule** of rule 11, which only narrows what the server already allows. The button "Change who can use each action" and the scope notice are not shown. Nothing here changes access control.
 - **Break-glass / Emergency access** (SAH-34) and its card flag.
@@ -60,6 +64,7 @@ Out of scope (each is a separate story or a human decision):
 19. **Tenant and privacy.** One clinic never reads or changes another clinic's setup (row-level security). The setup holds no patient data. The preview and the cards write no record-access rows beyond what SAH-36 already writes (none for the list, DEC-021).
 20. **Vital tile marks.** A tile outside the normal range carries the word "Check" or "Critical" as well as colour. The server decides the mark from the approved SAH-30 rule, never from a new limit and never in the browser (OQ-37-11).
 21. **Wording and format.** Plain English, sentence case; dates as 24 Oct 2026, times as 11:05 AM IST; texts from the mockup are kept; changed or new texts are listed in the story and OQ-37-8.
+22. **Field names stay distinct (V15; added by DEC-032, human approved 9 Nov 2026).** A label may not match, ignoring case and extra spaces, the standard name of any other card field or the label of another field in the same setup; Save draft and Publish are refused with "This name is already used by another field." and nothing is stored. A label equal to the field's own standard name is allowed and counts as no change. The screen shows label errors (control or text-direction character, over 40 characters, duplicate name) under the label box before anything is sent, and the server checks the same rules again. Reason: two headings called "Allergies" on a ward screen, one of them not the allergy, is a misreading risk. Stored drafts and versions are not rewritten; the owner meets the message at the next Save draft or Publish.
 
 ## Patient-safety and privacy points
 - **Locked safety fields** (rule 9) are enforced by the server on every save and publish, and again when the card is read: if a stored setup is missing a locked item, the server adds it back. The screen shows them with the pill "Safety · always on" (green, lock icon); the name shows "Required".

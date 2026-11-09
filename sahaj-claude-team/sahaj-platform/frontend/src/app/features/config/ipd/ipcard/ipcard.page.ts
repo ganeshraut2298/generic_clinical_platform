@@ -1,10 +1,15 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   HostListener,
+  Injector,
+  afterNextRender,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -56,6 +61,10 @@ const TABS: readonly { key: Tab; label: string }[] = [
 export class IpCardPage implements LeaveAware {
   protected readonly store = inject(CardSetupStore);
   private readonly dialog = inject(MatDialog);
+  private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
 
   protected readonly tabs = TABS;
   protected readonly tab = signal<Tab>('layout');
@@ -84,6 +93,38 @@ export class IpCardPage implements LeaveAware {
         return null;
     }
   });
+
+  constructor() {
+    // The status bar is one row or two; the sticky preview starts just below it (D-8).
+    effect((onCleanup) => {
+      const bar = this.bar()?.nativeElement;
+      if (!bar || typeof ResizeObserver === 'undefined') {
+        return;
+      }
+      const apply = () =>
+        this.host.nativeElement.style.setProperty('--pcbar-h', `${bar.offsetHeight}px`);
+      const observer = new ResizeObserver(apply);
+      observer.observe(bar);
+      apply();
+      onCleanup(() => observer.disconnect());
+    });
+    // The first label box in error gets the focus after a refused Save draft or Publish (G-1, G-2); the
+    // Fields tab opens first when the owner is on another tab.
+    effect(() => {
+      const request = this.store.labelFocus();
+      if (request === null) {
+        return;
+      }
+      this.tab.set('fields');
+      afterNextRender(
+        () =>
+          this.host.nativeElement
+            .querySelector<HTMLInputElement>(`[data-label="${request.key}"]`)
+            ?.focus(),
+        { injector: this.injector },
+      );
+    });
+  }
 
   protected selectTab(tab: Tab): void {
     this.tab.set(tab);
@@ -124,6 +165,7 @@ export class IpCardPage implements LeaveAware {
     }
     return this.dialog
       .open<CardLeaveDialogComponent, void, boolean>(CardLeaveDialogComponent, {
+        panelClass: 'sheet-panel',
         width: '420px',
         maxWidth: '100vw',
       })

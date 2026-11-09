@@ -4,8 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.sahaj.ipd.domain.card.CardSetup;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
@@ -22,13 +27,30 @@ final class CardSetupJson {
 
     private static final ObjectMapper LENIENT = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private static final ObjectMapper STRICT = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true)
-            .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true)
-            .configure(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES, true)
-            .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
+    private static final ObjectMapper STRICT = strict();
 
     private CardSetupJson() {
+    }
+
+    /**
+     * The request reader: the contract says boolean, integer and string, so a value of another JSON type is refused
+     * and never coerced ({@code "on":"true"}, {@code "on":1}, {@code "cardsPerRow":"3"}, {@code "cardsPerRow":3.0},
+     * {@code "label":5}); code review SAH-37, finding 7.
+     */
+    private static ObjectMapper strict() {
+        ObjectMapper mapper = JsonMapper.builder()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true)
+                .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true)
+                .configure(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES, true)
+                .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true)
+                .configure(DeserializationFeature.ACCEPT_FLOAT_AS_INT, false)
+                .configure(MapperFeature.ALLOW_COERCION_OF_SCALARS, false)
+                .build();
+        mapper.coercionConfigFor(LogicalType.Textual)
+                .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+                .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
+                .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail);
+        return mapper;
     }
 
     /** The setup as the text stored in {@code jsonb}. */

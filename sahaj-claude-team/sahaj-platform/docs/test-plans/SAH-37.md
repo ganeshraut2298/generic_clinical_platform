@@ -2,7 +2,7 @@
 
 Story: `docs/stories/SAH-37.md` (66 acceptance criteria, numbered 1-66 through the file). Decisions: ADR-015, `docs/architecture/SAH-37-patient-card-setup.md`, `docs/database/SAH-37.md`, DEC-027, DEC-028.
 Mockup screen: Clinic setup → Patient card (screen-map row 29), used on IPD → Admitted (SAH-36).
-Written 9 Nov 2026 by qa-engineer (resume run). Status: see "Results" at the end; this plan is updated as the runs finish.
+Written 9 Nov 2026 by qa-engineer; finished in resume 2 (18:56). Status: see "Results" at the end. Verdict after the fix-pass re-run (9 Nov 2026, 21:55): **PASS, no open defect.** D1, D2 and D3 are closed and re-tested (section "Re-run after the fix pass" at the end).
 
 ## What is tested where
 
@@ -24,7 +24,7 @@ IT = integration test (class.method, shortened to the part of the name that tell
 | --- | --- | --- | --- |
 | 1 | Entry after Discharge, text, chips, tips; IPD Off: not in menu, API 403 `module-off` | E2E "AC1 the entry sits after Discharge...", "AC1 IPD Off..."; E2E "AC1 IPD Off: the section shows the plan notice and asks the server for nothing"; IT CardSetupIT.whenIpdIsOffTheSetupAndEveryWriteAre403ModuleOff | pass |
 | 2 | Never published: v1 teal pill, no unpublished changes, Reset and Publish disabled, v1 in the list | E2E "AC2 ..."; IT CardSetupIT.aClinicThatNeverPublishedSeesTheStandardCardAsV1AndNothingIsStored | pass |
-| 3 | A change only changes the draft; amber pill counts the changed parts; Publish enabled; staff still see the live card | E2E "AC3 a change only changes the draft..."; IT CardSetupIT.saveDraftStoresItForTheOwnerWithRevisionAndChangedParts...; CardFactsIT.thePublishedSetupTravelsInTheListAnswer... (drafts are not on the ward) | **fail (1 case): see Defect D2** (pill shows "2 changes" for a section move alone; E2E "AC3 WITNESS") |
+| 3 | A change only changes the draft; amber pill counts the changed parts; Publish enabled; staff still see the live card | E2E "AC3 a change only changes the draft..."; IT CardSetupIT.saveDraftStoresItForTheOwnerWithRevisionAndChangedParts...; CardFactsIT.thePublishedSetupTravelsInTheListAnswer... (drafts are not on the ward) | pass after the fix pass (D2 closed: E2E "AC3 WITNESS" passes at both sizes) |
 | 4 | Save draft stored on the server, toast, "saved 11:05 AM", history line; leave warning | E2E "AC4 Save draft...", "AC4 leaving with unsaved edits asks first...", "AC4 no warning when nothing was changed"; IT CardSetupIT.saveDraftAndPublishWriteOneHistoryLineEach... | pass |
 | 5 | Discard removes the draft, toast; none: no Discard | E2E "AC5 ..."; IT CardSetupIT.discardRemovesTheDraftWritesNoHistoryAndWithNoDraftIsA200 | pass |
 | 6 | Reset to default makes the draft standard; disabled when equal | E2E "AC6 ..."; IT CardSetupIT.aDraftThatEqualsTheLiveSetupRemovesTheDraftAndWritesNoHistoryLine (the server side of "equal") | pass |
@@ -54,7 +54,7 @@ IT = integration test (class.method, shortened to the part of the name that tell
 | 30 | A safety field moves only into a section that is on; into the header it sits after the name | E2E "AC30 ..."; IT CardSetupIT.aSafetyFieldMayMoveToAnotherSectionOnlyWhileThatSectionIsOn; everyRuleOfTheValidator... | pass |
 | 31 | Label trimmed, 40 characters, plain text, empty = standard name | E2E "AC31 ..."; IT CardSetupIT.theLabelLimitIs40CharactersNotBytesAndMarkupIsKeptAsTypedAndTrimmed | pass |
 | 32 | Safety fields and the name cannot be renamed (box disabled; server refuses a changed label) | E2E "AC27 AC29 AC32 ..."; IT CardSetupIT.everyRuleOfTheValidator... (label of a locked field) | pass |
-| 33 | A role does not get a field it may not see; Mobile only to OWNER and FRONT_DESK; preview "Hidden for <role>" | IT CardFactsIT.factsSwitchedOnAreSentToTheRolesThatMaySeeThem...; aFactIsAbsentWhenItsFieldIsOff...; theCardAbilitiesAndTheVisibleGroups...; E2E "AC46 AC48 ...", "AC56 a Nurse card has no mobile..." ; **the Mobile value: CardFactsIT.theMobileValueIsTheNumberOfThePatient... FAILS, Defect D1** | **fail (1 case): D1** |
+| 33 | A role does not get a field it may not see; Mobile only to OWNER and FRONT_DESK; preview "Hidden for <role>" | IT CardFactsIT.factsSwitchedOnAreSentToTheRolesThatMaySeeThem...; aFactIsAbsentWhenItsFieldIsOff...; theCardAbilitiesAndTheVisibleGroups...; E2E "AC46 AC48 ...", "AC56 a Nurse card has no mobile..." ; **the Mobile value: CardFactsIT.theMobileValueIsTheNumberOfThePatient... FAILS, Defect D1** | pass after the fix pass (D1 closed: the Mobile value test is green) |
 | 34 | Vitals tiles switchable; Early warning locked; no vitals: "No vitals recorded yet", "Last recorded" amber "Not recorded" | IT CardFactsIT.aBlankReasonShowsAsUnderEvaluationAndAPatientWithNoVitalsHasNullTilesAndNoScore (the data side: null tiles, no score); E2E "AC54 AC55 ..." (3 layouts) and the unit test patient-card.layouts.spec.ts (the words) | pass |
 | 35 | Non-owner 403; unknown key / duplicate / wrong section / missing locked field 400; stored setup lacking a locked item is repaired on read | IT CardSetupIT.everyRuleOfTheValidator...; CardSetupStoredIT.aStoredSetupThatLacksLockedItemsIsRepairedOnEveryRead...; aStoredDraftWithMissingLockedItemsIsRepairedForTheOwnerOnly; E2E "AC10 AC25 AC35 ..." | pass |
 | 36 | Roles and accessible names: tabs, switches `aria-checked`, move buttons, label boxes, live region | E2E "AC24 AC36 ...", "AC36 roles and names ..." | pass |
@@ -77,7 +77,7 @@ IT = integration test (class.method, shortened to the part of the name that tell
 | 53 | Failed patient load: example patient and notice | E2E "AC53 ..." | pass |
 | 54 | Admitted cards follow the published setup (layout, sections, order, labels, on fields, actions, cards per row); v1 when never published | IT CardFactsIT.thePublishedSetupTravelsInTheListAnswer...ReachesEveryRoleAtTheNextRead; theDefaultAnswerIsTheSah36FactsPlusTheCardSetup...; E2E "AC54 AC55 no setup ever published ...", "AC54 AC55 AC58 the published layout <layout>" (3), "AC20 AC54 ..." | pass |
 | 55 | Standard, Compact, Expanded drawn as specified | E2E "AC54 AC55 AC58 the published layout compact / standard / expanded" | pass |
-| 56 | A role gets only its groups; FRONT_DESK never gets vitals, allergies, diagnosis; NURSE / DOCTOR never billing; Mobile only OWNER and FRONT_DESK | IT CardFactsIT.factsSwitchedOnAreSentToTheRoles...; theDefaultAnswer...; aFactIsAbsentWhen...; AdmittedCardsIT.aFrontDeskAnswerHasNoClinicalKey... (rescoped, see below); E2E "AC56 ..." (2) | pass for the keys and groups; **the Mobile value for OWNER / FRONT_DESK is empty: D1** |
+| 56 | A role gets only its groups; FRONT_DESK never gets vitals, allergies, diagnosis; NURSE / DOCTOR never billing; Mobile only OWNER and FRONT_DESK | IT CardFactsIT.factsSwitchedOnAreSentToTheRoles...; theDefaultAnswer...; aFactIsAbsentWhen...; AdmittedCardsIT.aFrontDeskAnswerHasNoClinicalKey... (rescoped, see below); E2E "AC56 ..." (2) | pass (D1 closed: the Mobile value reaches OWNER and FRONT_DESK only) |
 | 57 | Locked fields always on the card of OWNER, DOCTOR, NURSE; Allergies / Early warning words; repaired on read | IT CardFactsIT.theDefaultAnswer... (locked lines in the default answer); CardSetupStoredIT repair tests; E2E "AC57 AC55 Compact always shows the allergy ..." | pass |
 | 58 | Tile marks "Check" / "Critical" with a title, from the SAH-30 points | IT CardFactsIT.theTileMarksFollowTheSah30PointsAtEveryBandEdgeAndTheDiastolicIsNeverMarked (41 band edges); theMarkReachesTheCardOfADoctor...; E2E "AC54 AC55 AC58 ..." | pass |
 | 59 | Table view unchanged; search, filter, paging apply | E2E "AC59 the Table view is unchanged by the setup"; existing admitted-cards.spec.ts | pass |
@@ -105,7 +105,7 @@ Note on AC66: the "previous user" part is only exercised through the 403-clears-
 | Role read again from the membership: a nurse moved to front desk loses the clinical facts at once; an owner token of a demoted owner gets 403 | CardFactsIT.factsSwitchedOn...; cardFactsAll... | pass |
 | Front desk raw JSON holds no clinical key even with every fact switched on | CardFactsIT.factsSwitchedOn...; AdmittedCardsIT.aFrontDeskAnswer...; ...afterAMerge | pass |
 | A label with markup is kept as typed | CardSetupIT.theLabelLimitIs40Characters...MarkupIsKeptAsTyped; E2E "AC31" | pass |
-| Revision restarts at 1 (the "revision hole") | CardSetupStoredIT.knownGapAStaleEditorAtRevision1CanOverwrite... (documents the gap, passes while the gap exists); aStaleEditorIsRefusedWhenTheRecreatedDraftHasAnotherBaseVersion... | see Defect D3 |
+| Revision restarts at 1 (the "revision hole") | CardSetupStoredIT.knownGapAStaleEditorAtRevision1CanOverwrite... (documents the gap, passes while the gap exists); aStaleEditorIsRefusedWhenTheRecreatedDraftHasAnotherBaseVersion... | pass after the fix pass: flipped to `CardSetupStoredIT.aStaleEditorHoldingTheOldRevisionIsRefused...` (409 on Save draft and Publish) (D3 closed) |
 | Query plans of the section 8 statements on a clinic of 300 admitted patients | CardSetupPlansIT (output below) | pass |
 
 ## Existing tests changed
@@ -119,7 +119,7 @@ Note on AC66: the "previous user" part is only exercised through the 403-clears-
 - Fix (test side): `sah36-list.ts` `abilitiesOf` gains `deposit` and `visibleGroups`, new `standardCardSetup()` (the Sahaj standard card v1, resolved by `sah37-world.ts`), `upgradeList` and `sah31-world.ts` `listOf` send `cardSetup`. That fixed 30 of the 32.
 - Two tests needed their expectation changed because the design changed (DEC-027): "the card shows, in order ..." now also expects the locked `Allergies` label last in the details; "the answer holds no clinical key" now removes `cardSetup` (section and field names are setup text) before it searches the forbidden keys, and also asserts `card.visibleGroups` is `patient, contact, billing` for the front desk. The privacy intent is kept.
 
-## Defects found (test left failing, product code not changed)
+## Defects found in the first run (all three CLOSED by the fix pass and re-tested on 9 Nov 2026, 20:45 to 21:50: D1 by `PatientLookupPort.mobilesOf`, D2 by the order-independent fields comparison, D3 by the clock-based revision token)
 
 | ID | Owner | Where | What |
 | --- | --- | --- | --- |
@@ -354,3 +354,118 @@ Updated at the end of the run; see the handoff block in `docs/handoffs/SAH-37.md
 - **CardFactsIT failure (a)** (`factsSwitchedOnAreSentToTheRoles...`, reported at line 197 by the 12:08 run): a **test mistake**, already corrected by the 12:09 edit of the test (the comment above the last Mobile assertion states the rule the product follows: the token role and the membership role must both be a contact-group role, so a nurse moved to the front desk gets no Mobile until she signs in again). In the `validate backend` run that started at 17:19 the test passes (CardFactsIT: 11 run, 1 failure, and the one failure is D1).
 - **CardFactsIT failure (b)** (the owner's mobile was "" instead of the number, line 218): a **product defect**, D1 above, confirmed again: `PatientLookup.findAllCurrent` still builds `PatientSummary` with a `null` mobile (file unchanged since 7 Nov), `AdmittedCards.patients` copies that `null`. The test stays red, product code is not touched.
 
+
+### Backend run (`node scripts/validate.mjs backend`, started 17:19, finished 18:18)
+
+| Number | Value |
+| --- | --- |
+| Integration tests run (failsafe, whole project) | 1,756 |
+| Failures | 5 |
+| Errors | 2 |
+| Skipped | 26 (the existing precondition skips, none of them SAH-37) |
+| SAH-37 integration tests in that run | CardSetupIT 26, CardSetupStoredIT 10, CardFactsIT 11, CardSetupPlansIT 1 (48 new) and AdmittedCardsIT 13 (changed) |
+
+Of the 7 not-passing results, **1 is a real product defect (D1)** and **6 are a side effect of the run itself**: at 17:38 somebody started the dev server (`mvn spring-boot:run`, now the process on port 8080) while this run was still in progress, and that rebuilt the `backend/target` folder under the running tests. `DoseWithoutPepperIT` (2 errors: "class path resource TenantProbeController.class does not exist") and `PackagedJarDevToolsIT` (4 failures: "The packaged jar does not exist") are existing SAH-32 / SAH-8 tests that touch nothing of SAH-37. Re-run alone at 18:2x with the backend lock (`mvn verify -Dit.test=DoseWithoutPepperIT,PackagedJarDevToolsIT,CardFactsIT`): DoseWithoutPepperIT 2 of 2 pass, PackagedJarDevToolsIT 5 of 5 pass, CardFactsIT 11 run and 1 failure (D1 again, the same assertion at line 218, "[owner] expected 7811189799 but was empty"). The files of the first run in `backend/target/failsafe-reports` for the classes that ran before 17:38 were lost with the folder; the failure list above is taken from the Maven log, which prints failures only.
+
+Verdict of the backend gate: **not green, because of D1 only.** Nothing else fails.
+
+### Browser run (production build, mocked API), 18:20 to 18:48
+
+| Run | Tests | Result |
+| --- | --- | --- |
+| `patient-card-setup.spec.ts`, run 1 of 3 (phone-360 and desktop-1440, 4 workers) | 126 | 121 passed, 3 skipped by design, 2 failed (D2 witness, both sizes) |
+| run 2 of 3 | 126 | same: 121 / 3 / 2 |
+| run 3 of 3 | 126 | same: 121 / 3 / 2 |
+| existing IPD specs once (admitted-cards, nursing, safety, mar, medicine-round, discharge, bed-transfer, emergency; both sizes) | 1,104 | 1,104 passed, 0 failed (20.5 min) |
+
+The 3 skips are the same in every run: the mouse drag at 360 px (a phone uses the arrows), "AC20 AC54 the published Cards per row is the opening grid" at 360 px (a phone shows one card per row whatever is published, AC64), and "AC64 a phone shows one card per row" at 1440 px (phone only). The two failures are the same test, "AC3 WITNESS", in all three runs: no flake was seen in the new spec, so no test-side change was needed in this resume.
+
+### Gate (9 Nov 2026, 18:20 to 19:00)
+
+| Check | Result |
+| --- | --- |
+| `node scripts/validate.mjs backend` (17:19 run) plus the targeted re-run | 1,756 integration tests; 1 real failure (D1, `CardFactsIT` line 218); the other 6 not-passing results pass on re-run (see above). **Not green because of D1.** |
+| `npm --prefix frontend test -- --watch=false` | first run 18:48: 4 failed, 2,403 passed, all four in `admitted.model.spec.ts` (`cardFlags` and `foldFlags`: the shared fixture `ROW` came back with an escalation and EWS 8 "High"; no source file of that spec or fixture changed since 10:38, and the 17:17 run of the same code passed). Re-run 18:56: **163 files, 2,411 tests, all passed.** Looks like an order-dependent shared fixture in `admitted.fixtures.ts`; recorded for the angular-developer as a possible flake, not a SAH-37 failure |
+| `npm --prefix frontend run lint` | passed ("All files pass linting") |
+| `npm --prefix frontend run build` | passed (18:20) |
+| `node scripts/validate.mjs frontend` | **fails, known and not a code failure**: its test step passes `--browsers=ChromeHeadless`, and the Angular Vitest builder refuses it ("The browsers option requires @vitest/browser-playwright ..."). `scripts/` is human-owned; lint passes in that run, and the same tests pass without the flag |
+| `node scripts/validate.mjs docs` | **fails, known**: `docs/stories/ADM-2.md: name files by story ID, e.g. SAH-12.md` (an old file, not SAH-37) |
+
+### Review items that touch QA (from `docs/reviews/SAH-37-code.md` and `SAH-37-security.md`)
+
+- Code review #13 / security finding 2: after the java-developer makes the draft revision never repeat, flip `CardSetupStoredIT.knownGapAStaleEditorAtRevision1CanOverwrite...` into the refusing assertion (the test is written to go red when the hole closes).
+- Security finding 4 (a separate port method for mobiles) is also the fix for D1. When it is in, `CardFactsIT.theMobileValueIsTheNumberOf...` should go green with no change; the nurse and doctor assertions (no `mobile` key, no number in the raw JSON) must stay green.
+- Security finding 5 (Low, backlog, QA-owned): `frontend/e2e/sah37-world.ts` (lines 229-277) and `patient-card-setup.spec.ts` use Indian personal names and 10-digit mobile numbers in a valid series. They are mocked and follow the convention of the other worlds; to be replaced by clearly fictional names and numbers that cannot be dialled in all e2e worlds in one later pass (not changed now, so the green runs above stay valid).
+
+## Re-run after the fix pass (9 Nov 2026, from 20:37)
+
+Changes in the product that the tests follow: the draft revision is an opaque clock-based token (about 1.79e15, never repeats, a save equal to the stored draft keeps it); the 403 text of every card-setup operation and of `cardFacts` is the shared "You do not have access to this."; `PatientLookupPort.mobilesOf` gives the Mobile value; the publish history line carries `factsOn` (keys of the sensitive facts the card switches on).
+
+### Test changes (qa-engineer, `backend/src/test/java/com/sahaj/platform/it/`)
+
+| Change | Where |
+| --- | --- |
+| The known-gap test is flipped: after a discard and re-create on the same base, a stale editor gets 409 `card-setup-changed` on Save draft and on Publish, nothing is stored, the other owner's draft is intact, the current token is accepted, and the token never repeats over four more discard-and-recreate cycles | `CardSetupStoredIT.aStaleEditorHoldingTheOldRevisionIsRefusedOnSaveAndPublishAfterADiscardAndRecreateOnTheSameBase` (renamed from `knownGap...`) |
+| The "another base version" test reads the stale token from the answer | `CardSetupStoredIT.aStaleEditorIsRefusedWhenTheRecreatedDraftHasAnotherBaseVersion...` |
+| Ten tests that hard-coded revision 1, 2, 3 now read the token from the previous answer (`revisionOf(answer)` in `CardSetupSupport`); counts became "a new token" (greater than the old one) | `CardSetupIT` (save draft, equal-to-live, discard, publish, stale revision, discarded by another owner, other owner publishes, label limit, locked fields, history lines) and `CardSetupStoredIT` (repair on read, update of the draft) |
+| Every 403 check of the card setup and of `cardFacts=all` now also asserts the shared text (new helper `forbiddenOf`) | `CardSetupIT` (owner-only writes, list roles, Read-only role order), `CardFactsIT` |
+| The publish history line has the extra key `factsOn` (empty for the standard card) | `CardSetupIT.saveDraftAndPublishWriteOneHistoryLine...` |
+| New: the publish line names the sensitive facts as keys only, in catalogue order (diagnosis, bp, mobile), never a label (security finding 1b) | `CardSetupIT.thePublishHistoryLineNamesTheSensitiveFactsSwitchedOnAsKeysOnly` |
+| New: saving a draft equal to the stored draft keeps the token, the saver and the time and writes no second history line, also for a second owner (security finding 3) | `CardSetupIT.savingAnUnchangedDraftAgainKeepsTheTokenAndWritesNoSecondHistoryLine` |
+
+### Targeted integration run (backend lock held, 20:38 to 20:45)
+
+`mvn verify -Dit.test=CardFactsIT,CardSetupStoredIT,CardSetupIT,AdmittedCardsIT`: **62 run, 0 failures, 0 errors, 0 skipped, BUILD SUCCESS.** AdmittedCardsIT 13, CardFactsIT 11, CardSetupIT 28 (26 + 2 new), CardSetupStoredIT 10.
+- **D1 closed:** `CardFactsIT.theMobileValueIsTheNumberOfThePatientForOwnerAndFrontDeskWhenMobileIsOnAndOfferedToOwnerInThePreview` passes; the nurse and doctor assertions (no `mobile` key, no number in the raw JSON) stay green.
+- **D3 closed:** the revision-restart hole is shut for Save draft and for Publish.
+
+### Full backend gate (`node scripts/validate.mjs backend`, 20:41 to 21:21, backend lock held)
+
+**Exit 0.** Unit tests 3,495 run, 0 failed. Integration tests 1,758 run, 0 failures, 0 errors, 26 skipped (the existing precondition skips, none of them SAH-37). The 1,758 are the 1,756 of the earlier run plus the 2 new CardSetupIT tests. CardSetupPlansIT (1) ran and passed. No class-not-found or rebuild corruption this time (the human's dev server on port 8080 did not rebuild `backend/target`).
+
+### Browser runs after the fix pass (production build rebuilt 21:23, frontend lock held, mocked API)
+
+| Run | Tests | Result |
+| --- | --- | --- |
+| "AC3 WITNESS: moving a section alone is one change" (both projects) | 2 | 2 passed: **D2 closed** |
+| `patient-card-setup.spec.ts`, run 1 of 3 (phone-360 and desktop-1440) | 126 | 123 passed, 3 skipped by design, 0 failed |
+| run 2 of 3 | 126 | 123 / 3 / 0 |
+| run 3 of 3 | 126 | 123 / 3 / 0 |
+| `work-area-width.spec.ts`, 3 runs (project desktop-1440; the phone-360 copies skip by design) | 8 per run | 8 passed, 8 skipped, 0 failed, three times |
+| `layout-matrix.spec.ts`, project layout-1920 | 12 | 12 passed (it did not depend on the old centred layout) |
+| `layout-matrix.spec.ts`, all 7 projects | 84 | 84 passed |
+
+The 3 skips in patient-card-setup are the same as before (mouse drag at 360 px, the opening grid at 360 px, the phone-only test at 1440 px). The Save draft / Discard steps of the existing specs were re-checked against the angular-developer's change (Save draft disabled when nothing is to be saved): they pass.
+
+Mutation check of the new width spec (not committed): the old rule `max-width: 1680px; margin: 0 auto` was injected into a temporary copy of the spec. The 1920 and 2560 tests and the "never a centred column" test failed, and the 1440 and 1680 tests passed, as designed. So the width spec does detect the bug.
+
+### Existing IPD browser specs, once (21:30 to 21:50)
+
+`admitted-cards`, `safety`, `nursing`, `emergency`, `medicine-round`, `mar`, `discharge`, `bed-transfer` at 360 and 1440 px: **1,104 run, 1,104 passed, 0 failed, 0 skipped** (18.3 min).
+
+### Frontend (frontend lock held)
+
+| Check | Result |
+| --- | --- |
+| `npm --prefix frontend test -- --watch=false` | 165 files, **2,439 tests passed**, 0 failed (the earlier flake in `admitted.model.spec` did not appear) |
+| `npm --prefix frontend run lint` | passed |
+| `npm --prefix frontend run build` | passed |
+| `validate frontend` / `validate docs` | not re-run in this pass; the known script flag and the ADM-2.md file name are not code failures (see above) |
+
+### Coverage of the fix pass: finding to test to result
+
+| Finding | Test | Result |
+| --- | --- | --- |
+| D1, security 4 (Mobile value) | CardFactsIT.theMobileValueIsTheNumberOfThePatientForOwnerAndFrontDeskWhenMobileIsOnAndOfferedToOwnerInThePreview (nurse and doctor: no key, no number) | pass |
+| D2 (section move is one change) | E2E "AC3 WITNESS" (2 projects) | pass |
+| D3, code 1, security 2 (revision never repeats) | CardSetupStoredIT.aStaleEditorHoldingTheOldRevisionIsRefusedOnSaveAndPublishAfterADiscardAndRecreateOnTheSameBase; ...AnotherBaseVersion... | pass |
+| Contract A1 (shared 403 text) | CardSetupIT / CardFactsIT `forbiddenOf` on every write, list and `cardFacts=all` 403 | pass |
+| Security 1b (`factsOn`) | CardSetupIT.thePublishHistoryLineNamesTheSensitiveFactsSwitchedOnAsKeysOnly; ...WriteOneHistoryLineEach... | pass |
+| Security 3 (no history line for an unchanged draft) | CardSetupIT.savingAnUnchangedDraftAgainKeepsTheTokenAndWritesNoSecondHistoryLine | pass |
+| Code 3 (Save draft disabled when nothing to save) | patient-card-setup.spec.ts (existing Save draft and Discard steps) | pass |
+| Code 11 (inert preview) | E2E "AC47 AC51 the preview card is inert" | pass |
+
+### Notes
+
+- The browser test of the revision token uses the mock server of `sah37-world.ts`, whose draft revision still counts 1, 2, 3. That is fine for what the browser tests prove (the screen sends back what it received). The angular-developer added unit specs with 1790000000000001; the large-number path is not driven in a browser here.
+- Security finding 5 (fictional names in the e2e data) is still a backlog item and untouched.

@@ -51,4 +51,14 @@ public interface PatientLookupPort {
      * {@link #findAll} do not follow a merge.
      */
     Map<UUID, PatientSummary> findAllCurrent(UUID tenantId, Collection<UUID> patientIds);
+
+    /**
+     * SAH-37 (ADR-015 D6; security review SAH-37 finding 4): the mobile numbers of many patients in one batch, keyed by
+     * the id asked for, and only through this explicit call, so that {@link #findAllCurrent} stays free of mobile
+     * numbers for every other caller. A merged-away record answers with the number of the record it was merged into,
+     * the same resolution as {@link #findAllCurrent}. Unknown or other-clinic ids, and patients with no number, are
+     * absent. The caller decides whether its role may see a mobile number; call this only when the number is shown
+     * (never log the answer).
+     */
+    Map<UUID, String> mobilesOf(UUID tenantId, Collection<UUID> patientIds);
 }

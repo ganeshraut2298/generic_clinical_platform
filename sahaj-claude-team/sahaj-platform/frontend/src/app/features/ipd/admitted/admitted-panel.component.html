@@ -69,6 +69,7 @@
       <button
         type="button"
         title="Cards"
+        aria-label="Cards"
         data-view="cards"
         [attr.aria-pressed]="state.view() === 'cards'"
         (click)="setView('cards')"
@@ -78,6 +79,7 @@
       <button
         type="button"
         title="Table"
+        aria-label="Table"
         data-view="table"
         [attr.aria-pressed]="state.view() === 'table'"
         (click)="setView('table')"

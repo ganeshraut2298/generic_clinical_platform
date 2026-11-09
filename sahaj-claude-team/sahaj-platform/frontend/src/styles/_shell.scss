@@ -2,9 +2,9 @@
 // 1000 px the sidebar is a drawer. Global (scoped under `.shell`) because the shell exists once and
 // its rules are too long for a component style budget. The work area is in `_console.scss`.
 .shell {
-  // Widest the page content gets. The top bar lines up with it (see `.topbar`), so on a very wide
-  // screen the bar and the page share one left edge instead of the page floating away from it.
-  --page-max: 1680px;
+  // The work area is fluid (mockup, last rule: `.axws, .cs main.page { max-width: none }`). It has no
+  // maximum width: a cap that only bites when the rail is collapsed (work area wider than the cap) made
+  // the content jump to a centred column with wide empty bands whenever the rail was toggled.
   --rail-w: 60px;
 
   display: grid;
@@ -310,7 +310,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
-    padding: 7px max(20px, calc((100% - var(--page-max)) / 2 + 20px));
+    padding: 7px 20px;
     border-bottom: 1px solid var(--line);
     background: color-mix(in srgb, var(--bg) 82%, transparent);
     -webkit-backdrop-filter: blur(14px);

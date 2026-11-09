@@ -5,6 +5,7 @@ import { ApiError } from '../../../../core/http/problem-detail';
 import { ShellStore } from '../../../../core/shell/shell.store';
 import { AdmissionsApi } from '../../../ipd/admissions.api';
 import { SAMPLE_AS_OF, SAMPLE_ID, SAMPLE_ROW, rowForGroups } from '../../../ipd/card/card-sample';
+import { labelProblems } from '../../../ipd/card/card-label.rules';
 import { CardSetupApi } from '../../../ipd/card/card-setup.api';
 import {
   EditResult,
@@ -18,6 +19,7 @@ import {
   groupsFor,
   hiddenCounts,
   hiddenText,
+  labelLocked,
   moveAction,
   moveActionBy,
   moveField,
@@ -68,7 +70,12 @@ export type Device = 'desktop' | 'tablet';
 export interface Problem {
   text: string;
   conflict: boolean;
+  /** Further server messages that belong to no label box (G-1); the banner lists them after `text`. */
+  more?: string[];
 }
+
+/** A server field path that names a label box: `setup.sections[2].fields[0].label`. */
+const LABEL_PATH = /^setup\.sections\[(\d+)\]\.fields\[(\d+)\]\.label$/;
 
 /**
  * State of Clinic setup → Patient card (SAH-37, key `ipcard`). One instance per page. It holds the last
@@ -99,6 +106,15 @@ export class CardSetupStore {
   private readonly serverParts = signal<CardChangedPart[] | null>(null);
   /** Polite announcement of a move (AC24); empty until then. */
   readonly announcement = signal('');
+
+  // ---- Label messages (G-1, G-2) ----
+  /** Boxes whose browser message may show: the owner left the box, or a submit found it in error. */
+  private readonly labelShown = signal<ReadonlySet<CardFieldKey>>(new Set());
+  /** Messages of the server's last 400, by field; they replace the browser's message and clear on a keystroke. */
+  private readonly labelServer = signal<ReadonlyMap<CardFieldKey, string>>(new Map());
+  private labelFocusCount = 0;
+  /** Asks the page to put the keyboard focus in a label box (first box in error after a submit). */
+  readonly labelFocus = signal<{ key: CardFieldKey; n: number } | null>(null);
 
   // ---- Preview ----
   readonly role = signal<CardRole>('NURSE');
@@ -141,10 +157,30 @@ export class CardSetupStore {
   readonly templates = computed(() => this.view()?.templates ?? []);
 
   // ---- What the editor holds ----
+  /** The canonical form of the browser needs the standard names (G-3). */
+  private readonly names = computed(() => this.catalogue() ?? undefined);
+  /** Every label problem of the editor now, by field, in body order (all rules of the design note 4.2). */
+  readonly labelProblems = computed(() => {
+    const e = this.editor();
+    const c = this.catalogue();
+    return e && c ? labelProblems(e, c) : new Map<CardFieldKey, string>();
+  });
+  /** The message to draw under each label box: the server's, else the browser's for boxes already left. */
+  readonly labelMessages = computed<ReadonlyMap<CardFieldKey, string>>(() => {
+    const out = new Map(this.labelServer());
+    const found = this.labelProblems();
+    for (const key of this.labelShown()) {
+      const message = found.get(key);
+      if (message !== undefined && !out.has(key)) {
+        out.set(key, message);
+      }
+    }
+    return out;
+  });
   readonly dirty = computed(() => {
     const e = this.editor();
     const l = this.live();
-    return !!e && !!l && !sameSetup(e, l.setup);
+    return !!e && !!l && !sameSetup(e, l.setup, this.names());
   });
   /** Edits made since the last answer of the server (not yet saved as a draft). */
   readonly unsaved = computed(() => {
@@ -153,26 +189,32 @@ export class CardSetupStore {
     if (!e || !l) {
       return false;
     }
-    return !sameSetup(e, this.serverDraft()?.setup ?? l.setup);
+    return !sameSetup(e, this.serverDraft()?.setup ?? l.setup, this.names());
   });
+  /**
+   * Save draft and Discard draft are offered while there are unsaved edits or a draft is stored on the
+   * server. A stored draft stays reachable even when the editor was edited back to equal the live setup
+   * (code review 37 #3): Save then sends the live setup, which makes the server remove the draft.
+   */
+  readonly draftActions = computed(() => this.unsaved() || this.serverDraft() !== null);
   readonly parts = computed<CardChangedPart[]>(() => {
     const e = this.editor();
     const l = this.live();
     if (!e || !l) {
       return [];
     }
-    return this.serverParts() ?? changedParts(e, l.setup);
+    return this.serverParts() ?? changedParts(e, l.setup, this.names());
   });
   readonly isDefault = computed(() => {
     const e = this.editor();
     const v = this.view();
-    return !!e && !!v && sameSetup(e, v.standard);
+    return !!e && !!v && sameSetup(e, v.standard, this.names());
   });
   /** "11:05 AM" while the editor is exactly the saved draft. */
   readonly savedAt = computed(() => {
     const d = this.serverDraft();
     const e = this.editor();
-    return d && e && sameSetup(e, d.setup)
+    return d && e && sameSetup(e, d.setup, this.names())
       ? (formatWhen(d.savedAt).split(', ').pop() ?? null)
       : null;
   });
@@ -289,6 +331,13 @@ export class CardSetupStore {
     this.view.set(view);
     this.editor.set(cloneSetup(view.draft?.setup ?? view.live.setup));
     this.serverParts.set(view.draft?.changedParts ?? null);
+    this.clearLabelMessages();
+  }
+
+  private clearLabelMessages(): void {
+    this.labelShown.set(new Set());
+    this.labelServer.set(new Map());
+    this.labelFocus.set(null);
   }
 
   /** A 403 clears everything this page holds (SAH-40); other failures keep the owner's edits. */
@@ -300,6 +349,7 @@ export class CardSetupStore {
       this.patientsFailed.set(false);
       this.serverParts.set(null);
       this.problem.set(null);
+      this.clearLabelMessages();
       this.snackBar.dismiss();
       this.loadError.set(isModuleOff(error) ? fallback : problemMessage(error, fallback));
       return;
@@ -388,12 +438,58 @@ export class CardSetupStore {
     }
   }
 
+  /** A keystroke in a label box: its message (the browser's or the server's) goes away. */
   setLabel(key: CardFieldKey, label: string): void {
     const e = this.editable();
     const c = this.catalogue();
     if (e && c) {
+      this.hideLabelMessage(key);
       this.change(setFieldLabel(e, c, key, label));
     }
+  }
+
+  /** The owner left a label box: its browser message may show now. */
+  labelLeft(key: CardFieldKey): void {
+    if (this.editable()) {
+      this.labelShown.update((shown) => new Set(shown).add(key));
+    }
+  }
+
+  private hideLabelMessage(key: CardFieldKey): void {
+    if (this.labelShown().has(key)) {
+      this.labelShown.update((shown) => {
+        const next = new Set(shown);
+        next.delete(key);
+        return next;
+      });
+    }
+    if (this.labelServer().has(key)) {
+      this.labelServer.update((errors) => {
+        const next = new Map(errors);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
+
+  /**
+   * Save draft and Publish check every label first (G-2). With any label in error nothing is sent: every
+   * message shows and the focus goes to the first box in error.
+   */
+  private labelsAllowSubmit(): boolean {
+    const found = this.labelProblems();
+    if (found.size === 0) {
+      return true;
+    }
+    this.labelServer.set(new Map());
+    this.labelShown.update((shown) => new Set([...shown, ...found.keys()]));
+    this.focusLabel(found.keys().next().value!);
+    return false;
+  }
+
+  private focusLabel(key: CardFieldKey): void {
+    this.labelFocusCount += 1;
+    this.labelFocus.set({ key, n: this.labelFocusCount });
   }
 
   moveField(key: CardFieldKey, toSection: CardSectionKey, toIndex: number): void {
@@ -460,18 +556,21 @@ export class CardSetupStore {
     return {
       baseVersion: v.live.version,
       draftRevision: v.draft?.revision ?? null,
-      setup: canonicalSetup(this.editor()!),
+      setup: canonicalSetup(this.editor()!, this.catalogue() ?? undefined),
     };
   }
 
+  /** Sends when the editor differs from what the server holds as draft (or as live, with no draft). */
   saveDraft(): void {
-    if (!this.canEdit() || this.busy() !== null || !this.dirty()) {
+    if (!this.canEdit() || this.busy() !== null || !this.unsaved() || !this.labelsAllowSubmit()) {
       return;
     }
     this.busy.set('save');
     this.problem.set(null);
+    this.labelServer.set(new Map());
+    const body = this.body();
     this.api
-      .saveDraft(this.body())
+      .saveDraft(body)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (view) => {
@@ -479,7 +578,7 @@ export class CardSetupStore {
           this.busy.set(null);
           this.toast('Draft saved. Staff still see the live card until you publish.');
         },
-        error: (error: unknown) => this.writeFailed(error, SAVE_ERROR),
+        error: (error: unknown) => this.writeFailed(error, SAVE_ERROR, body.setup),
       });
   }
 
@@ -509,18 +608,20 @@ export class CardSetupStore {
           this.busy.set(null);
           this.toast('Draft discarded. The live card is unchanged.');
         },
-        error: (error: unknown) => this.writeFailed(error, DISCARD_ERROR),
+        error: (error: unknown) => this.writeFailed(error, DISCARD_ERROR, null),
       });
   }
 
   publish(): void {
-    if (!this.canEdit() || this.busy() !== null || !this.dirty()) {
+    if (!this.canEdit() || this.busy() !== null || !this.dirty() || !this.labelsAllowSubmit()) {
       return;
     }
     this.busy.set('publish');
     this.problem.set(null);
+    this.labelServer.set(new Map());
+    const body = this.body();
     this.api
-      .publish(this.body())
+      .publish(body)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (view) => {
@@ -529,11 +630,11 @@ export class CardSetupStore {
           const newest = view.versions?.[0];
           this.toast(publishToast(view.live.version, newest?.changedParts ?? []));
         },
-        error: (error: unknown) => this.writeFailed(error, PUBLISH_ERROR),
+        error: (error: unknown) => this.writeFailed(error, PUBLISH_ERROR, body.setup),
       });
   }
 
-  private writeFailed(error: unknown, fallback: string): void {
+  private writeFailed(error: unknown, fallback: string, sent: CardSetup | null): void {
     this.busy.set(null);
     if (isRefusal(error)) {
       this.fail(error, LOAD_ERROR);
@@ -558,11 +659,47 @@ export class CardSetupStore {
         return;
       }
       if (error.status === 400) {
-        this.problem.set({ text: problemMessage(error, fallback), conflict: false });
+        this.validationFailed(error, fallback, sent);
         return;
       }
     }
     this.problem.set({ text: fallback, conflict: false });
+  }
+
+  /**
+   * A 400 with field errors (G-1): each label path is resolved to a field through the setup that was sent
+   * (not the editor, which may have moved) and shown under its own box; everything else, and any path that
+   * cannot be resolved, is listed in the banner. Focus goes to the first box in error.
+   */
+  private validationFailed(error: ApiError, fallback: string, sent: CardSetup | null): void {
+    if (error.fieldErrors.length === 0) {
+      this.problem.set({ text: problemMessage(error, fallback), conflict: false });
+      return;
+    }
+    const catalogue = this.catalogue();
+    const boxes = new Map<CardFieldKey, string>();
+    const rest: string[] = [];
+    for (const item of error.fieldErrors) {
+      const match = LABEL_PATH.exec(item.field);
+      const key = match
+        ? sent?.sections[Number(match[1])]?.fields[Number(match[2])]?.key
+        : undefined;
+      if (key !== undefined && catalogue && !labelLocked(catalogue, key)) {
+        if (!boxes.has(key)) {
+          boxes.set(key, item.message);
+        }
+      } else if (!rest.includes(item.message)) {
+        rest.push(item.message);
+      }
+    }
+    this.labelServer.set(boxes);
+    this.problem.set(
+      rest.length === 0 ? null : { text: rest[0], conflict: false, more: rest.slice(1) },
+    );
+    const first = sent?.sections.flatMap((s) => s.fields).find((f) => boxes.has(f.key));
+    if (first) {
+      this.focusLabel(first.key);
+    }
   }
 
   toast(message: string): void {

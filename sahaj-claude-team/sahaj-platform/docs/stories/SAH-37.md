@@ -21,6 +21,10 @@ Reads against `docs/design/mockup/sahaj-mockup.html` (section "IPD patient card:
 | Break-glass "Emergency access" (SAH-34) | Blocked | **No** |
 | Sahaj admin portal line "IPD patient card" per clinic | Admin portal | **No** (OQ-37-9) |
 
+Scope notes added by the release audit (DEC-032, 9 Nov 2026):
+- The **inline error line** under a label box is a state the Patient card mockup does not draw. It reuses the mockup's existing error style (`.ferr`) and was approved by the human on 9 Nov 2026 (DEC-032). See AC 68.
+- **V15** (a label may not duplicate another field's name) is stricter than the mockup and was not in the original stories. It was approved by the human on 9 Nov 2026 (DEC-032). See AC 67 and AC 69.
+
 Role names in this file: owner = OWNER, front desk = FRONT_DESK, nurse = NURSE, doctor = DOCTOR (billing, pharmacist and visiting doctor have no Admitted list in phase 1).
 
 ## 1. Stories
@@ -44,7 +48,9 @@ Priority: Must
 Priority: Must
 
 ## Acceptance criteria
-Numbering runs through the whole file so that tests and the requirement can point to one number. "Rule" numbers are those of `docs/requirements/SAH-37.md`.
+Numbering runs through the whole file (69 acceptance criteria, AC 1 to AC 69) so that tests and the requirement can point to one number. "Rule" numbers are those of `docs/requirements/SAH-37.md`.
+
+Traceability: SAH-37-1 = AC 1 to 16 (rules 1 to 4, 17, 18, 19); SAH-37-2 = AC 17 to 26 (rules 5 to 7, 9, 16); SAH-37-3 = AC 27 to 36 and AC 67 to 69 (rules 8, 9, 11, 16, 22); SAH-37-4 = AC 37 to 43 (rules 10, 11, 16); SAH-37-5 = AC 44 to 53 (rules 11, 12, 19); SAH-37-6 = AC 54 to 66 (rules 9 to 11, 13 to 15, 19, 20). AC 67 to 69 were added on 9 Nov 2026 by the release audit (DEC-032). They sit at the end of story SAH-37-3 and carry the next free numbers after AC 66; the existing numbers are not changed.
 
 ### SAH-37-1 · Entry, draft and publish, versions, history
 1. Given IPD is Trial, On or Read-only, when the user opens Clinic setup, then the group "In-patients (IPD)" lists "Patient card" after "Discharge" with the cards icon, the text "What each admitted patient's card shows: layout, sections, fields and quick actions. Changes go live when you publish.", the "Affects" chips Doctor, Nurse, Front desk, and the three tips of the mockup ("Most clinics use the standard card as it is. Change it only when staff keep asking for the same missing detail.", "Fewer fields read faster on a ward round. Hide what nobody looks at.", "Publish after the evening round, so the next shift starts with the new card."). Given IPD is Off, then the entry is not in the menu and the API answers 403 `module-off`. (Rule 1; the changed text drops "workflow stages", OQ-37-3.)
@@ -96,6 +102,9 @@ Notes for design
 34. Given the Vitals section, then the readings BP, Pulse, SpO₂, Temp and RR are each switchable (one tile each; Early warning and Last recorded sit below them), the Early warning field is locked; given no vitals have ever been recorded, then the card shows "No vitals recorded yet" (not blanks), and "Last recorded" reads "Not recorded" in amber. (Rule 9; mockup `pcnov`, `vtime`.)
 35. Given a user who is not the owner, then every field control is disabled and the server answers 403 to a call. Given an unknown field key, a duplicate field, a field in a section the catalogue does not allow, or a setup that lacks a locked field, then the server answers 400 and stores nothing; given a stored setup that lacks a locked item (for example an older version), then the server adds the item back when the card is read. (Rule 3, 9, 16.)
 36. Given a keyboard user, then every switch has role "switch" with `aria-checked`, every label box a visible or accessible label, every move button an accessible name ("Move up <field>"), and focus stays on the moved row. Given a screen reader, the pill "Safety · always on" is read out. (Accessibility.)
+67. **Duplicate label (V15).** Given I am the owner on the Fields tab, when I give a field a label that matches, ignoring case and extra spaces, the standard name of any other card field (for example "Allergies" for Diagnosis) or the label of another field, then Save draft and Publish are refused with "This name is already used by another field." under that field's label box. Nothing is saved. When two fields share a new label, the message is on the later field only. A label equal to the field's own standard name, in any case or spacing, is never a V15 error and is accepted. Only the exact standard name (same case) is stored as empty, with no change counted; a case or spacing variant such as "bed" is a real label, stored as typed (see AC 69). The server refuses the same setup with 400 at `setup.sections[i].fields[j].label` even when the browser check is bypassed. (Rule 16, 22; DEC-032, stricter than the mockup.)
+68. **Inline label errors.** Given I edit a label, when I leave the box or press Save draft or Publish and the label has a control, invisible or text-direction character, is over 40 characters, or duplicates another field's name, then the message ("Label cannot contain control or text-direction characters", "Keep the label to 40 characters." or "This name is already used by another field.") appears under that box in the existing error style, the box is marked invalid for screen readers, and nothing is sent. When the server refuses a save with field errors, each label message appears under its own box, focus moves to the first box in error, and any other messages are listed in the banner. The message clears when I type in that box. (Rule 16, 22; DEC-032, a state the mockup does not draw.)
+69. **Label equal to the standard name.** Given a field with a custom label, when I type exactly the field's own standard name (in the same case), then the field shows as unchanged for the pill, Reset, the unsaved check and Publish, the same as the server counts it. (Rule 4, 8, 22; DEC-032.)
 
 Notes for design
 - Each field belongs to one data group (the mockup's `g`), which decides who may see it (rule 11). The group decides access, not the section it sits in.
@@ -197,3 +206,4 @@ Clinic setup "Patient card" page (bar, tabs, templates, layouts, sections, field
 
 ## 7. Status log
 - 9 Nov 2026 · drafted by the business-analyst from the mockup (`cfgIpCard`, `pcBar`, `pcPreview`, `pcCard`, `pcDefault`, `PC_PRESET`, locked safety block at line 8434), SAH-36, DEC-021 and the IPD contract. Awaiting human approval of `stories`.
+- 9 Nov 2026 · release audit (DEC-032): AC 67 to 69 added to SAH-37-3 (duplicate label V15, inline label errors, label equal to the standard name); 69 acceptance criteria now. No other AC changed. The inline error line and V15 were approved by the human on 9 Nov 2026.

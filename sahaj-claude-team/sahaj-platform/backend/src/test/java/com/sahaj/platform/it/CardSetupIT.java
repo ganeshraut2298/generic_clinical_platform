@@ -191,7 +191,8 @@ class CardSetupIT extends CardSetupSupport {
         ObjectNode compact = edit(standard(clinic.owner()), s -> s.put("layout", "compact"));
         JsonNode saved = saveOk(clinic.owner(), 1, null, compact);
         JsonNode draft = saved.get("draft");
-        assertThat(draft.get("revision").asLong()).isEqualTo(1);
+        long r1 = draft.get("revision").asLong();
+        assertThat(r1).as("an opaque token, not a count of saves").isPositive();
         assertThat(draft.get("baseVersion").asInt()).isEqualTo(1);
         assertThat(texts(draft.get("changedParts"))).containsExactly("layout");
         assertThat(draft.get("setup").get("layout").asText()).isEqualTo("compact");
@@ -202,7 +203,7 @@ class CardSetupIT extends CardSetupSupport {
         Stored s = stored(clinic);
         assertThat(s.drafts()).isEqualTo(1);
         assertThat(s.versions()).isZero();
-        assertThat(s.draft().get(0)).isEqualTo("1");
+        assertThat(s.draft().get(0)).isEqualTo(String.valueOf(r1));
         assertThat(s.draft().get(1)).isEqualTo("1");
         // a new owner session (another device) reads the same draft
         JsonNode again = view(clinic.owner());
@@ -214,8 +215,8 @@ class CardSetupIT extends CardSetupSupport {
             actionOn(x, "deposit", true);
             x.put("cardsPerRow", 4);
         });
-        JsonNode second = saveOk(clinic.owner(), 1, 1L, more);
-        assertThat(second.get("draft").get("revision").asLong()).isEqualTo(2);
+        JsonNode second = saveOk(clinic.owner(), 1, r1, more);
+        assertThat(second.get("draft").get("revision").asLong()).as("every save gives a new token").isGreaterThan(r1);
         assertThat(texts(second.get("draft").get("changedParts"))).containsExactly("layout", "sections", "fields", "quickActions");
         assertThat(stored(clinic).drafts()).as("still one draft per clinic").isEqualTo(1);
         // staff still see the live card and never the draft (AC10)
@@ -261,11 +262,11 @@ class CardSetupIT extends CardSetupSupport {
     void aDraftThatEqualsTheLiveSetupRemovesTheDraftAndWritesNoHistoryLine() throws Exception {
         Clinic clinic = hospital();
         ObjectNode changed = edit(standard(clinic.owner()), s -> fieldOn(s, "ward", false));
-        saveOk(clinic.owner(), 1, null, changed);
+        long rChanged = revisionOf(saveOk(clinic.owner(), 1, null, changed));
         assertThat(stored(clinic).drafts()).isEqualTo(1);
         long audits = stored(clinic).cardAudits();
         // the owner switched it back: the same canonical setup as live
-        JsonNode back = saveOk(clinic.owner(), 1, 1L, standard(clinic.owner()));
+        JsonNode back = saveOk(clinic.owner(), 1, rChanged, standard(clinic.owner()));
         assertThat(back.get("draft").isNull()).isTrue();
         Stored s = stored(clinic);
         assertThat(s.drafts()).isZero();
@@ -286,17 +287,17 @@ class CardSetupIT extends CardSetupSupport {
     @Test
     void discardRemovesTheDraftWritesNoHistoryAndWithNoDraftIsA200() throws Exception {
         Clinic clinic = hospital();
-        saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
+        long rv = revisionOf(saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact"))));
         long audits = stored(clinic).cardAudits();
         assertThat(audits).isEqualTo(1);
-        JsonNode after = ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", clinic.owner(), null, 200);
+        JsonNode after = ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + rv, clinic.owner(), null, 200);
         assertThat(after.get("draft").isNull()).isTrue();
         assertThat(after.get("live").get("version").asInt()).isEqualTo(1);
         Stored s = stored(clinic);
         assertThat(s.drafts()).isZero();
         assertThat(s.cardAudits()).as("discard writes no history line").isEqualTo(audits);
         // nothing to discard: the outcome the owner wanted
-        assertThat(ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", clinic.owner(), null, 200).get("draft").isNull()).isTrue();
+        assertThat(ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + rv, clinic.owner(), null, 200).get("draft").isNull()).isTrue();
         // a missing or silly revision
         problem(call(HttpMethod.DELETE, DRAFT, clinic.owner(), null), 400);
         assertType(problem(discard(clinic.owner(), 0), 400), "validation");
@@ -314,8 +315,8 @@ class CardSetupIT extends CardSetupSupport {
             s.put("layout", "expanded");
             fieldOn(s, "ipNumber", true);
         });
-        saveOk(clinic.owner(), 1, null, setup2);
-        JsonNode r2 = publishOk(clinic.owner(), 1, 1L, setup2);
+        long rDraft = revisionOf(saveOk(clinic.owner(), 1, null, setup2));
+        JsonNode r2 = publishOk(clinic.owner(), 1, rDraft, setup2);
         assertThat(r2.get("live").get("version").asInt()).isEqualTo(2);
         assertThat(r2.get("live").get("isStandard").asBoolean()).isFalse();
         assertThat(r2.get("live").get("setup").get("layout").asText()).isEqualTo("expanded");
@@ -432,30 +433,31 @@ class CardSetupIT extends CardSetupSupport {
     void aStaleDraftRevisionIsRefusedForSaveDiscardAndPublish() throws Exception {
         Clinic clinic = hospital();
         Staff second = secondOwner(clinic);
-        saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
-        // both hold revision 1; the second owner saves again
-        saveOk(second.auth(), 1, 1L, edit(standard(clinic.owner()), s -> s.put("layout", "expanded")));
+        long rOld = revisionOf(saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact"))));
+        // both hold the first token; the second owner saves again and the token changes
+        long rNew = revisionOf(saveOk(second.auth(), 1, rOld, edit(standard(clinic.owner()), s -> s.put("layout", "expanded"))));
         Stored before = stored(clinic);
-        assertThat(before.draft().get(0)).isEqualTo("2");
+        assertThat(before.draft().get(0)).isEqualTo(String.valueOf(rNew));
+        assertThat(rNew).isNotEqualTo(rOld);
         ObjectNode stale = edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 4));
-        conflictOf(putDraft(clinic.owner(), 1, 1L, stale));
-        conflictOf(publish(clinic.owner(), 1, 1L, stale));
-        conflictOf(discard(clinic.owner(), 1));
+        conflictOf(putDraft(clinic.owner(), 1, rOld, stale));
+        conflictOf(publish(clinic.owner(), 1, rOld, stale));
+        conflictOf(discard(clinic.owner(), rOld));
         assertThat(stored(clinic)).isEqualTo(before);
         // the fresh revision is accepted
-        assertThat(saveOk(clinic.owner(), 1, 2L, stale).get("draft").get("revision").asLong()).isEqualTo(3);
+        assertThat(saveOk(clinic.owner(), 1, rNew, stale).get("draft").get("revision").asLong()).isGreaterThan(rNew);
     }
 
     @Test
     void aDraftDiscardedByAnotherOwnerCannotBeSavedOrPublishedFromTheOldRevision() throws Exception {
         Clinic clinic = hospital();
         Staff second = secondOwner(clinic);
-        saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
-        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", second.auth(), null, 200);
+        long rMine = revisionOf(saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact"))));
+        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + rMine, second.auth(), null, 200);
         Stored before = stored(clinic);
         ObjectNode mine = edit(standard(clinic.owner()), s -> s.put("layout", "expanded"));
-        conflictOf(putDraft(clinic.owner(), 1, 1L, mine));
-        conflictOf(publish(clinic.owner(), 1, 1L, mine));
+        conflictOf(putDraft(clinic.owner(), 1, rMine, mine));
+        conflictOf(publish(clinic.owner(), 1, rMine, mine));
         assertThat(stored(clinic)).isEqualTo(before);
         assertThat(before.drafts()).isZero();
         assertThat(before.versions()).isZero();
@@ -475,8 +477,8 @@ class CardSetupIT extends CardSetupSupport {
         assertThat(view(clinic.owner()).get("live").get("setup").get("layout").asText()).isEqualTo("compact");
         assertThat(view(clinic.owner()).get("live").get("version").asInt()).isEqualTo(2);
         // a draft saved on the old base is also stale after another owner's publish
-        saveOk(second.auth(), 2, null, edit(theirs, s -> s.put("cardsPerRow", 2)));
-        publishOk(second.auth(), 2, 1L, edit(theirs, s -> s.put("cardsPerRow", 2)));
+        long rTheirs = revisionOf(saveOk(second.auth(), 2, null, edit(theirs, s -> s.put("cardsPerRow", 2))));
+        publishOk(second.auth(), 2, rTheirs, edit(theirs, s -> s.put("cardsPerRow", 2)));
         conflictOf(putDraft(clinic.owner(), 2, null, mine));
     }
 
@@ -499,17 +501,17 @@ class CardSetupIT extends CardSetupSupport {
         names.add("NURSE (2nd)");
         for (int i = 0; i < callers.size(); i++) {
             RequestPostProcessor who = callers.get(i);
-            assertType(problem(putDraft(who, 1, 1L, setup), 403), "forbidden");
-            assertType(problem(publish(who, 1, 1L, setup), 403), "forbidden");
-            assertType(problem(discard(who, 1), 403), "forbidden");
+            forbiddenOf(putDraft(who, 1, 1L, setup));
+            forbiddenOf(publish(who, 1, 1L, setup));
+            forbiddenOf(discard(who, 1));
             assertThat(stored(clinic)).as(names.get(i)).isEqualTo(before);
         }
         // a role in the token that the membership does not have (an owner token on a demoted person)
         Staff demoted = secondOwner(clinic);
         setMembershipRole(clinic, demoted.userId(), "NURSE");
-        assertType(problem(putDraft(demoted.auth(), 1, 1L, setup), 403), "forbidden");
-        assertType(problem(publish(demoted.auth(), 1, 1L, setup), 403), "forbidden");
-        assertType(problem(discard(demoted.auth(), 1), 403), "forbidden");
+        forbiddenOf(putDraft(demoted.auth(), 1, 1L, setup));
+        forbiddenOf(publish(demoted.auth(), 1, 1L, setup));
+        forbiddenOf(discard(demoted.auth(), 1));
         JsonNode asNurse = view(demoted.auth());
         assertThat(asNurse.has("draft")).as("a demoted owner no longer gets the draft").isFalse();
         assertThat(asNurse.get("canEdit").asBoolean()).isFalse();
@@ -529,13 +531,13 @@ class CardSetupIT extends CardSetupSupport {
             assertThat(v.get("catalogue")).isNotNull();
         }
         for (String role : NO_CARD_ROLES) {
-            assertType(problem(call(HttpMethod.GET, CARD_SETUP, staff(clinic, role).auth(), null), 403), "forbidden");
+            forbiddenOf(call(HttpMethod.GET, CARD_SETUP, staff(clinic, role).auth(), null));
         }
         // an inactive membership with a valid token
         Staff gone = staff(clinic, "NURSE");
         view(gone.auth());
         setMembershipStatus(clinic.tenantId(), gone.userId(), "INACTIVE");
-        assertType(problem(call(HttpMethod.GET, CARD_SETUP, gone.auth(), null), 403), "forbidden");
+        forbiddenOf(call(HttpMethod.GET, CARD_SETUP, gone.auth(), null));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(CARD_SETUP))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
     }
@@ -697,22 +699,21 @@ class CardSetupIT extends CardSetupSupport {
         RequestPostProcessor owner = clinic.owner();
         ObjectNode std = standard(owner);
         // exactly 40 characters, and 40 symbols of two UTF-16 units each, are accepted
-        assertThat(saveOk(owner, 1, null, edit(std, s -> fieldLabel(s, "bed", repeat("a", 40))))
-                .get("draft").get("revision").asLong()).isEqualTo(1);
-        JsonNode symbols = saveOk(owner, 1, 1L, edit(std, s -> fieldLabel(s, "bed", repeat("😀", 40))));
+        long r1 = revisionOf(saveOk(owner, 1, null, edit(std, s -> fieldLabel(s, "bed", repeat("a", 40)))));
+        JsonNode symbols = saveOk(owner, 1, r1, edit(std, s -> fieldLabel(s, "bed", repeat("😀", 40))));
         assertThat(fieldOf(symbols.get("draft").get("setup"), "bed").get("label").asText().codePointCount(0, 80)).isEqualTo(40);
         // markup is text: stored and sent back as typed (the screen shows it as typed), trimmed
-        JsonNode markup = saveOk(owner, 1, 2L, edit(std, s -> fieldLabel(s, "ward", "  <b>x</b> & \"q\"  ")));
+        JsonNode markup = saveOk(owner, 1, revisionOf(symbols), edit(std, s -> fieldLabel(s, "ward", "  <b>x</b> & \"q\"  ")));
         assertThat(fieldOf(markup.get("draft").get("setup"), "ward").get("label").asText()).isEqualTo("<b>x</b> & \"q\"");
         // labels travel with the field; moving a field keeps its label
-        JsonNode moved = saveOk(owner, 1, 3L, edit(std, s -> {
+        JsonNode moved = saveOk(owner, 1, revisionOf(markup), edit(std, s -> {
             fieldLabel(s, "ward", "Unit");
             moveField(s, "ward", "care");
         }));
         assertThat(fieldKeys(moved.get("draft").get("setup"), "care")).containsExactly("doctor", "ward");
         assertThat(fieldOf(moved.get("draft").get("setup"), "ward").get("label").asText()).isEqualTo("Unit");
         // the same two limits on the whole-label unit "label of a field that is off" (labels are kept while a field is off)
-        JsonNode off = saveOk(owner, 1, 4L, edit(std, s -> {
+        JsonNode off = saveOk(owner, 1, revisionOf(moved), edit(std, s -> {
             fieldLabel(s, "room", "Bay");
             fieldOn(s, "room", false);
         }));
@@ -797,18 +798,19 @@ class CardSetupIT extends CardSetupSupport {
         assertThat(fieldKeys(saved.get("draft").get("setup"), "billing")).contains("allergies");
         // then switching that section off while the safety field sits in it is refused (the server side of AC23)
         ObjectNode off = edit(intoOn, s -> sectionOn(s, "billing", false));
-        JsonNode p = problem(putDraft(owner, 1, 1L, off), 400);
+        JsonNode p = problem(putDraft(owner, 1, revisionOf(saved), off), 400);
         assertThat(hasMessage(p, "Allergies is a safety field. Move it to a section that is switched on.")).isTrue();
         // the card header may hold other fields, e.g. Early warning, after the patient name
         ObjectNode intoHeader = edit(std, s -> moveField(s, "ews", "header"));
-        assertThat(saveOk(owner, 1, 1L, intoHeader).get("draft").get("revision").asLong()).isEqualTo(2);
+        JsonNode headerSaved = saveOk(owner, 1, revisionOf(saved), intoHeader);
+        assertThat(revisionOf(headerSaved)).isGreaterThan(revisionOf(saved));
         // other sections may be reordered, switched off (Care, Stay, Billing) and any non-safety field switched off
         ObjectNode reordered = edit(std, s -> {
             moveSection(s, "care", 1);
             sectionOn(s, "stay", false);
             fieldOn(s, "doctor", false);
         });
-        assertThat(saveOk(owner, 1, 2L, reordered).get("draft").get("revision").asLong()).isEqualTo(3);
+        assertThat(revisionOf(saveOk(owner, 1, revisionOf(headerSaved), reordered))).isGreaterThan(revisionOf(headerSaved));
     }
 
     // ---------------- AC14, AC1: Read-only and IPD Off ----------------
@@ -837,7 +839,7 @@ class CardSetupIT extends CardSetupSupport {
         }
         // a stale token or a bad body is not what is reported first: the body check comes before Read-only, the role before both
         assertType(problem(putDraft(clinic.owner(), 1, null, edit(setup, s -> s.put("layout", "wide"))), 400), "validation");
-        assertType(problem(putDraft(nurse.auth(), 1, 1L, setup), 403), "forbidden");
+        forbiddenOf(putDraft(nurse.auth(), 1, 1L, setup));
         assertThat(stored(clinic)).isEqualTo(before);
         // the Admitted list still draws the published (here: standard) card
         assertThat(listOf(clinic.owner()).get("cardSetup").get("version").asInt()).isEqualTo(1);
@@ -908,14 +910,17 @@ class CardSetupIT extends CardSetupSupport {
             fieldLabel(s, "ward", label);
         });
         long access = count(clinic, "select count(*) from patient.record_access");
+        long[] revisions = new long[1];
         try (com.sahaj.platform.support.LogCapture logs = new com.sahaj.platform.support.LogCapture()) {
-            saveOk(clinic.owner(), 1, null, setup);
+            long firstRevision = revisionOf(saveOk(clinic.owner(), 1, null, setup));
             // refused or empty writes write no line
             problem(putDraft(clinic.owner(), 1, null, edit(setup, s -> s.put("layout", "wide"))), 400);
             conflictOf(putDraft(clinic.owner(), 1, null, setup));
-            ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", clinic.owner(), null, 200);
-            saveOk(clinic.owner(), 1, null, setup);
-            publishOk(clinic.owner(), 1, 1L, setup);
+            ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + firstRevision, clinic.owner(), null, 200);
+            long secondRevision = revisionOf(saveOk(clinic.owner(), 1, null, setup));
+            assertThat(secondRevision).as("the token of the second draft is not the first one").isNotEqualTo(firstRevision);
+            publishOk(clinic.owner(), 1, secondRevision, setup);
+            revisions[0] = firstRevision;
             view(clinic.owner());
             listOf(clinic.owner());
             assertThat(logs.allText()).as("no label and no setup in a log line").doesNotContain(label);
@@ -931,7 +936,7 @@ class CardSetupIT extends CardSetupSupport {
         assertThat(keys(before)).containsExactly("liveVersion");
         assertThat(before.get("liveVersion").asInt()).isEqualTo(1);
         assertThat(keys(after)).containsExactlyInAnyOrder("liveVersion", "draftRevision", "changedParts");
-        assertThat(after.get("draftRevision").asInt()).isEqualTo(1);
+        assertThat(after.get("draftRevision").asLong()).isEqualTo(revisions[0]);
         assertThat(texts(after.get("changedParts"))).containsExactly("layout", "fields");
         assertThat(save[4]).isEqualTo(clinic.ownerUserId().toString());
         String[] pub = published.get(0);
@@ -940,7 +945,8 @@ class CardSetupIT extends CardSetupSupport {
         JsonNode pAfter = objectMapper.readTree(pub[3]);
         assertThat(keys(pBefore)).containsExactly("version");
         assertThat(pBefore.get("version").asInt()).isEqualTo(1);
-        assertThat(keys(pAfter)).containsExactlyInAnyOrder("version", "changedParts", "isStandard");
+        assertThat(keys(pAfter)).containsExactlyInAnyOrder("version", "changedParts", "isStandard", "factsOn");
+        assertThat(texts(pAfter.get("factsOn"))).as("no sensitive fact is switched on in this card").isEmpty();
         assertThat(pAfter.get("version").asInt()).isEqualTo(2);
         assertThat(pAfter.get("isStandard").asBoolean()).isFalse();
         assertThat(texts(pAfter.get("changedParts"))).containsExactly("layout", "fields");
@@ -955,6 +961,41 @@ class CardSetupIT extends CardSetupSupport {
         assertThat(history).contains("IPD_CARD_PUBLISHED").contains("IPD_CARD_DRAFT_SAVED").doesNotContain(label);
         // reading the setup and the list wrote no record-access row (AC63)
         assertThat(count(clinic, "select count(*) from patient.record_access")).isEqualTo(access);
+    }
+
+    /** Security review SAH-37, finding 3: saving a draft equal to the stored draft changes nothing and writes no history line. */
+    @Test
+    void savingAnUnchangedDraftAgainKeepsTheTokenAndWritesNoSecondHistoryLine() throws Exception {
+        Clinic clinic = hospital();
+        Staff second = secondOwner(clinic);
+        ObjectNode compact = edit(standard(clinic.owner()), s -> s.put("layout", "compact"));
+        JsonNode first = saveOk(clinic.owner(), 1, null, compact);
+        long token = revisionOf(first);
+        Stored before = stored(clinic);
+        assertThat(before.cardAudits()).isEqualTo(1);
+        // the same owner presses Save draft again with nothing changed, and so does the second owner
+        JsonNode again = saveOk(clinic.owner(), 1, token, compact);
+        assertThat(revisionOf(again)).as("the token stays").isEqualTo(token);
+        JsonNode byOther = saveOk(second.auth(), 1, token, compact);
+        assertThat(revisionOf(byOther)).isEqualTo(token);
+        assertThat(stored(clinic)).as("nothing changes: same draft row, saver and time, one history line").isEqualTo(before);
+        assertThat(byOther.get("draft").get("savedByName").asText()).isEqualTo(nameOf(clinic, clinic.ownerUserId()));
+    }
+
+    /** Security review SAH-37, finding 1b: the publish history line names which sensitive facts the card switches on (keys only). */
+    @Test
+    void thePublishHistoryLineNamesTheSensitiveFactsSwitchedOnAsKeysOnly() throws Exception {
+        Clinic clinic = hospital();
+        publishOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> {
+            fieldOn(s, "diagnosis", true);
+            fieldOn(s, "mobile", true);
+            fieldOn(s, "bp", true);
+            fieldLabel(s, "diagnosis", "Why admitted");
+        }));
+        String[] line = audit(clinic, "IPD_CARD_PUBLISHED").get(0);
+        JsonNode after = objectMapper.readTree(line[3]);
+        assertThat(texts(after.get("factsOn"))).containsExactly("diagnosis", "bp", "mobile");
+        assertThat(String.join(" ", line)).as("keys only, never a label").doesNotContain("Why admitted");
     }
 
     @Test

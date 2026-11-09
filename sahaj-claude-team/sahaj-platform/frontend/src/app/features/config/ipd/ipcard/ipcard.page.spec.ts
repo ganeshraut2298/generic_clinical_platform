@@ -162,7 +162,7 @@ describe('IpCardPage', () => {
     if (patients === 'fail') {
       req.flush(problem('x', 500, 'Try later.'), { status: 500, statusText: 'Server Error' });
     } else if (patients === 'forbidden') {
-      req.flush(problem('forbidden', 403, 'Only the clinic owner can preview the card setup.'), {
+      req.flush(problem('forbidden', 403, 'You do not have access to this.'), {
         status: 403,
         statusText: 'Forbidden',
       });
@@ -316,6 +316,27 @@ describe('IpCardPage', () => {
       await settle();
     });
 
+    it('sends a large opaque server revision back unchanged on Save draft and on Discard', async () => {
+      const big = 1790000000000001;
+      const saved = { ...standardSetup(), layout: 'compact' as const };
+      const answer = JSON.parse(JSON.stringify(ownerView({ draft: draftOf(saved, big) })));
+      await open('OWNER', { view: answer });
+      await click('[data-cols="4"]');
+      await click('[data-act=save]');
+      const put = http.expectOne(CARD + '/draft');
+      expect(put.request.body.draftRevision).toBe(big);
+      expect(JSON.stringify(put.request.body)).toContain('"draftRevision":1790000000000001');
+      put.flush(
+        JSON.parse(JSON.stringify(ownerView({ draft: draftOf({ ...saved, cardsPerRow: 4 }, big + 2) }))),
+      );
+      await settle();
+      await click('[data-act=discard]');
+      const del = http.expectOne(CARD + '/draft?draftRevision=1790000000000003');
+      expect(del.request.method).toBe('DELETE');
+      del.flush(ownerView());
+      await settle();
+    });
+
     it('keeps the edits on screen and does not claim a save when it fails (AC13)', async () => {
       await open();
       await click('[data-layout=compact]');
@@ -376,6 +397,54 @@ describe('IpCardPage', () => {
       expect(q('[data-layout=standard]').getAttribute('aria-pressed')).toBe('true');
       expect(q('[data-testid=pc-draft]')).toBeNull();
       expect(text('[data-testid=pc-showing]')).toBe('Showing the live card');
+    });
+
+    describe('a saved draft stays reachable (code review 37 #3)', () => {
+      const compact = { ...standardSetup(), layout: 'compact' as const };
+
+      it('still offers Save draft and Discard draft when the editor was edited back to equal the live setup', async () => {
+        await open('OWNER', { view: ownerView({ draft: draftOf(compact, 3) }) });
+        await click('[data-layout=standard]');
+        expect(q('[data-testid=pc-draft]')).toBeNull();
+        expect(text('[data-testid=pc-nochange]')).toBe('No unpublished changes');
+        expect(q('[data-act=discard]')).not.toBeNull();
+        expect(q<HTMLButtonElement>('[data-act=save]').disabled).toBe(false);
+        expect(q<HTMLButtonElement>('[data-act=publish]').disabled).toBe(true);
+      });
+
+      it('sends the live setup with the draft revision on Save draft, and the server then removes the draft', async () => {
+        await open('OWNER', { view: ownerView({ draft: draftOf(compact, 3) }) });
+        await click('[data-layout=standard]');
+        await click('[data-act=save]');
+        const put = http.expectOne(CARD + '/draft');
+        expect(put.request.body.draftRevision).toBe(3);
+        expect(put.request.body.setup.layout).toBe('standard');
+        put.flush(ownerView());
+        await settle();
+        expect(q('[data-act=save]')).toBeNull();
+        expect(q('[data-act=discard]')).toBeNull();
+        expect(q('[data-testid=pc-draft]')).toBeNull();
+      });
+
+      it('removes the stored draft on Discard draft from that state', async () => {
+        await open('OWNER', { view: ownerView({ draft: draftOf(compact, 3) }) });
+        await click('[data-layout=standard]');
+        await click('[data-act=discard]');
+        const del = http.expectOne(CARD + '/draft?draftRevision=3');
+        expect(del.request.method).toBe('DELETE');
+        del.flush(ownerView());
+        await settle();
+        expect(q('[data-act=discard]')).toBeNull();
+      });
+
+      it('disables Save draft, and sends nothing, while the editor equals the saved draft', async () => {
+        await open('OWNER', { view: ownerView({ draft: draftOf(compact, 3) }) });
+        expect(q('[data-act=discard]')).not.toBeNull();
+        expect(q<HTMLButtonElement>('[data-act=save]').disabled).toBe(true);
+        q<HTMLButtonElement>('[data-act=save]').click();
+        await settle();
+        http.expectNone(CARD + '/draft');
+      });
     });
 
     it('drops unsaved edits without a call when no draft was saved', async () => {
@@ -616,7 +685,7 @@ describe('IpCardPage', () => {
       await open('OWNER', { patients: 'forbidden' });
       expect(q('[data-testid=pc-bar]')).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('Asha Patil');
-      expect(text('.notice.err')).toContain('Only the clinic owner can preview the card setup.');
+      expect(text('.notice.err')).toContain('You do not have access to this.');
     });
 
     it('clears everything when a write answers 403 (a demoted owner)', async () => {
@@ -625,13 +694,13 @@ describe('IpCardPage', () => {
       await click('[data-act=publish]');
       http
         .expectOne(CARD + '/publish')
-        .flush(problem('forbidden', 403, 'Only the clinic owner can change the patient card.'), {
+        .flush(problem('forbidden', 403, 'You do not have access to this.'), {
           status: 403,
           statusText: 'Forbidden',
         });
       await settle();
       expect(q('[data-testid=pc-bar]')).toBeNull();
-      expect(text('.notice.err')).toContain('Only the clinic owner can change the patient card.');
+      expect(text('.notice.err')).toContain('You do not have access to this.');
     });
   });
 
@@ -858,6 +927,313 @@ describe('IpCardPage', () => {
       expect(q('[data-testid=pc-draft]')).toBeNull();
     });
 
+    describe('messages under the label box (G-1, G-2, G-3; AC67 to AC69)', () => {
+      const CONTROL = 'Label cannot contain control or text-direction characters';
+      const LONG = 'Keep the label to 40 characters.';
+      const USED = 'This name is already used by another field.';
+      const BIDI = 'Doc\u{202E}tor';
+
+      const leave = async (sel: string): Promise<void> => {
+        q<HTMLInputElement>(sel).dispatchEvent(new Event('blur'));
+        await settle();
+      };
+      const message = (key: string): string | null =>
+        (fixture.nativeElement as HTMLElement).querySelector(`[data-error=${key}]`)?.textContent
+          ?.trim() ?? null;
+      const refused = (errors: { field: string; message: string }[]) => ({
+        ...problem('validation', 400, errors[0].message),
+        fieldErrors: errors,
+      });
+      const BAD = { status: 400, statusText: 'Bad Request' };
+      const focused = () => (document.activeElement as HTMLElement | null)?.getAttribute('data-label');
+
+      it('shows the message under the box after the owner leaves it, in the mockup error style', async () => {
+        await openFields();
+        await input('[data-label=doctor]', BIDI);
+        expect(message('doctor')).toBeNull();
+        await leave('[data-label=doctor]');
+        expect(message('doctor')).toBe(CONTROL);
+        const box = q<HTMLInputElement>('[data-label=doctor]');
+        expect(box.getAttribute('aria-invalid')).toBe('true');
+        expect(box.classList.contains('bad')).toBe(true);
+        const note = q('[data-error=doctor]');
+        expect(note.classList.contains('ferr')).toBe(true);
+        expect(box.getAttribute('aria-describedby')).toBe(note.id);
+        expect(q('[data-testid=pc-problem]')).toBeNull();
+        expect(q('[data-label=ward]').getAttribute('aria-invalid')).toBeNull();
+        expect(q('[data-label=ward]').getAttribute('aria-describedby')).toBeNull();
+      });
+
+      it('shows the duplicate message (V15) for another field’s standard name', async () => {
+        await openFields();
+        await input('[data-label=diagnosis]', ' ALLERGIES ');
+        await leave('[data-label=diagnosis]');
+        expect(message('diagnosis')).toBe(USED);
+      });
+
+      it('shows the duplicate message on the later field only, and moves it when the first is renamed', async () => {
+        await openFields();
+        await input('[data-label=ward]', 'Block');
+        await leave('[data-label=ward]');
+        await input('[data-label=room]', 'block');
+        await leave('[data-label=room]');
+        expect(message('ward')).toBeNull();
+        expect(message('room')).toBe(USED);
+        await input('[data-label=ward]', 'Wing');
+        await leave('[data-label=ward]');
+        expect(message('room')).toBeNull();
+      });
+
+      it('shows nothing before the box is left, and clears the message on the next keystroke', async () => {
+        await openFields();
+        await input('[data-label=doctor]', BIDI);
+        await leave('[data-label=doctor]');
+        expect(message('doctor')).toBe(CONTROL);
+        await input('[data-label=doctor]', BIDI + 'x');
+        expect(message('doctor')).toBeNull();
+        expect(q('[data-label=doctor]').getAttribute('aria-invalid')).toBeNull();
+        await leave('[data-label=doctor]');
+        expect(message('doctor')).toBe(CONTROL);
+      });
+
+      it('shows no message for a good label', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Consultant');
+        await leave('[data-label=doctor]');
+        expect(message('doctor')).toBeNull();
+      });
+
+      it('counts the field’s own standard name as no change (G-3)', async () => {
+        await openFields();
+        await input('[data-label=bed]', 'Bed');
+        await leave('[data-label=bed]');
+        expect(message('bed')).toBeNull();
+        expect(q('[data-testid=pc-draft]')).toBeNull();
+        expect(text('[data-testid=pc-nochange]')).toBe('No unpublished changes');
+        expect(q<HTMLButtonElement>('[data-act=publish]').disabled).toBe(true);
+        expect(q<HTMLButtonElement>('[data-act=reset]').disabled).toBe(true);
+        expect(q('[data-act=save]')).toBeNull();
+      });
+
+      it('counts a case variant of the own name as a change, sent as typed', async () => {
+        await openFields();
+        await input('[data-label=bed]', 'bed');
+        await leave('[data-label=bed]');
+        expect(message('bed')).toBeNull();
+        expect(text('[data-testid=pc-draft]')).toBe('Draft · 1 change not published');
+        await click('[data-act=save]');
+        const put = http.expectOne(CARD + '/draft');
+        expect(put.request.body.setup.sections[0].fields[3]).toEqual({
+          key: 'bed',
+          on: true,
+          label: 'bed',
+        });
+        put.flush(ownerView());
+        await settle();
+      });
+
+      it('sends the own name as an empty label, so the browser and the server agree', async () => {
+        await openFields();
+        await input('[data-label=bed]', 'Bed');
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=save]');
+        const sent = http.expectOne(CARD + '/draft').request.body.setup;
+        expect(sent.sections[0].fields[3].label).toBe('');
+        expect(sent.sections[3].fields[0].label).toBe('Consultant');
+      });
+
+      it('keeps the leave guard quiet for the own name, and asks for a real edit', async () => {
+        await openFields();
+        await input('[data-label=bed]', 'Bed');
+        expect(fixture.componentInstance.confirmLeave()).toBe(true);
+        await input('[data-label=bed]', 'Cot');
+        leaveAnswer = false;
+        let answer: unknown;
+        (fixture.componentInstance.confirmLeave() as Observable<boolean>).subscribe(
+          (v) => (answer = v),
+        );
+        expect(answer).toBe(false);
+        expect(dialogOpen).toHaveBeenCalledTimes(1);
+      });
+
+      it('sends nothing on Save draft with a label in error, shows every message and focuses the first box', async () => {
+        await openFields();
+        await input('[data-label=room]', 'Doctor');
+        await input('[data-label=bed]', BIDI);
+        await input('[data-label=diagnosis]', 'Allergies');
+        await click('[data-act=save]');
+        http.expectNone(CARD + '/draft');
+        expect(message('bed')).toBe(CONTROL);
+        expect(message('room')).toBe(USED);
+        expect(message('diagnosis')).toBe(USED);
+        expect(focused()).toBe('bed');
+        expect(q('[data-testid=pc-problem]')).toBeNull();
+        expect(q<HTMLButtonElement>('[data-act=save]').disabled).toBe(false);
+      });
+
+      it('sends nothing on Publish with a label in error, and opens the Fields tab first', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Block');
+        await input('[data-label=ward]', 'Block');
+        await click('#pc-tab-layout');
+        expect(q('[data-label=doctor]')).toBeNull();
+        await click('[data-act=publish]');
+        http.expectNone(CARD + '/publish');
+        expect(q('[data-testid=pc-fields]')).not.toBeNull();
+        expect(message('doctor')).toBe(USED);
+        expect(focused()).toBe('doctor');
+      });
+
+      it('moves the focus to the first box in the order of the card, whatever the order of typing', async () => {
+        await openFields();
+        await input('[data-label=diagnosis]', 'Doctor');
+        await input('[data-label=ward]', 'Doctor');
+        await click('[data-act=publish]');
+        http.expectNone(CARD + '/publish');
+        expect(focused()).toBe('ward');
+      });
+
+      it('refuses a stored draft that already breaks the rule when the owner first submits', async () => {
+        const saved = standardSetup();
+        saved.sections[3].fields[0].label = 'Allergies';
+        await open('OWNER', { view: ownerView({ draft: draftOf(saved, 3, ['fields']) }) });
+        await click('#pc-tab-fields');
+        expect(message('doctor')).toBeNull();
+        await click('[data-act=publish]');
+        http.expectNone(CARD + '/publish');
+        expect(message('doctor')).toBe(USED);
+        expect(focused()).toBe('doctor');
+      });
+
+      it('refuses a stored label over 40 characters with the length message', async () => {
+        const saved = standardSetup();
+        saved.sections[3].fields[0].label = 'a'.repeat(41);
+        await open('OWNER', { view: ownerView({ draft: draftOf(saved, 3, ['fields']) }) });
+        await click('#pc-tab-fields');
+        await click('[data-act=publish]');
+        http.expectNone(CARD + '/publish');
+        expect(message('doctor')).toBe(LONG);
+      });
+
+      it('sends again once the labels are fixed', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Allergies');
+        await click('[data-act=save]');
+        http.expectNone(CARD + '/draft');
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=save]');
+        http.expectOne(CARD + '/draft').flush(ownerView());
+        await settle();
+        expect(message('doctor')).toBeNull();
+      });
+
+      it('shows a server label error under its own box, with the focus, and clears it on a keystroke (G-1)', async () => {
+        await openFields();
+        // The browser would catch a duplicate; a stricter server rule is simulated with a clean label.
+        await input('[data-label=doctor]', 'Consultant');
+        await input('[data-label=ward]', 'Block');
+        await click('[data-act=save]');
+        http.expectOne(CARD + '/draft').flush(
+          refused([
+            { field: 'setup.sections[3].fields[0].label', message: 'Server says no to doctor.' },
+            { field: 'setup.sections[2].fields[2].label', message: 'Server says no to ward.' },
+          ]),
+          BAD,
+        );
+        await settle();
+        expect(message('doctor')).toBe('Server says no to doctor.');
+        expect(message('ward')).toBe('Server says no to ward.');
+        expect(q('[data-label=doctor]').getAttribute('aria-invalid')).toBe('true');
+        expect(q('[data-testid=pc-problem]')).toBeNull();
+        expect(focused()).toBe('ward');
+        expect(q<HTMLButtonElement>('[data-act=save]').disabled).toBe(false);
+        await input('[data-label=ward]', 'Blocks');
+        expect(message('ward')).toBeNull();
+        expect(message('doctor')).toBe('Server says no to doctor.');
+      });
+
+      it('lists other paths and unresolved label paths in the banner, all of them once', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=save]');
+        http.expectOne(CARD + '/draft').flush(
+          refused([
+            { field: 'setup.sections[3].fields[0].label', message: 'Label message.' },
+            { field: 'setup.layout', message: 'Choose Compact, Standard or Expanded.' },
+            { field: 'setup.sections[9].fields[0].label', message: 'Unresolved label message.' },
+            { field: 'setup.cardsPerRow', message: 'Choose Compact, Standard or Expanded.' },
+            { field: 'setup.sections[0].fields[0].label', message: 'Name message.' },
+          ]),
+          BAD,
+        );
+        await settle();
+        expect(message('doctor')).toBe('Label message.');
+        expect(message('name')).toBeNull();
+        const banner = q('[data-testid=pc-problem]');
+        expect(banner.getAttribute('role')).toBe('alert');
+        expect(all('[data-testid=pc-problem] .pcprob > span').map((s) => s.textContent!.trim())).toEqual([
+          'Choose Compact, Standard or Expanded.',
+          'Unresolved label message.',
+          'Name message.',
+        ]);
+      });
+
+      it('keeps the single banner line when the 400 has no field errors', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=save]');
+        http
+          .expectOne(CARD + '/draft')
+          .flush(problem('validation', 400, 'The card setup is not valid.'), BAD);
+        await settle();
+        expect(text('[data-testid=pc-problem]')).toBe('The card setup is not valid.');
+        expect(q('[data-error]')).toBeNull();
+      });
+
+      it('keeps the banner for a 409 and shows nothing under the boxes', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=save]');
+        http
+          .expectOne(CARD + '/draft')
+          .flush(problem('card-setup-changed', 409, 'Changed by someone else.'), {
+            status: 409,
+            statusText: 'Conflict',
+          });
+        await settle();
+        expect(text('[data-testid=pc-problem]')).toContain('Changed by someone else.');
+        expect(q('[data-error]')).toBeNull();
+        expect(q('[data-act=reload]')).not.toBeNull();
+      });
+
+      it('shows a server error of a published change under the right box after Publish', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=publish]');
+        http.expectOne(CARD + '/publish').flush(
+          refused([{ field: 'setup.sections[3].fields[0].label', message: 'Server says no.' }]),
+          BAD,
+        );
+        await settle();
+        expect(message('doctor')).toBe('Server says no.');
+        expect(focused()).toBe('doctor');
+        expect(q('[data-testid=pc-problem]')).toBeNull();
+      });
+
+      it('does not offer a message box for a fixed label (safety fields keep the standard name)', async () => {
+        await openFields();
+        await input('[data-label=doctor]', 'Consultant');
+        await click('[data-act=save]');
+        http.expectOne(CARD + '/draft').flush(
+          refused([{ field: 'setup.sections[0].fields[1].label', message: 'UHID cannot change.' }]),
+          BAD,
+        );
+        await settle();
+        expect(q('[data-error]')).toBeNull();
+        expect(text('[data-testid=pc-problem]')).toBe('UHID cannot change.');
+      });
+    });
+
     it('moves a field with the arrows across a section border and keeps the focus on it (AC27, AC36)', async () => {
       await openFields();
       const down = q<HTMLButtonElement>('[data-row=admissionType] [data-move=down]');
@@ -1046,6 +1422,13 @@ describe('IpCardPage', () => {
   // ---------------------------------------------------------------- story 5
 
   describe('Live preview (AC44 to AC53)', () => {
+    it('is inert, so its buttons leave the keyboard order and the accessibility tree (code review 37 #11)', async () => {
+      await open();
+      const frame = q('[data-testid=pc-frame]');
+      expect(frame.hasAttribute('inert')).toBe(true);
+      expect(frame.querySelectorAll('button').length).toBeGreaterThan(0);
+    });
+
     it('is a labelled panel beside the editor, on every tab, with Desktop and Tablet', async () => {
       await open();
       expect(q('[data-testid=pc-preview]').getAttribute('aria-label')).toBe('Live preview');

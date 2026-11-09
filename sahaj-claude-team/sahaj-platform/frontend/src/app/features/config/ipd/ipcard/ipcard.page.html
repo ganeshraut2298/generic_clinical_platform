@@ -16,7 +16,7 @@
   </section>
 } @else if (store.live(); as live) {
   <div id="f-ipcard" class="pccfg">
-    <div class="pcbar glass" data-testid="pc-bar">
+    <div #bar class="pcbar glass" data-testid="pc-bar">
       <div class="pcbs">
         <span
           class="pill"
@@ -46,7 +46,7 @@
           >
             <app-icon name="undo" [size]="14" /> Reset to default
           </button>
-          @if (store.dirty() && store.canEdit()) {
+          @if (store.draftActions() && store.canEdit()) {
             <button
               type="button"
               mat-stroked-button
@@ -60,7 +60,7 @@
               type="button"
               mat-stroked-button
               data-act="save"
-              [disabled]="store.locked()"
+              [disabled]="store.locked() || !store.unsaved()"
               (click)="store.saveDraft()"
             >
               {{ store.busy() === 'save' ? 'Saving' : 'Save draft' }}
@@ -90,7 +90,12 @@
     @if (store.problem(); as p) {
       <div class="notice err" role="alert" data-testid="pc-problem">
         <app-icon name="alert" [size]="16" />
-        <span>{{ p.text }}</span>
+        <span class="pcprob">
+          <span>{{ p.text }}</span>
+          @for (line of p.more ?? []; track $index) {
+            <span data-testid="pc-problem-more">{{ line }}</span>
+          }
+        </span>
         @if (p.conflict) {
           <button type="button" mat-stroked-button data-act="reload" (click)="store.reload()">
             Reload

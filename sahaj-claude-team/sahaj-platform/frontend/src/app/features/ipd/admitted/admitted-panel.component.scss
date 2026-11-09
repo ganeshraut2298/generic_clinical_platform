@@ -124,6 +124,13 @@
   }
 }
 
+// Phones: the Cards and Table buttons keep their icons only (mockup line 2182, .pcview span{display:none}; D-15).
+@media (max-width: 760px) {
+  .pcview span {
+    display: none;
+  }
+}
+
 .iptbl {
   // The scroll container is also the containing block of the hidden "Open" header text, so that text
   // is clipped here and cannot widen the page at 360 px (SAH-36 F-3).

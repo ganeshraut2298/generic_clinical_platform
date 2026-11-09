@@ -54,6 +54,21 @@ public class PatientLookup implements PatientLookupPort {
         return result;
     }
 
+    /** SAH-37: the explicit mobile read. The merge resolution is the one of {@link #findAllCurrent}. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public Map<UUID, String> mobilesOf(UUID tenantId, Collection<UUID> patientIds) {
+        Map<UUID, String> result = new HashMap<>();
+        for (Map.Entry<UUID, PatientRepository.PatientRow> entry
+                : PatientMergeChains.current(patientRepository, tenantId, patientIds).entrySet()) {
+            String mobile = entry.getValue().mobile();
+            if (mobile != null) {
+                result.put(entry.getKey(), mobile);
+            }
+        }
+        return result;
+    }
+
     private static PatientSummary summary(PatientRepository.PatientRow row) {
         return new PatientSummary(row.id(), row.name(), row.age(), row.sex(), row.mobile(),
                 row.mergedIntoId() != null, row.uhid());

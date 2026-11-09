@@ -7,7 +7,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.sahaj.ipd.application.CardSetupRepository;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -66,16 +70,80 @@ class JdbcCardSetupRepositoryTest {
         String sql = sqlSent(() -> repository().insertVersion(TENANT, 2, "{}", false, List.of("layout", "fields"),
                 UUID.randomUUID()));
 
-        assertThat(sql).contains("insert into ipd.card_setup_version (version, setup, is_standard, changed_parts, "
-                + "published_by)").contains("cast(:setup as jsonb)").contains("string_to_array(:parts, ',')")
+        assertThat(sql.replaceAll("\\s+", " ")).contains("insert into ipd.card_setup_version (version, setup, "
+                + "is_standard, changed_parts, published_by, schema_version)").contains("cast(:setup as jsonb)")
+                .contains("string_to_array(:parts, ',')").contains(":schemaVersion")
                 .doesNotContain("tenant_id").doesNotContain("published_at").doesNotContain("id,");
+        verify(spec).param("schemaVersion", 1);
     }
 
     @Test
     void theDraftWritesListOnlyTheColumnsTheRoleMayWrite() {
         String insert = sqlSent(() -> repository().insertDraft(TENANT, "{}", 1, 1L, UUID.randomUUID()));
-        assertThat(insert).contains("insert into ipd.card_setup_draft (setup, base_version, revision, saved_by)")
-                .contains("cast(:setup as jsonb)").doesNotContain("tenant_id");
+        assertThat(insert).contains("insert into ipd.card_setup_draft (setup, base_version, revision, saved_by, "
+                + "schema_version)").contains("cast(:setup as jsonb)").contains(":schemaVersion")
+                .doesNotContain("tenant_id");
+        verify(spec).param("schemaVersion", 1);
+    }
+
+    @Test
+    void theSchemaVersionIsWrittenExplicitlyAsOneNotLeftToTheColumnDefault() {
+        assertThat(CardSetupRepository.SCHEMA_VERSION).isEqualTo(1);
+        sqlSent(() -> repository().updateDraft(TENANT, "{}", 1, 2L, UUID.randomUUID(), Instant.now()));
+        verify(spec).param("schemaVersion", 1);
+    }
+
+    @Test
+    void theReadsAskForTheSchemaVersionOfTheStoredDocument() {
+        assertThat(sqlSent(() -> repository().findLatestVersion(TENANT))).contains("schema_version");
+    }
+
+    @Test
+    void theDraftReadAsksForTheSchemaVersion() {
+        assertThat(sqlSent(() -> repository().findDraft(TENANT))).contains("schema_version");
+    }
+
+    @Test
+    void aVersionRowCarriesTheStoredSchemaVersion() throws SQLException {
+        for (int stored : new int[] {1, 2, 7}) {
+            ResultSet rs = mock(ResultSet.class);
+            UUID by = UUID.randomUUID();
+            OffsetDateTime at = OffsetDateTime.parse("2026-11-09T10:00:00Z");
+            when(rs.getInt("version")).thenReturn(3);
+            when(rs.getString("setup")).thenReturn("{}");
+            when(rs.getBoolean("is_standard")).thenReturn(false);
+            when(rs.getString("changed_parts")).thenReturn("layout,fields");
+            when(rs.getObject("published_by", UUID.class)).thenReturn(by);
+            when(rs.getObject("published_at", OffsetDateTime.class)).thenReturn(at);
+            when(rs.getInt("schema_version")).thenReturn(stored);
+
+            CardSetupRepository.VersionRow row = JdbcCardSetupRepository.versionRow(rs);
+
+            assertThat(row.schemaVersion()).isEqualTo(stored);
+            assertThat(row.version()).isEqualTo(3);
+            assertThat(row.changedParts()).containsExactly("layout", "fields");
+            assertThat(row.publishedAt()).isEqualTo(at.toInstant());
+        }
+    }
+
+    @Test
+    void aDraftRowCarriesTheStoredSchemaVersion() throws SQLException {
+        for (int stored : new int[] {1, 2}) {
+            ResultSet rs = mock(ResultSet.class);
+            OffsetDateTime at = OffsetDateTime.parse("2026-11-09T10:00:00Z");
+            when(rs.getString("setup")).thenReturn("{}");
+            when(rs.getInt("base_version")).thenReturn(2);
+            when(rs.getLong("revision")).thenReturn(9L);
+            when(rs.getObject("saved_by", UUID.class)).thenReturn(TENANT);
+            when(rs.getObject("saved_at", OffsetDateTime.class)).thenReturn(at);
+            when(rs.getInt("schema_version")).thenReturn(stored);
+
+            CardSetupRepository.DraftRow row = JdbcCardSetupRepository.draftRow(rs);
+
+            assertThat(row.schemaVersion()).isEqualTo(stored);
+            assertThat(row.revision()).isEqualTo(9L);
+            assertThat(row.baseVersion()).isEqualTo(2);
+        }
     }
 
     @Test
@@ -85,7 +153,7 @@ class JdbcCardSetupRepositoryTest {
         assertThat(update).contains("update ipd.card_setup_draft").contains("where tenant_id = :tenantId")
                 .contains("setup = cast(:setup as jsonb)").contains("base_version = :baseVersion")
                 .contains("revision = :revision").contains("saved_by = :by").contains("saved_at = :savedAt")
-                .doesNotContain("set tenant_id");
+                .contains("schema_version = :schemaVersion").doesNotContain("set tenant_id");
     }
 
     @Test

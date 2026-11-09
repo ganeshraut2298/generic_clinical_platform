@@ -54,7 +54,10 @@ export function visibleActions(
     .filter((a): a is (typeof CARD_ACTIONS)[number] => !!a && card[a.key]);
 }
 
-export function actionLabel(action: { label: string }, row: Pick<AdmittedPatientRow, 'patientName'>): string {
+export function actionLabel(
+  action: { label: string },
+  row: Pick<AdmittedPatientRow, 'patientName'>,
+): string {
   return `${action.label} for ${row.patientName}`;
 }
 
@@ -82,15 +85,16 @@ export function filterAnnounceText(matches: number, total: number): string {
 // ---- Search and ward filter (on the device; ADR-013 D8) ----
 
 /**
- * Rows whose patient name, UHID, bed code or IP number contains the text (case and edge spaces
- * ignored) and, when a ward is chosen, whose bed is in that ward. The order of the list is kept.
+ * Rows whose patient name, UHID, bed code or IP number contains the text (case, edge spaces and the way an accent is typed
+ * ignored: composed or as a base letter plus a combining mark, DEC-032 G-10) and, when a ward is chosen, whose bed is in that ward. The order of the list is kept.
  */
 export function filterRows(
   rows: readonly AdmittedPatientRow[],
   query: string,
   wardId: string,
 ): AdmittedPatientRow[] {
-  const q = query.trim().toLowerCase();
+  const fold = (text: string) => text.normalize('NFC').toLowerCase();
+  const q = fold(query.trim());
   return rows.filter((r) => {
     if (wardId !== ALL_WARDS && r.wardId !== wardId) {
       return false;
@@ -98,7 +102,7 @@ export function filterRows(
     if (q === '') {
       return true;
     }
-    return [r.patientName, r.uhid ?? '', r.bedCode, r.ipNumber].some((v) => v.toLowerCase().includes(q));
+    return [r.patientName, r.uhid ?? '', r.bedCode, r.ipNumber].some((v) => fold(v).includes(q));
   });
 }
 
@@ -150,7 +154,11 @@ export function admittedOnText(admittedAt: string): string {
 export function lengthOfStay(admittedAt: string, dayNumber: number, asOf: string): string {
   const at = new Date(admittedAt);
   const now = new Date(asOf);
-  if (!Number.isNaN(at.getTime()) && !Number.isNaN(now.getTime()) && istToday(at) === istToday(now)) {
+  if (
+    !Number.isNaN(at.getTime()) &&
+    !Number.isNaN(now.getTime()) &&
+    istToday(at) === istToday(now)
+  ) {
     return 'Day 1 (today)';
   }
   return dayNumber === 1 ? '1 day' : `${dayNumber} days`;
@@ -216,7 +224,14 @@ export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities):
     if (c.allergy.status === 'RECORDED') {
       const text = (c.allergy.text ?? '').trim();
       const shown = text === '' ? 'Allergy recorded' : `Allergy: ${text}`;
-      flags.push({ kind: 'allergy', text: shown, tone: 'crit', icon: 'alert', title: shown, safety: true });
+      flags.push({
+        kind: 'allergy',
+        text: shown,
+        tone: 'crit',
+        icon: 'alert',
+        title: shown,
+        safety: true,
+      });
     }
     const ews = c.latestEws;
     if (ews && (ews.risk === 'MEDIUM' || ews.risk === 'HIGH')) {
@@ -231,7 +246,14 @@ export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities):
       });
     }
     if (c.vitalsDue) {
-      flags.push({ kind: 'vitals', text: 'Vitals due', tone: 'warn', icon: 'clock', title: 'Vitals due', safety: false });
+      flags.push({
+        kind: 'vitals',
+        text: 'Vitals due',
+        tone: 'warn',
+        icon: 'clock',
+        title: 'Vitals due',
+        safety: false,
+      });
     }
   }
   if (row.goingHomeToday) {
@@ -245,7 +267,14 @@ export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities):
     });
   }
   if (row.depositLow && card.depositLowFlag) {
-    flags.push({ kind: 'deposit', text: 'Deposit low', tone: 'crit', icon: 'deposit', title: 'Deposit low', safety: false });
+    flags.push({
+      kind: 'deposit',
+      text: 'Deposit low',
+      tone: 'crit',
+      icon: 'deposit',
+      title: 'Deposit low',
+      safety: false,
+    });
   }
   return flags;
 }

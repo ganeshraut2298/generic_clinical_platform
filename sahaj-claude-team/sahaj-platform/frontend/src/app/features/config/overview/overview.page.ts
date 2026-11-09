@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { Observable, catchError, of } from 'rxjs';
 import { CardSetupApi } from '../../ipd/card/card-setup.api';
+import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { CONFIG_SECTIONS } from '../config-sections';
@@ -19,6 +21,9 @@ import {
   tileSummaries,
   todoBySection,
 } from './overview.logic';
+
+/** The roles GET /card-setup answers; any other role gets a 403 (SAH-37 code review #6). */
+export const CARD_SETUP_ROLES: readonly Role[] = ['FRONT_DESK', 'NURSE', 'DOCTOR', 'OWNER'];
 
 /**
  * Overview (SAH-7), mockup `cfgHome`: setup percentage, checklist with Fix links, a tile for each
@@ -39,6 +44,7 @@ export class OverviewPage implements OnInit {
   private readonly store = inject(ShellStore);
   private readonly ipdAccess = inject(IpdAccess);
   private readonly cardApi = inject(CardSetupApi);
+  private readonly destroyRef = inject(DestroyRef);
   private tileData: TileData | null = null;
   private cardRequested = false;
 
@@ -57,6 +63,10 @@ export class OverviewPage implements OnInit {
   protected readonly checks = computed(() => sortChecks(this.overview()?.checks ?? []));
   protected readonly counts = computed(() => summarise(this.overview()?.checks ?? []));
   protected readonly todo = computed(() => todoBySection(this.overview()?.checks ?? []));
+  private readonly canReadCard = computed(() => {
+    const role = this.store.me()?.role;
+    return !!role && CARD_SETUP_ROLES.includes(role);
+  });
   protected readonly tiles = computed(() =>
     CONFIG_SECTIONS.filter((s) => s.key !== 'home' && this.ipdAccess.visible(s)),
   );
@@ -64,7 +74,7 @@ export class OverviewPage implements OnInit {
   constructor() {
     // SAH-37 (AC15): the Patient card tile line needs the card setup, which only a clinic with IPD has.
     effect(() => {
-      if (this.ipdAccess.available()) {
+      if (this.ipdAccess.available() && this.canReadCard()) {
         untracked(() => this.loadCardTile());
       }
     });
@@ -133,7 +143,10 @@ export class OverviewPage implements OnInit {
     }
     this.cardApi
       .get()
-      .pipe(catchError(() => of(null)))
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((view) => {
         data.cardSetup = view;
         this.summaries.set(tileSummaries(data));

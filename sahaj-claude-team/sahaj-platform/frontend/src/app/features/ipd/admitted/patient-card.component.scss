@@ -179,10 +179,13 @@
   margin: 0;
 
   dt {
+    min-width: 0;
     font-size: 0.66rem;
     line-height: 1.25;
     font-weight: 600;
     color: var(--ink-3);
+    // The owner's label can be one long word; it wraps inside its column and never widens the card (D-5).
+    overflow-wrap: anywhere;
   }
   dd {
     margin: 0;
@@ -249,6 +252,15 @@
 
 .lay-expanded .pckv {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  // Three narrow columns: a value wraps (mockup .pckv dd{overflow-wrap:anywhere}, line 2079) instead of
+  // being cut to "4 Nov 2026, 9:..." where a phone has no hover title (D-6).
+  dd {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
 }
 
 .pcflags {

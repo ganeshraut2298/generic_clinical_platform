@@ -216,12 +216,11 @@
   background: var(--warn-soft);
 }
 
-// Mockup `.axws`: the work area is centred and no wider than 1320 px.
+// Mockup `.axws` (last rule: `max-width: none`): the work area fills the space beside the rail, so the
+// rail toggle never changes the side margins.
 .adm-page {
   box-sizing: border-box;
   width: 100%;
-  max-width: 1320px;
-  margin-inline: auto;
   padding: 14px 20px 24px;
   display: flex;
   flex-direction: column;

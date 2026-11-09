@@ -138,10 +138,10 @@ class CardSetupStoredIT extends CardSetupSupport {
         insertDraft(clinic, 1, 1, broken.toString());
         JsonNode draft = view(clinic.owner()).get("draft");
         assertRepairedLocks(draft.get("setup"));
-        assertThat(draft.get("revision").asLong()).isEqualTo(1);
-        // the owner can continue from the repaired draft
+        assertThat(draft.get("revision").asLong()).as("the stored token (inserted as 1) is shown as stored").isEqualTo(1);
+        // the owner can continue from the repaired draft; the next token is new
         assertThat(saveOk(clinic.owner(), 1, 1L, edit(draft.get("setup"), s -> s.put("layout", "compact")))
-                .get("draft").get("revision").asLong()).isEqualTo(2);
+                .get("draft").get("revision").asLong()).isGreaterThan(1);
         assertThat(view(nurse.auth()).has("draft")).isFalse();
     }
 
@@ -292,9 +292,9 @@ class CardSetupStoredIT extends CardSetupSupport {
     @Test
     void theDraftTableAllowsReplaceAndDeleteByTheAppButNotMovingTheRowToAnotherClinicOrTruncate() throws Exception {
         Clinic clinic = hospital();
-        saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
+        long saved = revisionOf(saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact"))));
         appOkCommitted(clinic, "update ipd.card_setup_draft set revision = revision + 1, saved_at = now()");
-        assertThat(values(clinic, "select revision::text from ipd.card_setup_draft")).containsExactly("2");
+        assertThat(values(clinic, "select revision::text from ipd.card_setup_draft")).containsExactly(String.valueOf(saved + 1));
         assertThat(appErr(clinic, "update ipd.card_setup_draft set tenant_id = gen_random_uuid()").state()).isEqualTo("42501");
         assertThat(appErr(clinic, "update ipd.card_setup_draft set base_version = 0").state()).isEqualTo("23514");
         assertThat(appErr(clinic, "truncate ipd.card_setup_draft").state()).isEqualTo("42501");
@@ -314,57 +314,63 @@ class CardSetupStoredIT extends CardSetupSupport {
         commitAsTenant(clinic.tenantId(), sql);
     }
 
-    // ---------------- the known hole: the revision restarts at 1 ----------------
+    // ---------------- the former hole: the revision restarted at 1 (fixed in the SAH-37 fix pass) ----------------
 
     /**
-     * ADR-015 D5 / docs/database/SAH-37.md section 7: the draft revision restarts at 1 when the row is gone. The service also
-     * compares the draft's {@code base_version}, so a recreated draft with a different base is refused (the second test).
-     * With the SAME base version a stale editor that still holds revision 1 passes both comparisons: it overwrites the
-     * other owner's recreated draft. This test documents the behaviour as it is today (RESULT: the stale editor CAN
-     * overwrite) so that a fix shows up as a red test to be turned into the opposite assertion. Severity Low, as the
-     * java-developer noted; owner: java-developer (e.g. a revision that never restarts, or a draft id).
+     * ADR-015 amendment A2: the draft revision is an opaque token that never repeats for a clinic. Before the fix pass the
+     * revision restarted at 1 when the row was gone, so a stale editor holding (base 1, revision 1) passed both comparisons
+     * on a draft that another owner had discarded and recreated on the same base, and overwrote it (this test used to document
+     * that, "knownGap..."). Now the stale editor is refused with 409 card-setup-changed on Save draft and on Publish, and
+     * nothing is stored.
      */
     @Test
-    void knownGapAStaleEditorAtRevision1CanOverwriteADraftThatAnotherOwnerDiscardedAndRecreatedOnTheSameBase() throws Exception {
+    void aStaleEditorHoldingTheOldRevisionIsRefusedOnSaveAndPublishAfterADiscardAndRecreateOnTheSameBase() throws Exception {
         Clinic clinic = hospital();
         Staff other = secondOwner(clinic);
-        // owner A saves the first draft: revision 1 on base version 1; A keeps (base 1, revision 1)
-        saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
-        // owner B discards it and starts a new one: it restarts at revision 1 on base version 1
-        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", other.auth(), null, 200);
+        // owner A saves the first draft on base version 1 and keeps its token pair (base 1, revision r1)
+        JsonNode first = saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
+        long r1 = first.get("draft").get("revision").asLong();
+        // owner B discards it and starts a new draft on the same base
+        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + r1, other.auth(), null, 200);
         JsonNode recreated = saveOk(other.auth(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "expanded")));
-        assertThat(recreated.get("draft").get("revision").asLong()).as("the revision restarted").isEqualTo(1);
-        // A, still holding the old token pair, saves: it is NOT refused and B's draft is gone
-        JsonNode mine = edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 4));
-        JsonNode result = ok(HttpMethod.PUT, DRAFT, clinic.owner(), writeBody(1, 1L, mine), 200);
-        assertThat(result.get("draft").get("setup").get("layout").asText()).as("B's layout is overwritten").isEqualTo("standard");
-        assertThat(result.get("draft").get("setup").get("cardsPerRow").asInt()).isEqualTo(4);
-        assertThat(result.get("draft").get("revision").asLong()).isEqualTo(2);
-        // the same through Publish: A publishes from the stale pair and B's draft is deleted without B being told
-        Clinic second = hospital();
-        Staff otherSecond = secondOwner(second);
-        saveOk(second.owner(), 1, null, edit(standard(second.owner()), s -> s.put("layout", "compact")));
-        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", otherSecond.auth(), null, 200);
-        saveOk(otherSecond.auth(), 1, null, edit(standard(second.owner()), s -> s.put("layout", "expanded")));
-        JsonNode published = publishOk(second.owner(), 1, 1L, edit(standard(second.owner()), s -> s.put("cardsPerRow", 4)));
-        assertThat(published.get("live").get("version").asInt()).isEqualTo(2);
-        assertThat(published.get("draft").isNull()).as("B's recreated draft was deleted by A's publish").isTrue();
+        long r2 = recreated.get("draft").get("revision").asLong();
+        assertThat(r2).as("the token of a recreated draft never repeats an earlier one").isNotEqualTo(r1);
+        Stored before = stored(clinic);
+        // A, still holding the old pair, tries Save draft: refused, B's draft is untouched
+        conflictOf(putDraft(clinic.owner(), 1, r1, edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 4))));
+        assertThat(stored(clinic)).as("a refused save stores nothing").isEqualTo(before);
+        assertThat(view(other.auth()).get("draft").get("setup").get("layout").asText()).isEqualTo("expanded");
+        // the same through Publish: refused, no version, B's recreated draft still there
+        conflictOf(publish(clinic.owner(), 1, r1, edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 4))));
+        assertThat(stored(clinic)).as("a refused publish stores nothing").isEqualTo(before);
+        assertThat(view(other.auth()).get("live").get("version").asInt()).isEqualTo(1);
+        // and A with the CURRENT token (after reloading) is accepted
+        JsonNode mine = ok(HttpMethod.PUT, DRAFT, clinic.owner(), writeBody(1, r2, edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 4))), 200);
+        assertThat(mine.get("draft").get("revision").asLong()).isNotIn(r1, r2);
+        // the token never repeats across repeated discard and recreate cycles
+        java.util.Set<Long> seen = new java.util.HashSet<>(java.util.List.of(r1, r2, mine.get("draft").get("revision").asLong()));
+        long current = mine.get("draft").get("revision").asLong();
+        for (int i = 0; i < 4; i++) {
+            ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + current, other.auth(), null, 200);
+            current = saveOk(other.auth(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact"))).get("draft").get("revision").asLong();
+            assertThat(seen.add(current)).as("revision " + current + " was used before").isTrue();
+        }
     }
 
     @Test
     void aStaleEditorIsRefusedWhenTheRecreatedDraftHasAnotherBaseVersionBecauseTheServiceAlsoComparesTheBase() throws Exception {
         Clinic clinic = hospital();
         Staff other = secondOwner(clinic);
-        saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
-        // B discards, publishes v2 and starts a new draft on base 2: revision 1 again, but base 2
-        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=1", other.auth(), null, 200);
+        long staleRevision = saveOk(clinic.owner(), 1, null, edit(standard(clinic.owner()), s -> s.put("layout", "compact"))).get("draft").get("revision").asLong();
+        // B discards, publishes v2 and starts a new draft on base 2 (a new token, and base 2)
+        ok(HttpMethod.DELETE, DRAFT + "?draftRevision=" + staleRevision, other.auth(), null, 200);
         publishOk(other.auth(), 1, null, edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 2)));
         JsonNode recreated = saveOk(other.auth(), 2, null, edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 4)));
-        assertThat(recreated.get("draft").get("revision").asLong()).isEqualTo(1);
+        assertThat(recreated.get("draft").get("revision").asLong()).isNotEqualTo(staleRevision);
         assertThat(recreated.get("draft").get("baseVersion").asInt()).isEqualTo(2);
         Stored before = stored(clinic);
-        conflictOf(putDraft(clinic.owner(), 1, 1L, edit(standard(clinic.owner()), s -> s.put("layout", "expanded"))));
-        conflictOf(publish(clinic.owner(), 1, 1L, edit(standard(clinic.owner()), s -> s.put("layout", "expanded"))));
+        conflictOf(putDraft(clinic.owner(), 1, staleRevision, edit(standard(clinic.owner()), s -> s.put("layout", "expanded"))));
+        conflictOf(publish(clinic.owner(), 1, staleRevision, edit(standard(clinic.owner()), s -> s.put("layout", "expanded"))));
         assertThat(stored(clinic)).isEqualTo(before);
         // and with the current base but the old draft token pair of a draft that no longer exists as such
         assertThat(view(clinic.owner()).get("draft").get("setup").get("cardsPerRow").asInt()).isEqualTo(4);

@@ -1,7 +1,13 @@
 // Clinic setup → Patient card (mockup `.pcbar`, `.pcsplit`, `.pced`, `.pcpv`).
+// The page is a size container: it sits inside the 248 px rail and the 270 px setup menu, so the room for
+// the editor depends on the work area and not on the window (DEC-032 D-1). --pcbar-h is the height of
+// the status bar now (one row or two); the page sets it so the sticky preview starts just below the bar (D-8).
 :host {
   display: block;
   min-width: 0;
+  container: ipcard / inline-size;
+  --pcbar-h: 66px;
+  --pcbar-top: 64px;
 }
 
 .pccfg {
@@ -20,7 +26,7 @@
   padding: 10px 12px;
   border-radius: var(--r-sm);
   position: sticky;
-  top: 64px;
+  top: var(--pcbar-top);
   z-index: 5;
 }
 
@@ -38,6 +44,11 @@
 
 .pcba button {
   min-height: 44px;
+}
+
+// "Publishing" is wider than "Publish"; a minimum width keeps the bar from shifting (D-14).
+.pcba [data-act='publish'] {
+  min-width: 112px;
 }
 
 .tabs button {
@@ -58,9 +69,13 @@
   min-width: 0;
 }
 
+// The preview sticks just below the status bar and scrolls inside itself when it is taller than the
+// window, so its last lines can always be reached (D-7, D-8).
 .pcpv {
   position: sticky;
-  top: 130px;
+  top: calc(var(--pcbar-top) + var(--pcbar-h) + 8px);
+  max-height: calc(100vh - var(--pcbar-top) - var(--pcbar-h) - 20px);
+  overflow: auto;
   padding: 14px;
   border-radius: var(--r);
   display: flex;
@@ -75,11 +90,23 @@
   text-align: right;
 }
 
-@media (max-width: 1100px) {
+// Editor above preview as soon as the editor would get under about 480 px (the label box needs room);
+// the mockup does this at a 1180 px window (@media (max-width:1180px), mockup line 2181), which is
+// too late inside the rail and the setup menu (D-1).
+@container ipcard (max-width: 879px) {
   .pcsplit {
     grid-template-columns: minmax(0, 1fr);
   }
   .pcpv {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+// Phones: the status bar is not sticky (mockup line 2182, .pcbar{position:static}; D-3).
+@media (max-width: 760px) {
+  .pcbar {
     position: static;
   }
 }

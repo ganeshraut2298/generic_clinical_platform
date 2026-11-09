@@ -17,6 +17,7 @@ import {
   ROLE_NAME,
 } from './card-setup.model';
 import type { AdmittedCardAbilities } from '../ipd.model';
+import { canonicalLabel, normalLabel } from './card-label.rules';
 
 /**
  * Pure editing rules of Clinic setup → Patient card (SAH-37). Each operation returns a new setup, or a
@@ -34,25 +35,36 @@ export function cloneSetup(setup: CardSetup): CardSetup {
   return JSON.parse(JSON.stringify(setup)) as CardSetup;
 }
 
-/** Labels trimmed; the shape the server compares and stores (empty label means the standard name). */
-export function canonicalSetup(setup: CardSetup): CardSetup {
+/**
+ * The shape the server compares and stores (G-3): every label in NFC, stripped at both ends, and "" when it
+ * is exactly the field's own standard name (case-sensitive), so the browser and the server agree on what
+ * is a change. Without the catalogue only the NFC and strip steps apply.
+ */
+export function canonicalSetup(setup: CardSetup, catalogue?: CardCatalogue): CardSetup {
   const copy = cloneSetup(setup);
   for (const section of copy.sections) {
     for (const f of section.fields) {
-      f.label = f.label.trim();
+      const name = catalogue?.fields.find((c) => c.key === f.key)?.name;
+      f.label = name === undefined ? normalLabel(f.label) : canonicalLabel(f.label, name);
     }
   }
   return copy;
 }
 
-export function sameSetup(a: CardSetup, b: CardSetup): boolean {
-  return JSON.stringify(canonicalSetup(a)) === JSON.stringify(canonicalSetup(b));
+export function sameSetup(a: CardSetup, b: CardSetup, catalogue?: CardCatalogue): boolean {
+  return (
+    JSON.stringify(canonicalSetup(a, catalogue)) === JSON.stringify(canonicalSetup(b, catalogue))
+  );
 }
 
 /** The parts that differ from the live setup, in the order of the pill (mockup `pcChanges`). */
-export function changedParts(edit: CardSetup, live: CardSetup): CardChangedPart[] {
-  const a = canonicalSetup(edit);
-  const b = canonicalSetup(live);
+export function changedParts(
+  edit: CardSetup,
+  live: CardSetup,
+  catalogue?: CardCatalogue,
+): CardChangedPart[] {
+  const a = canonicalSetup(edit, catalogue);
+  const b = canonicalSetup(live, catalogue);
   const out: CardChangedPart[] = [];
   if (a.layout !== b.layout || a.cardsPerRow !== b.cardsPerRow) {
     out.push('layout');
@@ -61,7 +73,15 @@ export function changedParts(edit: CardSetup, live: CardSetup): CardChangedPart[
   if (flags(a) !== flags(b)) {
     out.push('sections');
   }
-  const fields = (s: CardSetup) => JSON.stringify(s.sections.map((x) => x.fields));
+  // Field placement: which fields each section holds, in what order, switched on or off, with which label.
+  // Independent of the order of the sections, as the server compares it (moving a section alone is one
+  // change, "sections"; SAH-37 design note section 5).
+  const fields = (s: CardSetup) =>
+    JSON.stringify(
+      s.sections
+        .map((x) => [x.key, x.fields] as const)
+        .sort(([ka], [kb]) => (ka < kb ? -1 : ka > kb ? 1 : 0)),
+    );
   if (fields(a) !== fields(b)) {
     out.push('fields');
   }
@@ -244,6 +264,14 @@ export function labelLocked(catalogue: CardCatalogue, key: CardFieldKey): boolea
   return isSafetyField(catalogue, key) || isRequiredField(catalogue, key);
 }
 
+/** The box stops at `max` UTF-16 units (AC31); a pair of units that make one character is never cut in half. */
+function cutLabel(label: string, max: number): string {
+  const cut = label.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  const splitPair = last >= 0xd800 && last <= 0xdbff && label.length > max;
+  return splitPair ? cut.slice(0, -1) : cut;
+}
+
 export function setFieldLabel(
   setup: CardSetup,
   catalogue: CardCatalogue,
@@ -257,7 +285,7 @@ export function setFieldLabel(
   for (const section of next.sections) {
     const f = section.fields.find((x) => x.key === key);
     if (f) {
-      f.label = label.slice(0, catalogue.labelMaxLength);
+      f.label = cutLabel(label, catalogue.labelMaxLength);
     }
   }
   return next;

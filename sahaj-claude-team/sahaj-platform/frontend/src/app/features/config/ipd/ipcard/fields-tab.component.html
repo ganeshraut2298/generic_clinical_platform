@@ -25,7 +25,7 @@
         @for (r of g.rows; track r.field.key) {
           <div
             #row
-            class="pcrow"
+            class="pcrow lbl"
             [class.off]="!r.field.on"
             [class.dragging]="dragged() === r.field.key"
             [class.over]="over() === r.field.key"
@@ -52,17 +52,30 @@
             <span class="pcrm">
               <input
                 class="input pclbl"
+                [class.bad]="r.message !== null"
                 type="text"
                 autocomplete="off"
                 [attr.maxlength]="maxLength()"
                 [value]="r.labelLocked ? r.cat.name : r.field.label"
                 [placeholder]="r.cat.name"
                 [attr.aria-label]="'Label for ' + r.cat.name"
+                [attr.aria-invalid]="r.message !== null ? 'true' : null"
+                [attr.aria-describedby]="r.message !== null ? 'pc-err-' + r.field.key : null"
                 [attr.data-label]="r.field.key"
                 [disabled]="store.locked() || r.labelLocked"
                 (input)="onLabel(r.field.key, $event)"
                 (change)="onLabelDone(r.field.key, $event)"
+                (blur)="store.labelLeft(r.field.key)"
               />
+              @if (r.message; as message) {
+                <small
+                  class="ferr"
+                  role="alert"
+                  [id]="'pc-err-' + r.field.key"
+                  [attr.data-error]="r.field.key"
+                  >{{ message }}</small
+                >
+              }
               <small>{{ r.line }}</small>
             </span>
             @if (r.cat.required) {
@@ -78,6 +91,7 @@
                 role="switch"
                 [attr.aria-checked]="r.field.on"
                 [attr.aria-label]="'Show ' + r.cat.name"
+                [attr.title]="'Show ' + r.cat.name"
                 [attr.data-switch]="r.field.key"
                 [disabled]="store.locked()"
                 (click)="store.toggleField(r.field.key)"
@@ -90,6 +104,7 @@
                   class="iconbtn sm"
                   data-move="up"
                   [attr.aria-label]="'Move up ' + r.cat.name"
+                  [attr.title]="'Move up ' + r.cat.name"
                   [disabled]="store.locked() || !r.canUp"
                   (click)="move(r.field.key, -1)"
                 >
@@ -100,6 +115,7 @@
                   class="iconbtn sm"
                   data-move="down"
                   [attr.aria-label]="'Move down ' + r.cat.name"
+                  [attr.title]="'Move down ' + r.cat.name"
                   [disabled]="store.locked() || !r.canDown"
                   (click)="move(r.field.key, 1)"
                 >

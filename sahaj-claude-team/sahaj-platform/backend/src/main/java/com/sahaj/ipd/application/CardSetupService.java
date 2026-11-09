@@ -15,6 +15,7 @@ import com.sahaj.ipd.domain.card.CardSetupCanonical;
 import com.sahaj.ipd.domain.card.CardSetupDefaults;
 import com.sahaj.ipd.domain.card.CardSetupValidator;
 import com.sahaj.ipd.domain.card.CardSetupValidator.Problem;
+import com.sahaj.ipd.domain.card.ResolvedCardSetup;
 import com.sahaj.ipd.domain.card.TextRules;
 import com.sahaj.platform.api.ActorDirectoryPort;
 import com.sahaj.platform.api.AuditLog;
@@ -25,8 +26,8 @@ import com.sahaj.platform.api.InvalidInputException;
 import com.sahaj.platform.api.ModuleEntitlementPort.ModuleEntitlement;
 import com.sahaj.platform.api.OwnerGuard;
 import com.sahaj.platform.api.TeamMemberPort;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,13 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
  * validated here on every save and publish, and repaired on read (ADR-015 D3).
  *
  * <p>The audit rows (IPD_CARD_DRAFT_SAVED, IPD_CARD_PUBLISHED) hold version numbers and the names of the changed parts
- * only, never a label and never patient data. Nothing here logs the setup or a label.
+ * only, never a label and never patient data; IPD_CARD_PUBLISHED also holds {@code factsOn}, the field keys of the
+ * sensitive facts the published card switches on (diagnosis, the vitals fields, mobile). Nothing here logs the setup or
+ * a label.
  */
 @Service
 public class CardSetupService {
 
-    static final String FORBIDDEN_READ = "You cannot open the card setup.";
-    static final String FORBIDDEN_WRITE = "Only the clinic owner can change the patient card.";
     static final int MAX_VERSIONS = 50;
     static final String V1_SUMMARY = "Sahaj standard patient card (default)";
     static final String BACK_TO_STANDARD = "Back to the Sahaj standard card";
@@ -104,10 +105,9 @@ public class CardSetupService {
      */
     @Transactional(readOnly = true)
     public CardSetupView view(UUID tenantId, UUID actor, String role) {
-        SafetySupport.requireRole(role, CardAccessRule.LIST_ROLES, FORBIDDEN_READ);
+        SafetySupport.requireRole(role, CardAccessRule.LIST_ROLES);
         ModuleEntitlement ent = gate.check(tenantId, false);
-        String memberRole = SafetySupport.membershipRole(team, tenantId, actor, CardAccessRule.LIST_ROLES,
-                FORBIDDEN_READ);
+        String memberRole = SafetySupport.membershipRole(team, tenantId, actor, CardAccessRule.LIST_ROLES);
         boolean owner = "OWNER".equals(role) && "OWNER".equals(memberRole);
         return build(tenantId, ent, owner);
     }
@@ -115,8 +115,10 @@ public class CardSetupService {
     // ---- write ----
 
     /**
-     * Save draft. A setup equal to the live setup removes any draft and writes no history line (AC8); otherwise the
-     * draft is stored with the next revision and one change-history line is written in the same transaction.
+     * Save draft. A setup equal to the live setup removes any draft and writes no history line (AC8). A setup equal to
+     * the draft already stored changes nothing and writes no history line (the draft, its revision and its saver stay;
+     * security review SAH-37, finding 3). Otherwise the draft is stored with the next revision (see
+     * {@link #nextRevision}) and one change-history line is written in the same transaction.
      */
     @Transactional
     public CardSetupView saveDraft(UUID tenantId, UUID actor, String role, JsonNode body) {
@@ -128,12 +130,17 @@ public class CardSetupService {
             repository.deleteDraft(tenantId);
             return build(tenantId, write.ent, true);
         }
+        if (draft.isPresent() && draft.get().baseVersion() == live.version()
+                && CardSetupCanonical.equal(write.setup, CardSetups.draftSetup(draft.get()))) {
+            return build(tenantId, write.ent, true);
+        }
         List<String> parts = CardSetupCanonical.changedParts(live.setup(), write.setup);
-        long revision = draft.map(d -> d.revision() + 1).orElse(1L);
+        Instant now = gate.now();
+        long revision = nextRevision(draft, now);
         String json = CardSetupJson.write(write.setup);
         try {
             if (draft.isPresent()) {
-                repository.updateDraft(tenantId, json, live.version(), revision, actor, gate.now());
+                repository.updateDraft(tenantId, json, live.version(), revision, actor, now);
             } else {
                 repository.insertDraft(tenantId, json, live.version(), revision, actor);
             }
@@ -156,7 +163,7 @@ public class CardSetupService {
      */
     @Transactional
     public CardSetupView discardDraft(UUID tenantId, UUID actor, String role, Long draftRevision) {
-        SafetySupport.requireRole(role, OWNER_ONLY, FORBIDDEN_WRITE);
+        SafetySupport.requireRole(role, OWNER_ONLY);
         ownerGuard.requireOwner(tenantId, actor);
         ModuleEntitlement ent = gate.check(tenantId, false);
         if (draftRevision == null || draftRevision < 1) {
@@ -204,6 +211,7 @@ public class CardSetupService {
         after.put("version", version);
         after.put("changedParts", parts);
         after.put("isStandard", standard);
+        after.put("factsOn", factsOn(write.setup));
         auditLog.record("IPD_CARD_PUBLISHED", "IPD_CONFIG", null, before, after);
         return build(tenantId, write.ent, true);
     }
@@ -225,7 +233,7 @@ public class CardSetupService {
 
     /** Role, module, body (400 with every error), Read-only (409), then the clinic lock. */
     private Write begin(UUID tenantId, UUID actor, String role, JsonNode body) {
-        SafetySupport.requireRole(role, OWNER_ONLY, FORBIDDEN_WRITE);
+        SafetySupport.requireRole(role, OWNER_ONLY);
         ownerGuard.requireOwner(tenantId, actor);
         ModuleEntitlement ent = gate.check(tenantId, false);
         CardSetupWrite request = CardSetupJson.readRequest(body);
@@ -253,22 +261,51 @@ public class CardSetupService {
 
     /**
      * 409 card-setup-changed when the live version is not the one the editor loaded, or a draft exists whose revision
-     * (or base version: the revision restarts at 1 after a discard) is not the editor's, or no draft exists while the
-     * editor holds one.
+     * is not the editor's, or no draft exists while the editor holds one. A draft's base version always equals the live
+     * version (a publish removes the draft), so the live version check covers it. Because a revision never repeats for
+     * a clinic ({@link #nextRevision}), a stale editor cannot match a draft that was discarded and started again.
      */
     private static void requireCurrent(CardSetupWrite request, CardSetups.Live live, Optional<DraftRow> draft) {
         if (live.version() != request.baseVersion()) {
             throw changed();
         }
         if (draft.isPresent()) {
-            DraftRow row = draft.get();
-            if (request.draftRevision() == null || row.revision() != request.draftRevision()
-                    || row.baseVersion() != request.baseVersion()) {
+            if (request.draftRevision() == null || draft.get().revision() != request.draftRevision()) {
                 throw changed();
             }
         } else if (request.draftRevision() != null) {
             throw changed();
         }
+    }
+
+    /**
+     * The revision of the draft about to be stored: it never repeats for a clinic, also after a Discard, a Publish or a
+     * Save equal to the live setup (all of which delete the draft row), so a stale editor cannot match a draft that was
+     * started again (AC12; code review SAH-37 finding 1, security finding 2). With no schema change the row cannot
+     * remember its last number, so the number comes from the clock: the time in microseconds since 1970 (about 1.8e15,
+     * inside the 2^53 a browser number holds exactly), and at least one more than the revision of the draft being
+     * replaced, so saves in the same microsecond still differ. The clinic lock serialises the writers. It is an opaque
+     * token: not a count of saves and it does not start at 1. It assumes the clock does not run backwards by more than
+     * the time between a discard and the next save.
+     */
+    static long nextRevision(Optional<DraftRow> draft, Instant now) {
+        long micros = Math.addExact(Math.multiplyExact(now.getEpochSecond(), 1_000_000L), now.getNano() / 1_000L);
+        return draft.map(d -> Math.max(micros, d.revision() + 1)).orElse(micros);
+    }
+
+    /**
+     * The sensitive facts the published setup switches on, as field keys in catalogue order (diagnosis, the vitals
+     * fields, mobile): what the ward list then carries. Keys only, never a label (security review SAH-37, 1b).
+     */
+    static List<String> factsOn(CardSetup setup) {
+        Set<String> shown = ResolvedCardSetup.of(0, false, false, setup).shownFields();
+        List<String> on = new ArrayList<>();
+        for (String key : CardCatalogue.SENSITIVE_FACTS) {
+            if (shown.contains(key)) {
+                on.add(key);
+            }
+        }
+        return List.copyOf(on);
     }
 
     static ConflictException changed() {
@@ -290,24 +327,25 @@ public class CardSetupService {
         draftRow.ifPresent(d -> ids.add(d.savedBy()));
         heads.forEach(h -> ids.add(h.publishedBy()));
         Map<UUID, String> names = ids.isEmpty() ? Map.of() : actors.displayNames(tenantId, ids);
-        Map<UUID, String> safeNames = new HashMap<>(names);
 
         CardLive cardLive = new CardLive(live.version(), live.isStandard(), live.setup(), live.publishedAt(),
-                live.publishedBy() == null ? null : name(safeNames, live.publishedBy()));
-        Optional<CardDraft> draft = null;
-        List<CardVersion> versions = null;
-        if (owner) {
-            draft = draftRow.map(row -> {
-                CardSetup setup = CardSetups.draftSetup(row);
-                return new CardDraft(row.revision(), row.baseVersion(), setup, row.savedAt(),
-                        name(safeNames, row.savedBy()), CardSetupCanonical.changedParts(live.setup(), setup));
-            });
-            versions = versions(heads, safeNames);
-        }
+                live.publishedBy() == null ? null : name(names, live.publishedBy()));
         boolean canEdit = owner && !readonly;
         String reason = canEdit ? null : owner ? "IPD_READONLY" : "ROLE";
+        // The contract's two kinds of "no draft": for the owner an Optional.empty() (written as JSON null); for every
+        // other role Java null (the property is absent from the JSON, see CardSetupView). Same for the versions.
         return new CardSetupView(CardCatalogue.catalogue(), CardSetupDefaults.standard(),
-                CardSetupDefaults.templates(), cardLive, draft, versions, canEdit, reason, state);
+                CardSetupDefaults.templates(), cardLive, owner ? draftOf(draftRow, live, names) : null,
+                owner ? versions(heads, names) : null, canEdit, reason, state);
+    }
+
+    private static Optional<CardDraft> draftOf(Optional<DraftRow> draftRow, CardSetups.Live live,
+                                               Map<UUID, String> names) {
+        return draftRow.map(row -> {
+            CardSetup setup = CardSetups.draftSetup(row);
+            return new CardDraft(row.revision(), row.baseVersion(), setup, row.savedAt(),
+                    name(names, row.savedBy()), CardSetupCanonical.changedParts(live.setup(), setup));
+        });
     }
 
     private static List<CardVersion> versions(List<VersionHead> heads, Map<UUID, String> names) {

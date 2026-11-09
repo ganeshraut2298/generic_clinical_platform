@@ -25,17 +25,19 @@ public final class CardSetupRepair {
     private CardSetupRepair() {
     }
 
-    public static CardSetup repair(CardSetup stored) {
+    /** {@code text} is the same rule the validator applies to a label (V12), so repair and validation agree. */
+    public static CardSetup repair(CardSetup stored, TextRules text) {
         CardSetup standard = CardSetupDefaults.standard();
         String layout = stored.layout() != null && CardCatalogue.LAYOUTS.contains(stored.layout())
                 ? stored.layout() : standard.layout();
         int perRow = CardCatalogue.CARDS_PER_ROW.contains(stored.cardsPerRow()) ? stored.cardsPerRow()
                 : standard.cardsPerRow();
-        return new CardSetup(layout, perRow, sections(stored.sections() == null ? List.of() : stored.sections()),
+        return new CardSetup(layout, perRow,
+                sections(stored.sections() == null ? List.of() : stored.sections(), text),
                 actions(stored.actions() == null ? List.of() : stored.actions()));
     }
 
-    private static List<Section> sections(List<Section> stored) {
+    private static List<Section> sections(List<Section> stored, TextRules rules) {
         // 1. known sections, once each, in stored order; the fields of a dropped duplicate are not lost: they are
         //    collected below with all others.
         Map<String, Boolean> on = new LinkedHashMap<>();
@@ -102,7 +104,7 @@ public final class CardSetupRepair {
         for (String sectionKey : sectionOrder) {
             List<FieldPlacement> placements = new ArrayList<>();
             for (String fieldKey : order.get(sectionKey)) {
-                placements.add(placement(fields.get(fieldKey)));
+                placements.add(placement(fields.get(fieldKey), rules));
             }
             result.add(new Section(sectionKey, on.get(sectionKey), List.copyOf(placements)));
         }
@@ -118,26 +120,35 @@ public final class CardSetupRepair {
         throw new IllegalStateException("A catalogue field was not placed: " + fieldKey);
     }
 
-    private static FieldPlacement placement(FieldPlacement stored) {
+    private static FieldPlacement placement(FieldPlacement stored, TextRules rules) {
         CardCatalogue.FieldDef def = CardCatalogue.field(stored.key()).orElseThrow();
         if (def.locked()) {
             return new FieldPlacement(def.key(), true, "");
         }
-        return new FieldPlacement(def.key(), stored.on(), label(stored.label(), def.name()));
+        return new FieldPlacement(def.key(), stored.on(), label(stored.label(), def.name(), rules));
     }
 
-    /** A stored label is NFC, trimmed, free of control characters and at most 40 code points. */
-    private static String label(String stored, String standardName) {
+    /**
+     * A stored label is NFC, trimmed and at most 40 code points, and free of what the validator refuses (V12): control,
+     * invisible and text-direction characters, by the same {@link TextRules} (security review SAH-37; code review 4). A
+     * clean label is kept as it is (a joiner that is in place stays); an unclean one loses every code point the rule
+     * refuses.
+     */
+    private static String label(String stored, String standardName, TextRules rules) {
         if (stored == null) {
             return "";
         }
+        String nfc = Normalizer.normalize(stored, Normalizer.Form.NFC);
         StringBuilder clean = new StringBuilder();
-        Normalizer.normalize(stored, Normalizer.Form.NFC).codePoints()
-                .filter(cp -> !Character.isISOControl(cp)).limit(CardCatalogue.LABEL_RAW_MAX)
-                .forEach(clean::appendCodePoint);
-        String text = clean.toString().strip();
+        if (rules.hasControlOrBidi(nfc)) {
+            nfc.codePoints().filter(cp -> !rules.hasControlOrBidi(new String(Character.toChars(cp))))
+                    .limit(CardCatalogue.LABEL_RAW_MAX).forEach(clean::appendCodePoint);
+        } else {
+            nfc.codePoints().limit(CardCatalogue.LABEL_RAW_MAX).forEach(clean::appendCodePoint);
+        }
+        String text = rules.strip(clean.toString());
         if (text.codePointCount(0, text.length()) > CardCatalogue.LABEL_MAX) {
-            text = text.substring(0, text.offsetByCodePoints(0, CardCatalogue.LABEL_MAX)).strip();
+            text = rules.strip(text.substring(0, text.offsetByCodePoints(0, CardCatalogue.LABEL_MAX)));
         }
         return text.equals(standardName) ? "" : text;
     }

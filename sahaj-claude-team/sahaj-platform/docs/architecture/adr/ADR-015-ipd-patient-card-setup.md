@@ -2,7 +2,7 @@
 
 Story: SAH-37 (IPD patient card setup; the Admitted cards use it)
 Mockup screens: Clinic setup → Patient card (screen-map row 29: `cfgIpCard`, `pcBar`, `pcPreview`, `pcDefault`, `PC_PRESET`, `PC_LAY`, `PC_F`, `PC_S`, `PC_A`, "Published versions", locked safety block at mockup line 8434); IPD → Admitted (`pcCard`, `pcgrid lay-*`, "Customize card")
-Module: ipd only (schema `ipd`, package `com.sahaj.ipd`). Existing ports only: `platform.api` (`TeamMemberPort`, `ModuleEntitlementPort`, `AuditLog`, `ActorDirectoryPort`) and `patient.api` (`PatientClinicalPort`, `PatientLookupPort`). No new module, port, event, library or service.
+Module: ipd only (schema `ipd`, package `com.sahaj.ipd`). Existing ports only: `platform.api` (`TeamMemberPort`, `ModuleEntitlementPort`, `AuditLog`, `ActorDirectoryPort`) and `patient.api` (`PatientClinicalPort`, `PatientLookupPort`). No new module, port, event, library or service. One new method on the existing `PatientLookupPort`: `mobilesOf(tenantId, ids)`, the explicit mobile read (see "Review amendments (9 Nov 2026)" A3).
 Status: PROPOSED (9 Nov 2026), with the SAH-37 contract. Accepted when the human approves `contract`. Work proceeds on the human's go-ahead of 9 Nov 2026 (`docs/handoffs/SAH-37.md`) and DEC-027 (decided).
 Deciders: Ganesh (human), tech-lead; recorded by solution-architect
 Related: `docs/requirements/SAH-37.md` (rules 1 to 21), `docs/stories/SAH-37.md` (AC1 to AC66), DEC-027, DEC-021, ADR-013 (D2, D3, D5, D6, D7, D10, D14, D15), ADR-006 (D3 `EarlyWarningScore`), ADR-002 (D7 audit port), `docs/architecture/SAH-37-patient-card-setup.md` (catalogue, validation table, defaults, frontend notes), `docs/api/ipd.yaml`
@@ -22,7 +22,7 @@ Related: `docs/requirements/SAH-37.md` (rules 1 to 21), `docs/stories/SAH-37.md`
 
 Two new tenant tables in `ipd` (details in "Data needed"):
 - `ipd.card_setup_version`: one row per publish, version 2, 3, ... per clinic. Append-only (update, delete, truncate refused by trigger). The live setup is the row with the highest version.
-- `ipd.card_setup_draft`: at most one row per clinic (primary key `tenant_id`), with a `revision` counter for optimistic concurrency. Replaced on Save draft; deleted on Discard and on Publish.
+- `ipd.card_setup_draft`: at most one row per clinic (primary key `tenant_id`), with a `revision` token for optimistic concurrency (an opaque clock-based token, changes on every save that changes the draft, never repeats for a clinic; D5, A2, DEC-028 addendum). Replaced on Save draft; deleted on Discard and on Publish.
 
 A clinic that never published has no row: the live setup is the **Sahaj standard setup, v1**, built in code (`CardSetupDefaults.standard()`). Reading never creates a row (as the Discharge and Transfer settings). Versions are not restored (out of scope); every version stays readable for the history.
 
@@ -39,7 +39,7 @@ Options rejected: (a) one row with live and draft columns: no history; (b) store
 | Save draft, Discard draft, Publish | OWNER | Trial, On (Read-only 409 `ipd-readonly`, OQ-37-10, as `PUT /discharge-settings`) |
 | Any | BILLING, PHARMACIST, VISITING_DOCTOR, others: 403 `forbidden`; IPD Off: 403 `module-off` | |
 
-Non-owners never receive the draft: `draft` and `versions` are **absent** from their answer (ADR-013 D3 pattern). The membership re-read uses `TeamMemberPort.findActiveByUserId` (the `OwnerGuard` pattern), so a demoted owner cannot publish with an old token. Check order on writes: role 403, module Off 403, body 400, Read-only 409, then the lock and the concurrency check 409 (D5).
+Non-owners never receive the draft: `draft` and `versions` are **absent** from their answer (ADR-013 D3 pattern). The membership re-read uses `TeamMemberPort.findActiveByUserId` (the `OwnerGuard` pattern), so a demoted owner cannot publish with an old token. Check order on writes: role 403, module Off 403, body 400, Read-only 409, then the lock and the concurrency check 409 (D5). Every 403 `forbidden` in SAH-37 (the four `/card-setup` operations and `cardFacts=all`) carries the shared forbidden problem of the platform handler (title "Not allowed", detail "You do not have access to this."), whether the token role or the membership re-read refuses; there is no operation-specific 403 text (A1).
 
 ### D3 · The server owns the card rule: catalogue, canonical form, validation, repair
 
@@ -75,6 +75,8 @@ Rejected: the Admitted page reading `GET /card-setup` separately (two requests p
 - Publish inserts version `max + 1`. The unique index `(tenant_id, version)` is the backstop; a 23505 maps to 409 `card-setup-changed`, never 500.
 - A double tap on Publish: the first succeeds; the second carries the old `baseVersion` and gets 409, and the client reloads (the button is also disabled while busy, AC13). Exactly one version is made (AC8).
 - The draft write is `insert ... on conflict (tenant_id) do update ... where revision = :draftRevision` style or an update guarded by revision; either way the advisory lock already serialises it.
+- **The revision is an opaque clock-based token** (A2, DEC-028 addendum, option A): the server sets it to `max(microseconds since 1970, previous revision + 1)`, about 1.79e15, below 2^53, so a browser number holds it exactly. It grows and changes on every Save draft that changes the draft and never repeats for a clinic, also after a Discard or a Publish removed the draft; it never restarts at 1. So an editor holding the token of a removed draft can never match a newer draft (AC12). The contract does not promise how the server derives it; the client sends back what it received and never computes or compares it. **No schema change:** `ipd.card_setup_draft.revision` stays `bigint`, `check (revision >= 1)`; no per-clinic counter table (option B rejected). Accepted risk: the server clock must not run backwards by more than the gap between a Discard or Publish and the next Save draft.
+- **A save equal to the stored draft changes nothing:** when the setup (canonical form) equals the stored draft, the revision stays, no history line is written and the answer carries the stored draft unchanged. (A setup equal to the live one still removes the draft, AC8.)
 
 ### D6 · `GET /admissions`: extra facts, role-gated, absent not null, minimised by the published setup
 
@@ -85,7 +87,7 @@ The rule from ADR-013 D3 is kept: a role-gated property is **absent** from the J
 | `clinical.diagnosis` | `AdmittedClinicalFlags` | OWNER, DOCTOR, NURSE | `ipd.admission.reason` in R1 (same row; one more column) |
 | `clinical.latestVitals` (each reading present only when its field is on; `recordedByName` only when Last recorded is on) | `AdmittedClinicalFlags` | OWNER, DOCTOR, NURSE | R4 of ADR-013 extended to the five readings and `recorded_by` (same row per admission, no extra probe); recorder names: one `ActorDirectoryPort.displayNames` batch, only when Last recorded is on |
 | reading `mark` (`CHECK`, `CRITICAL`, absent for none) | each reading | as above | `EarlyWarningScore` per-parameter points (ADR-006 D3): 3 = CRITICAL, 1 or 2 = CHECK, 0 = none. BP uses the systolic points (diastolic is not scored). No new threshold (DEC-027, OQ-37-11) |
-| `mobile` | `AdmittedPatientRow` | OWNER, FRONT_DESK | FRONT_DESK: the R2' `PatientLookupPort.findAllCurrent` already loaded (`PatientSummary.mobile`). OWNER: one extra `findAllCurrent` batch, **only** when Mobile is on (OWNER's R2 is `PatientClinicalPort`, which has no mobile). Amends ADR-013 D15 ("the mobile number is never mapped into the list") for this one switch |
+| `mobile` | `AdmittedPatientRow` | OWNER, FRONT_DESK | **Superseded by A3:** one explicit batch mobile read, `PatientLookupPort.mobilesOf(tenantId, ids)`, called **only** when the plan needs Mobile (field on, or `cardFacts=all`) and the caller is OWNER or FRONT_DESK. `findAllCurrent` stays free of mobiles. Amends ADR-013 D15 ("the mobile number is never mapped into the list") for this one switch |
 
 - Billing fields (`runningBillPaise`, `depositPaise`, `payer`, `depositLow`) and `ipNumber`, `admissionType` stay on every row for all four roles, as ADR-013 D3 decided for the unchanged Table view. On the **card** they are drawn only for groups in `card.visibleGroups`. This is a display rule, not a privacy control, exactly as today; removing the bill from NURSE and DOCTOR would change the Table and is out of scope (open point O2).
 - `cardFacts=all` (query parameter, **OWNER only**, others 403 `forbidden`): the answer carries every new fact for every patient whatever the published setup says, so the setup page's preview can draw a draft that switches on a field not yet published. It is used only by the setup page (loaded when the page opens and on **Try again**, never polled). The owner may see every group (rule 11), so no data leaves the server that the owner could not already see by publishing. No record-access row, as the list (DEC-021).
@@ -102,8 +104,8 @@ The Angular card is one component, input: a `ResolvedCardSetup`, one row, the ca
 
 - **Clinic setup change history** is the existing config audit (`platform.api.AuditLog`, shown by `GET /api/v1/platform/audit-events`), in the same transaction as the write:
   - `IPD_CARD_DRAFT_SAVED`, entity type `IPD_CONFIG`: before `{ liveVersion }`, after `{ liveVersion, draftRevision, changedParts }`.
-  - `IPD_CARD_PUBLISHED`, entity type `IPD_CONFIG`: before `{ version: n - 1 }`, after `{ version: n, changedParts, isStandard }`.
-  - Discard and Reset write no history line (mockup `cfgLog`; OQ-37-9). A Save draft that equals the live setup (draft removed) writes none.
+  - `IPD_CARD_PUBLISHED`, entity type `IPD_CONFIG`: before `{ version: n - 1 }`, after `{ version: n, changedParts, isStandard, factsOn }`. `factsOn` lists the **field keys only** of the sensitive facts the published card switches on (diagnosis, the vitals fields, mobile; catalogue order), so the history shows when the ward list started carrying them (security review SAH-37, 1b). Never a label, never patient data.
+  - Discard and Reset write no history line (mockup `cfgLog`; OQ-37-9). A Save draft that equals the live setup (draft removed) writes none; a Save draft that equals the stored draft writes none and keeps the revision (D5).
   - No label text, no setup body and no patient data in any audit row (labels are owner text; the parts changed are enough, rule 18).
 - **Versions** are the rows of `ipd.card_setup_version` plus the virtual v1; the summary line is derived ("Sahaj standard patient card (default)" for v1, "Back to the Sahaj standard card" when `isStandard`, otherwise "Changed: layout, fields"). Newest first, at most 50 in one answer (a clinic publishes a few times a year).
 
@@ -117,7 +119,7 @@ Assume 100 hospitals × 15 visible Admitted tabs = 1,500 list reads a minute (25
 | Diagnosis | one more column in R1; 0 extra queries |
 | Readings, recorder id | more columns from the R4 row already fetched per admission; 0 extra probes (the conditional include-index of ADR-013 R4 would need the readings added; not recommended, the heap fetch is 300 rows) |
 | Recorder names | 1 batch query, only when Last recorded is on (distinct recorder ids, usually under 30) |
-| Owner mobile | 1 batch patient read, only for OWNER and only when Mobile is on |
+| Mobile | 1 batch mobile read (`PatientLookupPort.mobilesOf`, A3), only for OWNER or FRONT_DESK and only when Mobile is on |
 | Bytes | default card: +2 KB (`cardSetup`); all fields on at 300 rows: about +120 KB raw, +12 KB gzipped (D14 compression) |
 
 So at most 3 extra statements per read, 1 in the default case: about 25 index probes a second over the whole platform. No cache is needed; if one is wanted later, a per-tenant cache keyed on the live version is safe because versions are append-only. `GET /card-setup` itself is read when the setup page opens, not polled.
@@ -128,6 +130,18 @@ So at most 3 extra statements per read, 1 in the default case: about 25 index pr
 - Logs carry ids, `tenantId`, `requestId`, version numbers only; never names, UHID, mobile, diagnosis, allergy or readings, and never the setup body.
 - Retention: the setup holds no patient data. Versions are kept for the life of the clinic account (configuration history, like `config_audit_event`); the draft lives until Publish or Discard. Closing a subscription does not delete them.
 - Boundaries: ipd only; `ModularityTests` stay green; no cross-module table access (mobile through `patient.api`, names through `platform.api`). Phase 1 held: no push on publish (the 60-second reload delivers it, OQ-37-7), no notification, no document, no analytics.
+
+## Review amendments (9 Nov 2026)
+
+After `docs/reviews/SAH-37-code.md` (#2) and `docs/reviews/SAH-37-security.md` (#2, #4). Where an amendment and an earlier decision differ, the amendment applies. No status code, problem type or check order changes.
+
+- **A1 · 403 text (code review #2).** `@PreAuthorize` refuses first, and the platform `ProblemExceptionHandler` maps every `AccessDeniedException` to the shared forbidden problem (`Problems.forbidden()`: type `forbidden`, title "Not allowed", detail "You do not have access to this."). The texts "Only the clinic owner can change the patient card." and "Only the clinic owner can preview the card setup." were never reachable and are withdrawn from the contract. The contract now names the shared text for `GET /card-setup`, `PUT` and `DELETE /card-setup/draft`, `POST /card-setup/publish` and `GET /admissions?cardFacts=all`. The UI never shows these 403s in normal use (the controls are not offered to non-owners). The dead constants go (java-developer).
+- **A2 · Draft revision (code review #1, security review #2).** The contract no longer says "1 for a new draft". `CardDraft.revision` is an opaque, ever-growing token that changes on every save that changes the draft and never repeats for a clinic, also after a Discard or a Publish; it never restarts at 1. The contract does not promise how the server derives it; the server uses the clock-based value of D5 (DEC-028 addendum, no schema change). Type unchanged (`integer`, `int64`, minimum 1); `draftRevision` in `CardSetupWrite` and the `DELETE` query parameter unchanged. The frontend already sends back what it received: no client change. The `baseVersion` comparison against the stored draft adds nothing (a draft's base version always equals the live version) and may be removed; the 409 conditions of D5 stay as written.
+- **A3 · Mobile, amends D6 and ADR-013 D15 (security review #4).** `PatientLookupPort.findAllCurrent` stays free of mobiles (it keeps answering `mobile` null for every caller, as ADR-013 D15 decided). Mobiles come from **one separate, explicit method on `PatientLookupPort`** that returns only the mobile numbers for the given patient ids (keyed by the id asked for, with the same merge resolution as `findAllCurrent`, unknown and other-clinic ids absent; built as `Map<UUID, String> mobilesOf(UUID tenantId, Collection<UUID> patientIds)`, called `PatientLookupPort.mobilesOf(tenantId, ids)` in this ADR). `AdmissionService.list` calls it **only when the facts plan needs Mobile** (Mobile on in the published setup, or `cardFacts=all`) **and** the caller is OWNER or FRONT_DESK (token role and membership role); never for NURSE or DOCTOR, never in the default setup. One batch query, so D10 is unchanged in count. The mobile is never logged; the new method's results carry no `toString` that prints numbers. This is an additive `patient.api` method; no new port, no table access from ipd, `ModularityTests` stay green.
+
+## Release audit amendment (9 Nov 2026, DEC-032)
+
+- **A4 · V15, no duplicate or impersonating label (G-4, human approved).** `CardSetupValidator` gains rule V15: a label's comparison key (NFC, inner spaces collapsed, trimmed, case folded) may not equal the standard name of any other of the 25 catalogue fields or the label of a field placed before it; the field's own standard name is allowed. Path `setup.sections[i].fields[j].label`, message "This name is already used by another field.", sorted after V13. `CardSetupRepair` does not apply V15 (no stored label is dropped). The browser mirrors V11, V12, V15 and the canonical label (G-1 to G-3) for messages under the label box only; the server stays the protection (D3). Full rule: design note section 4.1 and 4.2. No boundary, table, port, status code or problem type changes.
 
 ## Options considered (summary)
 
@@ -156,7 +170,7 @@ One forward-only migration. No change to any existing table; **no destructive ch
    - Unique `(tenant_id, version)` (also serves "latest": backward scan, limit 1).
    - FORCE RLS, policy `tenant_id = platform.current_tenant()`. Grants to `sahaj_app`: select; insert `(version, setup, is_standard, changed_parts, published_by)`. Triggers refuse update, delete, truncate (`platform.deny_audit_mutation()` pattern).
 2. `ipd.card_setup_draft`
-   - `tenant_id uuid pk default platform.current_tenant()`, `setup jsonb not null` (same checks), `base_version integer not null check (base_version >= 1)`, `revision bigint not null check (revision >= 1)`, `saved_by uuid not null`, `saved_at timestamptz not null default now()`.
+   - `tenant_id uuid pk default platform.current_tenant()`, `setup jsonb not null` (same checks), `base_version integer not null check (base_version >= 1)`, `revision bigint not null check (revision >= 1)` (holds the clock-based token of D5; no further change), `saved_by uuid not null`, `saved_at timestamptz not null default now()`.
    - FORCE RLS, same policy. Grants: select, insert `(setup, base_version, revision, saved_by)`, update `(setup, base_version, revision, saved_by, saved_at)`, delete. Truncate refused.
 3. Tenant scope: both tables are tenant tables; other clinics invisible. No patient data in either.
 4. Retention: kept for the life of the clinic account; the draft row is deleted on Publish and Discard.

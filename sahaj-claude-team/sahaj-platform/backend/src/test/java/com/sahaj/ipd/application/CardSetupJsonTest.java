@@ -111,6 +111,72 @@ class CardSetupJsonTest {
     }
 
     @Test
+    void aValueOfAnotherJsonTypeIsNeverCoercedAndIsRefusedWithItsPath() {
+        // "on":"true", "on":1, "cardsPerRow":"3", "cardsPerRow":3.0, "baseVersion":"1", "label":5, "draftRevision":"7"
+        ObjectNode textBoolean = body();
+        ((ObjectNode) textBoolean.get("setup").get("sections").get(1)).put("on", "true");
+        assertRefused(textBoolean, "setup.sections[1].on");
+
+        ObjectNode numberBoolean = body();
+        ((ObjectNode) numberBoolean.get("setup").get("sections").get(1)).put("on", 1);
+        assertRefused(numberBoolean, "setup.sections[1].on");
+
+        ObjectNode fieldNumberBoolean = body();
+        ((ObjectNode) fieldNumberBoolean.get("setup").get("sections").get(2).get("fields").get(0)).put("on", 0);
+        assertRefused(fieldNumberBoolean, "setup.sections[2].fields[0].on");
+
+        ObjectNode textNumber = body();
+        ((ObjectNode) textNumber.get("setup")).put("cardsPerRow", "3");
+        assertRefused(textNumber, "setup.cardsPerRow");
+
+        ObjectNode decimalNumber = body();
+        ((ObjectNode) decimalNumber.get("setup")).put("cardsPerRow", 3.0);
+        assertRefused(decimalNumber, "setup.cardsPerRow");
+
+        ObjectNode textVersion = body();
+        textVersion.put("baseVersion", "1");
+        assertRefused(textVersion, "baseVersion");
+
+        ObjectNode textRevision = body();
+        textRevision.put("draftRevision", "7");
+        assertRefused(textRevision, "draftRevision");
+
+        ObjectNode numberLabel = body();
+        ((ObjectNode) numberLabel.get("setup").get("sections").get(0).get("fields").get(0)).put("label", 5);
+        assertRefused(numberLabel, "setup.sections[0].fields[0].label");
+
+        ObjectNode booleanLabel = body();
+        ((ObjectNode) booleanLabel.get("setup").get("sections").get(0).get("fields").get(0)).put("label", true);
+        assertRefused(booleanLabel, "setup.sections[0].fields[0].label");
+
+        ObjectNode textAction = body();
+        ((ObjectNode) textAction.get("setup").get("actions").get(0)).put("on", "false");
+        assertRefused(textAction, "setup.actions[0].on");
+    }
+
+    @Test
+    void theExactTypesOfTheContractAreStillAccepted() {
+        ObjectNode root = body();
+        root.put("draftRevision", 1_778_000_000_000_000L);
+        ((ObjectNode) root.get("setup")).put("cardsPerRow", 4);
+        ((ObjectNode) root.get("setup").get("sections").get(0).get("fields").get(0)).put("label", "Name");
+
+        CardSetupWrite write = CardSetupJson.readRequest(root);
+
+        assertThat(write.draftRevision()).isEqualTo(1_778_000_000_000_000L);
+        assertThat(write.setup().cardsPerRow()).isEqualTo(4);
+        assertThat(write.setup().sections().get(0).fields().get(0).label()).isEqualTo("Name");
+    }
+
+    @Test
+    void theStoredReadStaysLenientSoADamagedRowStillParses() {
+        String json = CardSetupJson.write(CardSetupDefaults.standard()).replace("\"cardsPerRow\":3",
+                "\"cardsPerRow\":\"3\"");
+
+        assertThat(CardSetupJson.read(json)).isPresent();
+    }
+
+    @Test
     void aBodyThatIsNotAnObjectIsRefused() {
         ArrayNode array = JSON.createArrayNode();
         assertRefused(array, "setup");

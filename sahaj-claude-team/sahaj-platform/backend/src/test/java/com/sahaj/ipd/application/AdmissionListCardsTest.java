@@ -141,11 +141,23 @@ class AdmissionListCardsTest {
         when(board.findLiveOnBoard(TENANT)).thenAnswer(call -> List.copyOf(live));
         when(admissions.findAdmittedWithPlacement(TENANT)).thenAnswer(call -> List.copyOf(placed));
         when(clinicalPatients.findAll(eq(TENANT), anyCollection())).thenAnswer(call -> Map.copyOf(patientMap));
+        // ADR-013 D15: findAllCurrent never carries a mobile number, whoever asks
         when(lookup.findAllCurrent(eq(TENANT), anyCollection())).thenAnswer(call -> {
             Map<UUID, PatientSummary> summaries = new HashMap<>();
             patientMap.forEach((id, p) -> summaries.put(id,
-                    new PatientSummary(p.id(), p.name(), p.age(), p.sex(), mobiles.get(id), false, p.uhid())));
+                    new PatientSummary(p.id(), p.name(), p.age(), p.sex(), null, false, p.uhid())));
             return summaries;
+        });
+        // SAH-37: the numbers come only from the separate, explicit port method
+        when(lookup.mobilesOf(eq(TENANT), anyCollection())).thenAnswer(call -> {
+            java.util.Collection<UUID> asked = call.getArgument(1);
+            Map<UUID, String> found = new HashMap<>();
+            asked.forEach(id -> {
+                if (mobiles.containsKey(id)) {
+                    found.put(id, mobiles.get(id));
+                }
+            });
+            return found;
         });
         when(vitals.findLatestOfAdmitted(TENANT)).thenAnswer(call -> Map.copyOf(latestScores));
         when(vitals.findLatestReadingsOfAdmitted(TENANT)).thenAnswer(call -> Map.copyOf(latestScores));
@@ -730,6 +742,7 @@ class AdmissionListCardsTest {
         verify(vitals, times(1)).findLatestOfAdmitted(TENANT);
         verify(actors, never()).displayNames(any(), any());
         verify(lookup, never()).findAllCurrent(any(), any());
+        verify(lookup, never()).mobilesOf(any(), any());
     }
 
     @Test
@@ -823,12 +836,27 @@ class AdmissionListCardsTest {
         assertThat(row.mobile()).contains("9876543210");
         verify(vitals, never()).findLatestReadingsOfAdmitted(any());
         verify(vitals, never()).findLatestOfAdmitted(any());
+        // the identities from findAllCurrent (no number in it), the numbers from the explicit mobilesOf, one batch each
         verify(lookup, times(1)).findAllCurrent(eq(TENANT), anyCollection());
+        verify(lookup, times(1)).mobilesOf(eq(TENANT), anyCollection());
         verifyNoInteractions(clinicalPatients);
     }
 
     @Test
-    void nurseAndDoctorNeverGetTheMobileEvenWhenTheSetupShowsIt() {
+    void frontDeskWithMobileOffNeverCallsTheMobileRead() {
+        publishWithFieldsOn("diagnosis");
+        admitWithReason("Meena Patil", "x");
+        mobiles.put(placed.get(0).admission().patientId(), "9876543210");
+        memberRole = "FRONT_DESK";
+
+        assertThat(only(list("FRONT_DESK")).mobile()).isNull();
+
+        verify(lookup, times(1)).findAllCurrent(eq(TENANT), anyCollection());
+        verify(lookup, never()).mobilesOf(any(), any());
+    }
+
+    @Test
+    void nurseAndDoctorNeverGetTheMobileEvenWhenTheSetupShowsItAndItIsNeverRead() {
         publishWithFieldsOn("mobile");
         admitWithReason("Meena Patil", "x");
         mobiles.put(placed.get(0).admission().patientId(), "9876543210");
@@ -837,10 +865,11 @@ class AdmissionListCardsTest {
             assertThat(only(list(role)).mobile()).as(role).isNull();
         }
         verify(lookup, never()).findAllCurrent(any(), any());
+        verify(lookup, never()).mobilesOf(any(), any());
     }
 
     @Test
-    void theOwnerGetsTheMobileFromOneExtraBatchAndNullWhenTheRecordHasNone() {
+    void theOwnerGetsTheMobileFromTheExplicitReadAndNullWhenTheRecordHasNone() {
         publishWithFieldsOn("mobile");
         admitWithReason("Meena Patil", "x");
         admitWithReason("Raj Kumar", "y");
@@ -851,7 +880,9 @@ class AdmissionListCardsTest {
 
         assertThat(list.items().get(0).mobile()).contains("9876543210");
         assertThat(list.items().get(1).mobile()).isEqualTo(Optional.empty());
-        verify(lookup, times(1)).findAllCurrent(eq(TENANT), anyCollection());
+        // the owner reads the identities through the clinical port; findAllCurrent is not needed for the number
+        verify(lookup, never()).findAllCurrent(any(), any());
+        verify(lookup, times(1)).mobilesOf(eq(TENANT), anyCollection());
     }
 
     @Test
@@ -962,7 +993,7 @@ class AdmissionListCardsTest {
             memberRole = role;
             assertThatThrownBy(() -> service.list(TENANT, ACTOR, role, null, "all"))
                     .isInstanceOf(AccessDeniedException.class)
-                    .hasMessage("Only the clinic owner can preview the card setup.");
+                    .hasMessage(SafetySupport.FORBIDDEN);
         }
         memberRole = "NURSE";
         assertThatThrownBy(() -> service.list(TENANT, ACTOR, "OWNER", null, "all"))

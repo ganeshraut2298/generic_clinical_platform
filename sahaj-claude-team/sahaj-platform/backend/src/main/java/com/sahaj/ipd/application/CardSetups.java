@@ -16,7 +16,8 @@ import org.springframework.stereotype.Component;
  * SAH-37 (ADR-015 D1, D3) reads the live setup of a clinic: the stored version with the highest number, parsed and
  * repaired in memory, or the Sahaj standard setup (v1, nothing stored) when the clinic never published. Reading never
  * creates a row. A stored row that cannot be parsed at all answers the standard setup with {@code fallback} true (the
- * Admitted page then shows "Could not load the card setup. Showing the standard card."). Shared by the setup service and
+ * Admitted page then shows "Could not load the card setup. Showing the standard card."); so does a row whose
+ * {@code schema_version} is higher than this build knows (G-5). Shared by the setup service and
  * the Admitted list, which reads it in the same transaction as the rows (one snapshot, D4).
  */
 @Component
@@ -48,19 +49,31 @@ class CardSetups {
     }
 
     private static Live fromRow(VersionRow row) {
-        Optional<CardSetup> parsed = CardSetupJson.read(row.setupJson());
+        Optional<CardSetup> parsed = knownShape(row.schemaVersion()) ? CardSetupJson.read(row.setupJson())
+                : Optional.empty();
         if (parsed.isEmpty()) {
             return new Live(row.version(), true, true, CardSetupDefaults.standard(), row.publishedBy(),
                     row.publishedAt());
         }
-        CardSetup repaired = CardSetupRepair.repair(parsed.get());
+        CardSetup repaired = CardSetupRepair.repair(parsed.get(), CardSetupService.TEXT);
         return new Live(row.version(), CardSetupCanonical.equal(repaired, CardSetupDefaults.standard()), false,
                 repaired, row.publishedBy(), row.publishedAt());
     }
 
-    /** A stored draft parsed and repaired; a draft that cannot be read is treated as the standard setup. */
+    /**
+     * A stored draft parsed and repaired; a draft that cannot be read, or that was written in a newer shape than this
+     * build knows, is treated as the standard setup.
+     */
     static CardSetup draftSetup(DraftRow draft) {
-        return CardSetupJson.read(draft.setupJson()).map(CardSetupRepair::repair)
+        if (!knownShape(draft.schemaVersion())) {
+            return CardSetupDefaults.standard();
+        }
+        return CardSetupJson.read(draft.setupJson()).map(stored -> CardSetupRepair.repair(stored, CardSetupService.TEXT))
                 .orElseGet(CardSetupDefaults::standard);
+    }
+
+    /** G-5: a document with a higher shape version than {@link CardSetupRepository#SCHEMA_VERSION} is not read. */
+    static boolean knownShape(int schemaVersion) {
+        return schemaVersion <= CardSetupRepository.SCHEMA_VERSION;
     }
 }

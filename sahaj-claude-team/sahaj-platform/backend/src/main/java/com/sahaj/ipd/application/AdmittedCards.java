@@ -91,34 +91,28 @@ class AdmittedCards {
     }
 
     /**
-     * R2 with the mobile number (SAH-37, ADR-015 D6, O4). The caller has decided that its role may see the contact group
-     * and that the published setup has Mobile on (or the owner asks for every card fact). The non-clinical path reads
-     * {@link PatientLookupPort#findAllCurrent} once and the mobiles come from the same call; a caller with clinical
-     * access (OWNER) costs one more {@code findAllCurrent} batch, and only when {@code wantMobile}. Without
-     * {@code wantMobile} the mobile is never copied out of the summary.
+     * R2 with the mobile number (SAH-37, ADR-015 D6, O4; amends ADR-013 D15). The caller has decided that its role may
+     * see the contact group and that the published setup has Mobile on (or the owner asks for every card fact). The
+     * identities come as for {@link #patients(UUID, Set, boolean)}; {@code findAllCurrent} never carries a mobile. When
+     * {@code wantMobile} the numbers come from the separate, explicit {@link PatientLookupPort#mobilesOf} (one more
+     * batch, a merged record resolved as for the name); without it that method is never called.
      */
     Patients patients(UUID tenantId, Set<UUID> patientIds, boolean clinicalAccess, boolean wantMobile) {
         if (patientIds.isEmpty()) {
             return new Patients(Map.of(), Map.of());
         }
-        Map<UUID, String> mobiles = new HashMap<>();
+        Map<UUID, PatientClinical> identities;
         if (clinicalAccess) {
-            Map<UUID, PatientClinical> clinical = clinicalPatients.findAll(tenantId, patientIds);
-            if (wantMobile) {
-                for (Map.Entry<UUID, PatientSummary> entry : lookup.findAllCurrent(tenantId, patientIds).entrySet()) {
-                    mobiles.put(entry.getKey(), entry.getValue().mobile());
-                }
-            }
-            return new Patients(clinical, mobiles);
-        }
-        Map<UUID, PatientClinical> identities = new HashMap<>();
-        for (Map.Entry<UUID, PatientSummary> entry : lookup.findAllCurrent(tenantId, patientIds).entrySet()) {
-            PatientSummary s = entry.getValue();
-            identities.put(entry.getKey(), new PatientClinical(s.id(), s.uhid(), s.name(), s.age(), s.sex(), null));
-            if (wantMobile) {
-                mobiles.put(entry.getKey(), s.mobile());
+            identities = clinicalPatients.findAll(tenantId, patientIds);
+        } else {
+            identities = new HashMap<>();
+            for (Map.Entry<UUID, PatientSummary> entry : lookup.findAllCurrent(tenantId, patientIds).entrySet()) {
+                PatientSummary s = entry.getValue();
+                identities.put(entry.getKey(),
+                        new PatientClinical(s.id(), s.uhid(), s.name(), s.age(), s.sex(), null));
             }
         }
+        Map<UUID, String> mobiles = wantMobile ? lookup.mobilesOf(tenantId, patientIds) : Map.of();
         return new Patients(identities, mobiles);
     }
 

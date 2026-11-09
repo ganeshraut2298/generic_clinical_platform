@@ -556,7 +556,7 @@ class AdmissionControllerTest {
     void aWrongCardFactsValueAndANonOwnerPreviewAreRefusedByTheService() throws Exception {
         when(service.list(any(), any(), eq("NURSE"), any(), eq("all")))
                 .thenThrow(new org.springframework.security.access.AccessDeniedException(
-                        "Only the clinic owner can preview the card setup."));
+                        "You do not have access to this."));
         when(service.list(any(), any(), eq("OWNER"), any(), eq("everything")))
                 .thenThrow(new InvalidInputException("cardFacts", "Use cardFacts=setup or cardFacts=all"));
 

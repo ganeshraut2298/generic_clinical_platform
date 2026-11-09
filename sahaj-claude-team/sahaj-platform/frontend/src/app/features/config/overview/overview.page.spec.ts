@@ -130,6 +130,52 @@ describe('OverviewPage', () => {
     expect(tile.textContent).toContain('Standard · Sahaj default · v1 · draft');
   });
 
+  function openWithIpd(role: Role): void {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailInterceptor])),
+        provideHttpClientTesting(),
+        { provide: ShellStore, useValue: { me: () => ({ userId: 'u1', role }) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    TestBed.inject(IpdAccess).set({ ipd: { state: 'on' } } as ModulesView);
+    fixture = TestBed.createComponent(OverviewPage);
+    fixture.detectChanges();
+    if (role === 'OWNER') {
+      http.expectOne(`${PLATFORM}/setup/overview`).flush(OVERVIEW);
+      http.expectOne((r) => r.url === `${PLATFORM}/audit-events`).flush([]);
+    }
+    answerTiles();
+    fixture.detectChanges();
+  }
+
+  it.each(['FRONT_DESK', 'NURSE', 'DOCTOR'] as Role[])(
+    'reads the card setup for the tile when the role is %s and IPD is available (code review 37 #6)',
+    async (role) => {
+      openWithIpd(role);
+      http.expectOne('/api/v1/ipd/card-setup').flush(ownerView());
+      await fixture.whenStable();
+    },
+  );
+
+  it.each(['VISITING_DOCTOR', 'BILLING', 'PHARMACIST', 'COUNSELLOR'] as Role[])(
+    'does not call GET /card-setup for the role %s, which the server refuses (code review 37 #6)',
+    async (role) => {
+      openWithIpd(role);
+      await fixture.whenStable();
+      http.expectNone('/api/v1/ipd/card-setup');
+    },
+  );
+
+  it('stops waiting for the card setup when the page is left (code review 37 #6)', async () => {
+    openWithIpd('OWNER');
+    const req = http.expectOne('/api/v1/ipd/card-setup');
+    fixture.destroy();
+    expect(req.cancelled).toBe(true);
+  });
+
   it('asks nothing about the Patient card while IPD is not known to be available', async () => {
     await open('OWNER');
     http.expectNone('/api/v1/ipd/card-setup');

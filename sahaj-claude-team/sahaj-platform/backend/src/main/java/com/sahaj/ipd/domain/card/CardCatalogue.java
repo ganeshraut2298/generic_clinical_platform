@@ -55,6 +55,13 @@ public final class CardCatalogue {
     public static final String RR = "rr";
     public static final String LAST_RECORDED = "lastRecorded";
 
+    /**
+     * The fields that widen what the ward list carries when the owner switches them on (security review SAH-37,
+     * finding 1b; DEC-028 O3): the diagnosis, the vitals fields and the mobile number. Field keys only, in this order.
+     */
+    public static final List<String> SENSITIVE_FACTS = List.of(DIAGNOSIS, BP, PULSE, SPO2, TEMP, RR, LAST_RECORDED,
+            MOBILE);
+
     public static final String NURSING = "nursing";
     public static final String EMR = "emr";
     public static final String TRANSFER = "transfer";

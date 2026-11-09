@@ -127,6 +127,7 @@
               role="switch"
               [attr.aria-checked]="r.section.on"
               [attr.aria-label]="'Show ' + r.cat.name"
+              [attr.title]="'Show ' + r.cat.name"
               [attr.data-switch]="r.section.key"
               [disabled]="store.locked()"
               (click)="store.toggleSection(r.section.key)"
@@ -138,6 +139,7 @@
               class="iconbtn sm"
               data-move="up"
               [attr.aria-label]="'Move up ' + r.cat.name"
+              [attr.title]="'Move up ' + r.cat.name"
               [disabled]="store.locked() || !r.canUp"
               (click)="move(r.section.key, -1)"
             >
@@ -148,6 +150,7 @@
               class="iconbtn sm"
               data-move="down"
               [attr.aria-label]="'Move down ' + r.cat.name"
+              [attr.title]="'Move down ' + r.cat.name"
               [disabled]="store.locked() || !r.canDown"
               (click)="move(r.section.key, 1)"
             >

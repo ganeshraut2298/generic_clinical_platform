@@ -10,6 +10,11 @@ export const LEAVE_TEXT = 'Your unsaved changes will be lost. A draft you alread
   selector: 'app-card-leave-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatButtonModule, MatDialogModule],
+  styles: `
+    button {
+      min-height: 44px;
+    }
+  `,
   template: `
     <h2 mat-dialog-title>{{ title }}</h2>
     <mat-dialog-content>

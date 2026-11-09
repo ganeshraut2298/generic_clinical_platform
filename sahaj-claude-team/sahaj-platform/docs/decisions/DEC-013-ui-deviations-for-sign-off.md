@@ -73,3 +73,9 @@ Decided by the tech lead under DEC-014; the human confirms or reverts.
 
 ## Item 14 · Who may read the patient list (found by QA, 6 Nov 2026)
 `PatientsIT.everyClinicRoleMayReadPatientsAsTheContractSays` is skipped with the note: the code (`PatientRoles.READ`) excludes BILLING, PHARMACIST and COUNSELLOR, but `docs/api/patient.yaml` says any clinic role may read patients. The two documents disagree. The code is the stricter side (less access to patient data). Tech lead position: keep the stricter code for now; the human decides whether those three roles need to read patients (billing and pharmacy probably do, for the patient name on a bill or a dispensing screen) or whether the contract is corrected. Not blocking any story.
+
+## Update, item 1 (page max width), 9 Nov 2026
+- **Defect found:** the human reported a width jump when the left rail is expanded or collapsed (screenshot of IPD → Admitted at about 1915 px). The cause was the 1680 px clinic cap (option B), centred in the work area. At 1920 px with the rail collapsed, the page jumped to a 1680 px column with an empty band of about 90 px on each side.
+- **Fix (angular-developer, 9 Nov 2026):** the clinic and the admin work areas are now fluid, as the mockup's last rule says (`.axws, .cs main.page { max-width: none !important }`). This is DEC-013 option C, and it deviates from the earlier recommendation B. It follows the mockup, which is the design.
+- **Trade-off:** at 2560 px the page is 2312 to 2500 px wide, so lines can get long.
+- **Decision for the human:** keep fluid (default applied), or add a cap for ultra-wide screens, for example 2000 px or more. That cap must be centred in the viewport, not in the work area, so the rail toggle does not shift the content.

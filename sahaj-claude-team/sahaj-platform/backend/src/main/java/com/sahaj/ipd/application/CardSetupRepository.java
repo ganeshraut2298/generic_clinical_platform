@@ -13,6 +13,13 @@ import java.util.UUID;
  */
 public interface CardSetupRepository {
 
+    /**
+     * The shape version of the setup document that this code writes and reads (G-5, DEC-032; column
+     * {@code schema_version} on both tables). A stored row with a higher number was written by a newer build: it is
+     * not read, the standard setup is shown with {@code fallback} true.
+     */
+    int SCHEMA_VERSION = 1;
+
     /** The live version: the row with the highest version, or empty when the clinic never published. */
     Optional<VersionRow> findLatestVersion(UUID tenantId);
 
@@ -36,7 +43,13 @@ public interface CardSetupRepository {
 
     /** The setup is owner-typed text: left out of {@code toString}. */
     record VersionRow(int version, String setupJson, boolean isStandard, List<String> changedParts, UUID publishedBy,
-                      Instant publishedAt) {
+                      Instant publishedAt, int schemaVersion) {
+
+        /** A row of the current shape ({@link #SCHEMA_VERSION}). */
+        public VersionRow(int version, String setupJson, boolean isStandard, List<String> changedParts,
+                          UUID publishedBy, Instant publishedAt) {
+            this(version, setupJson, isStandard, changedParts, publishedBy, publishedAt, SCHEMA_VERSION);
+        }
 
         @Override
         public String toString() {
@@ -48,7 +61,13 @@ public interface CardSetupRepository {
                        Instant publishedAt) {
     }
 
-    record DraftRow(String setupJson, int baseVersion, long revision, UUID savedBy, Instant savedAt) {
+    record DraftRow(String setupJson, int baseVersion, long revision, UUID savedBy, Instant savedAt,
+                    int schemaVersion) {
+
+        /** A draft of the current shape ({@link #SCHEMA_VERSION}). */
+        public DraftRow(String setupJson, int baseVersion, long revision, UUID savedBy, Instant savedAt) {
+            this(setupJson, baseVersion, revision, savedBy, savedAt, SCHEMA_VERSION);
+        }
 
         @Override
         public String toString() {

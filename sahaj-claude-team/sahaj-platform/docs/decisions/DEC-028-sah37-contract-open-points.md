@@ -30,3 +30,14 @@ Go-live conditions, carried over:
 | F4 | The non-owner preview uses the Example patient only. `cardFacts=all` is OWNER only (ADR-015 D6), but the mockup lists real patients for every role. | Accept: data minimisation. |
 | F5 | A client-side fallback card is used only when cardSetup is missing. There is also a client safety guard; the server is the real protection. | Accept. |
 | F7 | A failed load (network or 5xx) shows fixed text. A 403 shows the server's message. | Accept. |
+
+## Addendum, draft revision design (9 Nov 2026, default applied under DEC-023)
+- **Question (from the java-developer):** how should the draft revision never repeat for a clinic?
+  - **A.** A clock-based opaque token: `max(microseconds since 1970, previous revision + 1)`. No schema change.
+  - **B.** A persistent per-clinic counter, which needs a migration.
+- **Decision: A.** It is the Recommended option because it closes the stale-draft overwrite (AC12) with no schema change. It fits the contract text "opaque, never repeats". The code and security re-checks accepted it as closed.
+- **Consequences:**
+  - QA changes the 14 revision tests so they read the revision from the previous answer.
+  - QA flips the known-gap test to a 409.
+  - The value is about 1.79e15, below 2^53, so a browser number holds it exactly.
+  - The server clock must not run backwards by more than the gap between a discard and the next save.

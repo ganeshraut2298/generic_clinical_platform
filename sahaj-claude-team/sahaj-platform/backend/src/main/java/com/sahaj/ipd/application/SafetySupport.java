@@ -9,7 +9,24 @@ import org.springframework.security.access.AccessDeniedException;
 /** SAH-33 the two role checks every Safety board call makes, shared by the read and the write service. */
 final class SafetySupport {
 
+    /**
+     * The text of the shared forbidden answer. The web layer maps every {@link AccessDeniedException} to the one fixed
+     * problem ("Not allowed", "You do not have access to this."), whatever message it holds, so a message of its own
+     * would never reach the client; code that has nothing more to say uses this one.
+     */
+    static final String FORBIDDEN = "You do not have access to this.";
+
     private SafetySupport() {
+    }
+
+    /** {@link #requireRole(String, Set, String)} with the shared forbidden text. */
+    static void requireRole(String role, Set<String> allowed) {
+        requireRole(role, allowed, FORBIDDEN);
+    }
+
+    /** {@link #membershipRole(TeamMemberPort, UUID, UUID, Set, String)} with the shared forbidden text. */
+    static String membershipRole(TeamMemberPort team, UUID tenantId, UUID actor, Set<String> allowed) {
+        return membershipRole(team, tenantId, actor, allowed, FORBIDDEN);
     }
 
     /** The role in the token must be one of {@code allowed} (403 forbidden). */

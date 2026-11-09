@@ -133,6 +133,45 @@ class PatientLookupTest {
     }
 
     @Test
+    void mobilesOfGivesTheNumberOfEachPatientKeyedByTheIdAskedFor() {
+        put(PLAIN, "UH-000200", "Plain Patient", 33, "M", null, null);
+
+        Map<UUID, String> mobiles = lookup.mobilesOf(TENANT, Set.of(PLAIN));
+
+        assertThat(mobiles).containsOnlyKeys(PLAIN).containsEntry(PLAIN, "9000000001");
+    }
+
+    @Test
+    void aMergedAwayRecordAnswersWithTheMobileOfTheRecordItWasMergedInto() {
+        rows.put(OLD, new PatientRow(OLD, "UH-000100", "Old Spelling", 40, "F", "9000000100", "Area", "mr", null, null,
+                true, KEPT, Instant.parse("2026-11-01T00:00:00Z"), 3L));
+        rows.put(KEPT, new PatientRow(KEPT, "UH-000101", "Kept Record", 41, "F", "9000000101", "Area", "mr", null, null,
+                true, null, Instant.parse("2026-11-01T00:00:00Z"), 3L));
+
+        Map<UUID, String> mobiles = lookup.mobilesOf(TENANT, Set.of(OLD));
+
+        assertThat(mobiles).containsOnlyKeys(OLD).containsEntry(OLD, "9000000101");
+        assertThat(lookup.findAllCurrent(TENANT, Set.of(OLD)).get(OLD).name()).isEqualTo("Kept Record");
+    }
+
+    @Test
+    void mobilesOfLeavesOutUnknownIdsAndPatientsWithoutANumberAndAnswersEmptyWithoutIds() {
+        rows.put(PLAIN, new PatientRow(PLAIN, "UH-000200", "Plain Patient", 33, "M", null, "Area", "mr", null, null,
+                true, null, Instant.parse("2026-11-01T00:00:00Z"), 3L));
+
+        assertThat(lookup.mobilesOf(TENANT, Set.of(PLAIN, UUID.randomUUID()))).isEmpty();
+        assertThat(lookup.mobilesOf(TENANT, Set.of())).isEmpty();
+    }
+
+    @Test
+    void mobilesOfNeverMakesFindAllCurrentCarryANumber() {
+        put(PLAIN, "UH-000200", "Plain Patient", 33, "M", null, null);
+
+        assertThat(lookup.mobilesOf(TENANT, Set.of(PLAIN))).isNotEmpty();
+        assertThat(lookup.findAllCurrent(TENANT, Set.of(PLAIN)).get(PLAIN).mobile()).isNull();
+    }
+
+    @Test
     void findAndFindAllKeepTheirOldBehaviourAndNowCarryTheUhid() {
         put(OLD, "UH-000100", "Old Spelling", 40, "F", null, KEPT);
         put(KEPT, "UH-000101", "Kept Record", 41, "F", "Sulfa", null);
