@@ -35,7 +35,7 @@ spring:
     # Flyway runs as sahaj_migrator on its own connection; it never shares the request pool.
     # Schemas are created by scripts/setup/create-database.mjs, not by Flyway.
     # db/guard holds the afterMigrate guard that fails the start when dev-tools objects exist in a database that is
-    # not sahaj_dev or sahaj_test (ADR-008 R3). Customizers that add db/dev-seed or db/dev-tools append to this list.
+    # not sahaj_dev or sahaj_test (ADR-008 R3). Customizers that add db/dev-seed, db/dev-tools or db/bootstrap-dev-tools (ADR-018, SAH-42) append to this list.
     locations: classpath:db/migration,classpath:db/guard
     schemas: platform
     default-schema: platform
@@ -90,6 +90,13 @@ sahaj:
     #   SAHAJ_ADMIN_SEED_EMAIL       dev profile only: dummy admin email
     #   SAHAJ_ADMIN_SEED_PASSWORD    dev profile only: dummy admin password (12 to 64 characters, not containing the email name)
     #   SAHAJ_ADMIN_SEED_NAME        dev profile only: dummy admin name (default Dev admin)
+    #   SAHAJ_ADMIN_BOOTSTRAP_ENABLED   SAH-42 (ADR-018): true switches on /admin/register, which creates the FIRST admin behind a
+    #                                   registration PIN. Exists ONLY in a backend built and started with the Maven profile dev-tools
+    #                                   (no such code is in a normal jar), only in profile dev, only on a loopback address, only while
+    #                                   no admin exists. Leave false or unset otherwise.
+    #   SAHAJ_ADMIN_BOOTSTRAP_PIN_HASH  the BCrypt hash (cost 12 to 16) of that PIN, in single quotes in .env because it contains $.
+    #                                   Make it with the hidden-prompt tool described in docs/architecture/adr/ADR-018 (D3); never
+    #                                   put the PIN itself anywhere.
     # With enabled=true and a secret missing, the app still starts and every /api/v1/admin request answers 503.
     # The secrets, the TOTP key and the seed values are NOT listed below on purpose: Spring Boot binds the
     # environment variables above straight to sahaj.admin.jwt-secret, sahaj.admin.totp-key and

@@ -17,6 +17,9 @@ import com.sahaj.ipd.application.SafetyViews.RoundPanel;
 import com.sahaj.ipd.application.SafetyViews.RoundRow;
 import com.sahaj.ipd.application.SafetyViews.Row;
 import com.sahaj.ipd.domain.MedicineRound;
+import com.sahaj.ipd.application.ScopeViews.SafetyScope;
+import com.sahaj.ipd.application.WardScopeRepository.UnreviewedMark;
+import com.sahaj.ipd.domain.EscalationState.Status;
 import com.sahaj.ipd.domain.ResponseAction;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
@@ -65,10 +68,17 @@ public class SafetyService {
     private final TeamMemberPort team;
     private final IpdGate gate;
     private final MedicineRoundReader round;
+    private final ScopeGuard guard;
+    private final WardScopeRepository scopeRepository;
+    private final EmergencyAccessReader grantReader;
 
     SafetyService(EscalationBoardRepository board, AdmissionRepository admissions, ClinicalEventRepository events,
                   PatientLookupPort patients, ActorDirectoryPort actors, TeamMemberPort team, IpdGate gate,
-                  MedicineRoundReader round) {
+                  MedicineRoundReader round, ScopeGuard guard, WardScopeRepository scopeRepository,
+                  EmergencyAccessReader grantReader) {
+        this.guard = guard;
+        this.scopeRepository = scopeRepository;
+        this.grantReader = grantReader;
         this.board = board;
         this.admissions = admissions;
         this.events = events;
@@ -92,12 +102,17 @@ public class SafetyService {
         ModuleEntitlement ent = gate.check(tenantId, false);
         String memberRole = SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.READ_ROLES,
                 "You cannot open the safety board.");
+        // SAH-34 (AC 15 to 19): every row and count is on the caller's scope; OWNER and DOCTOR are never narrowed.
+        PatientScope scope = guard.scope(tenantId, actor, role, memberRole);
+        Set<UUID> visible = guard.visibleAdmissionIds(tenantId, scope);
+        boolean owner = isOwner(role, memberRole);
         Instant asOf = board.databaseNow();
-        List<BoardRow> found = new ArrayList<>(board.findOnBoard(tenantId, asOf));
+        List<BoardRow> onBoard = board.findOnBoard(tenantId, asOf);
+        List<BoardRow> found = new ArrayList<>(inScope(onBoard, visible));
         found.sort((a, b) -> SafetyRows.ORDER.compare(a.escalation(), b.escalation()));
 
         // SAH-35: the Medicine round in the same transaction and against the same asOf (two statements).
-        MedicineRound.Result doses = round.read(tenantId, asOf);
+        MedicineRound.Result doses = round.read(tenantId, asOf, visible);
         Map<UUID, PatientSummary> patientMap = patientsOf(tenantId, found, doses);
         List<Detail> details = new ArrayList<>();
         for (BoardRow row : found) {
@@ -111,9 +126,53 @@ public class SafetyService {
                     asOf, access));
         }
         boolean nurse = SafetySupport.isNurseView(memberRole);
-        Integer yourPatients = nurse ? admissions.countAdmitted(tenantId) : null;
-        return new Board(ent.ipdState(), nurse ? "NURSE" : "DOCTOR", asOf, SafetyRows.counts(details, doses, asOf),
-                yourPatients, actionOptions(), List.copyOf(rows), roundPanel(doses, access, ent.ipdState(), patientMap));
+        int admittedTotal = nurse ? admissions.countAdmitted(tenantId) : 0;
+        Integer yourPatients = nurse ? (visible == null ? admittedTotal : visible.size()) : null;
+        UnreviewedMark unreviewed = owner ? scopeRepository.unreviewedMark(tenantId) : null;
+        SafetyScope safetyScope = nurse ? new SafetyScope(scope.isAll() ? "ALL" : "WARDS", yourPatients, admittedTotal,
+                scope.hasWard()) : null;
+        Integer otherWards = nurse && !scope.isAll() ? otherWardsPastTarget(onBoard, visible, asOf) : null;
+        ScopeViews.EmergencyAccessReviewPage grants = owner
+                ? grantReader.page(tenantId, asOf, EmergencyAccessReader.PAGE, null, unreviewed) : null;
+        return new Board(ent.ipdState(), nurse ? "NURSE" : "DOCTOR", asOf,
+                SafetyRows.counts(details, doses, asOf, unreviewed), yourPatients, actionOptions(),
+                List.copyOf(rows), roundPanel(doses, access, ent.ipdState(), patientMap), safetyScope, grants,
+                otherWards);
+    }
+
+    /** OWNER by the role in the token and by the membership: the only caller of the emergency access tile and panel. */
+    private static boolean isOwner(String role, String memberRole) {
+        return "OWNER".equals(role) && "OWNER".equals(memberRole);
+    }
+
+    /** The rows of the admissions in {@code visible}; every row when {@code visible} is null (scope all). */
+    private static List<BoardRow> inScope(List<BoardRow> rows, Set<UUID> visible) {
+        if (visible == null) {
+            return rows;
+        }
+        List<BoardRow> kept = new ArrayList<>();
+        for (BoardRow row : rows) {
+            if (visible.contains(row.escalation().admissionId())) {
+                kept.add(row);
+            }
+        }
+        return kept;
+    }
+
+    /**
+     * SAH-34 (AC 20, OQ-34-26): how many OPEN escalations of ADMITTED admissions outside the caller's scope are past
+     * their response target at {@code asOf}, by the one definition of past target. A number only: the rows are counted
+     * and dropped, none reaches the answer.
+     */
+    private static int otherWardsPastTarget(List<BoardRow> all, Set<UUID> visible, Instant asOf) {
+        int count = 0;
+        for (BoardRow row : all) {
+            Detail d = row.escalation();
+            if (d.status() == Status.OPEN && !visible.contains(d.admissionId()) && SafetyRows.pastTarget(d, asOf)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
@@ -141,10 +200,14 @@ public class SafetyService {
     public Counts summary(UUID tenantId, UUID actor, String role) {
         SafetySupport.requireRole(role, EscalationRules.READ_ROLES, "You cannot open the safety board.");
         gate.check(tenantId, false);
-        SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.READ_ROLES,
+        String memberRole = SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.READ_ROLES,
                 "You cannot open the safety board.");
+        PatientScope scope = guard.scope(tenantId, actor, role, memberRole);
+        Set<UUID> visible = guard.visibleAdmissionIds(tenantId, scope);
         Instant asOf = board.databaseNow();
-        return countsOf(board.findLiveOnBoard(tenantId), round.read(tenantId, asOf), asOf);
+        UnreviewedMark unreviewed = isOwner(role, memberRole) ? scopeRepository.unreviewedMark(tenantId) : null;
+        return countsOf(inScope(board.findLiveOnBoard(tenantId), visible), round.read(tenantId, asOf, visible), asOf,
+                unreviewed);
     }
 
     /**
@@ -152,7 +215,12 @@ public class SafetyService {
      * list reads them once and hands the same rows to the banner, the counts and the card flags.
      */
     List<BoardRow> liveEscalations(UUID tenantId) {
-        List<BoardRow> live = new ArrayList<>(board.findLiveOnBoard(tenantId));
+        return liveEscalations(tenantId, null);
+    }
+
+    /** As above for a caller's scope: only the escalations of {@code visible} admissions (null means every one). */
+    List<BoardRow> liveEscalations(UUID tenantId, Set<UUID> visible) {
+        List<BoardRow> live = new ArrayList<>(inScope(board.findLiveOnBoard(tenantId), visible));
         live.sort((a, b) -> SafetyRows.ORDER.compare(a.escalation(), b.escalation()));
         return live;
     }
@@ -162,6 +230,15 @@ public class SafetyService {
      * the board order; {@code nameOf} gives the name shown for a row's patient.
      */
     Banner banner(UUID tenantId, Instant asOf, List<BoardRow> live, Function<BoardRow, String> nameOf) {
+        return banner(tenantId, asOf, live, nameOf, null, null);
+    }
+
+    /**
+     * As above for a caller's scope: the dose counts are those of {@code visible} (null means every admitted patient)
+     * and, for the owner, {@code unreviewed} gives {@code emergencyAccessWaiting} and the change token line.
+     */
+    Banner banner(UUID tenantId, Instant asOf, List<BoardRow> live, Function<BoardRow, String> nameOf,
+                  Set<UUID> visible, UnreviewedMark unreviewed) {
         List<BannerItem> past = new ArrayList<>();
         List<Detail> liveDetails = new ArrayList<>();
         for (BoardRow row : live) {
@@ -172,7 +249,8 @@ public class SafetyService {
             }
         }
         // SAH-35: the dose counts and the dose lines of the token, from the same function as the board and the summary.
-        return new Banner(SafetyRows.counts(liveDetails, round.read(tenantId, asOf), asOf), List.copyOf(past));
+        return new Banner(SafetyRows.counts(liveDetails, round.read(tenantId, asOf, visible), asOf,
+                unreviewed), List.copyOf(past));
     }
 
     /** SAH-36: the database clock for an answer that does not go through the board (the Admitted list). */
@@ -180,12 +258,13 @@ public class SafetyService {
         return board.databaseNow();
     }
 
-    private static Counts countsOf(List<BoardRow> live, MedicineRound.Result doses, Instant asOf) {
+    private static Counts countsOf(List<BoardRow> live, MedicineRound.Result doses, Instant asOf,
+                                   UnreviewedMark unreviewed) {
         List<Detail> details = new ArrayList<>();
         for (BoardRow row : live) {
             details.add(row.escalation());
         }
-        return SafetyRows.counts(details, doses, asOf);
+        return SafetyRows.counts(details, doses, asOf, unreviewed);
     }
 
     private static List<ActionOption> actionOptions() {
@@ -220,7 +299,11 @@ public class SafetyService {
         }
         Instant asOf = board.databaseNow();
         UUID onlyFor = SafetySupport.isNurseView(memberRole) ? actor : null;
-        List<EventRow> found = events.findPage(tenantId, onlyFor, after, limit + 1);
+        PatientScope scope = guard.scope(tenantId, actor, role, memberRole);
+        // SAH-34 (AC 11): a scoped NURSE reads her own entries and those of the admissions in her wards or under her grant.
+        List<EventRow> found = onlyFor != null && !scope.isAll()
+                ? events.findPageInScope(tenantId, actor, scope.wardIds(), scope.grants().keySet(), after, limit + 1)
+                : events.findPage(tenantId, onlyFor, after, limit + 1);
         boolean more = found.size() > limit;
         List<EventRow> page = more ? found.subList(0, limit) : found;
 
@@ -228,6 +311,9 @@ public class SafetyService {
         Set<UUID> actorIds = new HashSet<>();
         for (EventRow row : page) {
             actorIds.add(row.actor());
+            if (grantee(row)) {
+                actorIds.add(row.grantUserId());
+            }
             if (row.patientId() != null) {
                 patientIds.add(row.patientId());
             }
@@ -240,10 +326,16 @@ public class SafetyService {
             boolean admission = row.admissionId() != null;
             items.add(new Event(row.id(), row.kind(), row.text(), row.at(), names.of(row.actor()), row.admissionId(),
                     admission ? patientName(patientMap, row.patientId()) : null,
-                    admission ? row.bedCode() : null));
+                    admission ? row.bedCode() : null, grantee(row) ? names.of(row.grantUserId()) : null));
         }
         String next = more && !page.isEmpty() ? EventCursor.encode(page.get(page.size() - 1).position()) : null;
         return new EventPage(asOf, List.copyOf(items), next);
+    }
+
+    /** SAH-34 (AC 70): the entry "Reviewed emergency access" names who opened the grant, read at display time. */
+    private static boolean grantee(EventRow row) {
+        return row.grantUserId() != null && ClinicalEventRepository.KIND_BG.equals(row.kind())
+                && EmergencyAccessReader.REVIEWED_TEXT.equals(row.text());
     }
 
     private static int limit(String text) {

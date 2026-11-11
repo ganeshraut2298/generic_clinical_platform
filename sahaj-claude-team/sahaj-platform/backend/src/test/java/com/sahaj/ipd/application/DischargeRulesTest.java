@@ -25,12 +25,18 @@ class DischargeRulesTest {
     }
 
     @Test
-    void theDefaultTemplateIsTheSetupChoiceThenTheAdmissionTypeThenGeneral() {
-        assertThat(DischargeRules.defaultTemplate("surgical", "maternity")).isEqualTo("surgical");
-        assertThat(DischargeRules.defaultTemplate(null, "maternity")).isEqualTo("maternity");
-        assertThat(DischargeRules.defaultTemplate(null, "daycare")).isEqualTo("daycare");
-        assertThat(DischargeRules.defaultTemplate(null, "planned")).isEqualTo("general");
-        assertThat(DischargeRules.defaultTemplate(null, "emergency")).isEqualTo("general");
+    void theDefaultTemplateIsTheSetupChoiceThenTheAdmissionTypeThenAPackageThenGeneral() {
+        assertThat(DischargeRules.defaultTemplate("surgical", "maternity", false)).isEqualTo("surgical");
+        assertThat(DischargeRules.defaultTemplate(null, "maternity", false)).isEqualTo("maternity");
+        assertThat(DischargeRules.defaultTemplate(null, "daycare", false)).isEqualTo("daycare");
+        assertThat(DischargeRules.defaultTemplate(null, "planned", false)).isEqualTo("general");
+        assertThat(DischargeRules.defaultTemplate(null, "emergency", false)).isEqualTo("general");
+        // SAH-29 (mockup ipdis): surgical for any other admission with a package.
+        assertThat(DischargeRules.defaultTemplate(null, "planned", true)).isEqualTo("surgical");
+        assertThat(DischargeRules.defaultTemplate(null, "emergency", true)).isEqualTo("surgical");
+        assertThat(DischargeRules.defaultTemplate(null, "maternity", true)).isEqualTo("maternity");
+        assertThat(DischargeRules.defaultTemplate(null, "daycare", true)).isEqualTo("daycare");
+        assertThat(DischargeRules.defaultTemplate("general", "planned", true)).isEqualTo("general");
     }
 
     @Test

@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ReplaySubject, of } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { DischargeSheet } from '../discharge.model';
-import { AdmissionBedOption, AdmissionDetail, AdmissionOptions, ChargeService } from '../ipd.model';
+import { AdmissionBedOption, AdmissionDetail, AdmissionOptions, ChargeService, billNote } from '../ipd.model';
 import { AdmissionsApi } from '../admissions.api';
 import { AdmissionDialogComponent } from './admission-dialog.component';
 
@@ -750,6 +750,47 @@ describe('AdmissionDialogComponent', () => {
       ]);
       const first = el().querySelectorAll('.ipbl')[0];
       expect(first.className).toBe('ipbl');
+    });
+  });
+
+  describe('package bill (SAH-29)', () => {
+    const PACKAGE_BILL: AdmissionDetail = {
+      ...DETAIL,
+      package: { name: 'Appendicectomy', pricePaise: 4500000, includedDays: 3 },
+      bill: {
+        ...DETAIL.bill,
+        lines: [
+          {
+            name: 'Package · Appendicectomy (bed, nursing and surgeon for 3 days)',
+            unitPaise: 4500000,
+            qty: 1,
+            amountPaise: 4500000,
+          },
+          { name: 'Bed · Private beyond the package', unitPaise: 200000, qty: 2, amountPaise: 400000 },
+          { name: 'CBC · not in package', unitPaise: 56250, qty: 1, amountPaise: 56250 },
+          { name: 'CBC · not in package', unitPaise: 45000, qty: 1, amountPaise: 45000 },
+        ],
+        totalPaise: 5001250,
+      },
+    };
+
+    it('draws the lines the server sends, in order, with no field for the package itself', async () => {
+      await setup(PACKAGE_BILL);
+      const rows = Array.from(el().querySelectorAll('.ipbl')).map(squash);
+      expect(rows.slice(0, 5)).toEqual([
+        'Package · Appendicectomy (bed, nursing and surgeon for 3 days) ₹45,000',
+        'Bed · Private beyond the package 2 × ₹2,000 ₹4,000',
+        'CBC · not in package ₹562.50',
+        'CBC · not in package ₹450',
+        'Total so far ₹50,012.50',
+      ]);
+      expect(text()).not.toContain('Doctor visits');
+      expect(text()).not.toContain('Nursing care');
+    });
+
+    it('keeps the bill note of the Running bill panel as it is', async () => {
+      await setup(PACKAGE_BILL);
+      expect(text()).toContain(billNote(PACKAGE_BILL.bill));
     });
   });
 

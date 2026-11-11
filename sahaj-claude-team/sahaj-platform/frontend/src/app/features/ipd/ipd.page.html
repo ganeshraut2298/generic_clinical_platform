@@ -1,4 +1,9 @@
-<app-page-head [title]="heading()" [lead]="locked() ? '' : lead()">
+<app-page-head
+  [title]="heading()"
+  [lead]="locked() ? '' : lead()"
+  [reserveLead]="leadPending()"
+  [leadLike]="leadLike()"
+>
   @if (emergencyOn() && activeTab() !== 'er') {
     <button type="button" mat-stroked-button data-act="open-emergency" (click)="openEmergency()">
       <app-icon name="siren" [size]="16" /> Emergency
@@ -123,7 +128,7 @@
         (click)="selectTab('admitted')"
         (keydown)="onTabKeydown($event)"
       >
-        Admitted<span class="c num">{{ l.items.length }}</span>
+        Admitted<span class="c num">{{ admittedTabNumber() }}</span>
       </button>
       @if (emergencyOn()) {
         <button
@@ -190,6 +195,8 @@
           [list]="l"
           [staleText]="staleText()"
           [isOwner]="isOwner()"
+          [role]="role()"
+          (openEmergencyAccess)="openEmergencyAccess()"
           (openAdmission)="openFromCard($event)"
           (openNursing)="openNursing($event)"
           (openEmr)="openEmr($event)"

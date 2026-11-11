@@ -106,7 +106,7 @@ class DischargeControllerTest {
                 new DischargeRecord("normal", "general", "Dr Signer", at.minusSeconds(60), "Front Desk", at, 7,
                         LocalDate.of(2026, 11, 18)),
                 new FinalBill(List.of(new BillLine("Bed · General", 80_000L, 3, 240_000L)), 3, 480_000L, 1_000_000L,
-                        -520_000L, "refunded", "Cash", "Front Desk", at), true, false, null, false);
+                        -520_000L, "refunded", "Cash", "Front Desk", at), true, false, null, false, null);
     }
 
     @Test

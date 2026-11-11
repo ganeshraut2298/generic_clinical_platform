@@ -36,6 +36,7 @@ public class VitalsController {
         this.service = service;
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @GetMapping("/admissions/{id}/nursing")
     @PreAuthorize(VIEWERS)
     public Sheet sheet(@PathVariable UUID id) {
@@ -44,6 +45,7 @@ public class VitalsController {
     }
 
     /** 201 for a new record; 200 with the first record for a repeat of the same client key. */
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PostMapping("/admissions/{id}/vitals")
     @PreAuthorize(RECORDERS)
     public ResponseEntity<VitalsSaved> record(@PathVariable UUID id, @RequestBody VitalsInput request) {

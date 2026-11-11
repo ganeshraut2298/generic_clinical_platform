@@ -100,7 +100,7 @@ class AdmissionControllerTest {
                 Instant.parse("2026-11-09T05:30:00Z"), "9000000001", "Chest pain",
                 List.of(new DepositEntry(UUID.randomUUID(), 1_000_000L, "UPI", Instant.parse("2026-11-09T05:30:00Z"),
                         "Front Desk")), true, 330_000L, false, bill(), true, true,
-                new TransferRules(true, "same"), false, "ADMITTED", null, true, null, null, true, false, null, true);
+                new TransferRules(true, "same"), false, "ADMITTED", null, true, null, null, true, false, null, true, null);
     }
 
     private static RunningBill bill() {
@@ -418,6 +418,34 @@ class AdmissionControllerTest {
         mockMvc.perform(get(URL + "/admissions/" + unknown).with(as("OWNER"))).andExpect(status().isNotFound());
         mockMvc.perform(get(URL + "/admissions/" + ADMISSION_ID).with(as("BILLING"))).andExpect(status().isForbidden());
         mockMvc.perform(get(URL + "/admissions/not-a-uuid").with(as("OWNER"))).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void detailCarriesThePackageCopyUnderTheContractNamePackageOrNull() throws Exception {
+        Detail plain = detail();
+        Detail packaged = new Detail(plain.id(), plain.ipNumber(), plain.patientId(), plain.patientName(), plain.age(),
+                plain.sex(), plain.doctorName(), plain.bedCode(), plain.categoryName(), plain.wardName(),
+                plain.admissionType(), plain.payer(), plain.dayNumber(), plain.depositPaise(),
+                plain.minimumDepositPaise(), plain.depositState(), plain.admittedAt(), plain.mobile(), plain.reason(),
+                plain.deposits(), plain.canCollectDeposit(), plain.runningBillPaise(), plain.depositLow(),
+                plain.bill(), plain.canAddCharge(), plain.canTransfer(), plain.transferRules(),
+                plain.goingHomeToday(), plain.status(), plain.dischargedAt(), plain.canStartDischarge(), null, null,
+                plain.canOpenNursing(), plain.vitalsDue(), plain.latestEws(), plain.canOpenEmr(),
+                new com.sahaj.ipd.application.AdmissionViews.AdmissionPackage("Appendicectomy", 4_500_000L, 3));
+        UUID other = UUID.randomUUID();
+        when(service.detail(eq(TENANT_ID), eq(USER_ID), any(), eq(ADMISSION_ID))).thenReturn(packaged);
+        when(service.detail(eq(TENANT_ID), eq(USER_ID), any(), eq(other))).thenReturn(plain);
+
+        mockMvc.perform(get(URL + "/admissions/" + ADMISSION_ID).with(as("NURSE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.package.name").value("Appendicectomy"))
+                .andExpect(jsonPath("$.package.pricePaise").value(4_500_000))
+                .andExpect(jsonPath("$.package.includedDays").value(3))
+                .andExpect(jsonPath("$.packageCopy").doesNotExist());
+        mockMvc.perform(get(URL + "/admissions/" + other).with(as("NURSE")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(Matchers.containsString("\"package\":null")));
     }
 
     @Test

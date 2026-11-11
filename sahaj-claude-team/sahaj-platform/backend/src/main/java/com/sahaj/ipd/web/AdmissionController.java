@@ -44,12 +44,14 @@ public class AdmissionController {
         this.service = service;
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/admission-rules")
     @PreAuthorize(READERS)
     public Rules rules() {
         return service.rules(ClinicUser.current().tenantId());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/admission-rules")
     @PreAuthorize(OWNER)
     public Rules updateRules(@RequestBody RulesInput request) {
@@ -57,6 +59,7 @@ public class AdmissionController {
         return service.updateRules(user.tenantId(), user.userId(), request);
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PostMapping("/admission-rules/confirm")
     @PreAuthorize(OWNER)
     public Rules confirmRules() {
@@ -64,6 +67,7 @@ public class AdmissionController {
         return service.confirmRules(user.tenantId(), user.userId());
     }
 
+    @ScopeExempt("Admitting a patient: the 201 answer is the detail the caller just typed")
     @GetMapping("/admission-options")
     @PreAuthorize(ADMITTERS)
     public Options options(@RequestParam(name = "emergencyCaseId", required = false) UUID emergencyCaseId) {
@@ -71,6 +75,7 @@ public class AdmissionController {
         return service.options(user.tenantId(), user.role(), emergencyCaseId);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.LIST)
     @GetMapping("/admissions")
     @PreAuthorize(READERS)
     public AdmissionList list(@RequestParam(name = "status", required = false) String status,
@@ -79,6 +84,7 @@ public class AdmissionController {
         return service.list(user.tenantId(), user.userId(), user.role(), status, cardFacts);
     }
 
+    @ScopeExempt("Admitting a patient: the 201 answer is the detail the caller just typed")
     @PostMapping("/admissions")
     @PreAuthorize(ADMITTERS)
     @ResponseStatus(HttpStatus.CREATED)
@@ -87,6 +93,7 @@ public class AdmissionController {
         return service.admit(user.tenantId(), user.userId(), user.role(), request);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @GetMapping("/admissions/{id}")
     @PreAuthorize(READERS)
     public Detail detail(@PathVariable UUID id) {
@@ -94,6 +101,7 @@ public class AdmissionController {
         return service.detail(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PostMapping("/admissions/{id}/deposits")
     @PreAuthorize(DEPOSIT_TAKERS)
     public Detail addDeposit(@PathVariable UUID id, @RequestBody DepositInput request) {
@@ -103,6 +111,7 @@ public class AdmissionController {
     }
 
     /** SAH-25 the fixed list of extra-charge services. */
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/charge-services")
     @PreAuthorize(READERS)
     public List<ChargeService> chargeServices() {
@@ -110,6 +119,7 @@ public class AdmissionController {
     }
 
     /** SAH-25 adds one charge to an admitted patient's running bill. */
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PostMapping("/admissions/{id}/charges")
     @PreAuthorize(ADMITTERS)
     public Detail addCharge(@PathVariable UUID id, @RequestBody ChargeInput request) {

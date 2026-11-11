@@ -1,6 +1,7 @@
 package com.sahaj.ipd.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -481,5 +482,18 @@ class MarServiceTest extends DoseTestBase {
         assertThat(mar.orders().get(0).toString()).doesNotContain("Heparin").doesNotContain("Meera");
         assertThat(mar.secondNurses().get(0).toString()).doesNotContain("Rupali");
         assertThat(slot(mar, 0, 0).dose().toString()).doesNotContain("Anjali").doesNotContain("Rupali");
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void marOutsideScopeWritesNoRecordAccess() {
+        active("pcm", "od");
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmission(eq(TENANT), eq(NURSE), eq("NURSE"),
+                eq("NURSE"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> nurseMar()).isInstanceOf(OutsideScopeException.class);
+
+        verifyNoInteractions(patientAccess);
     }
 }

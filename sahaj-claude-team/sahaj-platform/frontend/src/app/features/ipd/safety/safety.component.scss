@@ -19,6 +19,10 @@
   color: var(--crit);
 }
 
+.kpi .v.warn {
+  color: var(--warn);
+}
+
 .kpi .s b.crit {
   color: var(--crit);
   font-weight: 600;

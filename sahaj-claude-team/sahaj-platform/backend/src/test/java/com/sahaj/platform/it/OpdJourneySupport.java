@@ -96,8 +96,7 @@ abstract class OpdJourneySupport extends AuthFlowTestSupport {
                 """);
         step(4, auth, "{\"feeTiming\":\"before\",\"queue\":true,\"vitals\":" + vitals
                 + ",\"followUpDays\":7,\"followUpFee\":\"free\"}");
-        step(5, auth, "{\"brand\":\"blue\",\"slug\":\"sahaj-" + UUID.randomUUID().toString().substring(0, 8)
-                + "\",\"language\":\"en\"}");
+        step(5, auth, "{\"brand\":\"blue\",\"slug\":\"" + UniqueSlugs.next() + "\",\"language\":\"en\"}");
         mvc.perform(post("/api/v1/platform/setup/complete").with(auth)).andExpect(status().isOk());
     }
 

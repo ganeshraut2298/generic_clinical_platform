@@ -38,6 +38,7 @@ public class MarController {
         this.doses = doses;
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @GetMapping("/admissions/{id}/mar")
     @PreAuthorize(MedicineOrderController.CLINIC_ROLES)
     public Mar mar(@PathVariable UUID id) {
@@ -46,6 +47,7 @@ public class MarController {
     }
 
     /** 201 for a new record; 200 for a replay of the same client key. */
+    @ScopeGuarded(ScopeGuarded.Kind.ORDER)
     @PostMapping("/medicine-orders/{id}/doses")
     @PreAuthorize(MedicineOrderController.CLINIC_ROLES)
     public ResponseEntity<DoseRecorded> give(@PathVariable UUID id, @RequestBody DoseInput request) {

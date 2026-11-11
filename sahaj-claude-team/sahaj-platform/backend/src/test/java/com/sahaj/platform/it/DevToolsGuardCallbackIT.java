@@ -91,6 +91,7 @@ class DevToolsGuardCallbackIT {
     /** No function, no INSERT privilege of the definer, no active sample account: every dev-tools object absent. */
     private void givenNothing() throws SQLException {
         exec("drop function if exists " + FUNCTION);
+        dropBootstrapObjects();
         if (SampleAdminDb.roleExists() && SampleAdminDb.tablesPresent()) {
             exec("revoke insert on platform.platform_admin from sahaj_admin_definer");
             exec("update platform.platform_admin set active = false where email = '" + SAMPLE_EMAIL + "'");
@@ -134,10 +135,10 @@ class DevToolsGuardCallbackIT {
         assertRaised(error, "guard with database name '" + name + "' and the function present");
         assertThat(error.getSQLState()).as("SQLSTATE; server message: " + error.getServerErrorMessage().getMessage()).isEqualTo("P0001");
         ServerErrorMessage server = error.getServerErrorMessage();
-        assertThat(server.getMessage()).contains("Dev-tools sample admin objects found in database \"" + name + "\"");
+        assertThat(server.getMessage()).contains("Dev-tools admin objects (sample admin or bootstrap registration) found in database \"" + name + "\"");
         assertThat(server.getDetail()).contains("the function platform.admin_dev_create_sample_admin exists")
                 .doesNotContain("INSERT").doesNotContain("account");
-        assertThat(server.getHint()).contains("dev-tools-sample-admin-cleanup.sql");
+        assertThat(server.getHint()).contains("dev-tools-sample-admin-cleanup.sql").contains("both dev-tools features");
         assertNoSecrets(error);
     }
 
@@ -223,6 +224,98 @@ class DevToolsGuardCallbackIT {
         assertRaised(error, "guard raised");
         assertThat(error.getServerErrorMessage().getDetail())
                 .contains("the function").contains("holds INSERT").contains("active dev sample admin account");
+    }
+
+    // ---- SAH-42 / ADR-018: checks 4 and 5 (the bootstrap state table and any bootstrap function) --------------------------
+
+    /** Removes the SAH-42 objects inside the (rolled back) transaction, whatever their signature, so "nothing" really is nothing. */
+    private void dropBootstrapObjects() throws SQLException {
+        exec("drop table if exists platform.platform_admin_bootstrap_state");
+        exec("do $d$ declare r record; begin "
+                + "for r in select p.oid::regprocedure as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                + "where n.nspname = 'platform' and p.proname like 'admin\\_bootstrap\\_%' loop "
+                + "execute 'drop function ' || r.sig; end loop; end $d$");
+    }
+
+    private void givenBootstrapTable() throws SQLException {
+        exec("create table platform.platform_admin_bootstrap_state (id smallint primary key)");
+    }
+
+    private void givenBootstrapFunction(String name) throws SQLException {
+        exec("create function platform." + name + "(integer) returns integer language sql as 'select 1'");
+    }
+
+    @Test
+    void theShippedGuardTextHasBothSah42ChecksAndStillOnlyReads() throws Exception {
+        assertThat(guard).contains("to_regclass('platform.platform_admin_bootstrap_state')")
+                .contains("p.proname like 'admin\\_bootstrap\\_%'")
+                .contains("the table platform.platform_admin_bootstrap_state exists")
+                .contains("a platform.admin_bootstrap_ function exists");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sahaj_staging", "sahaj_prod", "sahaj_dev_staging", "sahaj_test_prod", "sahaj_dev_1", "sahaj_test_1",
+            "sahaj_dev ", "Sahaj_Dev"})
+    void onlyTheBootstrapStateTableRaisesAndNamesItInWordsAndPointsAtTheRunbook(String name) throws Exception {
+        givenNothing();
+        givenBootstrapTable();
+        PSQLException error = run(variant(name));
+        assertRaised(error, "guard with database name '" + name + "' and only the bootstrap table");
+        ServerErrorMessage server = error.getServerErrorMessage();
+        assertThat(server.getDetail()).isEqualTo("the table platform.platform_admin_bootstrap_state exists");
+        assertThat(server.getHint()).contains("dev-tools-sample-admin-cleanup.sql").contains("both dev-tools features");
+        assertThat(server.getMessage()).contains("Dev-tools admin objects (sample admin or bootstrap registration) found in database \"" + name + "\"");
+        assertNoSecrets(error);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"admin_bootstrap_begin", "admin_bootstrap_unlock_failed", "admin_bootstrap_unlock_succeeded",
+            "admin_bootstrap_ticket_status", "admin_bootstrap_register", "admin_bootstrap_anything_else"})
+    void onlyOneBootstrapFunctionOfAnySignatureRaisesAndNamesTheKindOfFinding(String function) throws Exception {
+        givenNothing();
+        givenBootstrapFunction(function);
+        PSQLException error = run(variant("sahaj_staging"));
+        assertRaised(error, "guard with only " + function);
+        assertThat(error.getServerErrorMessage().getDetail()).isEqualTo("a platform.admin_bootstrap_ function exists");
+        assertNoSecrets(error);
+    }
+
+    @Test
+    void theBootstrapTableAndAFunctionTogetherAreBothListed() throws Exception {
+        givenNothing();
+        givenBootstrapTable();
+        givenBootstrapFunction("admin_bootstrap_begin");
+        PSQLException error = run(variant("sahaj_staging"));
+        assertRaised(error, "guard raised");
+        assertThat(error.getServerErrorMessage().getDetail())
+                .contains("the table platform.platform_admin_bootstrap_state exists").contains("a platform.admin_bootstrap_ function exists");
+    }
+
+    @Test
+    void aFunctionWhoseNameOnlyLooksSimilarIsNotAFindingTheMatchIsTheExactPrefixInSchemaPlatform() throws Exception {
+        givenNothing();
+        exec("create function platform.admin_bootstrapx(integer) returns integer language sql as 'select 1'");
+        exec("create function platform.my_admin_bootstrap_begin(integer) returns integer language sql as 'select 1'");
+        exec("create schema qa_probe_schema");
+        exec("create function qa_probe_schema.admin_bootstrap_begin(integer) returns integer language sql as 'select 1'");
+        assertPasses(run(variant("sahaj_staging")), "similar names and another schema are not findings");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sahaj_dev", "sahaj_test"})
+    void theTwoExactDevAndTestNamesNeverRaiseWhateverBootstrapObjectsExist(String name) throws Exception {
+        givenNothing();
+        givenBootstrapTable();
+        givenBootstrapFunction("admin_bootstrap_register");
+        assertPasses(run(variant(name)), "guard in '" + name + "' with the bootstrap objects present");
+    }
+
+    @Test
+    void noBootstrapObjectAndNoOtherFindingPassesInAnyOtherDatabase() throws Exception {
+        givenNothing();
+        for (String name : new String[] {"sahaj_staging", "sahaj_prod", "sahaj_dev_staging", "sahaj_test_prod"}) {
+            assertPasses(run(variant(name)), name + " with neither the table nor any bootstrap function");
+        }
     }
 
     @Test

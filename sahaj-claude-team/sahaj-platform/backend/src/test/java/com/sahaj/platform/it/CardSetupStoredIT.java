@@ -375,4 +375,148 @@ class CardSetupStoredIT extends CardSetupSupport {
         // and with the current base but the old draft token pair of a draft that no longer exists as such
         assertThat(view(clinic.owner()).get("draft").get("setup").get("cardsPerRow").asInt()).isEqualTo(4);
     }
+
+    // ---------------- DEC-032 G-5: schema_version on the two jsonb tables ----------------
+
+    @Test
+    void theSchemaVersionColumnIsASmallintNotNullWithDefault1AndACheckOnBothTables() throws Exception {
+        Clinic clinic = hospital();
+        List<String> columns = column(clinic, "select table_name || ':' || data_type || ':' || is_nullable || ':' "
+                + "|| column_default from information_schema.columns where table_schema = 'ipd' "
+                + "and table_name in ('card_setup_version', 'card_setup_draft') and column_name = 'schema_version' "
+                + "order by table_name");
+        assertThat(columns).containsExactly("card_setup_draft:smallint:NO:1", "card_setup_version:smallint:NO:1");
+        List<String> checks = column(clinic, "select conrelid::regclass::text || ':' || conname from pg_constraint "
+                + "where conname in ('ck_card_setup_version_schema_version', 'ck_card_setup_draft_schema_version') order by 1");
+        assertThat(checks).containsExactly("ipd.card_setup_draft:ck_card_setup_draft_schema_version",
+                "ipd.card_setup_version:ck_card_setup_version_schema_version");
+    }
+
+    @Test
+    void aNewDraftAndANewVersionStoreSchemaVersion1AndAnUpdateKeepsIt() throws Exception {
+        Clinic clinic = hospital();
+        RequestPostProcessor owner = clinic.owner();
+        JsonNode first = saveOk(owner, 1, null, edit(standard(owner), s -> s.put("layout", "compact")));
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_draft")).containsExactly("1");
+        JsonNode second = saveOk(owner, 1, revisionOf(first), edit(standard(owner), s -> s.put("layout", "expanded")));
+        assertThat(revisionOf(second)).as("a real update, not a no-change").isNotEqualTo(revisionOf(first));
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_draft")).as("update keeps it")
+                .containsExactly("1");
+        publishOk(owner, 1, revisionOf(second), edit(standard(owner), s -> s.put("layout", "expanded")));
+        assertThat(column(clinic, "select version::text || ':' || schema_version::text from ipd.card_setup_version "
+                + "order by version")).containsExactly("2:1");
+        saveOk(owner, 2, null, edit(standard(owner), s -> s.put("cardsPerRow", 4)));
+        publishNow(clinic, edit(standard(owner), s -> s.put("cardsPerRow", 4)));
+        assertThat(column(clinic, "select version::text || ':' || schema_version::text from ipd.card_setup_version "
+                + "order by version")).containsExactly("2:1", "3:1");
+    }
+
+    @Test
+    void aRowInsertedWithoutTheColumnGetsTheDefault1AndZeroOrNegativeIsRefusedWith23514() throws Exception {
+        Clinic clinic = hospital();
+        insertVersion(clinic, 2, standard(clinic.owner()).toString());
+        insertDraft(clinic, 2, 5, standard(clinic.owner()).toString());
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_version")).containsExactly("1");
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_draft")).containsExactly("1");
+        String version = "insert into ipd.card_setup_version (version, setup, is_standard, changed_parts, published_by, "
+                + "schema_version) values (3, '{}'::jsonb, false, array[]::text[], gen_random_uuid(), %s)";
+        assertThat(appErr(clinic, version.formatted("0")).state()).as("version table, 0").isEqualTo("23514");
+        assertThat(appErr(clinic, version.formatted("-1")).state()).as("version table, -1").isEqualTo("23514");
+        assertThat(appErr(clinic, version.formatted("null")).state()).as("version table, null").isEqualTo("23502");
+        assertThat(appErr(clinic, version.formatted("32768")).state()).as("past smallint").isEqualTo("22003");
+        Clinic empty = hospital();
+        String draft = "insert into ipd.card_setup_draft (setup, base_version, revision, saved_by, schema_version) "
+                + "values ('{}'::jsonb, 1, 1, gen_random_uuid(), %s)";
+        assertThat(appErr(empty, draft.formatted("0")).state()).as("draft table, 0").isEqualTo("23514");
+        assertThat(appErr(empty, draft.formatted("-1")).state()).as("draft table, -1").isEqualTo("23514");
+        assertThat(appErr(empty, draft.formatted("null")).state()).as("draft table, null").isEqualTo("23502");
+        // an update of the existing draft to 0 is refused as well; the version table cannot be updated at all
+        assertThat(appErr(clinic, "update ipd.card_setup_draft set schema_version = 0").state()).isEqualTo("23514");
+        assertThat(appErr(clinic, "update ipd.card_setup_version set schema_version = 2").state()).isEqualTo("42501");
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_draft")).containsExactly("1");
+        assertThat(rows(empty, "card_setup_draft")).isZero();
+        // 1 and higher are accepted by the database (the application decides what it can read)
+        commitAsTenant(empty.tenantId(), draft.formatted("2"));
+        assertThat(values(empty, "select schema_version::text from ipd.card_setup_draft")).containsExactly("2");
+    }
+
+    @Test
+    void aLiveVersionWithSchemaVersion2GivesTheStandardSetupWithFallbackOnTheCardSetupAndOnTheAdmittedListAndThePatientListStillLoads()
+            throws Exception {
+        Ward w = ward();
+        Clinic clinic = w.clinic();
+        ObjectNode future = edit(standard(clinic.owner()), s -> {
+            s.put("layout", "compact");
+            s.put("cardsPerRow", 2);
+            fieldLabel(s, "ward", "Unit");
+        });
+        commitAsTenant(clinic.tenantId(), "insert into ipd.card_setup_version (version, setup, is_standard, changed_parts, "
+                + "published_by, schema_version) values (2, ?::jsonb, false, array['layout']::text[], ?::uuid, 2)",
+                future.toString(), clinic.ownerUserId().toString());
+        JsonNode v = view(clinic.owner());
+        assertThat(v.get("live").get("version").asInt()).isEqualTo(2);
+        assertThat(v.get("live").get("setup")).as("the newer shape is not read: the standard setup").isEqualTo(v.get("standard"));
+        assertThat(v.get("live").get("setup").get("layout").asText()).isEqualTo("standard");
+        assertThat(v.get("live").get("isStandard").asBoolean()).isTrue();
+        for (RequestPostProcessor auth : new RequestPostProcessor[] {clinic.owner(), w.nurse().auth(), w.doctor().auth(),
+            staff(clinic, "FRONT_DESK").auth()}) {
+            JsonNode l = listOf(auth);
+            JsonNode card = l.get("cardSetup");
+            assertThat(card.get("fallback").asBoolean()).isTrue();
+            assertThat(card.get("version").asInt()).isEqualTo(2);
+            assertThat(card.get("layout").asText()).isEqualTo("standard");
+            assertThat(card.toString()).doesNotContain("Unit");
+            assertThat(l.get("items")).as("the patient list still loads").hasSize(1);
+        }
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_version")).as("never rewritten")
+                .containsExactly("2");
+        // the owner can publish on top of it: version 3 is written in the shape this build knows
+        JsonNode next = publishOk(clinic.owner(), 2, null, edit(standard(clinic.owner()), s -> s.put("cardsPerRow", 2)));
+        assertThat(next.get("live").get("version").asInt()).isEqualTo(3);
+        assertThat(column(clinic, "select version::text || ':' || schema_version::text from ipd.card_setup_version "
+                + "order by version")).containsExactly("2:2", "3:1");
+        assertThat(listOf(clinic.owner()).get("cardSetup").get("fallback").asBoolean()).isFalse();
+    }
+
+    @Test
+    void aDraftWithSchemaVersion2GivesTheStandardSetupInTheOwnersDraftAndTheNextSaveWritesVersion1() throws Exception {
+        Clinic clinic = hospital();
+        Staff nurse = staff(clinic, "NURSE");
+        ObjectNode future = edit(standard(clinic.owner()), s -> {
+            s.put("layout", "expanded");
+            fieldLabel(s, "ward", "Unit");
+        });
+        commitAsTenant(clinic.tenantId(), "insert into ipd.card_setup_draft (setup, base_version, revision, saved_by, "
+                + "schema_version) values (?::jsonb, 1, 9, ?::uuid, 2)", future.toString(), clinic.ownerUserId().toString());
+        JsonNode v = view(clinic.owner());
+        assertThat(v.get("draft").get("setup")).as("the newer shape is not read: the standard setup").isEqualTo(v.get("standard"));
+        assertThat(v.get("draft").get("revision").asLong()).isEqualTo(9);
+        assertThat(v.get("live").get("version").asInt()).isEqualTo(1);
+        assertThat(v.toString()).doesNotContain("Unit");
+        // other roles never see the draft, whatever its shape
+        assertThat(view(nurse.auth()).has("draft")).isFalse();
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_draft")).as("reading does not rewrite")
+                .containsExactly("2");
+        // the owner's next Save draft writes the shape this build knows
+        JsonNode saved = saveOk(clinic.owner(), 1, 9L, edit(standard(clinic.owner()), s -> s.put("layout", "compact")));
+        assertThat(saved.get("draft").get("setup").get("layout").asText()).isEqualTo("compact");
+        assertThat(values(clinic, "select schema_version::text from ipd.card_setup_draft")).containsExactly("1");
+    }
+
+    @Test
+    void schemaVersionIsInvisibleToTheOtherClinicAndNeverInTheApiBody() throws Exception {
+        Clinic mine = hospital();
+        Clinic theirs = hospital();
+        commitAsTenant(theirs.tenantId(), "insert into ipd.card_setup_version (version, setup, is_standard, changed_parts, "
+                + "published_by, schema_version) values (2, '{}'::jsonb, false, array[]::text[], ?::uuid, 2)",
+                theirs.ownerUserId().toString());
+        // my clinic is not affected by their unreadable shape
+        JsonNode v = view(mine.owner());
+        assertThat(v.get("live").get("version").asInt()).isEqualTo(1);
+        assertThat(count(mine, "select count(*) from ipd.card_setup_version")).isZero();
+        assertThat(call(HttpMethod.GET, CARD_SETUP, mine.owner(), null).andReturn().getResponse().getContentAsString())
+                .doesNotContain("schema_version").doesNotContain("schemaVersion");
+        assertThat(call(HttpMethod.GET, CARD_SETUP, theirs.owner(), null).andReturn().getResponse().getContentAsString())
+                .doesNotContain("schema_version").doesNotContain("schemaVersion");
+    }
 }

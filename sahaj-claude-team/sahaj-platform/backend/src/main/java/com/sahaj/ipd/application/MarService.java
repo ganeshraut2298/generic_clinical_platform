@@ -30,10 +30,12 @@ public class MarService {
     private final TeamMemberPort team;
     private final IpdGate gate;
     private final MarAssembler marAssembler;
+    private final ScopeGuard guard;
 
     MarService(AdmissionRepository admissions, MedicineOrderRepository orders, PatientClinicalPort patients,
                PatientAccessPort patientAccess, TeamMemberPort team, IpdGate gate,
-               MarAssembler marAssembler) {
+               MarAssembler marAssembler, ScopeGuard guard) {
+        this.guard = guard;
         this.admissions = admissions;
         this.orders = orders;
         this.patients = patients;
@@ -59,6 +61,8 @@ public class MarService {
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
         PatientClinical patient = patients.find(tenantId, admission.patientId())
                 .orElseThrow(() -> new NotFoundException("Patient not found"));
+        // SAH-34: after the 404 checks, before the record-access row (a refusal writes nothing).
+        guard.requireAdmission(tenantId, actor, role, member.role(), admissionId, "mar-sheet");
         patientAccess.recordOpened(tenantId, admission.patientId(), actor);
         return marAssembler.mar(tenantId, member.membershipId(), role, member.role(), ent, admission, patient,
                 orders.databaseNow());

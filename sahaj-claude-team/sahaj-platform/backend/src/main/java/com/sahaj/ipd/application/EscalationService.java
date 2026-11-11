@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,10 +69,12 @@ public class EscalationService {
     private final AuditLog auditLog;
     private final IpdGate gate;
     private final SeniorCallRepository seniorCalls;
+    private final ScopeGuard guard;
 
     EscalationService(EscalationBoardRepository board, AdmissionRepository admissions, ClinicalEventRepository events,
                       PatientLookupPort patients, ActorDirectoryPort actors, TeamMemberPort team, AuditLog auditLog,
-                      IpdGate gate, SeniorCallRepository seniorCalls) {
+                      IpdGate gate, SeniorCallRepository seniorCalls, ScopeGuard guard) {
+        this.guard = guard;
         this.seniorCalls = seniorCalls;
         this.board = board;
         this.admissions = admissions;
@@ -97,7 +100,8 @@ public class EscalationService {
         Acknowledge body = EscalationRules.acknowledge(input);
         String memberRole = SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.DOCTOR_ROLES,
                 "You cannot acknowledge an escalation.");
-        Locked locked = lock(tenantId, escalationId);
+        Locked locked = lock(tenantId, escalationId, admission -> guard.requireAdmissionLocked(tenantId, actor, role,
+                memberRole, admission.id(), "escalation-acknowledge"));
         Detail before = locked.escalation();
         Answer answer = EscalationState.acknowledge(before.snapshot(), body.version(), actor);
         if (answer.isReplay()) {
@@ -130,7 +134,8 @@ public class EscalationService {
         Respond body = EscalationRules.respond(input);
         String memberRole = SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.DOCTOR_ROLES,
                 "You cannot record a response.");
-        Locked locked = lock(tenantId, escalationId);
+        Locked locked = lock(tenantId, escalationId, admission -> guard.requireAdmissionLocked(tenantId, actor, role,
+                memberRole, admission.id(), "escalation-respond"));
         Detail before = locked.escalation();
         Answer answer = EscalationState.respond(before.snapshot(), body.version(), actor, body.action(), body.note());
         if (answer.isReplay()) {
@@ -166,7 +171,8 @@ public class EscalationService {
         CallSenior body = EscalationRules.callSenior(input);
         String memberRole = SafetySupport.membershipRole(team, tenantId, actor, EscalationRules.NURSE_ROLES,
                 "You cannot call the senior doctor.");
-        Locked locked = lock(tenantId, escalationId);
+        Locked locked = lock(tenantId, escalationId, admission -> guard.requireAdmissionLocked(tenantId, actor, role,
+                memberRole, admission.id(), "escalation-call-senior"));
         Detail before = locked.escalation();
         CallHistory history = new CallHistory(tenantId, escalationId, actor);
         Answer answer = EscalationState.callSenior(before.snapshot(), body.version(), body.seniorCalls(), history);
@@ -236,14 +242,17 @@ public class EscalationService {
 
     /**
      * A plain read of the escalation gives its admission (404 when missing or another clinic's); the bare admission row
-     * is locked {@code for no key update} and read joined with its bed in a new statement (404 unless ADMITTED); the
-     * escalation is read again, because it may have changed while the lock was awaited; the patient is looked up (404
-     * when missing, never a placeholder in an answer to an action).
+     * is locked {@code for no key update} and read joined with its bed in a new statement (404 when missing); the
+     * scope guard runs on that admission next (SAH-34: a scoped nurse out of scope gets 403 {@code outside-scope}
+     * before any state answer, so the order of design note 1.2 holds for a discharged admission too); the escalation is
+     * read again, because it may have changed while the lock was awaited; the admission must be ADMITTED (404); the
+     * patient is looked up (404 when missing, never a placeholder in an answer to an action).
      */
-    private Locked lock(UUID tenantId, UUID escalationId) {
+    private Locked lock(UUID tenantId, UUID escalationId, Consumer<AdmissionRow> scopeGuard) {
         Detail first = board.findById(tenantId, escalationId).orElseThrow(() -> new NotFoundException(NOT_FOUND));
         AdmissionRow admission = admissions.findForNoKeyUpdate(tenantId, first.admissionId())
                 .orElseThrow(() -> new NotFoundException(NOT_FOUND));
+        scopeGuard.accept(admission);
         Detail current = board.findById(tenantId, escalationId).orElseThrow(() -> new NotFoundException(NOT_FOUND));
         if (!"ADMITTED".equals(admission.status())) {
             throw new NotFoundException("This patient is not admitted any more.");

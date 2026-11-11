@@ -50,6 +50,7 @@ import org.springframework.security.access.AccessDeniedException;
 class BedBoardServiceTest {
 
     private static final UUID TENANT = UUID.randomUUID();
+    private static final UUID ACTOR = UUID.randomUUID();
     private static final UUID WARD1 = UUID.randomUUID();
     private static final UUID WARD2 = UUID.randomUUID();
     private static final UUID WARD3 = UUID.randomUUID();
@@ -79,6 +80,7 @@ class BedBoardServiceTest {
     private ChargeRepository charges;
     private DischargeRepository discharges = mock(DischargeRepository.class);
     private BedBoardService service;
+    private ScopeGuard guard;
 
     @BeforeEach
     void setUp() {
@@ -92,9 +94,10 @@ class BedBoardServiceTest {
         team = mock(TeamMemberPort.class);
         charges = mock(ChargeRepository.class);
         IpdCatalog catalog = new IpdCatalog(settings);
+        guard = ScopeStubs.unscoped();
         service = new BedBoardService(beds, wards, admissions, auditLog, patients, team,
                 new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)), catalog, new IpdBilling(charges, mock(TransferRepository.class), catalog),
-                discharges);
+                discharges, guard);
         state("on");
         roomLevel(true);
         when(settings.findCategories(TENANT)).thenReturn(List.of());
@@ -131,12 +134,12 @@ class BedBoardServiceTest {
     void withNoSettingsRowTheBoardUsesTheDefaultRoomsOn() {
         when(settings.findConfig(TENANT)).thenReturn(Optional.empty());
 
-        assertThat(service.board(TENANT, "OWNER").roomLevel()).isTrue();
+        assertThat(service.board(TENANT, ACTOR, "OWNER").roomLevel()).isTrue();
     }
 
     @Test
     void boardListsWardsInOrderWithCountsAndRoomGroups() {
-        BedBoard board = service.board(TENANT, "NURSE");
+        BedBoard board = service.board(TENANT, ACTOR, "NURSE");
 
         assertThat(board.state()).isEqualTo("on");
         assertThat(board.roomLevel()).isTrue();
@@ -164,7 +167,7 @@ class BedBoardServiceTest {
 
     @Test
     void occupiedBedCarriesPatientDayAndDoctorShortName() {
-        BoardBed bed = service.board(TENANT, "DOCTOR").wards().get(0).rooms().get(0).beds().get(1);
+        BoardBed bed = service.board(TENANT, ACTOR, "DOCTOR").wards().get(0).rooms().get(0).beds().get(1);
 
         assertThat(bed.status()).isEqualTo("occ");
         assertThat(bed.admissionId()).isEqualTo(ADMISSION);
@@ -177,7 +180,7 @@ class BedBoardServiceTest {
     }
 
     private BoardBed occupiedBed() {
-        return service.board(TENANT, "DOCTOR").wards().get(0).rooms().get(0).beds().get(1);
+        return service.board(TENANT, ACTOR, "DOCTOR").wards().get(0).rooms().get(0).beds().get(1);
     }
 
     private static DischargeRepository.SignoffRow signoffAt(String instant) {
@@ -205,7 +208,7 @@ class BedBoardServiceTest {
         when(discharges.findLatestSignoffsOfAdmitted(TENANT)).thenReturn(Map.of(ADMISSION,
                 signoffAt("2026-11-11T19:00:00Z")));
 
-        BedBoard board = service.board(TENANT, "OWNER");
+        BedBoard board = service.board(TENANT, ACTOR, "OWNER");
 
         assertThat(board.wards().get(0).rooms().get(0).beds()).filteredOn(b -> !"occ".equals(b.status()))
                 .allSatisfy(b -> assertThat(b.goingHomeToday()).isNull());
@@ -217,14 +220,14 @@ class BedBoardServiceTest {
         // Admitted 11 Nov 00:30 IST, now 12 Nov 01:30 IST: calendar day 2, but only 25 hours passed, so one 24h period.
         when(settings.findConfig(TENANT)).thenReturn(Optional.of(new ConfigRow(true, "24h", 0L, 0L)));
 
-        BoardBed bed = service.board(TENANT, "DOCTOR").wards().get(0).rooms().get(0).beds().get(1);
+        BoardBed bed = service.board(TENANT, ACTOR, "DOCTOR").wards().get(0).rooms().get(0).beds().get(1);
 
         assertThat(bed.dayNumber()).isEqualTo(1);
     }
 
     @Test
     void settingsCategoriesAndDepositRulesAreReadOncePerBoard() {
-        service.board(TENANT, "OWNER");
+        service.board(TENANT, ACTOR, "OWNER");
 
         verify(settings, times(1)).findConfig(TENANT);
         verify(settings, times(1)).findCategories(TENANT);
@@ -235,12 +238,12 @@ class BedBoardServiceTest {
     void anUnknownBedStatusIsAnErrorNotABlockedBed() {
         when(beds.findAll(TENANT)).thenReturn(List.of(new BedRow(BED_FREE_A, WARD1, ROOM_A, "201", "semi", "weird")));
 
-        assertThatThrownBy(() -> service.board(TENANT, "OWNER")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.board(TENANT, ACTOR, "OWNER")).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void lookupsAreBatchedOncePerRequest() {
-        service.board(TENANT, "OWNER");
+        service.board(TENANT, ACTOR, "OWNER");
 
         verify(patients, times(1)).findAll(eq(TENANT), anyCollection());
         verify(patients, never()).find(any(), any());
@@ -252,7 +255,7 @@ class BedBoardServiceTest {
     void noAdmittedPatientsMeansNoLookups() {
         when(admissions.findAdmitted(TENANT)).thenReturn(List.of());
 
-        service.board(TENANT, "OWNER");
+        service.board(TENANT, ACTOR, "OWNER");
 
         verify(patients, never()).findAll(any(), anyCollection());
         verify(team, never()).findAll(any(), anyCollection());
@@ -262,7 +265,7 @@ class BedBoardServiceTest {
     void roomsOffGivesOneGroupWithEmptyNameHoldingAllBeds() {
         roomLevel(false);
 
-        BoardWard general = service.board(TENANT, "OWNER").wards().get(0);
+        BoardWard general = service.board(TENANT, ACTOR, "OWNER").wards().get(0);
 
         assertThat(general.rooms()).hasSize(1);
         assertThat(general.rooms().get(0).name()).isEmpty();
@@ -272,14 +275,14 @@ class BedBoardServiceTest {
 
     @Test
     void canAdmitAndCanChangeBedsFollowRoleAndState() {
-        assertThat(service.board(TENANT, "OWNER").canAdmit()).isTrue();
-        assertThat(service.board(TENANT, "FRONT_DESK").canChangeBeds()).isTrue();
-        assertThat(service.board(TENANT, "NURSE").canAdmit()).isTrue();
-        assertThat(service.board(TENANT, "DOCTOR").canAdmit()).isFalse();
-        assertThat(service.board(TENANT, "DOCTOR").canChangeBeds()).isFalse();
+        assertThat(service.board(TENANT, ACTOR, "OWNER").canAdmit()).isTrue();
+        assertThat(service.board(TENANT, ACTOR, "FRONT_DESK").canChangeBeds()).isTrue();
+        assertThat(service.board(TENANT, ACTOR, "NURSE").canAdmit()).isTrue();
+        assertThat(service.board(TENANT, ACTOR, "DOCTOR").canAdmit()).isFalse();
+        assertThat(service.board(TENANT, ACTOR, "DOCTOR").canChangeBeds()).isFalse();
 
         state("readonly");
-        BedBoard readonly = service.board(TENANT, "OWNER");
+        BedBoard readonly = service.board(TENANT, ACTOR, "OWNER");
         assertThat(readonly.state()).isEqualTo("readonly");
         assertThat(readonly.canAdmit()).isFalse();
         assertThat(readonly.canChangeBeds()).isFalse();
@@ -289,8 +292,8 @@ class BedBoardServiceTest {
     void offStateIsModuleOff() {
         state("off");
 
-        assertThatThrownBy(() -> service.board(TENANT, "OWNER")).isInstanceOf(ModuleOffException.class);
-        assertThatThrownBy(() -> service.markReady(TENANT, "OWNER", BED_CLEAN)).isInstanceOf(ModuleOffException.class);
+        assertThatThrownBy(() -> service.board(TENANT, ACTOR, "OWNER")).isInstanceOf(ModuleOffException.class);
+        assertThatThrownBy(() -> service.markReady(TENANT, ACTOR, "OWNER", BED_CLEAN)).isInstanceOf(ModuleOffException.class);
     }
 
     @Test
@@ -298,7 +301,7 @@ class BedBoardServiceTest {
         when(beds.findForUpdate(TENANT, BED_CLEAN)).thenReturn(Optional.of(
                 new BedRow(BED_CLEAN, WARD1, ROOM_B, "103", "gen", "clean")));
 
-        BedBoard board = service.markReady(TENANT, "NURSE", BED_CLEAN);
+        BedBoard board = service.markReady(TENANT, ACTOR, "NURSE", BED_CLEAN);
 
         assertThat(board.wards()).hasSize(3);
         InOrder order = inOrder(wards, beds);
@@ -317,7 +320,7 @@ class BedBoardServiceTest {
         when(beds.findForUpdate(TENANT, BED_BLK)).thenReturn(Optional.of(
                 new BedRow(BED_BLK, WARD1, null, "100", "gen", "blk")));
 
-        service.markReady(TENANT, "OWNER", BED_BLK);
+        service.markReady(TENANT, ACTOR, "OWNER", BED_BLK);
 
         verify(beds).updateStatus(TENANT, BED_BLK, "free");
     }
@@ -327,7 +330,7 @@ class BedBoardServiceTest {
         when(beds.findForUpdate(TENANT, BED_CLEAN)).thenReturn(Optional.of(
                 new BedRow(BED_CLEAN, WARD1, ROOM_B, "103", "gen", "clean")));
 
-        service.block(TENANT, "FRONT_DESK", BED_CLEAN);
+        service.block(TENANT, ACTOR, "FRONT_DESK", BED_CLEAN);
 
         verify(beds).updateStatus(TENANT, BED_CLEAN, "blk");
         verify(auditLog).record(eq("IPD_BED_BLOCKED"), eq("IPD_BED"), eq(BED_CLEAN), isNull(), anyMap());
@@ -339,7 +342,7 @@ class BedBoardServiceTest {
         for (String[] c : cases) {
             UUID id = UUID.randomUUID();
             when(beds.findForUpdate(TENANT, id)).thenReturn(Optional.of(new BedRow(id, WARD1, null, "X", "gen", c[0])));
-            assertThatThrownBy(() -> service.markReady(TENANT, "OWNER", id)).isInstanceOf(ConflictException.class)
+            assertThatThrownBy(() -> service.markReady(TENANT, ACTOR, "OWNER", id)).isInstanceOf(ConflictException.class)
                     .hasMessage("This bed cannot be changed from " + c[1] + ".")
                     .extracting(e -> ((ConflictException) e).problemType()).isEqualTo("bed-state");
             verify(beds, never()).updateStatus(eq(TENANT), eq(id), any());
@@ -351,7 +354,7 @@ class BedBoardServiceTest {
         UUID id = UUID.randomUUID();
         when(beds.findForUpdate(TENANT, id)).thenReturn(Optional.of(new BedRow(id, WARD1, null, "X", "gen", "blk")));
 
-        assertThatThrownBy(() -> service.block(TENANT, "OWNER", id)).isInstanceOf(ConflictException.class)
+        assertThatThrownBy(() -> service.block(TENANT, ACTOR, "OWNER", id)).isInstanceOf(ConflictException.class)
                 .hasMessage("This bed cannot be changed from Blocked.");
     }
 
@@ -360,7 +363,7 @@ class BedBoardServiceTest {
         for (String status : new String[] {"free", "occ", "res", "blk"}) {
             UUID id = UUID.randomUUID();
             when(beds.findForUpdate(TENANT, id)).thenReturn(Optional.of(new BedRow(id, WARD1, null, "X", "gen", status)));
-            assertThatThrownBy(() -> service.block(TENANT, "OWNER", id)).isInstanceOf(ConflictException.class);
+            assertThatThrownBy(() -> service.block(TENANT, ACTOR, "OWNER", id)).isInstanceOf(ConflictException.class);
         }
         verify(auditLog, never()).record(any(), any(), any(), any(), any());
     }
@@ -370,19 +373,19 @@ class BedBoardServiceTest {
         UUID id = UUID.randomUUID();
         when(beds.findForUpdate(TENANT, id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.markReady(TENANT, "OWNER", id)).isInstanceOf(NotFoundException.class);
-        assertThatThrownBy(() -> service.block(TENANT, "OWNER", id)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.markReady(TENANT, ACTOR, "OWNER", id)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.block(TENANT, ACTOR, "OWNER", id)).isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void aRoleThatMayNotChangeBedsIsRefusedBeforeTheGateTheLockAndAnyWrite() {
         for (String role : new String[] {"DOCTOR", "VISITING_DOCTOR", "BILLING", "PHARMACIST", "COUNSELLOR", "nobody"}) {
-            assertThatThrownBy(() -> service.markReady(TENANT, role, BED_CLEAN))
+            assertThatThrownBy(() -> service.markReady(TENANT, ACTOR, role, BED_CLEAN))
                     .isInstanceOf(AccessDeniedException.class);
-            assertThatThrownBy(() -> service.block(TENANT, role, BED_CLEAN))
+            assertThatThrownBy(() -> service.block(TENANT, ACTOR, role, BED_CLEAN))
                     .isInstanceOf(AccessDeniedException.class);
         }
-        assertThatThrownBy(() -> service.markReady(TENANT, null, BED_CLEAN))
+        assertThatThrownBy(() -> service.markReady(TENANT, ACTOR, null, BED_CLEAN))
                 .isInstanceOf(AccessDeniedException.class);
 
         verify(entitlements, never()).forTenant(any());
@@ -395,7 +398,7 @@ class BedBoardServiceTest {
     void readonlyBlocksWritesBeforeAnyLock() {
         state("readonly");
 
-        assertThatThrownBy(() -> service.markReady(TENANT, "OWNER", BED_CLEAN))
+        assertThatThrownBy(() -> service.markReady(TENANT, ACTOR, "OWNER", BED_CLEAN))
                 .isInstanceOf(ConflictException.class)
                 .extracting(e -> ((ConflictException) e).problemType()).isEqualTo("ipd-readonly");
         verify(wards, never()).lockTenant(any());
@@ -425,29 +428,29 @@ class BedBoardServiceTest {
     void occupiedBedIsFlaggedDepositLowForASelfPatientWhoseBillReachedTheAlertShare() {
         // The board test settings charge no visit or nursing: two bill days of bed 800 = 1,600; 80 percent of 2,000.
         admission("Self", 200_000L);
-        assertThat(occupiedBed(service.board(TENANT, "NURSE")).depositLow()).isTrue();
+        assertThat(occupiedBed(service.board(TENANT, ACTOR, "NURSE")).depositLow()).isTrue();
 
         admission("Self", 200_001L);
-        assertThat(occupiedBed(service.board(TENANT, "NURSE")).depositLow()).isFalse();
+        assertThat(occupiedBed(service.board(TENANT, ACTOR, "NURSE")).depositLow()).isFalse();
     }
 
     @Test
     void depositLowCountsExtraChargesAndNeverFlagsInsurancePatients() {
         admission("Self", 400_000L);
-        assertThat(occupiedBed(service.board(TENANT, "OWNER")).depositLow()).isFalse();
+        assertThat(occupiedBed(service.board(TENANT, ACTOR, "OWNER")).depositLow()).isFalse();
         when(charges.findForAdmitted(TENANT)).thenReturn(List.of(
                 new ChargeRepository.ChargeRow(ADMISSION, "oxygen", "Oxygen (per day)", 80_000L, 2),
                 new ChargeRepository.ChargeRow(ADMISSION, "cbc", "CBC", 30_000L, 1)));
         // 1,600 + 1,600 + 300 = 3,500 of 4,000 is 87.5 percent.
-        assertThat(occupiedBed(service.board(TENANT, "OWNER")).depositLow()).isTrue();
+        assertThat(occupiedBed(service.board(TENANT, ACTOR, "OWNER")).depositLow()).isTrue();
 
         admission("Insurance", 0L);
-        assertThat(occupiedBed(service.board(TENANT, "OWNER")).depositLow()).isFalse();
+        assertThat(occupiedBed(service.board(TENANT, ACTOR, "OWNER")).depositLow()).isFalse();
     }
 
     @Test
     void freeBedsHaveNoDepositLowFlagAndTheChargesAreFetchedOnce() {
-        BedBoard board = service.board(TENANT, "OWNER");
+        BedBoard board = service.board(TENANT, ACTOR, "OWNER");
 
         assertThat(board.wards().stream().flatMap(w -> w.rooms().stream()).flatMap(r -> r.beds().stream())
                 .filter(b -> !"occ".equals(b.status()))).allMatch(b -> b.depositLow() == null);
@@ -462,6 +465,91 @@ class BedBoardServiceTest {
                 1_000_000L, 500_000L, 300_000L, 1_500_000L, 0L, 200_000L, 500_000L, 1_000_000L, true, 75, true)));
 
         // 1,600 x 100 >= 2,000.01 x 75 -> low at 75 percent, not at 80.
-        assertThat(occupiedBed(service.board(TENANT, "OWNER")).depositLow()).isTrue();
+        assertThat(occupiedBed(service.board(TENANT, ACTOR, "OWNER")).depositLow()).isTrue();
+    }
+
+    // ---- SAH-34 patient scope on the board ----
+
+    private BoardBed occupiedBedAs(String role) {
+        for (BoardWard ward : service.board(TENANT, ACTOR, role).wards()) {
+            for (BoardRoom room : ward.rooms()) {
+                for (BoardBed bed : room.beds()) {
+                    if ("occ".equals(bed.status())) {
+                        return bed;
+                    }
+                }
+            }
+        }
+        throw new AssertionError("no occupied bed");
+    }
+
+    private PatientScope nurseScope(java.util.Set<UUID> wardIds, java.util.Map<UUID, Instant> grants) {
+        return new PatientScope(PatientScope.Kind.WARDS, ACTOR, "NURSE", "NURSE", UUID.randomUUID(), wardIds, grants);
+    }
+
+    @Test
+    void anOccupiedBedOutsideTheNursesWardsKeepsItsStatusAndLosesEveryPatientField() {
+        when(guard.scope(TENANT, ACTOR, "NURSE", null)).thenReturn(nurseScope(java.util.Set.of(WARD2), Map.of()));
+
+        BoardBed bed = occupiedBedAs("NURSE");
+
+        assertThat(bed.status()).isEqualTo("occ");
+        assertThat(bed.code()).isEqualTo("102");
+        assertThat(bed.outsideScope()).isTrue();
+        assertThat(bed.admissionId()).isNull();
+        assertThat(bed.patientName()).isNull();
+        assertThat(bed.dayNumber()).isNull();
+        assertThat(bed.doctorShortName()).isNull();
+        assertThat(bed.depositLow()).isNull();
+        assertThat(bed.goingHomeToday()).isNull();
+        verify(patients, never()).findAll(any(), anyCollection());
+        verify(team, never()).findAll(any(), anyCollection());
+        assertThat(service.board(TENANT, ACTOR, "NURSE").counts().occ()).isEqualTo(1);
+        assertThat(service.board(TENANT, ACTOR, "NURSE").wards().get(0).occupied()).isEqualTo(1);
+    }
+
+    @Test
+    void aBedInTheNursesWardKeepsThePatientAndHasNoOutsideScopeMark() {
+        when(guard.scope(TENANT, ACTOR, "NURSE", null)).thenReturn(nurseScope(java.util.Set.of(WARD1), Map.of()));
+
+        BoardBed bed = occupiedBedAs("NURSE");
+
+        assertThat(bed.patientName()).isEqualTo("Test Patient");
+        assertThat(bed.admissionId()).isEqualTo(ADMISSION);
+        assertThat(bed.outsideScope()).isNull();
+    }
+
+    @Test
+    void aLiveEmergencyAccessGrantOpensTheBedOfThatPatient() {
+        when(guard.scope(TENANT, ACTOR, "NURSE", null))
+                .thenReturn(nurseScope(java.util.Set.of(WARD2), Map.of(ADMISSION, NOW.plusSeconds(600))));
+
+        BoardBed bed = occupiedBedAs("NURSE");
+
+        assertThat(bed.patientName()).isEqualTo("Test Patient");
+        assertThat(bed.outsideScope()).isNull();
+    }
+
+    @Test
+    void ownerAndDoctorSeeEveryBedAndTheMarkIsAbsentFromTheJson() throws Exception {
+        for (String role : new String[] {"OWNER", "DOCTOR", "FRONT_DESK"}) {
+            assertThat(occupiedBedAs(role).patientName()).as(role).isEqualTo("Test Patient");
+        }
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(occupiedBedAs("OWNER"));
+        assertThat(json).doesNotContain("outsideScope");
+    }
+
+    @Test
+    void theBoardAnsweredByReadyAndBlockIsMaskedToo() {
+        when(guard.scope(TENANT, ACTOR, "NURSE", null)).thenReturn(nurseScope(java.util.Set.of(WARD2), Map.of()));
+        when(beds.findForUpdate(TENANT, BED_CLEAN)).thenReturn(Optional.of(
+                new BedRow(BED_CLEAN, WARD1, ROOM_B, "103", "gen", "clean")));
+
+        BedBoard answer = service.markReady(TENANT, ACTOR, "NURSE", BED_CLEAN);
+
+        BoardBed occupied = answer.wards().get(0).rooms().get(0).beds().stream()
+                .filter(b -> "occ".equals(b.status())).findFirst().orElseThrow();
+        assertThat(occupied.outsideScope()).isTrue();
+        assertThat(occupied.patientName()).isNull();
     }
 }

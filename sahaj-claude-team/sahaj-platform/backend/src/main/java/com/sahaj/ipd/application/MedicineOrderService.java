@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -87,11 +88,14 @@ public class MedicineOrderService {
     private final IpdGate gate;
     private final MedicineCatalogue catalogue;
     private final MedicineAssembler assembler;
+    private final ScopeGuard guard;
 
     MedicineOrderService(MedicineOrderRepository orders, AdmissionRepository admissions,
                          ClinicalEventRepository events, PatientClinicalPort patients,
                          PatientAccessPort patientAccess, ActorDirectoryPort actors, TeamMemberPort team,
-                         AuditLog auditLog, IpdGate gate, MedicineCatalogue catalogue, MedicineAssembler assembler) {
+                         AuditLog auditLog, IpdGate gate, MedicineCatalogue catalogue, MedicineAssembler assembler,
+                         ScopeGuard guard) {
+        this.guard = guard;
         this.orders = orders;
         this.admissions = admissions;
         this.events = events;
@@ -121,6 +125,8 @@ public class MedicineOrderService {
         AdmissionRow admission = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
         PatientClinical patient = patient(tenantId, admission);
+        // SAH-34: after the 404 checks, before the record-access row and the view entry (a refusal writes nothing).
+        guard.requireAdmission(tenantId, actor, role, memberRole, admissionId, "emr-sheet");
         patientAccess.recordOpened(tenantId, admission.patientId(), actor);
         events.insert(tenantId, admissionId, ClinicalEventRepository.KIND_VIEW, MedicineRules.OPENED_TEXT, actor);
         return sheetNow(tenantId, role, memberRole, ent, admission, patient);
@@ -145,6 +151,8 @@ public class MedicineOrderService {
         AdmissionRow admission = admissions.findForNoKeyUpdate(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
         PatientClinical patient = patient(tenantId, admission);
+        // SAH-34: under the admission lock, after the 404 checks and before the repeat and state checks.
+        guard.requireAdmissionLocked(tenantId, actor, role, memberRole, admissionId, "medicine-order");
 
         OrderRow first = orders.findByClientKey(tenantId, body.clientKey()).orElse(null);
         if (first != null) {
@@ -276,7 +284,10 @@ public class MedicineOrderService {
         requireRole(role, MedicineRules.ORDER_ROLES, MedicineRules.ONLY_DOCTOR);
         ModuleEntitlement ent = gate.check(tenantId, false);
         String memberRole = membershipRole(team, tenantId, actor, MedicineRules.ORDER_ROLES, MedicineRules.ONLY_DOCTOR);
-        Locked locked = lock(tenantId, orderId);
+        // SAH-34: the order's admission is found first (another clinic's id is 404) and checked under its lock, before
+        // the "not admitted" answer.
+        Locked locked = lock(tenantId, orderId, admission -> guard.requireAdmissionLocked(tenantId, actor, role,
+                memberRole, admission.id(), "medicine-stop"));
         OrderRow order = locked.order();
         if (order.live()) {
             if (!orders.markStopped(tenantId, orderId, actor)) {
@@ -313,7 +324,7 @@ public class MedicineOrderService {
         ModuleEntitlement ent = gate.check(tenantId, false);
         RejectReason reason = MedicineRules.reject(input);
         membershipRole(team, tenantId, actor, MedicineRules.PHARMACIST_ROLES, MedicineRules.ONLY_PHARMACIST);
-        Locked locked = lock(tenantId, orderId);
+        Locked locked = lock(tenantId, orderId, NO_SCOPE_GUARD);
         OrderRow order = locked.order();
         KeyLabel label = new KeyLabel(reason.key(), reason.label());
         Drug drug = assembler.drug(order.drugKey());
@@ -371,7 +382,7 @@ public class MedicineOrderService {
         ModuleEntitlement ent = gate.check(tenantId, true);
         Verify body = MedicineRules.verify(input);
         membershipRole(team, tenantId, actor, MedicineRules.PHARMACIST_ROLES, MedicineRules.ONLY_PHARMACIST);
-        Locked locked = lock(tenantId, orderId);
+        Locked locked = lock(tenantId, orderId, NO_SCOPE_GUARD);
         OrderRow order = locked.order();
         Drug drug = assembler.drug(order.drugKey());
         if (MedicineOrderRepository.ACTIVE.equals(order.status()) && actor.equals(order.verifiedBy())) {
@@ -415,16 +426,21 @@ public class MedicineOrderService {
         }
     }
 
+    /** Pharmacist paths: the role is always scope ALL, so there is nothing to guard. */
+    private static final Consumer<AdmissionRow> NO_SCOPE_GUARD = admission -> { };
+
     /**
      * A plain read of the order gives its admission (404 when missing or another clinic's); the bare admission row is
-     * locked {@code for no key update} and read joined in a new statement (404); the order is read again, because it
-     * may have changed while the lock was awaited; the admission must be ADMITTED (409); the patient must be found
-     * (404, never a placeholder in the answer to an action).
+     * locked {@code for no key update} and read joined in a new statement (404); the scope guard runs on that admission
+     * next (SAH-34: a scoped nurse out of scope gets 403 {@code outside-scope} before any state answer, also for a
+     * discharged admission); the order is read again, because it may have changed while the lock was awaited; the
+     * admission must be ADMITTED (409); the patient must be found (404, never a placeholder in the answer to an action).
      */
-    private Locked lock(UUID tenantId, UUID orderId) {
+    private Locked lock(UUID tenantId, UUID orderId, Consumer<AdmissionRow> scopeGuard) {
         OrderRow first = orders.findById(tenantId, orderId).orElseThrow(() -> new NotFoundException("Order not found"));
         AdmissionRow admission = admissions.findForNoKeyUpdate(tenantId, first.admissionId())
                 .orElseThrow(() -> new NotFoundException("Order not found"));
+        scopeGuard.accept(admission);
         OrderRow current = orders.findById(tenantId, orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
         if (!"ADMITTED".equals(admission.status())) {

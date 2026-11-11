@@ -55,4 +55,7 @@ The developer computed these from `_tokens.scss`. Nothing was changed in the app
 Other pairs pass today: `--ink-2` on tile 6.74, `--pri-text` on `--pri-soft` 6.68, `--warn` on `--warn-soft` 4.74. The "Required" and "Always on" pills use the `p-wait` pair, which was not computed.
 
 ## Inconsistency in the approved text (found by the developer)
-AC 69 says a label equal to the field's own standard name "(any case)" counts as unchanged. The design note (section 4.2) and V15 say the exact match (case-sensitive) is stored as empty, and a case or spacing variant such as "bed" is a real change on the server. The developer followed the design note. **Fix: the BA changes AC 69 to say "exactly".**
+AC 69 says a label equal to the field's own standard name "(any case)" counts as unchanged. The design note (section 4.2) and V15 say the exact match (case-sensitive) is stored as empty, and a case or spacing variant such as "bed" is a real change on the server. The developer followed the design note. **Fixed (9 Nov 2026): the BA changed AC 69 to say "exactly, in the same case".**
+
+## Mockup self-contradiction on the Standard card values (10 Nov 2026, D-17)
+The mockup wraps every card value (`.pckv dd{overflow-wrap:anywhere}`, line 2079) but its uniform grid cuts them with an ellipsis (`.pcgrid.uni .pckv dd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`, line 2368). The angular-developer followed line 2079, as in the D-6 fix for Expanded, so "Admitted on" is never cut. Cost: a card whose value wraps is one line taller in the uniform grid. **Default applied (DEC-023):** wrap, because a cut admission date is a safety and readability defect. The human can reverse it; if line 2368 is preferred, the QA test D-17 must change.

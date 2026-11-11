@@ -1,6 +1,6 @@
-@if (list().items.length === 0) {
+@if (list().items.length === 0 && scopeEmpty() === null) {
   <section class="panel surf">
-    <div class="empty">No one is admitted right now.</div>
+    <div class="empty">{{ nobodyText }}</div>
   </section>
 } @else {
   @if (staleText(); as stale) {
@@ -45,6 +45,19 @@
         <option [value]="w.id" [selected]="wardValue() === w.id">{{ w.name }}</option>
       }
     </select>
+    @if (canMine()) {
+      <button
+        type="button"
+        class="pctog"
+        data-act="pclist"
+        data-k="mine"
+        data-testid="my-patients"
+        [attr.aria-pressed]="mineOn()"
+        (click)="toggleMine()"
+      >
+        <app-icon name="user" [size]="14" /> {{ myPatientsLabel }}
+      </button>
+    }
     @if (state.view() === 'cards') {
       <div class="seg pccolseg" role="group" aria-label="Cards per row" data-testid="admitted-cols">
         @for (n of colsChoices; track n) {
@@ -92,11 +105,41 @@
         <app-icon name="sliders" [size]="14" /> Customize card
       </a>
     }
+    @if (showChip()) {
+      <span class="pcscope" data-testid="scope">
+        <span
+          class="pcscopechip"
+          role="note"
+          data-testid="scope-chip"
+          [attr.aria-label]="chipTip()"
+          [title]="chipTip()"
+        >
+          <app-icon name="shieldu" [size]="13" />
+          <span>{{ chipText() }}</span>
+        </span>
+        @if (canOpenEmergencyAccess()) {
+          <button
+            type="button"
+            mat-button
+            class="egbtn"
+            data-act="sfbg"
+            data-testid="emergency-access-button"
+            (click)="openEmergencyAccess.emit()"
+          >
+            <app-icon name="key" [size]="14" /> {{ emergencyLabel }}
+          </button>
+        }
+      </span>
+    }
   </div>
 
   <div class="sr-only" aria-live="polite" data-testid="admitted-announce">{{ announcement() }}</div>
 
-  @if (state.view() === 'cards') {
+  @if (scopeEmpty(); as scopeText) {
+    <section class="panel surf">
+      <div class="empty" role="status" data-testid="scope-empty">{{ scopeText }}</div>
+    </section>
+  } @else if (state.view() === 'cards') {
     <div [class]="'pcgrid uni cols-' + state.cols() + ' lay-' + layout()" data-testid="admitted-cards">
       @for (a of drawn(); track a.id) {
         <app-patient-card

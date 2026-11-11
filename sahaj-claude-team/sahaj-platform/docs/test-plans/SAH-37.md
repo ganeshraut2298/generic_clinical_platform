@@ -1,6 +1,6 @@
 # Test plan SAH-37 · IPD patient card setup (Clinic setup → Patient card; the Admitted cards that follow it)
 
-Story: `docs/stories/SAH-37.md` (66 acceptance criteria, numbered 1-66 through the file). Decisions: ADR-015, `docs/architecture/SAH-37-patient-card-setup.md`, `docs/database/SAH-37.md`, DEC-027, DEC-028.
+Story: `docs/stories/SAH-37.md` (69 acceptance criteria, numbered 1-69 through the file; AC 67 to 69 were added by the release audit, DEC-032). Decisions: ADR-015, `docs/architecture/SAH-37-patient-card-setup.md`, `docs/database/SAH-37.md`, DEC-027, DEC-028.
 Mockup screen: Clinic setup → Patient card (screen-map row 29), used on IPD → Admitted (SAH-36).
 Written 9 Nov 2026 by qa-engineer; finished in resume 2 (18:56). Status: see "Results" at the end. Verdict after the fix-pass re-run (9 Nov 2026, 21:55): **PASS, no open defect.** D1, D2 and D3 are closed and re-tested (section "Re-run after the fix pass" at the end).
 
@@ -88,6 +88,9 @@ IT = integration test (class.method, shortened to the part of the name that tell
 | 64 | Tablet 2 per row, 44 px targets; one per row at 700 px; long text cut | E2E "AC64 phone and desktop ...", "AC64 a phone shows one card per row ..." | pass |
 | 65 | Another clinic's card never appears; Read-only / Trial draw the same setup; IPD Off lock page | IT CardSetupIT.anotherClinicsSetupDraftAndVersionsAreInvisible...; CardFactsIT.theCardAbilities... (Read-only); E2E "AC40 AC43 AC39 ...", "AC1 IPD Off" | pass |
 | 66 | Slow network: SAH-36 loading / Try again; no previous user's setup after sign-out and sign-in | E2E "SAH-40 a 403 ... clears everything" (2 pages), "AC13 ... Try again". The sign-out part is the SAH-40 clearing, tested by the angular unit tests; not separately driven in the browser | partial (see note) |
+| 67 | Duplicate label (V15): a label equal to another field's standard name or label is refused on the later field only, with "This name is already used by another field.", nothing stored | IT CardSetupIT.aLabelThatDuplicatesAnotherFieldsNameIs400OnTheLaterFieldOnly... (14 cases, Save and Publish), v15IsReportedLastTogetherWithOtherRules..., v15IsPerClinicAndEveryRoleButTheOwnerGets403..., aStoredDuplicateSetupStillReadsWith200...; E2E "G-2 AC68 the name check is case, space and no-break-space blind" | pass |
+| 68 | Inline label errors: message under the box on blur and on submit, aria-invalid, nothing sent, focus on the first box, server 400 per box, clears on a keystroke | E2E sah37-audit-regression.spec.ts "G-2 AC68 a duplicate name shows under the box...", "G-1 AC68 nothing is sent when a label is in error...", "G-1 AC68 a server 400 with a label path...", "G-1 a server 400 whose label path points to a box that moved..." | pass |
+| 69 | A label exactly equal to the own standard name is unchanged (pill, Reset, unsaved check, Publish) and stored as empty; a case variant is a real label | IT CardSetupIT.anOwnNameInAnyCaseAndANewLabelAreAccepted...; E2E "G-3 AC69 a label equal exactly to the own standard name counts as unchanged..." | pass |
 
 Note on AC66: the "previous user" part is only exercised through the 403-clears-the-page tests (SAH-40 pattern). A full sign-out / sign-in in the browser is not driven here because the API is mocked per test (every test starts with a new context and so cannot show a previous user).
 
@@ -469,3 +472,5 @@ Mutation check of the new width spec (not committed): the old rule `max-width: 1
 
 - The browser test of the revision token uses the mock server of `sah37-world.ts`, whose draft revision still counts 1, 2, 3. That is fine for what the browser tests prove (the screen sends back what it received). The angular-developer added unit specs with 1790000000000001; the large-number path is not driven in a browser here.
 - Security finding 5 (fictional names in the e2e data) is still a backlog item and untouched.
+
+- 10 Nov 2026 (final QA pass) · No acceptance criterion changed. The browser regression for the audit fixes is `frontend/e2e/sah37-audit-regression.spec.ts` (36 of 38 runs pass; the two failing are the D-11 layout-shift test in two projects, an open UI defect, see `docs/reviews/QA_REPORT_SAH-37.md`). AC 67 to 69 are covered by `CardSetupIT` and `CardSetupStoredIT` (backend) and the G-1 to G-3 browser tests.

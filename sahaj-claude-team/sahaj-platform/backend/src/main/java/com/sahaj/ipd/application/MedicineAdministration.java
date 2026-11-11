@@ -82,11 +82,14 @@ public class MedicineAdministration {
     private final IpdGate gate;
     private final MedicineAssembler medicines;
     private final MarAssembler marAssembler;
+    private final ScopeGuard guard;
 
     MedicineAdministration(MedicineOrderRepository orders, DoseRepository doses, AdmissionRepository admissions,
                            ClinicalEventRepository events, PatientClinicalPort patients,
                            PatientAccessPort patientAccess, ActorDirectoryPort actors, TeamMemberPort team,
-                           AuditLog auditLog, IpdGate gate, MedicineAssembler medicines, MarAssembler marAssembler) {
+                           AuditLog auditLog, IpdGate gate, MedicineAssembler medicines, MarAssembler marAssembler,
+                           ScopeGuard guard) {
+        this.guard = guard;
         this.orders = orders;
         this.doses = doses;
         this.admissions = admissions;
@@ -155,6 +158,8 @@ public class MedicineAdministration {
         AdmissionRow admission = admissions.find(tenantId, order.admissionId())
                 .orElseThrow(() -> new NotFoundException("Order not found"));
         PatientClinical patient = patient(tenantId, admission);
+        // SAH-34 (step 3): after the 404 checks, before any state check, PIN check or entry. A refused request checks no PIN.
+        guard.requireAdmission(tenantId, actor, role, caller.memberRole(), admission.id(), "dose-record");
         Instant asOf = orders.databaseNow();
 
         Decision decision = decide(tenantId, actor, caller, order, admission, patient, body, input, asOf, false);
@@ -189,6 +194,8 @@ public class MedicineAdministration {
                 .orElseThrow(() -> new NotFoundException("Order not found"));
         OrderRow order = orders.findById(tenantId, orderId).orElseThrow(() -> new NotFoundException("Order not found"));
         PatientClinical patient = patient(tenantId, admission);
+        // SAH-34 (step 5): again under the admission lock, on locked data and the database clock (an expiry that raced).
+        guard.requireAdmissionLocked(tenantId, actor, role, caller.memberRole(), admission.id(), "dose-record");
         // The clock is read after the lock: the due rule uses the time the dose is really recorded.
         Instant asOf = orders.databaseNow();
 

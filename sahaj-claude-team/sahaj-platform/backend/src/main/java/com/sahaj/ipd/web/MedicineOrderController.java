@@ -47,6 +47,7 @@ public class MedicineOrderController {
         this.pharmacist = pharmacist;
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @GetMapping("/admissions/{id}/emr")
     @PreAuthorize(CLINIC_ROLES)
     public EmrSheet emr(@PathVariable UUID id) {
@@ -55,6 +56,7 @@ public class MedicineOrderController {
     }
 
     /** 201 for a placed order; 200 for BLOCKED, NEEDS_REASON and a repeat of a placed order. */
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PostMapping("/admissions/{id}/medicine-orders")
     @PreAuthorize(CLINIC_ROLES)
     public ResponseEntity<MedicineOrderAnswer> order(@PathVariable UUID id, @RequestBody MedicineOrderInput request) {
@@ -64,6 +66,7 @@ public class MedicineOrderController {
         return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK).body(answer);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ORDER)
     @PostMapping("/medicine-orders/{id}/stop")
     @PreAuthorize(CLINIC_ROLES)
     public EmrSheet stop(@PathVariable UUID id) {
@@ -71,6 +74,7 @@ public class MedicineOrderController {
         return orders.stop(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
     @PostMapping("/medicine-orders/{id}/verify")
     @PreAuthorize(CLINIC_ROLES)
     public PharmacistActionResult verify(@PathVariable UUID id, @RequestBody VerifyOrderInput request) {
@@ -78,6 +82,7 @@ public class MedicineOrderController {
         return pharmacist.verify(user.tenantId(), user.userId(), user.role(), id, request);
     }
 
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
     @PostMapping("/medicine-orders/{id}/reject")
     @PreAuthorize(CLINIC_ROLES)
     public PharmacistActionResult reject(@PathVariable UUID id, @RequestBody RejectOrderInput request) {
@@ -86,6 +91,7 @@ public class MedicineOrderController {
     }
 
     /** The limit and the cursor are read as text so that the service gives the contract's own 400 for a bad one. */
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
     @GetMapping("/pharmacist-checks")
     @PreAuthorize(CLINIC_ROLES)
     public PharmacistChecks checks(@RequestParam(name = "limit", required = false) String limit,
@@ -94,6 +100,7 @@ public class MedicineOrderController {
         return pharmacist.list(user.tenantId(), user.userId(), user.role(), limit, cursor);
     }
 
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
     @GetMapping("/pharmacist-checks/summary")
     @PreAuthorize(CLINIC_ROLES)
     public PharmacistChecksSummary summary() {

@@ -24,7 +24,10 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
 import { MedicineRoundComponent } from './medicine-round.component';
 import { PharmacistStore } from '../pharmacist/pharmacist.store';
-import { focusIsLost, isRefusal } from '../ipd-refusal';
+import { EmergencyReviewComponent } from '../emergency-access/emergency-review.component';
+import { TILE_TEXT as EMERGENCY_TILE_TEXT, TILE_TITLE as EMERGENCY_TILE_TITLE } from '../emergency-access/emergency-access.model';
+import { focusIsLost, isOutsideScope, isRefusal } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { PharmacistPanelComponent } from '../pharmacist/pharmacist-panel.component';
 import { PharmacistTileComponent } from '../pharmacist/pharmacist-tile.component';
 import { ResponseSheetComponent, ResponseSheetData } from './response-sheet.component';
@@ -49,7 +52,6 @@ import {
   SHOW_EARLIER,
   SafetyBoard,
   SafetyCounts,
-  YOUR_PATIENTS_TEXT,
   ackToast,
   auditSubtitle,
   callToast,
@@ -59,16 +61,20 @@ import {
   dosesTileNumber,
   dosesTileText,
   eventLine,
+  eventText,
   eventTime,
   kindIcon,
   mergeEvents,
   noticeBody,
   noticeHead,
   openTileText,
+  otherWardsNotice,
   raisedLine,
   riskWord,
+  scopeNote,
   staleBoardText,
   statusPill,
+  yourPatientsText,
 } from './safety.model';
 
 /** Same interval as the Emergency queue (DEC-015, OQ-33-10). */
@@ -101,6 +107,7 @@ export const ESCALATIONS_HEADING_ID = 'sf-esc-h';
     PharmacistTileComponent,
     PharmacistPanelComponent,
     MedicineRoundComponent,
+    EmergencyReviewComponent,
   ],
   styleUrl: './safety.component.scss',
   templateUrl: './safety.component.html',
@@ -116,6 +123,7 @@ export class SafetyComponent implements OnInit {
   /** Provided by the IPD page; absent when the board is used alone. Cleared when the board is refused. */
   private readonly pharmacist = inject(PharmacistStore, { optional: true });
   private readonly roundPanel = viewChild(MedicineRoundComponent);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   /** Counts of every board answer: the tab number and the banner of the page follow them. */
   readonly counts = output<SafetyCounts>();
@@ -149,7 +157,12 @@ export class SafetyComponent implements OnInit {
   protected readonly auditTitle = AUDIT_TITLE;
   protected readonly noEvents = NO_EVENTS;
   protected readonly showEarlier = SHOW_EARLIER;
-  protected readonly yourPatientsText = YOUR_PATIENTS_TEXT;
+  protected readonly yourPatientsText = yourPatientsText;
+  protected readonly scopeNote = scopeNote;
+  protected readonly otherWards = otherWardsNotice;
+  protected readonly eventText = eventText;
+  protected readonly emergencyTileTitle = EMERGENCY_TILE_TITLE;
+  protected readonly emergencyTileText = EMERGENCY_TILE_TEXT;
   protected readonly dosesTitle = DOSES_TILE_TITLE;
   protected readonly dosesNumber = dosesTileNumber;
   protected readonly dosesText = dosesTileText;
@@ -180,6 +193,8 @@ export class SafetyComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    // SAH-34 AC 38: a sheet met 403 `outside-scope` for a patient (a transfer, an ended emergency access): the rows read again.
+    this.scopeRefusals.refusals.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reloadAll());
     startVisiblePoll(this.doc, SAFETY_REFRESH_MS, () => this.refresh(), this.destroyRef);
     this.destroyRef.onDestroy(() => {
       this.boardSub?.unsubscribe();
@@ -381,6 +396,16 @@ export class SafetyComponent implements OnInit {
     this.snackBar.open(message, 'Close', { duration: 6000 });
   }
 
+  /** SAH-34 AC 68, 69: a review was made, or was already made by someone else; the tile, the panel and the tab number follow the server. */
+  protected reviewChanged(): void {
+    this.reloadAll();
+  }
+
+  /** A 403 on a review or on "Show 25 more": the board is refused (SAH-40): the data clears. */
+  protected reviewRefused(error: ApiError): void {
+    this.refuse(error);
+  }
+
   protected dismissNotice(): void {
     this.actionNotice.set(null);
   }
@@ -389,7 +414,7 @@ export class SafetyComponent implements OnInit {
     if (this.busy() || !row.canAcknowledge) {
       return;
     }
-    this.run(this.api.acknowledge(row.id, row.version), (r) => ackToast(r.escalation.patientName));
+    this.run(row, this.api.acknowledge(row.id, row.version), (r) => ackToast(r.escalation.patientName));
   }
 
   protected callSenior(row: EscalationRow): void {
@@ -397,12 +422,14 @@ export class SafetyComponent implements OnInit {
       return;
     }
     this.run(
+      row,
       this.api.callSenior(row.id, { version: row.version, seniorCalls: row.seniorCalls }),
       (r) => callToast(r.escalation.patientName),
     );
   }
 
   private run(
+    row: EscalationRow,
     call: Observable<EscalationActionResult>,
     toast: (result: EscalationActionResult) => string,
   ): void {
@@ -416,13 +443,18 @@ export class SafetyComponent implements OnInit {
       },
       error: (error: unknown) => {
         this.busy.set(false);
-        this.failAction(error);
+        this.failAction(error, row);
       },
     });
   }
 
   /** A state change on the server: say what happened and reload what is really on the board. */
-  private failAction(error: unknown): void {
+  private failAction(error: unknown, row: EscalationRow): void {
+    if (isOutsideScope(error)) {
+      // SAH-34 AC 17: the patient is not in this nurse's wards. Nothing was saved; the page says so and the board reads again.
+      this.scopeRefusals.report(row.admissionId, true);
+      return;
+    }
     if (error instanceof ApiError && (error.status === 409 || error.status === 404)) {
       this.actionNotice.set(
         problemMessage(error, error.status === 404 ? NOT_ADMITTED : ACTION_ERROR),

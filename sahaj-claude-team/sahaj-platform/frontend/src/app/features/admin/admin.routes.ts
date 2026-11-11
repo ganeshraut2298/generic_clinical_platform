@@ -14,6 +14,13 @@ export const ADMIN_ROUTES: Routes = [
   },
   { path: 'login', redirectTo: 'sign-in' },
   {
+    // SAH-42, dev-only bootstrap registration of the first admin. No link leads here. The server
+    // answers an empty 404 when it is off or an admin exists, and the page then shows not found.
+    path: 'register',
+    title: 'Create the first admin · Sahaj',
+    loadComponent: () => import('./register/admin-register.page').then((m) => m.AdminRegisterPage),
+  },
+  {
     path: '',
     canActivate: [adminGuard],
     loadComponent: () => import('./shell/admin-shell.component').then((m) => m.AdminShellComponent),

@@ -6,9 +6,10 @@ import { provideRouter } from '@angular/router';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
-import { AdmissionRules, TransferRules } from '../../ipd/ipd.model';
+import { AdmissionRules, PackageList, TransferRules } from '../../ipd/ipd.model';
 import { IpdState } from '../modules/modules.model';
 import { IpAdmPage } from './ipadm.page';
+import { PackagesStore } from './packages.store';
 
 const IPD = '/api/v1/ipd';
 
@@ -21,6 +22,14 @@ const RULES: AdmissionRules = {
 };
 
 const TRANSFER: TransferRules = { upgradeNeedsOwner: true, newRateFrom: 'same' };
+const PACKAGES: PackageList = {
+  items: [
+    { id: 'p1', name: 'Appendicectomy', pricePaise: 4500000, includedDays: 3 },
+    { id: 'p2', name: 'Cataract (day-care)', pricePaise: 1800000, includedDays: 0 },
+    { id: 'p3', name: 'Observation', pricePaise: 12500000, includedDays: 1 },
+  ],
+};
+const NO_PACKAGES: PackageList = { items: [] };
 const FAIL = { type: 'about:blank', title: 'Error', status: 500, detail: 'Try later.' };
 
 describe('IpAdmPage', () => {
@@ -33,6 +42,7 @@ describe('IpAdmPage', () => {
     state: IpdState = 'on',
     rules: AdmissionRules = RULES,
     transfer: TransferRules | 'fail' = TRANSFER,
+    packages: PackageList | 'fail' | 'forbidden' | 'module-off' = NO_PACKAGES,
   ) {
     snack = vi.fn();
     TestBed.configureTestingModule({
@@ -64,6 +74,22 @@ describe('IpAdmPage', () => {
       } else {
         call.flush(transfer);
       }
+      const pk = http.expectOne(`${IPD}/packages`);
+      if (packages === 'fail') {
+        pk.flush(FAIL, { status: 500, statusText: 'Server Error' });
+      } else if (packages === 'forbidden' || packages === 'module-off') {
+        pk.flush(
+          {
+            type: `https://sahaj.example/problems/${packages}`,
+            title: 'Refused',
+            status: 403,
+            detail: 'Not allowed.',
+          },
+          { status: 403, statusText: 'Forbidden' },
+        );
+      } else {
+        pk.flush(packages);
+      }
       await fixture.whenStable();
       fixture.detectChanges();
     }
@@ -71,14 +97,18 @@ describe('IpAdmPage', () => {
 
   const el = () => fixture.nativeElement as HTMLElement;
   const text = () => el().textContent ?? '';
-  const input = (label: string) => el().querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  const input = (label: string) =>
+    el().querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
   const change = (i: HTMLInputElement, value: string) => {
     i.value = value;
     i.dispatchEvent(new Event('change'));
   };
   const button = (label: string) =>
-    Array.from(el().querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent!.trim() === label);
-  const stepper = (label: string) => el().querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+    Array.from(el().querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.textContent!.trim() === label,
+    );
+  const stepper = (label: string) =>
+    el().querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
   const sw = () => el().querySelector<HTMLButtonElement>('button[role=switch]')!;
 
   afterEach(() => http.verify());
@@ -101,7 +131,7 @@ describe('IpAdmPage', () => {
     expect(sw().getAttribute('aria-checked')).toBe('true');
     expect(text()).toContain('80%');
     expect(text()).toContain('Bed transfer rules');
-    expect(text()).not.toContain('Packages');
+    expect(text()).toContain('Packages');
   });
 
   it('saves a base deposit in paise at once', async () => {
@@ -123,7 +153,12 @@ describe('IpAdmPage', () => {
     await open('OWNER');
     change(input('ICU added to the minimum deposit, in rupees'), '15000');
     const req = http.expectOne(`${IPD}/admission-rules`);
-    expect(req.request.body.categoryAddPaise).toEqual({ gen: 0, semi: 200000, pvt: 500000, icu: 1500000 });
+    expect(req.request.body.categoryAddPaise).toEqual({
+      gen: 0,
+      semi: 200000,
+      pvt: 500000,
+      icu: 1500000,
+    });
     req.flush(RULES);
   });
 
@@ -199,10 +234,12 @@ describe('IpAdmPage', () => {
     await open('OWNER');
     const field = input('Emergency minimum deposit, in rupees');
     change(field, '6000');
-    http.expectOne(`${IPD}/admission-rules`).flush(
-      { type: 'validation', title: 'Invalid', status: 400, detail: 'Enter whole rupees.' },
-      { status: 400, statusText: 'Bad Request' },
-    );
+    http
+      .expectOne(`${IPD}/admission-rules`)
+      .flush(
+        { type: 'validation', title: 'Invalid', status: 400, detail: 'Enter whole rupees.' },
+        { status: 400, statusText: 'Bad Request' },
+      );
     await fixture.whenStable();
     expect(snack).toHaveBeenCalledWith('Enter whole rupees.', 'Close', expect.anything());
     expect(field.value).toBe('5000');
@@ -245,7 +282,7 @@ describe('IpAdmPage', () => {
     it('shows the panel under Minimum deposit with both rules and their hints, defaults chosen', async () => {
       await open('OWNER');
       const headings = Array.from(el().querySelectorAll('h2')).map((h) => h.textContent!.trim());
-      expect(headings).toEqual(['Minimum deposit', 'Bed transfer rules']);
+      expect(headings).toEqual(['Minimum deposit', 'Bed transfer rules', 'Packages']);
       expect(text()).toContain('Moving to a higher category');
       expect(text()).toContain('For example General to Private');
       expect(text()).toContain('New bed rate starts');
@@ -254,7 +291,6 @@ describe('IpAdmPage', () => {
       expect(pressed('Front desk can do it')).toBe(false);
       expect(pressed('Same day')).toBe(true);
       expect(pressed('Next day')).toBe(false);
-      expect(text()).not.toContain('Packages');
     });
 
     it('reads the saved values', async () => {
@@ -295,12 +331,23 @@ describe('IpAdmPage', () => {
     it('shows the server message and puts the choice back when saving fails (409 ipd-readonly)', async () => {
       await open('OWNER');
       choice('Next day').click();
-      http.expectOne(`${IPD}/transfer-rules`).flush(
-        { type: 'ipd-readonly', title: 'Read-only', status: 409, detail: 'IPD is read-only. Nothing can be changed.' },
-        { status: 409, statusText: 'Conflict' },
-      );
+      http
+        .expectOne(`${IPD}/transfer-rules`)
+        .flush(
+          {
+            type: 'ipd-readonly',
+            title: 'Read-only',
+            status: 409,
+            detail: 'IPD is read-only. Nothing can be changed.',
+          },
+          { status: 409, statusText: 'Conflict' },
+        );
       await settle();
-      expect(snack).toHaveBeenCalledWith('IPD is read-only. Nothing can be changed.', 'Close', expect.anything());
+      expect(snack).toHaveBeenCalledWith(
+        'IPD is read-only. Nothing can be changed.',
+        'Close',
+        expect.anything(),
+      );
       expect(pressed('Same day')).toBe(true);
       expect(pressed('Next day')).toBe(false);
     });
@@ -342,5 +389,155 @@ describe('IpAdmPage', () => {
       await settle();
       expect(pressed('Same day')).toBe(true);
     });
+  });
+
+  describe('Packages panel (SAH-29)', () => {
+    const settle = async () => {
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+    const panel = () => el().querySelector<HTMLElement>('#f-ippackages')!;
+    const rows = () => Array.from(panel().querySelectorAll<HTMLElement>('.li'));
+    const heads = () => Array.from(el().querySelectorAll('h2')).map((h) => h.textContent!.trim());
+
+    it('lists each package under Bed transfer rules: chip, bold name, fixed text, price', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, PACKAGES);
+      expect(heads()).toEqual(['Minimum deposit', 'Bed transfer rules', 'Packages']);
+      const list = rows();
+      expect(list.length).toBe(3);
+      expect(list[0].querySelector('.tokchip')!.textContent).toBe('3 days');
+      expect(list[0].querySelector('.main b')!.textContent).toBe('Appendicectomy');
+      expect(list[0].querySelector('.main small')!.textContent).toBe(
+        'Bed, nursing and surgeon included · extra days and exclusions at normal rates',
+      );
+      expect(list[0].querySelector('b.num')!.textContent).toBe('₹45,000');
+      expect(list[1].querySelector('.tokchip')!.textContent).toBe('Day-care');
+      expect(list[1].querySelector('b.num')!.textContent).toBe('₹18,000');
+      expect(list[2].querySelector('.tokchip')!.textContent).toBe('1 days');
+      expect(list[2].querySelector('b.num')!.textContent).toBe('₹1,25,000');
+    });
+
+    it('has no add, edit or remove control', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, PACKAGES);
+      expect(panel().querySelector('button, input, a, [role=button], [role=switch]')).toBeNull();
+    });
+
+    it('shows the heading with an empty list and no new text when there are no packages (OQ-29-3)', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, NO_PACKAGES);
+      expect(panel().querySelector('h2')!.textContent).toBe('Packages');
+      expect(rows().length).toBe(0);
+      expect(panel().textContent!.trim()).toBe('Packages');
+    });
+
+    it.each(['FRONT_DESK', 'NURSE', 'DOCTOR'] as const)('is the same for %s', async (role) => {
+      await open(role, 'on', RULES, TRANSFER, PACKAGES);
+      expect(rows().length).toBe(3);
+    });
+
+    it('is listed when IPD is read-only', async () => {
+      await open('OWNER', 'readonly', RULES, TRANSFER, PACKAGES);
+      expect(rows().length).toBe(3);
+    });
+
+    it('asks for nothing and shows no panel when IPD is off', async () => {
+      await open('OWNER', 'off');
+      expect(el().querySelector('#f-ippackages')).toBeNull();
+    });
+
+    it('shows Try again when the packages cannot be read, and the rest of the page stays', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, 'fail');
+      expect(panel().textContent).toContain('We could not load the packages. Try again.');
+      expect(text()).toContain('Minimum deposit');
+      expect(rows().length).toBe(0);
+      const retry = Array.from(panel().querySelectorAll('button')).find(
+        (b) => b.textContent!.trim() === 'Try again',
+      )!;
+      retry.click();
+      http.expectOne(`${IPD}/packages`).flush(PACKAGES);
+      await settle();
+      expect(rows().length).toBe(3);
+      expect(panel().querySelector('[role=alert]')).toBeNull();
+    });
+
+    it('keeps the last list when a later read fails with a server fault (stale data stays)', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, PACKAGES);
+      const store = fixture.debugElement.injector.get(PackagesStore);
+      store.load();
+      http.expectOne(`${IPD}/packages`).flush(FAIL, { status: 500, statusText: 'Server Error' });
+      await settle();
+      expect(rows().length).toBe(3);
+      expect(panel().textContent).toContain('We could not load the packages. Try again.');
+    });
+
+    it('keeps the last list when the network fails', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, PACKAGES);
+      fixture.debugElement.injector.get(PackagesStore).load();
+      http.expectOne(`${IPD}/packages`).error(new ProgressEvent('error'));
+      await settle();
+      expect(rows().length).toBe(3);
+      expect(panel().textContent).toContain('We could not load the packages. Try again.');
+    });
+
+    it('clears the list on a 403 forbidden and shows the server words', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, PACKAGES);
+      fixture.debugElement.injector.get(PackagesStore).load();
+      http
+        .expectOne(`${IPD}/packages`)
+        .flush(
+          {
+            type: 'https://sahaj.example/problems/forbidden',
+            title: 'Forbidden',
+            status: 403,
+            detail: 'Not allowed.',
+          },
+          { status: 403, statusText: 'Forbidden' },
+        );
+      await settle();
+      expect(rows().length).toBe(0);
+      expect(panel().textContent).not.toContain('Appendicectomy');
+      expect(panel().textContent).toContain('Not allowed.');
+      // A 403 forbidden may pass (the role can change), so Try again is still offered.
+      expect(tryAgainButtons().length).toBe(1);
+    });
+
+    it('clears the list on a 403 module-off and shows the fixed text, not the server words', async () => {
+      await open('OWNER', 'on', RULES, TRANSFER, PACKAGES);
+      fixture.debugElement.injector.get(PackagesStore).load();
+      http
+        .expectOne(`${IPD}/packages`)
+        .flush(
+          {
+            type: 'https://sahaj.example/problems/module-off',
+            title: 'Off',
+            status: 403,
+            detail: 'IPD is off.',
+          },
+          { status: 403, statusText: 'Forbidden' },
+        );
+      await settle();
+      expect(rows().length).toBe(0);
+      expect(panel().textContent).toContain(
+        'Packages are not available because the module is off.',
+      );
+      expect(panel().textContent).not.toContain('IPD is off.');
+      // IPD is off: Try again cannot help, so the button is not shown and the text does not offer it.
+      expect(tryAgainButtons().length).toBe(0);
+      expect(panel().querySelector('[role=alert]')!.textContent).not.toContain('Try again');
+    });
+
+    it('opens with a refusal: no list at all', async () => {
+      await open('FRONT_DESK', 'on', RULES, TRANSFER, 'module-off');
+      expect(rows().length).toBe(0);
+      expect(panel().querySelector('[role=alert]')!.textContent).toContain(
+        'Packages are not available because the module is off.',
+      );
+      expect(tryAgainButtons().length).toBe(0);
+    });
+
+    function tryAgainButtons(): HTMLButtonElement[] {
+      return Array.from(panel().querySelectorAll('button')).filter(
+        (b) => b.textContent!.trim() === 'Try again',
+      );
+    }
   });
 });

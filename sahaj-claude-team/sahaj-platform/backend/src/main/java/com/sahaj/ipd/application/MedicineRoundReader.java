@@ -50,7 +50,25 @@ class MedicineRoundReader {
     }
 
     MedicineRound.Result read(UUID tenantId, Instant asOf) {
+        return read(tenantId, asOf, null);
+    }
+
+    /**
+     * SAH-34: the round of a caller's scope. {@code visibleAdmissionIds} are the admissions the caller may reach, or null
+     * for every admitted patient. The rows of other admissions are dropped before any count, so the counts, the rows and the
+     * change token of a scoped caller agree and hold nothing of another ward.
+     */
+    MedicineRound.Result read(UUID tenantId, Instant asOf, Set<UUID> visibleAdmissionIds) {
         List<ActiveOrder> active = repository.findActiveOfAdmitted(tenantId);
+        if (visibleAdmissionIds != null) {
+            List<ActiveOrder> inScope = new ArrayList<>();
+            for (ActiveOrder order : active) {
+                if (visibleAdmissionIds.contains(order.admissionId())) {
+                    inScope.add(order);
+                }
+            }
+            active = inScope;
+        }
         if (active.isEmpty()) {
             return MedicineRound.empty();
         }

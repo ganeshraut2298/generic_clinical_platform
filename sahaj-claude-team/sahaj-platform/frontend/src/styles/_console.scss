@@ -232,6 +232,8 @@
 
     b {
       font-weight: 600;
+      // A long name with no spaces must wrap inside the row, not widen the page (SAH-29 D-2).
+      overflow-wrap: anywhere;
     }
     small {
       display: block;
@@ -978,6 +980,11 @@ select.input {
 }
 
 @media (max-width: 620px) {
+  // Touch target (angular.md): a button inside a notice (Try again) is 44 px high on a phone.
+  // Material draws stroked and flat buttons 38 to 40 px high; desktop keeps the mockup size (SAH-29 D-3).
+  .notice > .mat-mdc-button-base {
+    min-height: 44px;
+  }
   .kpi {
     display: flex;
     flex-direction: column;

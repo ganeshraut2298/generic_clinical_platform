@@ -1,8 +1,9 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpContext, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import { BOOTSTRAP_CALL } from '../../../core/http/bootstrap-call';
 import { adminAuthInterceptor } from './admin-auth.interceptor';
 import { AdminAuthService } from './admin-auth.service';
 
@@ -83,6 +84,45 @@ describe('adminAuthInterceptor', () => {
       .flush('no', { status: 401, statusText: 'Unauthorized' });
     expect(auth.refresh).not.toHaveBeenCalled();
     expect(error).toBeTruthy();
+  });
+
+  it('lets a bootstrap call pass: no token, and a 401 (wrong PIN) never starts a refresh', () => {
+    const url = '/api/v1/admin/bootstrap/unlock';
+    let error: unknown;
+    http
+      .post(url, { pin: 'throwaway' }, { context: new HttpContext().set(BOOTSTRAP_CALL, true) })
+      .subscribe({ error: (e: unknown) => (error = e) });
+    const req = httpMock.expectOne(url);
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush('no', { status: 401, statusText: 'Unauthorized' });
+    expect(auth.accessToken).not.toHaveBeenCalled();
+    expect(auth.refresh).not.toHaveBeenCalled();
+    expect(auth.endSession).not.toHaveBeenCalled();
+    expect(error).toBeTruthy();
+  });
+
+  it('ignores the marker on any other admin path: the token is attached and a 401 still refreshes', () => {
+    auth.accessToken.mockReturnValueOnce('admin-token-1').mockReturnValue('admin-token-2');
+    auth.refresh.mockReturnValue(of(true));
+    const marked = { context: new HttpContext().set(BOOTSTRAP_CALL, true) };
+    http.get('/api/v1/admin/me', marked).subscribe();
+    const first = httpMock.expectOne('/api/v1/admin/me');
+    expect(first.request.headers.get('Authorization')).toBe('Bearer admin-token-1');
+    first.flush('no', { status: 401, statusText: 'Unauthorized' });
+    expect(auth.refresh).toHaveBeenCalledTimes(1);
+    httpMock.expectOne('/api/v1/admin/me').flush({});
+  });
+
+  it('lets the register path pass when marked, including with a host in front (dev origin)', () => {
+    for (const url of ['/api/v1/admin/bootstrap/register', 'http://localhost:4200/api/v1/admin/bootstrap/register']) {
+      http
+        .post(url, {}, { context: new HttpContext().set(BOOTSTRAP_CALL, true) })
+        .subscribe({ error: () => undefined });
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.has('Authorization'), url).toBe(false);
+      req.flush('no', { status: 401, statusText: 'Unauthorized' });
+    }
+    expect(auth.refresh).not.toHaveBeenCalled();
   });
 
   it('refreshes once after a 401 and retries with the new token', () => {

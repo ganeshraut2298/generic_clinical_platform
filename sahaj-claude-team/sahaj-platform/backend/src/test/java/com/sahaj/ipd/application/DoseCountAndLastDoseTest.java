@@ -21,7 +21,7 @@ class DoseCountAndLastDoseTest extends DoseTestBase {
     @BeforeEach
     void setUp() {
         orderService = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team,
-                auditLog, gate, catalogue, assembler);
+                auditLog, gate, catalogue, assembler, guard);
     }
 
     private int count(boolean admitted) {

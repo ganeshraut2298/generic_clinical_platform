@@ -51,9 +51,9 @@ abstract class DoseTestBase extends MedicineTestBase {
         staffPin = mock(StaffPinPort.class);
         marAssembler = new MarAssembler(fake, doses, assembler, actors, team);
         administration = new MedicineAdministration(fake, doses, admissions, events, patients, patientAccess, actors,
-                team, auditLog, gate, assembler, marAssembler);
+                team, auditLog, gate, assembler, marAssembler, guard);
         service = new DoseService(administration, staffPin);
-        marService = new MarService(admissions, fake, patients, patientAccess, team, gate, marAssembler);
+        marService = new MarService(admissions, fake, patients, patientAccess, team, gate, marAssembler, guard);
 
         memberRoles.put(OWNER, "OWNER");
         memberRoles.put(SECOND_NURSE, "NURSE");

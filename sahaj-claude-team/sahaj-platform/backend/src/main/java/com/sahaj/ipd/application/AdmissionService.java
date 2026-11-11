@@ -4,6 +4,7 @@ import com.sahaj.ipd.application.AdmissionRepository.AdmissionRow;
 import com.sahaj.ipd.application.AdmissionRepository.AdmittedRow;
 import com.sahaj.ipd.application.AdmissionRepository.DepositRow;
 import com.sahaj.ipd.application.AdmissionRepository.NewAdmission;
+import com.sahaj.ipd.application.WardScopeRepository.UnreviewedMark;
 import com.sahaj.ipd.application.AdmissionViews.AdmissionList;
 import com.sahaj.ipd.application.AdmissionViews.AdmittedPatientRow;
 import com.sahaj.ipd.application.AdmissionViews.BedOption;
@@ -29,6 +30,8 @@ import com.sahaj.ipd.application.IpdBilling.Batch;
 import com.sahaj.ipd.application.IpdSettingsRepository.CategoryRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.ConfigRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.DepositRules;
+import com.sahaj.ipd.application.ScopeViews.AdmissionScope;
+import com.sahaj.ipd.application.ScopeViews.AdmittedEmergencyAccess;
 import com.sahaj.ipd.application.WardRepository.WardRow;
 import com.sahaj.ipd.application.AdmittedCards.FactsPlan;
 import com.sahaj.ipd.domain.card.CardAccessRule;
@@ -120,13 +123,17 @@ public class AdmissionService {
     private final VitalsRepository vitals;
     private final AdmittedCards cards;
     private final CardSetups cardSetups;
+    private final ScopeGuard guard;
+    private final WardScopeRepository scopeRepository;
 
     AdmissionService(AdmissionRepository admissions, BedRepository beds, WardRepository wards,
                      IpdSettingsRepository settings, OwnerGuard ownerGuard, AuditLog auditLog, TeamMemberPort team,
                      PatientLookupPort patients, PatientAccessPort patientAccess, ActorDirectoryPort actors,
                      IpdGate gate, IpdCatalog catalog, ChargeRepository charges, IpdBilling billing,
                      DischargeRepository discharges, EmergencyService emergency, VitalsRepository vitals,
-                     AdmittedCards cards, CardSetups cardSetups) {
+                     AdmittedCards cards, CardSetups cardSetups, ScopeGuard guard, WardScopeRepository scopeRepository) {
+        this.guard = guard;
+        this.scopeRepository = scopeRepository;
         this.cardSetups = cardSetups;
         this.cards = cards;
         this.vitals = vitals;
@@ -248,6 +255,8 @@ public class AdmissionService {
         if (status != null && !"ADMITTED".equals(status)) {
             throw new InvalidInputException("status", "Only the Admitted list is available");
         }
+        // SAH-34 (AC 1): the scope is built once, right after the membership re-read, from the signed-in user only.
+        PatientScope scope = guard.scopeWithMembership(tenantId, actor, role, memberRole);
         boolean allFacts = allCardFacts(cardFacts, role, memberRole);
         // SAH-37 (ADR-015 D4, D6): the published setup is read in this snapshot (R7); it decides which new card facts
         // are sent.
@@ -263,7 +272,16 @@ public class AdmissionService {
         boolean roomLevel = config.roomLevel();
         Lookups lookups = new Lookups();
         Instant now = gate.now();
-        List<AdmittedRow> placed = admissions.findAdmittedWithPlacement(tenantId);
+        List<AdmittedRow> everyone = admissions.findAdmittedWithPlacement(tenantId);
+        // SAH-34: only the rows in scope go on. Nothing of another row is read for the answer (patients, bills, flags).
+        List<AdmittedRow> placed = scope.isAll() ? everyone : inScope(scope, everyone);
+        Set<UUID> visibleIds = null;
+        if (!scope.isAll()) {
+            visibleIds = new HashSet<>();
+            for (AdmittedRow row : placed) {
+                visibleIds.add(row.admission().id());
+            }
+        }
         List<AdmissionRow> admitted = new ArrayList<>();
         Set<UUID> patientIds = new HashSet<>();
         for (AdmittedRow placedRow : placed) {
@@ -282,8 +300,11 @@ public class AdmissionService {
         LocalDate today = DischargeRules.istDate(now);
         // SAH-33, SAH-36: the Safety tab count, the banner and the clinical facts of the cards, for OWNER, DOCTOR and
         // NURSE only, from the same snapshot and the same escalation rows; null / absent for every other role.
+        UnreviewedMark unreviewed = AdmittedCardRules.both(Set.of("OWNER"), role, memberRole)
+                ? scopeRepository.unreviewedMark(tenantId) : null;
         AdmittedCards.Clinical clinical = clinicalAccess
-                ? cards.clinical(tenantId, asOf, placed, patientMap, plan, ids -> actors.displayNames(tenantId, ids))
+                ? cards.clinical(tenantId, asOf, placed, patientMap, plan, ids -> actors.displayNames(tenantId, ids),
+                        visibleIds, unreviewed)
                 : AdmittedCards.Clinical.NONE;
         List<AdmittedPatientRow> items = new ArrayList<>();
         int alerts = 0;
@@ -302,9 +323,12 @@ public class AdmissionService {
             if (home) {
                 goingHome++;
             }
+            Instant grantEnds = scope.grantOnlyExpiry(placedRow.wardId(), row.doctorMembershipId(), row.id());
             items.add(AdmittedPatientRow.of(summary, patient == null ? null : patient.uhid(), placedRow.wardId(),
                     roomLevel ? placedRow.roomName() : null, clinical.flags().get(row.id()),
-                    plan.mobile() ? Optional.ofNullable(loaded.mobiles().get(row.patientId())) : null));
+                    plan.mobile() ? Optional.ofNullable(loaded.mobiles().get(row.patientId())) : null)
+                    .withScope(mine(scope, memberRole, placedRow),
+                            grantEnds == null ? null : new AdmittedEmergencyAccess(grantEnds)));
         }
         boolean canAdmit = ADMIT_ROLES.contains(role) && !"readonly".equals(ent.ipdState());
         Instant dayStart = today.atStartOfDay(RunningBill.IST).toInstant();
@@ -316,9 +340,51 @@ public class AdmissionService {
         for (WardRow ward : wards.findWards(tenantId)) {
             wardOptions.add(new WardOption(ward.id(), ward.name()));
         }
+        AdmissionScope scopeView = new AdmissionScope(kindName(scope), items.size(), everyone.size(),
+                scope.isNurse() ? scope.hasWard() : null,
+                !scope.isAll() && AdmittedCardRules.both(Set.of(ScopeGuard.NURSE), role, memberRole));
         return new AdmissionList(allBeds.size(), occupied, available, canAdmit, alerts, rules.alertPercent(),
                 dischargedToday, goingHome, emergencyCounts, clinical.banner(), asOf, List.copyOf(wardOptions),
-                AdmittedCardRules.abilities(role, memberRole, ent.ipdState()), cardSetup, List.copyOf(items));
+                AdmittedCardRules.abilities(role, memberRole, ent.ipdState()), cardSetup, List.copyOf(items),
+                scopeView);
+    }
+
+    /** The rows the scope reaches: the ward or own rule, or a live emergency access grant of the caller. */
+    private static List<AdmittedRow> inScope(PatientScope scope, List<AdmittedRow> rows) {
+        List<AdmittedRow> kept = new ArrayList<>();
+        for (AdmittedRow row : rows) {
+            if (scope.allows(row.wardId(), row.admission().doctorMembershipId(), row.admission().id())) {
+                kept.add(row);
+            }
+        }
+        return kept;
+    }
+
+    /** ALL, WARDS or OWN on the wire; a nurse with no ward (NONE) is WARDS with {@code hasWard} false. */
+    private static String kindName(PatientScope scope) {
+        switch (scope.kind()) {
+            case ALL:
+                return "ALL";
+            case OWN:
+                return "OWN";
+            default:
+                return "WARDS";
+        }
+    }
+
+    /**
+     * SAH-34 (AC 33, OQ-34-9): the filter "My patients", never a security rule. OWNER and DOCTOR: the admitting doctor is
+     * the caller's membership. NURSE: the bed's ward is one of her live wards, with the switch on or off. Absent (null)
+     * for every other role, and no membership id is sent.
+     */
+    private static Boolean mine(PatientScope scope, String memberRole, AdmittedRow row) {
+        if (scope.isNurse()) {
+            return row.wardId() != null && scope.wardIds().contains(row.wardId());
+        }
+        if ("OWNER".equals(memberRole) || "DOCTOR".equals(memberRole)) {
+            return scope.membershipId() != null && scope.membershipId().equals(row.admission().doctorMembershipId());
+        }
+        return null;
     }
 
     /**
@@ -332,6 +398,8 @@ public class AdmissionService {
         ModuleEntitlement ent = gate.check(tenantId, false);
         AdmissionRow row = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        // SAH-34: after the 404, before the record-access row (a refusal writes nothing).
+        guard.requireAdmission(tenantId, actor, role, null, admissionId, "admission-detail");
         patientAccess.recordOpened(tenantId, row.patientId(), actor);
         return buildDetail(tenantId, actor, role, ent, row);
     }
@@ -446,6 +514,8 @@ public class AdmissionService {
         wards.lockTenant(tenantId);
         AdmissionRow row = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        // SAH-34: under the clinic IPD lock (a transfer or discharge takes it too), before the state checks.
+        guard.requireAdmissionLocked(tenantId, actor, role, null, admissionId, "deposit-add");
         if (!"ADMITTED".equals(row.status())) {
             throw new ConflictException("not-admitted", "Patient is not admitted",
                     "This patient is not admitted any more. A deposit cannot be added.");
@@ -489,6 +559,7 @@ public class AdmissionService {
         wards.lockTenant(tenantId);
         AdmissionRow row = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        guard.requireAdmissionLocked(tenantId, actor, role, null, admissionId, "charge-add");
         if (!"ADMITTED".equals(row.status())) {
             throw new ConflictException("not-admitted", "Patient is not admitted",
                     "This patient is not admitted any more. A charge cannot be added.");
@@ -650,7 +721,8 @@ public class AdmissionService {
                 List.copyOf(deposits), canCollect, s.runningBillPaise(), admitted && s.depositLow(), bill, canAddCharge,
                 canTransfer, catalog.transferRules(tenantId), goingHome, row.status(), row.dischargedAt(),
                 canStartDischarge, null, null, VitalsRules.canRead(role), vitalsDue,
-                VitalsRules.summary(latestVitals), canOpenEmr(tenantId, actor, role, admitted));
+                VitalsRules.summary(latestVitals), canOpenEmr(tenantId, actor, role, admitted),
+                AdmissionViews.AdmissionPackage.of(row.packageCopy()));
     }
 
     /**
@@ -702,7 +774,7 @@ public class AdmissionService {
         AdmissionRow row = new AdmissionRow(stored.id(), stored.ipNumber(), stored.patientId(), stored.bedId(),
                 stored.bedCode(), bill.categoryKey(), stored.wardName(), stored.doctorMembershipId(),
                 stored.admissionType(), stored.payer(), stored.reason(), stored.status(), stored.admittedAt(),
-                bill.depositsPaise(), stored.dischargedAt());
+                bill.depositsPaise(), stored.dischargedAt(), stored.packageCopy());
         Lookups lookups = new Lookups();
         DepositRules rules = catalog.depositRules(tenantId);
         RunningBill frozen = new RunningBill(bill.billDays(), bill.bedDayCut(),
@@ -733,7 +805,8 @@ public class AdmissionService {
                 List.copyOf(deposits), false, bill.totalPaise(), false, frozen, false, false,
                 catalog.transferRules(tenantId), false, "DISCHARGED", stored.dischargedAt(), false, record,
                 finalBill, VitalsRules.canRead(role), VitalsRules.canRead(role) ? Boolean.FALSE : null,
-                VitalsRules.summary(latestVitals), false);
+                VitalsRules.summary(latestVitals), false,
+                AdmissionViews.AdmissionPackage.of(row.packageCopy()));
     }
 
     /** Required ids and choices; returns the reason to store (stripped, or the default when blank). */

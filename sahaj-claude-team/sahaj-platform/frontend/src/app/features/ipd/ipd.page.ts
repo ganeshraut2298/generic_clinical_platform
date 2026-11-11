@@ -35,16 +35,19 @@ import { goingHomeCount, goingHomeText } from './discharge.model';
 import { AdmitDialogComponent, AdmitDialogData } from './admit/admit-dialog.component';
 import { AdmittedPanelComponent, OpenAdmissionRequest } from './admitted/admitted-panel.component';
 import { AdmittedViewState } from './admitted/admitted-view.state';
+import { isScoped } from './admitted/admitted.model';
+import {
+  EmergencyAccessResult,
+  EmergencyAccessSheetComponent,
+} from './emergency-access/emergency-access-sheet.component';
+import { SHEET_TITLE_ID, grantToast } from './emergency-access/emergency-access.model';
 import { AdmissionsApi } from './admissions.api';
 import { BedBoardComponent } from './board/bed-board.component';
 import { EmergencyComponent, EmergencyRefusal } from './emergency/emergency.component';
 import { EmrSheetComponent, EmrSheetData } from './emr/emr-sheet.component';
-import {
-  EmergencyCounts,
-  tileNumber,
-  tileText,
-} from './emergency/emergency.model';
+import { EmergencyCounts, tileNumber, tileText } from './emergency/emergency.model';
 import { isModuleOff, isRefusal } from './ipd-refusal';
+import { ScopeRefusal, ScopeRefusals, outsideScopeText } from './ipd-scope-refusal';
 import { AdmissionDetail, AdmissionList, ipdLead } from './ipd.model';
 import { NursingSheetComponent, NursingSheetData } from './nursing/nursing-sheet.component';
 import { PharmacistStore } from './pharmacist/pharmacist.store';
@@ -65,6 +68,9 @@ import {
 
 type IpdTab = 'board' | 'admitted' | 'er' | 'safety';
 const EMERGENCY_LEAD = 'Triage first. Admit, treat and release, or refer out.';
+/** What the beds lead is expected to say before the two calls that complete it answer (mockup `cfg`: midnight, 80%). */
+const EXPECTED_BED_DAY_CUT = 'midnight';
+const EXPECTED_ALERT_PERCENT = 80;
 const LOAD_ERROR = 'We could not load beds and admissions. Try again.';
 
 /** The heading of the lock notice: focus goes here when a refusal removes the control that had it. */
@@ -110,6 +116,8 @@ export class IpdPage implements OnInit {
   private readonly doc = inject(DOCUMENT);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly scopeRefusals = inject(ScopeRefusals);
+  private readonly viewState = inject(AdmittedViewState);
 
   protected readonly goingHome = goingHomeCount;
   protected readonly goingHomeLine = goingHomeText;
@@ -120,6 +128,7 @@ export class IpdPage implements OnInit {
 
   /** SAH-31 (ADR-009 D11): a PHARMACIST gets the Safety tab only, with the tile and the panel. */
   protected readonly isPharmacist = computed(() => this.shell.me()?.role === 'PHARMACIST');
+  protected readonly role = computed(() => this.shell.me()?.role);
   protected readonly tab = signal<IpdTab>(
     this.shell.me()?.role === 'PHARMACIST'
       ? 'safety'
@@ -145,22 +154,47 @@ export class IpdPage implements OnInit {
   );
   private readonly charges = signal<IpdCharges | null>(null);
   private readonly alertPercent = signal<number | null>(null);
+  /** Each call of the lead line has answered, with words or with a failure (D-11). */
+  private readonly chargesAnswered = signal(false);
+  private readonly rulesAnswered = signal(false);
+  private readonly leadPartsAnswered = computed(
+    () => this.chargesAnswered() && this.rulesAnswered(),
+  );
 
   /** Counts from the Emergency tab's last answer; they replace the ones of the list until it reloads. */
   private readonly liveCounts = signal<EmergencyCounts | null>(null);
-  protected readonly emergency = computed(() => this.liveCounts() ?? this.list()?.emergency ?? null);
+  protected readonly emergency = computed(
+    () => this.liveCounts() ?? this.list()?.emergency ?? null,
+  );
   /** The tab, tile number and header button need IPD to be writable; Read-only hides them. */
   protected readonly emergencyOn = computed(() => this.emergency()?.writable === true);
   /** Counts from the Safety board's last answer or the summary poll; they replace the list's until it reloads. */
   private readonly liveSafety = signal<SafetyCounts | null>(null);
   /** SAH-40: the Safety board was refused; its counts stay hidden until it answers again (Try again). */
   private readonly safetyRefused = signal(false);
-  /** SAH-33 (mockup sfTabOn): the tab shows when the server sent `safety` and someone is admitted. */
+  /**
+   * SAH-33 (mockup sfTabOn): the tab shows when the server sent `safety` and someone is admitted. For a
+   * scoped user "someone" is the clinic's M (the mockup counts every admitted patient), so a nurse with no
+   * ward still reaches the board and its note (SAH-34 AC 37); M is the server's number.
+   */
   protected readonly safetyOn = computed(() => {
     const l = this.list();
-    return !!l && l.safety != null && l.items.length > 0;
+    if (!l || l.safety == null) {
+      return false;
+    }
+    return (isScoped(l.scope) ? l.scope.admitted : l.items.length) > 0;
   });
-  protected readonly safetyCounts = computed(() => this.liveSafety() ?? this.list()?.safety?.counts ?? null);
+  /** SAH-34 AC 31: the number on the Admitted tab is N (what a scoped user can see), else every admitted patient. */
+  protected readonly admittedTabNumber = computed(() => {
+    const l = this.list();
+    if (!l) {
+      return 0;
+    }
+    return isScoped(l.scope) ? l.scope.visible : l.items.length;
+  });
+  protected readonly safetyCounts = computed(
+    () => this.liveSafety() ?? this.list()?.safety?.counts ?? null,
+  );
   /**
    * The number on the Safety tab (mockup `sfCount`): open escalations, the owner's orders waiting and
    * the late doses (SAH-35; due doses are not added); a pharmacist's is the orders waiting. The
@@ -173,7 +207,12 @@ export class IpdPage implements OnInit {
       // SAH-40: after a refusal the counts are unknown; a partial sum would read as a real total.
       return 0;
     }
-    return safetyTabCount(counts?.open, this.pharmacist.waiting(), counts?.dosesLate);
+    return safetyTabCount(
+      counts?.open,
+      this.pharmacist.waiting(),
+      counts?.dosesLate,
+      counts?.emergencyAccessWaiting,
+    );
   });
   protected readonly tabs = computed<IpdTab[]>(() => [
     'board',
@@ -231,6 +270,32 @@ export class IpdPage implements OnInit {
       : ipdLead(this.charges()?.bedDayCut, this.alertPercent());
   });
 
+  /**
+   * The words the beds lead is expected to end with (D-11). A part that has answered is used as it is; a part
+   * still on its way is taken from the mockup's defaults (charges post at midnight, alert at 80%). The page head
+   * sizes itself for this text while the lead is pending, so its buttons wrap where they will wrap and the
+   * tiles below do not move when the words arrive.
+   */
+  protected readonly leadLike = computed(() =>
+    ipdLead(
+      this.chargesAnswered() ? this.charges()?.bedDayCut : EXPECTED_BED_DAY_CUT,
+      this.rulesAnswered() ? this.alertPercent() : EXPECTED_ALERT_PERCENT,
+    ),
+  );
+
+  /**
+   * The beds lead is still waiting for the charges and the deposit-alert percent (D-11): the page head is
+   * laid out for the finished words (`leadLike`), so the tiles below do not move when they arrive.
+   */
+  protected readonly leadPending = computed(
+    () =>
+      !this.leadPartsAnswered() &&
+      this.activeTab() !== 'er' &&
+      !this.isPharmacist() &&
+      !this.locked() &&
+      this.loadError() === null,
+  );
+
   constructor() {
     this.reloadRequests
       .pipe(
@@ -260,6 +325,10 @@ export class IpdPage implements OnInit {
         this.liveCounts.set(null);
         this.liveSafety.set(null);
       });
+    // SAH-34 AC 38, 39: a sheet met 403 `outside-scope`; this page says so, drops the row and reads the list again.
+    this.scopeRefusals.refusals
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((refusal) => this.onOutsideScope(refusal));
     // IPD switched off is answered by the pharmacist calls too (403 module-off): same lock notice,
     // and nothing of the page stays in memory behind it (SAH-40).
     effect(() => {
@@ -360,7 +429,10 @@ export class IpdPage implements OnInit {
   }
 
   /** The answer of a sheet this page opened; the sheet is tracked until it closes. */
-  private track<T>(ref: { close(): void; afterClosed(): Observable<T | undefined> }): Observable<T | undefined> {
+  private track<T>(ref: {
+    close(): void;
+    afterClosed(): Observable<T | undefined>;
+  }): Observable<T | undefined> {
     this.openSheets.add(ref);
     return ref.afterClosed().pipe(
       tap(() => this.openSheets.delete(ref)),
@@ -391,13 +463,22 @@ export class IpdPage implements OnInit {
     this.layoutApi
       .layout()
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({ next: (layout) => this.charges.set(layout.charges), error: () => undefined });
+      .subscribe({
+        next: (layout) => {
+          this.charges.set(layout.charges);
+          this.chargesAnswered.set(true);
+        },
+        error: () => this.chargesAnswered.set(true),
+      });
     this.api
       .rules()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (rules) => this.alertPercent.set(rules.alertPercent),
-        error: () => undefined,
+        next: (rules) => {
+          this.alertPercent.set(rules.alertPercent);
+          this.rulesAnswered.set(true);
+        },
+        error: () => this.rulesAnswered.set(true),
       });
   }
 
@@ -535,6 +616,60 @@ export class IpdPage implements OnInit {
     document.getElementById('ipd-tab-' + order[next])?.focus();
   }
 
+  /**
+   * SAH-34 AC 38, 39. The sheets of the patient have closed themselves (they watch the same event). Here: the
+   * message (the `emergency access has ended` one for a patient the user had through a grant; plus "Nothing was saved."
+   * after a save), the patient's row leaves the page's memory, and the list reloads and drops the patient. The page is
+   * not locked: this is neither `forbidden` nor `module-off`.
+   */
+  private onOutsideScope(refusal: ScopeRefusal): void {
+    const viaGrant =
+      this.list()?.items.find((i) => i.id === refusal.admissionId)?.emergencyAccess !== undefined;
+    this.list.update((l) =>
+      l ? { ...l, items: l.items.filter((i) => i.id !== refusal.admissionId) } : l,
+    );
+    this.snackBar.open(outsideScopeText(viaGrant, refusal.write), 'Close', { duration: 8000 });
+    this.refreshList();
+    this.board()?.reload();
+    // The button that opened the sheet may be gone with the row: the focus must not fall to the page body.
+    afterNextRender(
+      () => {
+        const active = this.doc.activeElement;
+        if (active === null || active === this.doc.body) {
+          this.doc.getElementById('ipd-panel')?.focus();
+        }
+      },
+      { injector: this.injector },
+    );
+  }
+
+  /** SAH-34 AC 44 to 51: the button "Emergency access" opens the sheet; the search is cleared after a grant (as the mockup). */
+  protected openEmergencyAccess(): void {
+    this.track(
+      this.dialog.open<EmergencyAccessSheetComponent, void, EmergencyAccessResult>(
+        EmergencyAccessSheetComponent,
+        {
+          panelClass: 'sheet-panel',
+          width: '640px',
+          maxWidth: '100vw',
+          ariaLabelledBy: SHEET_TITLE_ID,
+        },
+      ),
+    ).subscribe((result) => {
+      if (!result) {
+        return;
+      }
+      if (result.kind === 'granted') {
+        // The toast shows only after the server has answered (the sheet closes on the 201).
+        this.viewState.setQuery('');
+        this.snackBar.open(grantToast(result.grant.patientName), 'Close', { duration: 8000 });
+      } else if (result.kind === 'in-scope' && result.message !== '') {
+        this.snackBar.open(result.message, 'Close', { duration: 8000 });
+      }
+      this.refreshList();
+    });
+  }
+
   /** Opens the Admit sheet, with a bed preselected when it comes from the bed board. */
   protected admit(bedId?: string): void {
     this.track(
@@ -548,10 +683,10 @@ export class IpdPage implements OnInit {
         },
       ),
     ).subscribe((admission) => {
-        if (admission) {
-          this.afterAdmitted(admission);
-        }
-      });
+      if (admission) {
+        this.afterAdmitted(admission);
+      }
+    });
   }
 
   /** Toast and reloads after the Admit sheet saved (from the page, a bed tile or an emergency card). */
@@ -589,10 +724,10 @@ export class IpdPage implements OnInit {
         data: { admissionId },
       }),
     ).subscribe((saved) => {
-        if (saved) {
-          this.refreshList();
-        }
-      });
+      if (saved) {
+        this.refreshList();
+      }
+    });
   }
 
   /** The card's EMR: the sheet of SAH-31 for the admission; focus returns to the button on close. */
@@ -614,22 +749,25 @@ export class IpdPage implements OnInit {
 
   private openById(id: string, startView: AdmissionDialogData['startView'] = 'details'): void {
     this.track(
-      this.dialog.open<AdmissionDialogComponent, AdmissionDialogData, boolean>(AdmissionDialogComponent, {
-        panelClass: 'sheet-panel',
-        width: '640px',
-        maxWidth: '100vw',
-        data: startView === 'details' ? { id } : { id, startView },
-        // SAH-36 F-1 (and SAH-37 for Deposit): from a card's Transfer or Deposit the sheet places the focus itself (on the bed select), so
-        // Material's first-tabbable step (the Close button) must not take it back. With autoFocus off,
-        // Material still focuses the sheet container until the sheet moves the focus. restoreFocus stays
-        // on, so closing returns to the card's button.
-        ...(startView === 'move' || startView === 'deposit' ? { autoFocus: false } : {}),
-      }),
+      this.dialog.open<AdmissionDialogComponent, AdmissionDialogData, boolean>(
+        AdmissionDialogComponent,
+        {
+          panelClass: 'sheet-panel',
+          width: '640px',
+          maxWidth: '100vw',
+          data: startView === 'details' ? { id } : { id, startView },
+          // SAH-36 F-1 (and SAH-37 for Deposit): from a card's Transfer or Deposit the sheet places the focus itself (on the bed select), so
+          // Material's first-tabbable step (the Close button) must not take it back. With autoFocus off,
+          // Material still focuses the sheet container until the sheet moves the focus. restoreFocus stays
+          // on, so closing returns to the card's button.
+          ...(startView === 'move' || startView === 'deposit' ? { autoFocus: false } : {}),
+        },
+      ),
     ).subscribe((changed) => {
-        if (changed) {
-          this.refreshList();
-          this.board()?.reload();
-        }
-      });
+      if (changed) {
+        this.refreshList();
+        this.board()?.reload();
+      }
+    });
   }
 }

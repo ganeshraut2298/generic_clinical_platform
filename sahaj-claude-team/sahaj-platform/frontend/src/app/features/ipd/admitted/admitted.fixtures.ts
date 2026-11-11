@@ -135,6 +135,7 @@ export function listOf(partial: Partial<AdmissionList> = {}): AdmissionList {
     ],
     card: ABILITIES_NURSE,
     cardSetup: resolvedStandard(),
+    scope: { kind: 'ALL', visible: 3, admitted: 3, canOpenEmergencyAccess: false },
     items: [
       rowOf(),
       rowOf({

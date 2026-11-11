@@ -198,7 +198,15 @@ class SafetyChangeTokenIT extends SafetyTestSupport {
         String id = raise(w.clinic(), a, high7());
         String token = token(w);
         assertThat(token).hasSize(22).doesNotContain(id).doesNotContain("Kavita");
-        assertThat(boardOf(w.owner().auth()).get("counts").size()).as("open, pastTarget, dosesDue, dosesLate, changeToken, asOf (SAH-35)").isEqualTo(6);
+        assertThat(boardOf(w.owner().auth()).get("counts").size())
+                .as("OWNER: open, pastTarget, dosesDue, dosesLate, changeToken, asOf (SAH-35) and emergencyAccessWaiting (SAH-34, OWNER only)")
+                .isEqualTo(7);
+        assertThat(boardOf(w.owner().auth()).get("counts").has("emergencyAccessWaiting")).isTrue();
+        for (Staff s : new Staff[] {w.doctor(), w.nurse()}) {
+            JsonNode counts = boardOf(s.auth()).get("counts");
+            assertThat(counts.size()).as(s.role() + ": the same six keys as before SAH-34").isEqualTo(6);
+            assertThat(counts.has("emergencyAccessWaiting")).as(s.role() + " never gets the owner's count").isFalse();
+        }
     }
 
     /** The vitals body with a new client key, so that it is a new save and not a replay. */

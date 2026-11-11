@@ -57,10 +57,12 @@ public class BedBoardService {
     private final IpdCatalog catalog;
     private final IpdBilling billing;
     private final DischargeRepository discharges;
+    private final ScopeGuard guard;
 
     BedBoardService(BedRepository beds, WardRepository wards, AdmissionRepository admissions, AuditLog auditLog,
                     PatientLookupPort patients, TeamMemberPort team, IpdGate gate, IpdCatalog catalog,
-                    IpdBilling billing, DischargeRepository discharges) {
+                    IpdBilling billing, DischargeRepository discharges, ScopeGuard guard) {
+        this.guard = guard;
         this.discharges = discharges;
         this.billing = billing;
         this.beds = beds;
@@ -74,23 +76,23 @@ public class BedBoardService {
     }
 
     @Transactional(readOnly = true)
-    public BedBoard board(UUID tenantId, String role) {
-        return build(tenantId, role, gate.check(tenantId, false));
+    public BedBoard board(UUID tenantId, UUID actor, String role) {
+        return build(tenantId, actor, role, gate.check(tenantId, false));
     }
 
     /** Cleaning or Blocked to Available. */
     @Transactional
-    public BedBoard markReady(UUID tenantId, String role, UUID bedId) {
-        return change(tenantId, role, bedId, Set.of("clean", "blk"), "free", "IPD_BED_READY");
+    public BedBoard markReady(UUID tenantId, UUID actor, String role, UUID bedId) {
+        return change(tenantId, actor, role, bedId, Set.of("clean", "blk"), "free", "IPD_BED_READY");
     }
 
     /** Cleaning to Blocked. */
     @Transactional
-    public BedBoard block(UUID tenantId, String role, UUID bedId) {
-        return change(tenantId, role, bedId, Set.of("clean"), "blk", "IPD_BED_BLOCKED");
+    public BedBoard block(UUID tenantId, UUID actor, String role, UUID bedId) {
+        return change(tenantId, actor, role, bedId, Set.of("clean"), "blk", "IPD_BED_BLOCKED");
     }
 
-    private BedBoard change(UUID tenantId, String role, UUID bedId, Set<String> allowedFrom, String to,
+    private BedBoard change(UUID tenantId, UUID actor, String role, UUID bedId, Set<String> allowedFrom, String to,
                             String action) {
         // Defence in depth (security review L1): the controller already checks the role, so a caller that skips
         // it, or a token that outlived a demotion, still cannot change a bed.
@@ -112,10 +114,16 @@ public class BedBoardService {
         after.put("from", bed.status());
         after.put("to", to);
         auditLog.record(action, "IPD_BED", bed.id(), null, after);
-        return build(tenantId, role, ent);
+        return build(tenantId, actor, role, ent);
     }
 
-    private BedBoard build(UUID tenantId, String role, ModuleEntitlement ent) {
+    /**
+     * The board for the caller. SAH-34 (AC 9, OQ-34-6): every ward, room, bed, status and count is kept; for an occupied
+     * bed whose patient is outside the caller's scope the patient fields are absent from the data and
+     * {@code outsideScope} is true. The patient of such a bed is not even read.
+     */
+    private BedBoard build(UUID tenantId, UUID actor, String role, ModuleEntitlement ent) {
+        PatientScope scope = guard.scope(tenantId, actor, role, null);
         String state = ent.ipdState();
         ConfigRow config = catalog.config(tenantId);
         boolean roomLevel = config.roomLevel();
@@ -129,11 +137,20 @@ public class BedBoardService {
         List<BedRow> bedRows = new ArrayList<>(beds.findAll(tenantId));
         bedRows.sort(BedOrder.byRoomThenCode(roomRows));
 
+        Map<UUID, UUID> wardOfBed = new HashMap<>();
+        for (BedRow bed : bedRows) {
+            wardOfBed.put(bed.id(), bed.wardId());
+        }
         Map<UUID, AdmissionRow> byBed = new HashMap<>();
+        Set<UUID> outside = new HashSet<>();
         Set<UUID> patientIds = new HashSet<>();
         Set<UUID> doctorIds = new HashSet<>();
         for (AdmissionRow row : admissions.findAdmitted(tenantId)) {
             byBed.put(row.bedId(), row);
+            if (!scope.allows(wardOfBed.get(row.bedId()), row.doctorMembershipId(), row.id())) {
+                outside.add(row.id());
+                continue;
+            }
             patientIds.add(row.patientId());
             doctorIds.add(row.doctorMembershipId());
         }
@@ -163,7 +180,7 @@ public class BedBoardService {
                 if (!ward.id().equals(bed.wardId())) {
                     continue;
                 }
-                BoardBed view = toView(bed, categories.get(bed.categoryKey()), byBed.get(bed.id()), patientMap,
+                BoardBed view = toView(bed, categories.get(bed.categoryKey()), byBed.get(bed.id()), outside, patientMap,
                         doctorMap, batch, signoffs, today);
                 wardBeds.add(view);
                 counts[index(bed.status())]++;
@@ -198,7 +215,7 @@ public class BedBoardService {
                 new Counts(counts[0], counts[1], counts[2], counts[3], counts[4]), List.copyOf(wardViews));
     }
 
-    private BoardBed toView(BedRow bed, CategoryRow category, AdmissionRow admission,
+    private BoardBed toView(BedRow bed, CategoryRow category, AdmissionRow admission, Set<UUID> outside,
                             Map<UUID, PatientSummary> patientMap, Map<UUID, TeamMember> doctorMap, Batch batch,
                             Map<UUID, SignoffRow> signoffs, LocalDate today) {
         long rate = category == null ? 0L : category.ratePaise();
@@ -206,6 +223,10 @@ public class BedBoardService {
         if (!"occ".equals(bed.status()) || admission == null) {
             return new BoardBed(bed.id(), bed.code(), bed.categoryKey(), name, rate, bed.status(), null, null, null,
                     null, null, null);
+        }
+        if (outside.contains(admission.id())) {
+            return new BoardBed(bed.id(), bed.code(), bed.categoryKey(), name, rate, bed.status(), null, null, null,
+                    null, null, null, Boolean.TRUE);
         }
         PatientSummary patient = patientMap.get(admission.patientId());
         TeamMember doctor = doctorMap.get(admission.doctorMembershipId());

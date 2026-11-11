@@ -1,6 +1,8 @@
 import { formatDayMonth, istToday } from '../../config/config-format';
 import { timeOfInstant } from '../emergency/emergency.model';
 import { KEY_RELOAD, Mar, MAR_LOCK_LINES, clockText } from '../mar/mar.model';
+import type { EmergencyAccessReviewPage } from '../emergency-access/emergency-access.model';
+import type { ScopeKind } from '../ipd.model';
 
 /**
  * SAH-33 Safety board (mockup `ipSafety`, `escRow`, `sfban`). Types follow `SafetyBoard`,
@@ -72,6 +74,11 @@ export interface SafetyCounts {
    */
   changeToken: string;
   asOf: string;
+  /**
+   * SAH-34 (OQ-34-30). OWNER only: the emergency access grants not yet reviewed. The same figure as the tile, the panel
+   * and the owner's part of the tab number; the change token also covers each unreviewed grant.
+   */
+  emergencyAccessWaiting?: number;
 }
 
 export interface SafetyBannerItem {
@@ -112,7 +119,24 @@ export interface MedicineRound {
   rows: MedicineRoundRow[];
 }
 
+/** SAH-34 `SafetyScope`: view NURSE only. No patient data; the notes above the tiles are drawn from it. */
+export interface SafetyScope {
+  kind: ScopeKind;
+  visible: number;
+  admitted: number;
+  hasWard: boolean;
+}
+
 export interface SafetyBoard {
+  /** SAH-34. view NURSE only (absent for DOCTOR, who is never narrowed). */
+  scope?: SafetyScope;
+  /** SAH-34 (34F). OWNER only: the tile "Emergency access" and the first page of the panel. */
+  emergencyAccess?: EmergencyAccessReviewPage;
+  /**
+   * SAH-34 (AC 20, OQ-34-26, x-needs-human). A scoped NURSE only: open escalations past target in wards outside
+   * hers, as a number only. Not part of the counts, the tiles or the rows.
+   */
+  otherWardsPastTarget?: number;
   state: 'trial' | 'on' | 'readonly';
   view: SafetyView;
   asOf: string;
@@ -157,6 +181,8 @@ export interface ClinicalEvent {
   admissionId: string | null;
   patientName: string | null;
   bedCode: string | null;
+  /** SAH-34 (AC 70). Only on the entry "Reviewed emergency access": the grantee's name, read at display time. */
+  grantStaffName?: string;
 }
 
 export interface ClinicalEventPage {
@@ -273,6 +299,31 @@ export function openTileText(counts: Pick<SafetyCounts, 'pastTarget'>): { text: 
 }
 
 export const YOUR_PATIENTS_TEXT = 'In your wards';
+/** SAH-33 AC4 wording for the tile "Your patients" while the clinic switch is off (every admitted patient). */
+export const YOUR_PATIENTS_ALL_TEXT = 'All admitted patients';
+
+/** SAH-34 AC 16: "In your wards" when the caller's scope is wards, "All admitted patients" when it is all. */
+export function yourPatientsText(scope: Pick<SafetyScope, 'kind'> | undefined): string {
+  return scope?.kind === 'ALL' ? YOUR_PATIENTS_ALL_TEXT : YOUR_PATIENTS_TEXT;
+}
+
+/** SAH-34 AC 37 (new text, OQ-34-27): the note above the tiles for a scoped nurse; null when the scope is all. */
+export function scopeNote(scope: SafetyScope | undefined): string | null {
+  if (!scope || scope.kind === 'ALL') {
+    return null;
+  }
+  return scope.hasWard
+    ? `This board shows your wards only (${scope.visible} of ${scope.admitted} patients).`
+    : 'No wards are assigned to you, so this board shows no patients.';
+}
+
+/** SAH-34 AC 37 (x-needs-human, OQ-34-26): "2 escalations past the response target in other wards. Tell the doctor now ..." */
+export function otherWardsNotice(count: number): { head: string; tail: string } {
+  return {
+    head: `${count} ${count === 1 ? 'escalation' : 'escalations'} past the response target in other wards.`,
+    tail: ' Tell the doctor now, or use Emergency access if you must act.',
+  };
+}
 
 // ---- Banner on the Admitted patients tab ----
 
@@ -415,6 +466,14 @@ export function eventLine(event: ClinicalEvent): string {
   return `${event.actorName} · ${event.patientName ?? 'Patient'}${bed}`;
 }
 
+/**
+ * The bold text of an entry. The review entry reads "Reviewed emergency access by <staff>" (the mockup's text); the
+ * name is the grantee's, read by the server at display time and never stored in the entry (AC 70).
+ */
+export function eventText(event: Pick<ClinicalEvent, 'text' | 'grantStaffName'>): string {
+  return event.grantStaffName ? `${event.text} by ${event.grantStaffName}` : event.text;
+}
+
 export const auditSubtitle = (view: SafetyView): string =>
   view === 'DOCTOR' ? AUDIT_SUBTITLE_DOCTOR : AUDIT_SUBTITLE_NURSE;
 
@@ -525,7 +584,10 @@ export function checkGive(mar: Mar, row: Pick<MedicineRoundRow, 'orderId' | 'slo
 
 // ---- Counts ----
 
-type Compared = Pick<SafetyCounts, 'open' | 'pastTarget' | 'dosesDue' | 'dosesLate' | 'changeToken'>;
+type Compared = Pick<
+  SafetyCounts,
+  'open' | 'pastTarget' | 'dosesDue' | 'dosesLate' | 'changeToken' | 'emergencyAccessWaiting'
+>;
 
 /** The poll compares the escalation numbers, the dose numbers and the token (the token also catches a swap). */
 export const sameCounts = (a: Compared, b: Compared): boolean =>
@@ -533,4 +595,5 @@ export const sameCounts = (a: Compared, b: Compared): boolean =>
   a.pastTarget === b.pastTarget &&
   a.dosesDue === b.dosesDue &&
   a.dosesLate === b.dosesLate &&
+  (a.emergencyAccessWaiting ?? 0) === (b.emergencyAccessWaiting ?? 0) &&
   a.changeToken === b.changeToken;

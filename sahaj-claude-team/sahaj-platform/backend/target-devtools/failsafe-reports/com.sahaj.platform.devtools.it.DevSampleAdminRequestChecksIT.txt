@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.platform.devtools.it.DevSampleAdminRequestChecksIT
 -------------------------------------------------------------------------------
-Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.494 s -- in com.sahaj.platform.devtools.it.DevSampleAdminRequestChecksIT
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.971 s -- in com.sahaj.platform.devtools.it.DevSampleAdminRequestChecksIT

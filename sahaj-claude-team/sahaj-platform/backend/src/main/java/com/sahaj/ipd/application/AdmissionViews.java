@@ -1,6 +1,7 @@
 package com.sahaj.ipd.application;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sahaj.ipd.application.IpdSettingsRepository.TransferRules;
 import com.sahaj.ipd.domain.EscalationState;
 import com.sahaj.ipd.domain.MedicineSafetyCheck;
@@ -77,7 +78,16 @@ public final class AdmissionViews {
                                 int depositAlerts, int alertPercent, int dischargedToday, int goingHomeToday,
                                 EmergencyViews.Counts emergency, SafetyViews.Banner safety, Instant asOf,
                                 List<WardOption> wards, AdmittedCardAbilities card, ResolvedCardSetup cardSetup,
-                                List<AdmittedPatientRow> items) {
+                                List<AdmittedPatientRow> items, ScopeViews.AdmissionScope scope) {
+
+        /** A list with no scope data (SAH-36 shape): {@code scope} is null. */
+        public AdmissionList(int bedsTotal, int bedsOccupied, int bedsAvailable, boolean canAdmit, int depositAlerts,
+                             int alertPercent, int dischargedToday, int goingHomeToday, EmergencyViews.Counts emergency,
+                             SafetyViews.Banner safety, Instant asOf, List<WardOption> wards,
+                             AdmittedCardAbilities card, ResolvedCardSetup cardSetup, List<AdmittedPatientRow> items) {
+            this(bedsTotal, bedsOccupied, bedsAvailable, canAdmit, depositAlerts, alertPercent, dischargedToday,
+                    goingHomeToday, emergency, safety, asOf, wards, card, cardSetup, items, null);
+        }
     }
 
     /** SAH-36 one option of the select "Ward": the id is the filter value (ADR-013 D1). */
@@ -106,7 +116,31 @@ public final class AdmissionViews {
                                      Instant admittedAt, long runningBillPaise, boolean depositLow,
                                      boolean goingHomeToday, String uhid, UUID wardId, String roomName,
                                      @JsonInclude(JsonInclude.Include.NON_NULL) AdmittedClinicalFlags clinical,
-                                     @JsonInclude(JsonInclude.Include.NON_NULL) Optional<String> mobile) {
+                                     @JsonInclude(JsonInclude.Include.NON_NULL) Optional<String> mobile,
+                                     @JsonInclude(JsonInclude.Include.NON_NULL) Boolean mine,
+                                     @JsonInclude(JsonInclude.Include.NON_NULL)
+                                     ScopeViews.AdmittedEmergencyAccess emergencyAccess) {
+
+        /** SAH-34: {@code mine} and {@code emergencyAccess} absent (a caller whose list has neither). */
+        public AdmittedPatientRow(UUID id, String ipNumber, UUID patientId, String patientName, Integer age,
+                                  String sex, String doctorName, String bedCode, String categoryName, String wardName,
+                                  String admissionType, String payer, int dayNumber, long depositPaise,
+                                  long minimumDepositPaise, String depositState, Instant admittedAt,
+                                  long runningBillPaise, boolean depositLow, boolean goingHomeToday, String uhid,
+                                  UUID wardId, String roomName, AdmittedClinicalFlags clinical,
+                                  Optional<String> mobile) {
+            this(id, ipNumber, patientId, patientName, age, sex, doctorName, bedCode, categoryName, wardName,
+                    admissionType, payer, dayNumber, depositPaise, minimumDepositPaise, depositState, admittedAt,
+                    runningBillPaise, depositLow, goingHomeToday, uhid, wardId, roomName, clinical, mobile, null, null);
+        }
+
+        /** The same row with SAH-34 {@code mine} (null = absent) and the caller's own live {@code emergencyAccess}. */
+        public AdmittedPatientRow withScope(Boolean mine, ScopeViews.AdmittedEmergencyAccess emergencyAccess) {
+            return new AdmittedPatientRow(id, ipNumber, patientId, patientName, age, sex, doctorName, bedCode,
+                    categoryName, wardName, admissionType, payer, dayNumber, depositPaise, minimumDepositPaise,
+                    depositState, admittedAt, runningBillPaise, depositLow, goingHomeToday, uhid, wardId, roomName,
+                    clinical, mobile, mine, emergencyAccess);
+        }
 
         /** The row of the table plus the card facts; {@code clinical} null for a caller who may not read it. */
         public static AdmittedPatientRow of(Summary s, String uhid, UUID wardId, String roomName,
@@ -205,6 +239,23 @@ public final class AdmissionViews {
         }
     }
 
+    /**
+     * SAH-29 contract schema {@code AdmissionPackage}: the package kept on the admission (name, price in paise, included
+     * days; 0 = day-care). A contract DTO, so the repository record can change without changing the JSON. Never logged.
+     */
+    public record AdmissionPackage(String name, long pricePaise, int includedDays) {
+
+        /** Maps the stored copy; null when the admission has no package. */
+        public static AdmissionPackage of(AdmissionRepository.PackageCopy copy) {
+            return copy == null ? null : new AdmissionPackage(copy.name(), copy.pricePaise(), copy.includedDays());
+        }
+
+        @Override
+        public String toString() {
+            return "AdmissionPackage[redacted]";
+        }
+    }
+
     public record DepositEntry(UUID id, long amountPaise, String mode, Instant collectedAt, String collectedByName) {
     }
 
@@ -221,7 +272,8 @@ public final class AdmissionViews {
                          boolean canTransfer, TransferRules transferRules, boolean goingHomeToday, String status,
                          Instant dischargedAt, boolean canStartDischarge, DischargeViews.DischargeRecord discharge,
                          DischargeViews.FinalBill finalBill, boolean canOpenNursing, Boolean vitalsDue,
-                         VitalsViews.EwsSummary latestEws, boolean canOpenEmr) {
+                         VitalsViews.EwsSummary latestEws, boolean canOpenEmr,
+                         @JsonProperty("package") AdmissionPackage packageCopy) {
 
         @Override
         public String toString() {

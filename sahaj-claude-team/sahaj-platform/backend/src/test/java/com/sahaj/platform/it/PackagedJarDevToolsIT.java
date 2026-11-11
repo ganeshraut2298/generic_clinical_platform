@@ -84,6 +84,67 @@ class PackagedJarDevToolsIT {
         assertThat(forbidden).as("dev-tools entries in " + jar.getFileName()).isEmpty();
     }
 
+    /**
+     * SAH-42 / ADR-018 "Must-not-ship" (T13 extended): the bootstrap registration has its own classes, its own Flyway location
+     * and its own SQL callback; none of them may be in a normal jar. Each rule is listed on its own so a failure names the rule.
+     */
+    @Test
+    void theProductionJarContainsNoBootstrapRegistrationClassSqlCallbackOrFlywayLocation() throws IOException {
+        assumeFalse(devToolsBuild(), "Stands down in a -Pdev-tools build (sahaj.devtools=true): the dev-tools jar is meant to hold "
+                + "these entries; PackagedJarDevToolsBuildIT checks that build instead.");
+        Path jar = jar();
+        List<String> names = entryNames(jar);
+        assertThat(names.stream().filter(n -> n.startsWith("BOOT-INF/classes/com/sahaj/platform/devtools/bootstrap/")).toList())
+                .as("class folder of the bootstrap registration").isEmpty();
+        assertThat(names.stream().filter(n -> n.startsWith("BOOT-INF/classes/db/bootstrap-dev-tools/")
+                || n.startsWith("db/bootstrap-dev-tools/")).toList()).as("Flyway location db/bootstrap-dev-tools/ (Revision 3 name)").isEmpty();
+        // ADR-018 Revision 3 (code review finding 7): the old name must exist in no jar at all, a regression check.
+        assertThat(names.stream().filter(n -> n.startsWith("BOOT-INF/classes/db/dev-tools-bootstrap/")
+                || n.startsWith("db/dev-tools-bootstrap/")).toList()).as("old Flyway location db/dev-tools-bootstrap/").isEmpty();
+        assertThat(names.stream().filter(n -> n.endsWith("afterMigrate__dev_tools_admin_bootstrap.sql")).toList())
+                .as("the bootstrap SQL callback, wherever it sits").isEmpty();
+        assertThat(names.stream().filter(n -> n.startsWith("BOOT-INF/classes/com/sahaj/platform/devtools/") && n.contains("Bootstrap")).toList())
+                .as("any entry with Bootstrap in its name below the devtools package").isEmpty();
+        assertThat(names.stream().filter(n -> n.contains("BootstrapPinHashTool")).toList()).as("the PIN hash tool").isEmpty();
+        assertThat(names.stream().filter(n -> n.contains("dev-tools-bootstrap") || n.contains("bootstrap-dev-tools")
+                || n.contains("dev_tools_admin_bootstrap")).toList())
+                .as("any name that mentions either bootstrap location name or the callback").isEmpty();
+    }
+
+    @Test
+    void theProductionJarStillHoldsTheMainCodeThatAnswersTheEmpty404ForTheReservedBootstrapPath() throws IOException {
+        // The reserved-path filter is main code (ADR-018 D1): with the bootstrap classes absent it is what turns every
+        // /api/v1/admin/bootstrap/** request into the empty 404. It must therefore ship in every build.
+        assertThat(entryNames(jar())).contains("BOOT-INF/classes/com/sahaj/platform/web/admin/AdminDevPathFilter.class",
+                "BOOT-INF/classes/com/sahaj/platform/web/admin/AdminDevNotFound.class", "BOOT-INF/classes/com/sahaj/platform/web/admin/DevEndpointGate.class");
+    }
+
+    @Test
+    void theGuardCallbackInTheJarHoldsTheTwoSah42ChecksSoANonDevDatabaseWithTheBootstrapObjectsStopsTheStart() throws IOException {
+        try (JarFile file = new JarFile(jar().toFile())) {
+            var entry = file.getEntry(GUARD);
+            assertThat(entry).as(GUARD).isNotNull();
+            try (var in = file.getInputStream(entry)) {
+                String sql = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                assertThat(sql).contains("platform_admin_bootstrap_state").contains("admin\\_bootstrap\\_%");
+            }
+        }
+    }
+
+    @Test
+    void theBootstrapClassesCannotBeLoadedWithoutTheProfile() {
+        assumeFalse(devToolsBuild(), "Stands down in a -Pdev-tools build (sahaj.devtools=true).");
+        for (String name : List.of("com.sahaj.platform.devtools.bootstrap.BootstrapController",
+                "com.sahaj.platform.devtools.bootstrap.BootstrapService", "com.sahaj.platform.devtools.bootstrap.BootstrapPinHashTool",
+                "com.sahaj.platform.devtools.bootstrap.BootstrapGate")) {
+            assertThatThrownBy(() -> Class.forName(name)).as(name + " on the test class path").isInstanceOf(ClassNotFoundException.class);
+        }
+        assertThat(PackagedJarDevToolsIT.class.getResource("/db/bootstrap-dev-tools/afterMigrate__dev_tools_admin_bootstrap.sql"))
+                .as("the callback file on the class path").isNull();
+        assertThat(PackagedJarDevToolsIT.class.getResource("/db/dev-tools-bootstrap/afterMigrate__dev_tools_admin_bootstrap.sql"))
+                .as("the callback file under the old folder name on the class path").isNull();
+    }
+
     @Test
     void theProductionJarHasNoDevToolsManifestAttributeAndNoDevToolsName() throws IOException {
         assumeFalse(devToolsBuild(), "Stands down in a -Pdev-tools build (sahaj.devtools=true).");

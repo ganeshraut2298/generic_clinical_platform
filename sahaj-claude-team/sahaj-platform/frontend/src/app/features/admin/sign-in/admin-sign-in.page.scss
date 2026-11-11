@@ -53,6 +53,13 @@
   margin-left: auto;
 }
 
+// Touch target: the "Back to website" link is at least 44 px high (SAH-42 review F-1).
+.adm-nav .actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 // Mockup `.auth`: text on the left, a 440 px card on the right, centred as a block.
 .adm-auth {
   display: grid;

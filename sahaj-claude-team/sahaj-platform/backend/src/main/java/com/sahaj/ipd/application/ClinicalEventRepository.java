@@ -2,6 +2,7 @@ package com.sahaj.ipd.application;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -22,7 +23,13 @@ public interface ClinicalEventRepository {
     /** SAH-32 (ADR-011 D9): a dose given or recorded as not given. A wristband mismatch is {@link #KIND_DENY}. */
     String KIND_GIVE = "give";
 
+    /** SAH-34: an emergency access was opened or reviewed (kind bg, written with the grant id). */
+    String KIND_BG = "bg";
+
     void insert(UUID tenantId, UUID admissionId, String kind, String text, UUID actor);
+
+    /** SAH-34: a `bg` entry of an emergency access grant ({@code grant_id} set). The text holds no name. */
+    void insertForGrant(UUID tenantId, UUID admissionId, String text, UUID actor, UUID grantId);
 
     /**
      * SAH-33: one page of the log, newest first ({@code at} descending, then {@code seq} descending), strictly older
@@ -33,12 +40,28 @@ public interface ClinicalEventRepository {
      */
     List<EventRow> findPage(UUID tenantId, UUID onlyForNurse, Position after, int limit);
 
+    /**
+     * SAH-34 (AC 11): the page of a scoped NURSE: her own entries, and the entries of ADMITTED admissions whose bed is in
+     * {@code wardIds} or whose id is in {@code grantAdmissionIds} (her live emergency access). Both sets may be empty.
+     */
+    List<EventRow> findPageInScope(UUID tenantId, UUID nurse, Set<UUID> wardIds, Set<UUID> grantAdmissionIds,
+                                   Position after, int limit);
+
     /** The position of an entry in the log: the keyset of the page cursor. */
     record Position(Instant at, long seq) {
     }
 
+    /**
+     * {@code grantUserId} (SAH-34) is the user who opened the emergency access grant the entry belongs to; null for an
+     * entry with no grant. The trail reads the grantee name from it at display time.
+     */
     record EventRow(UUID id, long seq, String kind, String text, Instant at, UUID actor, UUID admissionId,
-                    UUID patientId, String bedCode) {
+                    UUID patientId, String bedCode, UUID grantUserId) {
+
+        public EventRow(UUID id, long seq, String kind, String text, Instant at, UUID actor, UUID admissionId,
+                        UUID patientId, String bedCode) {
+            this(id, seq, kind, text, at, actor, admissionId, patientId, bedCode, null);
+        }
 
         public Position position() {
             return new Position(at, seq);

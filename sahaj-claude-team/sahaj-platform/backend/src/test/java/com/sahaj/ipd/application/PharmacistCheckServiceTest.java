@@ -65,7 +65,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
     void setUp() {
         staffPin = mock(StaffPinPort.class);
         orders = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team, auditLog,
-                gate, catalogue, assembler);
+                gate, catalogue, assembler, guard);
         service = new PharmacistCheckService(orders, fake, assembler, staffPin, team, gate);
         when(staffPin.check(eq(TENANT), any(), anyString())).thenReturn(new PinCheck(Outcome.OK, 5, null, 0));
     }
@@ -591,7 +591,10 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
 
         verify(staffPin).check(TENANT, PHARMACIST, "4821");
         verify(staffPin, times(1)).check(any(), any(), anyString());
-        assertThat(auditAfter("IPD_MED_VERIFIED").toString()).doesNotContain("4821");
+        // The audit holds random ids, so a four-digit PIN can by chance be a piece of one: compare whole values and keys.
+        Map<String, Object> audit = auditAfter("IPD_MED_VERIFIED");
+        assertThat(audit.keySet()).noneMatch(key -> key.toLowerCase().contains("pin"));
+        assertThat(audit.values()).noneMatch(value -> "4821".equals(String.valueOf(value)));
     }
 
     @Test

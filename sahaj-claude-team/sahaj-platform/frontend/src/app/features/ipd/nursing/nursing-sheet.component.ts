@@ -17,6 +17,8 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
 import { newClientKey } from '../../../shared/client-key';
 import { sheetToast } from '../../../shared/ui/sheet-toast';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { MarTabComponent } from '../mar/mar-tab.component';
 import { Mar, NursingTab, TAB_MAR, TAB_VITALS, countBadge, marSubtitle, tabAfterKey } from '../mar/mar.model';
 import { NursingApi } from './nursing.api';
@@ -93,6 +95,7 @@ export class NursingSheetComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly data = inject<NursingSheetData>(MAT_DIALOG_DATA);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   protected readonly fields = VITAL_FIELDS;
   protected readonly notePlaceholder = NOTE_PLACEHOLDER;
@@ -161,7 +164,28 @@ export class NursingSheetComponent {
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.key = newClientKey();
     });
+    // SAH-34 AC 38, 39: 403 outside-scope here, or in the Medicines tab or its Give sheet. What was typed is not kept
+    // (OQ-34-15 default); the sheet closes and the page says "Nothing was saved." after a save.
+    this.scopeRefusals.watch(this.data.admissionId, this.destroyRef, () => this.leaveOutsideScope());
     this.load();
+  }
+
+  private leaveOutsideScope(): void {
+    this.sheet.set(null);
+    this.mar.set(null);
+    this.loadError.set(null);
+    this.failure.set(null);
+    this.form.reset();
+    this.dialogRef.close(false);
+  }
+
+  /** The read or the save met 403 outside-scope: report it once and stop. */
+  private outsideScope(error: unknown, write: boolean): boolean {
+    if (!isOutsideScope(error)) {
+      return false;
+    }
+    this.scopeRefusals.report(this.data.admissionId, write);
+    return true;
   }
 
   protected load(): void {
@@ -180,6 +204,9 @@ export class NursingSheetComponent {
         },
         error: (error: unknown) => {
           this.loading.set(false);
+          if (this.outsideScope(error, false)) {
+            return;
+          }
           this.loadError.set(problemMessage(error, LOAD_ERROR));
         },
       });
@@ -259,6 +286,9 @@ export class NursingSheetComponent {
 
   private failed(error: unknown): void {
     this.running.set(false);
+    if (this.outsideScope(error, true)) {
+      return;
+    }
     if (isLostAnswer(error)) {
       this.show(LOST_ANSWER, true);
       return;
@@ -335,6 +365,9 @@ export class NursingSheetComponent {
         },
         error: (error: unknown) => {
           this.checking.set(false);
+          if (this.outsideScope(error, false)) {
+            return;
+          }
           this.snackBar.open(problemMessage(error, LOAD_ERROR), 'Close', sheetToast(8000));
         },
       });
@@ -371,8 +404,12 @@ export class NursingSheetComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (sheet) => this.accept(sheet, false),
-        error: (error: unknown) =>
-          this.snackBar.open(problemMessage(error, LOAD_ERROR), 'Close', sheetToast(8000)),
+        error: (error: unknown) => {
+          if (this.outsideScope(error, false)) {
+            return;
+          }
+          this.snackBar.open(problemMessage(error, LOAD_ERROR), 'Close', sheetToast(8000));
+        },
       });
   }
 

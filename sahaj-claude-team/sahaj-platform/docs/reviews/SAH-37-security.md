@@ -77,3 +77,19 @@ Conditions for PASS: QA updates the revision ITs (R1) and the backend gate passe
 
 ## Closure (9 Nov 2026)
 R1 is closed: QA updated the revision tests and flipped the known-gap test, which now proves a 409 on Save draft and Publish after a discard and re-create. The backend gate passed (unit 3,495, integration 1,758, 0 failed). R2 is closed: the 403 mocks use the shared text. Verdict stays **PASS WITH CONDITIONS**; the remaining conditions are the human's go-live items (privacy register for diagnosis, vitals and mobile; clinician sign-off; approval lines).
+
+## Release audit re-check (DEC-032, 10 Nov 2026): PASS WITH CONDITIONS
+Reviewed by reading only (commit 62064bf plus the working tree). No Critical, High or Medium. Not verified: the grants on a live database (`\dp`), the ITs and e2e results (taken from the QA report), `npm audit`.
+
+**Passing:**
+- **V15:** the fixed message never echoes typed text; per clinic by construction; the role check runs before the body is read (non-owner gets 403); a rejection throws before any write, audit row or lock; no logging added.
+- **Migration V2026_12_07:** additive only (`smallint not null default 1` and a `>= 1` check on both tables); RLS, FORCE and policies untouched; column-level grants only; the version table stays append-only; parameterised SQL.
+- **Frontend:** no innerHTML, sanitiser bypass, console, localStorage or sessionStorage in the touched folders; inline errors are plain interpolation of fixed server texts; the preview is `inert`; the Overview call is limited to four roles; D-11 is layout only.
+- **Tests:** the `sah31-world.ts` mock returns a data-free 404; the new ITs include negative, 403 and "nothing stored" cases. No dependency changes.
+
+| # | Sev | File:line | Finding | Owner | Tech lead decision |
+|---|---|---|---|---|---|
+| A1 | Low | CardSetups.java:52-73; CardSetupService.build(); QA R-5 | **Newer-shape fallback is silent for the owner.** A row with a higher `schema_version` reads as the standard setup (`isStandard: true`), and `GET /card-setup` has no `fallback` property. A newer-shape draft is overwritten by the next Save. Nothing leaks (the fallback keeps all four locked safety fields; facts stay role-gated). It matters only if a deploy is rolled back. | solution-architect, java-developer | Backlog: add `fallback` to the GET view, or refuse Save and Publish while the live row is newer. Accept for phase 1. |
+| A2 | Info | frontend/e2e/serve.mjs:9-13 | `E2E_DIST` serves the folder it is given (127.0.0.1 only; the traversal guard still applies; does nothing when unset). | qa-engineer | None. Optional guard. |
+| A3 | Info | sah37-world.ts; audit-sah37-ui.spec.ts | Realistic Indian names and mobile numbers in the mocked e2e data (the earlier finding 5). | qa-engineer | Backlog |
+| A4 | Info | DEC-028 O3; docs/approvals.md | Privacy register entry (Diagnosis, vitals, Mobile) still open. `SAH-37 | stories`, `contract` (re-approve: V15 and AC 67-69 changed wording) and `merge` lines are missing. | Human | Needed before merge |

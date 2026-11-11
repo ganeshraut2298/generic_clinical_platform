@@ -4,12 +4,17 @@
 --   psql -v ON_ERROR_STOP=1 -U sahaj_migrator -d <database> -f docs/database/runbooks/dev-tools-sample-admin-cleanup.sql
 --
 -- When: the Flyway guard (afterMigrate__platform_dev_tools_absent_guard) stopped the application with
--- "Dev-tools sample admin objects found in database ...", or you want to switch the dev-tools objects off in sahaj_dev.
+-- "Dev-tools admin objects (sample admin or bootstrap registration) found in database ...", or you want to switch the dev-tools objects off in sahaj_dev.
 --
 -- What it does, in ONE transaction (any error rolls everything back; psql with ON_ERROR_STOP stops at the first error):
 --   1. Drops platform.admin_dev_create_sample_admin(uuid,text,bytea,smallint,inet,text) if it exists.
+--   1b. (SAH-42, ADR-018 Revision 3) Drops the five platform.admin_bootstrap_* functions (the Revision 3 signatures AND
+--      the Revision 2 signatures, whichever are present) and the table platform.platform_admin_bootstrap_state, if they
+--      exist. Dropping the table forgets the wrong-PIN count, the lock and
+--      any open ticket. It deletes no admin and no audit row. Not yet executed (written by reading only).
 --   2. Revokes INSERT (table level, which also removes column-level grants) on platform.platform_admin from
---      sahaj_admin_definer. This restores the ADR-003 D1 state: no INSERT for the definer.
+--      sahaj_admin_definer. This restores the ADR-003 D1 state: no INSERT for the definer. (This also removes the
+--      four-column INSERT grant of the bootstrap callback.)
 --   3. Only OUTSIDE sahaj_dev / sahaj_test: switches the dev sample admin (sample-admin@example.test) off with
 --      active = false (never deletes: retention), ends its open admin sessions (reason ADMIN_OFF), closes its open
 --      pre-auth tokens, and writes one append-only audit row (kind ACTION, action ADMIN_DEV_SAMPLE_DEACTIVATED). In
@@ -60,11 +65,43 @@ begin
   if v_tbl_owner is not null and not pg_has_role(current_user, v_tbl_owner, 'usage') then
     raise exception 'Cannot change platform.platform_admin: run this as sahaj_migrator (the table owner).';
   end if;
+
+  -- SAH-42: the bootstrap functions are owned by the definer too; the state table is owned by the migrator.
+  if exists (select 1
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'platform' and p.proname like 'admin\_bootstrap\_%'
+                and not pg_has_role(current_user, p.proowner, 'usage')) then
+    raise exception 'Cannot drop platform.admin_bootstrap_* functions: run this as sahaj_migrator (member of sahaj_admin_definer with inherit).';
+  end if;
+  select c.relowner into v_tbl_owner
+    from pg_class c
+   where c.oid = to_regclass('platform.platform_admin_bootstrap_state');
+  if v_tbl_owner is not null and not pg_has_role(current_user, v_tbl_owner, 'usage') then
+    raise exception 'Cannot drop platform.platform_admin_bootstrap_state: run this as sahaj_migrator (the table owner).';
+  end if;
 end
 $pre$;
 
 -- 1. The function. Harmless when the function or the schema does not exist.
 drop function if exists platform.admin_dev_create_sample_admin(uuid, text, bytea, smallint, inet, text);
+
+-- 1b. SAH-42 / ADR-018 Revision 3: the bootstrap registration objects. Each drop is harmless when the object or the schema
+--     does not exist. The signatures are the exact ones of docs/database/SAH-42-admin-bootstrap.sql (Revision 3) plus the
+--     three Revision 2 signatures that differ (ticket_status and register keep their argument lists, so one drop covers
+--     both result types). A database may hold either generation, so both are dropped. No cascade: nothing depends on them.
+--     The self-check below still matches any signature by name, so a shape not listed here fails the run instead of staying.
+-- Revision 3 signatures:
+drop function if exists platform.admin_bootstrap_begin(uuid);
+drop function if exists platform.admin_bootstrap_unlock_failed(uuid, inet, text);
+drop function if exists platform.admin_bootstrap_unlock_succeeded(uuid, text, text);
+-- Revision 2 signatures (a database that has not run the Revision 3 callback yet):
+drop function if exists platform.admin_bootstrap_begin();
+drop function if exists platform.admin_bootstrap_unlock_failed(inet, text);
+drop function if exists platform.admin_bootstrap_unlock_succeeded(text, text);
+-- Same argument list in both generations:
+drop function if exists platform.admin_bootstrap_ticket_status(text, text);
+drop function if exists platform.admin_bootstrap_register(text, text, uuid, text, text, text, inet, text);
+drop table if exists platform.platform_admin_bootstrap_state;
 
 -- 2. The grant. Only when the role and the table exist.
 do $revoke$
@@ -147,6 +184,16 @@ declare
 begin
   if to_regprocedure('platform.admin_dev_create_sample_admin(uuid,text,bytea,smallint,inet,text)') is not null then
     raise exception 'Cleanup failed: platform.admin_dev_create_sample_admin still exists.';
+  end if;
+
+  -- SAH-42: the bootstrap objects are gone too.
+  if exists (select 1
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'platform' and p.proname like 'admin\_bootstrap\_%') then
+    raise exception 'Cleanup failed: a platform.admin_bootstrap_ function still exists.';
+  end if;
+  if to_regclass('platform.platform_admin_bootstrap_state') is not null then
+    raise exception 'Cleanup failed: platform.platform_admin_bootstrap_state still exists.';
   end if;
 
   -- Each table test is its own if: PL/pgSQL plans a statement or expression only when it runs, so a reference to a

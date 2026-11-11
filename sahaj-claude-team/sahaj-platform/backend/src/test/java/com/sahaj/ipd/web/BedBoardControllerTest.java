@@ -68,7 +68,7 @@ class BedBoardControllerTest {
 
     @Test
     void boardIsReadByTheFourRolesAndMatchesTheContractShape() throws Exception {
-        when(service.board(any(), any())).thenReturn(board());
+        when(service.board(any(), any(), any())).thenReturn(board());
 
         for (String role : new String[] {"OWNER", "FRONT_DESK", "NURSE", "DOCTOR"}) {
             mockMvc.perform(get(URL + "/board").with(as(role)))
@@ -92,12 +92,12 @@ class BedBoardControllerTest {
     @Test
     void otherRolesAreForbidden() throws Exception {
         mockMvc.perform(get(URL + "/board").with(as("PHARMACIST"))).andExpect(status().isForbidden());
-        verify(service, never()).board(any(), any());
+        verify(service, never()).board(any(), any(), any());
     }
 
     @Test
     void moduleOffIs403() throws Exception {
-        when(service.board(any(), any())).thenThrow(new ModuleOffException("off"));
+        when(service.board(any(), any(), any())).thenThrow(new ModuleOffException("off"));
 
         mockMvc.perform(get(URL + "/board").with(as("OWNER")))
                 .andExpect(status().isForbidden())
@@ -106,8 +106,8 @@ class BedBoardControllerTest {
 
     @Test
     void readyAndBlockAreForOwnerFrontDeskNurseOnly() throws Exception {
-        when(service.markReady(any(), any(), any())).thenReturn(board());
-        when(service.block(any(), any(), any())).thenReturn(board());
+        when(service.markReady(any(), any(), any(), any())).thenReturn(board());
+        when(service.block(any(), any(), any(), any())).thenReturn(board());
 
         for (String role : new String[] {"OWNER", "FRONT_DESK", "NURSE"}) {
             mockMvc.perform(post(URL + "/beds/" + BED_ID + "/ready").with(as(role)))
@@ -121,15 +121,15 @@ class BedBoardControllerTest {
 
     @Test
     void usesTheSignedInClinicAndRole() throws Exception {
-        when(service.markReady(TENANT_ID, "NURSE", BED_ID)).thenReturn(board());
+        when(service.markReady(TENANT_ID, USER_ID, "NURSE", BED_ID)).thenReturn(board());
 
         mockMvc.perform(post(URL + "/beds/" + BED_ID + "/ready").with(as("NURSE"))).andExpect(status().isOk());
-        verify(service).markReady(TENANT_ID, "NURSE", BED_ID);
+        verify(service).markReady(TENANT_ID, USER_ID, "NURSE", BED_ID);
     }
 
     @Test
     void problemsMapToTheirStatusAndType() throws Exception {
-        when(service.markReady(any(), any(), any()))
+        when(service.markReady(any(), any(), any(), any()))
                 .thenThrow(new ConflictException("bed-state", "Bed cannot be changed",
                         "This bed cannot be changed from Occupied."))
                 .thenThrow(new NotFoundException("Bed not found"))

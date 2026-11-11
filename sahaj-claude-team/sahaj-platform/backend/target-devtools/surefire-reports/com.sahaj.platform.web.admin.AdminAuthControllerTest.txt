@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.platform.web.admin.AdminAuthControllerTest
 -------------------------------------------------------------------------------
-Tests run: 37, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.612 s -- in com.sahaj.platform.web.admin.AdminAuthControllerTest
+Tests run: 37, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.060 s -- in com.sahaj.platform.web.admin.AdminAuthControllerTest

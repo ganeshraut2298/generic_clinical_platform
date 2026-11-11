@@ -829,8 +829,8 @@ paths:
         medicine), computed by the same function as SafetyBoard.counts and medicineRound, and changeToken now
         also covers every listed dose slot, so a dose recorded by anyone, a slot entering the 60-minute window
         or turning late changes it. The client compares open, pastTarget, dosesDue, dosesLate and changeToken.
-        The Safety tab number is open + dosesLate (+ PharmacistChecksSummary.waiting for OWNER); DUE doses are
-        not added (mockup sfCount; OQ-35-3).
+        The Safety tab number is open + dosesLate (+ PharmacistChecksSummary.waiting and, from SAH-34,
+        emergencyAccessWaiting for OWNER; AC 71, OQ-34-30); DUE doses are not added (mockup sfCount; OQ-35-3).
       responses:
         '200': { description: Counts, content: { application/json: { schema: { $ref: '#/components/schemas/SafetyCounts' } } } }
         '401': { $ref: '#/components/responses/Problem' }
@@ -1714,15 +1714,27 @@ paths:
         Only for a caller whose scope is narrower than all: token role and membership role NURSE and
         AdmissionList.scope.kind not ALL (the clinic switch is on). Every other caller, also a NURSE while the
         switch is off, 403 forbidden "Emergency access is only for staff who see some wards."; VISITING_DOCTOR
-        keeps 403 forbidden until story 34D. Check order: role 403 forbidden; module Off 403 module-off; then one
-        read-only REPEATABLE READ transaction: membership re-read (NURSE, else 403 forbidden); scope build
-        (kind ALL 403 forbidden). Allowed in Trial, On and Read-only (OQ-34-29). Lists every ADMITTED admission
+        keeps 403 forbidden until story 34D. The operation is reachable by every IPD token role (OWNER, DOCTOR,
+        VISITING_DOCTOR, NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR) so that each one that is not a NURSE
+        gets this same fixed sentence (problem type forbidden, title "Not allowed") before anything is read; a
+        token without an IPD role gets the generic 403 forbidden. The same applies to POST /emergency-access.
+        Check order: role 403 forbidden; module Off 403 module-off (the role check comes first, the IPD order
+        kept by ADR-017 D3; both are fixed-text 403s; SAH-34 security review finding 9, decided 10 Nov 2026, design
+        note section 1.2); then one REPEATABLE READ transaction (not read-only, because it writes the audit row
+        below): membership re-read (NURSE, else 403 forbidden); scope build (kind ALL 403 forbidden). Allowed in
+        Trial, On and Read-only (OQ-34-29). Lists every ADMITTED admission
         of the clinic outside the caller's scope (bed not in her live wards and no active grant of hers), with
         identity only: name, bed code, UHID and the admission id (option P1, as the mockup; a directory of
         admitted patients before a reason is given, listed for the security review and the privacy register,
         OQ-34-11). No diagnosis, allergy, vitals, notes or bill. Ordered by bed code (code-point order; the
-        mockup gives no order). Not paged (bounded by the bed limit). Writes nothing: no record-access row, no
-        audit, no clinical event; never logged. Empty items: the sheet shows "You can already see every admitted
+        mockup gives no order). Not paged (bounded by the bed limit). Writes exactly one platform audit event per
+        successful read (SAH-34 security review finding 1, decided 10 Nov 2026): action
+        IPD_EMERGENCY_ACCESS_PICKER_VIEWED, entity type IPD_EMERGENCY_ACCESS, entity id null, actor the caller's
+        user id, before null, after {"count": N} where N is the number of items returned (0 included). No
+        admission id, patient id, name, UHID or bed code is in the audit row. It is written at the end of the
+        same transaction, after the list is built; if it fails the request fails (500) and no list is returned.
+        A refused request (401, 403) writes no audit row. No record-access row and no clinical event; the names
+        are never logged. Empty items: the sheet shows "You can already see every admitted
         patient." and only Cancel. The client shows each option as "<patientName> · bed <bedCode> · <uhid>"
         (UHID in place of the mockup's MRN, OQ-36-8).
       responses:
@@ -1762,7 +1774,7 @@ paths:
         (NURSE with a scope narrower than all); OWNER, DOCTOR, FRONT_DESK, BILLING, PHARMACIST and a NURSE while
         the switch is off 403 forbidden "Emergency access is only for staff who see some wards."; VISITING_DOCTOR
         403 until 34D. Allowed in Trial, On and Read-only (OQ-34-29). Check order: role 403 forbidden; module Off
-        403 module-off; body 400 problem type validation with fieldErrors, every error together in the order
+        403 module-off (role first, as GET /emergency-access/patients; ADR-017 D3, design note section 1.2); body 400 problem type validation with fieldErrors, every error together in the order
         admissionId, reasonKey, confirmed (admissionId missing or not a UUID "Choose a patient."; reasonKey
         missing or not an EmergencyAccessReasonKey "Choose a reason for emergency access."; confirmed not the JSON
         value true "Tick the box to confirm this access is recorded."); nothing stored. Then one READ COMMITTED
@@ -1778,7 +1790,8 @@ paths:
         clock_timestamp(), never sent and never changeable); the clinical event (kind bg) "Emergency access opened
         · <reason label>" with the grant id, actor = the caller, admission set (no name, no free text); one
         patient.record_access row through patient.api PatientAccessPort (R1, ids only); the audit
-        IPD_EMERGENCY_ACCESS_OPENED (grantId, admissionId, reasonKey, expiresAt). Any failure rolls back all of
+        IPD_EMERGENCY_ACCESS_OPENED (entity type IPD_EMERGENCY_ACCESS, entity id the grant id; grantId,
+        admissionId, reasonKey, expiresAt). Any failure rolls back all of
         them: no grant exists. No extension, no early end, no edit, no delete (no endpoint). The grant adds the
         admission to the caller's scope for her own role's endpoints until expiresAt, the discharge, or a change
         of her role or membership, whichever comes first; it is checked on every request against the database
@@ -1798,7 +1811,7 @@ paths:
               open: { value: { admissionId: 6c1b8e8e-0d0a-4b8e-9a52-7f0f3c1d2e33, reasonKey: DETERIORATING, confirmed: true } }
       responses:
         '201': { description: 'Opened: the grant', content: { application/json: { schema: { $ref: '#/components/schemas/EmergencyAccessGrant' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on admissionId, reasonKey, confirmed); or bad-request for a body that cannot be read (components/responses/BadRequest)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (fieldErrors on admissionId, reasonKey, confirmed); or malformed-request ("Request could not be read", "The request body is missing or is not valid JSON.", no fieldErrors) for a body that cannot be read or that carries a field not in EmergencyAccessInput (additionalProperties false; the name is never echoed)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("Emergency access is only for staff who see some wards.") or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (admission missing, another clinic''s, or not admitted)' }
@@ -1829,8 +1842,8 @@ paths:
         + 1); no row updated 409 already-reviewed ("Already reviewed."; two owners or a double tap), nothing
         written. Then the clinical event (kind bg) "Reviewed emergency access" with the grant id, actor = the
         owner, admission set (no staff or patient name: the trail shows the grantee by reading the grant at
-        display time, ClinicalEvent.grantStaffName) and the audit IPD_EMERGENCY_ACCESS_REVIEWED (grantId,
-        admissionId). The review fields can never be changed or cleared (database trigger). No comment, outcome
+        display time, ClinicalEvent.grantStaffName) and the audit IPD_EMERGENCY_ACCESS_REVIEWED (entity type
+        IPD_EMERGENCY_ACCESS, entity id the grant id; grantId, admissionId). The review fields can never be changed or cleared (database trigger). No comment, outcome
         or history (not in the mockup, AC 77). Client: the button is disabled while the request runs; on 200 the
         toast "Marked as reviewed", the row leaves the panel and the board reloads; on 409 already-reviewed the
         notice "Already reviewed." and the panel reloads; on any other failure the row stays and the error is
@@ -1884,7 +1897,8 @@ paths:
         "Choose nurses from the list.". Live rows of the ward not in the set get removed_at (database clock) and
         removed_by; ids not yet live get a new row (assigned_at by the database clock, assigned_by); rows are
         never deleted. The same set as now: 200, nothing written. Otherwise audit IPD_WARD_ASSIGNMENT_CHANGED
-        (wardId, added and removed membership ids; never names). Removing a nurse's last ward while the switch is
+        (entity type IPD_WARD_ASSIGNMENT, entity id the ward id; wardId, added and removed membership ids; never
+        names). Removing a nurse's last ward while the switch is
         on is allowed: she then sees no patient (fail closed) and nursesWithoutWard in the answer shows it. Takes
         effect at each nurse's next request.
       requestBody:
@@ -1894,7 +1908,7 @@ paths:
             schema: { $ref: '#/components/schemas/WardAssignmentInput' }
       responses:
         '200': { description: 'Assignments and the switch after the change', content: { application/json: { schema: { $ref: '#/components/schemas/WardAssignments' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (field membershipIds); or bad-request when the {wardId} path value is not a UUID (components/responses/BadRequest)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (field membershipIds); or malformed-request ("Request could not be read", "The request body is missing or is not valid JSON.", no fieldErrors) for a body that cannot be read or that carries a field not in WardAssignmentInput (additionalProperties false; the name is never echoed); or bad-request when the {wardId} path value is not a UUID (components/responses/BadRequest)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or module-off' }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found (ward missing or another clinic''s)' }
@@ -1911,8 +1925,12 @@ paths:
         400 (on missing or not a JSON boolean: field on "Choose on or off"); Read-only 409 ipd-readonly; then
         one READ COMMITTED transaction under the clinic IPD advisory lock: membership re-read (OWNER); on = true
         while one or more active NURSE members have no live ward 409 nurse-without-ward ("Assign a ward to every
-        nurse before you switch this on.", OQ-34-21; nothing stored). Upserts the setting; audit
-        IPD_WARD_SCOPE_CHANGED (before, after) when the value changed; the same value: 200, nothing written.
+        nurse before you switch this on.", OQ-34-21; nothing stored). This check runs on every request with on =
+        true, also when the switch is already on: a repeated "on" while a nurse has no ward answers 409
+        nurse-without-ward (the switch stays on and nothing is written), so the answer always tells the owner
+        that a nurse sees no patient. on = false is never refused by this check. Upserts the setting; audit
+        IPD_WARD_SCOPE_CHANGED (entity type IPD_CONFIG, entity id null; before and after values only) when the
+        value changed; the same value with the check passed: 200, nothing written.
         Applies at once: every user's next request builds the scope from it (OQ-34-5; no publish step, C1).
         Go-live condition for the human: the clinical sign-off owner (OQ-30-6) reads ADR-016 section 8 before any
         clinic switches it on (OQ-34-31).
@@ -1923,7 +1941,7 @@ paths:
             schema: { $ref: '#/components/schemas/WardScopeInput' }
       responses:
         '200': { description: 'Assignments and the switch after the change', content: { application/json: { schema: { $ref: '#/components/schemas/WardAssignments' } } } }
-        '400': { $ref: '#/components/responses/Problem', description: 'validation (field on)' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (field on); or malformed-request ("Request could not be read", "The request body is missing or is not valid JSON.", no fieldErrors) for a body that cannot be read or that carries a field not in WardScopeInput (additionalProperties false; the name is never echoed)' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or module-off' }
         '409':
@@ -2155,12 +2173,12 @@ components:
       type: object
       required: [bedsTotal, bedsOccupied, bedsAvailable, canAdmit, depositAlerts, alertPercent, dischargedToday, goingHomeToday, emergency, safety, asOf, wards, card, cardSetup, items, scope]
       properties:
-        scope: { $ref: '#/components/schemas/AdmissionScope', description: 'SAH-34 (34B, 34C). The caller''s patient scope for the chip "Patients in their wards · N of M", the Admitted tab number (N for a scoped user, OQ-34-28), the zero-ward and empty texts, "My patients" and the Emergency access button. For every role (no patient data). With scope.kind WARDS, items, depositAlerts, goingHomeToday and safety.counts are computed on the visible set; bedsTotal, bedsOccupied, bedsAvailable, dischargedToday and emergency stay clinic-wide.' }
+        scope: { $ref: '#/components/schemas/AdmissionScope', description: 'SAH-34 (34B, 34C). The caller''s patient scope for the chip "Patients in their wards · N of M", the Admitted tab number (N for a scoped user, OQ-34-28), the zero-ward and empty texts, "My patients", the Emergency access button and the Safety tab gate (scope.admitted above 0, see safety). Always present, for every role and every scope kind, ALL included (no patient data). With scope.kind WARDS, items, depositAlerts, goingHomeToday and safety.counts are computed on the visible set; bedsTotal, bedsOccupied, bedsAvailable, dischargedToday and emergency stay clinic-wide.' }
         cardSetup: { $ref: '#/components/schemas/ResolvedCardSetup', description: 'SAH-37 (ADR-015 D4). The published card setup the Cards view draws, for every allowed role, read in the same transaction as the rows. The Sahaj standard setup (v1) when the clinic never published.' }
         asOf: { type: string, format: date-time, description: 'SAH-36 (ADR-013 D2, D7). Database clock (clock_timestamp()) of this answer, read once; base of every minute count and of vitalsDue in the rows. The time in "Could not refresh. Showing data from <asOf as 11:05 AM>." when a 60-second reload fails (the last answer stays on screen). For every role (FRONT_DESK has no safety.counts.asOf).' }
         wards: { type: array, items: { $ref: '#/components/schemas/WardOption' }, description: 'SAH-36 (story 2, AC14, AC20, AC21). Every ward of the clinic, in the order of IpdLayout.wards (the Beds setup), also wards with no admitted patient, for the select "Ward" after the option "All wards". Filtering is on the device by AdmittedPatientRow.wardId.' }
         card: { $ref: '#/components/schemas/AdmittedCardAbilities', description: 'SAH-36 (story 5; ADR-013 D5). What the card shows for this caller, once for the whole list (every listed patient is ADMITTED, so abilities depend only on the role and the IPD state).' }
-        safety: { oneOf: [{ $ref: '#/components/schemas/AdmissionSafety' }, { type: 'null' }], description: 'SAH-33. The Safety tab count and the banner of the Admitted patients tab, for OWNER, DOCTOR and NURSE (token role and membership role both); null for every other role, which has no Safety tab. The client shows the Safety tab, as the last tab, when safety is not null and items is not empty (mockup sfTabOn), in Trial, On and Read-only state.' }
+        safety: { oneOf: [{ $ref: '#/components/schemas/AdmissionSafety' }, { type: 'null' }], description: 'SAH-33. The Safety tab count and the banner of the Admitted patients tab, for OWNER, DOCTOR and NURSE (token role and membership role both); null for every other role, which has no Safety tab. The client shows the Safety tab, as the last tab, when safety is not null and scope.admitted (M, every ADMITTED admission of the clinic) is above 0 (mockup sfTabOn: ipAdm().length > 0, the clinic count, not the caller''s visible count), in Trial, On and Read-only state. SAH-34 (34C, AC 37): the gate is M, not items, so a scoped NURSE with no ward or no patient in her wards (items empty, scope.visible 0) still reaches the Safety tab and its scope note; for a caller with scope.kind ALL, items holds every admitted patient, so M equals the number of items.' }
         emergency: { $ref: '#/components/schemas/EmergencyCounts', description: 'SAH-28. Second tile "Emergency" (after Beds occupied, before Deposit alerts and Going home today) and the count on the Emergency tab.' }
         bedsTotal: { type: integer }
         bedsOccupied: { type: integer }
@@ -2291,7 +2309,7 @@ components:
         - type: object
           required: [reason, deposits, canCollectDeposit, bill, canAddCharge, canTransfer, transferRules, status, dischargedAt, canStartDischarge, discharge, finalBill, canOpenNursing, vitalsDue, latestEws, canOpenEmr, package]
           properties:
-            package: { oneOf: [{ $ref: '#/components/schemas/AdmissionPackage' }, { type: 'null' }], description: 'SAH-29 (AC2). The admission''s own copy of the package taken when it was attached (ipd.admission package columns); null when the admission has no package. Later changes to the package list never change it. Sent to all four roles (they already see the bill). The sheet draws no separate field for it: the Summary strip shows no new field (AC4); the package shows only as the bill lines of RunningBill. Same value for a DISCHARGED admission (its bill comes from finalBill).' }
+            package: { oneOf: [{ $ref: '#/components/schemas/AdmissionPackage' }, { type: 'null' }], description: 'SAH-29 (AC2). The admission''s own copy of the package taken when it was attached (ipd.admission package columns); null when the admission has no package. Later changes to the package list never change it. Sent to all four roles (they already see the bill). The sheet draws no separate field for it: the Summary strip shows no new field (AC4); the package shows only as the bill lines of RunningBill. Same value for a DISCHARGED admission (its bill comes from finalBill). The package name is never logged and never put in audit before_json or after_json as free text (AdmissionPackage).' }
             canOpenEmr: { type: boolean, description: 'SAH-31 (AC1, OQ-31-7; ADR-009 D11). Shows the footer button "EMR" (emr icon) of the admission sheet, which opens the EMR sheet (GET /admissions/{id}/emr): true when the token role and the role re-read from the active membership are both OWNER, DOCTOR or NURSE, the admission is ADMITTED and IPD is Trial, On or Read-only (Read-only added to the story so a doctor can still read and stop medicines; ADR-009 Q6); false otherwise, and always false for a DISCHARGED admission and for FRONT_DESK, BILLING and every other role.' }
             canOpenNursing: { type: boolean, description: 'SAH-30. Shows the footer button "Nursing" (nurse icon) that opens the Nursing sheet: true for OWNER, NURSE and DOCTOR in Trial, On and Read-only state, for an ADMITTED or a DISCHARGED admission (AC1, AC11); false for every other role. Whether the sheet can save is NursingSheet.canRecord.' }
             vitalsDue: { type: [boolean, 'null'], description: 'SAH-30 (AC10), for the later patient card. True when the admission is ADMITTED and has no vitals, or the whole minutes from its latest vitals recordedAt to the read time (the database clock, clock_timestamp(), never the application clock; review M1) (rounded down) are more than 240 (mockup pcDue); false otherwise and always false for a DISCHARGED admission. Null for a role without vitals access (FRONT_DESK; ADR-006 Q6). The Nursing sheet shows no flag for it.' }
@@ -2329,7 +2347,7 @@ components:
         doctorShortName: { type: [string, 'null'], description: First two words of the doctor's name. Set when occupied. }
         depositLow: { type: [boolean, 'null'], description: SAH-25. Set when occupied. }
         goingHomeToday: { type: [boolean, 'null'], description: 'SAH-27. Set when occupied: same rule as AdmissionRow.goingHomeToday. Shows the flag "Going home today" on the bed tile, before "Deposit low".' }
-        outsideScope: { type: boolean, description: 'SAH-34 (34B, AC 9; OQ-34-6). Present and true only for an occupied bed whose patient is outside the caller''s scope; then admissionId, patientName, dayNumber, doctorShortName, depositLow and goingHomeToday are null (absent from the data, not hidden by the screen) and the tile shows the status "Occupied" only, with no action on the patient. Absent for every other bed and for every caller whose scope is all.' }
+        outsideScope: { type: boolean, description: 'SAH-34 (34B, AC 9; OQ-34-6). Present and true only for an occupied bed whose patient is outside the caller''s scope; then admissionId, patientName, dayNumber, doctorShortName, depositLow and goingHomeToday are null (absent from the data, not hidden by the screen) and the tile shows the bed code, the category and the status "Occupied" only (no name, day, doctor or flag). The tile does nothing on click: it opens no sheet and calls nothing; it stays in the tab order marked aria-disabled, like other tiles with no action. Absent (never false) for every other bed and for every caller whose scope is all.' }
     BoardRoom:
       type: object
       required: [id, name, beds]
@@ -2422,10 +2440,10 @@ components:
         alertPercent: { type: integer }
     AdmissionPackage:
       type: object
-      description: 'SAH-29 (AC2). The copy of a package kept on one admission (ipd.admission.package_name, package_price_paise, package_days; all three set or none). Not a link to ipd.package: changing or switching off the package later never changes it.'
+      description: 'SAH-29 (AC2). The copy of a package kept on one admission (ipd.admission.package_name, package_price_paise, package_days; all three set or none). Not a link to ipd.package: changing or switching off the package later never changes it. AdmissionDetail.package is this named schema or null (no inline object). Privacy rule (SAH-29 code review #3, security review S-3): on an admission a package name can imply a procedure, so it is treated like clinical text. A package name is never written to an application log line, and never put in an audit after_json or before_json as free text; when a write that attaches a package to an admission is added (none exists yet: sahaj_app has no grant on the three columns), its audit records ids, pricePaise and includedDays only. It is sent only in answers that already carry the bill (the same four roles), and toString of the Java views hides it.'
       required: [name, pricePaise, includedDays]
       properties:
-        name: { type: string, minLength: 1, maxLength: 80, description: 'Package name as it was when attached. Not patient data.' }
+        name: { type: string, minLength: 1, maxLength: 80, description: 'Package name as it was when attached. On screen only (the bill line "Package · <name> …"); never logged, never in audit before_json or after_json.' }
         pricePaise: { type: integer, minimum: 0, maximum: 100000000, multipleOf: 100, description: 'Package price in paise, whole rupees (at most ₹10,00,000).' }
         includedDays: { type: integer, minimum: 0, maximum: 60, description: 'Bed days included; 0 = day-care (the bill counts it as 1 bed day).' }
     IpdPackage:
@@ -2995,16 +3013,16 @@ components:
         canCallSenior: { type: boolean, description: 'status OPEN and both roles NURSE.' }
     SafetyCounts:
       type: object
-      description: 'SAH-33. Counts only, no names (ADR-005 D3). Escalations of ADMITTED admissions of the clinic; from SAH-35 also the dose slots of the Medicine round (ADR-012 D3). The Safety tab number is open + dosesLate (+ PharmacistChecksSummary.waiting for OWNER), hidden at 0 (mockup sfCount).'
+      description: 'SAH-33. Counts only, no names (ADR-005 D3). Escalations of ADMITTED admissions of the clinic; from SAH-35 also the dose slots of the Medicine round (ADR-012 D3). The Safety tab number is open + dosesLate (+ PharmacistChecksSummary.waiting + emergencyAccessWaiting for OWNER; SAH-34 AC 71, OQ-34-30), hidden at 0 (mockup sfCount).'
       required: [open, pastTarget, dosesDue, dosesLate, changeToken, asOf]
       properties:
-        open: { type: integer, minimum: 0, description: 'Escalations with status OPEN or ACK. Part of the number next to the Safety tab name (with dosesLate, and waiting for OWNER) and the tile "Escalations open"; always equal to the rows of SafetyBoard.escalations that are not DONE.' }
+        open: { type: integer, minimum: 0, description: 'Escalations with status OPEN or ACK. Part of the number next to the Safety tab name (with dosesLate, and waiting and emergencyAccessWaiting for OWNER) and the tile "Escalations open"; always equal to the rows of SafetyBoard.escalations that are not DONE.' }
         dosesDue: { type: integer, minimum: 0, description: 'SAH-35. Dose slots of today in state DUE (from 60 whole minutes before to 60 whole minutes after the slot time, no dose record) of ACTIVE orders of ADMITTED admissions (DoseSlots, ADR-011 D2; ADR-012 D1). LATE slots are not included. The tile "Doses due or overdue" shows dosesDue + dosesLate. Not added to the tab number (OQ-35-3). Always the full count, also when MedicineRound.truncated is true.' }
         dosesLate: { type: integer, minimum: 0, description: 'SAH-35. Dose slots of today in state LATE (more than 60 whole minutes after the slot time, no dose record) of ACTIVE orders of ADMITTED admissions. The tile small text "<dosesLate> overdue" ("0 overdue" when none; the figure in crit when above 0) and the dose term of the tab number. Always the full count.' }
         pastTarget: { type: integer, minimum: 0, description: 'Escalations with pastTarget true.' }
         changeToken: { type: string, minLength: 22, maxLength: 22, pattern: '^[A-Za-z0-9_-]{22}$', description: 'SAH-33 review fix (code review SAH-33 item 2, ADR-007 R1). Opaque; the client only compares it for equality with the last one it saw and reloads the board or the banner when it, open or pastTarget differ. Computed from the same snapshot as open and pastTarget: a hash of the id and version of every escalation counted in open (status OPEN or ACK of ADMITTED admissions), with no name, score or text in it (ADR-007 R1 gives the exact rule). It changes when such an escalation is raised, acknowledged, closed, re-opened or gets a higher score; not on a senior call (version unchanged) and not when only the minutes pass. SAH-35 (ADR-012 D3): the sorted lines also hold one line per dose slot counted in dosesDue or dosesLate (all of them, not only the 200 rows), "dose:<order id lower case>:<slotAt as epoch seconds>:<LATE or DUE>", with the same join, SHA-256, 16 bytes and base64url; with no dose in the window the token is the SAH-33 token. It then also changes when a dose is recorded by anyone, a slot enters the window or turns from DUE to LATE, or an order or admission with a slot in the window starts or ends; not when only lateHours grows. No name, medicine or text is in it.' }
         asOf: { type: string, format: date-time, description: 'Database clock the counts were computed at.' }
-        emergencyAccessWaiting: { type: integer, minimum: 0, description: 'SAH-34 (34F, AC 64, AC 71; OQ-34-30, a deviation from the mockup''s sfCount). OWNER only (token role and membership role); absent for every other role. Emergency access grants of the clinic with no review yet (also expired, discharged or of an inactive grantee). The same figure as the tile "Emergency access", SafetyBoard.emergencyAccess.waiting and the panel rows; added to the OWNER''s Safety tab number (open + dosesLate + PharmacistChecksSummary.waiting + emergencyAccessWaiting). For OWNER the changeToken also holds one sorted line "bg:<grant id lower case>" per unreviewed grant, so a new grant or a review changes it.' }
+        emergencyAccessWaiting: { type: integer, minimum: 0, description: 'SAH-34 (34F, AC 64, AC 71; OQ-34-30, a deviation from the mockup''s sfCount). OWNER only (token role and membership role); absent for every other role. Emergency access grants of the clinic with no review yet (also expired, discharged or of an inactive grantee). The same figure as the tile "Emergency access", SafetyBoard.emergencyAccess.waiting and the panel rows; added to the OWNER''s Safety tab number (open + dosesLate + PharmacistChecksSummary.waiting + emergencyAccessWaiting). For OWNER, when at least one grant is unreviewed, the changeToken also holds exactly one sorted line "bg:<count>:<newest grant id lower case>", where count is this figure (decimal, no padding) and the newest grant is the unreviewed one with the latest opened_at, then the highest id (order by opened_at desc, id desc limit 1, partial index ix_emergency_access_grant_unreviewed); with none unreviewed there is no bg line (SAH-34 security review finding 4, 10 Nov 2026, replacing the earlier one line per unreviewed grant, which read every id). A new grant changes the newest id; a review alone lowers the count; so a new grant or a review changes it. Same hash, length and pattern as before; clients compare for equality only and need no change (every OWNER token differs once after the deploy, which costs one reload).' }
     SafetyBannerItem:
       type: object
       required: [escalationId, admissionId, patientName, ewsScore]
@@ -3023,7 +3041,8 @@ components:
         Safety tab. With pastTarget empty there is no banner. SAH-35 (ADR-012 D3): counts carries dosesDue and
         dosesLate from the same function as GET /safety and GET /safety/summary (GET /admissions runs the two
         dose reads for OWNER, DOCTOR and NURSE only, without names), so the Safety tab number (counts.open +
-        counts.dosesLate, plus waiting for OWNER) is right on page load and the change token equals the
+        counts.dosesLate, plus waiting and counts.emergencyAccessWaiting for OWNER, SAH-34 AC 71) is right on
+        page load and the change token equals the
         summary's at the same snapshot. When the summary's changeToken differs on this tab the client reloads
         GET /admissions, at most once per 60-second poll. SAH-36 (ADR-013 D7): while the Admitted tab is shown
         and the browser tab is visible, the client reloads GET /admissions itself every 60 seconds and takes the
@@ -3071,7 +3090,7 @@ components:
         target in other wards. Tell the doctor now, or use Emergency access if you must act." (no names).
       required: [state, view, asOf, counts, yourPatients, responseActions, escalations, medicineRound]
       properties:
-        scope: { $ref: '#/components/schemas/SafetyScope', description: 'SAH-34 (34B AC 19, 34C AC 37). view NURSE only; absent for view DOCTOR (OWNER and DOCTOR are never narrowed, AC 18).' }
+        scope: { $ref: '#/components/schemas/SafetyScope', description: 'SAH-34 (34B AC 19, 34C AC 37). Sent for view NURSE only (with kind ALL when the switch is off, or WARDS); absent for view DOCTOR, that is OWNER and DOCTOR, who are never narrowed (AC 18).' }
         emergencyAccess: { $ref: '#/components/schemas/EmergencyAccessReviewPage', description: 'SAH-34 (34F). OWNER only (token role and membership role); absent for every other role, which never receives the tile or the panel. The first page (up to 25 rows, oldest first) read in the board''s transaction; waiting equals counts.emergencyAccessWaiting.' }
         otherWardsPastTarget:
           type: integer
@@ -4001,7 +4020,7 @@ components:
       type: object
       required: [admissionId, reasonKey, confirmed]
       additionalProperties: false
-      description: 'SAH-34. There is no duration, start, end, patient or user field: the server sets them (a duration or time sent by a client is refused by additionalProperties false, 400 bad-request).'
+      description: 'SAH-34. There is no duration, start, end, patient or user field: the server sets them. A field not listed here (for example a duration or a time sent by a client), or a body that is not a JSON object, is refused with 400 malformed-request (type https://sahaj.in/problems/malformed-request, title "Request could not be read", detail "The request body is missing or is not valid JSON.", no fieldErrors; the unknown name is never echoed). bad-request is only for a path value that is not a UUID.'
       properties:
         admissionId: { type: string, format: uuid, description: 'EmergencyAccessPatient.admissionId. Missing or not a UUID: field admissionId "Choose a patient."' }
         reasonKey: { $ref: '#/components/schemas/EmergencyAccessReasonKey', description: 'Missing or another value: field reasonKey "Choose a reason for emergency access."' }
@@ -4079,6 +4098,7 @@ components:
       x-needs-human: 'Screen not in the mockup yet (34A).'
       required: [membershipIds]
       additionalProperties: false
+      description: 'SAH-34. A field not listed here, or a body that is not a JSON object: 400 malformed-request (no fieldErrors; the name is never echoed).'
       properties:
         membershipIds: { type: array, maxItems: 100, uniqueItems: true, items: { type: string, format: uuid }, description: 'The whole new set of nurses of the ward (empty removes every nurse). Each must be an active NURSE member: field membershipIds "Choose nurses from the list."' }
     WardScopeInput:
@@ -4086,5 +4106,6 @@ components:
       x-needs-human: 'Screen not in the mockup yet (34A).'
       required: ['on']
       additionalProperties: false
+      description: 'SAH-34. A field not listed here, or a body that is not a JSON object: 400 malformed-request (no fieldErrors; the name is never echoed).'
       properties:
         'on': { type: boolean, description: 'true = nurses see only their wards. Not a JSON boolean: field on "Choose on or off".' }

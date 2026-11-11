@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.platform.devtools.it.DevToolsCleanupAfterCallbackIT
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.056 s -- in com.sahaj.platform.devtools.it.DevToolsCleanupAfterCallbackIT
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.037 s -- in com.sahaj.platform.devtools.it.DevToolsCleanupAfterCallbackIT

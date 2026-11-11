@@ -29,6 +29,14 @@ class JdbcAdmissionQueriesTest {
     }
 
     @Test
+    void bothListsAndTheSingleReadSelectThePackageCopyColumnsOfTheAdmissionRow() {
+        for (String sql : new String[] {JdbcAdmissionRepository.FIND_ADMITTED,
+                JdbcAdmissionRepository.FIND_ADMITTED_WITH_PLACEMENT}) {
+            assertThat(sql).contains("a.package_name, a.package_price_paise, a.package_days");
+        }
+    }
+
+    @Test
     void thePlacementListAddsItsColumnsAfterTheAdmissionColumns() {
         String sql = JdbcAdmissionRepository.FIND_ADMITTED_WITH_PLACEMENT;
 

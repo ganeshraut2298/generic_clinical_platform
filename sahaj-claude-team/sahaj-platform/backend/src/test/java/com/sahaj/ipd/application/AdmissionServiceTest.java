@@ -95,6 +95,7 @@ class AdmissionServiceTest {
     private SafetyService safety;
     private PatientClinicalPort clinicalPatients;
     private AdmissionService service;
+    private ScopeGuard guard;
     private BedRow freeBed;
 
     @BeforeEach
@@ -121,11 +122,12 @@ class AdmissionServiceTest {
         when(vitals.findLatestOfAdmitted(TENANT)).thenReturn(Map.of());
         when(vitals.databaseNow()).thenReturn(DB_NOW);
         IpdCatalog catalog = new IpdCatalog(settings);
+        guard = ScopeStubs.unscoped();
         service = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team, patients,
                 patientAccess, actors, new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
                 catalog, charges, new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
                 emergency, vitals, new AdmittedCards(clinicalPatients, patients, vitals, safety),
-                new CardSetups(mock(CardSetupRepository.class)));
+                new CardSetups(mock(CardSetupRepository.class)), guard, ScopeStubs.repository());
 
         state("on");
         freeBed = new BedRow(BED, WARD, null, "101-A", "gen", "free");
@@ -1480,5 +1482,191 @@ class AdmissionServiceTest {
 
         assertThat(service.emrHeader(TENANT, row("Self", "planned", "gen", 1_000_000L)).doctorName())
                 .isEqualTo("Doctor");
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void detailOutsideScopeIsRefusedWithNoRecordAccess() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmission(eq(TENANT), eq(ACTOR), eq("NURSE"), any(),
+                eq(ADMISSION), anyString());
+
+        assertThatThrownBy(() -> service.detail(TENANT, ACTOR, "NURSE", ADMISSION))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verify(patientAccess, never()).recordOpened(any(), any(), any());
+        verify(patients, never()).find(any(), any());
+    }
+
+    @Test
+    void depositOutsideScopeWritesNothing() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("OWNER"),
+                any(), eq(ADMISSION), anyString());
+
+        assertThatThrownBy(() -> service.addDeposit(TENANT, ACTOR, "OWNER", ADMISSION, 10_000L, "UPI"))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verify(wards).lockTenant(TENANT);
+        verify(admissions, never()).insertDeposit(any(), any(), anyLong(), anyString(), any());
+        verify(auditLog, never()).record(anyString(), anyString(), any(), any(), any());
+        verify(patientAccess, never()).recordOpened(any(), any(), any());
+    }
+
+    @Test
+    void chargeOutsideScopeWritesNothing() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("NURSE"),
+                any(), eq(ADMISSION), anyString());
+
+        assertThatThrownBy(() -> service.addCharge(TENANT, ACTOR, "NURSE", ADMISSION, ChargeServices.ALL.get(0).key()))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verify(charges, never()).insert(any(), any(), anyString(), anyString(), anyLong(), any());
+        verify(auditLog, never()).record(anyString(), anyString(), any(), any(), any());
+        verify(patientAccess, never()).recordOpened(any(), any(), any());
+    }
+
+    @Test
+    void theOutsideScopeAnswerComesAfterTheNotFoundAndBeforeNotAdmitted() {
+        AdmissionRow discharged = new AdmissionRow(ADMISSION, "IP/26-27/0042", PATIENT, BED, "101-A", "gen",
+                "General ward", DOCTOR, "planned", "Self", "x", "DISCHARGED", ADMITTED_AT, 0);
+        when(admissions.find(TENANT, ADMISSION)).thenReturn(Optional.of(discharged));
+        doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("OWNER"),
+                any(), eq(ADMISSION), anyString());
+
+        assertThatThrownBy(() -> service.addDeposit(TENANT, ACTOR, "OWNER", ADMISSION, 10_000L, "UPI"))
+                .isInstanceOf(OutsideScopeException.class);
+
+        UUID unknown = UUID.randomUUID();
+        when(admissions.find(TENANT, unknown)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.addDeposit(TENANT, ACTOR, "OWNER", unknown, 10_000L, "UPI"))
+                .isInstanceOf(NotFoundException.class);
+        verify(guard, never()).requireAdmissionLocked(any(), any(), any(), any(), eq(unknown), anyString());
+    }
+
+    private static PatientScope nurseScope(java.util.Set<UUID> wardIds, Map<UUID, Instant> grants, UUID membership) {
+        return new PatientScope(wardIds.isEmpty() ? PatientScope.Kind.NONE : PatientScope.Kind.WARDS, ACTOR, "NURSE",
+                "NURSE", membership, wardIds, grants);
+    }
+
+    private AdmissionRow otherPatientRow(UUID id, UUID patient) {
+        return new AdmissionRow(id, "IP/26-27/0099", patient, UUID.randomUUID(), "202-B", "gen", "ICU", DOCTOR,
+                "planned", "Self", "x", "ADMITTED", ADMITTED_AT, 1_000_000L);
+    }
+
+    @Test
+    void aScopedNurseListHoldsOnlyHerWardsAndNothingElseIsReadForTheOthers() {
+        UUID otherWard = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        UUID otherPatient = UUID.randomUUID();
+        when(beds.findAll(TENANT)).thenReturn(List.of(freeBed));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(List.of(
+                new AdmittedRow(row("Self", "planned", "gen", 1_000_000L), WARD, null),
+                new AdmittedRow(otherPatientRow(otherId, otherPatient), otherWard, null)));
+        when(guard.scopeWithMembership(TENANT, ACTOR, "NURSE", "NURSE"))
+                .thenReturn(nurseScope(java.util.Set.of(WARD), Map.of(), UUID.randomUUID()));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known")));
+        when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
+                new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
+
+        AdmissionList list = listAs("NURSE", "ADMITTED");
+
+        assertThat(list.items()).extracting(i -> i.id()).containsExactly(ADMISSION);
+        assertThat(list.scope().kind()).isEqualTo("WARDS");
+        assertThat(list.scope().visible()).isEqualTo(1);
+        assertThat(list.scope().admitted()).isEqualTo(2);
+        assertThat(list.scope().hasWard()).isTrue();
+        assertThat(list.scope().canOpenEmergencyAccess()).isTrue();
+        assertThat(list.items().get(0).mine()).isTrue();
+        assertThat(list.items().get(0).emergencyAccess()).isNull();
+        verify(clinicalPatients).findAll(eq(TENANT), eq(java.util.Set.of(PATIENT)));
+        verify(clinicalPatients, never()).findAll(eq(TENANT), eq(java.util.Set.of(otherPatient)));
+    }
+
+    @Test
+    void aGrantedPatientOutsideHerWardsIsListedWithHerOwnEmergencyAccessFlagAndNotMine() {
+        UUID otherWard = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        UUID otherPatient = UUID.randomUUID();
+        Instant ends = Instant.parse("2026-11-11T06:00:00Z");
+        when(beds.findAll(TENANT)).thenReturn(List.of(freeBed));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(List.of(
+                new AdmittedRow(row("Self", "planned", "gen", 1_000_000L), WARD, null),
+                new AdmittedRow(otherPatientRow(otherId, otherPatient), otherWard, null)));
+        when(guard.scopeWithMembership(TENANT, ACTOR, "NURSE", "NURSE"))
+                .thenReturn(nurseScope(java.util.Set.of(WARD), Map.of(otherId, ends), UUID.randomUUID()));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known"),
+                otherPatient, new PatientClinical(otherPatient, "UH-0002", "Other Patient", 30, "F", null)));
+        when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
+                new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
+
+        AdmissionList list = listAs("NURSE", "ADMITTED");
+
+        assertThat(list.items()).extracting(i -> i.id()).containsExactlyInAnyOrder(ADMISSION, otherId);
+        AdmissionViews.AdmittedPatientRow granted = list.items().stream().filter(i -> i.id().equals(otherId))
+                .findFirst().orElseThrow();
+        assertThat(granted.emergencyAccess().expiresAt()).isEqualTo(ends);
+        assertThat(granted.mine()).isFalse();
+        assertThat(list.scope().visible()).isEqualTo(2);
+    }
+
+    @Test
+    void aNurseWithNoWardSeesAnEmptyListAndHasWardFalseAndStillMayOpenEmergencyAccess() {
+        when(beds.findAll(TENANT)).thenReturn(List.of(freeBed));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row("Self", "planned", "gen", 0)));
+        when(guard.scopeWithMembership(TENANT, ACTOR, "NURSE", "NURSE"))
+                .thenReturn(nurseScope(java.util.Set.of(), Map.of(), UUID.randomUUID()));
+
+        AdmissionList list = listAs("NURSE", "ADMITTED");
+
+        assertThat(list.items()).isEmpty();
+        assertThat(list.scope().kind()).isEqualTo("WARDS");
+        assertThat(list.scope().hasWard()).isFalse();
+        assertThat(list.scope().visible()).isZero();
+        assertThat(list.scope().admitted()).isEqualTo(1);
+        assertThat(list.scope().canOpenEmergencyAccess()).isTrue();
+        verify(clinicalPatients, never()).findAll(any(), any());
+    }
+
+    @Test
+    void anUnscopedNurseHasKindAllHasWardMineByWardAndNoEmergencyAccessButton() {
+        when(beds.findAll(TENANT)).thenReturn(List.of(freeBed));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row("Self", "planned", "gen", 0)));
+        when(guard.scopeWithMembership(TENANT, ACTOR, "NURSE", "NURSE")).thenReturn(
+                PatientScope.all(ACTOR, "NURSE", "NURSE", UUID.randomUUID(), java.util.Set.of(WARD)));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known")));
+        when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
+                new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
+
+        AdmissionList list = listAs("NURSE", "ADMITTED");
+
+        assertThat(list.scope().kind()).isEqualTo("ALL");
+        assertThat(list.scope().hasWard()).isTrue();
+        assertThat(list.scope().canOpenEmergencyAccess()).isFalse();
+        assertThat(list.items().get(0).mine()).isTrue();
+        assertThat(list.items().get(0).emergencyAccess()).isNull();
+    }
+
+    @Test
+    void mineIsTheAdmittingDoctorForOwnerAndDoctorAndAbsentForFrontDesk() {
+        when(beds.findAll(TENANT)).thenReturn(List.of(freeBed));
+        when(admissions.findAdmittedWithPlacement(TENANT)).thenReturn(placed(row("Self", "planned", "gen", 0)));
+        when(clinicalPatients.findAll(eq(TENANT), any())).thenReturn(Map.of(PATIENT, clinical("None known")));
+        when(team.findAll(eq(TENANT), any())).thenReturn(Map.of(DOCTOR,
+                new TeamMember(DOCTOR, "Dr Test", "DOCTOR", true, 0)));
+        for (String role : new String[] {"OWNER", "DOCTOR"}) {
+            when(guard.scopeWithMembership(TENANT, ACTOR, role, role))
+                    .thenReturn(PatientScope.all(ACTOR, role, role, DOCTOR, java.util.Set.of()));
+            AdmissionList mine = listAs(role, "ADMITTED");
+            assertThat(mine.items().get(0).mine()).as(role).isTrue();
+            assertThat(mine.scope().kind()).isEqualTo("ALL");
+            assertThat(mine.scope().hasWard()).isNull();
+            assertThat(mine.scope().canOpenEmergencyAccess()).isFalse();
+            when(guard.scopeWithMembership(TENANT, ACTOR, role, role))
+                    .thenReturn(PatientScope.all(ACTOR, role, role, UUID.randomUUID(), java.util.Set.of()));
+            assertThat(listAs(role, "ADMITTED").items().get(0).mine()).as(role + " not the admitting doctor").isFalse();
+        }
+        when(guard.scopeWithMembership(TENANT, ACTOR, "FRONT_DESK", "FRONT_DESK"))
+                .thenReturn(PatientScope.all(ACTOR, "FRONT_DESK", "FRONT_DESK", UUID.randomUUID(), java.util.Set.of()));
+        assertThat(listAs("FRONT_DESK", "ADMITTED").items().get(0).mine()).isNull();
     }
 }

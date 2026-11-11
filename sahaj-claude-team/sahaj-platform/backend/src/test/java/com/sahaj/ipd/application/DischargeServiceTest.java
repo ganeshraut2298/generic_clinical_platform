@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.sahaj.ipd.application.AdmissionRepository.AdmissionRow;
+import com.sahaj.ipd.application.AdmissionRepository.PackageCopy;
 import com.sahaj.ipd.application.AdmissionViews.Detail;
 import com.sahaj.ipd.application.BedRepository.BedRow;
 import com.sahaj.ipd.application.DischargeRepository.DischargeRow;
@@ -95,10 +96,12 @@ class DischargeServiceTest {
     private EscalationRepository escalations;
     private ClinicalEventRepository events;
     private DischargeService service;
+    private ScopeGuard guard;
 
     private long deposits = 1_000_000L;
     private String reason = REASON;
     private String admissionType = "planned";
+    private PackageCopy packageCopy;
     private boolean discharged;
 
     @BeforeEach
@@ -123,11 +126,13 @@ class DischargeServiceTest {
         IpdCatalog catalog = new IpdCatalog(settings);
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
         IpdBilling billing = new IpdBilling(charges, transfers, catalog);
+        guard = ScopeStubs.unscoped();
         AdmissionService sheets = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team,
                 patients, patientAccess, actors, gate, catalog, charges, billing, discharges,
-                mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class));
+                mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class),
+                guard, ScopeStubs.repository());
         service = new DischargeService(admissions, beds, wards, settings, discharges, ownerGuard, auditLog, team,
-                patients, patientAccess, actors, followUps, gate, catalog, billing, sheets, escalations, events);
+                patients, patientAccess, actors, followUps, gate, catalog, billing, sheets, escalations, events, guard);
 
         state("on");
         when(settings.findCategories(TENANT)).thenReturn(List.of());
@@ -160,7 +165,7 @@ class DischargeServiceTest {
     private AdmissionRow row() {
         return new AdmissionRow(ADMISSION, "IP/26-27/0042", PATIENT, BED, "101-A", "gen", "General ward", DOCTOR,
                 admissionType, "Self", reason, discharged ? "DISCHARGED" : "ADMITTED", ADMITTED_AT, deposits,
-                discharged ? NOW : null);
+                discharged ? NOW : null, packageCopy);
     }
 
     private void signed(String type, String template) {
@@ -405,6 +410,16 @@ class DischargeServiceTest {
     void theSpecialtyIsNullWhenTheDoctorHasNone() {
         when(team.doctorSpecialty(TENANT, DOCTOR)).thenReturn(Optional.empty());
         assertThat(service.sheet(TENANT, ACTOR, "NURSE", ADMISSION).preview().doctorSpecialty()).isNull();
+    }
+
+    @Test
+    void anAdmissionWithAPackageStartsOnTheSurgicalTemplateUnlessSetupOrTheTypeSaysOtherwise() {
+        packageCopy = new PackageCopy("Appendicectomy", 4_500_000L, 3);
+        assertThat(service.sheet(TENANT, ACTOR, "OWNER", ADMISSION).defaultTemplateKey()).isEqualTo("surgical");
+        admissionType = "maternity";
+        assertThat(service.sheet(TENANT, ACTOR, "OWNER", ADMISSION).defaultTemplateKey()).isEqualTo("maternity");
+        admissionType = "daycare";
+        assertThat(service.sheet(TENANT, ACTOR, "OWNER", ADMISSION).defaultTemplateKey()).isEqualTo("daycare");
     }
 
     @Test
@@ -1007,10 +1022,10 @@ class DischargeServiceTest {
         AdmissionService sheets = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team,
                 mock(PatientLookupPort.class), patientAccess, mock(ActorDirectoryPort.class), gate, catalog,
                 mock(ChargeRepository.class), billing, discharges, mock(EmergencyService.class),
-                mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class));
+                mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class), ScopeStubs.unscoped(), ScopeStubs.repository());
         DischargeService lateService = new DischargeService(admissions, beds, wards, settings, discharges, ownerGuard,
                 auditLog, team, mock(PatientLookupPort.class), patientAccess, mock(ActorDirectoryPort.class),
-                followUps, gate, catalog, billing, sheets, escalations, events);
+                followUps, gate, catalog, billing, sheets, escalations, events, guard);
         deposits = 0L;
         // Admitted 9 Nov 11:00 IST; at 11 Nov 00:30 IST the midnight cut is day 3 as well.
         stubFrozenRows(BILL, 0L, "UPI");
@@ -1397,5 +1412,41 @@ class DischargeServiceTest {
         assertThat(service.sheet(TENANT, ACTOR, "FRONT_DESK", ADMISSION).openEscalation()).isTrue();
         escalationIs("ACK");
         assertThat(service.sheet(TENANT, ACTOR, "OWNER", ADMISSION).openEscalation()).isTrue();
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void sheetOutsideScopeIsRefused() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmission(eq(TENANT), eq(ACTOR), eq("NURSE"), any(),
+                eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.sheet(TENANT, ACTOR, "NURSE", ADMISSION))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verifyNothingWritten();
+    }
+
+    @Test
+    void signoffOutsideScopeWritesNothing() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("DOCTOR"),
+                any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.signoff(TENANT, ACTOR, "DOCTOR", ADMISSION,
+                new SignoffInput("normal", "general"))).isInstanceOf(OutsideScopeException.class);
+
+        verifyNothingWritten();
+    }
+
+    @Test
+    void dischargeOutsideScopeWritesNothing() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("OWNER"),
+                any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> discharge("OWNER", input("normal", "general", BILL, "UPI")))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verifyNothingWritten();
+        verify(beds, never()).findForUpdate(any(), any());
     }
 }

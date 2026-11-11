@@ -12,6 +12,7 @@ import {
   BedBoard,
   ChargeService,
   ChargeServiceKey,
+  PackageList,
   PayMode,
   TransferRules,
 } from './ipd.model';
@@ -23,7 +24,7 @@ import {
   DischargeSignoffInput,
 } from './discharge.model';
 
-/** The only place that calls the `/ipd` endpoints of SAH-23 to SAH-27 (rules, options, admissions, deposits, charges, transfer, board, discharge). */
+/** The only place that calls the `/ipd` endpoints of SAH-23 to SAH-27 and SAH-29 (rules, packages, options, admissions, deposits, charges, transfer, board, discharge). */
 @Injectable({ providedIn: 'root' })
 export class AdmissionsApi {
   private readonly http = inject(HttpClient);
@@ -93,6 +94,11 @@ export class AdmissionsApi {
 
   transfer(id: string, toBedId: string): Observable<AdmissionDetail> {
     return this.http.post<AdmissionDetail>(`${this.baseUrl}/admissions/${id}/transfer`, { toBedId });
+  }
+
+  /** SAH-29. Read-only: the clinic's active packages. There is no create, change or attach call in this slice. */
+  packages(): Observable<PackageList> {
+    return this.http.get<PackageList>(`${this.baseUrl}/packages`);
   }
 
   board(): Observable<BedBoard> {

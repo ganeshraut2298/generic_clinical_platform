@@ -84,6 +84,33 @@ class SafetyRowsTest {
     }
 
     @Test
+    void theOwnerTokenGainsOneBgLineOnlyWhenGrantsWaitAndChangesWithTheCountAndTheNewestId() {
+        Detail one = detail(ID_1, 3, Status.OPEN, 8, NOW, 0);
+        UUID newest = UUID.fromString("AAAAAAAA-0000-4000-8000-000000000001");
+        UUID other = UUID.fromString("BBBBBBBB-0000-4000-8000-000000000002");
+        String plain = counts(List.of(one), NOW).changeToken();
+
+        Counts none = SafetyRows.counts(List.of(one), MedicineRound.empty(), NOW,
+                new WardScopeRepository.UnreviewedMark(0, null));
+        Counts two = SafetyRows.counts(List.of(one), MedicineRound.empty(), NOW,
+                new WardScopeRepository.UnreviewedMark(2, newest));
+        Counts three = SafetyRows.counts(List.of(one), MedicineRound.empty(), NOW,
+                new WardScopeRepository.UnreviewedMark(3, newest));
+        Counts twoOther = SafetyRows.counts(List.of(one), MedicineRound.empty(), NOW,
+                new WardScopeRepository.UnreviewedMark(2, other));
+
+        assertThat(none.changeToken()).isEqualTo(plain);
+        assertThat(none.emergencyAccessWaiting()).isZero();
+        assertThat(two.emergencyAccessWaiting()).isEqualTo(2);
+        assertThat(two.changeToken()).hasSize(22).isNotEqualTo(plain);
+        assertThat(three.changeToken()).isNotEqualTo(two.changeToken());
+        assertThat(twoOther.changeToken()).isNotEqualTo(two.changeToken());
+        assertThat(SafetyRows.changeToken(List.of(one), List.of("bg:2:" + newest.toString().toLowerCase())))
+                .isEqualTo(two.changeToken());
+        assertThat(counts(List.of(one), NOW).emergencyAccessWaiting()).isNull();
+    }
+
+    @Test
     void theTokenDoesNotChangeOnASeniorCallOrWhenOnlyTimePasses() {
         Detail before = detail(ID_1, 3, Status.OPEN, 8, NOW, 0);
         Detail afterCall = detail(ID_1, 3, Status.OPEN, 8, NOW, 5);

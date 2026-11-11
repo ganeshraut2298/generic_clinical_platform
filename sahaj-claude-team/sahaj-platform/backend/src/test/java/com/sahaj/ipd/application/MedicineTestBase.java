@@ -68,6 +68,8 @@ abstract class MedicineTestBase {
     String allergyText = "None known";
     boolean patientFound = true;
     AdmissionRow admission;
+    /** SAH-34: a guard that reaches every patient; a test replaces its answer to prove a refusal. */
+    ScopeGuard guard = ScopeStubs.unscoped();
 
     @BeforeEach
     void baseSetUp() {

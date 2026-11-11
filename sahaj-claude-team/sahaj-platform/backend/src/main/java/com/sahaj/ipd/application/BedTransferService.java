@@ -50,11 +50,13 @@ public class BedTransferService {
     private final IpdGate gate;
     private final IpdCatalog catalog;
     private final AdmissionService sheets;
+    private final ScopeGuard guard;
 
     BedTransferService(AdmissionRepository admissions, BedRepository beds, WardRepository wards,
                        IpdSettingsRepository settings, TransferRepository transfers, OwnerGuard ownerGuard,
                        AuditLog auditLog, PatientAccessPort patientAccess, IpdGate gate, IpdCatalog catalog,
-                       AdmissionService sheets) {
+                       AdmissionService sheets, ScopeGuard guard) {
+        this.guard = guard;
         this.admissions = admissions;
         this.beds = beds;
         this.wards = wards;
@@ -116,6 +118,9 @@ public class BedTransferService {
         wards.lockTenant(tenantId);
         AdmissionRow found = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        // SAH-34: under the clinic IPD lock, on the bed the patient is in before the move; after the 404, before the
+        // state checks. A move that takes the patient out of the caller's wards still answers 200 to her.
+        guard.requireAdmissionLocked(tenantId, actor, role, null, admissionId, "bed-transfer");
         requireAdmitted(found);
         if (toBedId.equals(found.bedId())) {
             throw new InvalidInputException("toBedId", "The patient is already in this bed. Pick another.");

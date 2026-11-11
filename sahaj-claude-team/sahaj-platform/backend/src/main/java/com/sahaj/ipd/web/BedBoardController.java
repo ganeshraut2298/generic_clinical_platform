@@ -22,24 +22,27 @@ public class BedBoardController {
         this.service = service;
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.LIST)
     @GetMapping("/board")
     @PreAuthorize(AdmissionController.READERS)
     public BedBoard board() {
         ClinicUser user = ClinicUser.current();
-        return service.board(user.tenantId(), user.role());
+        return service.board(user.tenantId(), user.userId(), user.role());
     }
 
+    @ScopeExempt("Bed state only: the board answer is masked by the scope")
     @PostMapping("/beds/{id}/ready")
     @PreAuthorize(AdmissionController.ADMITTERS)
     public BedBoard ready(@PathVariable UUID id) {
         ClinicUser user = ClinicUser.current();
-        return service.markReady(user.tenantId(), user.role(), id);
+        return service.markReady(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeExempt("Bed state only: the board answer is masked by the scope")
     @PostMapping("/beds/{id}/block")
     @PreAuthorize(AdmissionController.ADMITTERS)
     public BedBoard block(@PathVariable UUID id) {
         ClinicUser user = ClinicUser.current();
-        return service.block(user.tenantId(), user.role(), id);
+        return service.block(user.tenantId(), user.userId(), user.role(), id);
     }
 }

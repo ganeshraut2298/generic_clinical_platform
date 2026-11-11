@@ -194,7 +194,7 @@
               <span role="columnheader">Quantity and price</span>
               <span role="columnheader">Amount</span>
             </div>
-            @for (l of a.bill.lines; track l.name) {
+            @for (l of a.bill.lines; track $index) {
               <div class="ipbl" role="row">
                 <span role="cell">{{ l.name }}</span>
                 <span role="cell" class="num faint">

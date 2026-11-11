@@ -37,8 +37,12 @@ public class DevSampleAdminController {
     private final DevEndpointGate gate;
     private final DevSampleAdminService service;
 
-    DevSampleAdminController(DevEndpointGate gate, DevSampleAdminService service) {
-        this.gate = gate;
+    /**
+     * The parameter is named like the bean of {@code DevSampleAdminConfiguration}: with the bootstrap registration on there are
+     * two {@code DevEndpointGate} beans, and Spring then picks the one whose bean name equals the parameter name.
+     */
+    DevSampleAdminController(DevEndpointGate devSampleAdminGate, DevSampleAdminService service) {
+        this.gate = devSampleAdminGate;
         this.service = service;
     }
 

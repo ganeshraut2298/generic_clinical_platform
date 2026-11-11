@@ -69,3 +69,76 @@ Observations outside SAH-37 (shell, not counted): the top bar text "Pune · Mon,
 1. After the fixes, re-run with: `AUDIT_UI=1 AUDIT_OUT=<file> AUDIT_SHOTS=<folder> E2E_PORT=4337 AUDIT_ONLY=1366,375 npx playwright test audit-sah37-ui.spec.ts --project=desktop-1440 --workers=1` from `frontend/e2e` (add `AUDIT_FOCUS=1` for the sticky, realistic-label and BP checks). Take the frontend lock first.
 2. The 404s of the Overview tile in the console come from endpoints that `sah31-world.ts` does not mock (`clinic/profile`, `clinic/holidays`, `specialties`, `opd/fee-settings`, `opd/case-paper-settings`); QA can add them to the world file.
 3. Regression tests to add with the fixes (QA, phase 3): no sideways scroll with a 40-character unbroken label; BP tile does not overlap Pulse; the Fields label box is at least 120 px at 1150 and 375; the preview is not covered by the bar at 1366 with a draft; the bar is static at 375.
+
+## 6. Phase 3 and 5 progress notes (qa-engineer, 9 Nov 2026, written while working)
+- New regression spec `frontend/e2e/sah37-audit-regression.spec.ts`: 16 tests. First run on the fresh production build: 11 passed, 5 failed. All 5 were mistakes in the test (an arrow count of 14 instead of 12, a caret at the start of a box, a hit test below the window, a focus read before the effect ran, a probe under a sticky bar for a stacked preview), not product defects. After the test fixes: desktop-1440 16 of 16, and both projects 32 of 32.
+- `frontend/e2e/serve.mjs` got an `E2E_DIST` variable (unset in every normal run) so a temporary copy of the build with one old rule put back can be served for mutation checks.
+- Full re-measure (`audit-sah37-ui.spec.ts`, all sizes) started; results in section 7 when it ends.
+
+## 7. Re-measure after the fixes (qa-engineer, 9 to 10 Nov 2026)
+
+Method: a fresh production build (`npm --prefix frontend run build`, passed), the same audit spec (`AUDIT_UI=1 AUDIT_FOCUS=1`, all 10 variants: 1920, 1366, 1150, 1024, 768, 375, 125 % zoom of 1920 and of 1366, dark at 1366 and 375, plus the focus pass), run with `--project=desktop-1440 --workers=1`: 13 of 13 ran, 9,869 findings (before the fixes: 8,450 and 7,095 in the two full passes). New screenshots: `docs/test-plans/SAH-37-audit-shots/after-fix/` (52 files, every screen at 1366 and 375 px). I looked at `fields-rows-375`, `admitted-expanded-realistic-375`, `sticky-scroll1500-1366` and `fields-rows-1366`.
+What stayed the same as in the first pass: no page error, no unhandled rejection, no failed asset, no duplicate call on load, no unmocked call on the SAH-37 screens. The 404s in the console are the five Overview setup endpoints that `sah31-world.ts` does not mock (a harness gap, listed in section 5.2), and the forced 500, 409 and lost-connection states. The one script error (`state-admitted-error`, "tab Admitted not found") is the page showing its error without tabs, as in the first pass, and is not a product fault.
+
+### 7.1 Status of every defect
+
+| ID | Sev | Status | After-fix measure | Regression test |
+|---|---|---|---|---|
+| D-1 | 2 | **Fixed** | Label boxes on the Fields tab: 479 to 570 px at 1366 (was 73 and 164), 160 to 228 at 1024, 243 at 375. Never under 120 px at 1920, 1366, 1150, 1024, 768, 375. The editor is above the preview at 1100, 1150, 1200, 1300 (the page is a size container, stacks under 880 px) and beside it at 1920. | `D-1 D-2 every label box ... 120 px`, `D-1 the editor is above the preview` |
+| D-2 | 2 | **Fixed** | At 375 px the label box fills the row (243 px) and the switch, pill and arrows sit under it. "Early warning" no longer breaks word by word (screenshot `fields-rows-375`). | `D-2 the rows are stacked at 375 px` |
+| D-3 | 2 | **Fixed** | At 375 px the status bar is `position: static` and scrolls away (its top is 1103 px at a scroll of 700 and 303 px at 1500: it moves with the page); at 1366 it is sticky. | `D-3 the status bar is sticky at 1366 px and static at 375 px` |
+| D-4 | 2 | **Fixed** | The BP unit is hidden (`display: none`) and the BP tile is 85 px wide: right edge 366, Pulse tile starts at 372 (1366); 110 and 116 (375). Same in the preview. | `D-4 the BP tile does not cover the Pulse tile` |
+| D-5 | 3 | **Fixed** | No sideways scroll on any screen, in any variant, with the 40 W label (first pass: 43 findings, up to 278 px). Admitted, preview and setup page checked at 1366, 1150 and 375. | `D-5` (two tests) |
+| D-6 | 3 | **Fixed for Expanded, new part open (D-17)** | Expanded "Admitted on" is "4 Nov 2026, 9:20 AM IST" in full at 1366, 1024, 768, 375 and in the preview (it wraps to two lines in the narrow column). | `D-6 the Expanded "Admitted on" value shows in full` |
+| D-7 | 3 | **Fixed** | The preview has a maximum height and scrolls inside itself; its last line can be reached at 1366, 1536 and 1920. | `D-8 ...` (reach check) |
+| D-8 | 3 | **Fixed** | Side by side (about 1400 px and wider, 1536 and 1920 measured) the preview starts below the bar, whether the bar has one row or two. Below that the preview is stacked under the editor, so nothing sticks. Consequence for the human: at 1366 and below the live preview is below the editor and is not in view while the owner edits. This follows the approved D-1 decision (stack sooner). | `D-8 the preview is not under the status bar` |
+| D-9 | 3 | **Open, human** | Unchanged: the tokens have not been changed. The pairs and values that pass AA are in DEC-032. | none (tokens) |
+| D-10 | 3 | **Fixed** | Every Move arrow and "Show X" switch of the SAH-37 screens has a title. The only icon buttons without one are shell controls (theme, log out, open menu), outside this story. | (unit tests of the developer) |
+| D-11 | 3 | **CLOSED (10 Nov 2026, DEC-033, option B by default): the tiles no longer jump on the default setup; the test asserts that and passes 3 of 3. Two residuals accepted as Sev-4 (section 9). The text that follows is the finding of the final pass, before the later fixes, kept for the record.** | Reproduced on the rebuilt build: layout shift 0.19 in the regression test and 0.233 in the audit at 375 px (before the fix 0.21 and 0.258), light and dark, 3 of 3 runs. The developer's `reserveLead` keeps two lines for the lead, and that works (the lead stays 38 px while the words are pending), but the lead is not what moves. The "Admit patient" button sits beside the heading while the lead is short (page head 68 px) and wraps under the lead once the long text arrives (124 px): +56 px, the four tiles jump. Probed every frame: 360, 375 and 414 px +56 px; 621 px +56 px (the reserve stops at 620 px); 320 px +19 px (the lead needs three lines, 58 px, not two); 768 px none. Owner: angular-developer. Fix idea: give the actions row its final place from the first paint while `reserveLead` is on (for example `flex-basis: 100%` for the actions block up to about 700 px), and reserve three lines at 340 px and below. `page-head.component.ts`, `ipd.page.html:1-5`. | D-11 test (layout shift under 0.1; tiles stay where first drawn at 375 and 768 px): passes 3 of 3 now; it failed with page head heights 68 > 124 before |
+| D-12 | 3 | **Fixed, one part accepted** | Move arrows are 44 by 44 px on the three tabs. The pill buttons, the leave-dialog buttons and the IPD tabs and "Admit patient" are no longer flagged. The patient-name link is a 20 px box with a 44 px hit area (`::after`, `inset: -12px 0`): a tap 10 px above or below the name reaches it, at 1366 and 375 px. **Decision: accepted.** The hit area is the target the finger meets, and the test proves a tap there reaches the name. (Whether it overlaps a neighbouring control was not measured; the 12 px above and below fall on the card's own padding and text lines.) | `D-12 every Move arrow ...`, `D-12 the patient-name link ...` |
+| D-13 | 4 | **Fixed** | The leave dialog docks to the bottom at 375 px (rect 0,480 375x187 in a 667 px window); both buttons 44 px high. `aria-modal` stays `false` (Material default for the whole app): accepted. | (screenshot `leave-dialog-375`) |
+| D-14 | 4 | **Fixed** | Publish is 112 px wide idle and while "Publishing" (no shift). The bar still wraps under the pills at 1366 as in the mockup: accepted. | (measure) |
+| D-15 | 4 | **Fixed, with a leftover that is now D-18** | The view words are hidden on phones as in the mockup and the Transfer and Discharge labels no longer wrap; but the icon-only Cards and Table buttons are 39 by 44 px (see D-18). The IPD tabs "Admitted 3" and "Safety 2" wrap to two lines at 108 and 91 px, also at 1366: that is the IPD shell, outside this story, noted for the owner. | (measure) |
+| D-16 | 4 | **Not a defect** | As before. | none |
+| **D-17 (new)** | 3 | **Fixed (final pass)** | The Standard "Admitted on" now wraps and shows in full on Admitted at 1150 px (it was 148 px of text in 121 px) and in the preview at 375 px. Cost: every card in the uniform grid is one line taller where the date used to be cut (+17 to +18 px at 1150 to 1280 px, +35 px with 4 per row at 1150 px; no change at 1366 and below 1100 px). Mutation check: the old rule put back makes the test fail (148 in 121). | `D-17 the Standard "Admitted on" value shows in full too` (passes 3 of 3) |
+
+| **D-18 (new)** | 3 | **Fixed (final pass)** | The Cards and Table buttons are 44 by 44 px at 375 px (`Cards 44x44`, `Table 44x44` in the layout-results JSON). `layout-matrix.spec.ts` at `layout-375`: 12 of 12 pass. | `layout-matrix.spec.ts` `[targets]` at `layout-375` |
+
+Counts after the re-measure (first pass): Sev-1 0, Sev-2 0 open (D-1 to D-4 fixed and tested). Sev-3 open: D-11, D-17, D-18. **Counts after the final pass (10 Nov 2026): Sev-1 0, Sev-2 0. Sev-3 open: D-11 (angular-developer) and D-9 (the human's tokens). D-17 and D-18 are fixed and verified.** Sev-4: accepted. **Counts after the closing step (10 Nov 2026, section 9): Sev-1 0, Sev-2 0, Sev-3 0 open apart from D-9 (the human's tokens). D-11 is closed; its two residuals are accepted Sev-4.**
+
+### 7.2 Layout matrix and zoom
+No sideways scroll and no clipped control in any of the 10 variants (1920, 1366, 1150, 1024, 768, 375, 125 % of 1920, 125 % of 1366, dark 1366, dark 375). The 125 % runs match their CSS widths (1536 and 1093 px). The existing `layout-matrix.spec.ts` is run in the final gate (QA report).
+
+
+## 8. Final pass after the fixes for D-11, D-17 and D-18 (qa-engineer, 10 Nov 2026)
+
+Method: production build rebuilt; `sah37-audit-regression.spec.ts` 3 runs; `layout-matrix.spec.ts` at `layout-375`; the audit spec (`AUDIT_UI=1`, `AUDIT_ONLY=375,375-dark,1366`); two throw-away probes (deleted afterwards) for the page head and the uniform grid; one whole e2e folder run. The detail and the numbers are in `docs/reviews/QA_REPORT_SAH-37.md` section 5.1.
+
+| Check | Result |
+|---|---|
+| D-17 Standard "Admitted on" in full | pass 3 of 3; fails on the old rule |
+| D-18 Cards and Table 44 px at 375 | `layout-375` 12 of 12 |
+| D-11 page does not jump at 375 and 768 | **fails** 3 of 3: 0.19; page head 68 then 124 px (the Admit button wraps under the long lead) |
+| 320 px: lead lines | three (58 px) against the 38 px reserved: +19 px |
+| 360 to 414 px, 621 px | +56 px; 768 px none |
+| Dark theme at 375 | same as light (0.233 in the audit); no dark-only finding |
+| Uniform grid height (Standard) | unchanged at 1366 and below 1100 px; +17 to +18 px at 1150 to 1280 px (3 per row); +18 px at 1200 to 1600 px and +35 px at 1150 px with 4 per row; Compact and Expanded unchanged; the cards of a row stay equal |
+| Lint, unit, build | pass; 167 files, 2,578 tests |
+| Whole e2e folder | 2,396 passed, 45 skipped, 3 failed (D-11 x2, one old timing flake in `medicine.spec.ts`, deflaked in the test) |
+
+## 9. Closing step for D-11 (qa-engineer, 10 Nov 2026, DEC-033)
+
+Decision: DEC-033, option B by default (the human can reverse it). The D-11 test's second assertion changed from "the page head height never changes" to "the tiles stay where they are first drawn"; the layout-shift assertion (under 0.1) stays. Reason: the head grows once (80 to 124 px at 375 px) in the same frame in which the list arrives and the tiles are first drawn, because the Admit patient button exists only after the list answers; nothing is drawn below the head before that frame, so nothing visible moves.
+
+| Check | Result |
+|---|---|
+| Layout shift at 375 and 768 px | under 0.1 (0.000 on the default setup); pass |
+| First tile top, sampled every frame from its first appearance | one value; pass |
+| Every drawn element below the head keeps the top it had in its first frame | none moved; pass |
+| The hidden copy of the lead (`.sizer`) at every frame | `visibility: hidden` and empty text; pass (this check is new in the test; before it was only in a probe) |
+| Test file, whole, 3 runs in a row, both projects | 38 passed each time; ESLint clean |
+| Mutation: pre-fix build served with `E2E_DIST` | fails in both projects: shift 0.2098 at 375 px, tile top 174 > 249, 16 elements moved |
+
+Accepted Sev-4 residuals (DEC-033, not asserted): (1) a clinic whose deposit-alert percent or cut-off time differs from the defaults can see the tiles move one line (19 px, shift 0.010 to 0.016) at 320, 600, 610 and 620 px only; (2) if the charges and deposit-alert calls both fail, the tiles move up 75 px at 375 px (shift 0.189), showing less text. Backlog: hold the Admit button's row from the first paint and keep the reserve on lead-call failure.
+
+Verdict: READY FOR RELEASE, apart from the human items (contrast tokens D-9, go-live conditions, the ₹ format). Whole e2e folder not re-run (only a test assertion changed): the last whole run was 2,397 passed, 45 skipped, 2 failed (this test in two projects), so the folder stands at 2,399 passed, 45 skipped, 0 failed of 2,444 (derived).

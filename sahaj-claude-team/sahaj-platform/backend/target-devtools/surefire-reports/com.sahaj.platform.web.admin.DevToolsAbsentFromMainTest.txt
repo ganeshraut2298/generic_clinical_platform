@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.platform.web.admin.DevToolsAbsentFromMainTest
 -------------------------------------------------------------------------------
-Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.079 s -- in com.sahaj.platform.web.admin.DevToolsAbsentFromMainTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.841 s -- in com.sahaj.platform.web.admin.DevToolsAbsentFromMainTest

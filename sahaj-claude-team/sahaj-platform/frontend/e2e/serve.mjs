@@ -6,7 +6,11 @@ import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist', 'frontend', 'browser');
+// E2E_DIST=<folder> (mutation checks only): serve a temporary copy of the build, with an old CSS rule put back, to prove that a
+// regression test fails on the old rule (SAH-37 audit, DEC-032). Unset in every normal run.
+const root = process.env.E2E_DIST
+  ? resolve(process.env.E2E_DIST)
+  : resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'dist', 'frontend', 'browser');
 const port = Number(process.env.E2E_PORT ?? 4300);
 // E2E_NO_KINETIC=1 (SAH-39 comparison runs only): serves the same build with the homepage background layer switched off,
 // to measure whether the layer slows other specs. Unset in every normal run.

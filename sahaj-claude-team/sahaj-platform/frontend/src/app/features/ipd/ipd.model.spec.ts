@@ -11,6 +11,8 @@ import {
   depositHint,
   ipdLead,
   minimumDepositPaise,
+  PACKAGE_INCLUDES_TEXT,
+  packageChip,
   parseWholeRupees,
   statusPills,
   transferOptionLabel,
@@ -168,5 +170,21 @@ describe('ipd model', () => {
   it('puts going home today in the bed label instead of deposit low', () => {
     const bed: BoardBed = { id: 'b1', code: '101-A', categoryKey: 'gen', categoryName: 'General', ratePaise: 80000, status: 'occ', patientName: 'Sunil Jadhav', goingHomeToday: true, depositLow: true };
     expect(bedAriaLabel(bed)).toBe('Bed 101-A, General, Occupied, Sunil Jadhav, going home today');
+  });
+});
+
+describe('package chip (SAH-29)', () => {
+  it('writes the days included, and Day-care for none', () => {
+    expect(packageChip(3)).toBe('3 days');
+    expect(packageChip(60)).toBe('60 days');
+    expect(packageChip(0)).toBe('Day-care');
+  });
+
+  it('keeps the mockup text for one day (OQ-29-4)', () => {
+    expect(packageChip(1)).toBe('1 days');
+  });
+
+  it('has the fixed text of the mockup', () => {
+    expect(PACKAGE_INCLUDES_TEXT).toBe('Bed, nursing and surgeon included · extra days and exclusions at normal rates');
   });
 });

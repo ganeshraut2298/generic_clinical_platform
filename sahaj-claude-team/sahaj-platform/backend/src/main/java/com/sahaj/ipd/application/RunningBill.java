@@ -1,5 +1,6 @@
 package com.sahaj.ipd.application;
 
+import com.sahaj.ipd.application.AdmissionRepository.PackageCopy;
 import com.sahaj.ipd.application.ChargeRepository.ChargeRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.CategoryRow;
 import com.sahaj.ipd.application.IpdSettingsRepository.ConfigRow;
@@ -67,6 +68,22 @@ public record RunningBill(int billDays, String bedDayCut, String categoryName, B
     static RunningBill compute(Instant admittedAt, Instant now, ConfigRow config, String categoryKey,
                                Map<String, CategoryRow> categories, String doctorName, List<ChargeRow> charges,
                                List<TransferRow> transfers, long paidPaise, int alertPercent) {
+        return compute(admittedAt, now, config, categoryKey, categories, doctorName, charges, transfers, paidPaise,
+                alertPercent, null);
+    }
+
+    /**
+     * As above, for an admission that may have a package (SAH-29, mockup {@code ipLines}). With a package the bill is
+     * the package line, the bed days beyond the package at the rate of the bed the patient is in now, and the extra
+     * charges "not in package"; there are no doctor visit, nursing or bed-transfer lines, and {@code transfers} is
+     * never read. With {@code null} the bill is the one of SAH-25/26.
+     *
+     * @param packageCopy the package copy kept on the admission, or null
+     */
+    static RunningBill compute(Instant admittedAt, Instant now, ConfigRow config, String categoryKey,
+                               Map<String, CategoryRow> categories, String doctorName, List<ChargeRow> charges,
+                               List<TransferRow> transfers, long paidPaise, int alertPercent,
+                               PackageCopy packageCopy) {
         String cut = cutOf(config);
         int days = billDays(admittedAt, now, cut);
         CategoryRow category = categories.get(categoryKey);
@@ -74,6 +91,10 @@ public record RunningBill(int billDays, String bedDayCut, String categoryName, B
         BigDecimal multiplier = category.multiplier();
 
         List<BillLine> lines = new ArrayList<>();
+        if (packageCopy != null) {
+            packageLines(lines, packageCopy, days, categoryName, category, multiplier, charges);
+            return finish(days, cut, categoryName, multiplier, lines, paidPaise, alertPercent);
+        }
         // SAH-26: the days fixed on earlier beds at transfer time come first, one pair of lines per transfer.
         long segmentTotal = 0L;
         for (TransferRow transfer : transfers) {
@@ -90,16 +111,40 @@ public record RunningBill(int billDays, String bedDayCut, String categoryName, B
                 scaled(config.visitPaise(), multiplier), currentDays);
         addLine(lines, "Nursing care", config.nursingPaise(), days);
 
-        // One line per service name (and base price, in case a price was ever changed), in order of first charge.
+        addChargeLines(lines, charges, multiplier, "");
+        return finish(days, cut, categoryName, multiplier, lines, paidPaise, alertPercent);
+    }
+
+    /**
+     * SAH-29 (AC3): the lines of an admission with a package, in order: the package at its price; the bed days beyond the
+     * package (a day-care package includes 1 bed day) at the bed charge of the category the patient is in now, no
+     * multiplier; then the extra charges named "... · not in package", priced as without a package. A line of
+     * quantity 0 is dropped. The wording is the mockup's, also for 0 and 1 days (OQ-29-4).
+     */
+    private static void packageLines(List<BillLine> lines, PackageCopy packageCopy, int days, String categoryName,
+                                     CategoryRow category, BigDecimal multiplier, List<ChargeRow> charges) {
+        addLine(lines, "Package · " + packageCopy.name() + " (bed, nursing and surgeon for "
+                + packageCopy.includedDays() + " days)", packageCopy.pricePaise(), 1);
+        int beyond = Math.max(0, days - Math.max(1, packageCopy.includedDays()));
+        addLine(lines, "Bed · " + categoryName + " beyond the package", category.ratePaise(), beyond);
+        addChargeLines(lines, charges, multiplier, " · not in package");
+    }
+
+    /** One line per service name (and base price, in case a price was ever changed), in order of first charge. */
+    private static void addChargeLines(List<BillLine> lines, List<ChargeRow> charges, BigDecimal multiplier,
+                                       String nameSuffix) {
         Map<String, ChargeGroup> grouped = new LinkedHashMap<>();
         for (ChargeRow charge : charges) {
             grouped.computeIfAbsent(charge.serviceName() + "|" + charge.unitPaise(),
                     k -> new ChargeGroup(charge.serviceName(), charge.unitPaise())).qty += charge.qty();
         }
         for (ChargeGroup group : grouped.values()) {
-            addLine(lines, group.name, scaled(group.unitPaise, multiplier), Math.toIntExact(group.qty));
+            addLine(lines, group.name + nameSuffix, scaled(group.unitPaise, multiplier), Math.toIntExact(group.qty));
         }
+    }
 
+    private static RunningBill finish(int days, String cut, String categoryName, BigDecimal multiplier,
+                                      List<BillLine> lines, long paidPaise, int alertPercent) {
         long total = 0L;
         for (BillLine line : lines) {
             total += line.amountPaise();

@@ -19,6 +19,8 @@ import { newClientKey } from '../../../shared/client-key';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { sheetToast } from '../../../shared/ui/sheet-toast';
 import { digitsOnly } from '../../pin/pin.model';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { IdentityBarComponent } from '../emr/identity-bar.component';
 import { MarApi } from './mar.api';
 import {
@@ -120,6 +122,7 @@ export class GiveSheetComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly data = inject<GiveSheetData>(MAT_DIALOG_DATA);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   protected readonly titleId = GIVE_TITLE_ID;
   protected readonly order = this.data.order;
@@ -176,6 +179,11 @@ export class GiveSheetComponent {
   private sentSignature: string | null = null;
 
   constructor() {
+    // SAH-34 AC 38: a refusal for this patient (here, or from the tab behind) closes this sheet; no dose is shown as given.
+    this.scopeRefusals.watch(this.data.mar.admissionId, this.destroyRef, () => {
+      this.clearPin();
+      this.dialogRef.close();
+    });
     effect(() => {
       this.dialogRef.disableClose = this.running();
     });
@@ -331,6 +339,11 @@ export class GiveSheetComponent {
   }
 
   private failed(error: unknown): void {
+    if (isOutsideScope(error)) {
+      // SAH-34 AC 39: nothing was recorded. This sheet closes (it watches the same event), the page says so.
+      this.scopeRefusals.report(this.data.mar.admissionId, true);
+      return;
+    }
     const failure = classifyGiveError(error);
     this.wardAnswer.set(failure.kind === 'pin' && failure.ward);
     switch (failure.kind) {

@@ -28,7 +28,10 @@ import {
   COLS_CHOICES,
   CardAction,
   CardsPerRow,
+  EMERGENCY_ACCESS_LABEL,
   EMPTY_FILTER_TEXT,
+  MY_PATIENTS_LABEL,
+  NOBODY_ADMITTED_TEXT,
   SEARCH_LABEL,
   SEARCH_ANNOUNCE_MS,
   SEARCH_MAX_LENGTH,
@@ -36,6 +39,11 @@ import {
   announceText,
   filterAnnounceText,
   filterRows,
+  scopeChipText,
+  scopeTooltip,
+  scopedEmptyText,
+  showMyPatients,
+  showScopeChip,
   showingText,
 } from './admitted.model';
 
@@ -50,6 +58,11 @@ export interface OpenAdmissionRequest {
  * Search and ward filter run on the device over the loaded list and apply to both views; the text
  * never leaves the browser. What the user chose lives in {@link AdmittedViewState}. The panel makes
  * no request: sheets are opened by the page through its outputs.
+ *
+ * SAH-34 (stories 34C and 34E; mockup `pctog`, `pcscope`, `sfbg`): for a scoped user the toolbar ends with
+ * the chip "Patients in their wards · N of M" and the button "Emergency access"; "My patients" narrows the list
+ * to the rows the server marked mine. N, M, "mine" and whether the nurse has a ward are the server's: the
+ * panel does no scoping and no counting of the clinic (AC 44, 105 note). Nothing about scope is stored.
  */
 @Component({
   selector: 'app-admitted-panel',
@@ -69,11 +82,15 @@ export class AdmittedPanelComponent {
   readonly staleText = input<string | null>(null);
   /** SAH-37. The owner gets the button "Customize card" and edits the card; everyone else reads it. */
   readonly isOwner = input(false);
+  /** SAH-34. The signed-in role: it decides who gets "My patients" (AC 32). */
+  readonly role = input<string | undefined>(undefined);
 
   /** The name, a Transfer or a Discharge was chosen (or Open in the table). */
   readonly openAdmission = output<OpenAdmissionRequest>();
   readonly openNursing = output<string>();
   readonly openEmr = output<string>();
+  /** SAH-34. The button "Emergency access" was chosen; the page opens the sheet. */
+  readonly openEmergencyAccess = output<void>();
 
   protected readonly formatInrPaise = formatInrPaise;
   protected readonly subline = admissionSubline;
@@ -86,6 +103,9 @@ export class AdmittedPanelComponent {
   protected readonly searchMax = SEARCH_MAX_LENGTH;
   protected readonly searchPlaceholder = SEARCH_PLACEHOLDER;
   protected readonly emptyText = EMPTY_FILTER_TEXT;
+  protected readonly nobodyText = NOBODY_ADMITTED_TEXT;
+  protected readonly myPatientsLabel = MY_PATIENTS_LABEL;
+  protected readonly emergencyLabel = EMERGENCY_ACCESS_LABEL;
 
   /** Polite line after a search, a ward change, "Show 24 more" or "Show all"; empty until then. */
   protected readonly announcement = signal('');
@@ -104,8 +124,19 @@ export class AdmittedPanelComponent {
     return `${LAYOUT_NAME[s.layout]} card · ${s.isStandard ? 'Sahaj standard card' : 'customized'} · v${s.version}${who}`;
   });
 
+  /** SAH-34 AC 26 to 28, 41: the chip is drawn from the server's N and M only, and never before the first answer. */
+  protected readonly showChip = computed(() => showScopeChip(this.list().scope));
+  protected readonly chipText = computed(() => scopeChipText(this.list().scope));
+  protected readonly chipTip = computed(() => scopeTooltip(this.list().scope));
+  protected readonly canOpenEmergencyAccess = computed(() => this.list().scope?.canOpenEmergencyAccess === true);
+  /** AC 29, 30: the words that replace the cards for a scoped user with no row. */
+  protected readonly scopeEmpty = computed(() => scopedEmptyText(this.list()));
+  protected readonly canMine = computed(() => showMyPatients(this.role(), this.list().scope));
+  /** A pressed "My patients" whose button is gone (the nurse lost her last ward) does not keep filtering. */
+  protected readonly mineOn = computed(() => this.state.mine() && this.canMine());
+
   protected readonly matches = computed(() =>
-    filterRows(this.list().items, this.state.query(), this.state.ward()),
+    filterRows(this.list().items, this.state.query(), this.state.ward(), this.mineOn()),
   );
   protected readonly drawn = computed(() => this.matches().slice(0, this.state.limit()));
   protected readonly more = computed(() => this.matches().length > this.drawn().length);
@@ -153,6 +184,13 @@ export class AdmittedPanelComponent {
 
   private announceResult(): void {
     this.announcement.set(filterAnnounceText(this.matches().length, this.list().items.length));
+  }
+
+  /** AC 33: a filter on the rows marked mine; kept in memory only, not stored and not sent. */
+  protected toggleMine(): void {
+    this.state.setMine(!this.mineOn());
+    this.cancelAnnounce();
+    this.announceResult();
   }
 
   protected setView(view: AdmittedView): void {

@@ -1,5 +1,6 @@
 package com.sahaj.ipd.application;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,7 +13,16 @@ public final class BedBoardViews {
     /** {@code toString} leaves out the patient name. */
     public record BoardBed(UUID id, String code, String categoryKey, String categoryName, long ratePaise,
                            String status, UUID admissionId, String patientName, Integer dayNumber,
-                           String doctorShortName, Boolean depositLow, Boolean goingHomeToday) {
+                           String doctorShortName, Boolean depositLow, Boolean goingHomeToday,
+                           @JsonInclude(JsonInclude.Include.NON_NULL) Boolean outsideScope) {
+
+        /** A bed with no scope mark (the patient is in the caller's scope, or the bed is not occupied). */
+        public BoardBed(UUID id, String code, String categoryKey, String categoryName, long ratePaise, String status,
+                        UUID admissionId, String patientName, Integer dayNumber, String doctorShortName,
+                        Boolean depositLow, Boolean goingHomeToday) {
+            this(id, code, categoryKey, categoryName, ratePaise, status, admissionId, patientName, dayNumber,
+                    doctorShortName, depositLow, goingHomeToday, null);
+        }
 
         @Override
         public String toString() {

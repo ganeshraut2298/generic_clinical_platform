@@ -91,11 +91,13 @@ public class VitalsService {
     private final AuditLog auditLog;
     private final IpdGate gate;
     private final MarAssembler mar;
+    private final ScopeGuard guard;
 
     VitalsService(AdmissionRepository admissions, VitalsRepository vitals, EscalationRepository escalations,
                   ClinicalEventRepository events, PatientLookupPort patients, PatientAccessPort patientAccess,
                   ActorDirectoryPort actors, TeamMemberPort team, AuditLog auditLog, IpdGate gate,
-                  MarAssembler mar) {
+                  MarAssembler mar, ScopeGuard guard) {
+        this.guard = guard;
         this.admissions = admissions;
         this.vitals = vitals;
         this.escalations = escalations;
@@ -127,6 +129,8 @@ public class VitalsService {
         AdmissionRow row = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
         PatientSummary patient = patient(tenantId, row);
+        // SAH-34: after the 404 checks, before the record-access row (a refusal writes nothing).
+        guard.requireAdmission(tenantId, actor, role, memberRole, admissionId, "nursing-sheet");
         patientAccess.recordOpened(tenantId, row.patientId(), actor);
         Names names = new Names(tenantId);
         VitalsRow latest = vitals.findLatest(tenantId, admissionId).orElse(null);
@@ -156,6 +160,8 @@ public class VitalsService {
         AdmissionRow row = admissions.findForNoKeyUpdate(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
         PatientSummary patient = patient(tenantId, row);
+        // SAH-34: under the admission lock, after the 404 checks and before the repeat and state checks.
+        guard.requireAdmissionLocked(tenantId, actor, role, memberRole, admissionId, "vitals-record");
 
         VitalsRow first = vitals.findByClientKey(tenantId, clientKey).orElse(null);
         if (first != null) {

@@ -17,8 +17,12 @@ export class AdmittedViewState {
   readonly cols = computed<CardsPerRow>(() => this.chosenCols() ?? this.publishedCols());
   readonly query = signal('');
   readonly ward = signal(ALL_WARDS);
+  /** SAH-34 AC 33. "My patients" is pressed: a filter on the rows the server marked mine, never stored or sent. */
+  readonly mine = signal(false);
   readonly limit = signal(PAGE_SIZE);
-  readonly filtering = computed(() => this.query().trim() !== '' || this.ward() !== ALL_WARDS);
+  readonly filtering = computed(
+    () => this.query().trim() !== '' || this.ward() !== ALL_WARDS || this.mine(),
+  );
 
   setView(view: AdmittedView): void {
     if (this.view() !== view) {
@@ -43,6 +47,11 @@ export class AdmittedViewState {
 
   setWard(wardId: string): void {
     this.ward.set(wardId);
+    this.limit.set(PAGE_SIZE);
+  }
+
+  setMine(on: boolean): void {
+    this.mine.set(on);
     this.limit.set(PAGE_SIZE);
   }
 

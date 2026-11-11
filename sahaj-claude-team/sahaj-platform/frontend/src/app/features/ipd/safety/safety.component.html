@@ -23,6 +23,24 @@
       </div>
     }
 
+    @if (scopeNote(b.scope); as note) {
+      <div class="notice info" data-testid="safety-scope-note">
+        <app-icon name="shieldu" [size]="16" />
+        <span>{{ note }}</span>
+      </div>
+    }
+
+    @if ((b.otherWardsPastTarget ?? 0) > 0) {
+      @let ow = otherWards(b.otherWardsPastTarget ?? 0);
+      <div class="notice crit" role="status" data-testid="safety-other-wards">
+        <app-icon name="siren" [size]="16" />
+        <span>
+          <b>{{ ow.head }}</b>
+          {{ ow.tail }}
+        </span>
+      </div>
+    }
+
     @if (b.counts.pastTarget > 0) {
       <div class="notice crit" role="status" data-testid="safety-late-notice">
         <app-icon name="siren" [size]="16" />
@@ -59,7 +77,14 @@
         <div class="kpi surf" data-kpi="your-patients">
           <span class="eyebrow">Your patients</span>
           <span class="v num">{{ b.yourPatients ?? 0 }}</span>
-          <span class="s">{{ yourPatientsText }}</span>
+          <span class="s">{{ yourPatientsText(b.scope) }}</span>
+        </div>
+      }
+      @if (b.emergencyAccess; as eg) {
+        <div class="kpi surf" data-kpi="emergency-access">
+          <span class="eyebrow">{{ emergencyTileTitle }}</span>
+          <span class="v num" [class.warn]="eg.waiting > 0" data-testid="emergency-access-waiting">{{ eg.waiting }}</span>
+          <span class="s">{{ emergencyTileText }}</span>
         </div>
       }
     </section>
@@ -177,6 +202,12 @@
 
     <app-medicine-round [round]="b.medicineRound" [asOf]="b.asOf" (answered)="roundAnswered()" />
 
+    @if (b.emergencyAccess; as eg) {
+      @if (eg.waiting > 0) {
+        <app-emergency-review [page]="eg" (changed)="reviewChanged()" (refused)="reviewRefused($event)" />
+      }
+    }
+
     <section class="panel surf sfp" aria-labelledby="sf-aud-h">
       <div class="sfph">
         <h2 id="sf-aud-h" tabindex="-1"><app-icon name="history" [size]="18" /> {{ auditTitle }}</h2>
@@ -198,7 +229,7 @@
             <div role="listitem" [class]="'sfai k-' + x.kind">
               <span class="ti"><app-icon [name]="icon(x.kind)" [size]="14" /></span>
               <span class="sfmn">
-                <b>{{ x.text }}</b>
+                <b>{{ eventText(x) }}</b>
                 <small>{{ line(x) }}</small>
               </span>
               <span class="faint num">{{ time(x) }}</span>

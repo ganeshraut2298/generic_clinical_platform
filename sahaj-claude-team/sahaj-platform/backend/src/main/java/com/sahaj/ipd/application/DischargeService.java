@@ -83,13 +83,15 @@ public class DischargeService {
     private final AdmissionService sheets;
     private final EscalationRepository escalations;
     private final ClinicalEventRepository events;
+    private final ScopeGuard guard;
 
     DischargeService(AdmissionRepository admissions, BedRepository beds, WardRepository wards,
                      IpdSettingsRepository settings, DischargeRepository discharges, OwnerGuard ownerGuard,
                      AuditLog auditLog, TeamMemberPort team, PatientLookupPort patients,
                      PatientAccessPort patientAccess, ActorDirectoryPort actors, FollowUpPort followUps, IpdGate gate,
                      IpdCatalog catalog, IpdBilling billing, AdmissionService sheets, EscalationRepository escalations,
-                     ClinicalEventRepository events) {
+                     ClinicalEventRepository events, ScopeGuard guard) {
+        this.guard = guard;
         this.admissions = admissions;
         this.beds = beds;
         this.wards = wards;
@@ -152,6 +154,8 @@ public class DischargeService {
         ModuleEntitlement ent = gate.check(tenantId, false);
         AdmissionRow row = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        // SAH-34: after the 404, before the not-admitted check and the record-access row.
+        guard.requireAdmission(tenantId, actor, role, null, admissionId, "discharge-sheet");
         requireAdmitted(row, "This patient is not admitted any more.");
         patientAccess.recordOpened(tenantId, row.patientId(), actor);
         return buildSheet(tenantId, role, ent, row);
@@ -171,6 +175,8 @@ public class DischargeService {
         requireTypeAndTemplate(type, templateKey);
         AdmissionRow row = admissions.findForUpdate(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        // SAH-34: under the admission lock, after the 404, before the not-admitted check.
+        guard.requireAdmissionLocked(tenantId, actor, role, null, admissionId, "discharge-signoff");
         requireAdmitted(row, "This patient is not admitted any more. The summary cannot be signed.");
         gate.requireWritable(ent);
         requireActiveSigner(tenantId, actor);
@@ -241,6 +247,8 @@ public class DischargeService {
         wards.lockTenant(tenantId);
         AdmissionRow found = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found"));
+        // SAH-34: under the clinic IPD lock (a transfer takes it too), after the 404, before the not-admitted check.
+        guard.requireAdmissionLocked(tenantId, actor, role, memberRole, admissionId, "discharge");
         requireAdmitted(found, "This patient is not admitted any more. The patient cannot be discharged.");
         BedRow bed = beds.findForUpdate(tenantId, found.bedId())
                 .orElseThrow(() -> new IllegalStateException("The bed of the admission was not found"));
@@ -375,7 +383,8 @@ public class DischargeService {
                         .orElse(null));
         return new Sheet(row.id(), row.ipNumber(), patient == null ? "Patient" : patient.name(), row.bedCode(),
                 bill.billDays(), config.approvalChain(), DischargeRules.TYPES, DischargeRules.TEMPLATES,
-                DischargeRules.NORMAL, DischargeRules.defaultTemplate(config.templateKey(), row.admissionType()),
+                DischargeRules.NORMAL, DischargeRules.defaultTemplate(config.templateKey(), row.admissionType(),
+                        row.packageCopy() != null),
                 signature, DischargeRules.SIGN_ROLES.contains(role) && writable,
                 DischargeRules.DISCHARGE_ROLES.contains(role) && writable, "OWNER".equals(role) && writable,
                 preview, new SheetBill(bill.totalPaise(), deposits, bill.totalPaise() - deposits),

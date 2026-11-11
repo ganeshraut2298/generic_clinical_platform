@@ -90,6 +90,7 @@ class VitalsServiceTest {
     private MarAssembler marAssembler;
     private ModuleEntitlementPort entitlements;
     private VitalsService service;
+    private ScopeGuard guard;
     private String status = "ADMITTED";
     private final List<String> calls = new ArrayList<>();
 
@@ -121,8 +122,9 @@ class VitalsServiceTest {
         when(actors.displayName(TENANT, OTHER_ACTOR)).thenReturn(Optional.empty());
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
         marAssembler = mock(MarAssembler.class);
+        guard = ScopeStubs.unscoped();
         service = new VitalsService(admissions, vitals, escalations, events, patients, patientAccess, actors, team,
-                auditLog, gate, marAssembler);
+                auditLog, gate, marAssembler, guard);
         state("on");
     }
 
@@ -1360,5 +1362,57 @@ class VitalsServiceTest {
         public List<EventRow> findPage(UUID tenantId, UUID onlyForNurse, Position after, int limit) {
             return List.of();
         }
+
+        @Override
+        public void insertForGrant(UUID tenantId, UUID admissionId, String text, UUID actor, UUID grantId) {
+            rows.add(new Event(admissionId, KIND_BG, text, actor));
+        }
+
+        @Override
+        public List<EventRow> findPageInScope(UUID tenantId, UUID nurse, java.util.Set<UUID> wardIds,
+                                              java.util.Set<UUID> grantAdmissionIds, Position after, int limit) {
+            return List.of();
+        }
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void sheetOutsideScopeWritesNoRecordAccess() {
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmission(eq(TENANT), eq(ACTOR),
+                eq("NURSE"), any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.sheet(TENANT, ACTOR, "NURSE", ADMISSION))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verifyNoInteractions(patientAccess);
+        assertThat(vitals.rows).isEmpty();
+    }
+
+    @Test
+    void recordOutsideScopeWritesNothing() {
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT),
+                eq(ACTOR), eq("NURSE"), any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> save(normal(UUID.randomUUID()))).isInstanceOf(OutsideScopeException.class);
+
+        assertThat(vitals.rows).isEmpty();
+        assertThat(vitals.notes).isEmpty();
+        assertThat(escalations.rows).isEmpty();
+        assertThat(events.rows).isEmpty();
+        verifyNoInteractions(patientAccess, auditLog);
+    }
+
+    @Test
+    void theOutsideScopeAnswerIsAfterTheLockAndTheNotFoundAndBeforeTheRepeatCheck() {
+        UUID key = UUID.randomUUID();
+        save(normal(key));
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT),
+                eq(ACTOR), eq("NURSE"), any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> save(normal(key))).isInstanceOf(OutsideScopeException.class);
+
+        assertThatThrownBy(() -> service.record(TENANT, ACTOR, "NURSE", UUID.randomUUID(), normal(UUID.randomUUID())))
+                .isInstanceOf(NotFoundException.class);
     }
 }

@@ -94,6 +94,13 @@ describe('AdmissionsApi', () => {
     expect(post.request.body).toEqual({ serviceKey: 'cbc' });
   });
 
+  it('reads the packages with one GET and no body (SAH-29)', () => {
+    api.packages().subscribe();
+    const get = http.expectOne(`${IPD}/packages`);
+    expect(get.request.method).toBe('GET');
+    expect(get.request.body).toBeNull();
+  });
+
   it('reads and saves the transfer rules, and moves a patient to a bed', () => {
     api.transferRules().subscribe();
     expect(http.expectOne(`${IPD}/transfer-rules`).request.method).toBe('GET');

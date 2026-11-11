@@ -30,12 +30,14 @@ public class BedTransferController {
         this.service = service;
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/transfer-rules")
     @PreAuthorize(AdmissionController.READERS)
     public TransferRules rules() {
         return service.rules(ClinicUser.current().tenantId());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/transfer-rules")
     @PreAuthorize(AdmissionController.OWNER)
     public TransferRules updateRules(@RequestBody TransferRulesInput request) {
@@ -44,6 +46,7 @@ public class BedTransferController {
                 request.newRateFrom());
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PostMapping("/admissions/{id}/transfer")
     @PreAuthorize(AdmissionController.ADMITTERS)
     public Detail transfer(@PathVariable UUID id, @RequestBody TransferInput request) {

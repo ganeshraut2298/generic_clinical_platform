@@ -1,5 +1,5 @@
 import { ApiError } from '../../core/http/problem-detail';
-import { focusIsLost, isModuleOff, isRefusal } from './ipd-refusal';
+import { focusIsLost, isModuleOff, isOutsideScope, isRefusal } from './ipd-refusal';
 
 const error = (status: number, slug: string) =>
   new ApiError({ type: `https://sahaj.in/problems/${slug}`, title: slug, status, detail: 'x' });
@@ -23,6 +23,16 @@ describe('ipd-refusal', () => {
     expect(isModuleOff(error(403, 'forbidden'))).toBe(false);
     expect(isModuleOff(error(409, 'module-off'))).toBe(false);
     expect(isModuleOff(undefined)).toBe(false);
+  });
+
+  it('tells outside-scope (one patient) from forbidden and module-off (SAH-34)', () => {
+    expect(isOutsideScope(error(403, 'outside-scope'))).toBe(true);
+    expect(isOutsideScope(error(403, 'forbidden'))).toBe(false);
+    expect(isOutsideScope(error(403, 'module-off'))).toBe(false);
+    expect(isOutsideScope(error(409, 'outside-scope'))).toBe(false);
+    expect(isOutsideScope(new Error('network'))).toBe(false);
+    expect(isRefusal(error(403, 'outside-scope'))).toBe(true);
+    expect(isModuleOff(error(403, 'outside-scope'))).toBe(false);
   });
 
   describe('focusIsLost', () => {

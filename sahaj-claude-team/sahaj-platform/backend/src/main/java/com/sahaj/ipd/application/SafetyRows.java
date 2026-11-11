@@ -2,6 +2,7 @@ package com.sahaj.ipd.application;
 
 import com.sahaj.ipd.application.EscalationBoardRepository.Detail;
 import com.sahaj.ipd.application.SafetyViews.Counts;
+import com.sahaj.ipd.application.WardScopeRepository.UnreviewedMark;
 import com.sahaj.ipd.application.SafetyViews.Response;
 import com.sahaj.ipd.application.SafetyViews.Row;
 import com.sahaj.ipd.domain.EscalationClock;
@@ -128,6 +129,18 @@ final class SafetyRows {
      * in the window ({@link MedicineRound#empty()}) the token is the SAH-33 token.
      */
     static Counts counts(Collection<Detail> escalations, MedicineRound.Result round, Instant asOf) {
+        return counts(escalations, round, asOf, null);
+    }
+
+    /**
+     * SAH-34 (34F, OQ-34-30): for the owner, {@code unreviewed} is the number of emergency access grants with no review
+     * yet and the newest of them. {@code emergencyAccessWaiting} is the number, and while it is above 0 the change token
+     * gains one line {@code bg:<count>:<newest grant id>} (none at 0), so a new grant or a review changes the token and
+     * the work is one count however many wait. Null for every other caller: the field is absent and the token is the
+     * SAH-35 token.
+     */
+    static Counts counts(Collection<Detail> escalations, MedicineRound.Result round, Instant asOf,
+                         UnreviewedMark unreviewed) {
         List<Detail> live = new ArrayList<>();
         int past = 0;
         for (Detail d : escalations) {
@@ -138,7 +151,13 @@ final class SafetyRows {
                 }
             }
         }
-        return new Counts(live.size(), past, round.due(), round.late(), changeToken(live, round.tokenLines()), asOf);
+        List<String> lines = round.tokenLines();
+        if (unreviewed != null && unreviewed.waiting() > 0 && unreviewed.newestId() != null) {
+            lines = new ArrayList<>(lines);
+            lines.add("bg:" + unreviewed.waiting() + ":" + unreviewed.newestId().toString().toLowerCase(Locale.ROOT));
+        }
+        return new Counts(live.size(), past, round.due(), round.late(), changeToken(live, lines), asOf,
+                unreviewed == null ? null : unreviewed.waiting());
     }
 
     /**

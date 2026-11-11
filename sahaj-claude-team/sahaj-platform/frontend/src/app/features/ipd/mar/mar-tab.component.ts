@@ -17,6 +17,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
 import { IdentityBarComponent } from '../emr/identity-bar.component';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { GIVE_TITLE_ID, GiveResult, GiveSheetComponent, GiveSheetData } from './give-sheet.component';
 import { MarApi } from './mar.api';
 import {
@@ -66,6 +68,7 @@ export class MarTabComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   /** The slot whose Give sheet just closed; the focus goes back to it once the MAR is drawn. */
   private pendingFocus: SlotRef | null = null;
@@ -110,6 +113,12 @@ export class MarTabComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.loading.set(false);
+          if (isOutsideScope(error)) {
+            // SAH-34 AC 38: the sheet around this tab clears and closes; the page says so.
+            this.mar.set(null);
+            this.scopeRefusals.report(this.admissionId(), false);
+            return;
+          }
           this.loadError.set(problemMessage(error, MAR_LOAD_ERROR));
           this.focusAfterDraw();
         },

@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { API_BASE_URL } from '../config/api-config';
 import { mayBeAdminApiUrl } from '../http/admin-url';
+import { isBootstrapCall } from '../http/bootstrap-call';
 import { AuthService } from './auth.service';
 
 const PUBLIC_AUTH_PATHS = ['/otp/request', '/otp/verify', '/select-clinic', '/refresh'];
@@ -33,7 +34,7 @@ function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // The admin realm (ADR-003 D8) has its own token and interceptor. A clinic token must never
   // ride on /api/v1/admin/**, and a 401 there is not a reason to refresh the clinic session.
-  if (mayBeAdminApiUrl(req.url, inject(API_BASE_URL))) {
+  if (isBootstrapCall(req) || mayBeAdminApiUrl(req.url, inject(API_BASE_URL))) {
     return next(req);
   }
   const auth = inject(AuthService);

@@ -50,7 +50,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     @BeforeEach
     void setUp() {
         service = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team, auditLog,
-                gate, catalogue, assembler);
+                gate, catalogue, assembler, guard);
         clientKey = UUID.randomUUID();
     }
 
@@ -459,7 +459,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         MedicineAssembler a = new MedicineAssembler(catalogue, failing, new FakeDoses(), patients, patientAccess, actors,
                 admissionService);
         MedicineOrderService s = new MedicineOrderService(failing, admissions, events, patients, patientAccess, actors,
-                team, auditLog, gate, catalogue, a);
+                team, auditLog, gate, catalogue, a, guard);
 
         assertThatThrownBy(() -> s.order(TENANT, DOCTOR, "DOCTOR", ADMISSION, input("pcm", "od")))
                 .isInstanceOf(IllegalStateException.class).hasMessage("The order could not be stored");
@@ -690,5 +690,64 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         when(entitlements.forTenant(TENANT)).thenReturn(off);
         assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id()))
                 .isInstanceOf(ModuleOffException.class);
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void emrOutsideScopeWritesNothing() {
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmission(eq(TENANT), eq(NURSE), eq("NURSE"), any(),
+                eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.emr(TENANT, NURSE, "NURSE", ADMISSION))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verifyNoInteractions(patientAccess, events, auditLog);
+    }
+
+    @Test
+    void orderOutsideScopeWritesNothing() {
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(DOCTOR), eq("DOCTOR"),
+                any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", input("pcm", "od"))).isInstanceOf(OutsideScopeException.class);
+
+        assertThat(fake.rows).isEmpty();
+        verifyNoInteractions(patientAccess, events, auditLog);
+    }
+
+    @Test
+    void stopOutsideScopeWritesNothing() {
+        OrderRow pending = fake.seed(ADMISSION, "pcm", "PENDING", OTHER_DOCTOR);
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(DOCTOR), eq("DOCTOR"),
+                any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", pending.id()))
+                .isInstanceOf(OutsideScopeException.class);
+
+        assertThat(fake.rows.get(pending.id()).status()).isEqualTo("PENDING");
+        verifyNoInteractions(patientAccess, events, auditLog);
+    }
+
+    @Test
+    void stopOnADischargedAdmissionOutsideHerScopeIs403BeforeTheNotAdmittedAnswer() {
+        OrderRow active = fake.seed(ADMISSION, "pcm", "ACTIVE", DOCTOR);
+        admission = admissionRow("DISCHARGED");
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(DOCTOR),
+                eq("DOCTOR"), any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id()))
+                .isInstanceOf(OutsideScopeException.class);
+
+        assertThat(fake.rows.get(active.id()).status()).isEqualTo("ACTIVE");
+        verifyNoInteractions(patientAccess, events, auditLog);
+    }
+
+    @Test
+    void anOrderOfAnotherClinicIsNotFoundAndNeverReachesTheGuard() {
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", UUID.randomUUID()))
+                .isInstanceOf(NotFoundException.class);
+
+        org.mockito.Mockito.verify(guard, never()).requireAdmissionLocked(any(), any(), any(), any(), any(), any());
     }
 }

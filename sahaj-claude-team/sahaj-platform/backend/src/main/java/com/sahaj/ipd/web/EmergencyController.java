@@ -43,6 +43,7 @@ public class EmergencyController {
         this.service = service;
     }
 
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @GetMapping("/emergency")
     @PreAuthorize(READERS)
     public Queue queue() {
@@ -50,6 +51,7 @@ public class EmergencyController {
         return service.queue(user.tenantId(), user.role());
     }
 
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @GetMapping("/emergency/summary")
     @PreAuthorize(READERS)
     public Counts summary() {
@@ -58,6 +60,7 @@ public class EmergencyController {
     }
 
     /** 201 for a new case; 200 with the first case for a repeat of the same client key. */
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @PostMapping("/emergency/cases")
     @PreAuthorize(READERS)
     public ResponseEntity<Queue> register(@RequestBody CaseInput request) {
@@ -66,6 +69,7 @@ public class EmergencyController {
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.queue());
     }
 
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @PostMapping("/emergency/cases/{id}/seen")
     @PreAuthorize(ACTORS)
     public Queue seen(@PathVariable UUID id) {
@@ -73,6 +77,7 @@ public class EmergencyController {
         return service.seen(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @PutMapping("/emergency/cases/{id}/level")
     @PreAuthorize(READERS)
     public Queue retriage(@PathVariable UUID id, @RequestBody LevelInput request) {
@@ -80,6 +85,7 @@ public class EmergencyController {
         return service.retriage(user.tenantId(), user.userId(), user.role(), id, request);
     }
 
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @PostMapping("/emergency/cases/{id}/release")
     @PreAuthorize(ACTORS)
     public Queue release(@PathVariable UUID id) {
@@ -87,6 +93,7 @@ public class EmergencyController {
         return service.release(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeExempt("Emergency queue: not admitted, no ward")
     @PostMapping("/emergency/cases/{id}/refer")
     @PreAuthorize(ACTORS)
     public Queue refer(@PathVariable UUID id) {
@@ -94,6 +101,7 @@ public class EmergencyController {
         return service.refer(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/emergency-settings")
     @PreAuthorize(READERS)
     public Settings settings() {
@@ -101,6 +109,7 @@ public class EmergencyController {
         return service.settings(user.tenantId(), user.role());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/emergency-settings")
     @PreAuthorize(OWNER)
     public Settings updateSettings(@RequestBody SettingsInput request) {

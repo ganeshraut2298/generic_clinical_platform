@@ -14,31 +14,36 @@ import {
   MAX_DEPOSIT_RUPEES,
   NEW_RATE_CHOICES,
   NewRateFrom,
+  PACKAGE_INCLUDES_TEXT,
   TransferRules,
   UPGRADE_CHOICES,
+  packageChip,
 } from '../../ipd/ipd.model';
 import { AdmissionRulesStore } from './admission-rules.store';
 import { IpdGateComponent } from './ipd-gate.component';
+import { PackagesStore } from './packages.store';
 import { CATEGORY_OPTIONS, CategoryKey, paiseToRupees, parseRupees, rupeesToPaise } from './ipd.model';
 
 /**
- * Clinic setup → Admission and deposits (SAH-23), mockup `cfgIpAdm`, Minimum deposit panel only:
- * base deposit for each admission type, the add-on for each bed category, emergency without
- * deposit, the deposit alert level, and Confirm these rules. SAH-26 adds the Bed transfer rules
- * panel (moving to a higher category, when the new bed rate starts). Amounts are whole rupees on screen
+ * Clinic setup → Admission and deposits (SAH-23), mockup `cfgIpAdm`: the Minimum deposit panel
+ * (base deposit for each admission type, the add-on for each bed category, emergency without
+ * deposit, the deposit alert level, and Confirm these rules). SAH-26 adds the Bed transfer rules
+ * panel (moving to a higher category, when the new bed rate starts). SAH-29 adds the read-only
+ * Packages panel (DEC-030). Amounts are whole rupees on screen
  * and integer paise in the API. Each change is saved at once.
  */
 @Component({
   selector: 'app-ip-adm',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatButtonModule, MatButtonToggleModule, IconComponent, IpdGateComponent],
-  providers: [AdmissionRulesStore],
+  providers: [AdmissionRulesStore, PackagesStore],
   styleUrls: ['../config-common.scss', './ipadm.page.scss'],
   templateUrl: './ipadm.page.html',
 })
 export class IpAdmPage {
   private readonly api = inject(AdmissionsApi);
   protected readonly store = inject(AdmissionRulesStore);
+  protected readonly packages = inject(PackagesStore);
 
   protected readonly types = ADMISSION_TYPES;
   protected readonly categories = CATEGORY_OPTIONS;
@@ -48,6 +53,8 @@ export class IpAdmPage {
   protected readonly alertMax = ALERT_MAX;
   protected readonly paiseToRupees = paiseToRupees;
   protected readonly formatInr = formatInr;
+  protected readonly chip = packageChip;
+  protected readonly includesText = PACKAGE_INCLUDES_TEXT;
 
   private input(): AdmissionRulesInput | null {
     const r = this.store.rules();

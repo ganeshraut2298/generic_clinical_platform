@@ -37,10 +37,10 @@ final class DischargeRules {
 
     /**
      * The template the sheet starts with: the one chosen in Discharge setup; when none is chosen, Maternity for a
-     * maternity admission, Day-care for a day-care admission, otherwise General medicine. (An admission with a
-     * package is Surgical once SAH-29 exists; no admission has a package yet.)
+     * maternity admission, Day-care for a day-care admission, Surgical for any other admission with a package (SAH-29,
+     * mockup {@code ipdis}), otherwise General medicine.
      */
-    static String defaultTemplate(String settingsTemplate, String admissionType) {
+    static String defaultTemplate(String settingsTemplate, String admissionType, boolean hasPackage) {
         if (settingsTemplate != null) {
             return settingsTemplate;
         }
@@ -49,6 +49,9 @@ final class DischargeRules {
         }
         if ("daycare".equals(admissionType)) {
             return "daycare";
+        }
+        if (hasPackage) {
+            return "surgical";
         }
         return "general";
     }

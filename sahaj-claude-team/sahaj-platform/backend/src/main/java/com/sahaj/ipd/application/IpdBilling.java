@@ -86,7 +86,7 @@ class IpdBilling {
         RunningBill bill(AdmissionRow row, String doctorName) {
             return RunningBill.compute(row.admittedAt(), now, config, row.categoryKey(), categories, doctorName,
                     charges.getOrDefault(row.id(), List.of()), transfers.getOrDefault(row.id(), List.of()),
-                    row.depositTotalPaise(), alertPercent);
+                    row.depositTotalPaise(), alertPercent, row.packageCopy());
         }
     }
 }

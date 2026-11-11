@@ -100,7 +100,7 @@ class AdmissionChargeServiceTest {
                 new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)), catalog, charges,
                 new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
                 mock(EmergencyService.class), mock(VitalsRepository.class), new AdmittedCards(clinicalPatients, patients, mock(VitalsRepository.class), safety),
-                new CardSetups(mock(CardSetupRepository.class)));
+                new CardSetups(mock(CardSetupRepository.class)), ScopeStubs.unscoped(), ScopeStubs.repository());
 
         state("on");
         when(settings.findDepositRules(TENANT)).thenReturn(Optional.empty());

@@ -1,8 +1,9 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpContext, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
+import { BOOTSTRAP_CALL } from '../http/bootstrap-call';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService } from './auth.service';
 
@@ -59,6 +60,31 @@ describe('authInterceptor', () => {
       expect(req.request.headers.has('Authorization')).toBe(false);
       req.flush({});
     }
+  });
+
+  it('lets a marked bootstrap call pass: no clinic token and no refresh on a 401 (dev origin case)', () => {
+    // In development the API base is another origin, so the URL rule alone does not see the call.
+    const url = 'http://localhost:4200/api/v1/admin/bootstrap/unlock';
+    http
+      .post(url, {}, { context: new HttpContext().set(BOOTSTRAP_CALL, true) })
+      .subscribe({ error: () => undefined });
+    const req = httpMock.expectOne(url);
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush('no', { status: 401, statusText: 'Unauthorized' });
+    expect(auth.refresh).not.toHaveBeenCalled();
+    expect(auth.accessToken).not.toHaveBeenCalled();
+  });
+
+  it('ignores the marker on any other path: the token is attached and a 401 still refreshes', () => {
+    auth.accessToken.mockReturnValueOnce('token-1').mockReturnValue('token-2');
+    auth.refresh.mockReturnValue(of(true));
+    const marked = { context: new HttpContext().set(BOOTSTRAP_CALL, true) };
+    http.get('/api/v1/platform/me', marked).subscribe();
+    const first = httpMock.expectOne('/api/v1/platform/me');
+    expect(first.request.headers.get('Authorization')).toBe('Bearer token-1');
+    first.flush('no', { status: 401, statusText: 'Unauthorized' });
+    expect(auth.refresh).toHaveBeenCalledTimes(1);
+    httpMock.expectOne('/api/v1/platform/me').flush({});
   });
 
   it('retries once through refresh after a 401, then succeeds', () => {

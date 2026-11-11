@@ -10,6 +10,7 @@ import com.sahaj.ipd.application.AdmissionViews.CardEscalationFlag;
 import com.sahaj.ipd.application.EscalationBoardRepository.BoardRow;
 import com.sahaj.ipd.application.EscalationBoardRepository.Detail;
 import com.sahaj.ipd.application.SafetyViews.Banner;
+import com.sahaj.ipd.application.WardScopeRepository.UnreviewedMark;
 import com.sahaj.ipd.application.VitalsRepository.LatestScore;
 import com.sahaj.ipd.application.VitalsViews.EwsSummary;
 import com.sahaj.ipd.domain.EscalationClock;
@@ -166,8 +167,20 @@ class AdmittedCards {
      */
     Clinical clinical(UUID tenantId, Instant asOf, List<AdmittedRow> rows, Map<UUID, PatientClinical> patientMap,
                       FactsPlan plan, Function<Collection<UUID>, Map<UUID, String>> names) {
-        List<BoardRow> live = safety.liveEscalations(tenantId);
-        Banner banner = safety.banner(tenantId, asOf, live, row -> name(patientMap, row.patientId()));
+        return clinical(tenantId, asOf, rows, patientMap, plan, names, null, null);
+    }
+
+    /**
+     * SAH-34: for a caller's scope. {@code visible} are the admission ids the caller may reach (null means every admitted
+     * patient): the escalations of the banner, the counts and the card flags, and the dose counts, are those of the
+     * scope. For the owner, {@code unreviewed} gives {@code emergencyAccessWaiting} and the change token line.
+     */
+    Clinical clinical(UUID tenantId, Instant asOf, List<AdmittedRow> rows, Map<UUID, PatientClinical> patientMap,
+                      FactsPlan plan, Function<Collection<UUID>, Map<UUID, String>> names, Set<UUID> visible,
+                      UnreviewedMark unreviewed) {
+        List<BoardRow> live = safety.liveEscalations(tenantId, visible);
+        Banner banner = safety.banner(tenantId, asOf, live, row -> name(patientMap, row.patientId()), visible,
+                unreviewed);
         Map<UUID, LatestScore> latest = plan.anyVitals() ? vitals.findLatestReadingsOfAdmitted(tenantId)
                 : vitals.findLatestOfAdmitted(tenantId);
         Map<UUID, String> recorders = Map.of();

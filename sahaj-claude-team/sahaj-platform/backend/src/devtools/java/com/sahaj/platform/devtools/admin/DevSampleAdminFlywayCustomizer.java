@@ -12,9 +12,10 @@ import org.springframework.boot.autoconfigure.flyway.FlywayConfigurationCustomiz
  * {@code afterMigrate__dev_tools_sample_admin.sql} as {@code sahaj_migrator} (ADR-008 D5, option W1).
  * Exists only when conditions C1 to C5 hold. Keeps the existing locations and never adds one twice.
  */
-final class DevSampleAdminFlywayCustomizer implements FlywayConfigurationCustomizer {
+public final class DevSampleAdminFlywayCustomizer implements FlywayConfigurationCustomizer {
 
-    static final String LOCATION = "classpath:db/dev-tools";
+    /** Public only so the bootstrap conditions test can check that no Flyway location is a prefix of another. */
+    public static final String LOCATION = "classpath:db/dev-tools";
 
     @Override
     public void customize(FluentConfiguration configuration) {

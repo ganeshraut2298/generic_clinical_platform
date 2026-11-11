@@ -1118,4 +1118,30 @@ class DoseServiceTest extends DoseTestBase {
         assertThat(result.answer().dose().toString()).doesNotContain("Rupali").doesNotContain("Anjali");
         assertThat(doses.inserted.get(0).toString()).doesNotContain(UHID).doesNotContain("scan");
     }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void doseOutsideScopeChecksNoPinAndWritesNothing() {
+        OrderRow order = active("pcm", "od");
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmission(eq(TENANT), eq(NURSE), eq("NURSE"),
+                eq("NURSE"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> nurseGives(order, given(EIGHT_AM))).isInstanceOf(OutsideScopeException.class);
+
+        assertNothingWritten();
+        verifyNoInteractions(staffPin);
+        verifyNoInteractions(patientAccess);
+    }
+
+    @Test
+    void doseWhoseGrantExpiredBeforeTheLockIsRefusedUnderTheLock() {
+        OrderRow order = active("pcm", "od");
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(NURSE), eq("NURSE"),
+                eq("NURSE"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> nurseGives(order, given(EIGHT_AM))).isInstanceOf(OutsideScopeException.class);
+
+        assertNothingWritten();
+    }
 }

@@ -56,6 +56,8 @@ import {
   stoppedToast,
 } from './emr.model';
 import { IdentityBarComponent } from './identity-bar.component';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { lastDoseLine } from '../mar/mar.model';
 
 export interface EmrSheetData {
@@ -96,6 +98,7 @@ export class EmrSheetComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly data = inject<EmrSheetData>(MAT_DIALOG_DATA);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   protected readonly medsTitle = MEDS_TITLE;
   protected readonly medsSubtitle = MEDS_SUBTITLE;
@@ -154,7 +157,27 @@ export class EmrSheetComponent {
     effect(() => {
       this.dialogRef.disableClose = this.busy();
     });
+    // SAH-34 AC 38, 39: 403 outside-scope on the read, an order or a stop. The chart, the orders and the typed form
+    // leave the screen and the sheet closes; the page says so ("Nothing was saved." after a save).
+    this.scopeRefusals.watch(this.data.admissionId, this.destroyRef, () => this.leaveOutsideScope());
     this.load();
+  }
+
+  private leaveOutsideScope(): void {
+    this.sheet.set(null);
+    this.shown.set(null);
+    this.errors.set({});
+    this.stopConfirmId.set(null);
+    this.form.reset();
+    this.dialogRef.close();
+  }
+
+  private outsideScope(error: unknown, write: boolean): boolean {
+    if (!isOutsideScope(error)) {
+      return false;
+    }
+    this.scopeRefusals.report(this.data.admissionId, write);
+    return true;
   }
 
   protected load(): void {
@@ -172,6 +195,9 @@ export class EmrSheetComponent {
         },
         error: (error: unknown) => {
           this.loading.set(false);
+          if (this.outsideScope(error, false)) {
+            return;
+          }
           if (error instanceof ApiError && error.status === 403 && !this.isModuleOff(error)) {
             this.hidden.set(true);
             return;
@@ -190,7 +216,12 @@ export class EmrSheetComponent {
     this.api
       .sheet(this.data.admissionId)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({ next: (sheet) => this.sheet.set(sheet), error: () => undefined });
+      .subscribe({
+        next: (sheet) => this.sheet.set(sheet),
+        error: (error: unknown) => {
+          this.outsideScope(error, false);
+        },
+      });
   }
 
   private resetSelects(sheet: EmrSheet): void {
@@ -342,6 +373,9 @@ export class EmrSheetComponent {
   }
 
   private orderFailed(error: unknown): void {
+    if (this.outsideScope(error, true)) {
+      return;
+    }
     if (!(error instanceof ApiError)) {
       this.toast(ORDER_ERROR);
       return;
@@ -413,6 +447,9 @@ export class EmrSheetComponent {
         error: (error: unknown) => {
           this.busy.set(false);
           this.stopConfirmId.set(null);
+          if (this.outsideScope(error, true)) {
+            return;
+          }
           if (error instanceof ApiError && (error.status === 409 || error.status === 404)) {
             this.reload();
           }

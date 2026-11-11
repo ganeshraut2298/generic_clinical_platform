@@ -74,7 +74,7 @@ class BedTransferControllerTest {
         return new Detail(ADMISSION_ID, "IP/26-27/0042", PATIENT_ID, "Test Patient", 56, "M", "Dr Test", "201-B",
                 "Private", "Private ward", "planned", "Self", 3, 1_000_000L, 1_000_000L, "OK",
                 Instant.parse("2026-11-09T05:30:00Z"), null, "Chest pain", List.of(), false, 410_000L, false, bill,
-                true, true, new TransferRules(true, "same"), false, "ADMITTED", null, true, null, null, true, false, null, true);
+                true, true, new TransferRules(true, "same"), false, "ADMITTED", null, true, null, null, true, false, null, true, null);
     }
 
     @Test

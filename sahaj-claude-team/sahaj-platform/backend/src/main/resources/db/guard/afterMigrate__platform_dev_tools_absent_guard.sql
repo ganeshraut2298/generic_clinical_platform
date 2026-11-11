@@ -9,12 +9,16 @@
 --   In any other database: raises (so the migrate fails and the application does not start) when ANY of these exists:
 --     1. function platform.admin_dev_create_sample_admin(uuid,text,bytea,smallint,inet,text);
 --     2. any INSERT privilege (table level or column level) of role sahaj_admin_definer on platform.platform_admin;
---     3. an ACTIVE row in platform.platform_admin with the dev sample email (a database cloned from sahaj_dev).
+--     3. an ACTIVE row in platform.platform_admin with the dev sample email (a database cloned from sahaj_dev);
+--     4. (SAH-42, ADR-018) table platform.platform_admin_bootstrap_state;
+--     5. (SAH-42, ADR-018) any function platform.admin_bootstrap_* (any signature).
 --   Each check is skipped when its object (role, table, function) does not exist yet, so a fresh database, or one where
 --   the parked admin migrations are not active, passes.
 --
 -- Never drops, revokes or updates anything: a migrate that silently changes privileges or data in a non-dev database is
--- worse than a stop the human sees. The fix is the runbook docs/database/runbooks/dev-tools-sample-admin-cleanup.sql.
+-- worse than a stop the human sees. The fix is the runbook docs/database/runbooks/dev-tools-sample-admin-cleanup.sql,
+-- which removes the objects of BOTH dev-tools features (the sample admin of ADR-008 and the bootstrap registration of
+-- ADR-018). The raise message names both features (SAH-42 code review finding 17).
 -- Read-only, idempotent, platform scope only, no tenant data, sets no app.tenant_id. The messages carry the database name
 -- and the kind of finding only: no email, no hash, no secret, no row value.
 -- Tests (QA T18): the database name is read once, in the line marked TEST SUBSTITUTION POINT. A test replaces that call with
@@ -54,10 +58,23 @@ begin
     end if;
   end if;
 
+  -- 4. SAH-42 / ADR-018: the bootstrap state table. to_regclass returns null (no error) when the schema or table is missing.
+  if to_regclass('platform.platform_admin_bootstrap_state') is not null then
+    v_found := array_append(v_found, 'the table platform.platform_admin_bootstrap_state exists'::text);
+  end if;
+
+  -- 5. SAH-42 / ADR-018: any bootstrap function, whatever its signature. pg_proc and pg_namespace always exist, so no
+  --    object-exists test is needed; a missing schema simply matches nothing.
+  if exists (select 1
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'platform' and p.proname like 'admin\_bootstrap\_%') then
+    v_found := array_append(v_found, 'a platform.admin_bootstrap_ function exists'::text);
+  end if;
+
   if array_length(v_found, 1) is not null then
-    raise exception 'Dev-tools sample admin objects found in database "%". Run docs/database/runbooks/dev-tools-sample-admin-cleanup.sql as sahaj_migrator, then start again (ADR-008 R3).', v_db
+    raise exception 'Dev-tools admin objects (sample admin or bootstrap registration) found in database "%". Run docs/database/runbooks/dev-tools-sample-admin-cleanup.sql as sahaj_migrator, then start again (ADR-008 R3, ADR-018).', v_db
       using detail  = array_to_string(v_found, '; '::text),
-            hint    = 'psql -v ON_ERROR_STOP=1 -U sahaj_migrator -d <database> -f docs/database/runbooks/dev-tools-sample-admin-cleanup.sql',
+            hint    = 'The runbook docs/database/runbooks/dev-tools-sample-admin-cleanup.sql removes the objects of both dev-tools features (sample admin and bootstrap registration): psql -v ON_ERROR_STOP=1 -U sahaj_migrator -d <database> -f docs/database/runbooks/dev-tools-sample-admin-cleanup.sql',
             errcode = 'P0001';
   end if;
 end

@@ -30,6 +30,7 @@ public class CardSetupController {
         this.service = service;
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/card-setup")
     @PreAuthorize(AdmissionController.READERS)
     public CardSetupView view() {
@@ -37,6 +38,7 @@ public class CardSetupController {
         return service.view(user.tenantId(), user.userId(), user.role());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/card-setup/draft")
     @PreAuthorize(AdmissionController.OWNER)
     public CardSetupView saveDraft(@RequestBody JsonNode request) {
@@ -44,6 +46,7 @@ public class CardSetupController {
         return service.saveDraft(user.tenantId(), user.userId(), user.role(), request);
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @DeleteMapping("/card-setup/draft")
     @PreAuthorize(AdmissionController.OWNER)
     public CardSetupView discardDraft(@RequestParam(name = "draftRevision") Long draftRevision) {
@@ -51,6 +54,7 @@ public class CardSetupController {
         return service.discardDraft(user.tenantId(), user.userId(), user.role(), draftRevision);
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PostMapping("/card-setup/publish")
     @PreAuthorize(AdmissionController.OWNER)
     public CardSetupView publish(@RequestBody JsonNode request) {

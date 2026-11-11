@@ -46,6 +46,7 @@ public class SafetyController {
         this.actions = actions;
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.LIST)
     @GetMapping("/safety")
     @PreAuthorize(READERS)
     public Board board() {
@@ -53,6 +54,7 @@ public class SafetyController {
         return reads.board(user.tenantId(), user.userId(), user.role());
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.LIST)
     @GetMapping("/safety/summary")
     @PreAuthorize(READERS)
     public Counts summary() {
@@ -60,6 +62,7 @@ public class SafetyController {
         return reads.summary(user.tenantId(), user.userId(), user.role());
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ESCALATION)
     @PostMapping("/escalations/{id}/acknowledge")
     @PreAuthorize(DOCTORS)
     public ActionResult acknowledge(@PathVariable UUID id, @RequestBody VersionInput request) {
@@ -67,6 +70,7 @@ public class SafetyController {
         return actions.acknowledge(user.tenantId(), user.userId(), user.role(), id, request);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ESCALATION)
     @PostMapping("/escalations/{id}/respond")
     @PreAuthorize(DOCTORS)
     public ActionResult respond(@PathVariable UUID id, @RequestBody ResponseInput request) {
@@ -74,6 +78,7 @@ public class SafetyController {
         return actions.respond(user.tenantId(), user.userId(), user.role(), id, request);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ESCALATION)
     @PostMapping("/escalations/{id}/call-senior")
     @PreAuthorize(NURSES)
     public ActionResult callSenior(@PathVariable UUID id, @RequestBody SeniorCallInput request) {
@@ -82,6 +87,7 @@ public class SafetyController {
     }
 
     /** The limit and the cursor are read as text so that the service gives the contract's own 400 for a bad one. */
+    @ScopeGuarded(ScopeGuarded.Kind.LIST)
     @GetMapping("/clinical-events")
     @PreAuthorize(READERS)
     public EventPage events(@RequestParam(name = "limit", required = false) String limit,

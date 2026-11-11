@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.ipd.application.SafetyServiceTest
 -------------------------------------------------------------------------------
-Tests run: 42, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.136 s -- in com.sahaj.ipd.application.SafetyServiceTest
+Tests run: 40, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.167 s -- in com.sahaj.ipd.application.SafetyServiceTest

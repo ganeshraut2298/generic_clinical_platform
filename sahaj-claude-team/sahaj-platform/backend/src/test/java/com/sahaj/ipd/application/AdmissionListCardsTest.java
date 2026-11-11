@@ -122,12 +122,12 @@ class AdmissionListCardsTest {
         SafetyService safety = new SafetyService(board, admissions, mock(ClinicalEventRepository.class), lookup,
                 mock(ActorDirectoryPort.class), team, gate,
                 new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()),
-                        new SkippedOrderWarningsTest.MutableClock()));
+                        new SkippedOrderWarningsTest.MutableClock()), ScopeStubs.unscoped(), ScopeStubs.repository(), mock(EmergencyAccessReader.class));
         service = new AdmissionService(admissions, mock(BedRepository.class), wards, settings, mock(OwnerGuard.class),
                 auditLog, team, lookup, patientAccess, actors, gate, catalog, charges,
                 new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
                 mock(EmergencyService.class), vitals, new AdmittedCards(clinicalPatients, lookup, vitals, safety),
-                new CardSetups(cardSetupRepository));
+                new CardSetups(cardSetupRepository), ScopeStubs.unscoped(), ScopeStubs.repository());
 
         when(entitlements.forTenant(TENANT)).thenAnswer(call -> new ModuleEntitlement(ipdState, false, 25));
         when(team.findActiveByUserId(TENANT, ACTOR)).thenAnswer(call -> memberRole == null ? Optional.empty()

@@ -10,6 +10,8 @@ export interface ProblemDetail {
   status: number;
   detail?: string;
   retryAfterSeconds?: number;
+  /** Only on the dev-only bootstrap-pin-invalid problem (docs/api/admin.yaml, SAH-42). */
+  triesLeft?: number;
   fieldErrors?: FieldError[];
 }
 

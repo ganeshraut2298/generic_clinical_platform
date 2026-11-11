@@ -1009,4 +1009,275 @@ class CardSetupIT extends CardSetupSupport {
         assertThat(values(clinic, "select published_by::text from ipd.card_setup_version where version = 2"))
                 .containsExactly(second.userId().toString());
     }
+
+    // ---------------- DEC-032 G-4, AC67, AC69: V15, a label may not duplicate another field's name ----------------
+
+    private static final String NAME_USED = "This name is already used by another field.";
+    private static final String LAYOUT_MESSAGE = "Choose Compact, Standard or Expanded.";
+
+    /** A setup edit, the typed fragment that must never come back in the answer, and the fields that get the V15 error. */
+    private record Dup(String name, Consumer<ObjectNode> change, String typed, String... fields) {
+    }
+
+    private static Dup dup(String name, Consumer<ObjectNode> change, String typed, String... fields) {
+        return new Dup(name, change, typed, fields);
+    }
+
+    private static List<String> v15Paths(JsonNode problem) {
+        List<String> out = new ArrayList<>();
+        for (JsonNode e : problem.get("fieldErrors")) {
+            if (NAME_USED.equals(e.get("message").asText())) {
+                out.add(e.get("field").asText());
+            }
+        }
+        return out;
+    }
+
+    /** Save draft or Publish with the same body, on the clinic's first version and no draft. */
+    private org.springframework.test.web.servlet.ResultActions send(boolean publish, RequestPostProcessor auth,
+                                                                     JsonNode setup) throws Exception {
+        return publish ? publish(auth, 1, null, setup) : putDraft(auth, 1, null, setup);
+    }
+
+    @Test
+    void aLabelThatDuplicatesAnotherFieldsNameIs400OnTheLaterFieldOnlyOnSaveAndPublishWithNoTypedTextAndNothingIsStored()
+            throws Exception {
+        Clinic clinic = hospital();
+        RequestPostProcessor owner = clinic.owner();
+        ObjectNode std = standard(owner);
+        List<Dup> cases = List.of(
+                dup("Diagnosis named Allergies", s -> fieldLabel(s, "diagnosis", "Allergies"), "allergies", "diagnosis"),
+                dup("IP number named ' uhid '", s -> fieldLabel(s, "ipNumber", " uhid "), "uhid", "ipNumber"),
+                dup("Room named Bed while Bed is called Cot", s -> {
+                    fieldLabel(s, "bed", "Cot");
+                    fieldLabel(s, "room", "Bed");
+                }, "cot", "room"),
+                dup("Ward Cot then Room COT: the later field only", s -> {
+                    fieldLabel(s, "ward", "Cot");
+                    fieldLabel(s, "room", "COT");
+                }, "cot", "room"),
+                dup("no-break space and case", s -> fieldLabel(s, "diagnosis", "LENGTH  of stay"), "length", "diagnosis"),
+                dup("the name of a field that is switched off", s -> {
+                    fieldOn(s, "room", false);
+                    fieldLabel(s, "diagnosis", "Room");
+                }, "room", "diagnosis"),
+                dup("the name of a field in a section that is switched off", s -> {
+                    sectionOn(s, "billing", false);
+                    fieldLabel(s, "diagnosis", "Payer");
+                }, "payer", "diagnosis"),
+                dup("three fields with the same new label: the 2nd and 3rd", s -> {
+                    fieldLabel(s, "ward", "Zone");
+                    fieldLabel(s, "room", "zone");
+                    fieldLabel(s, "admissionType", " ZONE ");
+                }, "zone", "room", "admissionType"),
+                dup("a field in a later section is the later field", s -> {
+                    fieldLabel(s, "doctor", "Alpha");
+                    fieldLabel(s, "diagnosis", "alpha");
+                }, "alpha", "diagnosis"),
+                dup("the order of the body decides: Clinical moved before Admission", s -> {
+                    moveSection(s, "clinical", 2);
+                    fieldLabel(s, "diagnosis", "Zeta");
+                    fieldLabel(s, "ward", "zeta");
+                }, "zeta", "ward"),
+                dup("two independent pairs", s -> {
+                    fieldLabel(s, "diagnosis", "Allergies");
+                    fieldLabel(s, "payer", "Deposit");
+                }, "deposit", "diagnosis", "payer"),
+                dup("swapped names: Ward is Room and Room is Ward", s -> {
+                    fieldLabel(s, "ward", "Room");
+                    fieldLabel(s, "room", "Ward");
+                }, "room", "ward", "room"),
+                dup("sharp s and SS fold to the same key", s -> {
+                    fieldLabel(s, "ward", "Straße");
+                    fieldLabel(s, "room", "STRASSE");
+                }, "strasse", "room"),
+                dup("the name of Patient name", s -> fieldLabel(s, "bed", "Patient name"), "patient name", "bed"));
+        Stored before = stored(clinic);
+        for (Dup c : cases) {
+            ObjectNode setup = edit(std, c.change());
+            List<String> expected = new ArrayList<>();
+            for (String key : c.fields()) {
+                expected.add(fieldPath(setup, key) + ".label");
+            }
+            for (boolean publish : new boolean[] {false, true}) {
+                JsonNode p = problem(send(publish, owner, setup), 400);
+                String as = (publish ? "publish: " : "save: ") + c.name() + " -> " + p.get("fieldErrors");
+                assertType(p, "validation");
+                assertThat(v15Paths(p)).as(as).containsExactlyInAnyOrderElementsOf(expected);
+                assertThat(p.get("fieldErrors")).as("no other error: " + as).hasSize(expected.size());
+                assertThat(p.get("detail").asText()).as(as).isEqualTo(NAME_USED);
+                assertThat(p.toString().toLowerCase(java.util.Locale.ROOT)).as("no typed text: " + as)
+                        .doesNotContain(c.typed());
+            }
+            assertThat(stored(clinic)).as("nothing stored after: " + c.name()).isEqualTo(before);
+        }
+        assertThat(cases).as("V15 cases").hasSize(14);
+    }
+
+    @Test
+    void v15IsReportedLastTogetherWithOtherRulesAndTheDetailIsTheFirstErrorInRuleOrder() throws Exception {
+        Clinic clinic = hospital();
+        RequestPostProcessor owner = clinic.owner();
+        ObjectNode std = standard(owner);
+        ObjectNode setup = edit(std, s -> {
+            s.put("layout", "wide");
+            fieldLabel(s, "diagnosis", "Allergies");
+            fieldLabel(s, "bed", repeat("a", 41));
+            fieldLabel(s, "payer", "Deposit​");
+            fieldLabel(s, "ward", "Zone");
+            fieldLabel(s, "admissionType", "zone");
+        });
+        Stored before = stored(clinic);
+        for (boolean publish : new boolean[] {false, true}) {
+            JsonNode p = problem(send(publish, owner, setup), 400);
+            List<String> messages = new ArrayList<>();
+            List<String> fields = new ArrayList<>();
+            for (JsonNode e : p.get("fieldErrors")) {
+                fields.add(e.get("field").asText());
+                messages.add(e.get("message").asText());
+            }
+            assertThat(messages).as("publish=" + publish).containsExactly(LAYOUT_MESSAGE, LABEL_LONG, LABEL_CONTROL,
+                    NAME_USED, NAME_USED);
+            assertThat(fields).as("publish=" + publish).containsExactly("setup.layout", fieldPath(setup, "bed") + ".label",
+                    fieldPath(setup, "payer") + ".label", fieldPath(setup, "admissionType") + ".label",
+                    fieldPath(setup, "diagnosis") + ".label");
+            assertThat(p.get("detail").asText()).as("detail is the first error in rule order").isEqualTo(LAYOUT_MESSAGE);
+        }
+        assertThat(stored(clinic)).isEqualTo(before);
+        // alone, V15 is the detail; and a label that raised V12 never also gets V15 (one error per path)
+        ObjectNode only = edit(std, s -> fieldLabel(s, "diagnosis", "Allergies"));
+        assertThat(problem(putDraft(owner, 1, null, only), 400).get("detail").asText()).isEqualTo(NAME_USED);
+        ObjectNode twice = edit(std, s -> {
+            fieldLabel(s, "diagnosis", "Allergies‮");
+            fieldLabel(s, "payer", "Deposit");
+        });
+        JsonNode p = problem(putDraft(owner, 1, null, twice), 400);
+        List<String> onDiagnosis = new ArrayList<>();
+        for (JsonNode e : p.get("fieldErrors")) {
+            if ((fieldPath(twice, "diagnosis") + ".label").equals(e.get("field").asText())) {
+                onDiagnosis.add(e.get("message").asText());
+            }
+        }
+        assertThat(onDiagnosis).containsExactly(LABEL_CONTROL);
+        assertThat(v15Paths(p)).containsExactly(fieldPath(twice, "payer") + ".label");
+        assertThat(stored(clinic)).isEqualTo(before);
+    }
+
+    @Test
+    void anOwnNameInAnyCaseAndANewLabelAreAcceptedAndOnlyTheExactStandardNameIsStoredAsEmpty() throws Exception {
+        Clinic clinic = hospital();
+        RequestPostProcessor owner = clinic.owner();
+        ObjectNode std = standard(owner);
+        ObjectNode setup = edit(std, s -> {
+            s.put("layout", "compact");
+            fieldLabel(s, "bed", "Bed");
+            fieldLabel(s, "ipNumber", "IP number ");
+            fieldLabel(s, "room", "ROOM");
+            fieldLabel(s, "ward", "ward");
+            fieldLabel(s, "doctor", "Consultant");
+        });
+        JsonNode saved = saveOk(owner, 1, null, setup);
+        JsonNode draft = saved.get("draft").get("setup");
+        assertThat(fieldOf(draft, "bed").get("label").asText()).as("exactly the standard name is stored as empty").isEmpty();
+        assertThat(fieldOf(draft, "ipNumber").get("label").asText()).as("stripped, then the standard name").isEmpty();
+        assertThat(fieldOf(draft, "room").get("label").asText()).as("a case variant is a real label").isEqualTo("ROOM");
+        assertThat(fieldOf(draft, "ward").get("label").asText()).as("a case variant is a real label").isEqualTo("ward");
+        assertThat(fieldOf(draft, "doctor").get("label").asText()).isEqualTo("Consultant");
+        JsonNode live = publishOk(owner, 1, revisionOf(saved), setup).get("live").get("setup");
+        assertThat(fieldOf(live, "bed").get("label").asText()).isEmpty();
+        assertThat(fieldOf(live, "room").get("label").asText()).isEqualTo("ROOM");
+        assertThat(fieldOf(live, "ward").get("label").asText()).isEqualTo("ward");
+        // AC69: typing exactly the field's own name is no change, the same as the server counts it
+        Clinic other = hospital();
+        ObjectNode ownName = edit(standard(other.owner()), s -> fieldLabel(s, "bed", "Bed"));
+        assertThat(saveOk(other.owner(), 1, null, ownName).get("draft").isNull()).as("equal to live: no draft").isTrue();
+        assertThat(rows(other, "card_setup_draft")).isZero();
+        assertThat(problem(publish(other.owner(), 1, null, ownName), 409).get("type").asText())
+                .endsWith("card-setup-unchanged");
+        // a case variant of the own name is a real change
+        JsonNode variant = saveOk(other.owner(), 1, null, edit(standard(other.owner()), s -> fieldLabel(s, "bed", "bed")));
+        assertThat(fieldOf(variant.get("draft").get("setup"), "bed").get("label").asText()).isEqualTo("bed");
+    }
+
+    @Test
+    void v15IsPerClinicAndEveryRoleButTheOwnerGets403BeforeTheBodyIsLookedAt() throws Exception {
+        Clinic mine = hospital();
+        Clinic theirs = hospital();
+        // another clinic's published labels never clash with mine
+        publishNow(theirs, edit(standard(theirs.owner()), s -> fieldLabel(s, "ward", "Cot")));
+        Stored theirsBefore = stored(theirs);
+        ObjectNode samePlace = edit(standard(mine.owner()), s -> {
+            fieldLabel(s, "room", "Cot");
+            fieldLabel(s, "bed", "Zone");
+        });
+        JsonNode saved = saveOk(mine.owner(), 1, null, samePlace);
+        assertThat(fieldOf(saved.get("draft").get("setup"), "room").get("label").asText()).isEqualTo("Cot");
+        // a body of mine that V15 refuses changes nothing of theirs
+        JsonNode refused = problem(putDraft(mine.owner(), 1, revisionOf(saved),
+                edit(samePlace, s -> fieldLabel(s, "diagnosis", "Allergies"))), 400);
+        assertType(refused, "validation");
+        assertThat(v15Paths(refused)).hasSize(1);
+        assertThat(stored(theirs)).isEqualTo(theirsBefore);
+        // a duplicate body from a role without write rights is 403 (not 400): the role is checked first
+        ObjectNode duplicate = edit(standard(mine.owner()), s -> fieldLabel(s, "diagnosis", "Allergies"));
+        Stored before = stored(mine);
+        for (String role : new String[] {"FRONT_DESK", "NURSE", "DOCTOR", "BILLING", "PHARMACIST", "VISITING_DOCTOR",
+            "COUNSELLOR"}) {
+            Staff who = staff(mine, role);
+            forbiddenOf(putDraft(who.auth(), 1, null, duplicate));
+            forbiddenOf(publish(who.auth(), 1, null, duplicate));
+        }
+        assertThat(stored(mine)).isEqualTo(before);
+    }
+
+    @Test
+    void aStoredDuplicateSetupStillReadsWith200AndNoFallbackAndTheNextSaveOrPublishIs400UntilItIsRenamed() throws Exception {
+        Ward w = ward();
+        Clinic clinic = w.clinic();
+        RequestPostProcessor owner = clinic.owner();
+        ObjectNode duplicate = edit(standard(owner), s -> {
+            fieldLabel(s, "diagnosis", "Allergies");
+            fieldLabel(s, "ward", "Zone");
+            fieldLabel(s, "room", "zone");
+        });
+        ObjectNode draftSetup = edit(duplicate, s -> s.put("layout", "compact"));
+        commitAsTenant(clinic.tenantId(), "insert into ipd.card_setup_version (version, setup, is_standard, changed_parts, "
+                + "published_by) values (2, ?::jsonb, false, array['fields']::text[], ?::uuid)", duplicate.toString(),
+                clinic.ownerUserId().toString());
+        commitAsTenant(clinic.tenantId(), "insert into ipd.card_setup_draft (setup, base_version, revision, saved_by) "
+                + "values (?::jsonb, 2, 7, ?::uuid)", draftSetup.toString(), clinic.ownerUserId().toString());
+        // the owner reads the live setup and the draft with their labels as stored (no repair, no data dropped)
+        JsonNode v = view(owner);
+        assertThat(v.get("live").get("version").asInt()).isEqualTo(2);
+        assertThat(v.get("live").get("isStandard").asBoolean()).isFalse();
+        assertThat(fieldOf(v.get("live").get("setup"), "diagnosis").get("label").asText()).isEqualTo("Allergies");
+        assertThat(fieldOf(v.get("live").get("setup"), "room").get("label").asText()).isEqualTo("zone");
+        assertThat(fieldOf(v.get("draft").get("setup"), "diagnosis").get("label").asText()).isEqualTo("Allergies");
+        assertThat(v.get("draft").get("revision").asLong()).isEqualTo(7);
+        // every list role still gets its list and the setup is not the fallback
+        for (RequestPostProcessor auth : new RequestPostProcessor[] {owner, w.nurse().auth(), w.doctor().auth(),
+            staff(clinic, "FRONT_DESK").auth()}) {
+            JsonNode l = listOf(auth);
+            assertThat(l.get("cardSetup").get("version").asInt()).isEqualTo(2);
+            assertThat(l.get("cardSetup").get("fallback").asBoolean()).isFalse();
+            assertThat(l.get("items")).hasSize(1);
+        }
+        // the next write is refused with V15 on the later field only; nothing is stored
+        Stored before = stored(clinic);
+        JsonNode save = problem(putDraft(owner, 2, 7L, draftSetup), 400);
+        assertType(save, "validation");
+        assertThat(v15Paths(save)).containsExactlyInAnyOrder(fieldPath(draftSetup, "diagnosis") + ".label",
+                fieldPath(draftSetup, "room") + ".label");
+        JsonNode pub = problem(publish(owner, 2, 7L, draftSetup), 400);
+        assertThat(v15Paths(pub)).hasSize(2);
+        assertThat(stored(clinic)).isEqualTo(before);
+        // once the owner renames them, it is accepted
+        ObjectNode fixed = edit(draftSetup, s -> {
+            fieldLabel(s, "diagnosis", "Why admitted");
+            fieldLabel(s, "room", "Bay");
+        });
+        JsonNode ok = saveOk(owner, 2, 7L, fixed);
+        assertThat(fieldOf(ok.get("draft").get("setup"), "diagnosis").get("label").asText()).isEqualTo("Why admitted");
+        assertThat(publishOk(owner, 2, revisionOf(ok), fixed).get("live").get("version").asInt()).isEqualTo(3);
+    }
 }

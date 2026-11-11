@@ -40,6 +40,7 @@ export function toApiError(error: HttpErrorResponse): ApiError {
       detail: typeof body['detail'] === 'string' ? body['detail'] : undefined,
       retryAfterSeconds:
         typeof body['retryAfterSeconds'] === 'number' ? body['retryAfterSeconds'] : retryFromHeader,
+      triesLeft: typeof body['triesLeft'] === 'number' ? body['triesLeft'] : undefined,
       fieldErrors: readFieldErrors(body['fieldErrors']),
     });
   }

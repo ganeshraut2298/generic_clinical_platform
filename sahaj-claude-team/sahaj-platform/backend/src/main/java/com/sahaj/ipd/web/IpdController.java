@@ -35,12 +35,14 @@ public class IpdController {
         this.service = service;
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/layout")
     @PreAuthorize(ANY_CLINIC_ROLE)
     public IpdLayout layout() {
         return service.layout(ClinicUser.current().tenantId());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PostMapping("/wards")
     @PreAuthorize(OWNER)
     @ResponseStatus(HttpStatus.CREATED)
@@ -49,6 +51,7 @@ public class IpdController {
         return service.addWard(user.tenantId(), user.userId(), request.name());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PostMapping("/wards/{id}/rooms")
     @PreAuthorize(OWNER)
     @ResponseStatus(HttpStatus.CREATED)
@@ -57,6 +60,7 @@ public class IpdController {
         return service.addRoom(user.tenantId(), user.userId(), id);
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PostMapping("/beds")
     @PreAuthorize(OWNER)
     @ResponseStatus(HttpStatus.CREATED)
@@ -65,6 +69,7 @@ public class IpdController {
         return service.addBed(user.tenantId(), user.userId(), request.wardId(), request.roomId());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/beds/{id}")
     @PreAuthorize(OWNER)
     public IpdLayout changeBedCategory(@PathVariable UUID id, @RequestBody BedUpdateRequest request) {
@@ -72,6 +77,7 @@ public class IpdController {
         return service.changeBedCategory(user.tenantId(), user.userId(), id, request.categoryKey());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @DeleteMapping("/beds/{id}")
     @PreAuthorize(OWNER)
     public IpdLayout removeBed(@PathVariable UUID id) {
@@ -79,6 +85,7 @@ public class IpdController {
         return service.removeBed(user.tenantId(), user.userId(), id);
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/room-level")
     @PreAuthorize(OWNER)
     public IpdLayout setRoomLevel(@RequestBody RoomLevelRequest request) {
@@ -86,6 +93,7 @@ public class IpdController {
         return service.setRoomLevel(user.tenantId(), user.userId(), request.on());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/categories/{key}")
     @PreAuthorize(OWNER)
     public IpdLayout updateCategory(@PathVariable String key, @RequestBody CategoryChargeRequest request) {
@@ -93,6 +101,7 @@ public class IpdController {
         return service.updateCategory(user.tenantId(), user.userId(), key, request.ratePaise(), request.multiplier());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/charges")
     @PreAuthorize(OWNER)
     public IpdLayout updateCharges(@RequestBody ChargesRequest request) {

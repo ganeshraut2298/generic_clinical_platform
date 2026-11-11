@@ -88,7 +88,7 @@ class SafetyServiceRoundTest {
         service = new SafetyService(board, mock(AdmissionRepository.class), mock(ClinicalEventRepository.class),
                 patients, actors, team, new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
                 new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()),
-                        new SkippedOrderWarningsTest.MutableClock()));
+                        new SkippedOrderWarningsTest.MutableClock()), ScopeStubs.unscoped(), ScopeStubs.repository(), mock(EmergencyAccessReader.class));
         when(entitlements.forTenant(TENANT)).thenAnswer(call -> new ModuleEntitlement(ipdState, false, 25));
         when(board.databaseNow()).thenReturn(NOW);
         when(board.findOnBoard(TENANT, NOW)).thenReturn(List.of());

@@ -12,6 +12,8 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiError } from '../../../core/http/problem-detail';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { formatInrPaise } from '../../../shared/format/inr';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { formatDate, formatWhen, problemMessage } from '../../config/config-format';
@@ -71,6 +73,7 @@ function isLostAnswer(error: unknown): boolean {
 export class DischargeSheetComponent implements OnInit {
   private readonly api = inject(AdmissionsApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   readonly admissionId = input.required<string>();
   /** Back to the admission sheet. */
@@ -147,12 +150,31 @@ export class DischargeSheetComponent implements OnInit {
 
   protected load(): void {
     this.loadError.set(null);
-    this.fetch((error) => this.loadError.set(problemMessage(error, LOAD_ERROR)));
+    this.fetch((error) => {
+      if (this.outsideScope(error, false)) {
+        return;
+      }
+      this.loadError.set(problemMessage(error, LOAD_ERROR));
+    });
+  }
+
+  /**
+   * SAH-34 AC 38, 39: 403 `outside-scope` is reported once; the admission sheet around this one clears and closes,
+   * and the page says so. Nothing is shown as saved.
+   */
+  private outsideScope(error: unknown, write: boolean): boolean {
+    if (!isOutsideScope(error)) {
+      return false;
+    }
+    this.scopeRefusals.report(this.admissionId(), write);
+    return true;
   }
 
   /** Reads the sheet again and keeps the choices still on offer (after bill-changed and the like). */
   private reload(): void {
-    this.fetch(() => undefined);
+    this.fetch((error) => {
+      this.outsideScope(error, false);
+    });
   }
 
   private fetch(failed: (error: unknown) => void): void {
@@ -214,6 +236,9 @@ export class DischargeSheetComponent implements OnInit {
         error: (error: unknown) => {
           this.signing.set(false);
           box.checked = false;
+          if (this.outsideScope(error, true)) {
+            return;
+          }
           this.fail(error, SIGN_ERROR);
         },
       });
@@ -243,6 +268,9 @@ export class DischargeSheetComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.running.set(false);
+          if (this.outsideScope(error, true)) {
+            return;
+          }
           if (isLostAnswer(error)) {
             this.actionError.set(DISCHARGE_LOST);
             this.outdated.emit();

@@ -1,8 +1,23 @@
 openapi: 3.1.0
 info:
   title: Sahaj admin portal API
-  version: 0.4.0
+  version: 0.5.0
   description: >-
+    Version 0.5.0 (SAH-42, ADR-018, DEC-034): adds the dev-only bootstrap registration of the first platform admin,
+    POST /bootstrap/unlock and POST /bootstrap/register (x-dev-only). Like /dev, it is absent from every jar built
+    without the Maven profile dev-tools, and every path under /bootstrap answers an empty 404 unless all its build,
+    start-time and request conditions hold and no platform admin exists yet. Adds the problem types
+    bootstrap-pin-invalid (with triesLeft), bootstrap-locked and bootstrap-ticket-invalid. Both bootstrap calls
+    answer 429 rate-limit with Retry-After 5 when their turn waits more than 10 seconds (nothing counted or
+    written). No other operation changes. (ADR-018 Revision 2, before approval: each bootstrap 400 is either
+    bad-request for a body that cannot be read, or validation with fixed field texts; register lists at most two
+    field errors.) (ADR-018 Revision 3, before approval: an unlock try is counted when it starts, before the PIN
+    is compared, so a try that ends in 500 still counts; triesLeft values are unchanged. A control character or an
+    unpaired surrogate in fullName or email is a field error. Every bootstrap problem document has a fixed
+    instance, the operation's own path. Problem lists instance. No operation is renamed.) (DEC-035, before
+    approval: the page /admin/register goes to /admin/sign-in after register, and the first sign-in runs
+    enrolment.) (ADR-018 Revision 5, security review L-4, human decision 11 Nov 2026, before approval: the register
+    201 has no body; the schema BootstrapRegistered is withdrawn and register issues no sign-in token.)
     Version 0.4.0 (ADM-2 and ADM-3 design, ADR-016, DEC-029): the directory search moves from GET /clinics to
     POST /clinics/search, so that the search text, which may hold owner mobile digits, never appears in a URL, an
     access log or browser history. The IPD filter and facet are withdrawn (not in the mockup). The Activity log
@@ -41,6 +56,7 @@ tags:
   - { name: ADM-2, description: Organizations directory and clinic detail (read-only) }
   - { name: ADM-3, description: Modules and plan management }
   - { name: DEV, description: 'Dev-only tools (DEC-016, ADR-008). Never in a production build.' }
+  - { name: SAH-42, description: 'Dev-only bootstrap registration of the first admin behind a PIN (DEC-034, ADR-018). Never in a production build.' }
 paths:
   /auth/login:
     post:
@@ -393,6 +409,209 @@ paths:
         '404': { $ref: '#/components/responses/DevNotFound' }
         '429': { $ref: '#/components/responses/Problem' }
         '500': { $ref: '#/components/responses/DevServerError' }
+  /bootstrap/unlock:
+    post:
+      tags: [SAH-42]
+      operationId: bootstrapUnlock
+      security: []
+      x-dev-only: true
+      x-required-role: 'none: anonymous caller on the local machine, dev-tools build only, only while no platform admin exists'
+      x-build-profile: dev-tools
+      x-runtime-conditions:
+        - 'B1 Built with the Maven profile dev-tools (otherwise no bootstrap class exists)'
+        - 'B2 Spring profile dev is active, and every active profile is dev or test'
+        - 'B3 sahaj.admin.bootstrap.enabled (SAHAJ_ADMIN_BOOTSTRAP_ENABLED in .env) is true, read at start'
+        - 'B4 SAHAJ_ADMIN_BOOTSTRAP_PIN_HASH is a BCrypt hash with cost 12 to 16; missing, blank or malformed means off'
+        - 'B5 Admin realm on (sahaj.admin.enabled=true, SAHAJ_ADMIN_JWT_SECRET and SAHAJ_ADMIN_TOTP_KEY set)'
+        - 'B6 No proxy configuration and no cloud platform (as ADR-008 C4)'
+        - 'B7 server.address is a loopback address'
+      x-request-checks:
+        - 'K1 Exactly POST /api/v1/admin/bootstrap/unlock or /api/v1/admin/bootstrap/register (any other method or path under /bootstrap is 404, never 405)'
+        - 'K2 Servlet remote address is loopback (127.0.0.0/8, ::1 or ::ffff:127.x.x.x)'
+        - 'K3 Forwarding headers may only narrow. Allowed, each at most once - X-Forwarded-For (every element an IP literal that is loopback), X-Forwarded-Proto (http or https), X-Forwarded-Port (digits), X-Forwarded-Host (as K4). Any other forwarding header of ADR-008 G3 refuses'
+        - 'K4 Host is localhost, 127.0.0.1 or [::1], optionally with a port'
+        - 'K5 Origin absent or exactly http(s)://<a K4 host>[:port]; Sec-Fetch-Site absent or same-origin'
+        - 'K6 Content-Type is application/json'
+        - 'K7 No platform admin exists (active or not), checked in the database on every request'
+      description: >-
+        Step 1 of the bootstrap registration (story SAH-42-2, SAH-42-3). Checks the PIN against the BCrypt hash in
+        SAHAJ_ADMIN_BOOTSTRAP_PIN_HASH with a constant-time compare. The PIN travels only in this body, never in a URL
+        or header, and is never logged, stored, audited or echoed. A blank or whitespace-only PIN is 400 validation
+        (field pin) and is not counted; neither is a body that cannot be read. Every other value, of any length or
+        content, is a try, and the try is counted and stored before the PIN is compared (ADR-018 D4 Revision 3); a
+        correct PIN then sets the count back to 0. So a try that ends in the bodyless 500, or gets no answer at all,
+        has still been counted. Anything over 64 characters or 72 UTF-8 bytes is wrong without being compared
+        against the real hash (a dummy hash of the same cost is checked instead, so time does not differ). The
+        count is global (every caller together), kept in the database and survives a restart. Wrong PINs 1 to 4 in
+        a row answer 401 bootstrap-pin-invalid with triesLeft (4 to 1, that is 5 minus the wrong PINs so far,
+        this one included), same title whatever was typed. The 5th wrong PIN locks the
+        feature for 60 minutes for everyone, cancels any open ticket and answers 423 bootstrap-locked with
+        retryAfterSeconds 3600. While locked every unlock, even with the correct PIN, answers 423 bootstrap-locked
+        with the remaining seconds; it is not compared, not counted and not audited. When the lock ends the count
+        restarts at 0. A correct PIN resets the count to 0, replaces any earlier ticket and returns a new ticket
+        (valid 5 minutes, single use) plus the HttpOnly binding cookie sahaj_admin_bootstrap; the ticket and the
+        cookie are both needed by /bootstrap/register. Unlocks are judged one at a time; a caller who waits more
+        than 10 seconds for its turn (another try is being checked, or an earlier try ended without a result in the
+        last 30 seconds) gets 429 rate-limit with Retry-After 5 and is not counted. Audited in
+        platform_admin_audit - AUTH ADMIN_BOOTSTRAP_UNLOCK_FAILED for each wrong PIN and ADMIN_BOOTSTRAP_LOCKED at
+        the lock (with the lock end time), with address and request id and never the typed text, and
+        ADMIN_BOOTSTRAP_UNLOCK_UNJUDGED for a counted try that ended without a result. A correct unlock is not
+        audited. Every case where the feature is off, out of reach or closed answers the same empty 404
+        (BootstrapNotFound) and writes nothing. A bearer token or any other cookie sent with the request is ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BootstrapUnlockInput' }
+            examples:
+              throwaway: { summary: 'A throwaway value, never the real PIN', value: { pin: not-a-real-pin } }
+      responses:
+        '200':
+          description: PIN accepted. Continue with /bootstrap/register within 5 minutes from the same browser.
+          headers:
+            Set-Cookie:
+              description: >-
+                sahaj_admin_bootstrap=<43 Base64url characters>; HttpOnly; SameSite=Strict; Path=/api/v1/admin/bootstrap;
+                Max-Age=300; Secure (omitted only in the dev profile on plain http://localhost, the existing
+                refresh-cookie-secure false setting). Stored on the server only as a keyed hash.
+              schema: { type: string }
+            Cache-Control: { description: no-store, schema: { type: string } }
+            Pragma: { description: no-cache, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BootstrapUnlocked' }
+              examples:
+                unlocked: { value: { ticket: Xq3vTn8bKp0aLmZr5YwC2dEfGhJ7sUiOq9RtVbNcA1k, expiresInSeconds: 300 } }
+        '400':
+          description: >-
+            Never counted, never audited, answered only after the closed (404) and locked (423) checks (ADR-018 D2
+            "Request bodies"). Two cases. (1) validation - the body is readable but pin is missing, null, empty or
+            whitespace only - exactly one fieldError, field pin, message "Enter the PIN.". (2) bad-request - the body
+            cannot be read - empty or not JSON, not a JSON object, a duplicate key, anything after the object, a field
+            other than pin, or a pin that is neither a string nor null (a number, boolean, array or object) - no
+            fieldErrors, title "Bad Request", detail "The request could not be understood. Check it and try again.".
+            No field name or value from the request is echoed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                blank: { value: { type: 'https://sahaj.in/problems/validation', title: Check the highlighted fields, status: 400, instance: /api/v1/admin/bootstrap/unlock, fieldErrors: [ { field: pin, message: Enter the PIN. } ] } }
+                unreadable: { value: { type: 'https://sahaj.in/problems/bad-request', title: Bad Request, status: 400, detail: The request could not be understood. Check it and try again., instance: /api/v1/admin/bootstrap/unlock } }
+        '401':
+          description: 'bootstrap-pin-invalid - wrong PIN number 1 to 4, with triesLeft. Same answer whatever was typed.'
+          headers:
+            Cache-Control: { description: no-store, schema: { type: string } }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                wrong: { value: { type: 'https://sahaj.in/problems/bootstrap-pin-invalid', title: That PIN is not right., status: 401, instance: /api/v1/admin/bootstrap/unlock, triesLeft: 3 } }
+        '403': { $ref: '#/components/responses/Problem', description: 'admin-network-denied (only when SAHAJ_ADMIN_ALLOWED_NETWORKS is set and excludes loopback)' }
+        '404': { $ref: '#/components/responses/BootstrapNotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '423': { $ref: '#/components/responses/BootstrapLocked' }
+        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit - another unlock held the turn for more than 10 seconds; Retry-After 5; not counted' }
+        '500': { $ref: '#/components/responses/BootstrapServerError', description: 'Bodyless 500 (BootstrapServerError). If the PIN step had started, the try has been counted (and, for the 5th, the lock is set) whatever the PIN was; it is never a 200 or a 401. No ticket was issued.' }
+  /bootstrap/register:
+    post:
+      tags: [SAH-42]
+      operationId: bootstrapRegister
+      security: []
+      x-dev-only: true
+      x-required-role: 'none: anonymous caller on the local machine holding a valid ticket and its binding cookie'
+      x-build-profile: dev-tools
+      x-runtime-conditions: 'Same as bootstrapUnlock (B1 to B7, ADR-018 D2)'
+      x-request-checks: 'Same as bootstrapUnlock (K1 to K7, ADR-018 D2)'
+      description: >-
+        Step 2 (story SAH-42-4, SAH-42-5). Creates the FIRST platform admin, role PLATFORM_ADMIN, with no tenant,
+        no membership and no clinic link. Order of checks after the request checks - (1) an admin exists - empty
+        404; (2) the feature is locked - 423 bootstrap-locked; (3) the ticket in the body and the
+        sahaj_admin_bootstrap cookie do not both match the open ticket, or it is older than 5 minutes from the
+        unlock, or it was replaced by a later unlock, cancelled by a lock or already spent - 401
+        bootstrap-ticket-invalid and the cookie is cleared; (4) the form - 400 validation with fieldErrors, using
+        the admin password rules of ADR-003 D2.1 (12 to 64 characters, at most 72 UTF-8 bytes, not containing the
+        part of the email before @ in any letter case; no breached-password check). The email is trimmed and
+        lower-cased. There is no "email already used" field error: this call runs only while no admin exists, so an
+        email clash cannot happen; an existing admin is check (1), the empty 404 (ADR-018 D6 step 2). A
+        rejected form does not spend the ticket. On success, in one transaction - the admin is created (password
+        BCrypt 12, not yet enrolled for the authenticator), the ticket is spent and the creation is audited; the
+        answer is 201 with no body, and the cookie is cleared. No sign-in token of any kind is issued (ADR-018
+        Revision 5, security review L-4). The page /admin/register then goes to /admin/sign-in (DEC-035, ADR-018
+        D6), where the owner signs in once with the same email and password; because the admin is not enrolled,
+        that sign-in answers next ENROL with its own pre-auth token and runs the existing /auth/totp/enrol and
+        /auth/totp/verify step, which enrols the authenticator app, returns the 10 recovery codes once and signs
+        the admin in (ADR-003 D2.6). If two registrations race, exactly one admin is created and the other
+        call gets the empty 404. Registrations and unlocks are judged one at a time; a caller who waits more than
+        10 seconds for its turn gets 429 rate-limit with Retry-After 5, nothing is created, the ticket is not spent
+        and the same ticket may be sent again while it is valid. A database failure creates nothing, does not spend
+        the ticket and answers the bodyless 500. Audited AUTH ADMIN_BOOTSTRAP_ADMIN_CREATED with the admin id and name, address and request id,
+        never the email, password, hash, ticket or PIN. The password and ticket are never logged or echoed. After
+        the first admin exists, both bootstrap calls answer the empty 404 for good.
+      parameters:
+        - $ref: '#/components/parameters/BootstrapBindingCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BootstrapRegisterInput' }
+            examples:
+              throwaway:
+                summary: Throwaway values only
+                value: { ticket: Xq3vTn8bKp0aLmZr5YwC2dEfGhJ7sUiOq9RtVbNcA1k, fullName: First admin, email: first.admin@example.test, password: example-password-only }
+      responses:
+        '201':
+          description: >-
+            The first admin was created (not yet enrolled) and the registration is now closed for good. No body and
+            no Content-Type header (Content-Length 0); the status alone says "created, now sign in". No token is
+            returned (ADR-018 Revision 5). Next step for every client - sign in at /admin/sign-in (POST /auth/login)
+            with the same email and password; that sign-in answers next ENROL and runs the enrolment step (DEC-035,
+            ADR-003 D2.6). No Location header (the admin has no resource in this API).
+          headers:
+            Set-Cookie: { description: 'Clears sahaj_admin_bootstrap (Max-Age=0, Path=/api/v1/admin/bootstrap).', schema: { type: string } }
+            Cache-Control: { description: no-store, schema: { type: string } }
+            Pragma: { description: no-cache, schema: { type: string } }
+        '400':
+          description: >-
+            Only after a valid ticket and cookie (a body from which no valid ticket can be read is 401
+            bootstrap-ticket-invalid instead). The ticket is not spent; nothing is audited; no submitted value or
+            field name is echoed (ADR-018 D2 "Request bodies", D6 step 2). Two cases. (1) bad-request - the rest of
+            the body cannot be read - a field other than ticket, fullName, email and password, or one of those
+            holding a value that is neither a string nor null - no fieldErrors, title "Bad Request", detail "The
+            request could not be understood. Check it and try again.". (2) validation - fieldErrors with these fixed
+            messages - fullName "Enter the full name." (missing, null, blank after trimming, over 120 characters,
+            or holding a control character or an unpaired surrogate anywhere, ends included);
+            email "Enter a valid email." (missing, null, not a valid email, or holding a control character or an
+            unpaired surrogate anywhere, ends included); password "The password must be 12 to
+            64 characters and must not contain the first part of your email.". A missing or null field counts as
+            empty. At most two entries - fullName when wrong, plus the first wrong one of email then password (the
+            password is judged only once the email is valid). The list is therefore not always complete; send again
+            after fixing, with the same ticket while it is valid. A control character means any character of
+            Unicode general category Cc (U+0000 to U+001F and U+007F to U+009F, written in JSON as \u0000 and
+            similar escapes); it is checked on the value as sent, before trimming. These values are never a 500
+            (ADR-018 D6 step 2, Revision 3).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                nameAndEmail: { value: { type: 'https://sahaj.in/problems/validation', title: Check the highlighted fields, status: 400, instance: /api/v1/admin/bootstrap/register, fieldErrors: [ { field: fullName, message: Enter the full name. }, { field: email, message: Enter a valid email. } ] } }
+                unreadable: { value: { type: 'https://sahaj.in/problems/bad-request', title: Bad Request, status: 400, detail: The request could not be understood. Check it and try again., instance: /api/v1/admin/bootstrap/register } }
+                weakPassword: { value: { type: 'https://sahaj.in/problems/validation', title: Check the highlighted fields, status: 400, instance: /api/v1/admin/bootstrap/register, fieldErrors: [ { field: password, message: The password must be 12 to 64 characters and must not contain the first part of your email. } ] } }
+        '401':
+          description: 'bootstrap-ticket-invalid - the ticket or the binding cookie is missing, malformed, unknown, expired, replaced, cancelled or spent. The cookie is cleared.'
+          headers:
+            Set-Cookie: { description: Clears sahaj_admin_bootstrap., schema: { type: string } }
+            Cache-Control: { description: no-store, schema: { type: string } }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                expired: { value: { type: 'https://sahaj.in/problems/bootstrap-ticket-invalid', title: Your unlock took too long. Enter the PIN again., status: 401, instance: /api/v1/admin/bootstrap/register } }
+        '403': { $ref: '#/components/responses/Problem', description: 'admin-network-denied (only when SAHAJ_ADMIN_ALLOWED_NETWORKS is set and excludes loopback)' }
+        '404': { $ref: '#/components/responses/BootstrapNotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '423': { $ref: '#/components/responses/BootstrapLocked' }
+        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit - an unlock or another registration held the turn for more than 10 seconds; Retry-After 5; nothing created, ticket not spent' }
+        '500': { $ref: '#/components/responses/BootstrapServerError' }
 components:
   securitySchemes:
     adminBearer:
@@ -418,6 +637,16 @@ components:
         returned by any endpoint, and a new value at every start. Exactly one header; compared in constant time.
         Missing, malformed or wrong gives the same empty 404 (DevNotFound), with no hint which check failed.
       schema: { type: string, minLength: 32, maxLength: 32, pattern: '^[0-9a-f]{32}$' }
+    BootstrapBindingCookie:
+      name: sahaj_admin_bootstrap
+      in: cookie
+      required: true
+      description: >-
+        Dev-only (ADR-018 D5). The browser-binding half of the bootstrap ticket, set by /bootstrap/unlock as an
+        HttpOnly, SameSite=Strict cookie on Path=/api/v1/admin/bootstrap, valid 5 minutes. The page cannot read it;
+        the browser sends it. Stored on the server only as a keyed hash. Missing or not matching gives 401
+        bootstrap-ticket-invalid (not a 400). Never logged.
+      schema: { type: string, minLength: 43, maxLength: 43, pattern: '^[A-Za-z0-9_-]{43}$' }
   responses:
     Problem:
       description: >-
@@ -428,14 +657,16 @@ components:
         forbidden (403, not a platform admin), admin-network-denied (403, "Sign-in works only from approved
         networks."), not-found (404), totp-already-enrolled (409), totp-enrolment-not-started (409),
         ipd-patients-admitted (409, with admittedNow), admin-sign-in-locked (423, "Too many attempts.", with
-        retryAfterSeconds), rate-limit (429, with retryAfterSeconds), admin-unavailable (503); and the shared
+        retryAfterSeconds), rate-limit (429, with retryAfterSeconds), admin-unavailable (503); dev-only
+        bootstrap-pin-invalid (401, "That PIN is not right.", with triesLeft), bootstrap-ticket-invalid (401, "Your
+        unlock took too long. Enter the PIN again.") and bootstrap-locked (423, with retryAfterSeconds); and the shared
         bad-request (400, components/responses/BadRequest) and payload-too-large (413,
         components/responses/PayloadTooLarge). Never echoes a submitted email, password, code, recovery code, token
         or search text, and never says whether an email belongs to an admin. The UI shows its own text for sign-in
         errors (ADR-003 D2.7).
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
     BadRequest:
-      description: 'bad-request: a path value is not of its declared type (an {id} that is not a UUID). Spring''s own text is replaced by a fixed sentence (ProblemExceptionHandler); the submitted value is never echoed; no fieldErrors. Same shape as platform.yaml components/responses/BadRequest. Nothing is audited.'
+      description: 'bad-request: a path value is not of its declared type (an {id} that is not a UUID). Spring''s own text is replaced by a fixed sentence (ProblemExceptionHandler); the submitted value is never echoed; no fieldErrors. Same shape as platform.yaml components/responses/BadRequest. Nothing is audited. The same type, title and detail are also the dev-only bootstrap answer to a request body that cannot be read (ADR-018 D2 "Request bodies").'
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -466,6 +697,40 @@ components:
         logged; the server log line carries the exception class and SQLSTATE only. Nothing was created.
       headers:
         Cache-Control: { description: no-store, schema: { type: string } }
+    BootstrapNotFound:
+      description: >-
+        Dev-only (ADR-018 D1, D2). The bootstrap registration is not available. Byte-identical to DevNotFound -
+        status 404, empty body, no Content-Type, Cache-Control no-store, no CORS headers, no WWW-Authenticate - for
+        every reason - a build without dev-tools, the switch off, the PIN hash missing or malformed, the admin realm
+        off or unavailable, a profile other than dev, proxy settings, a non-loopback bind, any request check K1 to
+        K6 failing, any method or path under /bootstrap other than the two operations, and any platform admin
+        already existing. Produced by the main-code reserved-path filter before any security chain or body-size
+        filter, or by the service for "an admin exists" with the same writer. Writes nothing to the database or the
+        audit.
+      headers:
+        Cache-Control: { description: no-store, schema: { type: string } }
+    BootstrapLocked:
+      description: >-
+        bootstrap-locked (ADR-018 D4). Five wrong PINs locked the bootstrap registration for 60 minutes for every
+        caller. The lock is stored in the database and survives a restart. retryAfterSeconds and the Retry-After
+        header give the seconds left (the page shows whole minutes, rounded up). Returned by the 5th wrong PIN, by
+        every unlock during the lock (even with the correct PIN, which is not compared or counted), and by
+        /bootstrap/register during the lock (the lock cancelled the open ticket).
+      headers:
+        Retry-After: { description: Seconds until the lock ends., schema: { type: integer, minimum: 1, maximum: 3600 } }
+        Cache-Control: { description: no-store, schema: { type: string } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            locked: { summary: 'From /bootstrap/unlock; from /bootstrap/register the instance is /api/v1/admin/bootstrap/register', value: { type: 'https://sahaj.in/problems/bootstrap-locked', title: Registration is locked., status: 423, instance: /api/v1/admin/bootstrap/unlock, retryAfterSeconds: 3600 } }
+    BootstrapServerError:
+      description: >-
+        Dev-only (ADR-018 D2, ADR-008 R4 pattern). An unexpected failure such as a database error. Status 500, empty
+        body, no Content-Type, Cache-Control no-store. Nothing was created and the ticket was not spent. The server
+        log line carries the exception class and SQLSTATE only.
+      headers:
+        Cache-Control: { description: no-store, schema: { type: string } }
   schemas:
     Problem:
       type: object
@@ -475,8 +740,19 @@ components:
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
+        instance:
+          type: string
+          format: uri-reference
+          description: >-
+            Optional. Absent on every other admin operation. On every problem document returned by the dev-only
+            bootstrap operations themselves (400, 401, 423, 429) it is present and exactly the operation's own path,
+            /api/v1/admin/bootstrap/unlock or /api/v1/admin/bootstrap/register, a constant set by the server and never
+            copied from the request URI. An answer given before the operation is reached (the 413 body-size filter, or
+            the request firewall's generic 400 bad-request for a path with ; parameters) has no instance. No answer
+            echoes any part of the request URI (ADR-018 D2 "instance", Revision 3).
         retryAfterSeconds: { type: integer, minimum: 0 }
         admittedNow: { type: integer, minimum: 1, description: Only for ipd-patients-admitted. }
+        triesLeft: { type: integer, minimum: 1, maximum: 4, description: 'Only for bootstrap-pin-invalid - wrong PINs left before the 60-minute lock (SAH-42, OQ-42-6).' }
         fieldErrors:
           type: array
           items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
@@ -795,3 +1071,69 @@ components:
         total: { type: integer, minimum: 0 }
         page: { type: integer, minimum: 0 }
         size: { type: integer }
+    BootstrapTicket:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: '^[A-Za-z0-9_-]{43}$'
+      description: >-
+        Dev-only (ADR-018 D5). Opaque, 256 random bits, Base64url without padding. Valid 5 minutes from the unlock,
+        single use, only with the binding cookie of the same browser, replaced by a new unlock, cancelled by a lock.
+        Keep in component memory only (never storage, URL or history). Stored on the server only as a keyed hash.
+        Not a bearer token; refused by every other endpoint. Never logged.
+    BootstrapUnlockInput:
+      type: object
+      additionalProperties: false
+      required: [pin]
+      description: 'Unknown properties, duplicate keys and a non-string pin are refused with 400 bad-request; a missing or null pin is 400 validation "Enter the PIN." (ADR-018 D2). The server''s toString of this object prints no value.'
+      properties:
+        pin:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          description: >-
+            Label "Registration PIN". Compared exactly as sent (no trimming). Blank or whitespace-only is a 400
+            validation error and is not counted. No length or digit rule here (the PIN may be longer or not numeric
+            later; DEC-034); a value over 64 characters or 72 UTF-8 bytes is a wrong PIN and counts. Only the 4 KB
+            body cap (413) limits it. Never logged, stored, audited or echoed.
+    BootstrapUnlocked:
+      type: object
+      required: [ticket, expiresInSeconds]
+      description: The server's toString of this object prints no value.
+      properties:
+        ticket: { $ref: '#/components/schemas/BootstrapTicket' }
+        expiresInSeconds: { type: integer, const: 300 }
+    BootstrapRegisterInput:
+      type: object
+      additionalProperties: false
+      required: [ticket, fullName, email, password]
+      description: >-
+        Unknown properties, duplicate keys and non-string values are refused with 400 bad-request and never stored;
+        a missing or null fullName, email or password is a field error (ADR-018 D2, D6). "Confirm password" is checked in the page only and
+        is not sent (OQ-42-4). The server's toString of this object prints no value.
+      properties:
+        ticket: { $ref: '#/components/schemas/BootstrapTicket' }
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: 'Label "Full name". Trimmed; 1 to 120 characters after trimming. Stored on the admin and in the creation audit row; never logged.'
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+          description: >-
+            Label "Work email". Trimmed and lower-cased (Locale.ROOT) before checks and storage. Must match the admin
+            email rule (one @, a dot in the domain, no spaces). Never logged, never audited, never echoed.
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 12
+          maxLength: 64
+          description: >-
+            Label "Password". ADR-003 D2.1 - 12 to 64 characters, at most 72 bytes in UTF-8, must not contain the
+            part of the email before @ (any letter case); no composition rules, no breached-password check
+            (OQ-42-2). Stored only as BCrypt (strength 12). Never logged, stored in plain text or echoed.

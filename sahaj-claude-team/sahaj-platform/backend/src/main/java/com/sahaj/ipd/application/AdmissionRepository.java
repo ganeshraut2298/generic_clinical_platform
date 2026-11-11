@@ -71,17 +71,37 @@ public interface AdmissionRepository {
         }
     }
 
-    /** Carries the reason and the patient id: {@code toString} shows the admission id and IP number only. */
+    /**
+     * SAH-29 (AC2): the copy of a package kept on one admission (name, price in paise, included days; 0 = day-care).
+     * Read from the three package columns of {@code ipd.admission}; the application never writes them.
+     */
+    record PackageCopy(String name, long pricePaise, int includedDays) {
+    }
+
+    /**
+     * Carries the reason and the patient id: {@code toString} shows the admission id and IP number only.
+     * {@code packageCopy} (SAH-29) is null when the admission has no package.
+     */
     record AdmissionRow(UUID id, String ipNumber, UUID patientId, UUID bedId, String bedCode, String categoryKey,
                         String wardName, UUID doctorMembershipId, String admissionType, String payer, String reason,
-                        String status, Instant admittedAt, long depositTotalPaise, Instant dischargedAt) {
+                        String status, Instant admittedAt, long depositTotalPaise, Instant dischargedAt,
+                        PackageCopy packageCopy) {
 
-        /** An admission that has not been discharged ({@code dischargedAt} is null). */
+        /** An admission with no package. */
+        public AdmissionRow(UUID id, String ipNumber, UUID patientId, UUID bedId, String bedCode, String categoryKey,
+                            String wardName, UUID doctorMembershipId, String admissionType, String payer,
+                            String reason, String status, Instant admittedAt, long depositTotalPaise,
+                            Instant dischargedAt) {
+            this(id, ipNumber, patientId, bedId, bedCode, categoryKey, wardName, doctorMembershipId, admissionType,
+                    payer, reason, status, admittedAt, depositTotalPaise, dischargedAt, null);
+        }
+
+        /** An admission that has not been discharged ({@code dischargedAt} is null) and has no package. */
         public AdmissionRow(UUID id, String ipNumber, UUID patientId, UUID bedId, String bedCode, String categoryKey,
                             String wardName, UUID doctorMembershipId, String admissionType, String payer,
                             String reason, String status, Instant admittedAt, long depositTotalPaise) {
             this(id, ipNumber, patientId, bedId, bedCode, categoryKey, wardName, doctorMembershipId, admissionType,
-                    payer, reason, status, admittedAt, depositTotalPaise, null);
+                    payer, reason, status, admittedAt, depositTotalPaise, null, null);
         }
 
         @Override

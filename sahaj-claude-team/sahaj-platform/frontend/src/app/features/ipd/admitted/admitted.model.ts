@@ -1,7 +1,8 @@
 import { formatWhen, istToday } from '../../config/config-format';
 import type { IconName } from '../../../shared/icon/icon.component';
 import type { CardActionKey, CardsPerRow } from '../card/card-setup.model';
-import type { AdmittedCardAbilities, AdmittedPatientRow } from '../ipd.model';
+import { timeOfInstant } from '../emergency/emergency.model';
+import type { AdmissionList, AdmissionScope, AdmittedCardAbilities, AdmittedPatientRow } from '../ipd.model';
 
 /**
  * SAH-36 Admitted patient cards (mockup `pcCard`, `sfFlags`, `pcFiltered`, `pcmore`; ADR-013).
@@ -21,6 +22,72 @@ export const COLS_CHOICES: readonly CardsPerRow[] = [2, 3, 4];
 export const ALL_WARDS = 'all';
 
 export const EMPTY_FILTER_TEXT = 'No patients match these filters.';
+
+// ---- SAH-34 ward scope (mockup `pcscope`, `pctog`; texts: docs/stories/SAH-34.md AC 26 to 42) ----
+
+export const MY_PATIENTS_LABEL = 'My patients';
+export const EMERGENCY_ACCESS_LABEL = 'Emergency access';
+/** AC 29: a scoped nurse with no live ward (new text, OQ-34-27). */
+export const NO_WARDS_TEXT =
+  'No wards are assigned to you, so no patients are shown. Ask the owner to assign your ward. If a patient needs you now, use Emergency access.';
+/** AC 30: a nurse with wards but nobody in them while others are admitted (new text, OQ-34-27). */
+export const NO_WARD_PATIENTS_TEXT = 'No patients in your wards right now.';
+/** The empty list of the Admitted tab when nobody at all is admitted (SAH-36). */
+export const NOBODY_ADMITTED_TEXT = 'No one is admitted right now.';
+
+/** True when the scope is narrower than all (the server's `kind`; the browser decides nothing else). */
+export function isScoped(scope: AdmissionScope | undefined): scope is AdmissionScope {
+  return !!scope && scope.kind !== 'ALL';
+}
+
+/** AC 26: "Patients in their wards · 3 of 12" (N visible, M admitted, both from the server). */
+export function scopeChipText(scope: Pick<AdmissionScope, 'visible' | 'admitted'>): string {
+  return `Patients in their wards · ${scope.visible} of ${scope.admitted}`;
+}
+
+/** AC 26 and AC 28: the tooltip and the accessible name of the chip. The mockup's pointer to the Roles panel is not shown. */
+export function scopeTooltip(scope: Pick<AdmissionScope, 'visible' | 'admitted'>): string {
+  return `As Nurse you see patients in their wards (${scope.visible} of ${scope.admitted}). The owner sets your wards in Clinic setup.`;
+}
+
+/**
+ * AC 26, 27: the chip shows for a scoped user when somebody is admitted in the clinic (M above 0);
+ * before the first answer there is no list, so no chip is drawn from a guess (AC 41).
+ */
+export function showScopeChip(scope: AdmissionScope | undefined): boolean {
+  return isScoped(scope) && scope.admitted > 0;
+}
+
+/**
+ * AC 32: "My patients" is shown to OWNER and DOCTOR (scope all) and to a scoped nurse only when she has
+ * a live ward. FRONT_DESK never sees it (mockup). `role` is the signed-in role; the server's `hasWard`
+ * decides for the nurse.
+ */
+export function showMyPatients(role: string | undefined, scope: AdmissionScope | undefined): boolean {
+  if (role === 'FRONT_DESK') {
+    return false;
+  }
+  if (role === 'NURSE') {
+    // AC 32: with the switch on or off, the nurse needs at least one live ward ("mine" means her wards).
+    return scope?.hasWard === true;
+  }
+  return true;
+}
+
+/**
+ * AC 29, 30: what the list area says in place of cards when a scoped user has no row. A nurse with no
+ * live ward gets the zero-ward text; one with wards but nobody in them gets "No patients in your wards
+ * right now.". Null when the list has rows, or when the scope is all (then "No one is admitted right
+ * now." or the filter text of SAH-36 apply).
+ */
+export function scopedEmptyText(list: Pick<AdmissionList, 'scope' | 'items'>): string | null {
+  const scope = list.scope;
+  if (list.items.length > 0 || !isScoped(scope) || scope.admitted === 0) {
+    return null;
+  }
+  return scope.hasWard === false ? NO_WARDS_TEXT : NO_WARD_PATIENTS_TEXT;
+}
+
 /** The search box takes at most this many characters (DEC-025 G-10). */
 export const SEARCH_MAX_LENGTH = 100;
 /** The polite result line waits this long after the last keystroke (the filter itself is instant). */
@@ -86,17 +153,23 @@ export function filterAnnounceText(matches: number, total: number): string {
 
 /**
  * Rows whose patient name, UHID, bed code or IP number contains the text (case, edge spaces and the way an accent is typed
- * ignored: composed or as a base letter plus a combining mark, DEC-032 G-10) and, when a ward is chosen, whose bed is in that ward. The order of the list is kept.
+ * ignored: composed or as a base letter plus a combining mark, DEC-032 G-10) and, when a ward is chosen, whose bed is in that ward
+ * and, with "My patients" pressed, that the server marked `mine`. The order of the list is kept.
  */
 export function filterRows(
   rows: readonly AdmittedPatientRow[],
   query: string,
   wardId: string,
+  mine = false,
 ): AdmittedPatientRow[] {
   const fold = (text: string) => text.normalize('NFC').toLowerCase();
   const q = fold(query.trim());
   return rows.filter((r) => {
     if (wardId !== ALL_WARDS && r.wardId !== wardId) {
+      return false;
+    }
+    // AC 33: "My patients" keeps the rows the server marked mine; a filter, never a security rule.
+    if (mine && r.mine !== true) {
       return false;
     }
     if (q === '') {
@@ -174,8 +247,8 @@ export function cardLabel(row: Pick<AdmittedPatientRow, 'patientName' | 'bedCode
 
 // ---- Flags (ADR-013 D4) ----
 
-export type FlagKind = 'escalation' | 'allergy' | 'ews' | 'vitals' | 'home' | 'deposit';
-export type FlagTone = 'crit' | 'warn' | 'blue';
+export type FlagKind = 'escalation' | 'emergency-access' | 'allergy' | 'ews' | 'vitals' | 'home' | 'deposit';
+export type FlagTone = 'crit' | 'warn' | 'blue' | 'grey';
 
 export interface CardFlag {
   kind: FlagKind;
@@ -194,7 +267,7 @@ export const HIGH_RISK = 'HIGH';
  * The flags of one card, in the order of ADR-013 D4: Not seen or Doctor reviewing, Allergy, EWS,
  * Vitals due, Going home today, Deposit low. Only server fields are used: `clinical` is absent for
  * FRONT_DESK, so the clinical flags are simply not built. "Allergy not recorded" and "None known"
- * give no flag (OQ-36-6). No Dose overdue flag and no Emergency access flag in this story.
+ * give no flag (OQ-36-6). No Dose overdue flag. SAH-34 adds the grey Emergency access flag (key icon) for the grantee.
  */
 export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities): CardFlag[] {
   const flags: CardFlag[] = [];
@@ -255,6 +328,20 @@ export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities):
         safety: false,
       });
     }
+  }
+  if (row.emergencyAccess) {
+    // SAH-34 (mockup `sfFlags`): grey, key icon, right after the escalation flag. Only the person who opened
+    // the grant gets `emergencyAccess` on the row. The end time is the server's (OQ-34-33); no countdown here.
+    const until = timeOfInstant(row.emergencyAccess.expiresAt);
+    const after = flags.filter((f) => f.kind === 'escalation').length;
+    flags.splice(after, 0, {
+      kind: 'emergency-access',
+      text: EMERGENCY_ACCESS_LABEL,
+      tone: 'grey',
+      icon: 'key',
+      title: until === '' ? EMERGENCY_ACCESS_LABEL : `Emergency access until ${until} IST`,
+      safety: true,
+    });
   }
   if (row.goingHomeToday) {
     flags.push({

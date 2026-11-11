@@ -96,7 +96,8 @@ export class BedBoardComponent implements OnInit {
   protected actionable(bed: BoardBed, board: BedBoard): boolean {
     switch (bed.status) {
       case 'occ':
-        return !!bed.admissionId;
+        // SAH-34: an occupied bed outside the scope has no admission id; the tile shows the status only.
+        return !bed.outsideScope && !!bed.admissionId;
       case 'free':
         return board.canAdmit;
       case 'clean':

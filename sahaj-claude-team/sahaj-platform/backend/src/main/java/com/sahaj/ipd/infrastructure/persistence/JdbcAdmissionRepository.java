@@ -45,7 +45,7 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
     private static final String ADMISSION_COLUMNS = """
             select a.id, a.ip_number, a.patient_id, a.bed_id, b.code as bed_code, b.category_key,
                    w.name as ward_name, a.doctor_membership_id, a.admission_type, a.payer, a.reason, a.status,
-                   a.admitted_at, a.discharged_at,
+                   a.admitted_at, a.discharged_at, a.package_name, a.package_price_paise, a.package_days,
                    coalesce((select sum(d.amount_paise) from ipd.deposit d
                              where d.tenant_id = a.tenant_id and d.admission_id = a.id), 0) as deposit_total""";
     private static final String ADMISSION_FROM = """
@@ -208,6 +208,16 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
                 rs.getString("payer"), rs.getString("reason"), rs.getString("status"),
                 rs.getObject("admitted_at", OffsetDateTime.class).toInstant(), rs.getLong("deposit_total"),
                 rs.getObject("discharged_at", OffsetDateTime.class) == null ? null
-                        : rs.getObject("discharged_at", OffsetDateTime.class).toInstant());
+                        : rs.getObject("discharged_at", OffsetDateTime.class).toInstant(),
+                packageCopy(rs));
+    }
+
+    /** SAH-29: the three package columns are all set or all null (a database check); null when not set. */
+    private static PackageCopy packageCopy(ResultSet rs) throws SQLException {
+        String name = rs.getString("package_name");
+        if (name == null) {
+            return null;
+        }
+        return new PackageCopy(name, rs.getLong("package_price_paise"), rs.getInt("package_days"));
     }
 }

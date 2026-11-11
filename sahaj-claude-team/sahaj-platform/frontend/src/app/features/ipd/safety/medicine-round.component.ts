@@ -15,6 +15,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { sheetToast } from '../../../shared/ui/sheet-toast';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { problemMessage } from '../../config/config-format';
 import { GIVE_TITLE_ID, GiveResult, GiveSheetComponent, GiveSheetData } from '../mar/give-sheet.component';
 import { MarApi } from '../mar/mar.api';
@@ -69,6 +71,7 @@ export class MedicineRoundComponent {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   readonly round = input.required<MedicineRound>();
   /** `SafetyBoard.asOf`: the clock in the subtitle. */
@@ -155,6 +158,12 @@ export class MedicineRoundComponent {
         },
         error: (error: unknown) => {
           this.busyKey.set(null);
+          if (isOutsideScope(error)) {
+            // SAH-34 AC 38: the page says "This patient is not in your wards." and the board reads again (the row goes).
+            this.scopeRefusals.report(row.admissionId, false);
+            setTimeout(() => this.restoreFocus(), 0);
+            return;
+          }
           this.toast(problemMessage(error, ROUND_MAR_ERROR));
           setTimeout(() => this.restoreFocus(), 0);
         },

@@ -77,3 +77,34 @@ QA still has to re-run CardFactsIT and CardSetupStoredIT, flip the revision test
 
 ## Closure (9 Nov 2026)
 #13 is closed: QA flipped the known-gap test. #14 is closed: the 403 mocks use the shared text. #15 is closed: the contract now says an unchanged save keeps its revision. The backend gate passed (unit 3,495, integration 1,758, 0 failed), and so did lint, the frontend unit tests (2,439) and the build. Verdict stays **APPROVE WITH COMMENTS**, with nothing open except accepted nits.
+
+## Release audit re-check (DEC-032, 10 Nov 2026): APPROVE WITH COMMENTS
+Reviewed by reading only (no builds or tests). Backend main code is unchanged since 62064bf; the working tree adds the two IT files and the D-11, D-17 and D-18 frontend fixes. No Blocker, no Major. V15 and G-5 are correct; both IT files are additions only (415 lines added, none removed); no assertion was weakened (the `sah31-world.ts:1308` edit is a data-free 404 like its siblings).
+
+| # | Sev | File:line | Finding | Owner | Tech lead decision |
+|---|---|---|---|---|---|
+| A1 | Minor | patient-card.component.scss:190-200 | The mockup contradicts itself on card values (line 2079 wraps, line 2368 cuts). The code wraps, so it differs from the mockup for the Standard grid. | Human | Recorded as DEC-013 item 15 (default: wrap). Needs the human's answer before merge. |
+| A2 | Minor | CardSetups.java:52-78; ipd.yaml GET /card-setup | A row with a newer `schema_version` reaches the owner as the standard setup with no warning, and publishing the standard setup answers 409 "unchanged". Only after an app roll-back. | solution-architect, then both developers | Backlog (same as security A1) |
+| A3 | Minor | CardSetupValidator.nameKey vs card-label.rules.ts nameKey | Two copies of the name key with no shared test. They agree on every input that survives V12. | java-developer, angular-developer | Backlog: one JSON fixture read by both unit suites |
+| A4 | Minor | card-label.rules.ts:119-127 | Check order differs from the server for a raw label over 400 with a control character. Rare (`maxlength="40"`). | angular-developer | Backlog |
+| A5 | Minor | page-head.component.ts:20-29; ipd.page.ts:239-250 | D-11 is sound. The reserved two lines are a guess; at about 320 px the lead may wrap to three lines; the test measures 375 and 768 only. | angular-developer | QA is measuring 320 px now |
+| A6 | Minor | sah37-layout-styles.spec.ts | The guard reads styles as text and could pass for a rule that never applies. The e2e measure and mutation check carry the proof. | angular-developer | Accept; not behaviour coverage |
+| A7 | Minor (process) | frontend/e2e/ is gitignored | The e2e files need `git add -f`, or the regression guard is lost. | Human at commit | In the QA commit list |
+| A8-A12 | Nit | CardSetupIT:1126, 1151 and the regression spec :383 write invisible characters raw; `aria-describedby` drops the hint line while an error shows; `--pcbar-h` via `style.setProperty`; fixed `waitForTimeout` pauses (flake risk); migration `add constraint` not idempotent (harmless under Flyway) | qa-engineer / angular-developer / db-engineer | Backlog |
+| A13 | Nit | DEC-032 line 58 | Stale "BA changes AC 69". | Tech lead | Fixed |
+
+Not verified by the reviewer: any test or build result, the 52 screenshots, the BP tile for screen readers when its unit is hidden. QA's full e2e re-run is still needed.
+
+## D-11 retry addendum (10 Nov 2026): APPROVE WITH COMMENTS
+Read-only re-check of the page-head sizer fix. No Blocker or Major. The settled DOM and CSS equal the earlier ones (the plain `<p class="lead">` is drawn when not reserved); the hidden sizer is an empty span with generated content and `visibility:hidden`, so it is not in `textContent` or the accessibility tree; `leadLike` and `leadPending` are right for success, partial answer, failure, Emergency tab, pharmacist, locked and list error; subscriptions use `takeUntilDestroyed`.
+
+| # | Sev | File:line | Finding | Owner | Tech lead decision |
+|---|---|---|---|---|---|
+| B1 | Minor | DEC-033 residual 2 | The text understated the case: one failed lead call also moves the tiles (19 px at 320-375 px, 56 px at 621 px). | tech lead | Fixed in DEC-033. Sev-4 stays. |
+| B2 | Minor | ipd.page.spec.ts (~302-356) | Missing unit paths: one call failing, Emergency tab, pharmacist, locked module. | angular-developer / QA | Backlog |
+| B3 | Minor | sah37-layout-styles.spec.ts (D-11 block) | Source-text regex tests, one vacuous. The page-head spec (DOM) and QA's e2e carry the proof. | QA | Backlog (replace with a DOM check) |
+| B4 | Nit | ipd.page.ts:71 | `const LOAD_ERROR ='…'` lost a space. | angular-developer | Backlog |
+| B5 | Nit | page-head.component.ts:49 | `.reserve` is only a test hook (no CSS); `pointer-events:none` on the sizer is redundant. | angular-developer | Backlog |
+| B6 | Nit | ipd.page.ts:420-423 | Old behaviour: a reload while both lead calls are in flight re-sends them. | — | Backlog |
+
+Backlog improvements: keep the reserve on after a lead-call failure with the default words in the hidden sizer only; keep the last answered cut and percent in an in-memory service per tenant (removes residual 1); start the lead calls in parallel with the list. Not verified by the reviewer: any rendered result (taken from QA 5.2) and the final changed D-11 assertion.

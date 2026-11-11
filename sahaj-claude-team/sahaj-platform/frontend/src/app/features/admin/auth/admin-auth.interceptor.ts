@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { API_BASE_URL } from '../../../core/config/api-config';
 import { isAdminApiUrl } from '../../../core/http/admin-url';
+import { isBootstrapCall } from '../../../core/http/bootstrap-call';
 import { AdminAuthService } from './admin-auth.service';
 
 /** The four public admin auth calls: no token, no refresh-and-retry. */
@@ -27,6 +28,9 @@ function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest
  * the admin is sent back to `/admin/sign-in` with "Your session ended".
  */
 export const adminAuthInterceptor: HttpInterceptorFn = (req, next) => {
+  if (isBootstrapCall(req)) {
+    return next(req);
+  }
   const apiBase = inject(API_BASE_URL);
   if (!isAdminApiUrl(req.url, apiBase)) {
     return next(req);

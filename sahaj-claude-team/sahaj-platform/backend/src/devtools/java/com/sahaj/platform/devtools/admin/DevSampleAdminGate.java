@@ -1,5 +1,6 @@
 package com.sahaj.platform.devtools.admin;
 
+import com.sahaj.platform.devtools.DevToolsChecks;
 import com.sahaj.platform.infrastructure.admin.IpLiterals;
 import com.sahaj.platform.web.admin.AdminRequestPaths;
 import com.sahaj.platform.web.admin.DevEndpointGate;
@@ -9,7 +10,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /**
  * The per-request checks G1 to G5 and G7 of ADR-008 D3 and R1. Every check must pass; any doubt (including a
@@ -35,8 +35,6 @@ public final class DevSampleAdminGate implements DevEndpointGate {
             "X-Forwarded-Proto", "X-Forwarded-Port", "X-Forwarded-Prefix", "X-Forwarded-Server",
             "X-Original-Forwarded-For", "X-Real-IP", "X-Client-IP", "Client-IP", "True-Client-IP", "CF-Connecting-IP",
             "Fastly-Client-IP", "X-Cluster-Client-IP", "Via");
-
-    private static final Pattern PORT = Pattern.compile("[0-9]{1,5}");
 
     private final DevSampleAdminNonce nonce;
 
@@ -85,38 +83,10 @@ public final class DevSampleAdminGate implements DevEndpointGate {
         return true;
     }
 
-    /** G4. Defeats DNS rebinding: a rebound page sends its own host name. */
+    /** G4. Defeats DNS rebinding: a rebound page sends its own host name. The rule is shared (DevToolsChecks). */
     static boolean localHost(HttpServletRequest request) {
         List<String> values = Collections.list(request.getHeaders("Host"));
-        if (values.size() != 1) {
-            return false;
-        }
-        String host = values.get(0).trim().toLowerCase(Locale.ROOT);
-        String port = null;
-        if (host.startsWith("[")) {
-            int close = host.indexOf(']');
-            if (close < 0) {
-                return false;
-            }
-            String rest = host.substring(close + 1);
-            host = host.substring(0, close + 1);
-            if (!rest.isEmpty()) {
-                if (!rest.startsWith(":")) {
-                    return false;
-                }
-                port = rest.substring(1);
-            }
-        } else {
-            int colon = host.indexOf(':');
-            if (colon >= 0) {
-                port = host.substring(colon + 1);
-                host = host.substring(0, colon);
-            }
-        }
-        if (port != null && !PORT.matcher(port).matches()) {
-            return false;
-        }
-        return host.equals("127.0.0.1") || host.equals("localhost") || host.equals("[::1]");
+        return values.size() == 1 && DevToolsChecks.localHostValue(values.get(0));
     }
 
     /** G7. Exactly one header, equal to the nonce of this start. Missing or repeated is a refusal. */

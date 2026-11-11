@@ -22,6 +22,8 @@ import { formatDate, formatWhen, problemMessage } from '../../config/config-form
 import { DischargeSheetComponent } from '../discharge/discharge-sheet.component';
 import { DISCHARGE_TEMPLATE_LABEL, DISCHARGE_TYPE_LABEL, dischargeToast } from '../discharge.model';
 import type { AdmissionStartView } from '../admitted/admitted.model';
+import { isOutsideScope } from '../ipd-refusal';
+import { ScopeRefusals } from '../ipd-scope-refusal';
 import { AdmissionsApi } from '../admissions.api';
 import { EmrSheetComponent, EmrSheetData } from '../emr/emr-sheet.component';
 import { NursingSheetComponent, NursingSheetData } from '../nursing/nursing-sheet.component';
@@ -83,6 +85,7 @@ export class AdmissionDialogComponent {
   private readonly data = inject<AdmissionDialogData>(MAT_DIALOG_DATA);
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly scopeRefusals = inject(ScopeRefusals);
 
   protected readonly modes = PAY_MODES;
   protected readonly formatInrPaise = formatInrPaise;
@@ -152,7 +155,23 @@ export class AdmissionDialogComponent {
         this.placeMoveFocus();
         this.placeDepositFocus();
       });
+    // SAH-34 AC 38, 39: the server no longer lets this user see this patient (403 outside-scope), from this sheet
+    // or from a sheet opened over it. The patient's data leaves the screen and the sheet closes.
+    this.scopeRefusals.watch(this.data.id, this.destroyRef, () => this.leaveOutsideScope());
     this.load();
+  }
+
+  /** Clears the bill, the bed choices and the typed amount, then closes. The page shows the message and reads the list again. */
+  private leaveOutsideScope(): void {
+    this.admission.set(null);
+    this.services.set([]);
+    this.freeBeds.set([]);
+    this.loadError.set(null);
+    this.moveError.set(null);
+    this.chargeError.set(null);
+    this.collectError.set(null);
+    this.amount.setValue('');
+    this.dialogRef.close(false);
   }
 
   protected load(): void {
@@ -170,6 +189,10 @@ export class AdmissionDialogComponent {
           this.loadFreeBeds(admission);
         },
         error: (error: unknown) => {
+          if (isOutsideScope(error)) {
+            this.scopeRefusals.report(this.data.id, false);
+            return;
+          }
           this.loadError.set(problemMessage(error, LOAD_ERROR));
         },
       });
@@ -338,6 +361,11 @@ export class AdmissionDialogComponent {
           );
         },
         error: (error: unknown) => {
+          if (isOutsideScope(error)) {
+            this.moving.set(false);
+            this.scopeRefusals.report(admission.id, true);
+            return;
+          }
           // Move stays disabled until the re-read comes back: the move may have happened anyway.
           this.moveError.set(problemMessage(error, MOVE_ERROR));
           this.refreshAfterMoveError(admission, error);
@@ -369,7 +397,12 @@ export class AdmissionDialogComponent {
           }
           this.moving.set(false);
         },
-        error: () => this.moving.set(false),
+        error: (error: unknown) => {
+          this.moving.set(false);
+          if (isOutsideScope(error)) {
+            this.scopeRefusals.report(admission.id, false);
+          }
+        },
       });
   }
 
@@ -395,6 +428,10 @@ export class AdmissionDialogComponent {
         },
         error: (error: unknown) => {
           this.adding.set(false);
+          if (isOutsideScope(error)) {
+            this.scopeRefusals.report(admission.id, true);
+            return;
+          }
           this.chargeError.set(problemMessage(error, CHARGE_ERROR));
         },
       });
@@ -449,7 +486,14 @@ export class AdmissionDialogComponent {
     this.api
       .get(this.data.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({ next: (fresh) => this.admission.set(fresh), error: () => undefined });
+      .subscribe({
+        next: (fresh) => this.admission.set(fresh),
+        error: (error: unknown) => {
+          if (isOutsideScope(error)) {
+            this.scopeRefusals.report(this.data.id, false);
+          }
+        },
+      });
   }
 
   protected onDischarged(admission: AdmissionDetail): void {
@@ -494,6 +538,10 @@ export class AdmissionDialogComponent {
         },
         error: (error: unknown) => {
           this.collecting.set(false);
+          if (isOutsideScope(error)) {
+            this.scopeRefusals.report(admission.id, true);
+            return;
+          }
           this.collectError.set(problemMessage(error, SAVE_ERROR));
         },
       });

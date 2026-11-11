@@ -79,3 +79,13 @@ Decided by the tech lead under DEC-014; the human confirms or reverts.
 - **Fix (angular-developer, 9 Nov 2026):** the clinic and the admin work areas are now fluid, as the mockup's last rule says (`.axws, .cs main.page { max-width: none !important }`). This is DEC-013 option C, and it deviates from the earlier recommendation B. It follows the mockup, which is the design.
 - **Trade-off:** at 2560 px the page is 2312 to 2500 px wide, so lines can get long.
 - **Decision for the human:** keep fluid (default applied), or add a cap for ultra-wide screens, for example 2000 px or more. That cap must be centred in the viewport, not in the work area, so the rail toggle does not shift the content.
+
+## Item 15 · Card values wrap in the Standard layout (SAH-37 audit D-17, 10 Nov 2026)
+- The mockup contradicts itself: line 2079 wraps every card value (`.pckv dd{overflow-wrap:anywhere}`), line 2368 cuts them in the uniform grid (`.pcgrid.uni .pckv dd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`).
+- **Default applied (DEC-023):** wrap everywhere, so "Admitted on" is never cut ("4 Nov 2026, 9:…"). Cost: a card whose value wraps is one line taller in the uniform grid.
+- **Decision for the human:** keep wrap (default), or follow line 2368 (then the QA D-17 test and the guard spec change). See DEC-032.
+
+## Item 16 · Admin registration page `/admin/register` (SAH-42, 10 Nov 2026)
+- **Not in the mockup.** It reuses the `pAdminLogin` card pattern. First step: a "Registration PIN" field. After a correct PIN: Full name, Email, Password, Confirm password, then the existing authenticator enrolment. New fields: Registration PIN, Full name, Confirm password. All new texts are listed in docs/stories/SAH-42.md.
+- Reachable only when the human switches it on in `.env`, only in the dev profile from this machine, and it closes itself once any platform admin exists (DEC-034).
+- **Decision for the human:** sign off the page and its texts (or give a mockup screen). The frontend is not built until then; the server side proceeds.

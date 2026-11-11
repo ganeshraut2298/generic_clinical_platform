@@ -186,4 +186,31 @@ class MedicineRoundReaderTest {
 
         assertThat(appender.list).hasSize(2);
     }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void aScopedRoundHoldsOnlyTheOrdersOfTheVisibleAdmissionsAndTheCountsFollow() {
+        ActiveOrder mine = order("hep", "tds");
+        ActiveOrder other = order("hep", "tds");
+        active(mine, other);
+
+        MedicineRound.Result scoped = reader.read(TENANT, AS_OF, java.util.Set.of(mine.admissionId()));
+        MedicineRound.Result everyone = reader.read(TENANT, AS_OF);
+
+        assertThat(scoped.rows()).isNotEmpty().allMatch(entry -> entry.admissionId().equals(mine.admissionId()));
+        assertThat(everyone.rows()).anyMatch(entry -> entry.admissionId().equals(other.admissionId()));
+        assertThat(scoped.due() + scoped.late()).isLessThan(everyone.due() + everyone.late());
+        assertThat(scoped.tokenLines()).hasSizeLessThan(everyone.tokenLines().size());
+    }
+
+    @Test
+    void aScopeThatReachesNobodyIsTheEmptyRoundAndNoDoseQueryIsMade() {
+        active(order("hep", "tds"));
+
+        MedicineRound.Result result = reader.read(TENANT, AS_OF, java.util.Set.of());
+
+        assertThat(result).isSameAs(MedicineRound.empty());
+        verify(repository, never()).findDosesBetween(any(), anyCollection(), any(), any());
+    }
 }

@@ -55,6 +55,20 @@ describe('problemDetailInterceptor', () => {
     expect(caught.problem.retryAfterSeconds).toBe(120);
   });
 
+  it('keeps triesLeft from the bootstrap-pin-invalid problem and ignores a non-number', () => {
+    const type = 'https://sahaj.in/problems/bootstrap-pin-invalid';
+    const withNumber = failWith({ type, title: 'x', status: 401, triesLeft: 3 }, 401) as ApiError;
+    expect(withNumber.problem.triesLeft).toBe(3);
+    const withText = failWith({ type, title: 'x', status: 401, triesLeft: '3' }, 401) as ApiError;
+    expect(withText.problem.triesLeft).toBeUndefined();
+  });
+
+  it('turns the empty 404 of a closed feature into an ApiError with status 404', () => {
+    const caught = failWith(null, 404) as ApiError;
+    expect(caught).toBeInstanceOf(ApiError);
+    expect(caught.status).toBe(404);
+  });
+
   it('builds a problem for a response that is not problem+json', () => {
     const caught = failWith('<html>bad gateway</html>', 502) as ApiError;
     expect(caught).toBeInstanceOf(ApiError);

@@ -78,6 +78,7 @@ class BedTransferServiceTest {
     private PatientAccessPort patientAccess;
     private ModuleEntitlementPort entitlements;
     private BedTransferService service;
+    private ScopeGuard guard;
 
     private UUID fromId = LOW;
     private UUID toId = HIGH;
@@ -99,12 +100,13 @@ class BedTransferServiceTest {
         ChargeRepository charges = mock(ChargeRepository.class);
         IpdCatalog catalog = new IpdCatalog(settings);
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
+        guard = ScopeStubs.unscoped();
         AdmissionService sheets = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team,
                 patients, patientAccess, mock(ActorDirectoryPort.class), gate, catalog, charges,
                 new IpdBilling(charges, transfers, catalog), mock(DischargeRepository.class),
-                mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class));
+                mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class), ScopeStubs.unscoped(), ScopeStubs.repository());
         service = new BedTransferService(admissions, beds, wards, settings, transfers, ownerGuard, auditLog,
-                patientAccess, gate, catalog, sheets);
+                patientAccess, gate, catalog, sheets, guard);
 
         state("on");
         when(settings.findCategories(TENANT)).thenReturn(List.of());
@@ -651,5 +653,30 @@ class BedTransferServiceTest {
         assertThat(BedTransferService.rank("gen")).isLessThan(BedTransferService.rank("semi"));
         assertThat(BedTransferService.rank("semi")).isLessThan(BedTransferService.rank("pvt"));
         assertThat(BedTransferService.rank("pvt")).isLessThan(BedTransferService.rank("icu"));
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void outsideScopeMovesNothing() {
+        doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("NURSE"),
+                any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.transfer(TENANT, ACTOR, "NURSE", ADMISSION, toId, null))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verifyNothingWritten();
+        verify(beds, never()).findForUpdate(any(), any());
+    }
+
+    @Test
+    void theOutsideScopeAnswerComesAfterTheNotFoundAndBeforeTheStateChecks() {
+        UUID unknown = UUID.randomUUID();
+        when(admissions.find(TENANT, unknown)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.transfer(TENANT, ACTOR, "NURSE", unknown, toId, null))
+                .isInstanceOf(NotFoundException.class);
+        verify(guard, never()).requireAdmissionLocked(any(), any(), any(), any(), eq(unknown),
+                org.mockito.ArgumentMatchers.anyString());
     }
 }

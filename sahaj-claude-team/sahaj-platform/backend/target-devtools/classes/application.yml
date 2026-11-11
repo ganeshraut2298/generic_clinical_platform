@@ -4,6 +4,13 @@
 # Database settings live in application-dev.yml and application-test.yml.
 server:
   port: ${SERVER_PORT:8080}
+  compression:
+    # SAH-36 (ADR-013 D2): GET /api/v1/ipd/admissions is about 1 KB a row (300 KB at 300 patients) and is reloaded every
+    # 60 seconds by each open Admitted tab; gzip brings it to about 30 to 40 KB. JSON only, and only above 2 KB. Set
+    # SAHAJ_HTTP_COMPRESSION=false when a reverse proxy already compresses.
+    enabled: ${SAHAJ_HTTP_COMPRESSION:true}
+    mime-types: application/json
+    min-response-size: 2KB
   tomcat:
     remoteip:
       # Forwarded headers are IGNORED unless both are set for a known reverse proxy. The rate limit
@@ -28,7 +35,7 @@ spring:
     # Flyway runs as sahaj_migrator on its own connection; it never shares the request pool.
     # Schemas are created by scripts/setup/create-database.mjs, not by Flyway.
     # db/guard holds the afterMigrate guard that fails the start when dev-tools objects exist in a database that is
-    # not sahaj_dev or sahaj_test (ADR-008 R3). Customizers that add db/dev-seed or db/dev-tools append to this list.
+    # not sahaj_dev or sahaj_test (ADR-008 R3). Customizers that add db/dev-seed, db/dev-tools or db/bootstrap-dev-tools (ADR-018, SAH-42) append to this list.
     locations: classpath:db/migration,classpath:db/guard
     schemas: platform
     default-schema: platform
@@ -51,12 +58,23 @@ sahaj:
   public-enquiry-limit:
     max-requests: ${SAHAJ_ENQUIRY_LIMIT_MAX:5}
     window: ${SAHAJ_ENQUIRY_LIMIT_WINDOW:1h}
+  request-body:
+    # Release audit G-1: largest request body, in bytes, the signed-in /api/v1/** endpoints read; a bigger one answers 413.
+    # The public endpoints keep their own fixed 4 KB cap. Values below 4096 are raised to 4096.
+    max-bytes: ${SAHAJ_MAX_REQUEST_BODY_BYTES:65536}
   jwt:
     # SAH-3 access tokens. A secret, so it has no default: set SAHAJ_JWT_SECRET (32+ characters) in
     # the environment, never in code.
     secret: ${SAHAJ_JWT_SECRET}
     access-token-minutes: ${SAHAJ_JWT_ACCESS_MINUTES:15}
     selection-token-minutes: ${SAHAJ_JWT_SELECTION_MINUTES:5}
+  pin:
+    # SAH-31 (ADR-010 D3) personal staff PIN. A secret, so no default and no value here: set SAHAJ_PIN_PEPPER in the
+    # environment to the Base64 of at least 32 random bytes (and different from SAHAJ_JWT_SECRET).
+    #   missing or blank: the app starts, staff PIN set and check answer 503 pin-unavailable (fail closed)
+    #   present but invalid: the app refuses to start
+    # Changing it later makes every stored PIN fail: everyone sets a new PIN (ADR-010 Q6).
+    pepper: ${SAHAJ_PIN_PEPPER:}
   modules:
     # TEMPORARY (DEC-010, SAH-19): lets the clinic owner start a 30-day IPD trial from Plan and modules
     # until the Sahaj admin console exists. Off by default (security review M1); dev and test profiles turn it on. A false value returns 404.
@@ -72,6 +90,13 @@ sahaj:
     #   SAHAJ_ADMIN_SEED_EMAIL       dev profile only: dummy admin email
     #   SAHAJ_ADMIN_SEED_PASSWORD    dev profile only: dummy admin password (12 to 64 characters, not containing the email name)
     #   SAHAJ_ADMIN_SEED_NAME        dev profile only: dummy admin name (default Dev admin)
+    #   SAHAJ_ADMIN_BOOTSTRAP_ENABLED   SAH-42 (ADR-018): true switches on /admin/register, which creates the FIRST admin behind a
+    #                                   registration PIN. Exists ONLY in a backend built and started with the Maven profile dev-tools
+    #                                   (no such code is in a normal jar), only in profile dev, only on a loopback address, only while
+    #                                   no admin exists. Leave false or unset otherwise.
+    #   SAHAJ_ADMIN_BOOTSTRAP_PIN_HASH  the BCrypt hash (cost 12 to 16) of that PIN, in single quotes in .env because it contains $.
+    #                                   Make it with the hidden-prompt tool described in docs/architecture/adr/ADR-018 (D3); never
+    #                                   put the PIN itself anywhere.
     # With enabled=true and a secret missing, the app still starts and every /api/v1/admin request answers 503.
     # The secrets, the TOTP key and the seed values are NOT listed below on purpose: Spring Boot binds the
     # environment variables above straight to sahaj.admin.jwt-secret, sahaj.admin.totp-key and

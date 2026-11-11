@@ -5,6 +5,7 @@ Amends: ADR-003 revision 2, D5 "Dummy admin" (adds a second, dev-only way to get
 Module: platform (admin realm). New code lives in a separate source set that the production build never compiles.
 Mockup screen: none. This is a developer tool with **no UI**; it is called with `curl` from the developer's own machine. Nothing is added to any screen (the human asked for an API only, DEC-016).
 Contract: `docs/api/admin.yaml` 0.3.1, operation `devCreateSampleAdmin` (`x-dev-only: true`)
+Extended by: `ADR-018-admin-bootstrap-registration-pin.md` (SAH-42): the main reserved-path filter also reserves `/api/v1/admin/bootstrap` and asks every `DevEndpointGate` bean; the production guard and the must-not-ship test also cover the bootstrap objects. Nothing in this ADR's endpoint changes.
 Status: PROPOSED, revision 2 (security review fixes R1 to R12, `docs/reviews/DEC-016-security.md`, 5 Nov 2026; see "Review fixes" at the end). Waiting for human `contract · APPROVED` (review M4) before first use.
 Deciders: Ganesh (human), tech-lead; recorded by solution-architect
 

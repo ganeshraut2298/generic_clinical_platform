@@ -1,5 +1,6 @@
 package com.sahaj.ipd.application;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sahaj.ipd.domain.DoseSlots;
 import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
@@ -25,7 +26,13 @@ public final class SafetyViews {
      * id and version of every escalation counted in {@code open} and of every listed dose slot; the client compares it
      * for equality with the last one it saw.
      */
-    public record Counts(int open, int pastTarget, int dosesDue, int dosesLate, String changeToken, Instant asOf) {
+    public record Counts(int open, int pastTarget, int dosesDue, int dosesLate, String changeToken, Instant asOf,
+                         @JsonInclude(JsonInclude.Include.NON_NULL) Integer emergencyAccessWaiting) {
+
+        /** The counts of a caller who is not the owner: {@code emergencyAccessWaiting} is absent from the JSON. */
+        public Counts(int open, int pastTarget, int dosesDue, int dosesLate, String changeToken, Instant asOf) {
+            this(open, pastTarget, dosesDue, dosesLate, changeToken, asOf, null);
+        }
     }
 
     /**
@@ -81,10 +88,20 @@ public final class SafetyViews {
 
     /**
      * The Safety board. {@code view} is DOCTOR or NURSE; {@code yourPatients} is set for NURSE only;
-     * {@code medicineRound} is the SAH-35 panel.
+     * {@code medicineRound} is the SAH-35 panel. SAH-34: {@code scope} (view NURSE only), {@code emergencyAccess} (OWNER
+     * only) and {@code otherWardsPastTarget} (a scoped NURSE only) are absent from the JSON for every other caller.
      */
     public record Board(String state, String view, Instant asOf, Counts counts, Integer yourPatients,
-                        List<ActionOption> responseActions, List<Row> escalations, RoundPanel medicineRound) {
+                        List<ActionOption> responseActions, List<Row> escalations, RoundPanel medicineRound,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) ScopeViews.SafetyScope scope,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) ScopeViews.EmergencyAccessReviewPage emergencyAccess,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) Integer otherWardsPastTarget) {
+
+        public Board(String state, String view, Instant asOf, Counts counts, Integer yourPatients,
+                     List<ActionOption> responseActions, List<Row> escalations, RoundPanel medicineRound) {
+            this(state, view, asOf, counts, yourPatients, responseActions, escalations, medicineRound, null, null,
+                    null);
+        }
 
         @Override
         public String toString() {
@@ -131,7 +148,13 @@ public final class SafetyViews {
 
     /** One entry of the clinical audit trail. Names are on screen only: hidden. */
     public record Event(UUID id, String kind, String text, Instant at, String actorName, UUID admissionId,
-                        String patientName, String bedCode) {
+                        String patientName, String bedCode,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) String grantStaffName) {
+
+        public Event(UUID id, String kind, String text, Instant at, String actorName, UUID admissionId,
+                     String patientName, String bedCode) {
+            this(id, kind, text, at, actorName, admissionId, patientName, bedCode, null);
+        }
 
         @Override
         public String toString() {

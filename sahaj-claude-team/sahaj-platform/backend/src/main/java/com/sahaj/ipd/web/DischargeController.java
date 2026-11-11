@@ -38,6 +38,7 @@ public class DischargeController {
         this.service = service;
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @GetMapping("/discharge-settings")
     @PreAuthorize(AdmissionController.READERS)
     public Settings settings() {
@@ -45,6 +46,7 @@ public class DischargeController {
         return service.settings(user.tenantId(), user.role());
     }
 
+    @ScopeExempt("Configuration: no patient data")
     @PutMapping("/discharge-settings")
     @PreAuthorize(AdmissionController.OWNER)
     public Settings updateSettings(@RequestBody SettingsInput request) {
@@ -52,6 +54,7 @@ public class DischargeController {
         return service.updateSettings(user.tenantId(), user.userId(), request);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @GetMapping("/admissions/{id}/discharge")
     @PreAuthorize(AdmissionController.READERS)
     public Sheet sheet(@PathVariable UUID id) {
@@ -59,6 +62,7 @@ public class DischargeController {
         return service.sheet(user.tenantId(), user.userId(), user.role(), id);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PutMapping("/admissions/{id}/discharge/signoff")
     @PreAuthorize(SIGNERS)
     public Sheet signoff(@PathVariable UUID id, @RequestBody SignoffInput request) {
@@ -66,6 +70,7 @@ public class DischargeController {
         return service.signoff(user.tenantId(), user.userId(), user.role(), id, request);
     }
 
+    @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
     @PostMapping("/admissions/{id}/discharge")
     @PreAuthorize(DISCHARGERS)
     public Detail discharge(@PathVariable UUID id, @RequestBody DischargeInput request) {

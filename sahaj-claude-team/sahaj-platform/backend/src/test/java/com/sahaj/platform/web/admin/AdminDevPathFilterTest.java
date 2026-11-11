@@ -25,13 +25,22 @@ class AdminDevPathFilterTest {
 
     private static final String[] RESERVED_PATHS = {"/api/v1/admin/dev/sample-admin", "/api/v1/admin/dev",
             "/api/v1/admin/dev/x", "/api/v1/admin/dev/sample-admin/", "/API/V1/ADMIN/DEV/SAMPLE-ADMIN",
-            "/api/v1/admin/Dev/x"};
+            "/api/v1/admin/Dev/x", "/api/v1/admin/bootstrap/unlock", "/api/v1/admin/bootstrap/register",
+            "/api/v1/admin/bootstrap", "/api/v1/admin/bootstrap/", "/api/v1/admin/bootstrap/other",
+            "/API/V1/ADMIN/BOOTSTRAP/UNLOCK", "/api/v1/admin/Bootstrap/register", "/api/v1/admin/%62ootstrap/unlock"};
     private static final String[] METHODS = {"POST", "GET", "OPTIONS", "PUT", "DELETE", "HEAD", "PATCH"};
 
-    private static ObjectProvider<DevEndpointGate> providerOf(DevEndpointGate gate) {
+    /** A provider holding the given gates in order (none, when the only gate is null). */
+    private static ObjectProvider<DevEndpointGate> providerOf(DevEndpointGate... gates) {
+        List<DevEndpointGate> present = new ArrayList<>();
+        for (DevEndpointGate gate : gates) {
+            if (gate != null) {
+                present.add(gate);
+            }
+        }
         @SuppressWarnings("unchecked")
         ObjectProvider<DevEndpointGate> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(gate);
+        when(provider.orderedStream()).thenAnswer(invocation -> present.stream());
         return provider;
     }
 
@@ -124,7 +133,7 @@ class AdminDevPathFilterTest {
     @Test
     void otherAdminAndClinicPathsAreNotTouched() throws Exception {
         String[] others = {"/api/v1/admin/auth/login", "/api/v1/admin/me", "/api/v1/admin/developers",
-                "/api/v1/admin/devices", "/api/v1/platform/health", "/api/v1/admin"};
+                "/api/v1/admin/devices", "/api/v1/admin/bootstrapper", "/api/v1/platform/health", "/api/v1/admin"};
         for (String path : others) {
             RecordingChain chain = new RecordingChain();
             Seen seen = run(null, "POST", path, chain);
@@ -138,7 +147,7 @@ class AdminDevPathFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/admin/%64ev/sample-admin");
         MockHttpServletResponse response = new MockHttpServletResponse();
         RecordingChain chain = new RecordingChain();
-        new AdminDevPathFilter(providerOf(null)).doFilter(request, response, chain);
+        new AdminDevPathFilter(providerOf((DevEndpointGate) null)).doFilter(request, response, chain);
         assertThat(response.getStatus()).isEqualTo(404);
         assertThat(chain.reached).isFalse();
     }
@@ -159,9 +168,51 @@ class AdminDevPathFilterTest {
     }
 
     @Test
+    void withTwoGatesTheRequestPassesWhenAnyOneOfThemPermitsIt() throws Exception {
+        DevEndpointGate refuses = request -> false;
+        DevEndpointGate permits = request -> true;
+        for (DevEndpointGate[] order : new DevEndpointGate[][] {{refuses, permits}, {permits, refuses}}) {
+            RecordingChain chain = new RecordingChain();
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/admin/bootstrap/unlock");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            new AdminDevPathFilter(providerOf(order)).doFilter(request, response, chain);
+            assertThat(chain.reached).isTrue();
+            assertThat(response.getStatus()).isEqualTo(200);
+        }
+    }
+
+    @Test
+    void withTwoGatesThatBothRefuseTheAnswerIsTheSameEmpty404() throws Exception {
+        DevEndpointGate refuses = request -> false;
+        Seen none = run(null, "POST", "/api/v1/admin/bootstrap/register", new RecordingChain());
+        RecordingChain chain = new RecordingChain();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        new AdminDevPathFilter(providerOf(refuses, refuses)).doFilter(
+                new MockHttpServletRequest("POST", "/api/v1/admin/bootstrap/register"), response, chain);
+        assertThat(chain.reached).isFalse();
+        assertThat(response.getStatus()).isEqualTo(none.status()).isEqualTo(404);
+        assertThat(response.getContentAsByteArray()).isEmpty();
+        assertThat(response.getHeaderNames()).containsExactly("Cache-Control");
+        assertThat(none.headers()).containsOnlyKeys("cache-control");
+    }
+
+    @Test
+    void aGateThatThrowsMakesTheBootstrapPathFailClosedEvenWhenAnotherGatePermits() throws Exception {
+        DevEndpointGate broken = request -> {
+            throw new IllegalStateException("secret detail");
+        };
+        RecordingChain chain = new RecordingChain();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        new AdminDevPathFilter(providerOf(broken, request -> true)).doFilter(
+                new MockHttpServletRequest("POST", "/api/v1/admin/bootstrap/unlock"), response, chain);
+        assertThat(chain.reached).isFalse();
+        assertThat(response.getStatus()).isEqualTo(404);
+    }
+
+    @Test
     void theFilterIsRegisteredAlwaysAndBeforeSpringSecurity() {
         FilterRegistrationBean<AdminDevPathFilter> registration =
-                new AdminDevPathConfig().adminDevPathFilterRegistration(providerOf(null));
+                new AdminDevPathConfig().adminDevPathFilterRegistration(providerOf((DevEndpointGate) null));
 
         assertThat(registration.getOrder()).isLessThan(SecurityProperties.DEFAULT_FILTER_ORDER);
         assertThat(registration.getUrlPatterns()).containsExactly("/*");

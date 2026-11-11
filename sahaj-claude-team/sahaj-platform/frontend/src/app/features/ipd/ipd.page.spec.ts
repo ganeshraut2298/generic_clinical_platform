@@ -13,6 +13,8 @@ import { EmergencyComponent } from './emergency/emergency.component';
 import { ShellStore } from '../../core/shell/shell.store';
 import { AdmissionDetail, AdmissionList, AdmittedPatientRow, BedBoard } from './ipd.model';
 import { EmrSheetComponent } from './emr/emr-sheet.component';
+import { EmergencyAccessSheetComponent } from './emergency-access/emergency-access-sheet.component';
+import { ScopeRefusals } from './ipd-scope-refusal';
 import { resolvedStandard } from './card/card-setup.fixtures';
 import { IpdPage } from './ipd.page';
 import { NursingSheetComponent } from './nursing/nursing-sheet.component';
@@ -78,6 +80,7 @@ function list(partial: Partial<AdmissionList> = {}): AdmissionList {
       visibleGroups: ['patient', 'contact', 'clinical', 'vitals', 'billing'],
     },
     cardSetup: resolvedStandard(),
+    scope: { kind: 'ALL', visible: 3, admitted: 3, canOpenEmergencyAccess: false },
     items: [
       ROW,
       { ...ROW, id: 'a2', patientName: 'Ravi Shah', payer: 'Insurance', depositState: 'NOT_NEEDED', depositPaise: 0, runningBillPaise: 450000, admissionType: 'planned', dayNumber: 1 },
@@ -297,6 +300,62 @@ describe('IpdPage', () => {
     http.expectOne(`${IPD}/admission-rules`).flush({}, { status: 500, statusText: 'Error' });
     await settle();
     expect(view.querySelector('.lead')!.textContent!.trim()).toBe('Beds and admissions');
+  });
+
+  it('D-11: holds room for the finished lead until both lead calls have answered, and keeps the text readable', async () => {
+    const view = setup();
+    // the plain lead is in the page from the first paint, so a screen reader is never left without it
+    expect(view.querySelector('.lead')!.textContent!.trim()).toBe('Beds and admissions');
+    expect(view.querySelector('.lead')!.classList.contains('reserve')).toBe(true);
+    expect(view.querySelector('.lead')!.closest('[aria-hidden=true]')).toBeNull();
+    http.expectOne(listUrl).flush(list());
+    await settle();
+    expect(view.querySelector('.lead')!.classList.contains('reserve')).toBe(true);
+    http.expectOne(`${IPD}/layout`).flush({ charges: { bedDayCut: 'midnight', nursingPaise: 0, visitPaise: 0 } });
+    await settle();
+    expect(view.querySelector('.lead')!.classList.contains('reserve')).toBe(true);
+    http.expectOne(`${IPD}/admission-rules`).flush({ alertPercent: 80 });
+    await settle();
+    expect(view.querySelector('.lead')!.classList.contains('reserve')).toBe(false);
+    expect(view.querySelector('.lead')!.textContent).toContain('deposit alert at 80% of the deposit');
+    expect(view.querySelector('.sizer')).toBeNull();
+  });
+
+  it('D-11: sizes the pending head for the finished words: the mockup defaults for a part not answered, the real part once it has', async () => {
+    const midnight80 =
+      'Beds and admissions · Bed and nursing charges post at midnight · deposit alert at 80% of the deposit';
+    const view = setup();
+    expect(view.querySelector('.sizer')!.getAttribute('data-like')).toBe(midnight80);
+    http.expectOne(listUrl).flush(list());
+    http.expectOne(`${IPD}/layout`).flush({ charges: { bedDayCut: '24h', nursingPaise: 0, visitPaise: 0 } });
+    await settle();
+    expect(view.querySelector('.sizer')!.getAttribute('data-like')).toBe(
+      'Beds and admissions · Bed and nursing charges post every 24 hours · deposit alert at 80% of the deposit',
+    );
+    // the sizer is not part of the page text, so waiting for the real words still waits
+    expect(view.querySelector('app-page-head')!.textContent).not.toContain('deposit alert');
+    http.expectOne(`${IPD}/admission-rules`).flush({ alertPercent: 65 });
+    await settle();
+    expect(view.querySelector('.sizer')).toBeNull();
+    expect(view.querySelector('.lead')!.textContent).toContain('every 24 hours · deposit alert at 65% of the deposit');
+  });
+
+  it('D-11: lets the room go when the lead calls fail', async () => {
+    const view = setup();
+    http.expectOne(listUrl).flush(list());
+    http.expectOne(`${IPD}/layout`).flush({}, { status: 500, statusText: 'Error' });
+    http.expectOne(`${IPD}/admission-rules`).flush({}, { status: 500, statusText: 'Error' });
+    await settle();
+    expect(view.querySelector('.lead')!.classList.contains('reserve')).toBe(false);
+  });
+
+  it('D-11: reserves nothing when the list fails to load', async () => {
+    const view = setup();
+    http
+      .expectOne(listUrl)
+      .flush({ type: 'x', title: 'x', status: 500, detail: 'Server trouble' }, { status: 500, statusText: 'Error' });
+    await settle();
+    expect(view.querySelector('.lead')!.classList.contains('reserve')).toBe(false);
   });
 
   it('toasts and reloads the list after an admission', async () => {
@@ -1852,6 +1911,263 @@ describe('IpdPage', () => {
         await settle();
         expect(view.querySelector('.lockpage h2')!.textContent).toContain('In-patient care (IPD) is not on for your clinic');
         expect(view.querySelector('[role=tab]')).toBeNull();
+      });
+    });
+  });
+
+  describe('ward scope and break-glass (SAH-34)', () => {
+    const WARDS = { kind: 'WARDS' as const, visible: 1, admitted: 12, hasWard: true, canOpenEmergencyAccess: true };
+    const counts = (over: Partial<AdmissionSafety['counts']> = {}): AdmissionSafety => ({
+      counts: { open: 0, pastTarget: 0, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: '2026-11-05T05:47:00Z', ...over },
+      pastTarget: [],
+    });
+    const scoped = (partial: Partial<AdmissionList> = {}): AdmissionList =>
+      list({ scope: WARDS, items: [{ ...ROW, mine: true }], ...partial });
+    const tabs = (view: HTMLElement) =>
+      Array.from(view.querySelectorAll<HTMLElement>('[role=tab]')).map((t) =>
+        t.textContent!.replace(/\s+/g, ' ').trim().replace(/(\D)(\d+)$/, '$1 $2'),
+      );
+    const GRANT = {
+      id: 'g1',
+      admissionId: 'a9',
+      patientName: 'Ravi Shah',
+      bedCode: '202-B',
+      reasonKey: 'DETERIORATING' as const,
+      reasonLabel: 'Patient deteriorating, rapid response',
+      openedAt: '2026-10-24T05:35:00Z',
+      expiresAt: '2026-10-24T06:05:00Z',
+    };
+
+    describe('the Admitted tab number and the chip (AC 26, 31, 40, 41)', () => {
+      it('shows N (what she can see) on the Admitted tab, not M, and the chip with N of M', async () => {
+        const view = setup('NURSE');
+        await loadOk(scoped());
+        expect(tabs(view)).toContain('Admitted 1');
+        const chip = view.querySelector('[data-testid=scope-chip]')!;
+        expect(chip.textContent).toContain('Patients in their wards · 1 of 12');
+      });
+
+      it('shows the number of the rows for a user whose scope is all, and no chip', async () => {
+        const view = setup('NURSE');
+        await loadOk(list({ scope: { kind: 'ALL', visible: 3, admitted: 3, hasWard: true, canOpenEmergencyAccess: false } }));
+        expect(tabs(view)).toContain('Admitted 3');
+        expect(view.querySelector('[data-testid=scope-chip]')).toBeNull();
+      });
+
+      it('draws no chip before the first answer', () => {
+        const view = setup('NURSE');
+        expect(view.querySelector('[data-testid=scope-chip]')).toBeNull();
+        http.expectOne(listUrl);
+      });
+
+      it('keeps the Safety tab for a scoped nurse with no ward (the mockup counts the clinic, M), so she reaches the board and its note', async () => {
+        const view = setup('NURSE');
+        await loadOk(
+          scoped({ items: [], scope: { ...WARDS, visible: 0, hasWard: false }, safety: counts() }),
+          false,
+        );
+        expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Emergency 3', 'Safety']);
+      });
+
+      it('has no Safety tab when nobody at all is admitted', async () => {
+        const view = setup('NURSE');
+        await loadOk(
+          scoped({ items: [], scope: { ...WARDS, visible: 0, admitted: 0 }, safety: counts() }),
+          false,
+        );
+        expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Emergency 3']);
+      });
+
+      it('passes the signed-in role to the list (My patients is for OWNER and DOCTOR, a nurse with a ward, never FRONT_DESK)', async () => {
+        const nurse = setup('NURSE');
+        await loadOk(scoped());
+        expect(nurse.querySelector('[data-testid=my-patients]')).not.toBeNull();
+      });
+
+      it('does not show My patients to a front desk user', async () => {
+        const view = setup('FRONT_DESK');
+        await loadOk(list());
+        expect(view.querySelector('[data-testid=my-patients]')).toBeNull();
+      });
+    });
+
+    describe('the owner tab number (AC 71)', () => {
+      it('adds the emergency access waiting for review to the Safety tab number', async () => {
+        const view = setup('OWNER');
+        await loadOk(list({ safety: counts({ open: 1, emergencyAccessWaiting: 2 }) }), false);
+        http.expectOne(`${IPD}/pharmacist-checks/summary`).flush({ waiting: 3, changeToken: TOKEN_A, asOf: '2026-11-06T05:47:00Z' });
+        await settle();
+        // open 1 + pharmacist 3 + emergency access 2
+        expect(tabs(view)).toContain('Safety 6');
+      });
+
+      it('does not add anything for a nurse', async () => {
+        const view = setup('NURSE');
+        await loadOk(scoped({ safety: counts({ open: 1 }) }), false);
+        expect(tabs(view)).toContain('Safety 1');
+      });
+    });
+
+    describe('Emergency access (AC 44, 51, 54)', () => {
+      it('opens the sheet from the button on the chip', async () => {
+        const view = setup('NURSE');
+        await loadOk(scoped());
+        view.querySelector<HTMLButtonElement>('[data-testid=emergency-access-button]')!.click();
+        await settle();
+        expect(dialog.open).toHaveBeenCalledTimes(1);
+        expect(dialog.open.mock.calls[0][0]).toBe(EmergencyAccessSheetComponent);
+        expect(dialog.open.mock.calls[0][1]).toEqual(
+          expect.objectContaining({ panelClass: 'sheet-panel', ariaLabelledBy: 'eg-title' }),
+        );
+      });
+
+      it('after a grant: the toast names the patient and says the owner will see it on the Safety board, the search is cleared and the list reads again', async () => {
+        const view = setup('NURSE', { kind: 'granted', grant: GRANT });
+        await loadOk(scoped());
+        const search = view.querySelector<HTMLInputElement>('[data-testid=admitted-search]')!;
+        search.value = 'asha';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        await settle();
+        expect(search.value).toBe('asha');
+        view.querySelector<HTMLButtonElement>('[data-testid=emergency-access-button]')!.click();
+        await settle();
+        expect(snack).toHaveBeenCalledWith(
+          'Emergency access to Ravi Shah for 30 minutes. The owner will see this on the Safety board.',
+          'Close',
+          expect.anything(),
+        );
+        expect(view.querySelector<HTMLInputElement>('[data-testid=admitted-search]')!.value).toBe('');
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+      });
+
+      it('after "already in your list": says so and reads the list again, without the grant toast', async () => {
+        const view = setup('NURSE', { kind: 'in-scope', message: 'This patient is already in your list.' });
+        await loadOk(scoped());
+        view.querySelector<HTMLButtonElement>('[data-testid=emergency-access-button]')!.click();
+        await settle();
+        expect(snack).toHaveBeenCalledWith('This patient is already in your list.', 'Close', expect.anything());
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+      });
+
+      it('after a 403 inside the sheet: reads the list again with no toast', async () => {
+        const view = setup('NURSE', { kind: 'reload' });
+        await loadOk(scoped());
+        view.querySelector<HTMLButtonElement>('[data-testid=emergency-access-button]')!.click();
+        await settle();
+        expect(snack).not.toHaveBeenCalled();
+        http.expectOne(listUrl).flush(list());
+        await settle();
+        expect(view.querySelector('[data-testid=scope-chip]')).toBeNull();
+      });
+
+      it('does nothing when the sheet is cancelled', async () => {
+        const view = setup('NURSE', undefined);
+        await loadOk(scoped());
+        view.querySelector<HTMLButtonElement>('[data-testid=emergency-access-button]')!.click();
+        await settle();
+        expect(snack).not.toHaveBeenCalled();
+        http.expectNone(listUrl);
+      });
+    });
+
+    describe('403 outside-scope on a sheet (AC 38, 39)', () => {
+      const refuseOne = async (write: boolean, row: AdmittedPatientRow = { ...ROW, mine: true }) => {
+        const view = setup('NURSE');
+        await loadOk(scoped({ items: [row, { ...ROW, id: 'a2', patientName: 'Ravi Shah', mine: true }] }));
+        TestBed.inject(ScopeRefusals).report('a1', write);
+        await settle();
+        return view;
+      };
+
+      it('says "This patient is not in your wards.", drops that patient at once and reads the list again', async () => {
+        const view = await refuseOne(false);
+        expect(snack).toHaveBeenCalledWith('This patient is not in your wards.', 'Close', expect.anything());
+        const names = Array.from(view.querySelectorAll('[data-testid=card-name]')).map((n) => n.textContent!.trim());
+        expect(names).toEqual(['Ravi Shah']);
+        http.expectOne(listUrl).flush(scoped({ items: [{ ...ROW, id: 'a2', patientName: 'Ravi Shah', mine: true }] }));
+        await settle();
+        expect(view.textContent).not.toContain('Asha Patil');
+      });
+
+      it('adds "Nothing was saved." after a save', async () => {
+        await refuseOne(true);
+        expect(snack).toHaveBeenCalledWith('This patient is not in your wards. Nothing was saved.', 'Close', expect.anything());
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+      });
+
+      it('says the emergency access has ended for a patient she had through a grant', async () => {
+        await refuseOne(false, { ...ROW, mine: false, emergencyAccess: { expiresAt: '2026-10-24T06:05:00Z' } });
+        expect(snack).toHaveBeenCalledWith('Your emergency access to this patient has ended.', 'Close', expect.anything());
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+      });
+
+      it('does not lock the page: the tabs and the list stay (it is neither forbidden nor module-off)', async () => {
+        const view = await refuseOne(true);
+        expect(view.querySelector('.lockpage')).toBeNull();
+        expect(view.querySelector('[role=tab]')).not.toBeNull();
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+        expect(view.querySelector('[data-testid=admitted-cards]')).not.toBeNull();
+      });
+
+      it('moves focus to the tab panel once the page has rendered, when the focus fell to the page body', async () => {
+        const view = setup('NURSE');
+        await loadOk(scoped({ items: [{ ...ROW, mine: true }] }));
+        (document.activeElement as HTMLElement | null)?.blur();
+        expect(document.activeElement).toBe(document.body);
+        TestBed.inject(ScopeRefusals).report('a1', false);
+        await settle();
+        expect(document.activeElement).toBe(view.querySelector('#ipd-panel'));
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+      });
+
+      it('leaves the focus alone when it is already on a control', async () => {
+        setup('NURSE');
+        await loadOk(scoped({ items: [{ ...ROW, mine: true }] }));
+        const other = document.createElement('button');
+        document.body.appendChild(other);
+        other.focus();
+        TestBed.inject(ScopeRefusals).report('a1', false);
+        await settle();
+        expect(document.activeElement).toBe(other);
+        other.remove();
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+      });
+
+      it('keeps the search, the ward, the view and My patients through the reload (AC 40)', async () => {
+        const view = setup('NURSE');
+        await loadOk(scoped({ items: [{ ...ROW, mine: true }, { ...ROW, id: 'a2', patientName: 'Ravi Shah', mine: true }] }));
+        view.querySelector<HTMLButtonElement>('[data-testid=my-patients]')!.click();
+        await settle();
+        TestBed.inject(ScopeRefusals).report('a2', false);
+        await settle();
+        http.expectOne(listUrl).flush(scoped());
+        await settle();
+        expect(view.querySelector('[data-testid=my-patients]')!.getAttribute('aria-pressed')).toBe('true');
+      });
+    });
+
+    describe('403 on the list itself still clears the page (SAH-40)', () => {
+      it('clears the list on forbidden', async () => {
+        const view = setup('NURSE');
+        await loadOk(scoped());
+        const page = fixture.componentInstance as unknown as { refreshCounts(): void };
+        page.refreshCounts();
+        http
+          .expectOne(listUrl)
+          .flush(
+            { type: 'https://sahaj.in/problems/forbidden', title: 'Forbidden', status: 403, detail: 'No.' },
+            { status: 403, statusText: 'Forbidden' },
+          );
+        await settle();
+        expect(view.querySelector('[data-testid=scope-chip]')).toBeNull();
+        expect(view.textContent).not.toContain('Asha Patil');
       });
     });
   });

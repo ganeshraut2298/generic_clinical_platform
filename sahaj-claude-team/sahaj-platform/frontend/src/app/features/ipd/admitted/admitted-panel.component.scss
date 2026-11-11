@@ -131,6 +131,12 @@
   }
 }
 
+// With the words hidden the button is only its icon: keep it 44 px wide as well as 44 px high (D-18).
+.pcview button {
+  min-width: 44px;
+  justify-content: center;
+}
+
 .iptbl {
   // The scroll container is also the containing block of the hidden "Open" header text, so that text
   // is clipped here and cannot widen the page at 360 px (SAH-36 F-3).
@@ -195,4 +201,58 @@
   margin: 0;
   font-size: 0.76rem;
   text-align: right;
+}
+
+// SAH-34. "My patients" (mockup `.pctog`): a pressed toggle; the pressed state is shown by the fill and
+// the border, and `aria-pressed` carries it for a screen reader.
+.pctog {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  // Touch target (angular.md): at least 44 px tall.
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  color: var(--ink-2);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.84rem;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    background: var(--pri-soft);
+    color: var(--pri-text);
+    border-color: var(--pri);
+  }
+}
+
+// SAH-34. The scope chip and the Emergency access button (mockup `.pcscope`): at the end of the toolbar.
+.pcscope {
+  margin-left: auto;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.pcscopechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: help;
+}
+
+.egbtn {
+  min-height: 44px;
+}
+
+@media (max-width: 620px) {
+  .pcscope {
+    margin-left: 0;
+    width: 100%;
+  }
 }

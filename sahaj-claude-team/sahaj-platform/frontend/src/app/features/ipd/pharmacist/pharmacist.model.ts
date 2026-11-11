@@ -136,14 +136,16 @@ export const rejectedToast = (label: string): string => `Order rejected · ${lab
 
 /**
  * The number on the Safety tab (mockup `sfCount`): open escalations, plus (owner) the orders waiting,
- * plus the late doses of the Medicine round (SAH-35). Doses that are only due are not added.
+ * plus the late doses of the Medicine round (SAH-35). Doses that are only due are not added. For the owner,
+ * SAH-34 adds the emergency access grants not yet reviewed (OQ-34-30, a deviation from the mockup's count).
  */
 export function safetyTabCount(
   open: number | null | undefined,
   waiting: number | null | undefined,
   dosesLate: number | null | undefined = 0,
+  emergencyAccessWaiting: number | null | undefined = 0,
 ): number {
-  return (open ?? 0) + (waiting ?? 0) + (dosesLate ?? 0);
+  return (open ?? 0) + (waiting ?? 0) + (dosesLate ?? 0) + (emergencyAccessWaiting ?? 0);
 }
 
 /**

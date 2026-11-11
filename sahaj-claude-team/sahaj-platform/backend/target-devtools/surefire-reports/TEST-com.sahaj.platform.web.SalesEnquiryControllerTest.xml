@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.578" tests="25" errors="0" skipped="0" failures="0" flakes="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.774" tests="25" errors="0" skipped="0" failures="0" flakes="0">
   <properties>
     <property name="java.specification.version" value="17"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -18,7 +18,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="US"/>
     <property name="sun.boot.library.path" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin"/>
-    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire16790332837580701310\surefirebooter-20261106024443141_3.jar C:\Users\Hp\AppData\Local\Temp\surefire16790332837580701310 2026-11-06T02-44-42_951-jvmRun1 surefire-20261106024443141_1tmp surefire_0-20261106024443141_2tmp"/>
+    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914\surefirebooter-20261111124638916_3.jar C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914 2026-11-11T12-46-38_572-jvmRun1 surefire-20261111124638916_1tmp surefire_0-20261111124638916_2tmp"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\test-classes;D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\classes;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter\3.5.16\spring-boot-starter-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot\3.5.16\spring-boot-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-context\6.2.19\spring-context-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\3.5.16\spring-boot-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-logging\3.5.16\spring-boot-starter-logging-3.5.16.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-classic\1.5.34\logback-classic-1.5.34.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-core\1.5.34\logback-core-1.5.34.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.24.3\log4j-to-slf4j-2.24.3.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-api\2.24.3\log4j-api-2.24.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\jul-to-slf4j\2.0.18\jul-to-slf4j-2.0.18.jar;C:\Users\Hp\.m2\repository\jakarta\annotation\jakarta.annotation-api\2.1.1\jakarta.annotation-api-2.1.1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-core\6.2.19\spring-core-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jcl\6.2.19\spring-jcl-6.2.19.jar;C:\Users\Hp\.m2\repository\org\yaml\snakeyaml\2.4\snakeyaml-2.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-web\3.5.16\spring-boot-starter-web-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-json\3.5.16\spring-boot-starter-json-3.5.16.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.21.4\jackson-datatype-jdk8-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.21.4\jackson-module-parameter-names-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\3.5.16\spring-boot-starter-tomcat-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\10.1.55\tomcat-embed-core-10.1.55.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\10.1.55\tomcat-embed-websocket-10.1.55.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-web\6.2.19\spring-web-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-beans\6.2.19\spring-beans-6.2.19.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-observation\1.15.12\micrometer-observation-1.15.12.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-commons\1.15.12\micrometer-commons-1.15.12.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-webmvc\6.2.19\spring-webmvc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-expression\6.2.19\spring-expression-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-security\3.5.16\spring-boot-starter-security-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-aop\6.2.19\spring-aop-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-config\6.5.11\spring-security-config-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-web\6.5.11\spring-security-web-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-validation\3.5.16\spring-boot-starter-validation-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\10.1.55\tomcat-embed-el-10.1.55.jar;C:\Users\Hp\.m2\repository\org\hibernate\validator\hibernate-validator\8.0.3.Final\hibernate-validator-8.0.3.Final.jar;C:\Users\Hp\.m2\repository\jakarta\validation\jakarta.validation-api\3.0.2\jakarta.validation-api-3.0.2.jar;C:\Users\Hp\.m2\repository\org\jboss\logging\jboss-logging\3.6.3.Final\jboss-logging-3.6.3.Final.jar;C:\Users\Hp\.m2\repository\com\fasterxml\classmate\1.7.3\classmate-1.7.3.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-jdbc\3.5.16\spring-boot-starter-jdbc-3.5.16.jar;C:\Users\Hp\.m2\repository\com\zaxxer\HikariCP\6.3.3\HikariCP-6.3.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\slf4j-api\2.0.18\slf4j-api-2.0.18.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jdbc\6.2.19\spring-jdbc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-tx\6.2.19\spring-tx-6.2.19.jar;C:\Users\Hp\.m2\repository\org\postgresql\postgresql\42.7.11\postgresql-42.7.11.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-core\11.7.2\flyway-core-11.7.2.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-toml\2.21.4\jackson-dataformat-toml-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.21.4\jackson-core-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.21.4\jackson-datatype-jsr310-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.21\jackson-annotations-2.21.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-database-postgresql\11.7.2\flyway-database-postgresql-11.7.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-core\1.4.14\spring-modulith-starter-core-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-api\1.4.14\spring-modulith-api-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-core\1.4.14\spring-modulith-core-1.4.14.jar;C:\Users\Hp\.m2\repository\com\tngtech\archunit\archunit\1.4.2\archunit-1.4.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-moments\1.4.14\spring-modulith-moments-1.4.14.jar;C:\Users\Hp\.m2\repository\org\jmolecules\jmolecules-events\1.10.0\jmolecules-events-1.10.0.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-api\0.12.6\jjwt-api-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-impl\0.12.6\jjwt-impl-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-jackson\0.12.6\jjwt-jackson-0.12.6.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.21.4\jackson-databind-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-test\3.5.16\spring-boot-starter-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test\3.5.16\spring-boot-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test-autoconfigure\3.5.16\spring-boot-test-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\com\jayway\jsonpath\json-path\2.9.0\json-path-2.9.0.jar;C:\Users\Hp\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\4.0.5\jakarta.xml.bind-api-4.0.5.jar;C:\Users\Hp\.m2\repository\jakarta\activation\jakarta.activation-api\2.1.4\jakarta.activation-api-2.1.4.jar;C:\Users\Hp\.m2\repository\net\minidev\json-smart\2.5.2\json-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\net\minidev\accessors-smart\2.5.2\accessors-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\org\ow2\asm\asm\9.7.1\asm-9.7.1.jar;C:\Users\Hp\.m2\repository\org\assertj\assertj-core\3.27.7\assertj-core-3.27.7.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy\1.17.8\byte-buddy-1.17.8.jar;C:\Users\Hp\.m2\repository\org\awaitility\awaitility\4.2.2\awaitility-4.2.2.jar;C:\Users\Hp\.m2\repository\org\hamcrest\hamcrest\3.0\hamcrest-3.0.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter\5.12.2\junit-jupiter-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.12.2\junit-jupiter-api-5.12.2.jar;C:\Users\Hp\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-commons\1.12.2\junit-platform-commons-1.12.2.jar;C:\Users\Hp\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.12.2\junit-jupiter-params-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.12.2\junit-jupiter-engine-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-engine\1.12.2\junit-platform-engine-1.12.2.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy-agent\1.17.8\byte-buddy-agent-1.17.8.jar;C:\Users\Hp\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-junit-jupiter\5.17.0\mockito-junit-jupiter-5.17.0.jar;C:\Users\Hp\.m2\repository\org\skyscreamer\jsonassert\1.5.3\jsonassert-1.5.3.jar;C:\Users\Hp\.m2\repository\com\vaadin\external\google\android-json\0.0.20131108.vaadin1\android-json-0.0.20131108.vaadin1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-test\6.2.19\spring-test-6.2.19.jar;C:\Users\Hp\.m2\repository\org\xmlunit\xmlunit-core\2.10.4\xmlunit-core-2.10.4.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-test\6.5.11\spring-security-test-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-core\6.5.11\spring-security-core-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-crypto\6.5.11\spring-security-crypto-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-test\1.4.14\spring-modulith-starter-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-test\1.4.14\spring-modulith-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-docs\1.4.14\spring-modulith-docs-1.4.14.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-core\3.1.0\structurizr-core-3.1.0.jar;C:\Users\Hp\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-export\3.1.0\structurizr-export-3.1.0.jar;"/>
     <property name="sun.cpu.endian" value="little"/>
@@ -35,7 +35,7 @@
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="FILE_LOG_CHARSET" value="windows-1252"/>
     <property name="java.awt.headless" value="true"/>
-    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire16790332837580701310\surefirebooter-20261106024443141_3.jar"/>
+    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914\surefirebooter-20261111124638916_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="java.runtime.version" value="17.0.21.0.2+1-LTS"/>
@@ -50,16 +50,15 @@
     <property name="localRepository" value="C:\Users\Hp\.m2\repository"/>
     <property name="java.vendor.url.bug" value="https://github.com/microsoft/openjdk/issues"/>
     <property name="java.io.tmpdir" value="C:\Users\Hp\AppData\Local\Temp\"/>
-    <property name="catalina.home" value="C:\Users\Hp\AppData\Local\Temp\tomcat.0.17170559038560526176"/>
+    <property name="catalina.home" value="C:\Users\Hp\AppData\Local\Temp\tomcat.0.7067091261810104882"/>
     <property name="java.version" value="17.0.21.0.2"/>
     <property name="user.dir" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
-    <property name="PID" value="22100"/>
-    <property name="it.test" value="Dev*IT,PackagedJar*IT"/>
+    <property name="PID" value="16448"/>
     <property name="sun.os.patch.level" value=""/>
     <property name="CONSOLE_LOG_CHARSET" value="windows-1252"/>
-    <property name="catalina.base" value="C:\Users\Hp\AppData\Local\Temp\tomcat.0.10703012944660514135"/>
+    <property name="catalina.base" value="C:\Users\Hp\AppData\Local\Temp\tomcat.0.11383593581644389897"/>
     <property name="native.encoding" value="Cp1252"/>
     <property name="java.library.path" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Users\Hp\bin;C:\Program Files\Git\ucrt64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\ucrt64\bin;C:\Program Files\Git\usr\bin;C:\Users\Hp\bin;C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;C:\Users\Hp\AppData\Roaming\nvm;C:\Program Files\nodejs;C:\Program Files\PuTTY;C:\Users\Hp\AppData\Roaming\npm;C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\Program Files\nodejs;C:\Users\Hp\AppData\Local\Microsoft\WindowsApps;C:\Users\Hp\AppData\Roaming\nvm;C:\Program Files\nodejs;C:\Users\Hp\AppData\Local\Microsoft\WinGet\Packages\Schniz.fnm_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\Hp\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\Hp\AppData\Local\Programs\cursor\resources\app\bin;C:\Users\Hp\AppData\Roaming\npm;C:\Users\Hp\tools\apache-maven-3.9.9\bin;C:\Program Files\PostgreSQL\16\bin;C:\Program Files\PostgreSQL\16\bin;C:\Users\Hp\AppData\Local\Programs\Microsoft VS Code\bin\copilot-shim;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl;."/>
     <property name="java.vm.info" value="mixed mode, sharing"/>
@@ -73,8 +72,8 @@
     <property name="LOGGED_APPLICATION_NAME" value="[sahaj-backend] "/>
   </properties>
   <testcase name="theRequestObjectDoesNotPrintTheMobileNumber" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.002">
-    <system-out><![CDATA[2026-11-06 02:46:13.344  INFO [requestId=,tenantId=] o.s.t.c.s.AnnotationConfigContextLoaderUtils - Could not detect default configuration classes for test class [com.sahaj.platform.web.SalesEnquiryControllerTest]: SalesEnquiryControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-2026-11-06 02:46:13.351  INFO [requestId=,tenantId=] o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.sahaj.SahajApplication for test class com.sahaj.platform.web.SalesEnquiryControllerTest
+    <system-out><![CDATA[2026-11-11 12:49:43.025  INFO [requestId=,tenantId=] o.s.t.c.s.AnnotationConfigContextLoaderUtils - Could not detect default configuration classes for test class [com.sahaj.platform.web.SalesEnquiryControllerTest]: SalesEnquiryControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-11-11 12:49:43.029  INFO [requestId=,tenantId=] o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.sahaj.SahajApplication for test class com.sahaj.platform.web.SalesEnquiryControllerTest
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -85,78 +84,213 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-06 02:46:13.366  INFO [requestId=,tenantId=] c.s.p.web.SalesEnquiryControllerTest - Starting SalesEnquiryControllerTest using Java 17.0.21.0.2 with PID 22100 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-06 02:46:13.366  INFO [requestId=,tenantId=] c.s.p.web.SalesEnquiryControllerTest - The following 1 profile is active: "dev"
-2026-11-06 02:46:13.705  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-06 02:46:13.705  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-06 02:46:13.705  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-06 02:46:13.710  INFO [requestId=,tenantId=] c.s.p.web.SalesEnquiryControllerTest - Started SalesEnquiryControllerTest in 0.357 seconds (process running for 90.4)
+2026-11-11 12:49:43.048  INFO [requestId=,tenantId=] c.s.p.web.SalesEnquiryControllerTest - Starting SalesEnquiryControllerTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 12:49:43.048  INFO [requestId=,tenantId=] c.s.p.web.SalesEnquiryControllerTest - The following 1 profile is active: "dev"
+2026-11-11 12:49:43.606  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 12:49:43.606  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 12:49:43.607  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 12:49:43.612  INFO [requestId=,tenantId=] c.s.p.web.SalesEnquiryControllerTest - Started SalesEnquiryControllerTest in 0.58 seconds (process running for 184.503)
 ]]></system-out>
   </testcase>
-  <testcase name="rejectsAMissingNameWithAFieldError" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.012"/>
-  <testcase name="answers429AfterFiveRequestsFromTheSameAddressInAnHour" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.017"/>
-  <testcase name="acceptsAnEnquiryWithOnlyTheRequiredFields" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004"/>
-  <testcase name="rejectsTooLongText" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.006"/>
-  <testcase name="rejectsBrokenJsonWithAProblem" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004"/>
-  <testcase name="rejectsAnUnsupportedContentTypeWithAProblem" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004"/>
-  <testcase name="doesNotSaveARequestThatIsOverTheLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.01"/>
-  <testcase name="rejectsControlCharactersInTheNameWithAFieldError" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004"/>
-  <testcase name="aForgedForwardedHeaderCannotBypassTheLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.021"/>
-  <testcase name="rejectsAnUnknownOptionWithoutEchoingIt" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003"/>
-  <testcase name="rejectsAnEmptyBody" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003"/>
-  <testcase name="aPathWithAnEncodedHyphenStillCountsTowardsTheSameLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.009"/>
-  <testcase name="aSecondAddressHasItsOwnAllowance" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.009"/>
-  <testcase name="ignoresATenantIdInTheBodyHeaderOrQuery" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004"/>
-  <testcase name="countsInvalidRequestsTowardsTheLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.011"/>
-  <testcase name="everyResponseCarriesARequestId" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.005"/>
-  <testcase name="rejectsMobileNumbersThatAreNotTenDigitsStartingWithSixToNine" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.014"/>
-  <testcase name="rejectsABodyLargerThanFourKilobytesWith413" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003"/>
-  <testcase name="savesAValidEnquiryAndReturns201WithTheId" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.006"/>
-  <testcase name="rejectsControlCharactersInTheClinicCityWithAFieldError" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.005"/>
-  <testcase name="theMobileNumberNeverReachesTheLogOrAnErrorResponse" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.017">
-    <system-out><![CDATA[2026-11-06 02:46:13.881 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.881 DEBUG [requestId=2eb161e8-0867-4408-bee3-65d2c093312f,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.881 DEBUG [requestId=2eb161e8-0867-4408-bee3-65d2c093312f,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.882 DEBUG [requestId=2eb161e8-0867-4408-bee3-65d2c093312f,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.883 DEBUG [requestId=2eb161e8-0867-4408-bee3-65d2c093312f,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-06 02:46:13.884 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.884 DEBUG [requestId=c210b106-2b2d-44f7-b9bf-bb17494a2c30,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.884 DEBUG [requestId=c210b106-2b2d-44f7-b9bf-bb17494a2c30,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.884 DEBUG [requestId=c210b106-2b2d-44f7-b9bf-bb17494a2c30,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.886 DEBUG [requestId=c210b106-2b2d-44f7-b9bf-bb17494a2c30,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
-2026-11-06 02:46:13.886 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.887 DEBUG [requestId=4e3396d6-30b1-4a1c-a490-37b0ad8a6ccc,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.887 DEBUG [requestId=4e3396d6-30b1-4a1c-a490-37b0ad8a6ccc,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.887 DEBUG [requestId=4e3396d6-30b1-4a1c-a490-37b0ad8a6ccc,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.888 DEBUG [requestId=4e3396d6-30b1-4a1c-a490-37b0ad8a6ccc,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
-2026-11-06 02:46:13.889 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.889 DEBUG [requestId=37d8e215-7925-4d73-bcce-e0a99329921b,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.889 DEBUG [requestId=37d8e215-7925-4d73-bcce-e0a99329921b,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.889 DEBUG [requestId=37d8e215-7925-4d73-bcce-e0a99329921b,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.890 DEBUG [requestId=37d8e215-7925-4d73-bcce-e0a99329921b,tenantId=] o.s.web.method.HandlerMethod - Could not resolve parameter [0] in public com.sahaj.platform.web.IdResponse com.sahaj.platform.web.SalesEnquiryController.create(com.sahaj.platform.web.SalesEnquiryRequest): JSON parse error: Unexpected end-of-input within/between Object entries
-2026-11-06 02:46:13.891 DEBUG [requestId=37d8e215-7925-4d73-bcce-e0a99329921b,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
-2026-11-06 02:46:13.891 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.891 DEBUG [requestId=4c619361-25af-4743-b039-3367265ef6df,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.891 DEBUG [requestId=4c619361-25af-4743-b039-3367265ef6df,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.891 DEBUG [requestId=4c619361-25af-4743-b039-3367265ef6df,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.892 DEBUG [requestId=4c619361-25af-4743-b039-3367265ef6df,tenantId=] o.s.web.method.HandlerMethod - Could not resolve parameter [0] in public com.sahaj.platform.web.IdResponse com.sahaj.platform.web.SalesEnquiryController.create(com.sahaj.platform.web.SalesEnquiryRequest): JSON parse error: Cannot deserialize value of type `com.sahaj.platform.domain.BestTime` from String "X": not one of the values accepted for Enum class: [AFTER_OPD, MORNING, AFTERNOON]
-2026-11-06 02:46:13.892 DEBUG [requestId=4c619361-25af-4743-b039-3367265ef6df,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
-2026-11-06 02:46:13.893 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.893 DEBUG [requestId=2d11fdfd-287d-436c-bc94-d9f0da238b02,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.893 DEBUG [requestId=2d11fdfd-287d-436c-bc94-d9f0da238b02,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.893 DEBUG [requestId=2d11fdfd-287d-436c-bc94-d9f0da238b02,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.893 DEBUG [requestId=2d11fdfd-287d-436c-bc94-d9f0da238b02,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 429 TOO_MANY_REQUESTS
-2026-11-06 02:46:13.893 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.893 DEBUG [requestId=2ee6bb4d-9120-4d97-8e2c-3e20bc554414,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-06 02:46:13.893 DEBUG [requestId=2ee6bb4d-9120-4d97-8e2c-3e20bc554414,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
-2026-11-06 02:46:13.893 DEBUG [requestId=2ee6bb4d-9120-4d97-8e2c-3e20bc554414,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
-2026-11-06 02:46:13.894 DEBUG [requestId=2ee6bb4d-9120-4d97-8e2c-3e20bc554414,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 429 TOO_MANY_REQUESTS
+  <testcase name="rejectsAMissingNameWithAFieldError" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.011">
+    <system-out><![CDATA[2026-11-11 12:49:43.625  INFO [requestId=c278fb1a-47b5-456b-8474-fe65c70b3317,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=7 tenantId=- userId=- requestId=c278fb1a-47b5-456b-8474-fe65c70b3317
 ]]></system-out>
   </testcase>
-  <testcase name="reportsEveryMissingRequiredFieldTogether" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.007"/>
-  <testcase name="aPercentEncodedPathStillCountsTowardsTheSameLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.011"/>
-  <testcase name="rejectsOtherMethodsWithAProblem" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004">
-    <system-out><![CDATA[2026-11-06 02:46:13.919  WARN [requestId=eff0c479-7374-46cb-a518-cf7860a82802,tenantId=] o.s.web.servlet.PageNotFound - Request method 'GET' is not supported
+  <testcase name="answers429AfterFiveRequestsFromTheSameAddressInAnHour" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.008">
+    <system-out><![CDATA[2026-11-11 12:49:43.630  INFO [requestId=57dd415f-eb38-499e-90b5-93701ae1d38a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=1 tenantId=- userId=- requestId=57dd415f-eb38-499e-90b5-93701ae1d38a
+2026-11-11 12:49:43.631  INFO [requestId=e56c7325-960a-41f3-87d5-d9f1b077146a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=e56c7325-960a-41f3-87d5-d9f1b077146a
+2026-11-11 12:49:43.632  INFO [requestId=9e5c4531-eb6a-42d2-b37d-ecd3d76a3019,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=9e5c4531-eb6a-42d2-b37d-ecd3d76a3019
+2026-11-11 12:49:43.632  INFO [requestId=a2700368-7c6f-4a49-9670-768d938574fd,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=a2700368-7c6f-4a49-9670-768d938574fd
+2026-11-11 12:49:43.633  INFO [requestId=5aab6cd1-7878-4032-bdc2-d43b7775e5d7,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=5aab6cd1-7878-4032-bdc2-d43b7775e5d7
+2026-11-11 12:49:43.634  INFO [requestId=4c4193fe-34c0-4d7c-8481-72130c6da78a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=4c4193fe-34c0-4d7c-8481-72130c6da78a
+]]></system-out>
+  </testcase>
+  <testcase name="acceptsAnEnquiryWithOnlyTheRequiredFields" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003">
+    <system-out><![CDATA[2026-11-11 12:49:43.637  INFO [requestId=c491a155-3996-46f3-be45-91aee92fe0a9,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=c491a155-3996-46f3-be45-91aee92fe0a9
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsTooLongText" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.005">
+    <system-out><![CDATA[2026-11-11 12:49:43.641  INFO [requestId=9a73373b-ce1f-4671-bb97-456919048c7a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=9a73373b-ce1f-4671-bb97-456919048c7a
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsBrokenJsonWithAProblem" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003">
+    <system-out><![CDATA[2026-11-11 12:49:43.646  INFO [requestId=ed0a76d6-f7d1-4b06-91ee-66abea4d48c3,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=ed0a76d6-f7d1-4b06-91ee-66abea4d48c3
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsAnUnsupportedContentTypeWithAProblem" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 12:49:43.650  INFO [requestId=430da3e5-b236-4c70-a0c0-9e32a11ebe4e,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=415 durationMs=1 tenantId=- userId=- requestId=430da3e5-b236-4c70-a0c0-9e32a11ebe4e
+]]></system-out>
+  </testcase>
+  <testcase name="doesNotSaveARequestThatIsOverTheLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.008">
+    <system-out><![CDATA[2026-11-11 12:49:43.654  INFO [requestId=212f9bad-f433-44be-accd-425c31a9d5ce,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=212f9bad-f433-44be-accd-425c31a9d5ce
+2026-11-11 12:49:43.655  INFO [requestId=e07a1121-91ff-4689-82e9-f49d90d65c8b,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=e07a1121-91ff-4689-82e9-f49d90d65c8b
+2026-11-11 12:49:43.656  INFO [requestId=a2f4aeab-07e5-4969-9ed2-4b8966d70928,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=a2f4aeab-07e5-4969-9ed2-4b8966d70928
+2026-11-11 12:49:43.657  INFO [requestId=b4a8ad54-34e9-4267-9b38-d32cf8e49736,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=b4a8ad54-34e9-4267-9b38-d32cf8e49736
+2026-11-11 12:49:43.658  INFO [requestId=9b8141ab-afe3-47db-b8cc-a60a7ee5595f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=9b8141ab-afe3-47db-b8cc-a60a7ee5595f
+2026-11-11 12:49:43.659  INFO [requestId=da04dfbd-7c63-4eb4-a787-9b6a22fc6606,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=da04dfbd-7c63-4eb4-a787-9b6a22fc6606
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsControlCharactersInTheNameWithAFieldError" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 12:49:43.662  INFO [requestId=6f081101-9ffe-497a-b6a9-816654e5d2de,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=6f081101-9ffe-497a-b6a9-816654e5d2de
+]]></system-out>
+  </testcase>
+  <testcase name="aForgedForwardedHeaderCannotBypassTheLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.018">
+    <system-out><![CDATA[2026-11-11 12:49:43.666  INFO [requestId=1fb3298f-50ee-4962-b9b0-df5bab7d09fe,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=1fb3298f-50ee-4962-b9b0-df5bab7d09fe
+2026-11-11 12:49:43.667  INFO [requestId=f4ddc31e-1504-4da2-825d-d17b4bb4e923,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=f4ddc31e-1504-4da2-825d-d17b4bb4e923
+2026-11-11 12:49:43.669  INFO [requestId=aa22860b-234b-47e2-a0d3-bd5852cca42b,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=aa22860b-234b-47e2-a0d3-bd5852cca42b
+2026-11-11 12:49:43.670  INFO [requestId=982f1289-b946-4557-bfb1-4e4852976a89,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=982f1289-b946-4557-bfb1-4e4852976a89
+2026-11-11 12:49:43.671  INFO [requestId=10ee5c24-7fa5-4875-99ed-c93f79899051,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=10ee5c24-7fa5-4875-99ed-c93f79899051
+2026-11-11 12:49:43.672  INFO [requestId=1c23fc7a-f3e0-4a6c-b0b6-17379d15a709,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=1c23fc7a-f3e0-4a6c-b0b6-17379d15a709
+2026-11-11 12:49:43.672  INFO [requestId=37308e7a-4b0e-43b3-b8ee-5b52b551384a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=37308e7a-4b0e-43b3-b8ee-5b52b551384a
+2026-11-11 12:49:43.673  INFO [requestId=26abc5a9-f086-4f7a-81a8-ca74e59b9167,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=26abc5a9-f086-4f7a-81a8-ca74e59b9167
+2026-11-11 12:49:43.673  INFO [requestId=46847cb0-b19d-44f3-88b6-46cb4c79b9ac,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=46847cb0-b19d-44f3-88b6-46cb4c79b9ac
+2026-11-11 12:49:43.674  INFO [requestId=ba436811-e476-4d62-8817-565977acdf1f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=ba436811-e476-4d62-8817-565977acdf1f
+2026-11-11 12:49:43.675  INFO [requestId=d6f29394-d0f3-4eb8-a515-946b643c093e,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=d6f29394-d0f3-4eb8-a515-946b643c093e
+2026-11-11 12:49:43.675  INFO [requestId=56808146-5129-48d0-b7dd-decb21300314,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=56808146-5129-48d0-b7dd-decb21300314
+2026-11-11 12:49:43.675  INFO [requestId=98bb1f23-e03b-4acb-be4b-c5a6a413b129,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=98bb1f23-e03b-4acb-be4b-c5a6a413b129
+2026-11-11 12:49:43.676  INFO [requestId=869cc50b-ae3e-4cf5-8b22-e74646b8ddf2,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=869cc50b-ae3e-4cf5-8b22-e74646b8ddf2
+2026-11-11 12:49:43.676  INFO [requestId=3c88a0bb-9ea1-4749-854a-cac10f90eff2,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=3c88a0bb-9ea1-4749-854a-cac10f90eff2
+2026-11-11 12:49:43.677  INFO [requestId=5f691888-faf7-4dce-83a0-4b425469db01,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=5f691888-faf7-4dce-83a0-4b425469db01
+2026-11-11 12:49:43.677  INFO [requestId=cc79d89d-3f94-4be9-9de1-51ee30ea96b1,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=cc79d89d-3f94-4be9-9de1-51ee30ea96b1
+2026-11-11 12:49:43.678  INFO [requestId=8f494981-e742-4103-bee2-00a9bc9254d8,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=8f494981-e742-4103-bee2-00a9bc9254d8
+2026-11-11 12:49:43.678  INFO [requestId=e15a9dcc-afb0-46cd-ac37-4fad18db205c,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=e15a9dcc-afb0-46cd-ac37-4fad18db205c
+2026-11-11 12:49:43.679  INFO [requestId=167c12be-5224-428f-a72f-a7669977e08f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=167c12be-5224-428f-a72f-a7669977e08f
+2026-11-11 12:49:43.679  INFO [requestId=44e8c7e6-ff45-48f8-b971-c09f74601481,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=44e8c7e6-ff45-48f8-b971-c09f74601481
+2026-11-11 12:49:43.679  INFO [requestId=c87963ad-17a2-4dc1-8b85-0cdb1a887ade,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=c87963ad-17a2-4dc1-8b85-0cdb1a887ade
+2026-11-11 12:49:43.680  INFO [requestId=81d7856e-4cc8-4bce-b6a8-cef3b14a524f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=81d7856e-4cc8-4bce-b6a8-cef3b14a524f
+2026-11-11 12:49:43.680  INFO [requestId=baa1461e-a54d-4976-b53c-d1618c12823c,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=baa1461e-a54d-4976-b53c-d1618c12823c
+2026-11-11 12:49:43.681  INFO [requestId=c25a15f4-d3fc-4fb0-80bc-27c92526f535,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=c25a15f4-d3fc-4fb0-80bc-27c92526f535
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsAnUnknownOptionWithoutEchoingIt" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 12:49:43.684  INFO [requestId=f5928526-a40a-4d16-bb62-c3c7ef173975,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=f5928526-a40a-4d16-bb62-c3c7ef173975
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsAnEmptyBody" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003">
+    <system-out><![CDATA[2026-11-11 12:49:43.688  INFO [requestId=78e9d933-818f-415c-b39f-7aded8cd9d39,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=78e9d933-818f-415c-b39f-7aded8cd9d39
+]]></system-out>
+  </testcase>
+  <testcase name="aPathWithAnEncodedHyphenStillCountsTowardsTheSameLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.008">
+    <system-out><![CDATA[2026-11-11 12:49:43.692  INFO [requestId=229a86ef-8f2d-4d72-9c24-807f79363659,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=229a86ef-8f2d-4d72-9c24-807f79363659
+2026-11-11 12:49:43.693  INFO [requestId=678f4914-55e1-4022-8b18-53bee6a6c098,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=678f4914-55e1-4022-8b18-53bee6a6c098
+2026-11-11 12:49:43.694  INFO [requestId=f45c1a67-64e2-491a-b53c-b22ffb68851e,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=f45c1a67-64e2-491a-b53c-b22ffb68851e
+2026-11-11 12:49:43.695  INFO [requestId=fa66c470-4112-452e-abb0-d08a3bf90e7a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=fa66c470-4112-452e-abb0-d08a3bf90e7a
+2026-11-11 12:49:43.696  INFO [requestId=ab3cfa43-d3ce-4266-b1dc-1f771b03f213,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=ab3cfa43-d3ce-4266-b1dc-1f771b03f213
+2026-11-11 12:49:43.697  INFO [requestId=42fbca81-0b82-439d-9f53-36caa462b7e6,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=42fbca81-0b82-439d-9f53-36caa462b7e6
+]]></system-out>
+  </testcase>
+  <testcase name="aSecondAddressHasItsOwnAllowance" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.009">
+    <system-out><![CDATA[2026-11-11 12:49:43.701  INFO [requestId=987b3a6f-c9ee-4fbb-9dfb-a8e86783f090,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=987b3a6f-c9ee-4fbb-9dfb-a8e86783f090
+2026-11-11 12:49:43.702  INFO [requestId=ad8262ef-5539-49d0-bb01-6122c9a9089b,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=ad8262ef-5539-49d0-bb01-6122c9a9089b
+2026-11-11 12:49:43.703  INFO [requestId=0f7f9ecd-6e0c-479f-a9c6-fed932632405,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=0f7f9ecd-6e0c-479f-a9c6-fed932632405
+2026-11-11 12:49:43.704  INFO [requestId=eaecdc9f-13b6-4bf4-83a4-88b1f9120bf7,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=eaecdc9f-13b6-4bf4-83a4-88b1f9120bf7
+2026-11-11 12:49:43.705  INFO [requestId=9ad19537-6b5a-47e2-9ac7-7902c13db0ea,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=9ad19537-6b5a-47e2-9ac7-7902c13db0ea
+2026-11-11 12:49:43.706  INFO [requestId=1593d464-4339-4cdd-bc72-4110a0907057,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=1593d464-4339-4cdd-bc72-4110a0907057
+2026-11-11 12:49:43.707  INFO [requestId=77fd7d80-cecb-4d07-9cba-52a8b1be4399,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=77fd7d80-cecb-4d07-9cba-52a8b1be4399
+]]></system-out>
+  </testcase>
+  <testcase name="ignoresATenantIdInTheBodyHeaderOrQuery" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 12:49:43.710  INFO [requestId=39f96147-ac12-4254-8375-688148455d5f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=39f96147-ac12-4254-8375-688148455d5f
+]]></system-out>
+  </testcase>
+  <testcase name="countsInvalidRequestsTowardsTheLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.009">
+    <system-out><![CDATA[2026-11-11 12:49:43.716  INFO [requestId=2d4b9d15-dedf-40d1-bcb3-11ebff379c19,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=2d4b9d15-dedf-40d1-bcb3-11ebff379c19
+2026-11-11 12:49:43.716  INFO [requestId=2b84aa97-c8db-4a54-be48-d4b702f5d6f2,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=2b84aa97-c8db-4a54-be48-d4b702f5d6f2
+2026-11-11 12:49:43.719  INFO [requestId=d075eb18-df4a-4c91-bf95-80967ad5bd1c,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=d075eb18-df4a-4c91-bf95-80967ad5bd1c
+2026-11-11 12:49:43.719  INFO [requestId=9115e7ef-55c4-4643-9a60-db972f8a7214,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=9115e7ef-55c4-4643-9a60-db972f8a7214
+2026-11-11 12:49:43.720  INFO [requestId=48f8eab7-4b81-407e-b9d6-d7bdea10c648,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=48f8eab7-4b81-407e-b9d6-d7bdea10c648
+2026-11-11 12:49:43.721  INFO [requestId=917ca934-2ff3-4d51-a53f-733307903a3f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=917ca934-2ff3-4d51-a53f-733307903a3f
+]]></system-out>
+  </testcase>
+  <testcase name="everyResponseCarriesARequestId" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.005">
+    <system-out><![CDATA[2026-11-11 12:49:43.724  INFO [requestId=0c552998-e489-4daf-8a1d-f70ec4d6b612,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=0c552998-e489-4daf-8a1d-f70ec4d6b612
+2026-11-11 12:49:43.726  INFO [requestId=d3f0ddd9-5822-44ff-b7c3-a06dc80c8fb0,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=d3f0ddd9-5822-44ff-b7c3-a06dc80c8fb0
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsMobileNumbersThatAreNotTenDigitsStartingWithSixToNine" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.012">
+    <system-out><![CDATA[2026-11-11 12:49:43.730  INFO [requestId=665ccb95-74c7-4006-88af-9cd3ee57d82a,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=665ccb95-74c7-4006-88af-9cd3ee57d82a
+2026-11-11 12:49:43.731  INFO [requestId=7e0ff973-90ec-44ef-b938-c49fc37bb30e,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=7e0ff973-90ec-44ef-b938-c49fc37bb30e
+2026-11-11 12:49:43.733  INFO [requestId=e71af5ed-d536-4504-9efd-3678ad6cb16e,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=e71af5ed-d536-4504-9efd-3678ad6cb16e
+2026-11-11 12:49:43.734  INFO [requestId=3d0d5e63-d083-4283-9069-620a52db8ed3,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=3d0d5e63-d083-4283-9069-620a52db8ed3
+2026-11-11 12:49:43.736  INFO [requestId=74d504d5-11ff-4447-8df1-0162dc08b785,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=74d504d5-11ff-4447-8df1-0162dc08b785
+2026-11-11 12:49:43.738  INFO [requestId=0d821572-d922-4b2e-9315-7d9f8628ea80,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=0d821572-d922-4b2e-9315-7d9f8628ea80
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsABodyLargerThanFourKilobytesWith413" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.002">
+    <system-out><![CDATA[2026-11-11 12:49:43.741  INFO [requestId=fdd2440e-0cf8-46a1-82ed-9dc647cf50d0,tenantId=] sahaj.access - request method=POST path=unmatched status=413 durationMs=0 tenantId=- userId=- requestId=fdd2440e-0cf8-46a1-82ed-9dc647cf50d0
+]]></system-out>
+  </testcase>
+  <testcase name="savesAValidEnquiryAndReturns201WithTheId" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003">
+    <system-out><![CDATA[2026-11-11 12:49:43.745  INFO [requestId=91e44e59-9110-4cac-9b33-5655e0a9ce23,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=91e44e59-9110-4cac-9b33-5655e0a9ce23
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsControlCharactersInTheClinicCityWithAFieldError" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.003">
+    <system-out><![CDATA[2026-11-11 12:49:43.749  INFO [requestId=83b5631d-b076-42d9-a3f0-b8956fbbb89f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=0 tenantId=- userId=- requestId=83b5631d-b076-42d9-a3f0-b8956fbbb89f
+]]></system-out>
+  </testcase>
+  <testcase name="theMobileNumberNeverReachesTheLogOrAnErrorResponse" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.02">
+    <system-out><![CDATA[2026-11-11 12:49:43.752 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.752 DEBUG [requestId=1994bdd2-1230-47da-8758-c5f9487dfedd,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.752 DEBUG [requestId=1994bdd2-1230-47da-8758-c5f9487dfedd,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.752 DEBUG [requestId=1994bdd2-1230-47da-8758-c5f9487dfedd,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.753 DEBUG [requestId=1994bdd2-1230-47da-8758-c5f9487dfedd,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 12:49:43.753  INFO [requestId=1994bdd2-1230-47da-8758-c5f9487dfedd,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=1 tenantId=- userId=- requestId=1994bdd2-1230-47da-8758-c5f9487dfedd
+2026-11-11 12:49:43.754 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.754 DEBUG [requestId=38174cf5-bb5c-4102-972d-b690fbceafdb,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.754 DEBUG [requestId=38174cf5-bb5c-4102-972d-b690fbceafdb,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.754 DEBUG [requestId=38174cf5-bb5c-4102-972d-b690fbceafdb,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.755 DEBUG [requestId=38174cf5-bb5c-4102-972d-b690fbceafdb,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
+2026-11-11 12:49:43.755  INFO [requestId=38174cf5-bb5c-4102-972d-b690fbceafdb,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=38174cf5-bb5c-4102-972d-b690fbceafdb
+2026-11-11 12:49:43.756 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.756 DEBUG [requestId=cbfd7760-75e3-4d97-95c5-ddb7100c35eb,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.756 DEBUG [requestId=cbfd7760-75e3-4d97-95c5-ddb7100c35eb,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.756 DEBUG [requestId=cbfd7760-75e3-4d97-95c5-ddb7100c35eb,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.758 DEBUG [requestId=cbfd7760-75e3-4d97-95c5-ddb7100c35eb,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
+2026-11-11 12:49:43.758  INFO [requestId=cbfd7760-75e3-4d97-95c5-ddb7100c35eb,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=2 tenantId=- userId=- requestId=cbfd7760-75e3-4d97-95c5-ddb7100c35eb
+2026-11-11 12:49:43.759 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.759 DEBUG [requestId=22c1b646-0133-4b3e-a032-5b48356d3d77,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.759 DEBUG [requestId=22c1b646-0133-4b3e-a032-5b48356d3d77,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.760 DEBUG [requestId=22c1b646-0133-4b3e-a032-5b48356d3d77,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.761 DEBUG [requestId=22c1b646-0133-4b3e-a032-5b48356d3d77,tenantId=] o.s.web.method.HandlerMethod - Could not resolve parameter [0] in public com.sahaj.platform.web.IdResponse com.sahaj.platform.web.SalesEnquiryController.create(com.sahaj.platform.web.SalesEnquiryRequest): JSON parse error: Unexpected end-of-input within/between Object entries
+2026-11-11 12:49:43.762 DEBUG [requestId=22c1b646-0133-4b3e-a032-5b48356d3d77,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
+2026-11-11 12:49:43.762  INFO [requestId=22c1b646-0133-4b3e-a032-5b48356d3d77,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=2 tenantId=- userId=- requestId=22c1b646-0133-4b3e-a032-5b48356d3d77
+2026-11-11 12:49:43.763 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.763 DEBUG [requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.763 DEBUG [requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.763 DEBUG [requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.764 DEBUG [requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64,tenantId=] o.s.web.method.HandlerMethod - Could not resolve parameter [0] in public com.sahaj.platform.web.IdResponse com.sahaj.platform.web.SalesEnquiryController.create(com.sahaj.platform.web.SalesEnquiryRequest): JSON parse error: Cannot deserialize value of type `com.sahaj.platform.domain.BestTime` from String "X": not one of the values accepted for Enum class: [AFTER_OPD, MORNING, AFTERNOON]
+2026-11-11 12:49:43.765 DEBUG [requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 400 BAD_REQUEST
+2026-11-11 12:49:43.765  INFO [requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=b77a042f-0850-4ac4-a70b-76ac58d06c64
+2026-11-11 12:49:43.765 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.765 DEBUG [requestId=4c40ca28-50e2-41d3-becf-b4f16d678ade,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.766 DEBUG [requestId=4c40ca28-50e2-41d3-becf-b4f16d678ade,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.766 DEBUG [requestId=4c40ca28-50e2-41d3-becf-b4f16d678ade,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.766 DEBUG [requestId=4c40ca28-50e2-41d3-becf-b4f16d678ade,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 429 TOO_MANY_REQUESTS
+2026-11-11 12:49:43.766  INFO [requestId=4c40ca28-50e2-41d3-becf-b4f16d678ade,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=4c40ca28-50e2-41d3-becf-b4f16d678ade
+2026-11-11 12:49:43.767 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.767 DEBUG [requestId=0336eca8-e181-419c-bfe7-92e6ab577886,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 12:49:43.767 DEBUG [requestId=0336eca8-e181-419c-bfe7-92e6ab577886,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/platform/public/sales-enquiries
+2026-11-11 12:49:43.767 DEBUG [requestId=0336eca8-e181-419c-bfe7-92e6ab577886,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/platform/public/sales-enquiries", parameters={}
+2026-11-11 12:49:43.767 DEBUG [requestId=0336eca8-e181-419c-bfe7-92e6ab577886,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 429 TOO_MANY_REQUESTS
+2026-11-11 12:49:43.767  INFO [requestId=0336eca8-e181-419c-bfe7-92e6ab577886,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=0336eca8-e181-419c-bfe7-92e6ab577886
+]]></system-out>
+  </testcase>
+  <testcase name="reportsEveryMissingRequiredFieldTogether" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.009">
+    <system-out><![CDATA[2026-11-11 12:49:43.776  INFO [requestId=b3e49e2d-c013-41b2-9ac0-842528fac520,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=400 durationMs=1 tenantId=- userId=- requestId=b3e49e2d-c013-41b2-9ac0-842528fac520
+]]></system-out>
+  </testcase>
+  <testcase name="aPercentEncodedPathStillCountsTowardsTheSameLimit" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.013">
+    <system-out><![CDATA[2026-11-11 12:49:43.783  INFO [requestId=29545565-b038-495d-918c-e802a65a33df,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=29545565-b038-495d-918c-e802a65a33df
+2026-11-11 12:49:43.785  INFO [requestId=1fd48c50-5f52-41b2-85d6-e82759e70112,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=1fd48c50-5f52-41b2-85d6-e82759e70112
+2026-11-11 12:49:43.787  INFO [requestId=910aee70-c1b4-4cb3-8efa-831e78e43597,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=1 tenantId=- userId=- requestId=910aee70-c1b4-4cb3-8efa-831e78e43597
+2026-11-11 12:49:43.789  INFO [requestId=492bad8e-957d-48c0-b4bb-959395008e7e,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=1 tenantId=- userId=- requestId=492bad8e-957d-48c0-b4bb-959395008e7e
+2026-11-11 12:49:43.791  INFO [requestId=9148597b-02dd-4154-9835-91ab92e43c5f,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=201 durationMs=0 tenantId=- userId=- requestId=9148597b-02dd-4154-9835-91ab92e43c5f
+2026-11-11 12:49:43.791  INFO [requestId=1030487d-5e05-4832-8dc2-f20573b0770b,tenantId=] sahaj.access - request method=POST path=/api/v1/platform/public/sales-enquiries status=429 durationMs=0 tenantId=- userId=- requestId=1030487d-5e05-4832-8dc2-f20573b0770b
+]]></system-out>
+  </testcase>
+  <testcase name="rejectsOtherMethodsWithAProblem" classname="com.sahaj.platform.web.SalesEnquiryControllerTest" time="0.005">
+    <system-out><![CDATA[2026-11-11 12:49:43.796  WARN [requestId=f9b28efe-6788-49e9-a8d2-bdcaab8080ca,tenantId=] o.s.web.servlet.PageNotFound - Request method 'GET' is not supported
+2026-11-11 12:49:43.796  INFO [requestId=f9b28efe-6788-49e9-a8d2-bdcaab8080ca,tenantId=] sahaj.access - request method=GET path=unmatched status=405 durationMs=0 tenantId=- userId=- requestId=f9b28efe-6788-49e9-a8d2-bdcaab8080ca
 ]]></system-out>
   </testcase>
 </testsuite>

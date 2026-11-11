@@ -80,6 +80,7 @@ class EscalationServiceTest {
     private AuditLog auditLog;
     private ModuleEntitlementPort entitlements;
     private SeniorCallRepository seniorCalls;
+    private ScopeGuard guard = ScopeStubs.unscoped();
     private EscalationService service;
     private String memberRole = "DOCTOR";
     private boolean memberActive = true;
@@ -98,7 +99,7 @@ class EscalationServiceTest {
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(DB_NOW, ZoneOffset.UTC));
         seniorCalls = mock(SeniorCallRepository.class);
         service = new EscalationService(board, admissions, events, patients, actors, team, auditLog, gate,
-                seniorCalls);
+                seniorCalls, guard);
 
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement("on", false, 25));
         when(board.databaseNow()).thenReturn(DB_NOW);
@@ -459,6 +460,25 @@ class EscalationServiceTest {
         memberRole = "NURSE";
         assertThatThrownBy(() -> service.callSenior(TENANT, ACTOR, "NURSE", ESC, call(3, 0)))
                 .isInstanceOf(NotFoundException.class);
+        verifyNothingWritten();
+    }
+
+    @Test
+    void aDischargedPatientOutsideHerScopeIs403OutsideScopeBeforeTheNotAdmittedAnswer() {
+        row(open(3, 0));
+        admissionStatus = "DISCHARGED";
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("DOCTOR"),
+                eq("DOCTOR"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.acknowledge(TENANT, ACTOR, "DOCTOR", ESC, version(3)))
+                .isInstanceOf(OutsideScopeException.class);
+        assertThatThrownBy(() -> service.respond(TENANT, ACTOR, "DOCTOR", ESC, response(3, ResponseAction.NO_CHANGE,
+                PLAN))).isInstanceOf(OutsideScopeException.class);
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("NURSE"),
+                eq("NURSE"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+        memberRole = "NURSE";
+        assertThatThrownBy(() -> service.callSenior(TENANT, ACTOR, "NURSE", ESC, call(3, 0)))
+                .isInstanceOf(OutsideScopeException.class);
         verifyNothingWritten();
     }
 
@@ -847,5 +867,58 @@ class EscalationServiceTest {
                     .isEqualTo(org.springframework.transaction.annotation.Isolation.READ_COMMITTED);
             assertThat(tx.readOnly()).as(method.getName()).isFalse();
         }
+    }
+
+    // ---- SAH-34 patient scope ----
+
+    @Test
+    void acknowledgeOutsideScopeWritesNothing() {
+        row(open(3, 0));
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("DOCTOR"),
+                eq("DOCTOR"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.acknowledge(TENANT, ACTOR, "DOCTOR", ESC, version(3)))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verify(board, never()).acknowledge(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
+        verifyNothingWritten();
+    }
+
+    @Test
+    void respondOutsideScopeWritesNothing() {
+        row(open(3, 0));
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("DOCTOR"),
+                eq("DOCTOR"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.respond(TENANT, ACTOR, "DOCTOR", ESC,
+                response(3, ResponseAction.NO_CHANGE, PLAN))).isInstanceOf(OutsideScopeException.class);
+
+        verifyNothingWritten();
+    }
+
+    @Test
+    void callSeniorOutsideScopeWritesNothing() {
+        memberRole = "NURSE";
+        row(open(3, 0));
+        org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(ACTOR), eq("NURSE"),
+                eq("NURSE"), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> service.callSenior(TENANT, ACTOR, "NURSE", ESC, call(3, 0)))
+                .isInstanceOf(OutsideScopeException.class);
+
+        verify(board, never()).callSenior(any(), any(), org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt());
+        verifyNoInteractions(seniorCalls);
+        verifyNothingWritten();
+    }
+
+    @Test
+    void anEscalationOfAnotherClinicIsNotFoundAndNeverReachesTheGuard() {
+        when(board.findById(TENANT, ESC)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.acknowledge(TENANT, ACTOR, "DOCTOR", ESC, version(3)))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(guard, never()).requireAdmissionLocked(any(), any(), any(), any(), any(), any());
     }
 }

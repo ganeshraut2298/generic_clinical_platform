@@ -120,7 +120,33 @@ export interface AdmissionList {
   card: AdmittedCardAbilities;
   /** SAH-37. The published card setup the Cards view draws (read in the same snapshot as the rows). */
   cardSetup: ResolvedCardSetup;
+  /** SAH-34. The caller's patient scope: the chip "N of M", "My patients", Emergency access and the empty texts. */
+  scope: AdmissionScope;
   items: AdmittedPatientRow[];
+}
+
+/** SAH-34 `ScopeKind`. OWN is reserved for the visiting doctor (story 34D) and is never sent in phase 1. */
+export type ScopeKind = 'ALL' | 'WARDS' | 'OWN';
+
+/**
+ * SAH-34 `AdmissionScope` (no patient data). The browser draws these numbers as they come: it never
+ * counts, filters or decides a scope itself (AC 44, AC 105 note).
+ */
+export interface AdmissionScope {
+  kind: ScopeKind;
+  /** N: the admitted patients the caller can see (the rows, with her own emergency access). */
+  visible: number;
+  /** M: every admitted patient of the clinic, as a number only. */
+  admitted: number;
+  /** NURSE only: she has at least one live ward. */
+  hasWard?: boolean;
+  /** Shows the button "Emergency access". */
+  canOpenEmergencyAccess: boolean;
+}
+
+/** SAH-34 `AdmittedEmergencyAccess`: the caller's own active grant on one row. */
+export interface AdmittedEmergencyAccess {
+  expiresAt: string;
 }
 
 /** SAH-36 `WardOption`: one option of the select "Ward". */
@@ -176,6 +202,10 @@ export interface AdmittedPatientRow extends AdmissionRow {
   clinical?: AdmittedClinicalFlags;
   /** SAH-37. OWNER and FRONT_DESK only, and only when the setup shows Mobile (absent otherwise). */
   mobile?: string | null;
+  /** SAH-34. For the filter "My patients" only (never a security rule); absent for FRONT_DESK. */
+  mine?: boolean;
+  /** SAH-34. Present only on a row the caller sees only through her own active emergency access. */
+  emergencyAccess?: AdmittedEmergencyAccess;
 }
 
 export interface DepositEntry {
@@ -207,10 +237,46 @@ export interface AdmissionDetail extends AdmissionRow {
   canOpenNursing?: boolean;
   /** SAH-31. Shows the footer button "EMR": OWNER, DOCTOR, NURSE while ADMITTED (also in Read-only IPD). */
   canOpenEmr?: boolean;
+  /**
+   * SAH-29. The admission's own copy of its package, or null. The sheet draws no field from it
+   * (the Summary strip shows no new field); the package shows only as lines of `bill.lines`.
+   */
+  package?: AdmissionPackage | null;
   /** SAH-30, for the later patient card. Null for a role without vitals access. */
   vitalsDue?: boolean | null;
   /** SAH-30, for the later patient card. Null when no vitals, or for a role without vitals access. */
   latestEws?: { score: number; risk: 'LOW' | 'MEDIUM' | 'HIGH'; recordedAt: string } | null;
+}
+
+/** SAH-29 `AdmissionPackage`: the copy kept on one admission. 0 included days = day-care. */
+export interface AdmissionPackage {
+  name: string;
+  pricePaise: number;
+  includedDays: number;
+}
+
+/** SAH-29 `IpdPackage`: one row of the Packages panel in Clinic setup → Admission and deposits. */
+export interface IpdPackage {
+  id: string;
+  name: string;
+  pricePaise: number;
+  includedDays: number;
+}
+
+/** SAH-29 `PackageList`: active packages in the order they were created. Empty when the clinic has none. */
+export interface PackageList {
+  items: IpdPackage[];
+}
+
+/** The small text under every package name, word for word from the mockup (`cfgIpAdm`). */
+export const PACKAGE_INCLUDES_TEXT = 'Bed, nursing and surgeon included · extra days and exclusions at normal rates';
+
+/**
+ * The chip of a package row: "3 days", or "Day-care" when no days are included. The mockup template
+ * is kept as it is, so one day reads "1 days" (OQ-29-4, DEC-030).
+ */
+export function packageChip(includedDays: number): string {
+  return includedDays ? `${includedDays} days` : 'Day-care';
 }
 
 /** SAH-26 `TransferRules`: `upgradeNeedsOwner` true = "Owner approves"; `newRateFrom` same | next. */
@@ -397,6 +463,11 @@ export interface BoardBed {
   depositLow?: boolean | null;
   /** SAH-27. Set when occupied: the tile shows the flag "Going home today" or "Deposit low", never both (the go flag wins). */
   goingHomeToday?: boolean | null;
+  /**
+   * SAH-34 (AC 9). True only for an occupied bed whose patient is outside the caller's scope: the patient fields above are
+   * null (absent from the data), and the tile shows the status "Occupied" only, with no action on the patient.
+   */
+  outsideScope?: boolean;
 }
 
 export interface BoardRoom {

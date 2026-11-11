@@ -183,4 +183,34 @@
       <p class="muted" aria-busy="true">Loading bed transfer rules</p>
     }
   </section>
+  <section class="panel surf" id="f-ippackages">
+    <h2>Packages</h2>
+    @if (packages.error(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        @if (!packages.moduleOff()) {
+          <button type="button" mat-stroked-button [disabled]="packages.loading()" (click)="packages.load()">
+            Try again
+          </button>
+        }
+      </div>
+    }
+    @if (packages.items(); as list) {
+      <div class="list">
+        @for (p of list; track p.id) {
+          <div class="li">
+            <span class="tokchip">{{ chip(p.includedDays) }}</span>
+            <div class="main">
+              <b>{{ p.name }}</b>
+              <small>{{ includesText }}</small>
+            </div>
+            <b class="num">{{ formatInr(paiseToRupees(p.pricePaise)) }}</b>
+          </div>
+        }
+      </div>
+    } @else if (packages.pending()) {
+      <p class="muted" aria-busy="true">Loading packages</p>
+    }
+  </section>
 }

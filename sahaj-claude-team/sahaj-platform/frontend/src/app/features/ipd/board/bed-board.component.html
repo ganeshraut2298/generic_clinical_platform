@@ -64,7 +64,7 @@
                     <app-icon [name]="meta[bed.status].icon" [size]="12" />
                     {{ meta[bed.status].label }}
                   </span>
-                  @if (bed.status === 'occ') {
+                  @if (bed.status === 'occ' && !bed.outsideScope) {
                     <span class="bpt">{{ bed.patientName }}</span>
                     <span class="bmeta">Day {{ bed.dayNumber }} · {{ bed.doctorShortName }}</span>
                     @if (bed.goingHomeToday) {
