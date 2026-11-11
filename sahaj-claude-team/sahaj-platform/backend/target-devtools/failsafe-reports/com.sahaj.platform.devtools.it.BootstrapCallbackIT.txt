@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.devtools.it.BootstrapCallbackIT
+-------------------------------------------------------------------------------
+Tests run: 21, Failures: 0, Errors: 0, Skipped: 8, Time elapsed: 2.663 s -- in com.sahaj.platform.devtools.it.BootstrapCallbackIT

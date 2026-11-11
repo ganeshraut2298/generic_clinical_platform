@@ -1,0 +1,30 @@
+// Sheet "Emergency access" (mockup `sfbg`, `.sfchk`). Colours come from the tokens only; every error is
+// written out under its field, so colour is never the only signal.
+.sub {
+  font-size: 0.86rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sfchk {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.84rem;
+  // Touch target (angular.md): the whole row is at least 44 px tall.
+  min-height: 44px;
+
+  input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.input {
+  min-height: 44px;
+}

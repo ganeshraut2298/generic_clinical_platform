@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.it.VitalsValidationIT
+-------------------------------------------------------------------------------
+Tests run: 26, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 113.8 s -- in com.sahaj.platform.it.VitalsValidationIT

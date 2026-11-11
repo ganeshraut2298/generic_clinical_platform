@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.it.SafetyConcurrencyIT
+-------------------------------------------------------------------------------
+Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 17.18 s -- in com.sahaj.platform.it.SafetyConcurrencyIT

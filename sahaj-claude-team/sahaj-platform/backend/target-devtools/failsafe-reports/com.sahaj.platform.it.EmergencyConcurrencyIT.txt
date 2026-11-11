@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.it.EmergencyConcurrencyIT
+-------------------------------------------------------------------------------
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.638 s -- in com.sahaj.platform.it.EmergencyConcurrencyIT

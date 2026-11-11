@@ -1,0 +1,75 @@
+// Panel "Emergency access to review" (mockup `.sfp`, `.sfrow`, `.sfacts`). Colours come from the tokens only.
+// Every row is written out (who, which patient, which bed, the reason, the time), so colour is never the only signal.
+:host {
+  display: block;
+}
+
+.sfp {
+  gap: 6px;
+}
+
+.sfph {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.sfrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line);
+
+  &:first-child {
+    border-top: 0;
+  }
+  .sfmn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    small {
+      color: var(--ink-3);
+      font-size: 0.78rem;
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+.sfacts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+
+  // Touch target (angular.md): 44 px tall.
+  button {
+    min-height: 44px;
+  }
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+
+  button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 620px) {
+  .sfrow {
+    flex-wrap: wrap;
+  }
+}

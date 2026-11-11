@@ -1,0 +1,127 @@
+<form class="sheet" [formGroup]="form" (ngSubmit)="submit()" novalidate data-testid="emergency-access-sheet">
+  <div class="sheet-h">
+    <div>
+      <h2 [id]="titleId">{{ title }}</h2>
+      <p class="muted sub">{{ subtitle }}</p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close"
+      data-act="eg-x"
+      [disabled]="running()"
+      (click)="cancel()"
+    >
+      <app-icon name="x" [size]="18" />
+    </button>
+  </div>
+
+  <div class="sheet-b">
+    @if (loading()) {
+      <p class="muted" role="status" aria-busy="true">{{ loadingText }}</p>
+    } @else if (refused(); as message) {
+      <div class="notice err" role="alert" data-testid="eg-refused">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    } @else if (loadError(); as message) {
+      <div class="notice err" role="alert" data-testid="eg-load-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button (click)="load()">Try again</button>
+      </div>
+    } @else if (nobodyOutside()) {
+      <div class="empty" role="status" data-testid="eg-nobody">{{ nothingOutside }}</div>
+    } @else if (picker(); as p) {
+      <div class="field">
+        <label for="eg-patient">{{ patientLabel }}</label>
+        <select
+          id="eg-patient"
+          class="input"
+          formControlName="admissionId"
+          data-testid="eg-patient"
+          [attr.aria-invalid]="errors().admissionId ? 'true' : null"
+          [attr.aria-describedby]="errors().admissionId ? 'eg-patient-err' : null"
+          (change)="dropError('admissionId')"
+        >
+          @for (item of p.items; track item.admissionId) {
+            <option [value]="item.admissionId">{{ option(item) }}</option>
+          }
+        </select>
+        @if (errors().admissionId; as message) {
+          <span class="err-text" role="alert" id="eg-patient-err" data-testid="eg-patient-error">{{ message }}</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="eg-reason">{{ reasonLabel }}</label>
+        <select
+          id="eg-reason"
+          class="input"
+          formControlName="reasonKey"
+          data-testid="eg-reason"
+          [attr.aria-invalid]="errors().reasonKey ? 'true' : null"
+          [attr.aria-describedby]="errors().reasonKey ? 'eg-reason-err' : null"
+          (change)="dropError('reasonKey')"
+        >
+          <option value="">{{ reasonPlaceholder }}</option>
+          @for (r of p.reasons; track r.key) {
+            <option [value]="r.key">{{ r.label }}</option>
+          }
+        </select>
+        @if (errors().reasonKey; as message) {
+          <span class="err-text" role="alert" id="eg-reason-err" data-testid="eg-reason-error">{{ message }}</span>
+        }
+      </div>
+
+      <div class="field">
+        <label class="sfchk" for="eg-confirm">
+          <input
+            id="eg-confirm"
+            type="checkbox"
+            formControlName="confirmed"
+            data-testid="eg-confirm"
+            [attr.aria-invalid]="errors().confirmed ? 'true' : null"
+            [attr.aria-describedby]="errors().confirmed ? 'eg-confirm-err' : null"
+            (change)="dropError('confirmed')"
+          />
+          <span>{{ confirmLabel }}</span>
+        </label>
+        @if (errors().confirmed; as message) {
+          <span class="err-text" role="alert" id="eg-confirm-err" data-testid="eg-confirm-error">{{ message }}</span>
+        }
+      </div>
+
+      @if (failure(); as message) {
+        <div class="notice err" role="alert" data-testid="eg-failure">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="sheet-f">
+    <button
+      mat-stroked-button
+      type="button"
+      data-act="eg-cancel"
+      [disabled]="running()"
+      (click)="cancel()"
+    >
+      {{ cancelLabel }}
+    </button>
+    @if (picker() !== null && !nobodyOutside() && refused() === null) {
+      <button
+        mat-flat-button
+        type="submit"
+        data-act="sfbgok"
+        data-testid="eg-open"
+        [disabled]="running()"
+        [attr.aria-busy]="running()"
+      >
+        <app-icon name="key" [size]="15" /> {{ openLabel }}
+      </button>
+    }
+  </div>
+</form>

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.it.RunningBillIT
+-------------------------------------------------------------------------------
+Tests run: 22, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.444 s -- in com.sahaj.platform.it.RunningBillIT

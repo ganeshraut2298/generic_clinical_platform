@@ -1,0 +1,1000 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-failsafe-plugin/xsd/failsafe-test-report.xsd" version="3.0.2" name="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="51.593" tests="13" errors="0" skipped="0" failures="0" flakes="0">
+  <properties>
+    <property name="java.specification.version" value="17"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="Cp1252"/>
+    <property name="java.class.path" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\test-classes;D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\classes;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter\3.5.16\spring-boot-starter-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot\3.5.16\spring-boot-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-context\6.2.19\spring-context-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\3.5.16\spring-boot-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-logging\3.5.16\spring-boot-starter-logging-3.5.16.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-classic\1.5.34\logback-classic-1.5.34.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-core\1.5.34\logback-core-1.5.34.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.24.3\log4j-to-slf4j-2.24.3.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-api\2.24.3\log4j-api-2.24.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\jul-to-slf4j\2.0.18\jul-to-slf4j-2.0.18.jar;C:\Users\Hp\.m2\repository\jakarta\annotation\jakarta.annotation-api\2.1.1\jakarta.annotation-api-2.1.1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-core\6.2.19\spring-core-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jcl\6.2.19\spring-jcl-6.2.19.jar;C:\Users\Hp\.m2\repository\org\yaml\snakeyaml\2.4\snakeyaml-2.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-web\3.5.16\spring-boot-starter-web-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-json\3.5.16\spring-boot-starter-json-3.5.16.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.21.4\jackson-datatype-jdk8-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.21.4\jackson-module-parameter-names-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\3.5.16\spring-boot-starter-tomcat-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\10.1.55\tomcat-embed-core-10.1.55.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\10.1.55\tomcat-embed-websocket-10.1.55.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-web\6.2.19\spring-web-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-beans\6.2.19\spring-beans-6.2.19.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-observation\1.15.12\micrometer-observation-1.15.12.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-commons\1.15.12\micrometer-commons-1.15.12.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-webmvc\6.2.19\spring-webmvc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-expression\6.2.19\spring-expression-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-security\3.5.16\spring-boot-starter-security-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-aop\6.2.19\spring-aop-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-config\6.5.11\spring-security-config-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-web\6.5.11\spring-security-web-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-validation\3.5.16\spring-boot-starter-validation-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\10.1.55\tomcat-embed-el-10.1.55.jar;C:\Users\Hp\.m2\repository\org\hibernate\validator\hibernate-validator\8.0.3.Final\hibernate-validator-8.0.3.Final.jar;C:\Users\Hp\.m2\repository\jakarta\validation\jakarta.validation-api\3.0.2\jakarta.validation-api-3.0.2.jar;C:\Users\Hp\.m2\repository\org\jboss\logging\jboss-logging\3.6.3.Final\jboss-logging-3.6.3.Final.jar;C:\Users\Hp\.m2\repository\com\fasterxml\classmate\1.7.3\classmate-1.7.3.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-jdbc\3.5.16\spring-boot-starter-jdbc-3.5.16.jar;C:\Users\Hp\.m2\repository\com\zaxxer\HikariCP\6.3.3\HikariCP-6.3.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\slf4j-api\2.0.18\slf4j-api-2.0.18.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jdbc\6.2.19\spring-jdbc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-tx\6.2.19\spring-tx-6.2.19.jar;C:\Users\Hp\.m2\repository\org\postgresql\postgresql\42.7.11\postgresql-42.7.11.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-core\11.7.2\flyway-core-11.7.2.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-toml\2.21.4\jackson-dataformat-toml-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.21.4\jackson-core-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.21.4\jackson-datatype-jsr310-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.21\jackson-annotations-2.21.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-database-postgresql\11.7.2\flyway-database-postgresql-11.7.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-core\1.4.14\spring-modulith-starter-core-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-api\1.4.14\spring-modulith-api-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-core\1.4.14\spring-modulith-core-1.4.14.jar;C:\Users\Hp\.m2\repository\com\tngtech\archunit\archunit\1.4.2\archunit-1.4.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-moments\1.4.14\spring-modulith-moments-1.4.14.jar;C:\Users\Hp\.m2\repository\org\jmolecules\jmolecules-events\1.10.0\jmolecules-events-1.10.0.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-api\0.12.6\jjwt-api-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-impl\0.12.6\jjwt-impl-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-jackson\0.12.6\jjwt-jackson-0.12.6.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.21.4\jackson-databind-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-test\3.5.16\spring-boot-starter-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test\3.5.16\spring-boot-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test-autoconfigure\3.5.16\spring-boot-test-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\com\jayway\jsonpath\json-path\2.9.0\json-path-2.9.0.jar;C:\Users\Hp\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\4.0.5\jakarta.xml.bind-api-4.0.5.jar;C:\Users\Hp\.m2\repository\jakarta\activation\jakarta.activation-api\2.1.4\jakarta.activation-api-2.1.4.jar;C:\Users\Hp\.m2\repository\net\minidev\json-smart\2.5.2\json-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\net\minidev\accessors-smart\2.5.2\accessors-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\org\ow2\asm\asm\9.7.1\asm-9.7.1.jar;C:\Users\Hp\.m2\repository\org\assertj\assertj-core\3.27.7\assertj-core-3.27.7.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy\1.17.8\byte-buddy-1.17.8.jar;C:\Users\Hp\.m2\repository\org\awaitility\awaitility\4.2.2\awaitility-4.2.2.jar;C:\Users\Hp\.m2\repository\org\hamcrest\hamcrest\3.0\hamcrest-3.0.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter\5.12.2\junit-jupiter-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.12.2\junit-jupiter-api-5.12.2.jar;C:\Users\Hp\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-commons\1.12.2\junit-platform-commons-1.12.2.jar;C:\Users\Hp\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.12.2\junit-jupiter-params-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.12.2\junit-jupiter-engine-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-engine\1.12.2\junit-platform-engine-1.12.2.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy-agent\1.17.8\byte-buddy-agent-1.17.8.jar;C:\Users\Hp\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-junit-jupiter\5.17.0\mockito-junit-jupiter-5.17.0.jar;C:\Users\Hp\.m2\repository\org\skyscreamer\jsonassert\1.5.3\jsonassert-1.5.3.jar;C:\Users\Hp\.m2\repository\com\vaadin\external\google\android-json\0.0.20131108.vaadin1\android-json-0.0.20131108.vaadin1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-test\6.2.19\spring-test-6.2.19.jar;C:\Users\Hp\.m2\repository\org\xmlunit\xmlunit-core\2.10.4\xmlunit-core-2.10.4.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-test\6.5.11\spring-security-test-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-core\6.5.11\spring-security-core-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-crypto\6.5.11\spring-security-crypto-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-test\1.4.14\spring-modulith-starter-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-test\1.4.14\spring-modulith-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-docs\1.4.14\spring-modulith-docs-1.4.14.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-core\3.1.0\structurizr-core-3.1.0.jar;C:\Users\Hp\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-export\3.1.0\structurizr-export-3.1.0.jar;"/>
+    <property name="java.vm.vendor" value="Microsoft"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="https://www.microsoft.com"/>
+    <property name="catalina.useNaming" value="false"/>
+    <property name="user.timezone" value="Asia/Calcutta"/>
+    <property name="org.jboss.logging.provider" value="slf4j"/>
+    <property name="os.name" value="Windows 11"/>
+    <property name="java.vm.specification.version" value="17"/>
+    <property name="APPLICATION_NAME" value="sahaj-backend"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="US"/>
+    <property name="sun.boot.library.path" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin"/>
+    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire14545598053458699511\surefirebooter-20261111063130509_3.jar C:\Users\Hp\AppData\Local\Temp\surefire14545598053458699511 2026-11-11T06-31-30_295-jvmRun1 surefire-20261111063130509_1tmp surefire_0-20261111063130509_2tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="test" value="NoSuchTest"/>
+    <property name="surefire.test.class.path" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\test-classes;D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\classes;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter\3.5.16\spring-boot-starter-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot\3.5.16\spring-boot-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-context\6.2.19\spring-context-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\3.5.16\spring-boot-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-logging\3.5.16\spring-boot-starter-logging-3.5.16.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-classic\1.5.34\logback-classic-1.5.34.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-core\1.5.34\logback-core-1.5.34.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.24.3\log4j-to-slf4j-2.24.3.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-api\2.24.3\log4j-api-2.24.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\jul-to-slf4j\2.0.18\jul-to-slf4j-2.0.18.jar;C:\Users\Hp\.m2\repository\jakarta\annotation\jakarta.annotation-api\2.1.1\jakarta.annotation-api-2.1.1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-core\6.2.19\spring-core-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jcl\6.2.19\spring-jcl-6.2.19.jar;C:\Users\Hp\.m2\repository\org\yaml\snakeyaml\2.4\snakeyaml-2.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-web\3.5.16\spring-boot-starter-web-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-json\3.5.16\spring-boot-starter-json-3.5.16.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.21.4\jackson-datatype-jdk8-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.21.4\jackson-module-parameter-names-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\3.5.16\spring-boot-starter-tomcat-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\10.1.55\tomcat-embed-core-10.1.55.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\10.1.55\tomcat-embed-websocket-10.1.55.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-web\6.2.19\spring-web-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-beans\6.2.19\spring-beans-6.2.19.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-observation\1.15.12\micrometer-observation-1.15.12.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-commons\1.15.12\micrometer-commons-1.15.12.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-webmvc\6.2.19\spring-webmvc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-expression\6.2.19\spring-expression-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-security\3.5.16\spring-boot-starter-security-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-aop\6.2.19\spring-aop-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-config\6.5.11\spring-security-config-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-web\6.5.11\spring-security-web-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-validation\3.5.16\spring-boot-starter-validation-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\10.1.55\tomcat-embed-el-10.1.55.jar;C:\Users\Hp\.m2\repository\org\hibernate\validator\hibernate-validator\8.0.3.Final\hibernate-validator-8.0.3.Final.jar;C:\Users\Hp\.m2\repository\jakarta\validation\jakarta.validation-api\3.0.2\jakarta.validation-api-3.0.2.jar;C:\Users\Hp\.m2\repository\org\jboss\logging\jboss-logging\3.6.3.Final\jboss-logging-3.6.3.Final.jar;C:\Users\Hp\.m2\repository\com\fasterxml\classmate\1.7.3\classmate-1.7.3.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-jdbc\3.5.16\spring-boot-starter-jdbc-3.5.16.jar;C:\Users\Hp\.m2\repository\com\zaxxer\HikariCP\6.3.3\HikariCP-6.3.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\slf4j-api\2.0.18\slf4j-api-2.0.18.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jdbc\6.2.19\spring-jdbc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-tx\6.2.19\spring-tx-6.2.19.jar;C:\Users\Hp\.m2\repository\org\postgresql\postgresql\42.7.11\postgresql-42.7.11.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-core\11.7.2\flyway-core-11.7.2.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-toml\2.21.4\jackson-dataformat-toml-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.21.4\jackson-core-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.21.4\jackson-datatype-jsr310-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.21\jackson-annotations-2.21.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-database-postgresql\11.7.2\flyway-database-postgresql-11.7.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-core\1.4.14\spring-modulith-starter-core-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-api\1.4.14\spring-modulith-api-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-core\1.4.14\spring-modulith-core-1.4.14.jar;C:\Users\Hp\.m2\repository\com\tngtech\archunit\archunit\1.4.2\archunit-1.4.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-moments\1.4.14\spring-modulith-moments-1.4.14.jar;C:\Users\Hp\.m2\repository\org\jmolecules\jmolecules-events\1.10.0\jmolecules-events-1.10.0.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-api\0.12.6\jjwt-api-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-impl\0.12.6\jjwt-impl-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-jackson\0.12.6\jjwt-jackson-0.12.6.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.21.4\jackson-databind-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-test\3.5.16\spring-boot-starter-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test\3.5.16\spring-boot-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test-autoconfigure\3.5.16\spring-boot-test-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\com\jayway\jsonpath\json-path\2.9.0\json-path-2.9.0.jar;C:\Users\Hp\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\4.0.5\jakarta.xml.bind-api-4.0.5.jar;C:\Users\Hp\.m2\repository\jakarta\activation\jakarta.activation-api\2.1.4\jakarta.activation-api-2.1.4.jar;C:\Users\Hp\.m2\repository\net\minidev\json-smart\2.5.2\json-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\net\minidev\accessors-smart\2.5.2\accessors-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\org\ow2\asm\asm\9.7.1\asm-9.7.1.jar;C:\Users\Hp\.m2\repository\org\assertj\assertj-core\3.27.7\assertj-core-3.27.7.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy\1.17.8\byte-buddy-1.17.8.jar;C:\Users\Hp\.m2\repository\org\awaitility\awaitility\4.2.2\awaitility-4.2.2.jar;C:\Users\Hp\.m2\repository\org\hamcrest\hamcrest\3.0\hamcrest-3.0.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter\5.12.2\junit-jupiter-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.12.2\junit-jupiter-api-5.12.2.jar;C:\Users\Hp\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-commons\1.12.2\junit-platform-commons-1.12.2.jar;C:\Users\Hp\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.12.2\junit-jupiter-params-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.12.2\junit-jupiter-engine-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-engine\1.12.2\junit-platform-engine-1.12.2.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy-agent\1.17.8\byte-buddy-agent-1.17.8.jar;C:\Users\Hp\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-junit-jupiter\5.17.0\mockito-junit-jupiter-5.17.0.jar;C:\Users\Hp\.m2\repository\org\skyscreamer\jsonassert\1.5.3\jsonassert-1.5.3.jar;C:\Users\Hp\.m2\repository\com\vaadin\external\google\android-json\0.0.20131108.vaadin1\android-json-0.0.20131108.vaadin1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-test\6.2.19\spring-test-6.2.19.jar;C:\Users\Hp\.m2\repository\org\xmlunit\xmlunit-core\2.10.4\xmlunit-core-2.10.4.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-test\6.5.11\spring-security-test-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-core\6.5.11\spring-security-core-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-crypto\6.5.11\spring-security-crypto-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-test\1.4.14\spring-modulith-starter-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-test\1.4.14\spring-modulith-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-docs\1.4.14\spring-modulith-docs-1.4.14.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-core\3.1.0\structurizr-core-3.1.0.jar;C:\Users\Hp\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-export\3.1.0\structurizr-export-3.1.0.jar;"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="C:\Users\Hp"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2026-10-22"/>
+    <property name="java.home" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot"/>
+    <property name="spring.profiles.active" value="test"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="FILE_LOG_CHARSET" value="windows-1252"/>
+    <property name="java.awt.headless" value="true"/>
+    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire14545598053458699511\surefirebooter-20261111063130509_3.jar"/>
+    <property name="user.script" value=""/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="17.0.21.0.2+1-LTS"/>
+    <property name="user.name" value="Hp"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="sahaj.packagedJar" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools/sahaj-backend-devtools-0.1.0-SNAPSHOT.jar"/>
+    <property name="file.encoding" value="Cp1252"/>
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [requestId=%X{requestId:-},tenantId=%X{tenantId:-}] %logger{36} - %msg%n"/>
+    <property name="surefire.failIfNoSpecifiedTests" value="false"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Microsoft-15779939"/>
+    <property name="localRepository" value="C:\Users\Hp\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/microsoft/openjdk/issues"/>
+    <property name="java.io.tmpdir" value="C:\Users\Hp\AppData\Local\Temp\"/>
+    <property name="catalina.home" value="C:\Users\Hp\AppData\Local\Temp\tomcat.0.5885201435320422283"/>
+    <property name="com.zaxxer.hikari.pool_number" value="43"/>
+    <property name="java.version" value="17.0.21.0.2"/>
+    <property name="user.dir" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="PID" value="12556"/>
+    <property name="it.test" value="Bootstrap*IT,PackagedJar*IT,DevToolsGuardCallbackIT"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="CONSOLE_LOG_CHARSET" value="windows-1252"/>
+    <property name="catalina.base" value="C:\Users\Hp\AppData\Local\Temp\tomcat.0.14635308939416007675"/>
+    <property name="native.encoding" value="Cp1252"/>
+    <property name="java.library.path" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Users\Hp\bin;C:\Program Files\Git\ucrt64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\ucrt64\bin;C:\Program Files\Git\usr\bin;C:\Users\Hp\bin;C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;C:\Users\Hp\AppData\Roaming\nvm;C:\Program Files\nodejs;C:\Program Files\PuTTY;C:\Users\Hp\AppData\Roaming\npm;C:\ProgramData\chocolatey\bin;C:\Program Files\Git\cmd;C:\Program Files\nodejs;C:\Users\Hp\AppData\Local\Microsoft\WindowsApps;C:\Users\Hp\AppData\Roaming\nvm;C:\Program Files\nodejs;C:\Users\Hp\AppData\Local\Microsoft\WinGet\Packages\Schniz.fnm_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\Hp\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\Hp\AppData\Local\Programs\cursor\resources\app\bin;C:\Users\Hp\AppData\Roaming\npm;C:\Users\Hp\tools\apache-maven-3.9.9\bin;C:\Program Files\PostgreSQL\16\bin;C:\Program Files\PostgreSQL\16\bin;C:\Users\Hp\AppData\Local\Programs\Microsoft VS Code\bin\copilot-shim;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl;."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="java.vendor" value="Microsoft"/>
+    <property name="java.vm.version" value="17.0.21.0.2+1-LTS"/>
+    <property name="java.specification.maintenance.version" value="1"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="61.0"/>
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [requestId=%X{requestId:-},tenantId=%X{tenantId:-}] %logger{36} - %msg%n"/>
+    <property name="sahaj.devtools" value="true"/>
+    <property name="LOGGED_APPLICATION_NAME" value="[sahaj-backend] "/>
+  </properties>
+  <testcase name="b2ProfileDevAloneAndDevWithTestBothTurnItOn" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="6.781">
+    <system-out><![CDATA[2026-11-11 06:31:47.282  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:31:47.282  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 1 profile is active: "dev"
+2026-11-11 06:31:48.198  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:31:48.199  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:31:48.199  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:31:48.244  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:31:48.244  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 960 ms
+2026-11-11 06:31:48.541  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:31:49.456  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:31:49.805  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52369 (http) with context path '/'
+2026-11-11 06:31:49.810  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:31:49.814  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 2.571 seconds (process running for 19.133)
+2026-11-11 06:31:49.816  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Starting...
+2026-11-11 06:31:49.887  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection org.postgresql.jdbc.PgConnection@5f69462f
+2026-11-11 06:31:49.888  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Start completed.
+2026-11-11 06:31:49.906  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:31:49.908  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:31:49.927  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown initiated...
+2026-11-11 06:31:49.930  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown completed.
+2026-11-11 06:31:50.090  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:31:50.090  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:31:51.126  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:31:51.127  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:31:51.127  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:31:51.153  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:31:51.153  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1028 ms
+2026-11-11 06:31:51.351  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:31:51.917  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:31:52.108  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52372 (http) with context path '/'
+2026-11-11 06:31:52.113  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:31:52.115  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 2.124 seconds (process running for 21.433)
+2026-11-11 06:31:52.115  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Starting...
+2026-11-11 06:31:52.268  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-3 - Added connection org.postgresql.jdbc.PgConnection@3ce71bbb
+2026-11-11 06:31:52.269  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Start completed.
+2026-11-11 06:31:52.278  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:31:52.280  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:31:52.286  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown initiated...
+2026-11-11 06:31:52.287  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-3 - Shutdown completed.
+2026-11-11 06:31:52.318  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:31:52.318  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "test", "dev"
+2026-11-11 06:31:52.998  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:31:52.999  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:31:52.999  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:31:53.024  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:31:53.024  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 704 ms
+2026-11-11 06:31:53.213  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:31:53.702  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:31:53.920  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52375 (http) with context path '/'
+2026-11-11 06:31:53.928  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:31:53.930  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.639 seconds (process running for 23.248)
+2026-11-11 06:31:53.931  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Starting...
+2026-11-11 06:31:53.988  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-4 - Added connection org.postgresql.jdbc.PgConnection@24e6bd00
+2026-11-11 06:31:53.988  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Start completed.
+2026-11-11 06:31:54.001  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:31:54.004  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:31:54.011  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown initiated...
+2026-11-11 06:31:54.017  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-4 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b7BothLoopbackLiteralsTurnItOn" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="1.763">
+    <system-out><![CDATA[2026-11-11 06:31:54.068  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:31:54.068  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:31:54.768  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:31:54.769  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:31:54.770  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:31:54.791  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:31:54.791  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 720 ms
+2026-11-11 06:31:54.975  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:31:55.446  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:31:55.604  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52378 (http) with context path '/'
+2026-11-11 06:31:55.612  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:31:55.613  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.589 seconds (process running for 24.932)
+2026-11-11 06:31:55.614  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Starting...
+2026-11-11 06:31:55.766  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-5 - Added connection org.postgresql.jdbc.PgConnection@5bf9bb2
+2026-11-11 06:31:55.767  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Start completed.
+2026-11-11 06:31:55.776  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:31:55.777  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:31:55.781  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown initiated...
+2026-11-11 06:31:55.782  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-5 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b4TheHashTheToolMakesAtCost14IsAccepted" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="5.491">
+    <system-out><![CDATA[2026-11-11 06:31:56.849  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:31:56.849  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:31:57.356  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:31:57.357  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:31:57.357  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:31:57.380  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:31:57.380  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 530 ms
+2026-11-11 06:31:57.550  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:31:58.833  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:31:58.996  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52381 (http) with context path '/'
+2026-11-11 06:31:59.000  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:31:59.002  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 2.175 seconds (process running for 28.321)
+2026-11-11 06:31:59.003  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Starting...
+2026-11-11 06:31:59.048  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-6 - Added connection org.postgresql.jdbc.PgConnection@64b1d0ab
+2026-11-11 06:31:59.048  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Start completed.
+2026-11-11 06:31:59.058  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:31:59.059  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:31:59.063  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown initiated...
+2026-11-11 06:31:59.063  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-6 - Shutdown completed.
+2026-11-11 06:31:59.092  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:31:59.092  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:31:59.639  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:31:59.640  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:31:59.640  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:31:59.663  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:31:59.663  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 570 ms
+2026-11-11 06:31:59.817  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:01.076  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:01.211  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52386 (http) with context path '/'
+2026-11-11 06:32:01.214  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:01.215  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 2.149 seconds (process running for 30.534)
+2026-11-11 06:32:01.216  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Starting...
+2026-11-11 06:32:01.258  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-7 - Added connection org.postgresql.jdbc.PgConnection@31ef9ac6
+2026-11-11 06:32:01.259  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Start completed.
+2026-11-11 06:32:01.268  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:01.269  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:01.272  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown initiated...
+2026-11-11 06:32:01.273  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-7 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b6AnyProxyOrCloudConfigurationLeavesTheRegistrationAbsent" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="9.564">
+    <system-out><![CDATA[2026-11-11 06:32:01.492  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:01.492  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:02.034  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:02.035  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:02.035  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:02.057  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:02.057  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 564 ms
+2026-11-11 06:32:02.226  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:02.300  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:02.477  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52391 (http) with context path '/'
+2026-11-11 06:32:02.480  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:02.481  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.01 seconds (process running for 31.8)
+2026-11-11 06:32:02.482  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Starting...
+2026-11-11 06:32:02.527  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-8 - Added connection org.postgresql.jdbc.PgConnection@65beeceb
+2026-11-11 06:32:02.527  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Start completed.
+2026-11-11 06:32:02.537  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:02.537  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:02.538  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:02.569  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:02.570  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:02.573  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown initiated...
+2026-11-11 06:32:02.574  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-8 - Shutdown completed.
+2026-11-11 06:32:02.867  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:02.868  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:03.368  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:03.369  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:03.369  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:03.389  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:03.389  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 520 ms
+2026-11-11 06:32:03.526  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:03.607  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:03.816  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52421 (http) with context path '/'
+2026-11-11 06:32:03.818  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:03.819  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.97 seconds (process running for 33.138)
+2026-11-11 06:32:03.820  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Starting...
+2026-11-11 06:32:03.871  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-9 - Added connection org.postgresql.jdbc.PgConnection@62c2a477
+2026-11-11 06:32:03.871  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Start completed.
+2026-11-11 06:32:03.883  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:03.883  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:03.884  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:03.922  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:03.923  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:03.928  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Shutdown initiated...
+2026-11-11 06:32:03.928  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-9 - Shutdown completed.
+2026-11-11 06:32:04.246  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:04.246  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:04.695  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:04.696  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:04.696  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:04.714  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:04.714  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 467 ms
+2026-11-11 06:32:04.823  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:04.877  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:05.041  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52452 (http) with context path '/'
+2026-11-11 06:32:05.043  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:05.044  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.817 seconds (process running for 34.363)
+2026-11-11 06:32:05.045  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Starting...
+2026-11-11 06:32:05.085  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-10 - Added connection org.postgresql.jdbc.PgConnection@4d127cd7
+2026-11-11 06:32:05.086  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Start completed.
+2026-11-11 06:32:05.095  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:05.095  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:05.096  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:05.129  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:05.130  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:05.134  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Shutdown initiated...
+2026-11-11 06:32:05.135  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-10 - Shutdown completed.
+2026-11-11 06:32:05.323  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:05.323  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:05.756  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:05.757  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:05.757  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:05.773  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:05.774  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 449 ms
+2026-11-11 06:32:05.876  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:05.936  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:06.069  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52482 (http) with context path '/'
+2026-11-11 06:32:06.071  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:06.072  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.767 seconds (process running for 35.391)
+2026-11-11 06:32:06.072  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Starting...
+2026-11-11 06:32:06.111  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-11 - Added connection org.postgresql.jdbc.PgConnection@6e5d37c0
+2026-11-11 06:32:06.111  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Start completed.
+2026-11-11 06:32:06.120  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:06.120  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:06.121  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 0 ms
+2026-11-11 06:32:06.148  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:06.149  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:06.152  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Shutdown initiated...
+2026-11-11 06:32:06.153  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-11 - Shutdown completed.
+2026-11-11 06:32:06.520  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:06.521  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:06.961  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:06.962  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:06.962  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:06.979  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:06.979  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 458 ms
+2026-11-11 06:32:07.092  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:07.158  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:07.327  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52512 (http) with context path '/'
+2026-11-11 06:32:07.329  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:07.330  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.824 seconds (process running for 36.649)
+2026-11-11 06:32:07.331  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Starting...
+2026-11-11 06:32:07.374  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-12 - Added connection org.postgresql.jdbc.PgConnection@6e5d2207
+2026-11-11 06:32:07.374  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Start completed.
+2026-11-11 06:32:07.385  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:07.385  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:07.386  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:07.415  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:07.416  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:07.420  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Shutdown initiated...
+2026-11-11 06:32:07.421  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-12 - Shutdown completed.
+2026-11-11 06:32:07.725  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:07.725  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:08.173  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:08.174  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:08.174  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:08.192  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:08.192  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 465 ms
+2026-11-11 06:32:08.302  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:08.355  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:08.490  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52542 (http) with context path '/'
+2026-11-11 06:32:08.492  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:08.493  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.787 seconds (process running for 37.812)
+2026-11-11 06:32:08.494  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Starting...
+2026-11-11 06:32:08.532  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-13 - Added connection org.postgresql.jdbc.PgConnection@43be5d62
+2026-11-11 06:32:08.532  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Start completed.
+2026-11-11 06:32:08.542  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:08.542  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:08.543  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:08.570  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:08.571  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:08.575  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Shutdown initiated...
+2026-11-11 06:32:08.576  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-13 - Shutdown completed.
+2026-11-11 06:32:08.752  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:08.752  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:09.204  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:09.204  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:09.204  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:09.223  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:09.223  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 470 ms
+2026-11-11 06:32:09.329  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:09.383  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:09.526  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52572 (http) with context path '/'
+2026-11-11 06:32:09.527  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:09.529  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.793 seconds (process running for 38.848)
+2026-11-11 06:32:09.530  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Starting...
+2026-11-11 06:32:09.570  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-14 - Added connection org.postgresql.jdbc.PgConnection@37347be1
+2026-11-11 06:32:09.570  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Start completed.
+2026-11-11 06:32:09.580  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:09.580  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:09.581  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:09.610  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:09.611  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:09.615  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Shutdown initiated...
+2026-11-11 06:32:09.616  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-14 - Shutdown completed.
+2026-11-11 06:32:09.801  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:09.801  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:10.261  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:10.263  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:10.263  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:10.281  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:10.281  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 479 ms
+2026-11-11 06:32:10.418  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:10.479  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: proxy settings or a cloud platform are present.
+2026-11-11 06:32:10.645  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52602 (http) with context path '/'
+2026-11-11 06:32:10.648  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:10.650  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.864 seconds (process running for 39.968)
+2026-11-11 06:32:10.651  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Starting...
+2026-11-11 06:32:10.700  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-15 - Added connection org.postgresql.jdbc.PgConnection@3047c35a
+2026-11-11 06:32:10.700  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Start completed.
+2026-11-11 06:32:10.712  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:10.712  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:10.713  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:10.744  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:10.745  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:10.749  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Shutdown initiated...
+2026-11-11 06:32:10.750  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-15 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b6AForwardHeadersStrategyOfNoneDoesNotSwitchItOff" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="1.281">
+    <system-out><![CDATA[2026-11-11 06:32:10.865  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:10.865  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:11.330  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:11.332  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:11.332  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:11.348  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:11.348  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 481 ms
+2026-11-11 06:32:11.495  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:11.932  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:12.057  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52631 (http) with context path '/'
+2026-11-11 06:32:12.059  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:12.060  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.215 seconds (process running for 41.379)
+2026-11-11 06:32:12.061  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Starting...
+2026-11-11 06:32:12.102  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-16 - Added connection org.postgresql.jdbc.PgConnection@6d678643
+2026-11-11 06:32:12.102  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Start completed.
+2026-11-11 06:32:12.111  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:12.113  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:12.118  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Shutdown initiated...
+2026-11-11 06:32:12.119  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-16 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b7AServerAddressThatIsNotALoopbackLiteralLeavesTheRegistrationAbsent" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="1.07">
+    <system-out><![CDATA[2026-11-11 06:32:12.222  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:12.222  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:12.668  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:12.669  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:12.669  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:12.687  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:12.687  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 464 ms
+2026-11-11 06:32:12.802  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:12.862  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: server.address is not a loopback address.
+2026-11-11 06:32:13.015  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52636 (http) with context path '/'
+2026-11-11 06:32:13.018  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:13.018  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.813 seconds (process running for 42.337)
+2026-11-11 06:32:13.019  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Starting...
+2026-11-11 06:32:13.061  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-17 - Added connection org.postgresql.jdbc.PgConnection@6c3e2c3d
+2026-11-11 06:32:13.061  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Start completed.
+2026-11-11 06:32:13.072  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:13.072  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:13.073  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:13.100  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:13.101  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:13.105  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Shutdown initiated...
+2026-11-11 06:32:13.106  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-17 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="theStartupLineNamesOnlyTheFirstFailingReasonInTheFixedOrder" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="2.004">
+    <system-out><![CDATA[2026-11-11 06:32:13.285  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:13.285  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 1 profile is active: "test"
+2026-11-11 06:32:13.695  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:13.696  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:13.696  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:13.712  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:13.712  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 426 ms
+2026-11-11 06:32:13.807  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:13.859  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:14.015  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52666 (http) with context path '/'
+2026-11-11 06:32:14.018  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:14.019  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.747 seconds (process running for 43.338)
+2026-11-11 06:32:14.020  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-18 - Starting...
+2026-11-11 06:32:14.067  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-18 - Added connection org.postgresql.jdbc.PgConnection@1b0a8749
+2026-11-11 06:32:14.067  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-18 - Start completed.
+2026-11-11 06:32:14.081  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:14.081  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:14.082  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:14.106  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:14.107  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:14.110  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-18 - Shutdown initiated...
+2026-11-11 06:32:14.111  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-18 - Shutdown completed.
+2026-11-11 06:32:14.389  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:14.389  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 1 profile is active: "test"
+2026-11-11 06:32:14.776  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:14.776  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:14.776  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:14.792  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:14.792  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 402 ms
+2026-11-11 06:32:14.889  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:14.928  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the active profiles are not dev.
+2026-11-11 06:32:15.037  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52696 (http) with context path '/'
+2026-11-11 06:32:15.039  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:15.040  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.662 seconds (process running for 44.359)
+2026-11-11 06:32:15.041  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-19 - Starting...
+2026-11-11 06:32:15.077  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-19 - Added connection org.postgresql.jdbc.PgConnection@6cab7c1b
+2026-11-11 06:32:15.078  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-19 - Start completed.
+2026-11-11 06:32:15.087  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:15.087  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:15.088  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:15.112  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:15.113  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:15.116  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-19 - Shutdown initiated...
+2026-11-11 06:32:15.117  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-19 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b5TheAdminRealmOffOrUnavailableLeavesTheRegistrationAbsent" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="2.068">
+    <system-out><![CDATA[2026-11-11 06:32:15.290  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:15.290  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:15.682  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:15.682  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:15.683  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:15.699  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:15.699  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 408 ms
+2026-11-11 06:32:15.791  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:15.831  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the admin realm is off.
+2026-11-11 06:32:15.942  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52727 (http) with context path '/'
+2026-11-11 06:32:15.944  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:15.945  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.669 seconds (process running for 45.263)
+2026-11-11 06:32:15.945  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-20 - Starting...
+2026-11-11 06:32:16.087  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-20 - Added connection org.postgresql.jdbc.PgConnection@49e1826f
+2026-11-11 06:32:16.087  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-20 - Start completed.
+2026-11-11 06:32:16.097  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:16.097  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:16.098  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:16.124  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:16.125  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:16.128  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-20 - Shutdown initiated...
+2026-11-11 06:32:16.129  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-20 - Shutdown completed.
+2026-11-11 06:32:16.505  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:16.505  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:16.856  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:16.856  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:16.857  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:16.871  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:16.871  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 366 ms
+2026-11-11 06:32:16.964  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:17.000  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the admin realm is off.
+2026-11-11 06:32:17.018  WARN [requestId=,tenantId=] c.s.p.w.admin.AdminUnavailableConfig - The admin portal is enabled but SAHAJ_ADMIN_JWT_SECRET or SAHAJ_ADMIN_TOTP_KEY is missing. Every /api/v1/admin request answers 503.
+2026-11-11 06:32:17.114  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52757 (http) with context path '/'
+2026-11-11 06:32:17.116  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:17.117  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.625 seconds (process running for 46.436)
+2026-11-11 06:32:17.117  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-21 - Starting...
+2026-11-11 06:32:17.153  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-21 - Added connection org.postgresql.jdbc.PgConnection@68c2ebb2
+2026-11-11 06:32:17.153  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-21 - Start completed.
+2026-11-11 06:32:17.161  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:17.161  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:17.162  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:17.184  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:17.185  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:17.188  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-21 - Shutdown initiated...
+2026-11-11 06:32:17.189  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-21 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b3TrueInAnyLetterCaseTurnsItOnAndTheSwitchWorksFromTheEnvironmentAndFromTheCommandLine" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="4.433">
+    <system-out><![CDATA[2026-11-11 06:32:17.281  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:17.281  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:17.682  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:17.683  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:17.683  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:17.698  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:17.699  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 417 ms
+2026-11-11 06:32:17.803  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:18.155  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:18.248  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52785 (http) with context path '/'
+2026-11-11 06:32:18.250  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:18.251  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.983 seconds (process running for 47.57)
+2026-11-11 06:32:18.252  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-22 - Starting...
+2026-11-11 06:32:18.287  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-22 - Added connection org.postgresql.jdbc.PgConnection@2cbe2d8e
+2026-11-11 06:32:18.287  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-22 - Start completed.
+2026-11-11 06:32:18.295  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:18.296  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:18.300  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-22 - Shutdown initiated...
+2026-11-11 06:32:18.300  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-22 - Shutdown completed.
+2026-11-11 06:32:18.316  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:18.317  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:18.695  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:18.696  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:18.696  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:18.711  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:18.711  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 393 ms
+2026-11-11 06:32:18.808  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:19.233  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:19.342  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52788 (http) with context path '/'
+2026-11-11 06:32:19.345  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:19.345  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.042 seconds (process running for 48.664)
+2026-11-11 06:32:19.346  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-23 - Starting...
+2026-11-11 06:32:19.491  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-23 - Added connection org.postgresql.jdbc.PgConnection@c22f218
+2026-11-11 06:32:19.492  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-23 - Start completed.
+2026-11-11 06:32:19.501  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:19.501  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:19.504  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-23 - Shutdown initiated...
+2026-11-11 06:32:19.505  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-23 - Shutdown completed.
+2026-11-11 06:32:19.522  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:19.522  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:19.950  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:19.951  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:19.951  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:19.965  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:19.966  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 443 ms
+2026-11-11 06:32:20.056  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:20.426  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:20.526  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52791 (http) with context path '/'
+2026-11-11 06:32:20.529  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:20.530  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.021 seconds (process running for 49.849)
+2026-11-11 06:32:20.530  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-24 - Starting...
+2026-11-11 06:32:20.567  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-24 - Added connection org.postgresql.jdbc.PgConnection@17cbd7e6
+2026-11-11 06:32:20.567  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-24 - Start completed.
+2026-11-11 06:32:20.576  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:20.577  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:20.584  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-24 - Shutdown initiated...
+2026-11-11 06:32:20.584  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-24 - Shutdown completed.
+2026-11-11 06:32:20.599  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:20.599  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:21.000  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:21.001  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:21.001  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:21.017  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:21.017  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 417 ms
+2026-11-11 06:32:21.114  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:21.534  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:21.636  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52794 (http) with context path '/'
+2026-11-11 06:32:21.638  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:21.639  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 1.053 seconds (process running for 50.957)
+2026-11-11 06:32:21.640  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-25 - Starting...
+2026-11-11 06:32:21.681  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-25 - Added connection org.postgresql.jdbc.PgConnection@37c8c1b8
+2026-11-11 06:32:21.681  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-25 - Start completed.
+2026-11-11 06:32:21.691  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:21.692  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:21.695  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-25 - Shutdown initiated...
+2026-11-11 06:32:21.696  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-25 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b4TheHashThatTheRealToolPrintsFromAHiddenPromptIsAcceptedAndNothingElseIsPrintedBeforeIt" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="1.38">
+    <system-out><![CDATA[2026-11-11 06:32:22.050  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:22.050  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:22.440  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:22.440  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:22.440  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:22.455  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:22.455  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 404 ms
+2026-11-11 06:32:22.548  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:22.925  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is on (dev-tools build). /admin/register works from this machine until an admin exists.
+2026-11-11 06:32:23.024  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52797 (http) with context path '/'
+2026-11-11 06:32:23.027  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:23.027  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.991 seconds (process running for 52.345)
+2026-11-11 06:32:23.028  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-26 - Starting...
+2026-11-11 06:32:23.062  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-26 - Added connection org.postgresql.jdbc.PgConnection@5d65977d
+2026-11-11 06:32:23.062  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-26 - Start completed.
+2026-11-11 06:32:23.070  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:23.071  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:23.075  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-26 - Shutdown initiated...
+2026-11-11 06:32:23.076  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-26 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b4AMissingBlankOrBadHashLeavesTheRegistrationAbsentAndTheStartupLineSaysWhyWithoutAnySecret" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="7.495">
+    <system-out><![CDATA[2026-11-11 06:32:23.165  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:23.165  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:23.539  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:23.539  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:23.539  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:23.554  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:23.554  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 388 ms
+2026-11-11 06:32:23.650  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:23.695  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:23.809  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52802 (http) with context path '/'
+2026-11-11 06:32:23.812  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:23.812  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.66 seconds (process running for 53.131)
+2026-11-11 06:32:23.813  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-27 - Starting...
+2026-11-11 06:32:23.848  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-27 - Added connection org.postgresql.jdbc.PgConnection@b63fb51
+2026-11-11 06:32:23.848  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-27 - Start completed.
+2026-11-11 06:32:23.861  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:23.861  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:23.862  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:23.896  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:23.897  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:23.903  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-27 - Shutdown initiated...
+2026-11-11 06:32:23.904  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-27 - Shutdown completed.
+2026-11-11 06:32:24.100  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:24.100  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:24.569  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:24.570  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:24.570  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:24.586  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:24.586  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 485 ms
+2026-11-11 06:32:24.682  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:24.726  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:24.842  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52832 (http) with context path '/'
+2026-11-11 06:32:24.844  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:24.845  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.76 seconds (process running for 54.164)
+2026-11-11 06:32:24.845  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-28 - Starting...
+2026-11-11 06:32:24.881  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-28 - Added connection org.postgresql.jdbc.PgConnection@10961656
+2026-11-11 06:32:24.881  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-28 - Start completed.
+2026-11-11 06:32:24.890  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:24.890  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:24.891  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:24.910  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:24.911  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:24.914  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-28 - Shutdown initiated...
+2026-11-11 06:32:24.915  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-28 - Shutdown completed.
+2026-11-11 06:32:25.076  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:25.077  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:25.430  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:25.430  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:25.431  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:25.445  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:25.445  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 368 ms
+2026-11-11 06:32:25.530  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:25.573  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:25.696  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52862 (http) with context path '/'
+2026-11-11 06:32:25.698  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:25.699  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.633 seconds (process running for 55.017)
+2026-11-11 06:32:25.699  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-29 - Starting...
+2026-11-11 06:32:25.736  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-29 - Added connection org.postgresql.jdbc.PgConnection@524a277c
+2026-11-11 06:32:25.736  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-29 - Start completed.
+2026-11-11 06:32:25.745  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:25.745  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:25.746  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:25.770  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:25.771  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:25.774  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-29 - Shutdown initiated...
+2026-11-11 06:32:25.775  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-29 - Shutdown completed.
+2026-11-11 06:32:25.944  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:25.944  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:26.319  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:26.319  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:26.319  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:26.334  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:26.334  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 389 ms
+2026-11-11 06:32:26.426  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:26.475  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:26.588  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52893 (http) with context path '/'
+2026-11-11 06:32:26.590  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:26.590  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.658 seconds (process running for 55.909)
+2026-11-11 06:32:26.591  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-30 - Starting...
+2026-11-11 06:32:26.725  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-30 - Added connection org.postgresql.jdbc.PgConnection@60b169eb
+2026-11-11 06:32:26.725  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-30 - Start completed.
+2026-11-11 06:32:26.734  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:26.734  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:26.735  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:26.753  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:26.754  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:26.757  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-30 - Shutdown initiated...
+2026-11-11 06:32:26.757  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-30 - Shutdown completed.
+2026-11-11 06:32:26.911  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:26.911  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:27.278  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:27.279  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:27.279  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:27.293  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:27.293  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 381 ms
+2026-11-11 06:32:27.383  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:27.430  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:27.566  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52923 (http) with context path '/'
+2026-11-11 06:32:27.568  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:27.569  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.67 seconds (process running for 56.888)
+2026-11-11 06:32:27.569  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-31 - Starting...
+2026-11-11 06:32:27.609  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-31 - Added connection org.postgresql.jdbc.PgConnection@474a7dd9
+2026-11-11 06:32:27.610  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-31 - Start completed.
+2026-11-11 06:32:27.620  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:27.620  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:27.621  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:27.645  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:27.645  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:27.649  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-31 - Shutdown initiated...
+2026-11-11 06:32:27.650  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-31 - Shutdown completed.
+2026-11-11 06:32:27.928  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:27.929  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:28.309  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:28.310  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:28.310  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:28.325  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:28.325  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 396 ms
+2026-11-11 06:32:28.416  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:28.461  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:28.574  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52953 (http) with context path '/'
+2026-11-11 06:32:28.577  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:28.577  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.661 seconds (process running for 57.896)
+2026-11-11 06:32:28.578  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-32 - Starting...
+2026-11-11 06:32:28.613  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-32 - Added connection org.postgresql.jdbc.PgConnection@310831b7
+2026-11-11 06:32:28.613  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-32 - Start completed.
+2026-11-11 06:32:28.622  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:28.622  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:28.623  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:28.642  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:28.643  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:28.646  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-32 - Shutdown initiated...
+2026-11-11 06:32:28.651  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-32 - Shutdown completed.
+2026-11-11 06:32:28.810  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:28.810  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:29.226  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:29.227  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:29.227  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:29.243  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:29.243  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 433 ms
+2026-11-11 06:32:29.338  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:29.384  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:29.521  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 52983 (http) with context path '/'
+2026-11-11 06:32:29.523  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:29.524  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.727 seconds (process running for 58.843)
+2026-11-11 06:32:29.524  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-33 - Starting...
+2026-11-11 06:32:29.563  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-33 - Added connection org.postgresql.jdbc.PgConnection@6a04a25f
+2026-11-11 06:32:29.563  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-33 - Start completed.
+2026-11-11 06:32:29.571  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:29.571  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:29.572  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:29.592  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:29.592  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:29.596  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-33 - Shutdown initiated...
+2026-11-11 06:32:29.596  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-33 - Shutdown completed.
+2026-11-11 06:32:29.765  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:29.766  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:30.153  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:30.155  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:30.155  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:30.170  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:30.170  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 403 ms
+2026-11-11 06:32:30.259  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:30.303  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the PIN hash is missing or not a valid BCrypt hash (cost 12 to 16).
+2026-11-11 06:32:30.419  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53015 (http) with context path '/'
+2026-11-11 06:32:30.422  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:30.422  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.668 seconds (process running for 59.741)
+2026-11-11 06:32:30.422  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-34 - Starting...
+2026-11-11 06:32:30.458  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-34 - Added connection org.postgresql.jdbc.PgConnection@3cb98754
+2026-11-11 06:32:30.458  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-34 - Start completed.
+2026-11-11 06:32:30.468  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:30.468  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:30.469  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:30.491  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:30.493  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:30.496  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-34 - Shutdown initiated...
+2026-11-11 06:32:30.497  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-34 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b2AnyProfileCombinationThatIsNotDevOrDevTestLeavesTheRegistrationAbsent" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="1.1">
+    <system-out><![CDATA[2026-11-11 06:32:30.662  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:30.662  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 1 profile is active: "test"
+2026-11-11 06:32:31.056  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:31.056  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:31.056  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:31.072  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:31.072  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 409 ms
+2026-11-11 06:32:31.161  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:31.202  WARN [requestId=,tenantId=] c.s.p.d.b.BootstrapStartupNotice - Admin bootstrap registration is off: the active profiles are not dev.
+2026-11-11 06:32:31.314  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53046 (http) with context path '/'
+2026-11-11 06:32:31.317  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:31.317  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.666 seconds (process running for 60.635)
+2026-11-11 06:32:31.318  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-35 - Starting...
+2026-11-11 06:32:31.467  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-35 - Added connection org.postgresql.jdbc.PgConnection@5504a431
+2026-11-11 06:32:31.467  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-35 - Start completed.
+2026-11-11 06:32:31.476  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:31.476  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:31.477  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:31.496  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:31.497  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:31.500  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-35 - Shutdown initiated...
+2026-11-11 06:32:31.501  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-35 - Shutdown completed.
+]]></system-out>
+  </testcase>
+  <testcase name="b3TheSwitchAbsentOrNotTrueLeavesTheRegistrationAbsentAndSilent" classname="com.sahaj.platform.devtools.it.BootstrapSwitchesIT" time="7.158">
+    <system-out><![CDATA[2026-11-11 06:32:31.755  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:31.755  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:32.093  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:32.093  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:32.093  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:32.107  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:32.107  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 351 ms
+2026-11-11 06:32:32.192  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:32.344  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53076 (http) with context path '/'
+2026-11-11 06:32:32.347  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:32.347  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.603 seconds (process running for 61.666)
+2026-11-11 06:32:32.348  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-36 - Starting...
+2026-11-11 06:32:32.382  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-36 - Added connection org.postgresql.jdbc.PgConnection@26169ae6
+2026-11-11 06:32:32.382  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-36 - Start completed.
+2026-11-11 06:32:32.390  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:32.390  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:32.391  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:32.409  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:32.410  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:32.413  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-36 - Shutdown initiated...
+2026-11-11 06:32:32.413  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-36 - Shutdown completed.
+2026-11-11 06:32:32.575  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:32.576  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:32.934  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:32.934  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:32.934  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:32.948  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:32.948  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 372 ms
+2026-11-11 06:32:33.036  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:33.211  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53106 (http) with context path '/'
+2026-11-11 06:32:33.213  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:33.213  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.653 seconds (process running for 62.531)
+2026-11-11 06:32:33.214  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-37 - Starting...
+2026-11-11 06:32:33.250  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-37 - Added connection org.postgresql.jdbc.PgConnection@447d77e5
+2026-11-11 06:32:33.250  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-37 - Start completed.
+2026-11-11 06:32:33.259  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:33.259  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:33.260  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:33.281  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:33.281  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:33.284  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-37 - Shutdown initiated...
+2026-11-11 06:32:33.285  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-37 - Shutdown completed.
+2026-11-11 06:32:33.449  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:33.449  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:33.823  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:33.824  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:33.824  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:33.847  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:33.847  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 397 ms
+2026-11-11 06:32:33.950  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:34.144  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53137 (http) with context path '/'
+2026-11-11 06:32:34.147  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:34.148  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.71 seconds (process running for 63.466)
+2026-11-11 06:32:34.148  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-38 - Starting...
+2026-11-11 06:32:34.190  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-38 - Added connection org.postgresql.jdbc.PgConnection@78c321de
+2026-11-11 06:32:34.190  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-38 - Start completed.
+2026-11-11 06:32:34.200  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:34.200  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:34.201  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:34.224  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:34.225  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:34.229  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-38 - Shutdown initiated...
+2026-11-11 06:32:34.230  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-38 - Shutdown completed.
+2026-11-11 06:32:34.404  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:34.405  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:34.794  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:34.794  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:34.794  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:34.808  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:34.808  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 403 ms
+2026-11-11 06:32:34.894  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:35.045  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53168 (http) with context path '/'
+2026-11-11 06:32:35.048  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:35.049  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.658 seconds (process running for 64.367)
+2026-11-11 06:32:35.049  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-39 - Starting...
+2026-11-11 06:32:35.084  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-39 - Added connection org.postgresql.jdbc.PgConnection@2ec76a97
+2026-11-11 06:32:35.084  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-39 - Start completed.
+2026-11-11 06:32:35.092  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:35.092  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:35.093  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:35.111  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:35.111  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:35.114  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-39 - Shutdown initiated...
+2026-11-11 06:32:35.115  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-39 - Shutdown completed.
+2026-11-11 06:32:35.371  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:35.372  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:35.718  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:35.718  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:35.718  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:35.732  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:35.732  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 360 ms
+2026-11-11 06:32:35.815  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:35.968  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53198 (http) with context path '/'
+2026-11-11 06:32:35.971  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:35.971  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.611 seconds (process running for 65.29)
+2026-11-11 06:32:35.972  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-40 - Starting...
+2026-11-11 06:32:36.008  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-40 - Added connection org.postgresql.jdbc.PgConnection@c4e99f7
+2026-11-11 06:32:36.008  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-40 - Start completed.
+2026-11-11 06:32:36.022  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:36.022  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:36.023  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:36.047  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:36.048  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:36.051  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-40 - Shutdown initiated...
+2026-11-11 06:32:36.051  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-40 - Shutdown completed.
+2026-11-11 06:32:36.211  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:36.211  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:36.602  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:36.603  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:36.603  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:36.618  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:36.618  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 406 ms
+2026-11-11 06:32:36.712  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:36.881  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53228 (http) with context path '/'
+2026-11-11 06:32:36.883  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:36.884  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.684 seconds (process running for 66.202)
+2026-11-11 06:32:36.884  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-41 - Starting...
+2026-11-11 06:32:36.919  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-41 - Added connection org.postgresql.jdbc.PgConnection@7c268e02
+2026-11-11 06:32:36.920  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-41 - Start completed.
+2026-11-11 06:32:36.929  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:36.929  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:36.929  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 0 ms
+2026-11-11 06:32:36.949  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:36.949  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:36.953  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-41 - Shutdown initiated...
+2026-11-11 06:32:36.953  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-41 - Shutdown completed.
+2026-11-11 06:32:37.116  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:37.116  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:37.499  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:37.499  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:37.499  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:37.514  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:37.514  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 397 ms
+2026-11-11 06:32:37.605  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:37.760  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53258 (http) with context path '/'
+2026-11-11 06:32:37.763  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:37.763  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.66 seconds (process running for 67.081)
+2026-11-11 06:32:37.763  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-42 - Starting...
+2026-11-11 06:32:37.798  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-42 - Added connection org.postgresql.jdbc.PgConnection@5183fc21
+2026-11-11 06:32:37.798  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-42 - Start completed.
+2026-11-11 06:32:37.807  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:37.807  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:37.808  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-11-11 06:32:37.826  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:37.827  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:37.829  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-42 - Shutdown initiated...
+2026-11-11 06:32:37.830  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-42 - Shutdown completed.
+2026-11-11 06:32:38.083  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Starting ForkedBooter v3.5.6 using Java 17.0.21.0.2 with PID 12556 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 06:32:38.083  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - The following 2 profiles are active: "dev", "test"
+2026-11-11 06:32:38.438  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 0 (http)
+2026-11-11 06:32:38.439  INFO [requestId=,tenantId=] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-11 06:32:38.439  INFO [requestId=,tenantId=] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-11 06:32:38.453  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-11 06:32:38.453  INFO [requestId=,tenantId=] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 368 ms
+2026-11-11 06:32:38.539  WARN [requestId=,tenantId=] c.s.p.i.security.StaffPinConfig - Staff PIN checks are off: SAHAJ_PIN_PEPPER is not set
+2026-11-11 06:32:38.690  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 53288 (http) with context path '/'
+2026-11-11 06:32:38.692  INFO [requestId=,tenantId=] o.s.s.config.TaskSchedulerRouter - No TaskScheduler/ScheduledExecutorService bean found for scheduled processing
+2026-11-11 06:32:38.693  INFO [requestId=,tenantId=] o.a.m.surefire.booter.ForkedBooter - Started ForkedBooter in 0.621 seconds (process running for 68.011)
+2026-11-11 06:32:38.693  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-43 - Starting...
+2026-11-11 06:32:38.727  INFO [requestId=,tenantId=] com.zaxxer.hikari.pool.HikariPool - HikariPool-43 - Added connection org.postgresql.jdbc.PgConnection@46be63cc
+2026-11-11 06:32:38.727  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-43 - Start completed.
+2026-11-11 06:32:38.735  INFO [requestId=,tenantId=] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-11 06:32:38.735  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-11 06:32:38.736  INFO [requestId=,tenantId=] o.s.web.servlet.DispatcherServlet - Completed initialization in 0 ms
+2026-11-11 06:32:38.755  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-11 06:32:38.755  INFO [requestId=,tenantId=] o.s.b.w.e.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-11-11 06:32:38.758  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-43 - Shutdown initiated...
+2026-11-11 06:32:38.759  INFO [requestId=,tenantId=] com.zaxxer.hikari.HikariDataSource - HikariPool-43 - Shutdown completed.
+]]></system-out>
+  </testcase>
+</testsuite>

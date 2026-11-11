@@ -1,0 +1,53 @@
+<section class="panel surf sfp" aria-labelledby="sf-eg-h" data-testid="emergency-review">
+  <div class="sfph">
+    <h2 [id]="headingId" tabindex="-1"><app-icon name="key" [size]="18" /> {{ title }}</h2>
+    <small class="faint">{{ subtitle }}</small>
+  </div>
+
+  @if (notice(); as message) {
+    <div class="notice err" role="alert" data-testid="review-notice">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  <div role="list" aria-label="Emergency access to review" data-testid="review-list">
+    @for (r of rows(); track r.grantId) {
+      <div role="listitem" class="sfrow" data-testid="review-row" [attr.data-grant]="r.grantId">
+        <span class="sfmn">
+          <b>{{ headline(r) }}</b>
+          <small>{{ small(r) }}</small>
+        </span>
+        <span class="sfacts">
+          <button
+            type="button"
+            mat-stroked-button
+            data-act="sfbgrev"
+            data-testid="mark-reviewed"
+            [disabled]="busy()"
+            [disabledInteractive]="true"
+            [attr.aria-busy]="busy() ? 'true' : null"
+            [attr.aria-label]="markName(r)"
+            (click)="markReviewed(r)"
+          >
+            <app-icon name="check" [size]="14" /> {{ markLabel }}
+          </button>
+        </span>
+      </div>
+    }
+  </div>
+
+  @if (cursor() !== null) {
+    <div class="more">
+      <button
+        type="button"
+        mat-stroked-button
+        data-testid="show-more-reviews"
+        [disabled]="loadingMore()"
+        (click)="showMore()"
+      >
+        {{ moreLabel }}
+      </button>
+    </div>
+  }
+</section>

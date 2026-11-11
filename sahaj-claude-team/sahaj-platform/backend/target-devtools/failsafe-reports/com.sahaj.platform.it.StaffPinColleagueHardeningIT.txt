@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.platform.it.StaffPinColleagueHardeningIT
+-------------------------------------------------------------------------------
+Tests run: 29, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 121.4 s -- in com.sahaj.platform.it.StaffPinColleagueHardeningIT

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.sahaj.ipd.domain.WristbandCheckTest
+-------------------------------------------------------------------------------
+Tests run: 63, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.068 s -- in com.sahaj.ipd.domain.WristbandCheckTest
