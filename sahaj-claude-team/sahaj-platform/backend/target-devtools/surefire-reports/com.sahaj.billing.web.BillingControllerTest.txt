@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.billing.web.BillingControllerTest
 -------------------------------------------------------------------------------
-Tests run: 24, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 24.75 s -- in com.sahaj.billing.web.BillingControllerTest
+Tests run: 24, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.811 s -- in com.sahaj.billing.web.BillingControllerTest

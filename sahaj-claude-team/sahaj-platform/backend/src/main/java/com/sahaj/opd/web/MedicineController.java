@@ -60,7 +60,9 @@ public class MedicineController {
 
     @GetMapping("/diagnoses")
     @PreAuthorize(OpdRoles.ANY_CLINIC_ROLE)
-    public List<DiagnosisResponse> diagnoses(@RequestParam(required = false) String q) {
-        return diagnosisService.search(q).stream().map(DiagnosisResponse::from).toList();
+    public List<DiagnosisResponse> diagnoses(@RequestParam(required = false) String q,
+                                              @RequestParam(required = false) String specialty,
+                                              @RequestParam(required = false) Integer page) {
+        return diagnosisService.search(q, specialty, page).stream().map(DiagnosisResponse::from).toList();
     }
 }

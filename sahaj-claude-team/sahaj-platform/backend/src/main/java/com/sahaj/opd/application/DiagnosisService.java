@@ -1,6 +1,7 @@
 package com.sahaj.opd.application;
 
 import com.sahaj.opd.application.DiagnosisRepository.DiagnosisRow;
+import com.sahaj.opd.application.emr.EmrQueryRules;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,18 @@ public class DiagnosisService {
 
     @Transactional(readOnly = true)
     public List<DiagnosisRow> search(String query) {
-        return repository.search(query, LIMIT);
+        return repository.search(query, null, LIMIT, 0);
+    }
+
+    /**
+     * SAH-43-1: an optional specialty (hint first, nothing hidden) and a 0-based page of 20. A specialty that is not
+     * one of the four template codes, or a page outside 0 to 500, is a 400 validation. Without both, the answer is
+     * the SAH-7 answer.
+     */
+    @Transactional(readOnly = true)
+    public List<DiagnosisRow> search(String query, String specialtyCode, Integer pageNumber) {
+        String specialty = EmrQueryRules.specialty(specialtyCode);
+        int page = EmrQueryRules.page(pageNumber);
+        return repository.search(query, specialty, LIMIT, page * LIMIT);
     }
 }

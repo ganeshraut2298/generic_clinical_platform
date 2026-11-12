@@ -224,3 +224,76 @@ Tech lead check: `docs/api/admin.yaml` parses (14 paths); the only remaining "Bo
 
 ## qa-engineer, F-1 closed (11 Nov 2026): done
 The "Back to website" link now measures 153.3 x 44 px (before 153.3 x 40) on `/admin/sign-in` and `/admin/register` at 360 and 1440 px, confirmed in a real browser (the e2e serves `frontend/dist`, built after the SCSS change; the built chunks contain the rule). The `test.fail` is gone; a new test checks the sign-in page; spec now 81 tests per project: 162 passed, 0 failed, no expected failures. Related specs (home, self-hosted-fonts, patient-card-setup, home-background, app-shell): 429 passed, 11 skipped (their own), 0 failed. Lint PASSED. Plan section 11 and the QA report updated; F-2 stays; page never run against the real backend (M-4, M-5, C1 for the human). Note: the Angular Revision 5 change (empty 201) will need QA to re-run the page e2e after it lands; the stale spec title at `admin-register.page.spec.ts` ~263 ("shows the normal page not found") is in the angular-developer's file (a unit spec title, not an e2e one).
+
+## java-developer, ADR-018 Revision 5 (11 Nov 2026): done
+`mvn -Pdev-tools test`: 4,059 run, 0 failed, 0 skipped. `validate backend` PASSED (about 45 minutes; the default build, so the dev-tools ITs that still assume the token were not part of it). SQL byte copy done (`cmp` 0; old `db/dev-tools-bootstrap` still gone; guard copy identical to `docs/database/ADR-008-guard.sql`, untouched). `BootstrapService` no longer has `PURPOSE_ENROL`, the `preAuthCreate` call, the token or the `AdminAuthRepository`/`AdminTokenHasher` dependencies; `RegisterOutcome` is `(kind, retryAfterSeconds, fieldErrors, adminId)`; after `register` returns CREATED nothing else is called and only the commit follows. `BootstrapController` answers 201 with no body, `Cache-Control: no-store`, `Pragma: no-cache`, `X-Content-Type-Options: nosniff` (kept because the other bootstrap answers carry it; **the contract lists only the first two: architect, one line**), no Content-Type, no Location, cookie cleared; `BootstrapRegistered.java` deleted. Tests: `BootstrapServiceTest` (57; the pre-auth failure case deleted, new commit-throws-after-CREATED case), `BootstrapTransactionProxyTest` (9; real proxy, a commit that fails), `BootstrapEndpointTest` (34; 201 empty body, headers, cookie), `BootstrapBodiesTest` (toString test deleted). `BootstrapConditionsTest` still declares an unused `AdminTokenHasher` bean and `AdminAuthRepository` mock (harmless, left).
+- **QA (dev-tools ITs that still assume the token):** `BootstrapRegisterIT` lines 111-124, 162-179, 243-256; `BootstrapLogsIT` 115-144; `BootstrapFunctionsIT` ~614 comment (S14); the `admin_preauth_create` prerequisite checks (`BootstrapCallbackIT`, `BootstrapPrerequisitesCanaryIT`, `BootstrapSupport`) stay (ADR Revision 5: ordering guard and the first sign-in needs it).
+
+## angular-developer, empty register 201 (11 Nov 2026): done
+`BootstrapRegistered` removed; `register()` returns `Observable<void>`; `created()` reads no body, still `dropEverything()` then `/admin/sign-in`; specs answer `flush(null, {status: 201})`, the pre-auth self-check removed, ticket, password and email scans kept. Gate: lint PASSED, 183 files 2,818 tests 0 failed, build PASSED. No text, autocomplete, navigation or header-link change. Next: QA (integration tests, the page e2e, `validate all`).
+
+## solution-architect, nosniff on the register 201 (11 Nov 2026): done; consistency follow-up started
+`docs/api/admin.yaml` (0.5.0) register 201 headers now list `X-Content-Type-Options: nosniff`; ADR-018 D6 step 5 the same. Tech lead check: parses (14 paths); `validate docs` fails only on ADM-2.md. The architect found that no other response in the contract lists nosniff (also not the dev sample-admin answers); the controller sets it at three places (lines 153, 174, 188). Follow-up (option b): one sentence in the `/bootstrap` descriptions saying what the controller writes carries nosniff and what the empty 404 carries (as the code actually does), and ADR-018 lines 86 and 423 made consistent. No header entries added to the other response components.
+
+## solution-architect, nosniff consistency (11 Nov 2026): done
+Tech lead check: `admin.yaml` parses (14 paths); `validate docs` fails only on ADM-2.md. What the code sends, now documented: nosniff on the unlock 200, the register 201 and the 400, 401, 423, 429 problems; **not** on the bodyless 500 (its handler resets the response and sets only `Cache-Control: no-store` and `Pragma: no-cache`) and **not** on the empty 404 (`Cache-Control: no-store` only, no Pragma, shared bytes with the other dev paths). One sentence in the `info.description` bootstrap paragraph; ADR-018 line 86 corrected (the 404 has no Pragma) and line 423 lists nosniff. Tech lead decisions: the bodyless 500 needs no nosniff (no body to sniff): no code change; the `BootstrapServerError` component lists only `Cache-Control` while the code also sends `Pragma: no-cache`: align the contract (one line, queued to the architect).
+
+## solution-architect, BootstrapServerError headers (11 Nov 2026): done
+`docs/api/admin.yaml` `BootstrapServerError` now lists `Cache-Control: no-store` and `Pragma: no-cache` and says no `X-Content-Type-Options` (no body to sniff); matches `BootstrapController.failed()`. `BootstrapNotFound` already matched the code. Tech lead check: parses (14 paths); `validate docs` fails only on ADM-2.md.
+
+
+---
+
+## qa-engineer · ADR-018 Revision 5 (restart pass after a network failure) · 11 Nov 2026
+
+Status: DONE for everything that can run. Revision 5 server tests (empty 201, headers, no pre-auth row, login → ENROL → enrol → verify → TOTP) are written and compile but SKIP: role `sahaj_admin_definer` and the admin tables are missing in `sahaj_test`. Nothing about them has executed. The page has still never run against the real backend (M-4, M-5, C1).
+
+Verified the dead agent's diffs (BootstrapRegisterIT, BootstrapLogsIT, BootstrapFunctionsIT, BootstrapCallbackIT, BootstrapPrerequisitesCanaryIT, BootstrapSupport, BootstrapDb, e2e spec). QA added the `X-Content-Type-Options: nosniff` assertion to the 201 IT and fixed one stale test-plan line.
+
+| Gate | Result |
+| --- | --- |
+| `mvn -Pdev-tools test` | 4,059 run, 0 failed, 0 skipped |
+| dev-tools IT verify (`Bootstrap*IT,PackagedJar*IT,DevToolsGuardCallbackIT`) | 114 run, 0 failed, 27 skipped (Bodies, Functions, Logs, Register, Unlock: class-level skip; Callback 8, ClearLock 2, Cleanup 1, Canary 3, DevToolsGuardCallbackIT 5; PackagedJarDevToolsIT 5 and BootstrapAbsentInProductionIT 3 stand down by design) |
+| `validate backend` | PASSED on the second run (ITs 1,938 run, 0 failed, 26 skipped; unit 3,766 run, 0 failed) |
+| lint | PASSED |
+| Playwright admin-register, both projects | 164 passed, 0 failed |
+| Playwright home, fonts, patient-card-setup, home-background, app-shell | 429 passed, 11 own skips, 0 failed |
+| ng test, 16 spec files (admin, core/http, core/auth) | 140 passed |
+| `validate frontend` | known `--browsers=ChromeHeadless` failure (human) |
+| `validate docs` | fails only on ADM-2.md (known, human) |
+
+Invalid first backend run (33 failed ITs: Medicine*/PharmacistCheckIT HTTP 500 and PackagedJarDevToolsIT jar missing): evidence points to a `mvn clean spring-boot:run` started at 15:37:54 (the human's dev server) recreating `backend/target` during the gate. None touch SAH-42. Re-ran once with no code change: passed. Unit count 3,767 → 3,766 not investigated. The extra skip (27 vs 26) is the canary's stray-admin test standing down when admin tables are missing.
+
+Requests: human creates role + admin tables in `sahaj_test`, then runs the IT command with `-Dsahaj.bootstrap.requireDb=true` (0 skipped among Bootstrap DB ITs); never `mvn clean` while a gate runs; M-4, M-5, C1 open. angular-developer: stale title in `admin-register.page.spec.ts` (~line 263).
+Files: devtools ITs, BootstrapDb, `frontend/e2e/admin-register.spec.ts` (gitignored: `git add -f`), docs/test-plans/SAH-42.md, docs/reviews/QA_REPORT_SAH-42.md.
+Next: code-reviewer, security-reviewer.
+
+
+---
+
+## security-reviewer · Revision 5 re-check · 11 Nov 2026
+PASS WITH CONDITIONS, no Critical/High/Medium; L-4 resolved in code (proof IT skipped, C1). Full text appended to docs/reviews/SAH-42-security.md. New: I-8, I-9 (info). Open: C1, C2/M-5, C3, M2, M3, M-4, L3 (target-devtools tracked in git; human).
+
+
+---
+
+## code-reviewer · Revision 5 re-check · 11 Nov 2026
+APPROVE WITH COMMENTS. Findings 1-4 minor (nosniff/Pragma unit asserts; DEC-035 addendum DONE by tech lead; S14 wording; stale spec title), 5-8 nits. Full text in docs/reviews/SAH-42-code.md. Small fix round dispatched to java-developer, qa-engineer/db-engineer, angular-developer, solution-architect.
+
+
+---
+
+## Small fix round after the Revision 5 code re-check · 11 Nov 2026
+
+**solution-architect (docs only):** ADR-018 line 13 marked "(superseded by Revision 5)" in two places; S14 row (line 430) now says S14 proves register creates the admin not enrolled and `admin_login_lookup` finds it, and that issuing the ENROL token is proven by `BootstrapRegisterIT`. `admin.yaml` (still 0.5.0): Pragma and X-Content-Type-Options added to the 401 (unlock and register) and `BootstrapLocked`; new `components/responses/BootstrapBusy` for both bootstrap 429s (Retry-After 5, no-store, Pragma, nosniff; `const: 5`), because headers cannot sit beside a `$ref` and the shared `Problem` response serves other operations. Tech lead check: `docs/api/admin.yaml OK, paths=14`; `validate docs` fails only on ADM-2.md. The `BootstrapBusy` component is the one change beyond the brief; it matches the code's `problem()` headers.
+
+**angular-developer:** `admin-register.page.spec.ts` line 268 title renamed (assertions unchanged); `.ts` comments were already correct. lint OK; register specs 3 files / 41 tests pass. Left open: the title at spec line 385 still ends "(criterion 12)" (stale; now criteria 2 and 9). The agent could not release its own frontend lock (denied); the tech lead removed that finished agent's lock with literal paths after checking its owner file.
+
+Still running: java-developer (nosniff/Pragma/commit-failure unit tests), qa-engineer (S14 comment, Content-Length assertion, 3,767 → 3,766), db-engineer (docs/database/SAH-42.md S14 wording).
+
+**java-developer (restart, code-review finding 1):** CLOSED. `BootstrapEndpointTest` now asserts nosniff on the register 201, Pragma + no nosniff on the bodyless 500s, and a new case where the commit fails after CREATED gives a bodyless 500 with nothing of the request logged. Diff read against `BootstrapController`; no controller change. `mvn -Pdev-tools test`: 4,060 run, 0 failed, 0 skipped. `validate backend`: PASSED (ITs 1,938 run, 0 failed, 26 skipped, the admin ITs waiting on role `sahaj_admin_definer` and tables in `sahaj_test`). Locks released.
+**db-engineer:** S14 row in `docs/database/SAH-42.md` reworded (lookup only; ENROL token proven by `BootstrapRegisterIT`), verified by the tech lead in the diff; the agent died before reporting. SQL files untouched.
+Remaining: qa-engineer (S14 comment in `BootstrapFunctionsIT`, `Content-Length` assertion in `BootstrapRegisterIT`, unit count 3,767 → 3,766 explanation).
+
+**qa-engineer (restart, findings 3, 7, 8):** 3 and 7 DONE (already in the diff, verified): S14 comment matches the test; `BootstrapRegisterIT` asserts Content-Length absent or "0" on the 201. `-Pdev-tools test-compile` OK; dev-tools IT verify 114 run, 0 failed, 27 skipped (as before). Both new server assertions are skipped until role `sahaj_admin_definer` and the admin tables exist in `sahaj_test` (P1, P2), so they have not executed. Finding 8: the code-review's explanation (deleted `BootstrapRegistered` toString test) is REFUTED. `validate backend` uses the normal build, which never compiles `src/devtools`: normal build 244 classes / 3,766 tests, dev-tools build 262 classes / 4,060 tests (the 18 extra classes hold 294 tests; 3,766 + 294 = 4,060). Nothing under `src/main` or `src/test` changed between the Revision 3 and 5 gates except an IT helper with no `@Test`, so no test was lost; the cause of the earlier 3,767 is not proven (likely a run on a slightly different tree). Baselines now: 3,766 (`validate backend`), 4,060 (dev-tools unit run). Locks released; the human's server on 8080 untouched.
+Fix round complete. Open: only human items and the stale "(criterion 12)" title at `admin-register.page.spec.ts` ~385 (wording only).

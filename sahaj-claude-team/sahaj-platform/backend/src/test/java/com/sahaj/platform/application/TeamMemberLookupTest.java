@@ -91,4 +91,65 @@ class TeamMemberLookupTest {
         when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.empty());
         assertThat(lookup.doctorSpecialty(TENANT, MEMBER)).isEmpty();
     }
+
+    // ---- SAH-43 (ADR-019 D7): doctorDetails ----
+
+    private static TeamRow detailRow(MembershipRole role, MembershipStatus status, boolean hasProfile,
+                                     String specialty, String degree, String registrationNo) {
+        return new TeamRow(MEMBER, UUID.randomUUID(), "Dr Test Person", "9000000001", role, status, null, hasProfile,
+                specialty, degree, registrationNo, 0L);
+    }
+
+    @Test
+    void doctorDetailsReturnsTheSavedValuesAsTheyAre() {
+        when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.of(
+                detailRow(MembershipRole.DOCTOR, MembershipStatus.ACTIVE, true, "General Physician", "MBBS, MD", "REG-1")));
+
+        var details = lookup.doctorDetails(TENANT, MEMBER).orElseThrow();
+
+        assertThat(details.membershipId()).isEqualTo(MEMBER);
+        assertThat(details.name()).isEqualTo("Dr Test Person");
+        assertThat(details.role()).isEqualTo("DOCTOR");
+        assertThat(details.membershipStatus()).isEqualTo("ACTIVE");
+        assertThat(details.specialty()).isEqualTo("General Physician");
+        assertThat(details.degree()).isEqualTo("MBBS, MD");
+        assertThat(details.registrationNo()).isEqualTo("REG-1");
+    }
+
+    @Test
+    void doctorDetailsReturnsBlankFieldsAsNull() {
+        when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.of(
+                detailRow(MembershipRole.VISITING_DOCTOR, MembershipStatus.ACTIVE, true, "  ", "", null)));
+
+        var details = lookup.doctorDetails(TENANT, MEMBER).orElseThrow();
+
+        assertThat(details.specialty()).isNull();
+        assertThat(details.degree()).isNull();
+        assertThat(details.registrationNo()).isNull();
+    }
+
+    @Test
+    void doctorDetailsIsEmptyForAnOwnerWithNoDoctorRowAndForAnotherClinicsOrUnknownId() {
+        when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.of(
+                detailRow(MembershipRole.OWNER, MembershipStatus.ACTIVE, false, null, null, null)));
+        assertThat(lookup.doctorDetails(TENANT, MEMBER)).isEmpty();
+
+        when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.empty());
+        assertThat(lookup.doctorDetails(TENANT, MEMBER)).isEmpty();
+    }
+
+    @Test
+    void doctorDetailsOfAnOwnerWhoIsADoctorAndOfARemovedMemberAreReturned() {
+        when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.of(
+                detailRow(MembershipRole.OWNER, MembershipStatus.ACTIVE, true, "Dental", null, null)));
+        assertThat(lookup.doctorDetails(TENANT, MEMBER)).isPresent();
+
+        MembershipStatus other = java.util.Arrays.stream(MembershipStatus.values())
+                .filter(status -> status != MembershipStatus.ACTIVE).findFirst().orElseThrow();
+        when(teamRepository.findById(TENANT, MEMBER)).thenReturn(Optional.of(
+                detailRow(MembershipRole.DOCTOR, other, true, "Dental", "BDS", "R-2")));
+        var removed = lookup.doctorDetails(TENANT, MEMBER).orElseThrow();
+        assertThat(removed.membershipStatus()).isEqualTo(other.name());
+        assertThat(removed.registrationNo()).isEqualTo("R-2");
+    }
 }

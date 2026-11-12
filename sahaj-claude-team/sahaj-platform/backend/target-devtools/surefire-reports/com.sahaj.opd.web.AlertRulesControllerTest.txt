@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.opd.web.AlertRulesControllerTest
 -------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.191 s -- in com.sahaj.opd.web.AlertRulesControllerTest
+Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.824 s -- in com.sahaj.opd.web.AlertRulesControllerTest

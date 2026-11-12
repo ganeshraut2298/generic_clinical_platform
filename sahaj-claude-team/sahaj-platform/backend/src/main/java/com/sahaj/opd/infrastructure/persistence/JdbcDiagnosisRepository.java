@@ -19,8 +19,8 @@ public class JdbcDiagnosisRepository implements DiagnosisRepository {
     private static final String SEARCH = """
             select code, name, specialty from opd.diagnosis
             where lower(name) like :namePattern escape '\\' or code like :codePattern escape '\\'
-            order by lower(name), code
-            limit :limit
+            order by case when specialty = :specialty then 0 else 1 end, lower(name), code
+            limit :limit offset :offset
             """;
 
     private final JdbcClient jdbc;
@@ -30,8 +30,10 @@ public class JdbcDiagnosisRepository implements DiagnosisRepository {
     }
 
     @Override
-    public List<DiagnosisRow> search(String prefix, int limit) {
+    public List<DiagnosisRow> search(String prefix, String specialty, int limit, int offset) {
         return jdbc.sql(SEARCH)
+                .param("specialty", specialty == null ? "" : specialty)
+                .param("offset", offset)
                 .param("namePattern", SearchPrefix.lowerPattern(prefix))
                 .param("codePattern", SearchPrefix.upperPattern(prefix))
                 .param("limit", limit)

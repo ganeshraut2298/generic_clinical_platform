@@ -74,3 +74,48 @@ The compare is reached in one place only (`BootstrapService.java:139-146`), afte
 | I7 | Info | `BootstrapController.java:43,180`; scrubber | The marker relies on every problem in this controller going through `problem()`; guarded by R3-U14; R3-I10 over real HTTP unrun | qa-engineer | Run R3-I10 at the first database run. |
 
 **Not verified:** every SQL property and SB004; second-connection visibility of the claim; no connection or row lock held across the compare; UNJUDGED timing; both callback generations; both runbooks; R3-I10 over real HTTP; K2 (unit only); the hash tool in a real terminal; `npm audit` and `mvn dependency:tree`.
+
+
+---
+
+# Re-check of ADR-018 Revision 5 (register 201 without body or token) · 11 Nov 2026
+
+Reviewer: security-reviewer, read-only (no Maven, Playwright, build, database or `.env`).
+
+**Verdict: PASS WITH CONDITIONS. No Critical, High or Medium findings. Revision 5 adds no new risk.**
+**The database half and the `/admin/register` page have never run against a real backend.** All Bootstrap database ITs, including the new Revision 5 assertions, are skipped.
+
+## L-4: RESOLVED in code
+- `BootstrapService.java:305-316`: the only database call in register is `repository.register(...)`; on CREATED it returns `RegisterOutcome(CREATED, 0, List.of(), adminId)`; `RegisterOutcome` (`:122-128`) has no token field and prints only its kind.
+- `JdbcBootstrapRepository` and `BootstrapRepository` have no pre-auth reference; `BootstrapRegistered.java` is gone from source and both target folders.
+- SQL `docs/database/SAH-42-admin-bootstrap.sql` and the byte copy under `backend/src/devtools/resources/db/bootstrap-dev-tools/` are identical (`cmp` 0). `admin_bootstrap_register` (`:503-640`) inserts only into `platform.platform_admin` and `platform.platform_admin_audit`; the only pre-auth reference left is the existence check `to_regprocedure(...)` at `:73`.
+- Logs: controller lines `:88`, `:96`, `:147` (adminId only), `:219` (class plus SQLSTATE); none prints a token. Audit row holds admin id and name only.
+- `BootstrapRegisterIT` asserts empty body and zero pre-auth rows (`preAuthRowsOf`); not yet run (C1).
+
+## Responses
+- 201 (`BootstrapController.java:146-154`): Cache-Control no-store, Pragma no-cache, X-Content-Type-Options nosniff, no body, no Content-Type, no Location; binding cookie cleared first (`:148`, path `/api/v1/admin/bootstrap`, Max-Age 0). Contract `admin.yaml:565-576` lists all four headers.
+- Bodyless 500 (`:217-224`): reset, status, no-store, Pragma; no nosniff; no request data in the log.
+- Empty 404 (`AdminDevNotFound.java:20-26`): reset, status, no-store; identical whether the feature is off, the caller refused, or an admin exists.
+- No new information leak: Revision 5 only removed fields from the 201.
+
+## Owner's first sign-in
+No new window. Before Revision 5 anyone who could read the 201 held a live ENROL token; now an ENROL token exists only after `/auth/login` proves the password again (ADR-003). The gap between register and first sign-in (password, no authenticator) is the accepted L4 window, now narrower. `admin_preauth_create` as a prerequisite is existence-checked only (SQL `:73`); nothing in bootstrap calls it or grants on it.
+
+## Frontend
+`admin-bootstrap.api.ts:31-33` `register()` returns `Observable<void>`, reads no body. `admin-register.page.ts:258-265` `created()` calls `dropEverything()` then navigates to `/admin/sign-in`; passwords cleared before the call; both calls `takeUntilDestroyed`. No console, storage, history state or pre-auth reference under `features/admin/register/`. `bootstrap-call.ts`, package files and pom unchanged. Secret scan of the 12 Revision 5 files: no 6+ digit run, hash or long hex except one doc mention of the literal prefix `$2a$12$` (no hash). Fixtures elsewhere hold throwaway values only; the reviewer cannot check whether any equals the human's real PIN, one more reason to close M2.
+
+## Findings
+| # | Severity | File:line | Finding | Owner | Tech lead decision |
+| --- | --- | --- | --- | --- | --- |
+| L-4 | was Low | `BootstrapController.java:146-154`; `BootstrapService.java:314-316`; SQL `:503-640` | RESOLVED in code; the IT that proves it on a real database is skipped (C1) | none | Close when C1 is green |
+| I-8 | Info | `BootstrapController.java:133-135`, `AdminDevNotFound.java:21-22` | A register answered CLOSED (admin created meanwhile, e.g. a parallel tab) gives the empty 404; its reset drops any Set-Cookie, so the HttpOnly path-scoped binding cookie stays until its 300 s Max-Age; the ticket is useless by then. Keeping the cookie on the 500 path is correct (ticket unspent) | none | Accept |
+| I-9 | Info | `BootstrapConditionsTest` | Unused `AdminTokenHasher` bean and `AdminAuthRepository` mock; harmless | java-developer | Optional tidy-up |
+| L3 | Low (open) | `backend/target-devtools/` | Tracked in git (2,839 files); `.gitignore` covers only `backend/target/` | human | `.gitignore` plus `git rm -r --cached` |
+
+## Conditions
+- **C1 (open):** keep `SAHAJ_ADMIN_BOOTSTRAP_ENABLED` off until `mvn -Pdev-tools verify` with `-Dsahaj.bootstrap.requireDb=true` shows 0 failed and 0 skipped for the Bootstrap ITs; then run the page once against the real backend (K2-K6 through the proxy, binding cookie on http://localhost, M-4).
+- **C2 / M-5 (open):** browser password-save check in Chrome, Edge, Firefox and any extension in use; until then type the PIN only in a private window or a profile with saving off.
+- **C3 (open):** server-side conditions above unchanged.
+- **M2 (open):** new PIN of at least 10 random characters, never typed in chat; only the hash in `.env` changes.
+- **M3 (open):** meaning of "loopback" on Windows covered by the operating rule only; H-BOOT-2 and H-BOOT-6 not adopted.
+- **L1, L2, L4:** accepted, unchanged (L4 narrower).

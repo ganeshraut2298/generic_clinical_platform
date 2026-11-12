@@ -454,6 +454,8 @@ class BootstrapEndpointTest {
         assertThat(response.getContentAsByteArray()).isEmpty();
         assertThat(response.getContentType()).isNull();
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getHeader("Pragma")).isEqualTo("no-cache");
+        assertThat(response.getHeader("X-Content-Type-Options")).isNull();
         assertThat(loggedText()).contains("BootstrapExceptions.Failed").doesNotContain(EMAIL).doesNotContain(PIN)
                 .doesNotContain(PASSWORD);
     }
@@ -487,6 +489,7 @@ class BootstrapEndpointTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().string("Pragma", "no-cache"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().doesNotExist("Content-Type"))
                 .andExpect(header().doesNotExist("Location"))
                 .andExpect(content().bytes(new byte[0]))
@@ -604,7 +607,31 @@ class BootstrapEndpointTest {
         MockHttpServletResponse response = perform(register());
         assertThat(response.getStatus()).isEqualTo(500);
         assertThat(response.getContentAsByteArray()).isEmpty();
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getHeader("Pragma")).isEqualTo("no-cache");
+        assertThat(response.getHeader("X-Content-Type-Options")).isNull();
         assertThat(loggedText()).doesNotContain(PASSWORD).doesNotContain(EMAIL);
+    }
+
+    @Test
+    void aRegisterWhoseCommitFailsAfterCreatedIsABodylessFiveHundredWithNoNosniffAndNothingOfTheRequestLogged()
+            throws Exception {
+        when(service.register(any(), any(), any(), any())).thenThrow(
+                new org.springframework.transaction.TransactionSystemException(
+                        "commit failed " + EMAIL + " " + PASSWORD + " " + TICKET + " " + BINDING));
+
+        MockHttpServletResponse response = perform(register());
+
+        assertThat(response.getStatus()).isEqualTo(500);
+        assertThat(response.getContentAsByteArray()).isEmpty();
+        assertThat(response.getContentType()).isNull();
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getHeader("Pragma")).isEqualTo("no-cache");
+        assertThat(response.getHeader("X-Content-Type-Options")).isNull();
+        assertThat(response.getHeader("Location")).isNull();
+        assertThat(loggedText()).contains("BootstrapExceptions.Failed").doesNotContain("admin created")
+                .doesNotContain(EMAIL).doesNotContain(PASSWORD).doesNotContain(TICKET).doesNotContain(BINDING)
+                .doesNotContain("First admin").doesNotContain("commit failed");
     }
 
     // ================================================================== reach (K1 to K6) at the filter

@@ -72,7 +72,7 @@ final class BootstrapSupport {
      * Start (Flyway on, so the dev-tools callback runs) once if the bootstrap objects are not there yet, then require them.
      *
      * <p>Skip or fail (code review findings 2 and 3, ADR-018 Revision 3): only the three HUMAN prerequisites skip (role
-     * {@code sahaj_admin_definer}, the admin tables, {@code admin_preauth_create}); the canary
+     * {@code sahaj_admin_definer}, the admin tables, {@code admin_preauth_create}: the ordering guard and the owner's first sign-in, ADR-018 Revision 5); the canary
      * {@code BootstrapPrerequisitesCanaryIT} fails the build for them when {@code -Dsahaj.bootstrap.requireDb=true}. A stray admin row
      * fails. After the start attempt the objects MUST exist: a callback that did not create them is a failure, never a skip.
      */

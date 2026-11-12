@@ -95,3 +95,38 @@ Database ITs match the Revision 3 shapes; time travel stays inside the check con
 1. **Human:** create the role and activate the parked admin migrations; add the SAH-42 `stories` and `contract` lines, set ADR-018's status, answer H-BOOT-1..7; create `feature/SAH-42-admin-bootstrap` from `main` with SAH-42 paths only (`target-devtools` out and ignored); put the `requireDb=true` run into the merge approval or the gate.
 2. **QA:** run that command; read the Flyway error first on failure; confirm the first-run watch list plus N4 and N9.
 3. **Re-review** the SAH-42-only diff and the first-run results.
+
+
+---
+
+# Re-check of ADR-018 Revision 5 (register 201 without body or token) · 11 Nov 2026
+
+Reviewer: code-reviewer, read-only (no Maven, Playwright, build or database).
+
+**Verdict: APPROVE WITH COMMENTS.** No Blocker or Major. Backend, contract and page agree on the bodyless 201.
+**The database half and the `/admin/register` page have never run against a real backend.** BootstrapRegisterIT, BootstrapLogsIT, BootstrapFunctionsIT, BootstrapUnlockIT and BootstrapBodiesIT skip at class level (role `sahaj_admin_definer` and admin tables missing in `sahaj_test`); judged on paper. The page e2e answers the API with `page.route`.
+
+## Checked and sound
+- **Backend:** `BootstrapController.java:147-153` 201 with Cache-Control no-store, Pragma no-cache, nosniff, no body, no Content-Type, no Location; cookie cleared at `:148`. No `admin_preauth_create` call and no `BootstrapRegistered` left in the bootstrap code; imports used. `BootstrapService.java:305-316` last DB step is `repository.register(...)`; `@Transactional` (`:270`) so only the commit follows; the "admin created" log is in the controller after the commit; a failed commit leaves as `TransactionSystemException`, wrapped in `Failed(sqlState)` and answered by the 500 handler (`:221-227`: reset, no-store, Pragma, no nosniff, no body). Empty 404 is `AdminDevNotFound`, no-store only. Comments correct.
+- **Contract and documents:** `admin.yaml` 0.5.0 201 (`:564-576`) no content with the four headers, 500 `BootstrapServerError` (`:731-739`), 404 `BootstrapNotFound`; `BootstrapRegistered` gone (withdrawal note `:23`). ADR-018 Revision 5 consistent; stories, requirements, `docs/database/SAH-42.md` and runbooks never say the 201 returns a token.
+- **Page:** `register(): Observable<void>`; `created()` (`admin-register.page.ts:257-264`) drops everything and navigates to `/admin/sign-in`; unit specs flush `null`/201; e2e asserts status 201, body length 0, no content-type, no `/admin/auth` call, empty sign-in card.
+- **Tests on paper:** BootstrapRegisterIT 201 test (`:122-152`) asserts empty body, headers incl. nosniff (`:136`), cleared cookie, zero pre-auth rows (`:151`); enrolment flow (`:252`) login → ENROL → enrol → verify → login → TOTP. BootstrapLogsIT token from `/auth/login`. Unit tests prove order (`BootstrapServiceTest.java:880-893`), failed commit after CREATED (`:933-943`), through the proxy (`BootstrapTransactionProxyTest.java:381-394`), bodyless 201 (`BootstrapEndpointTest.java:482-503`).
+
+## Findings
+| # | Severity | File:line | Finding | Owner | Tech lead decision |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Minor | `BootstrapEndpointTest.java:482-503, 447-460, 596-607` | No running test asserts nosniff on the register 201 (ADR-018:423 says this unit test must); the 500 tests assert only Cache-Control, so Pragma on the 500 and the absence of nosniff are unproven; the register commit-failure path is not driven through MockMvc | java-developer | FIX now |
+| 2 | Minor | `docs/decisions/DEC-034/035` | The human's Revision 5 answer is recorded only in ADR-018:14 | tech lead | FIX now (DEC-035 addendum) |
+| 3 | Minor | `docs/database/SAH-42.md:219`, ADR-018:430, `BootstrapFunctionsIT.java:613-627` | S14 row and ADR say S14 "keeps" that `admin_preauth_create(..., 'ENROL', ...)` works; the test only calls `admin_login_lookup` | qa-engineer, db-engineer | FIX now (reword to "lookup only; issue proven by the register IT") |
+| 4 | Minor (open) | `admin-register.page.spec.ts:268` | Stale title "normal page not found" | angular-developer | FIX now |
+| 5 | Nit | ADR-018:13 | Revision 4 still says the server returns the ENROL token; add "(superseded by Revision 5)" | solution-architect | FIX now |
+| 6 | Nit | `admin.yaml` 401/423/429 headers (~:604-607) | Header lists omit Pragma and nosniff the code sends (pre-existing) | solution-architect | FIX now (list them) |
+| 7 | Nit | `BootstrapRegisterIT.java:131-136` | Content-Length 0 not asserted by the server IT | qa-engineer | FIX with 3 |
+| 8 | Info | QA report | Unit count 3,767 → 3,766 not investigated (likely the deleted `BootstrapRegistered` toString test) | qa-engineer | Confirm once |
+
+Earlier items stay open and human-owned: mixed branch, gitignored e2e, `--browsers` flag in `validate frontend`, wording sign-off list, `replaceUrl` and OQ-42-16, M-4/M-5, C1, `target-devtools` tracked in git (L3), prerequisites P1/P2.
+
+## Conditions before merge
+1. Human creates role and admin tables in `sahaj_test`; Bootstrap ITs run with `-Dsahaj.bootstrap.requireDb=true`, 0 failed, 0 skipped (first real run of the Revision 5 server tests).
+2. C1, M-4, M-5: the page once against the real dev-tools backend at `http://localhost:4200`.
+3. Findings 1 to 4 fixed (small); 5 to 8 optional.

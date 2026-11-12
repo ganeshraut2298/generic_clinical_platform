@@ -24,7 +24,8 @@ import java.util.UUID;
  * <ol>
  *   <li>the human prerequisites of DEC-016: role {@code sahaj_admin_definer} and the six admin tables ({@link SampleAdminDb});
  *   <li>{@code platform.admin_preauth_create(uuid,text,text,text,inet)} from the parked migration {@code V2026_11_15_1010}
- *       (the callback's pre-flight needs it);
+ *       (the callback's pre-flight needs it as the ordering guard, and the owner's first sign-in needs it; the register call
+ *       itself no longer calls it, ADR-018 Revision 5);
  *   <li>the bootstrap table and the five functions, which only the dev-tools callback creates, on the first start of a
  *       {@code -Pdev-tools} build with the switch on and Flyway on.
  * </ol>
@@ -39,7 +40,8 @@ import java.util.UUID;
 public final class BootstrapDb {
 
     public static final String NO_PREAUTH = "function platform.admin_preauth_create(uuid,text,text,text,inet) does not exist: "
-            + "human prerequisite, activate the parked admin migrations V2026_11_15_1000 and V2026_11_15_1010 (DEC-016)";
+            + "human prerequisite, activate the parked admin migrations V2026_11_15_1000 and V2026_11_15_1010 (DEC-016); "
+            + "needed as the ordering guard and by the owner's first sign-in (register no longer calls it, ADR-018 Revision 5)";
     public static final String NO_OBJECTS = "the bootstrap table and the five platform.admin_bootstrap_* functions do not exist in "
             + "sahaj_test: they are created by the dev-tools callback on the first start of a -Pdev-tools build with "
             + "SAHAJ_ADMIN_BOOTSTRAP_ENABLED=true and Flyway on, which needs the human prerequisites above";

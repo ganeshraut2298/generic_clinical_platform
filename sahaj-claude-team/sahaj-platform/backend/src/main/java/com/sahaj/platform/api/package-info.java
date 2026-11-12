@@ -14,6 +14,9 @@
  * and the staff PIN check {@code ipd} calls (SAH-31: {@link com.sahaj.platform.api.StaffPinPort},
  * {@link com.sahaj.platform.api.PinCheck}, {@link com.sahaj.platform.api.StaffPinException}; SAH-32:
  * {@link com.sahaj.platform.api.ColleaguePinCheck}),
+ * and the clinic's specialty code that {@code opd} reads for the EMR template choice (SAH-43:
+ * {@link com.sahaj.platform.api.ClinicSpecialtyPort}; the doctor details come through
+ * {@link com.sahaj.platform.api.TeamMemberPort#doctorDetails}),
  * so that dependencies between modules run one way only.
  *
  * <p>{@link org.springframework.modulith.NamedInterface} is what makes Spring Modulith actually

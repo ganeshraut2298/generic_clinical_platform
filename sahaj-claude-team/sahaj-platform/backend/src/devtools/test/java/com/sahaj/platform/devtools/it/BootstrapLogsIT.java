@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
  *   <li>the lock is logged ONCE per lock, at WARN, after the commit of the 5th wrong PIN, with the end time (ISO 8601 UTC, the
  *       value of the audit row) and the request id; a refusal during a lock writes no line (a local loop must not fill the log);
  *   <li>the allowed lines carry no value: wrong PIN "(n of 5)", "admin created adminId=...";
- *   <li>no PIN (right or wrong), hash, ticket, binding, password, e-mail, name, pre-auth token, signing secret or authenticator
+ *   <li>no PIN (right or wrong), hash, ticket, binding, password, e-mail, name, pre-auth token (now from the first sign-in, not from the 201), signing secret or authenticator
  *       text appears anywhere in the logs of a whole run, and no audit row holds any of them.
  * </ul>
  *
@@ -122,7 +122,13 @@ class BootstrapLogsIT extends BootstrapHttpBase {
             BootstrapSupport.register(run, ticket, NAME, email, "short");
             RawHttp.Response created = BootstrapSupport.register(run, ticket, NAME, email, PASSWORD);
             assertThat(created.status()).isEqualTo(201);
-            preAuth = json(created).get("preAuthToken").asText();
+            assertThat(created.body()).as("ADR-018 Revision 5: the 201 has no body, so no token").isEmpty();
+            // The pre-auth token now comes from the owner's first sign-in (the page's fallback), not from the 201.
+            RawHttp.Response login = run.post("/api/v1/admin/auth/login")
+                    .json("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}").send();
+            assertThat(login.status()).isEqualTo(200);
+            assertThat(json(login).get("next").asText()).isEqualTo("ENROL");
+            preAuth = json(login).get("preAuthToken").asText();
             RawHttp.Response enrol = run.post("/api/v1/admin/auth/totp/enrol").json("{\"preAuthToken\":\"" + preAuth + "\"}").send();
             assertThat(enrol.status()).isEqualTo(200);
             String secretKey = json(enrol).get("secretKey").asText();

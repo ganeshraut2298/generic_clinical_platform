@@ -265,7 +265,7 @@ describe('AdminRegisterPage', () => {
       expect(heldAnywhere(PIN)).toBe(false);
     });
 
-    it('shows the normal page not found when the server answers the empty 404, replacing the history entry (SAH-42-1 criterion 11)', async () => {
+    it('goes to what the app shows for an unknown address (the home page) when the server answers the empty 404, replacing the history entry (SAH-42-1 criterion 11)', async () => {
       await open();
       await enterPin();
       http.expectOne(UNLOCK).flush(null, { status: 404, statusText: 'Not Found' });

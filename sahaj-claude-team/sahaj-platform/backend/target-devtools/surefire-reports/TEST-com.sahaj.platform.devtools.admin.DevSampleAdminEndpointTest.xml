@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="11.627" tests="19" errors="0" skipped="0" failures="0" flakes="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="11.619" tests="19" errors="0" skipped="0" failures="0" flakes="0">
   <properties>
     <property name="java.specification.version" value="17"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -17,7 +17,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="US"/>
     <property name="sun.boot.library.path" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin"/>
-    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914\surefirebooter-20261111124638916_3.jar C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914 2026-11-11T12-46-38_572-jvmRun1 surefire-20261111124638916_1tmp surefire_0-20261111124638916_2tmp"/>
+    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire11600605898665760377\surefirebooter-20261111184402121_3.jar C:\Users\Hp\AppData\Local\Temp\surefire11600605898665760377 2026-11-11T18-44-01_850-jvmRun1 surefire-20261111184402121_1tmp surefire_0-20261111184402121_2tmp"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\test-classes;D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\classes;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter\3.5.16\spring-boot-starter-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot\3.5.16\spring-boot-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-context\6.2.19\spring-context-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\3.5.16\spring-boot-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-logging\3.5.16\spring-boot-starter-logging-3.5.16.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-classic\1.5.34\logback-classic-1.5.34.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-core\1.5.34\logback-core-1.5.34.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.24.3\log4j-to-slf4j-2.24.3.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-api\2.24.3\log4j-api-2.24.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\jul-to-slf4j\2.0.18\jul-to-slf4j-2.0.18.jar;C:\Users\Hp\.m2\repository\jakarta\annotation\jakarta.annotation-api\2.1.1\jakarta.annotation-api-2.1.1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-core\6.2.19\spring-core-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jcl\6.2.19\spring-jcl-6.2.19.jar;C:\Users\Hp\.m2\repository\org\yaml\snakeyaml\2.4\snakeyaml-2.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-web\3.5.16\spring-boot-starter-web-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-json\3.5.16\spring-boot-starter-json-3.5.16.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.21.4\jackson-datatype-jdk8-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.21.4\jackson-module-parameter-names-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\3.5.16\spring-boot-starter-tomcat-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\10.1.55\tomcat-embed-core-10.1.55.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\10.1.55\tomcat-embed-websocket-10.1.55.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-web\6.2.19\spring-web-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-beans\6.2.19\spring-beans-6.2.19.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-observation\1.15.12\micrometer-observation-1.15.12.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-commons\1.15.12\micrometer-commons-1.15.12.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-webmvc\6.2.19\spring-webmvc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-expression\6.2.19\spring-expression-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-security\3.5.16\spring-boot-starter-security-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-aop\6.2.19\spring-aop-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-config\6.5.11\spring-security-config-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-web\6.5.11\spring-security-web-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-validation\3.5.16\spring-boot-starter-validation-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\10.1.55\tomcat-embed-el-10.1.55.jar;C:\Users\Hp\.m2\repository\org\hibernate\validator\hibernate-validator\8.0.3.Final\hibernate-validator-8.0.3.Final.jar;C:\Users\Hp\.m2\repository\jakarta\validation\jakarta.validation-api\3.0.2\jakarta.validation-api-3.0.2.jar;C:\Users\Hp\.m2\repository\org\jboss\logging\jboss-logging\3.6.3.Final\jboss-logging-3.6.3.Final.jar;C:\Users\Hp\.m2\repository\com\fasterxml\classmate\1.7.3\classmate-1.7.3.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-jdbc\3.5.16\spring-boot-starter-jdbc-3.5.16.jar;C:\Users\Hp\.m2\repository\com\zaxxer\HikariCP\6.3.3\HikariCP-6.3.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\slf4j-api\2.0.18\slf4j-api-2.0.18.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jdbc\6.2.19\spring-jdbc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-tx\6.2.19\spring-tx-6.2.19.jar;C:\Users\Hp\.m2\repository\org\postgresql\postgresql\42.7.11\postgresql-42.7.11.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-core\11.7.2\flyway-core-11.7.2.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-toml\2.21.4\jackson-dataformat-toml-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.21.4\jackson-core-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.21.4\jackson-datatype-jsr310-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.21\jackson-annotations-2.21.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-database-postgresql\11.7.2\flyway-database-postgresql-11.7.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-core\1.4.14\spring-modulith-starter-core-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-api\1.4.14\spring-modulith-api-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-core\1.4.14\spring-modulith-core-1.4.14.jar;C:\Users\Hp\.m2\repository\com\tngtech\archunit\archunit\1.4.2\archunit-1.4.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-moments\1.4.14\spring-modulith-moments-1.4.14.jar;C:\Users\Hp\.m2\repository\org\jmolecules\jmolecules-events\1.10.0\jmolecules-events-1.10.0.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-api\0.12.6\jjwt-api-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-impl\0.12.6\jjwt-impl-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-jackson\0.12.6\jjwt-jackson-0.12.6.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.21.4\jackson-databind-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-test\3.5.16\spring-boot-starter-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test\3.5.16\spring-boot-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test-autoconfigure\3.5.16\spring-boot-test-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\com\jayway\jsonpath\json-path\2.9.0\json-path-2.9.0.jar;C:\Users\Hp\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\4.0.5\jakarta.xml.bind-api-4.0.5.jar;C:\Users\Hp\.m2\repository\jakarta\activation\jakarta.activation-api\2.1.4\jakarta.activation-api-2.1.4.jar;C:\Users\Hp\.m2\repository\net\minidev\json-smart\2.5.2\json-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\net\minidev\accessors-smart\2.5.2\accessors-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\org\ow2\asm\asm\9.7.1\asm-9.7.1.jar;C:\Users\Hp\.m2\repository\org\assertj\assertj-core\3.27.7\assertj-core-3.27.7.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy\1.17.8\byte-buddy-1.17.8.jar;C:\Users\Hp\.m2\repository\org\awaitility\awaitility\4.2.2\awaitility-4.2.2.jar;C:\Users\Hp\.m2\repository\org\hamcrest\hamcrest\3.0\hamcrest-3.0.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter\5.12.2\junit-jupiter-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.12.2\junit-jupiter-api-5.12.2.jar;C:\Users\Hp\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-commons\1.12.2\junit-platform-commons-1.12.2.jar;C:\Users\Hp\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.12.2\junit-jupiter-params-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.12.2\junit-jupiter-engine-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-engine\1.12.2\junit-platform-engine-1.12.2.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy-agent\1.17.8\byte-buddy-agent-1.17.8.jar;C:\Users\Hp\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-junit-jupiter\5.17.0\mockito-junit-jupiter-5.17.0.jar;C:\Users\Hp\.m2\repository\org\skyscreamer\jsonassert\1.5.3\jsonassert-1.5.3.jar;C:\Users\Hp\.m2\repository\com\vaadin\external\google\android-json\0.0.20131108.vaadin1\android-json-0.0.20131108.vaadin1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-test\6.2.19\spring-test-6.2.19.jar;C:\Users\Hp\.m2\repository\org\xmlunit\xmlunit-core\2.10.4\xmlunit-core-2.10.4.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-test\6.5.11\spring-security-test-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-core\6.5.11\spring-security-core-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-crypto\6.5.11\spring-security-crypto-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-test\1.4.14\spring-modulith-starter-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-test\1.4.14\spring-modulith-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-docs\1.4.14\spring-modulith-docs-1.4.14.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-core\3.1.0\structurizr-core-3.1.0.jar;C:\Users\Hp\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-export\3.1.0\structurizr-export-3.1.0.jar;"/>
     <property name="sun.cpu.endian" value="little"/>
@@ -34,7 +34,7 @@
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="FILE_LOG_CHARSET" value="windows-1252"/>
     <property name="java.awt.headless" value="true"/>
-    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914\surefirebooter-20261111124638916_3.jar"/>
+    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire11600605898665760377\surefirebooter-20261111184402121_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="java.runtime.version" value="17.0.21.0.2+1-LTS"/>
@@ -53,7 +53,7 @@
     <property name="user.dir" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
-    <property name="PID" value="16448"/>
+    <property name="PID" value="24504"/>
     <property name="sun.os.patch.level" value=""/>
     <property name="CONSOLE_LOG_CHARSET" value="windows-1252"/>
     <property name="native.encoding" value="Cp1252"/>
@@ -68,8 +68,8 @@
     <property name="sahaj.devtools" value="true"/>
     <property name="LOGGED_APPLICATION_NAME" value="[sahaj-backend] "/>
   </properties>
-  <testcase name="theNonceIsNeverInAResponseOrALogLine" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.026">
-    <system-out><![CDATA[2026-11-11 12:48:24.045  INFO [requestId=,tenantId=] o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.sahaj.SahajApplication for test class com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest
+  <testcase name="theNonceIsNeverInAResponseOrALogLine" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.025">
+    <system-out><![CDATA[2026-11-11 18:45:28.936  INFO [requestId=,tenantId=] o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.sahaj.SahajApplication for test class com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -80,22 +80,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:24.070  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:24.070  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:25.064  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:25.064  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:25.065  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:25.075  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 1.026 seconds (process running for 105.966)
-2026-11-11 12:48:25.082 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5192, missCount = 27, failureCount = 0]
-2026-11-11 12:48:25.087 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:25.088 DEBUG [requestId=11e4b389-5266-4dfc-b97d-b5514f17c07f,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:25.089 DEBUG [requestId=11e4b389-5266-4dfc-b97d-b5514f17c07f,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:25.089 DEBUG [requestId=11e4b389-5266-4dfc-b97d-b5514f17c07f,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:25.094 DEBUG [requestId=11e4b389-5266-4dfc-b97d-b5514f17c07f,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:25.099 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5193, missCount = 27, failureCount = 0]
+2026-11-11 18:45:28.964  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:28.964  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:29.955  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:29.955  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:29.955  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:29.964  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 1.025 seconds (process running for 87.696)
+2026-11-11 18:45:29.971 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5192, missCount = 27, failureCount = 0]
+2026-11-11 18:45:29.976 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:29.979 DEBUG [requestId=bdf5d6bb-1343-42f1-9066-cf75474608b1,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:29.979 DEBUG [requestId=bdf5d6bb-1343-42f1-9066-cf75474608b1,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:29.979 DEBUG [requestId=bdf5d6bb-1343-42f1-9066-cf75474608b1,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:29.984 DEBUG [requestId=bdf5d6bb-1343-42f1-9066-cf75474608b1,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:29.987 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5193, missCount = 27, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="theHappyPathReturnsTheContractBodyOnceWithNoStoreHeaders" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.019">
+  <testcase name="theHappyPathReturnsTheContractBodyOnceWithNoStoreHeaders" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.014">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -106,37 +106,37 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:25.165  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:25.166  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:26.239  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:26.239  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:26.240  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:26.251  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 1.145 seconds (process running for 107.142)
-2026-11-11 12:48:26.255 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5206, missCount = 28, failureCount = 0]
-2026-11-11 12:48:26.257 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:26.257 DEBUG [requestId=1a95ca83-1e69-43cd-ac93-18904ea7eb5b,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:26.257 DEBUG [requestId=1a95ca83-1e69-43cd-ac93-18904ea7eb5b,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:26.257 DEBUG [requestId=1a95ca83-1e69-43cd-ac93-18904ea7eb5b,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:26.260 DEBUG [requestId=1a95ca83-1e69-43cd-ac93-18904ea7eb5b,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:26.264 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['adminId']
-2026-11-11 12:48:26.264 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['email']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['fullName']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['password']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['secretKey']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['otpauthUri']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['accountName']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['issuer']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['digits']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['periodSeconds']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['algorithm']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['totpEnrolled']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['totpDevBypassOn']
-2026-11-11 12:48:26.265 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['signInPath']
-2026-11-11 12:48:26.266 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $.length()
-2026-11-11 12:48:26.266 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5207, missCount = 28, failureCount = 0]
+2026-11-11 18:45:30.020  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:30.020  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:30.758  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:30.758  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:30.758  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:30.769  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.776 seconds (process running for 88.501)
+2026-11-11 18:45:30.774 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5206, missCount = 28, failureCount = 0]
+2026-11-11 18:45:30.775 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:30.775 DEBUG [requestId=3b799a0d-e9ab-432a-927e-f224e2ce5eb3,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:30.776 DEBUG [requestId=3b799a0d-e9ab-432a-927e-f224e2ce5eb3,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:30.776 DEBUG [requestId=3b799a0d-e9ab-432a-927e-f224e2ce5eb3,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:30.778 DEBUG [requestId=3b799a0d-e9ab-432a-927e-f224e2ce5eb3,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['adminId']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['email']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['fullName']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['password']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['secretKey']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['otpauthUri']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['accountName']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['issuer']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['digits']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['periodSeconds']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['algorithm']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['totpEnrolled']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['totpDevBypassOn']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['signInPath']
+2026-11-11 18:45:30.781 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $.length()
+2026-11-11 18:45:30.782 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5207, missCount = 28, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="aFailureThatIsAlreadyOurWrapperIsAnsweredAsIs" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
+  <testcase name="aFailureThatIsAlreadyOurWrapperIsAnsweredAsIs" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.01">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -147,23 +147,23 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:26.303  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:26.303  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:27.196  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:27.196  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:27.197  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:27.203  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.929 seconds (process running for 108.095)
-2026-11-11 12:48:27.206 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5220, missCount = 29, failureCount = 0]
-2026-11-11 12:48:27.207 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:27.207 DEBUG [requestId=8022a859-150c-4eea-b058-966480de3f07,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:27.207 DEBUG [requestId=8022a859-150c-4eea-b058-966480de3f07,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:27.208 DEBUG [requestId=8022a859-150c-4eea-b058-966480de3f07,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:27.209 ERROR [requestId=8022a859-150c-4eea-b058-966480de3f07,tenantId=] c.s.p.d.a.DevSampleAdminController - The sample admin could not be created (DevSampleAdminFailedException[sqlState=08006])
-2026-11-11 12:48:27.209 DEBUG [requestId=8022a859-150c-4eea-b058-966480de3f07,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 500 INTERNAL_SERVER_ERROR
-2026-11-11 12:48:27.210 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5221, missCount = 29, failureCount = 0]
+2026-11-11 18:45:30.808  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:30.808  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:31.518  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:31.518  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:31.519  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:31.527  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.739 seconds (process running for 89.258)
+2026-11-11 18:45:31.532 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5220, missCount = 29, failureCount = 0]
+2026-11-11 18:45:31.534 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:31.534 DEBUG [requestId=6f3f3ae0-bc21-4b3c-95d4-fd322b3ae56c,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:31.534 DEBUG [requestId=6f3f3ae0-bc21-4b3c-95d4-fd322b3ae56c,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:31.534 DEBUG [requestId=6f3f3ae0-bc21-4b3c-95d4-fd322b3ae56c,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:31.536 ERROR [requestId=6f3f3ae0-bc21-4b3c-95d4-fd322b3ae56c,tenantId=] c.s.p.d.a.DevSampleAdminController - The sample admin could not be created (DevSampleAdminFailedException[sqlState=08006])
+2026-11-11 18:45:31.536 DEBUG [requestId=6f3f3ae0-bc21-4b3c-95d4-fd322b3ae56c,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 500 INTERNAL_SERVER_ERROR
+2026-11-11 18:45:31.537 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5221, missCount = 29, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="theSuccessfulCallLogsNoSecret" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.011">
+  <testcase name="theSuccessfulCallLogsNoSecret" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -174,22 +174,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:27.230  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:27.230  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:27.842  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:27.842  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:27.842  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:27.851  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.637 seconds (process running for 108.742)
-2026-11-11 12:48:27.854 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5234, missCount = 30, failureCount = 0]
-2026-11-11 12:48:27.855 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:27.855 DEBUG [requestId=bad1ceb0-a082-4ad2-86d1-63a56a43d18b,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:27.855 DEBUG [requestId=bad1ceb0-a082-4ad2-86d1-63a56a43d18b,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:27.855 DEBUG [requestId=bad1ceb0-a082-4ad2-86d1-63a56a43d18b,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:27.859 DEBUG [requestId=bad1ceb0-a082-4ad2-86d1-63a56a43d18b,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:27.860 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5235, missCount = 30, failureCount = 0]
+2026-11-11 18:45:31.566  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:31.566  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:32.184  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:32.184  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:32.185  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:32.191  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.65 seconds (process running for 89.922)
+2026-11-11 18:45:32.195 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5234, missCount = 30, failureCount = 0]
+2026-11-11 18:45:32.196 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:32.196 DEBUG [requestId=d68b5223-53f2-4bc5-b492-89d527cd1fd9,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:32.196 DEBUG [requestId=d68b5223-53f2-4bc5-b492-89d527cd1fd9,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:32.196 DEBUG [requestId=d68b5223-53f2-4bc5-b492-89d527cd1fd9,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:32.198 DEBUG [requestId=d68b5223-53f2-4bc5-b492-89d527cd1fd9,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:32.199 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5235, missCount = 30, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="fiftyWrongNonceCallsAreNotCountedAndTheCorrectOneThenAnswers201" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.018">
+  <testcase name="fiftyWrongNonceCallsAreNotCountedAndTheCorrectOneThenAnswers201" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.024">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -200,19 +200,19 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:27.883  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:27.884  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:28.409  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:28.409  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:28.409  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:28.415  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.549 seconds (process running for 109.307)
-2026-11-11 12:48:28.419 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5248, missCount = 31, failureCount = 0]
-2026-11-11 12:48:28.430 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:28.431 DEBUG [requestId=f896e6b3-c55b-410f-9810-2caebc7c0fc6,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:28.431 DEBUG [requestId=f896e6b3-c55b-410f-9810-2caebc7c0fc6,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:28.431 DEBUG [requestId=f896e6b3-c55b-410f-9810-2caebc7c0fc6,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:28.433 DEBUG [requestId=f896e6b3-c55b-410f-9810-2caebc7c0fc6,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:28.433 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5249, missCount = 31, failureCount = 0]
+2026-11-11 18:45:32.220  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:32.221  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:32.769  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:32.769  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:32.770  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:32.779  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.575 seconds (process running for 90.511)
+2026-11-11 18:45:32.784 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5248, missCount = 31, failureCount = 0]
+2026-11-11 18:45:32.800 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:32.800 DEBUG [requestId=770a74f9-4b0b-453f-ada7-7474c9f937ae,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:32.800 DEBUG [requestId=770a74f9-4b0b-453f-ada7-7474c9f937ae,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:32.800 DEBUG [requestId=770a74f9-4b0b-453f-ada7-7474c9f937ae,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:32.803 DEBUG [requestId=770a74f9-4b0b-453f-ada7-7474c9f937ae,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:32.803 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5249, missCount = 31, failureCount = 0]
 ]]></system-out>
   </testcase>
   <testcase name="aFailureWithTheFailingRowInItsMessageAndCauseReachesSpringsResolversAsAMessageFreeCauseLessException" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.006">
@@ -226,23 +226,23 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:28.459  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:28.459  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:29.000  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:29.000  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:29.000  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:29.006  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.568 seconds (process running for 109.898)
-2026-11-11 12:48:29.008 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5262, missCount = 32, failureCount = 0]
-2026-11-11 12:48:29.009 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:29.009 DEBUG [requestId=f7a20879-e7f3-4159-a2ee-8431ede81753,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:29.009 DEBUG [requestId=f7a20879-e7f3-4159-a2ee-8431ede81753,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:29.009 DEBUG [requestId=f7a20879-e7f3-4159-a2ee-8431ede81753,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:29.010 ERROR [requestId=f7a20879-e7f3-4159-a2ee-8431ede81753,tenantId=] c.s.p.d.a.DevSampleAdminController - The sample admin could not be created (DevSampleAdminFailedException[sqlState=23514])
-2026-11-11 12:48:29.010 DEBUG [requestId=f7a20879-e7f3-4159-a2ee-8431ede81753,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 500 INTERNAL_SERVER_ERROR
-2026-11-11 12:48:29.011 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5263, missCount = 32, failureCount = 0]
+2026-11-11 18:45:32.828  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:32.829  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:33.372  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:33.372  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:33.372  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:33.378  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.571 seconds (process running for 91.109)
+2026-11-11 18:45:33.381 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5262, missCount = 32, failureCount = 0]
+2026-11-11 18:45:33.382 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:33.382 DEBUG [requestId=f38e15e8-4c20-44d3-ae23-b58382c3b15b,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:33.382 DEBUG [requestId=f38e15e8-4c20-44d3-ae23-b58382c3b15b,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:33.382 DEBUG [requestId=f38e15e8-4c20-44d3-ae23-b58382c3b15b,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:33.383 ERROR [requestId=f38e15e8-4c20-44d3-ae23-b58382c3b15b,tenantId=] c.s.p.d.a.DevSampleAdminController - The sample admin could not be created (DevSampleAdminFailedException[sqlState=23514])
+2026-11-11 18:45:33.383 DEBUG [requestId=f38e15e8-4c20-44d3-ae23-b58382c3b15b,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 500 INTERNAL_SERVER_ERROR
+2026-11-11 18:45:33.384 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5263, missCount = 32, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="aMissingEmptyMalformedOrWrongNonceIsTheSame404AsEveryOtherRefusalAndNeverReachesTheService" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.007">
+  <testcase name="aMissingEmptyMalformedOrWrongNonceIsTheSame404AsEveryOtherRefusalAndNeverReachesTheService" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.009">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -253,17 +253,17 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:29.028  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:29.028  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:29.515  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:29.515  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:29.515  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:29.520  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.506 seconds (process running for 110.412)
-2026-11-11 12:48:29.522 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5276, missCount = 33, failureCount = 0]
-2026-11-11 12:48:29.526 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5277, missCount = 33, failureCount = 0]
+2026-11-11 18:45:33.403  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:33.403  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:33.907  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:33.907  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:33.907  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:33.914  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.526 seconds (process running for 91.645)
+2026-11-11 18:45:33.917 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5276, missCount = 33, failureCount = 0]
+2026-11-11 18:45:33.922 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5277, missCount = 33, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="anyOtherFailureIsABodylessFiveHundredThatLogsTheTypeOnly" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.005">
+  <testcase name="anyOtherFailureIsABodylessFiveHundredThatLogsTheTypeOnly" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -274,23 +274,23 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:29.548  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:29.548  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:29.996  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:29.996  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:29.996  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:30.001  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.471 seconds (process running for 110.892)
-2026-11-11 12:48:30.004 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5290, missCount = 34, failureCount = 0]
-2026-11-11 12:48:30.004 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:30.005 DEBUG [requestId=e7c23553-7cc6-4779-a7b3-649730a649da,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:30.005 DEBUG [requestId=e7c23553-7cc6-4779-a7b3-649730a649da,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:30.005 DEBUG [requestId=e7c23553-7cc6-4779-a7b3-649730a649da,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:30.006 ERROR [requestId=e7c23553-7cc6-4779-a7b3-649730a649da,tenantId=] c.s.p.d.a.DevSampleAdminController - The sample admin could not be created (DevSampleAdminFailedException[sqlState=none])
-2026-11-11 12:48:30.006 DEBUG [requestId=e7c23553-7cc6-4779-a7b3-649730a649da,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 500 INTERNAL_SERVER_ERROR
-2026-11-11 12:48:30.006 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5291, missCount = 34, failureCount = 0]
+2026-11-11 18:45:33.943  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:33.943  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:34.599  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:34.599  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:34.600  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:34.613  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.687 seconds (process running for 92.344)
+2026-11-11 18:45:34.617 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5290, missCount = 34, failureCount = 0]
+2026-11-11 18:45:34.619 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:34.619 DEBUG [requestId=4c2b7e37-93c7-4697-8aae-ed065ac11dbd,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:34.619 DEBUG [requestId=4c2b7e37-93c7-4697-8aae-ed065ac11dbd,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:34.619 DEBUG [requestId=4c2b7e37-93c7-4697-8aae-ed065ac11dbd,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:34.620 ERROR [requestId=4c2b7e37-93c7-4697-8aae-ed065ac11dbd,tenantId=] c.s.p.d.a.DevSampleAdminController - The sample admin could not be created (DevSampleAdminFailedException[sqlState=none])
+2026-11-11 18:45:34.620 DEBUG [requestId=4c2b7e37-93c7-4697-8aae-ed065ac11dbd,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 500 INTERNAL_SERVER_ERROR
+2026-11-11 18:45:34.620 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5291, missCount = 34, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="aWhitespacePaddedNonceIsNotTrimmedByTheGate" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.007">
+  <testcase name="aWhitespacePaddedNonceIsNotTrimmedByTheGate" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.005">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -301,17 +301,17 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:30.022  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:30.022  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:30.462  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:30.462  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:30.462  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:30.468  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.459 seconds (process running for 111.359)
-2026-11-11 12:48:30.472 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5304, missCount = 35, failureCount = 0]
-2026-11-11 12:48:30.474 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5305, missCount = 35, failureCount = 0]
+2026-11-11 18:45:34.647  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:34.647  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:35.169  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:35.169  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:35.170  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:35.176  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.548 seconds (process running for 92.907)
+2026-11-11 18:45:35.179 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5304, missCount = 35, failureCount = 0]
+2026-11-11 18:45:35.180 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5305, missCount = 35, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="everyRefusedCallerAnswersTheSame404AndNeverReachesTheService" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.013">
+  <testcase name="everyRefusedCallerAnswersTheSame404AndNeverReachesTheService" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.009">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -322,17 +322,17 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:30.495  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:30.495  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:30.963  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:30.963  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:30.963  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:30.970  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.491 seconds (process running for 111.862)
-2026-11-11 12:48:30.973 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5318, missCount = 36, failureCount = 0]
-2026-11-11 12:48:30.982 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5319, missCount = 36, failureCount = 0]
+2026-11-11 18:45:35.197  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:35.197  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:35.673  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:35.673  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:35.674  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:35.679  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.496 seconds (process running for 93.41)
+2026-11-11 18:45:35.681 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5318, missCount = 36, failureCount = 0]
+2026-11-11 18:45:35.687 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5319, missCount = 36, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="aTokenOrCookieSentWithTheRequestIsIgnored" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.009">
+  <testcase name="aTokenOrCookieSentWithTheRequestIsIgnored" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -343,22 +343,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:30.999  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:30.999  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:31.469  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:31.469  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:31.470  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:31.476  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.491 seconds (process running for 112.368)
-2026-11-11 12:48:31.478 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5332, missCount = 37, failureCount = 0]
-2026-11-11 12:48:31.481 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:31.481 DEBUG [requestId=c0f63674-d204-4605-b898-8ac3ae88d30d,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:31.481 DEBUG [requestId=c0f63674-d204-4605-b898-8ac3ae88d30d,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:31.481 DEBUG [requestId=c0f63674-d204-4605-b898-8ac3ae88d30d,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:31.483 DEBUG [requestId=c0f63674-d204-4605-b898-8ac3ae88d30d,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:31.484 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5333, missCount = 37, failureCount = 0]
+2026-11-11 18:45:35.708  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:35.709  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:36.198  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:36.198  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:36.199  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:36.203  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.511 seconds (process running for 93.934)
+2026-11-11 18:45:36.205 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5332, missCount = 37, failureCount = 0]
+2026-11-11 18:45:36.208 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:36.208 DEBUG [requestId=f13d097a-52f6-415a-a4f3-cf5934b55f2b,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:36.208 DEBUG [requestId=f13d097a-52f6-415a-a4f3-cf5934b55f2b,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:36.208 DEBUG [requestId=f13d097a-52f6-415a-a4f3-cf5934b55f2b,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:36.210 DEBUG [requestId=f13d097a-52f6-415a-a4f3-cf5934b55f2b,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:36.210 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5333, missCount = 37, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="noRequestBodyIsReadAndTheServiceGetsTheRemoteAddressAndRequestId" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.006">
+  <testcase name="noRequestBodyIsReadAndTheServiceGetsTheRemoteAddressAndRequestId" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -369,22 +369,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:31.503  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:31.503  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:31.971  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:31.971  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:31.971  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:31.975  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.487 seconds (process running for 112.867)
-2026-11-11 12:48:31.978 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5346, missCount = 38, failureCount = 0]
-2026-11-11 12:48:31.978 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:31.979 DEBUG [requestId=c9acfeab-5eea-4ff0-8870-8cc4041ee59a,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:31.979 DEBUG [requestId=c9acfeab-5eea-4ff0-8870-8cc4041ee59a,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:31.979 DEBUG [requestId=c9acfeab-5eea-4ff0-8870-8cc4041ee59a,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:31.980 DEBUG [requestId=c9acfeab-5eea-4ff0-8870-8cc4041ee59a,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:31.981 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5347, missCount = 38, failureCount = 0]
+2026-11-11 18:45:36.225  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:36.225  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:36.696  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:36.696  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:36.696  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:36.701  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.488 seconds (process running for 94.432)
+2026-11-11 18:45:36.703 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5346, missCount = 38, failureCount = 0]
+2026-11-11 18:45:36.704 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:36.704 DEBUG [requestId=88e0fbee-6644-40a3-bbe3-6cb4609105d9,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:36.704 DEBUG [requestId=88e0fbee-6644-40a3-bbe3-6cb4609105d9,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:36.704 DEBUG [requestId=88e0fbee-6644-40a3-bbe3-6cb4609105d9,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:36.706 DEBUG [requestId=88e0fbee-6644-40a3-bbe3-6cb4609105d9,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:36.707 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5347, missCount = 38, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="ipv6LoopbackAndLocalhostHostWork" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.006">
+  <testcase name="ipv6LoopbackAndLocalhostHostWork" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -395,19 +395,19 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:31.996  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:31.996  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:32.436  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:32.436  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:32.436  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:32.442  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.458 seconds (process running for 113.333)
-2026-11-11 12:48:32.444 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5360, missCount = 39, failureCount = 0]
-2026-11-11 12:48:32.445 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:32.445 DEBUG [requestId=bcf172d3-de59-43cc-9c0b-ad834fb720a1,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:32.445 DEBUG [requestId=bcf172d3-de59-43cc-9c0b-ad834fb720a1,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:32.446 DEBUG [requestId=bcf172d3-de59-43cc-9c0b-ad834fb720a1,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:32.447 DEBUG [requestId=bcf172d3-de59-43cc-9c0b-ad834fb720a1,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:32.448 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5361, missCount = 39, failureCount = 0]
+2026-11-11 18:45:36.730  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:36.730  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:37.180  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:37.180  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:37.181  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:45:37.185  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.472 seconds (process running for 94.917)
+2026-11-11 18:45:37.188 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5360, missCount = 39, failureCount = 0]
+2026-11-11 18:45:37.190 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:37.190 DEBUG [requestId=954c7fb6-dec5-44fa-83fd-19a3c14b9eb2,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:37.190 DEBUG [requestId=954c7fb6-dec5-44fa-83fd-19a3c14b9eb2,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:37.190 DEBUG [requestId=954c7fb6-dec5-44fa-83fd-19a3c14b9eb2,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:37.192 DEBUG [requestId=954c7fb6-dec5-44fa-83fd-19a3c14b9eb2,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:37.192 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5361, missCount = 39, failureCount = 0]
 ]]></system-out>
   </testcase>
   <testcase name="theRightNonceAloneIsEnoughAfterTheOtherChecksPass" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.006">
@@ -421,22 +421,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:32.464  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:32.464  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:32.905  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:32.905  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:32.906  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:32.910  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.459 seconds (process running for 113.802)
-2026-11-11 12:48:32.912 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5374, missCount = 40, failureCount = 0]
-2026-11-11 12:48:32.913 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:32.913 DEBUG [requestId=5ee82fb3-50b1-4876-bfb0-2071cfed0434,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:32.913 DEBUG [requestId=5ee82fb3-50b1-4876-bfb0-2071cfed0434,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:32.913 DEBUG [requestId=5ee82fb3-50b1-4876-bfb0-2071cfed0434,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:32.915 DEBUG [requestId=5ee82fb3-50b1-4876-bfb0-2071cfed0434,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:32.915 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5375, missCount = 40, failureCount = 0]
+2026-11-11 18:45:37.209  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:37.209  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:37.704  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:37.704  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:37.704  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:37.710  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.514 seconds (process running for 95.441)
+2026-11-11 18:45:37.713 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5374, missCount = 40, failureCount = 0]
+2026-11-11 18:45:37.713 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:37.714 DEBUG [requestId=04ad98c3-0e21-4359-9a89-cb98e8b8ebf2,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:37.714 DEBUG [requestId=04ad98c3-0e21-4359-9a89-cb98e8b8ebf2,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:37.714 DEBUG [requestId=04ad98c3-0e21-4359-9a89-cb98e8b8ebf2,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:37.714 DEBUG [requestId=04ad98c3-0e21-4359-9a89-cb98e8b8ebf2,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:37.715 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5375, missCount = 40, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="fiftyRefusedCallsNeverUseUpTheRateLimit" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.023">
+  <testcase name="fiftyRefusedCallsNeverUseUpTheRateLimit" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.026">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -447,42 +447,42 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:32.932  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:32.932  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:33.358  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:33.358  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:33.359  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:33.363  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.445 seconds (process running for 114.255)
-2026-11-11 12:48:33.366 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5388, missCount = 41, failureCount = 0]
-2026-11-11 12:48:33.376 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.376 DEBUG [requestId=670d3cb4-b164-4269-b095-ca512eeaf439,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:33.376 DEBUG [requestId=670d3cb4-b164-4269-b095-ca512eeaf439,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.376 DEBUG [requestId=670d3cb4-b164-4269-b095-ca512eeaf439,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:33.378 DEBUG [requestId=670d3cb4-b164-4269-b095-ca512eeaf439,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:33.379 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.379 DEBUG [requestId=6badaee9-9f12-4005-a460-5d1429c60045,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:33.379 DEBUG [requestId=6badaee9-9f12-4005-a460-5d1429c60045,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.379 DEBUG [requestId=6badaee9-9f12-4005-a460-5d1429c60045,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:33.380 DEBUG [requestId=6badaee9-9f12-4005-a460-5d1429c60045,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:33.381 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.381 DEBUG [requestId=9086df2d-f2e5-49e9-804b-f9e466400ff5,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:33.381 DEBUG [requestId=9086df2d-f2e5-49e9-804b-f9e466400ff5,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.381 DEBUG [requestId=9086df2d-f2e5-49e9-804b-f9e466400ff5,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:33.382 DEBUG [requestId=9086df2d-f2e5-49e9-804b-f9e466400ff5,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:33.382 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.382 DEBUG [requestId=2025c311-dbea-41d0-9947-436512b38436,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:33.382 DEBUG [requestId=2025c311-dbea-41d0-9947-436512b38436,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.382 DEBUG [requestId=2025c311-dbea-41d0-9947-436512b38436,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:33.383 DEBUG [requestId=2025c311-dbea-41d0-9947-436512b38436,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:33.384 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.384 DEBUG [requestId=bc888c76-5ccc-4f55-830f-0d0338530f2a,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:33.384 DEBUG [requestId=bc888c76-5ccc-4f55-830f-0d0338530f2a,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:33.384 DEBUG [requestId=bc888c76-5ccc-4f55-830f-0d0338530f2a,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:33.385 DEBUG [requestId=bc888c76-5ccc-4f55-830f-0d0338530f2a,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
-2026-11-11 12:48:33.385 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5389, missCount = 41, failureCount = 0]
+2026-11-11 18:45:37.733  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:37.733  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:38.280  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:38.280  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:38.280  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:38.285  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.567 seconds (process running for 96.016)
+2026-11-11 18:45:38.288 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5388, missCount = 41, failureCount = 0]
+2026-11-11 18:45:38.299 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.299 DEBUG [requestId=3c720bbc-9ecd-4f1e-87da-4bb00ee6c8be,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:38.299 DEBUG [requestId=3c720bbc-9ecd-4f1e-87da-4bb00ee6c8be,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.299 DEBUG [requestId=3c720bbc-9ecd-4f1e-87da-4bb00ee6c8be,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:38.302 DEBUG [requestId=3c720bbc-9ecd-4f1e-87da-4bb00ee6c8be,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:38.303 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.303 DEBUG [requestId=d3cb9329-20d2-4b10-9749-69a859c5b54c,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:38.303 DEBUG [requestId=d3cb9329-20d2-4b10-9749-69a859c5b54c,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.303 DEBUG [requestId=d3cb9329-20d2-4b10-9749-69a859c5b54c,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:38.304 DEBUG [requestId=d3cb9329-20d2-4b10-9749-69a859c5b54c,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:38.305 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.305 DEBUG [requestId=8323e1c7-e86a-466c-be91-10e101812b00,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:38.305 DEBUG [requestId=8323e1c7-e86a-466c-be91-10e101812b00,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.305 DEBUG [requestId=8323e1c7-e86a-466c-be91-10e101812b00,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:38.306 DEBUG [requestId=8323e1c7-e86a-466c-be91-10e101812b00,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:38.308 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.308 DEBUG [requestId=f6e4637a-49ca-4095-a6cd-60ac1acec798,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:38.308 DEBUG [requestId=f6e4637a-49ca-4095-a6cd-60ac1acec798,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.308 DEBUG [requestId=f6e4637a-49ca-4095-a6cd-60ac1acec798,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:38.309 DEBUG [requestId=f6e4637a-49ca-4095-a6cd-60ac1acec798,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:38.309 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.310 DEBUG [requestId=f5df30f1-933f-482b-a7d5-b17106ac3c88,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:38.310 DEBUG [requestId=f5df30f1-933f-482b-a7d5-b17106ac3c88,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.310 DEBUG [requestId=f5df30f1-933f-482b-a7d5-b17106ac3c88,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:38.311 DEBUG [requestId=f5df30f1-933f-482b-a7d5-b17106ac3c88,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 201 CREATED
+2026-11-11 18:45:38.311 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5389, missCount = 41, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="aUniqueViolationAnswersTheSame404" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.007">
+  <testcase name="aUniqueViolationAnswersTheSame404" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.005">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -493,22 +493,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:33.405  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:33.405  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:33.994  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:33.994  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:33.995  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:34.001  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.612 seconds (process running for 114.893)
-2026-11-11 12:48:34.004 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5402, missCount = 42, failureCount = 0]
-2026-11-11 12:48:34.005 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:34.005 DEBUG [requestId=919db5c0-be48-47ab-847e-14e336fb1ea3,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:34.005 DEBUG [requestId=919db5c0-be48-47ab-847e-14e336fb1ea3,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:34.006 DEBUG [requestId=919db5c0-be48-47ab-847e-14e336fb1ea3,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:34.007 DEBUG [requestId=919db5c0-be48-47ab-847e-14e336fb1ea3,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:34.007 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5403, missCount = 42, failureCount = 0]
+2026-11-11 18:45:38.331  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:38.331  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:38.860  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:38.860  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:38.860  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:38.865  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.549 seconds (process running for 96.596)
+2026-11-11 18:45:38.867 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5402, missCount = 42, failureCount = 0]
+2026-11-11 18:45:38.868 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.868 DEBUG [requestId=c22cec50-59d3-4916-b1a2-d961ddf9f48c,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:38.868 DEBUG [requestId=c22cec50-59d3-4916-b1a2-d961ddf9f48c,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:38.868 DEBUG [requestId=c22cec50-59d3-4916-b1a2-d961ddf9f48c,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:38.869 DEBUG [requestId=c22cec50-59d3-4916-b1a2-d961ddf9f48c,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:38.869 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5403, missCount = 42, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="anAdminThatAlreadyExistsAnswersTheSameBytesAsTheFilter404" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.004">
+  <testcase name="anAdminThatAlreadyExistsAnswersTheSameBytesAsTheFilter404" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.008">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -519,22 +519,22 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:34.025  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:34.025  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:34.500  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:34.500  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:34.500  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:34.506  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.494 seconds (process running for 115.397)
-2026-11-11 12:48:34.508 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5416, missCount = 43, failureCount = 0]
-2026-11-11 12:48:34.509 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:34.509 DEBUG [requestId=ff1e92d1-4f15-435e-ae53-33b86dd5b6f7,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:34.509 DEBUG [requestId=ff1e92d1-4f15-435e-ae53-33b86dd5b6f7,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:34.509 DEBUG [requestId=ff1e92d1-4f15-435e-ae53-33b86dd5b6f7,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:34.510 DEBUG [requestId=ff1e92d1-4f15-435e-ae53-33b86dd5b6f7,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:34.510 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5417, missCount = 43, failureCount = 0]
+2026-11-11 18:45:38.885  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:38.885  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:39.332  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:39.332  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:39.332  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:39.340  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.467 seconds (process running for 97.071)
+2026-11-11 18:45:39.344 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5416, missCount = 43, failureCount = 0]
+2026-11-11 18:45:39.345 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.346 DEBUG [requestId=d9c8e33f-4acc-4fa5-8af8-518036fde36a,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:39.346 DEBUG [requestId=d9c8e33f-4acc-4fa5-8af8-518036fde36a,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.346 DEBUG [requestId=d9c8e33f-4acc-4fa5-8af8-518036fde36a,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:39.347 DEBUG [requestId=d9c8e33f-4acc-4fa5-8af8-518036fde36a,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:39.348 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5417, missCount = 43, failureCount = 0]
 ]]></system-out>
   </testcase>
-  <testcase name="theSixthCallThatPassedTheGateAnswers429WithRetryAfter" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.01">
+  <testcase name="theSixthCallThatPassedTheGateAnswers429WithRetryAfter" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.013">
     <system-out><![CDATA[
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -545,42 +545,42 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:34.527  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:34.527  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:35.050  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:35.050  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:35.050  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:48:35.055  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.542 seconds (process running for 115.946)
-2026-11-11 12:48:35.057 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5430, missCount = 44, failureCount = 0]
-2026-11-11 12:48:35.058 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.058 DEBUG [requestId=239d0663-e851-43a6-ac99-211fb9982bb0,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:35.058 DEBUG [requestId=239d0663-e851-43a6-ac99-211fb9982bb0,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.058 DEBUG [requestId=239d0663-e851-43a6-ac99-211fb9982bb0,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:35.059 DEBUG [requestId=239d0663-e851-43a6-ac99-211fb9982bb0,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:35.059 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.059 DEBUG [requestId=c6c94e91-4a15-43d5-98c4-985fbed1048a,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:35.059 DEBUG [requestId=c6c94e91-4a15-43d5-98c4-985fbed1048a,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.059 DEBUG [requestId=c6c94e91-4a15-43d5-98c4-985fbed1048a,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:35.060 DEBUG [requestId=c6c94e91-4a15-43d5-98c4-985fbed1048a,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:35.060 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.060 DEBUG [requestId=4475a544-4e1e-4875-ab66-53e3f4760aa5,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:35.060 DEBUG [requestId=4475a544-4e1e-4875-ab66-53e3f4760aa5,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.060 DEBUG [requestId=4475a544-4e1e-4875-ab66-53e3f4760aa5,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:35.060 DEBUG [requestId=4475a544-4e1e-4875-ab66-53e3f4760aa5,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:35.061 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.061 DEBUG [requestId=a435eb39-97eb-4207-859a-e3c7a4a6eda6,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:35.061 DEBUG [requestId=a435eb39-97eb-4207-859a-e3c7a4a6eda6,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.061 DEBUG [requestId=a435eb39-97eb-4207-859a-e3c7a4a6eda6,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:35.061 DEBUG [requestId=a435eb39-97eb-4207-859a-e3c7a4a6eda6,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:35.061 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.061 DEBUG [requestId=d6340d94-6a91-4f9a-87f8-5e7b438595e5,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
-2026-11-11 12:48:35.061 DEBUG [requestId=d6340d94-6a91-4f9a-87f8-5e7b438595e5,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.061 DEBUG [requestId=d6340d94-6a91-4f9a-87f8-5e7b438595e5,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
-2026-11-11 12:48:35.061 DEBUG [requestId=d6340d94-6a91-4f9a-87f8-5e7b438595e5,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
-2026-11-11 12:48:35.062 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
-2026-11-11 12:48:35.063 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['type']
-2026-11-11 12:48:35.064 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['retryAfterSeconds']
-2026-11-11 12:48:35.065 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5431, missCount = 44, failureCount = 0]
+2026-11-11 18:45:39.370  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:39.370  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:39.958  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:39.958  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:39.958  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:39.967  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.615 seconds (process running for 97.698)
+2026-11-11 18:45:39.970 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5430, missCount = 44, failureCount = 0]
+2026-11-11 18:45:39.971 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.971 DEBUG [requestId=822b7c7f-92f5-4e34-8f35-fce756e6f1cc,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:39.971 DEBUG [requestId=822b7c7f-92f5-4e34-8f35-fce756e6f1cc,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.971 DEBUG [requestId=822b7c7f-92f5-4e34-8f35-fce756e6f1cc,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:39.972 DEBUG [requestId=822b7c7f-92f5-4e34-8f35-fce756e6f1cc,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:39.973 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.973 DEBUG [requestId=042abb21-432f-4f74-8297-ec5c2c0ee244,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:39.973 DEBUG [requestId=042abb21-432f-4f74-8297-ec5c2c0ee244,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.973 DEBUG [requestId=042abb21-432f-4f74-8297-ec5c2c0ee244,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:39.974 DEBUG [requestId=042abb21-432f-4f74-8297-ec5c2c0ee244,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:39.974 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.974 DEBUG [requestId=cffabe61-c565-4f92-b10d-cd0d5ea41465,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:39.974 DEBUG [requestId=cffabe61-c565-4f92-b10d-cd0d5ea41465,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.974 DEBUG [requestId=cffabe61-c565-4f92-b10d-cd0d5ea41465,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:39.974 DEBUG [requestId=cffabe61-c565-4f92-b10d-cd0d5ea41465,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:39.975 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.975 DEBUG [requestId=6e714a68-8e54-4665-b88b-30006252abf4,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:39.975 DEBUG [requestId=6e714a68-8e54-4665-b88b-30006252abf4,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.975 DEBUG [requestId=6e714a68-8e54-4665-b88b-30006252abf4,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:39.975 DEBUG [requestId=6e714a68-8e54-4665-b88b-30006252abf4,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:39.976 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.976 DEBUG [requestId=e19686f1-2df1-48fb-9700-8c46ba04f129,tenantId=] o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-11-11 18:45:39.976 DEBUG [requestId=e19686f1-2df1-48fb-9700-8c46ba04f129,tenantId=] o.s.security.web.FilterChainProxy - Secured POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.976 DEBUG [requestId=e19686f1-2df1-48fb-9700-8c46ba04f129,tenantId=] o.s.t.w.s.TestDispatcherServlet - POST "/api/v1/admin/dev/sample-admin", parameters={}
+2026-11-11 18:45:39.976 DEBUG [requestId=e19686f1-2df1-48fb-9700-8c46ba04f129,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed 404 NOT_FOUND
+2026-11-11 18:45:39.976 DEBUG [requestId=,tenantId=] o.s.security.web.FilterChainProxy - Securing POST /api/v1/admin/dev/sample-admin
+2026-11-11 18:45:39.978 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['type']
+2026-11-11 18:45:39.979 DEBUG [requestId=,tenantId=] c.j.j.internal.path.CompiledPath - Evaluating path: $['retryAfterSeconds']
+2026-11-11 18:45:39.979 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5431, missCount = 44, failureCount = 0]
 ]]></system-out>
   </testcase>
   <testcase name="theControllerAsksTheGateAgainBeforeCallingTheService" classname="com.sahaj.platform.devtools.admin.DevSampleAdminEndpointTest" time="0.004">
@@ -594,14 +594,14 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:48:35.081  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:48:35.081  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
-2026-11-11 12:48:35.599  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:48:35.599  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:48:35.600  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
-2026-11-11 12:48:35.604  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.536 seconds (process running for 116.496)
-2026-11-11 12:48:35.607 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5444, missCount = 45, failureCount = 0]
-2026-11-11 12:48:35.607 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@7789408e size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5445, missCount = 45, failureCount = 0]
+2026-11-11 18:45:39.998  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Starting DevSampleAdminEndpointTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:45:39.999  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - The following 1 profile is active: "dev"
+2026-11-11 18:45:40.480  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:45:40.480  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:45:40.480  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
+2026-11-11 18:45:40.484  INFO [requestId=,tenantId=] c.s.p.d.a.DevSampleAdminEndpointTest - Started DevSampleAdminEndpointTest in 0.501 seconds (process running for 98.215)
+2026-11-11 18:45:40.486 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5444, missCount = 45, failureCount = 0]
+2026-11-11 18:45:40.487 DEBUG [requestId=,tenantId=] o.springframework.test.context.cache - Spring test ApplicationContext cache statistics: [DefaultContextCache@3231e0fd size = 27, maxSize = 32, parentContextCount = 0, hitCount = 5445, missCount = 45, failureCount = 0]
 ]]></system-out>
   </testcase>
 </testsuite>

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.sahaj.ipd.application.AdmissionListCardsTest
 -------------------------------------------------------------------------------
-Tests run: 51, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.626 s -- in com.sahaj.ipd.application.AdmissionListCardsTest
+Tests run: 51, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.714 s -- in com.sahaj.ipd.application.AdmissionListCardsTest

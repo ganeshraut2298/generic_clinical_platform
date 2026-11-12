@@ -211,13 +211,35 @@ class OpdControllersTest {
 
     @Test
     void diagnosesAreSearchable() throws Exception {
-        when(diagnosisService.search("j06")).thenReturn(List.of(
+        when(diagnosisService.search("j06", null, null)).thenReturn(List.of(
                 new DiagnosisRow("J06.9", "Acute upper respiratory infection, unspecified", "gp")));
 
         mockMvc.perform(get(OPD + "/diagnoses").param("q", "j06").with(as("NURSE")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("J06.9"))
                 .andExpect(jsonPath("$[0].specialty").value("gp"));
+    }
+
+    @Test
+    void diagnosesTakeAnOptionalSpecialtyAndPage() throws Exception {
+        when(diagnosisService.search("a", "dental", 2)).thenReturn(List.of(
+                new DiagnosisRow("K02.9", "Dental caries, unspecified", "dental")));
+
+        mockMvc.perform(get(OPD + "/diagnoses").param("q", "a").param("specialty", "dental").param("page", "2")
+                        .with(as("DOCTOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("K02.9"));
+    }
+
+    @Test
+    void diagnosesRefuseASpecialtyOrPageOutOfRangeWithValidation() throws Exception {
+        when(diagnosisService.search("a", "ayur", null))
+                .thenThrow(new InvalidInputException("specialty", "Choose one of gp, dental, paeds or homeo."));
+
+        mockMvc.perform(get(OPD + "/diagnoses").param("q", "a").param("specialty", "ayur").with(as("DOCTOR")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/validation"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("specialty"));
     }
 
     @Test

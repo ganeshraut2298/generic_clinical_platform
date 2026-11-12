@@ -1,8 +1,29 @@
 openapi: 3.1.0
 info:
   title: Sahaj OPD API
-  version: 0.1.0
-  description: Phase 1 contract, SAH-7. Reads are for any logged-in clinic user; writes are owner only (403 otherwise). Errors are RFC 9457 application/problem+json.
+  version: 0.2.0
+  description: >-
+    Phase 1 contract, SAH-7 (and SAH-9, SAH-11, SAH-12, SAH-14, SAH-15, SAH-18 as tagged). Reads are for any logged-in
+    clinic user; writes are owner only (403 otherwise) unless an operation says otherwise. Errors are RFC 9457
+    application/problem+json; the type is https://sahaj.in/problems/<slug> and slugs are written below without the
+    prefix. The tenant always comes from the logged-in user, never from a body, query, path or header; a clinic id
+    sent in a body is ignored.
+
+    0.2.0 (11 Nov 2026) adds SAH-43 and SAH-44, the Doctor EMR masters and specialty templates (ADR-019), under
+    /emr/**, and two optional query parameters on GET /diagnoses (specialty, page). Nothing that existed changes
+    meaning. Rules for every /emr/** operation: no or expired session answers 401 (unauthorized); a role outside
+    the operation's x-required-role answers 403 (forbidden); a write method (POST, PUT, PATCH, DELETE) on the
+    read-only paths /emr/masters/**, /emr/quick-options/**, /emr/templates and /emr/templates/{templateKey}
+    answers 403 (forbidden), not 405, for every role including the owner, because masters and templates are global
+    and change by migration only; a body over 64 KB answers 413 (payload-too-large); request bodies are closed
+    (an unknown field answers 400 validation). Problem types used by /emr/**: unauthorized, forbidden,
+    doctor-details-missing (403: an owner with no doctor details asks for a doctor-only call), bad-request,
+    validation (400 with fieldErrors), hidden-section-required (400), section-not-hideable (400),
+    template-not-found (404), section-not-found (404), emr-setup-changed (409: stale revision or version),
+    payload-too-large (413). x-required-permission names the ADR-019 D8 capability: clinic.consultation.write
+    (DOCTOR or VISITING_DOCTOR, or OWNER with doctor details) and clinic.emr_setup.edit (OWNER); they are fixed in
+    code, not cells of the "Who can do what" grid. No /emr/** answer or log line contains patient data; search
+    text is never logged. Starter master and template content is not clinically reviewed (OQ-43-8).
 servers:
   - url: /api/v1/opd
 security:
@@ -197,9 +218,15 @@ paths:
   /diagnoses:
     get:
       tags: [SAH-7]
-      description: Global read-only ICD-10 list.
+      description: >-
+        Global read-only ICD-10 list. Matches the start of the name or of the code, at most 20 per answer (SAH-7,
+        unchanged). SAH-43 (0.2.0) adds two optional parameters; without them the answer is exactly as before.
+        specialty puts diagnoses whose specialty hint equals it first and hides nothing. page asks for the next
+        20 in the same order; a client stops when it gets fewer than 20.
       parameters:
         - { name: q, in: query, schema: { type: string } }
+        - { name: specialty, in: query, required: false, description: 'SAH-43-1. Hint first; never a filter.', schema: { $ref: '#/components/schemas/SpecialtyCode' } }
+        - { name: page, in: query, required: false, description: 'SAH-43-1. 0-based page of 20.', schema: { type: integer, minimum: 0, maximum: 500, default: 0 } }
       responses:
         '200':
           description: Matches
@@ -208,6 +235,7 @@ paths:
               schema:
                 type: array
                 items: { type: object, required: [code, name], properties: { code: { type: string }, name: { type: string }, specialty: { type: string } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation: specialty not one of the four codes, or page outside 0 to 500 (SAH-43).' }
   /case-paper-settings:
     get:
       tags: [SAH-7]
@@ -323,6 +351,252 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /emr/masters/{master}:
+    parameters:
+      - { name: master, in: path, required: true, schema: { $ref: '#/components/schemas/EmrSearchMaster' } }
+    get:
+      tags: [SAH-43]
+      operationId: searchEmrMaster
+      summary: Search the complaints, investigations or advice master
+      description: >-
+        SAH-43-1. Global, read-only masters (ADR-019 D3). Prefix match on the name, ignoring letter case; q is
+        trimmed; an empty or all-space q returns the first page in master order. The characters % _ and \ are
+        matched literally, never as wildcards. Order: with specialty, items whose hint equals it first; then the
+        master's sort order; then name A to Z. Nothing is hidden by specialty. No match is 200 with an empty
+        list. Diagnoses and medicines are searched with GET /diagnoses and GET /medicines (SAH-7, unchanged). The
+        q text is never logged.
+      x-required-role: any clinic role (OWNER, DOCTOR, VISITING_DOCTOR, NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR)
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 }, description: 'Over 100 characters answers 400 validation (field q, "Search text must be 100 characters or fewer.").' }
+        - { name: specialty, in: query, required: false, schema: { $ref: '#/components/schemas/SpecialtyCode' } }
+        - { name: page, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 500, default: 0 } }
+      responses:
+        '200':
+          description: One page of 20
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmrMasterPage' }
+              examples:
+                complaints:
+                  value:
+                    items:
+                      - { id: 3f0c2a52-6a8e-4c1b-9d43-2b7f0d5e9a11, name: Fever, specialtyHint: null }
+                      - { id: 9b1d7c04-0e55-4f0a-8a6b-5c3e2d1f0b22, name: Fatigue, specialtyHint: null }
+                    total: 2
+                    page: 0
+                    pageSize: 20
+                empty:
+                  value: { items: [], total: 0, page: 0, pageSize: 20 }
+        '400': { $ref: '#/components/responses/Problem', description: 'bad-request (master not one of complaints, investigations, advice) or validation (q too long, page or specialty out of range).' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /emr/quick-options/{master}:
+    parameters:
+      - { name: master, in: path, required: true, schema: { $ref: '#/components/schemas/EmrMaster' } }
+    get:
+      tags: [SAH-43]
+      operationId: listEmrQuickOptions
+      summary: The signed-in doctor's quick-add items for one master, ranked by own use
+      description: >-
+        SAH-43-2 (ADR-019 D10). Always the caller's own ranking in this clinic: there is no doctor parameter and
+        the server reads none (an added doctorMembershipId is ignored). Order: items this doctor used on signed
+        visits, by use count (most first), then last used (newest first); then items never used, in the master's
+        own order (with specialty, hint first; for medicines the SAH-7 order, clinic favourites first). Never
+        empty while the master has items. Counts come only from the sign step (SAH-51) through an internal
+        service; there is no operation that writes counts, and free-typed text is never counted or offered.
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 50, default: 10 }, description: 'The chip row asks for 10.' }
+        - { name: specialty, in: query, required: false, schema: { $ref: '#/components/schemas/SpecialtyCode' }, description: 'Orders the never-used tail only; the EMR passes the visit''s template key.' }
+      responses:
+        '200':
+          description: At most limit items
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmrQuickOptionList' }
+              examples:
+                diagnoses:
+                  value:
+                    master: diagnoses
+                    items:
+                      - { itemKey: J06.9, name: 'Acute upper respiratory infection, unspecified', icd10Code: J06.9, form: null, favourite: null, useCount: 5, lastUsedAt: '2026-11-10T06:05:00Z' }
+                      - { itemKey: A09, name: 'Infectious gastroenteritis and colitis, unspecified', icd10Code: A09, form: null, favourite: null, useCount: 0, lastUsedAt: null }
+        '400': { $ref: '#/components/responses/Problem', description: 'bad-request (unknown master) or validation (limit or specialty out of range).' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR) or doctor-details-missing (OWNER without doctor details).' }
+  /emr/me:
+    get:
+      tags: [SAH-43, SAH-44]
+      operationId: getEmrDoctorContext
+      summary: The signed-in doctor's own details for the EMR and the template the EMR would choose
+      description: >-
+        SAH-43-3 and SAH-44-4 (ADR-019 D6, D7, D9). Name from the user; specialty, degree and registration number
+        exactly as saved in Team and access (read through platform.api, no copy). missing lists the empty
+        fields; nothing is blocked (OQ-43-11 default; the case paper prints "—"). template is the choice rule:
+        the doctor's specialty through the alias list, else the clinic's specialty, else gp. Only the caller's
+        own details; there is no operation to read another doctor's details for the EMR. Name and registration
+        number are never logged.
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      responses:
+        '200':
+          description: Own details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmrDoctorContext' }
+              examples:
+                doctor:
+                  value:
+                    membershipId: 5d2b8f1e-2c47-4a90-b6d3-7e1f0a9c4b33
+                    name: Dr Asha Kulkarni
+                    role: DOCTOR
+                    specialty: General Physician
+                    degree: MBBS, MD
+                    registrationNo: null
+                    missing: [REGISTRATION_NO]
+                    template: { templateKey: gp, templateVersion: 1, templateName: General practice, choiceSource: DOCTOR_SPECIALTY }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (not a doctor role) or doctor-details-missing (OWNER with no doctor details: "Add your doctor details in Team and access to write consultations.").' }
+  /emr/templates:
+    get:
+      tags: [SAH-44]
+      operationId: listEmrTemplates
+      summary: The four specialty templates (newest version) with this clinic's counts
+      description: >-
+        SAH-44-1 (ADR-019 D4). Global definitions, the same for every clinic; the counts are this clinic's
+        effective counts ("n sections on · m required", FR-20). clinicSpecialty marks the clinic's own specialty
+        ("yours"). Order: gp, dental, paeds, homeo.
+      x-required-role: any clinic role
+      responses:
+        '200':
+          description: Four templates
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EmrTemplateSummary' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /emr/templates/{templateKey}:
+    parameters:
+      - { name: templateKey, in: path, required: true, schema: { $ref: '#/components/schemas/TemplateKeyPath' } }
+    get:
+      tags: [SAH-44]
+      operationId: getEmrTemplate
+      summary: One template's sections, with this clinic's overrides applied
+      description: >-
+        SAH-44-1, SAH-44-2. The newest version of the template; every section is listed, hidden ones too
+        (shown false), in part then position order, with the template default, the clinic's effective Show and
+        Required, whether an override exists, whether the section may be hidden, the number of quick options
+        and, for sections with their own chips, the chip list. revision is the value to send back with a change
+        or reset. canEdit is true only for OWNER; every other clinic role reads (SO-44-6). A key that is a
+        known specialty without an EMR template (ayur, physio, derma, gynae, …) or any other well-formed unknown
+        key answers 404 template-not-found ("There is no EMR template for this specialty yet."); a malformed key
+        answers 400 bad-request.
+      x-required-role: any clinic role
+      responses:
+        '200':
+          description: Template view
+          content: { application/json: { schema: { $ref: '#/components/schemas/EmrTemplateView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /emr/templates/{templateKey}/sections/{sectionKey}/override:
+    parameters:
+      - { name: templateKey, in: path, required: true, schema: { $ref: '#/components/schemas/TemplateKeyPath' } }
+      - { name: sectionKey, in: path, required: true, schema: { $ref: '#/components/schemas/SectionKey' } }
+    put:
+      tags: [SAH-44]
+      operationId: setEmrSectionOverride
+      summary: Set Show and Required for one section in this clinic
+      description: >-
+        SAH-44-2 (ADR-019 D5). Only shown and required (OQ-43-15); label, part or any other field answers 400
+        validation. shown false with required true answers 400 hidden-section-required ("A hidden section cannot
+        be required."); shown false alone saves required false in the same change. Hiding a section that cannot
+        be hidden answers 400 section-not-hideable ("<Label> cannot be hidden.") and nothing changes. A value
+        equal to the template default removes the override. revision must equal the current revision of this
+        clinic and template, else 409 emr-setup-changed ("Someone else changed this template. Reload and try
+        again."). All or nothing. One audit entry EMR_TEMPLATE_OVERRIDE_CHANGED with before and after of shown
+        and required; a request that changes nothing answers 200, writes no audit and keeps the revision.
+        Applies to visits opened after the change only.
+      x-required-role: OWNER
+      x-required-permission: clinic.emr_setup.edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmrSectionOverrideInput' }
+            examples:
+              hideLocalExam: { value: { shown: false, required: false, revision: 3 } }
+      responses:
+        '200': { description: The template view after the change, content: { application/json: { schema: { $ref: '#/components/schemas/EmrTemplateView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'bad-request (malformed key), validation, hidden-section-required or section-not-hideable.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem', description: 'template-not-found or section-not-found (the key is not in the newest version).' }
+        '409': { $ref: '#/components/responses/Problem', description: emr-setup-changed }
+        '413': { $ref: '#/components/responses/Problem' }
+  /emr/templates/{templateKey}/reset:
+    parameters:
+      - { name: templateKey, in: path, required: true, schema: { $ref: '#/components/schemas/TemplateKeyPath' } }
+    post:
+      tags: [SAH-44]
+      operationId: resetEmrTemplate
+      summary: Remove all of this clinic's overrides for one template
+      description: >-
+        SAH-44-2 (BR13). Effective sections become the template's defaults; the answer carries the new counts.
+        With no overrides: 200, nothing changes, no audit entry, revision unchanged. Otherwise one audit entry
+        EMR_TEMPLATE_RESET with before and after counts. Stale revision answers 409 emr-setup-changed.
+      x-required-role: OWNER
+      x-required-permission: clinic.emr_setup.edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/EmrTemplateResetInput' } } }
+      responses:
+        '200': { description: The template view after the reset, content: { application/json: { schema: { $ref: '#/components/schemas/EmrTemplateView' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
+  /emr/settings:
+    get:
+      tags: [SAH-44]
+      operationId: getEmrSettings
+      summary: How the EMR opens in this clinic
+      description: 'SAH-44-3 (ADR-019 D11). Defaults until the first save: COLLAPSED, CASE_PAPER, ASSESSMENT, version 0. canEdit is true only for OWNER.'
+      x-required-role: any clinic role
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmrSettings' }
+              examples:
+                defaults: { value: { sectionPanel: COLLAPSED, rightPanelFirst: CASE_PAPER, defaultPart: ASSESSMENT, version: 0, canEdit: true } }
+        '401': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [SAH-44]
+      operationId: saveEmrSettings
+      summary: Save the section panel and right panel defaults
+      description: >-
+        SAH-44-3. defaultPart is not accepted (OQ-43-16: stored as ASSESSMENT, no control); sending it, or any
+        other unknown field, answers 400 validation. version must equal the stored version (0 before the first
+        save), else 409 emr-setup-changed. One audit entry EMR_SETTINGS_UPDATED with before and after of each
+        changed setting; no change, no entry. Applies the next time an EMR is opened.
+      x-required-role: OWNER
+      x-required-permission: clinic.emr_setup.edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmrSettingsInput' }
+            examples:
+              openRail: { value: { sectionPanel: OPEN, rightPanelFirst: CASE_PAPER, version: 0 } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/EmrSettings' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -613,3 +887,202 @@ components:
             when: { type: array, items: { type: string } }
             cond: { type: array, items: { type: string } }
             then: { type: array, items: { type: string } }
+    SpecialtyCode:
+      type: string
+      enum: [gp, dental, paeds, homeo]
+      description: 'SAH-43, SAH-44. The four template specialties (same codes as platform.specialty and the clinic profile): General practice, Dental, Paediatrics, Homeopathy. Also the EMR template key.'
+    TemplateKeyPath:
+      type: string
+      pattern: '^[a-z][a-z0-9_]{1,19}$'
+      description: 'A template key in a path. Well-formed but not one of the four answers 404 template-not-found; malformed answers 400 bad-request.'
+    SectionKey:
+      type: string
+      pattern: '^[a-z][a-z0-9_]{1,39}$'
+      description: 'Stable section key within a template (ADR-019 D4; the business analyst''s reading of the BRD, SO-44-10).'
+    EmrSearchMaster:
+      type: string
+      enum: [complaints, investigations, advice]
+      description: SAH-43-1. Masters searched under /emr/masters; diagnoses and medicines keep GET /diagnoses and GET /medicines.
+    EmrMaster:
+      type: string
+      enum: [complaints, diagnoses, medicines, investigations, advice]
+      description: SAH-43. Every quick-option master.
+    EmrMasterItem:
+      type: object
+      required: [id, name, specialtyHint]
+      properties:
+        id: { type: string, format: uuid, description: 'Stable across environments (derived from the name).' }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        specialtyHint: { oneOf: [{ $ref: '#/components/schemas/SpecialtyCode' }, { type: 'null' }], description: 'Ordering hint only; null = general.' }
+    EmrMasterPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/EmrMasterItem' } }
+        total: { type: integer, minimum: 0, description: 'Every match, not only this page.' }
+        page: { type: integer, minimum: 0 }
+        pageSize: { type: integer, const: 20 }
+    EmrQuickOption:
+      type: object
+      required: [itemKey, name, icd10Code, form, favourite, useCount, lastUsedAt]
+      properties:
+        itemKey: { type: string, maxLength: 40, description: 'The master item: uuid text for complaints, investigations, advice and medicines; the ICD-10 code for diagnoses. This is what a visit refers to.' }
+        name: { type: string }
+        icd10Code: { type: [string, 'null'], description: 'Diagnoses only; null for other masters.' }
+        form: { type: [string, 'null'], description: 'Medicines only (Tablet, Syrup, …); null otherwise.' }
+        favourite: { type: [boolean, 'null'], description: 'Medicines only: a clinic favourite (SAH-7); null otherwise.' }
+        useCount: { type: integer, minimum: 0, description: 'Signed visits of this doctor in this clinic that used the item; 0 when never used.' }
+        lastUsedAt: { type: [string, 'null'], format: date-time, description: 'Signature time of the latest such visit; null when never used.' }
+    EmrQuickOptionList:
+      type: object
+      required: [master, items]
+      properties:
+        master: { $ref: '#/components/schemas/EmrMaster' }
+        items: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/EmrQuickOption' } }
+    EmrTemplateChoiceSource:
+      type: string
+      enum: [DOCTOR_SPECIALTY, CLINIC_SPECIALTY, DEFAULT, SWITCHED]
+      description: 'Why this template (BR15). DEFAULT = neither the doctor''s nor the clinic''s specialty decided, so General practice. SWITCHED is used only in a visit snapshot (SAH-46).'
+    EmrTemplateChoice:
+      type: object
+      required: [templateKey, templateVersion, templateName, choiceSource]
+      properties:
+        templateKey: { $ref: '#/components/schemas/SpecialtyCode' }
+        templateVersion: { type: integer, minimum: 1 }
+        templateName: { type: string }
+        choiceSource: { $ref: '#/components/schemas/EmrTemplateChoiceSource' }
+    EmrDoctorContext:
+      type: object
+      required: [membershipId, name, role, specialty, degree, registrationNo, missing, template]
+      properties:
+        membershipId: { type: string, format: uuid }
+        name: { type: string, description: 'From the user, not the doctor details. Screen only, never logged.' }
+        role: { type: string, enum: [OWNER, DOCTOR, VISITING_DOCTOR] }
+        specialty: { type: [string, 'null'], maxLength: 120, description: As saved in Team and access (free text). }
+        degree: { type: [string, 'null'], maxLength: 120 }
+        registrationNo: { type: [string, 'null'], maxLength: 80, description: Never logged. }
+        missing: { type: array, items: { type: string, enum: [DEGREE, REGISTRATION_NO] }, description: 'Empty fields the case paper needs (NMC rule as written in the BRD). Nothing is blocked (OQ-43-11).' }
+        template: { $ref: '#/components/schemas/EmrTemplateChoice' }
+    EmrPart:
+      type: string
+      enum: [ASSESSMENT, TREATMENT]
+    EmrEditorType:
+      type: string
+      enum: [COMPLAINTS, VITALS_STEPPERS, SIGNS, SYSTEMS, DIAGNOSIS, PRESCRIPTION, TOOTH_CHART, TREATMENT_PLAN, SERVICES, ADVICE, CHIP_LIST]
+      description: The eleven editors of BRD FR-11.
+    EmrSectionOptions:
+      type: object
+      required: [source, master]
+      properties:
+        source: { type: string, enum: [MASTER, TEMPLATE, TARIFF, NONE], description: 'MASTER: a SAH-43 master (search and ranking apply). TEMPLATE: the template version''s own chips. TARIFF: the clinic''s active services (SAH-7). NONE: no option list.' }
+        master: { oneOf: [{ $ref: '#/components/schemas/EmrMaster' }, { type: 'null' }], description: Set only when source is MASTER. }
+    EmrTemplateOption:
+      type: object
+      required: [key, label, style, isNone]
+      properties:
+        key: { type: string, pattern: '^[a-z][a-z0-9_]{0,39}$' }
+        label: { type: string, maxLength: 80 }
+        style: { type: string, enum: [NORMAL, ALERT], description: 'ALERT = the red allergy and alert chips.' }
+        isNone: { type: boolean, description: 'The "None" or "Nothing abnormal" option (OQ-43-19).' }
+    EmrSectionView:
+      type: object
+      required: [key, label, part, position, editorType, iconKey, options, quickOptionCount, templateOptions, templateRequired, hideable, shown, required, overridden]
+      properties:
+        key: { $ref: '#/components/schemas/SectionKey' }
+        label: { type: string, maxLength: 60 }
+        part: { $ref: '#/components/schemas/EmrPart' }
+        position: { type: integer, minimum: 1, description: Order within the template. }
+        editorType: { $ref: '#/components/schemas/EmrEditorType' }
+        iconKey: { type: [string, 'null'], description: 'May be null until the EMR mockup shows icons (OQ-43-20).' }
+        options: { $ref: '#/components/schemas/EmrSectionOptions' }
+        quickOptionCount: { type: [integer, 'null'], minimum: 0, description: 'The setup table''s "quick options" number: master rows, template chips or active services; null for NONE.' }
+        templateOptions: { type: array, items: { $ref: '#/components/schemas/EmrTemplateOption' }, description: 'The chips when options.source is TEMPLATE; empty otherwise.' }
+        templateRequired: { type: boolean, description: The template's required default. }
+        hideable: { type: boolean, description: 'False for Prescription, Remedy & potency, History & allergies, Medical alerts (OQ-43-14). The Show switch is then fixed on.' }
+        shown: { type: boolean, description: Effective Show for this clinic. }
+        required: { type: boolean, description: 'Effective Required; always false when shown is false.' }
+        overridden: { type: boolean, description: 'True when this clinic has an override for this section.' }
+    EmrTemplateSummary:
+      type: object
+      required: [templateKey, name, version, clinicSpecialty, sectionCount, sectionsOn, requiredOn, hasOverrides]
+      properties:
+        templateKey: { $ref: '#/components/schemas/SpecialtyCode' }
+        name: { type: string, examples: [General practice] }
+        version: { type: integer, minimum: 1 }
+        clinicSpecialty: { type: boolean, description: 'This clinic''s own specialty ("yours").' }
+        sectionCount: { type: integer, minimum: 1 }
+        sectionsOn: { type: integer, minimum: 0 }
+        requiredOn: { type: integer, minimum: 0 }
+        hasOverrides: { type: boolean }
+    EmrTemplateView:
+      type: object
+      required: [templateKey, name, version, clinicSpecialty, revision, canEdit, sectionsOn, requiredOn, sections]
+      properties:
+        templateKey: { $ref: '#/components/schemas/SpecialtyCode' }
+        name: { type: string }
+        version: { type: integer, minimum: 1 }
+        clinicSpecialty: { type: boolean }
+        revision: { type: integer, format: int64, minimum: 0, description: 'This clinic''s revision of its overrides for this template; 0 before the first change. Send it back with a change or reset.' }
+        canEdit: { type: boolean, description: True only for OWNER. }
+        sectionsOn: { type: integer, minimum: 0, description: '"n sections on".' }
+        requiredOn: { type: integer, minimum: 0, description: '"m required".' }
+        sections: { type: array, items: { $ref: '#/components/schemas/EmrSectionView' }, description: 'Every section of the newest version, hidden ones included, ASSESSMENT then TREATMENT, by position.' }
+    EmrSectionOverrideInput:
+      type: object
+      additionalProperties: false
+      required: [shown, required, revision]
+      properties:
+        shown: { type: boolean }
+        required: { type: boolean }
+        revision: { type: integer, format: int64, minimum: 0 }
+    EmrTemplateResetInput:
+      type: object
+      additionalProperties: false
+      required: [revision]
+      properties:
+        revision: { type: integer, format: int64, minimum: 0 }
+    EmrSettings:
+      type: object
+      required: [sectionPanel, rightPanelFirst, defaultPart, version, canEdit]
+      properties:
+        sectionPanel: { type: string, enum: [COLLAPSED, OPEN], description: 'FR-06/FR-21 "Section panel". Default COLLAPSED.' }
+        rightPanelFirst: { type: string, enum: [CASE_PAPER, PAST_VISITS], description: 'FR-21 "Right panel first". Default CASE_PAPER.' }
+        defaultPart: { $ref: '#/components/schemas/EmrPart', description: 'Always ASSESSMENT in release 1; read-only (OQ-43-16).' }
+        version: { type: integer, format: int64, minimum: 0, description: 0 before the first save. }
+        canEdit: { type: boolean, description: True only for OWNER. }
+    EmrSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [sectionPanel, rightPanelFirst, version]
+      properties:
+        sectionPanel: { type: string, enum: [COLLAPSED, OPEN] }
+        rightPanelFirst: { type: string, enum: [CASE_PAPER, PAST_VISITS] }
+        version: { type: integer, format: int64, minimum: 0 }
+    EmrSnapshotSection:
+      type: object
+      required: [key, label, part, position, required, editorType, iconKey, options]
+      properties:
+        key: { $ref: '#/components/schemas/SectionKey' }
+        label: { type: string }
+        part: { $ref: '#/components/schemas/EmrPart' }
+        position: { type: integer, minimum: 1 }
+        required: { type: boolean, description: Effective required flag at the moment the snapshot was taken. }
+        editorType: { $ref: '#/components/schemas/EmrEditorType' }
+        iconKey: { type: [string, 'null'] }
+        options: { $ref: '#/components/schemas/EmrSectionOptions' }
+    EmrTemplateSnapshot:
+      type: object
+      description: >-
+        SAH-44-4 (ADR-019 D6). The section list a visit was opened with. Defined now; stored and returned by the
+        EMR visit operations of SAH-46 (no operation in 0.2.0 uses it). Only shown sections, in template order.
+        Template chips are referred to by templateKey + templateVersion + section key (versions never change),
+        not copied. Never changed after signing; a draft may replace it by switching template (choiceSource
+        SWITCHED, audited).
+      required: [schemaVersion, templateKey, templateVersion, choiceSource, takenAt, sections]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        templateKey: { $ref: '#/components/schemas/SpecialtyCode' }
+        templateVersion: { type: integer, minimum: 1 }
+        choiceSource: { $ref: '#/components/schemas/EmrTemplateChoiceSource' }
+        takenAt: { type: string, format: date-time }
+        sections: { type: array, minItems: 1, items: { $ref: '#/components/schemas/EmrSnapshotSection' } }

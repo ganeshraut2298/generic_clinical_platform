@@ -103,4 +103,49 @@ class VitalsCatalogIT extends VitalsSupport {
                 + "'clinical_event', 'ews_escalation', 'emergency_case', 'emergency_triage_event', 'dose_administration')"));
         assertThat(present).as("all seven tables exist").isEqualTo(7);
     }
+
+    /**
+     * SAH-43 / SAH-44 (ADR-019 D4): the three template tables cannot be updated, deleted or truncated by anyone, the table
+     * owner included, because of these six triggers. They are created in V2026_12_08_1000; switching one off would let a
+     * shipped template version change under the visits that refer to it. Test plan: docs/test-plans/SAH-43-44.md.
+     */
+    @Test
+    void theEmrTemplateImmutabilityTriggersAreThereByNameAndEnabled() throws Exception {
+        List<String> found = triggers("t.tgname like 'trg\\_emr\\_%'");
+        for (String expected : new String[] {
+                "opd.emr_template.trg_emr_template_immutable", "opd.emr_template.trg_emr_template_no_truncate",
+                "opd.emr_template_section.trg_emr_template_section_immutable",
+                "opd.emr_template_section.trg_emr_template_section_no_truncate",
+                "opd.emr_template_option.trg_emr_template_option_immutable",
+                "opd.emr_template_option.trg_emr_template_option_no_truncate"}) {
+            assertThat(found).as("trigger " + expected).contains(expected + "=O");
+        }
+        assertThat(found).as("no other trg_emr_ trigger appeared unannounced").hasSize(6);
+        // the function behind them still refuses with the documented SQLSTATE and wording
+        String definition = db().asMigrator(c -> DbAccess.text(c, "select pg_get_functiondef('opd.deny_emr_template_change()'::regprocedure)"));
+        assertThat(definition).contains("insufficient_privilege").contains("is immutable");
+    }
+
+    /** SAH-43 / SAH-44: the four new clinic tables keep enabled and forced row level security. */
+    @Test
+    void theFourEmrClinicTablesHaveRowLevelSecurityEnabledAndForced() throws Exception {
+        List<String> weak = db().asMigrator(c -> {
+            List<String> out = new ArrayList<>();
+            try (var ps = c.prepareStatement("select n.nspname || '.' || cl.relname || ' enabled=' || cl.relrowsecurity::text "
+                    + "|| ' forced=' || cl.relforcerowsecurity::text from pg_class cl join pg_namespace n on n.oid = cl.relnamespace "
+                    + "where n.nspname = 'opd' and cl.relname in ('emr_template_setup', 'emr_template_override', 'emr_settings', "
+                    + "'emr_item_usage') and not (cl.relrowsecurity and cl.relforcerowsecurity) order by 1");
+                 var rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(rs.getString(1));
+                }
+            }
+            return out;
+        });
+        assertThat(weak).as("EMR clinic tables without enabled and forced row level security").isEmpty();
+        long present = db().<Long>asMigrator(c -> DbAccess.count(c, "select count(*) from pg_class cl join pg_namespace n "
+                + "on n.oid = cl.relnamespace where n.nspname = 'opd' and cl.relname in ('emr_template_setup', "
+                + "'emr_template_override', 'emr_settings', 'emr_item_usage')"));
+        assertThat(present).as("all four tables exist").isEqualTo(4);
+    }
 }

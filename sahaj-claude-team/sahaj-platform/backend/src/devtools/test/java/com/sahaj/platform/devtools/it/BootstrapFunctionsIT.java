@@ -611,7 +611,9 @@ class BootstrapFunctionsIT {
         for (String row : SampleAdminDb.auditRowsSince(snapshot)) {
             assertThat(row).as("no audit column holds the e-mail").doesNotContain(email);
         }
-        // The new admin can be found by the sign-in lookup and given an ENROL pre-auth token (the register step of the app).
+        // The register step of the app no longer calls admin_preauth_create (ADR-018 Revision 5). This block calls admin_login_lookup
+        // only: it proves the new admin can be found and is not enrolled, which is what the first sign-in needs. It does NOT issue
+        // or check an ENROL token; that the sign-in then issues one is proven by BootstrapRegisterIT (enrolment flow).
         try (Connection c = SampleAdminDb.app()) {
             c.setAutoCommit(false);
             try (PreparedStatement s = c.prepareStatement("select totp_enrolled from platform.admin_login_lookup(?)")) {

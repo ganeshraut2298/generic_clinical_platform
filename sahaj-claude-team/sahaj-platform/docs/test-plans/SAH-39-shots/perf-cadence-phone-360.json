@@ -5,34 +5,34 @@
   "order": "layer on first",
   "layerOn": {
     "layer": "on",
-    "syntheticPointerMoves": 89,
-    "pageFrames": 88,
+    "syntheticPointerMoves": 122,
+    "pageFrames": 121,
     "msBetweenPageFrames": {
-      "mean": 56.25,
-      "p95": 200,
-      "max": 266.7
+      "mean": 42.15,
+      "p95": 100,
+      "max": 500
     },
-    "pageFramesOver33ms": 35,
-    "layerFrames": 88,
+    "pageFramesOver33ms": 19,
+    "layerFrames": 121,
     "layerFrameMs": {
-      "median": 0.8,
-      "p95": 10.7,
-      "max": 57.5
+      "median": 0.6,
+      "p95": 2.7,
+      "max": 7.4
     },
-    "layerFramesOver8ms": 7,
-    "longTasks": 24,
-    "mainThreadBusyPercent": 94
+    "layerFramesOver8ms": 0,
+    "longTasks": 10,
+    "mainThreadBusyPercent": 67
   },
   "layerOff": {
     "layer": "off (control)",
-    "syntheticPointerMoves": 150,
-    "pageFrames": 149,
+    "syntheticPointerMoves": 206,
+    "pageFrames": 205,
     "msBetweenPageFrames": {
-      "mean": 33.44,
-      "p95": 83.3,
-      "max": 250
+      "mean": 24.06,
+      "p95": 50,
+      "max": 150
     },
-    "pageFramesOver33ms": 23,
+    "pageFramesOver33ms": 13,
     "layerFrames": 0,
     "layerFrameMs": {
       "median": 0,
@@ -40,7 +40,7 @@
       "max": 0
     },
     "layerFramesOver8ms": 0,
-    "longTasks": 16,
-    "mainThreadBusyPercent": 81
+    "longTasks": 9,
+    "mainThreadBusyPercent": 65
   }
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="1.06" tests="37" errors="0" skipped="0" failures="0" flakes="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="1.258" tests="37" errors="0" skipped="0" failures="0" flakes="0">
   <properties>
     <property name="java.specification.version" value="17"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -17,7 +17,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="US"/>
     <property name="sun.boot.library.path" value="C:\Program Files\Microsoft\jdk-17.0.21.21-hotspot\bin"/>
-    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914\surefirebooter-20261111124638916_3.jar C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914 2026-11-11T12-46-38_572-jvmRun1 surefire-20261111124638916_1tmp surefire_0-20261111124638916_2tmp"/>
+    <property name="sun.java.command" value="C:\Users\Hp\AppData\Local\Temp\surefire11600605898665760377\surefirebooter-20261111184402121_3.jar C:\Users\Hp\AppData\Local\Temp\surefire11600605898665760377 2026-11-11T18-44-01_850-jvmRun1 surefire-20261111184402121_1tmp surefire_0-20261111184402121_2tmp"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\test-classes;D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\classes;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter\3.5.16\spring-boot-starter-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot\3.5.16\spring-boot-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-context\6.2.19\spring-context-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\3.5.16\spring-boot-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-logging\3.5.16\spring-boot-starter-logging-3.5.16.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-classic\1.5.34\logback-classic-1.5.34.jar;C:\Users\Hp\.m2\repository\ch\qos\logback\logback-core\1.5.34\logback-core-1.5.34.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.24.3\log4j-to-slf4j-2.24.3.jar;C:\Users\Hp\.m2\repository\org\apache\logging\log4j\log4j-api\2.24.3\log4j-api-2.24.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\jul-to-slf4j\2.0.18\jul-to-slf4j-2.0.18.jar;C:\Users\Hp\.m2\repository\jakarta\annotation\jakarta.annotation-api\2.1.1\jakarta.annotation-api-2.1.1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-core\6.2.19\spring-core-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jcl\6.2.19\spring-jcl-6.2.19.jar;C:\Users\Hp\.m2\repository\org\yaml\snakeyaml\2.4\snakeyaml-2.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-web\3.5.16\spring-boot-starter-web-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-json\3.5.16\spring-boot-starter-json-3.5.16.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.21.4\jackson-datatype-jdk8-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.21.4\jackson-module-parameter-names-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\3.5.16\spring-boot-starter-tomcat-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\10.1.55\tomcat-embed-core-10.1.55.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\10.1.55\tomcat-embed-websocket-10.1.55.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-web\6.2.19\spring-web-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-beans\6.2.19\spring-beans-6.2.19.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-observation\1.15.12\micrometer-observation-1.15.12.jar;C:\Users\Hp\.m2\repository\io\micrometer\micrometer-commons\1.15.12\micrometer-commons-1.15.12.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-webmvc\6.2.19\spring-webmvc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-expression\6.2.19\spring-expression-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-security\3.5.16\spring-boot-starter-security-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-aop\6.2.19\spring-aop-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-config\6.5.11\spring-security-config-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-web\6.5.11\spring-security-web-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-validation\3.5.16\spring-boot-starter-validation-3.5.16.jar;C:\Users\Hp\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\10.1.55\tomcat-embed-el-10.1.55.jar;C:\Users\Hp\.m2\repository\org\hibernate\validator\hibernate-validator\8.0.3.Final\hibernate-validator-8.0.3.Final.jar;C:\Users\Hp\.m2\repository\jakarta\validation\jakarta.validation-api\3.0.2\jakarta.validation-api-3.0.2.jar;C:\Users\Hp\.m2\repository\org\jboss\logging\jboss-logging\3.6.3.Final\jboss-logging-3.6.3.Final.jar;C:\Users\Hp\.m2\repository\com\fasterxml\classmate\1.7.3\classmate-1.7.3.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-jdbc\3.5.16\spring-boot-starter-jdbc-3.5.16.jar;C:\Users\Hp\.m2\repository\com\zaxxer\HikariCP\6.3.3\HikariCP-6.3.3.jar;C:\Users\Hp\.m2\repository\org\slf4j\slf4j-api\2.0.18\slf4j-api-2.0.18.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-jdbc\6.2.19\spring-jdbc-6.2.19.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-tx\6.2.19\spring-tx-6.2.19.jar;C:\Users\Hp\.m2\repository\org\postgresql\postgresql\42.7.11\postgresql-42.7.11.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-core\11.7.2\flyway-core-11.7.2.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-toml\2.21.4\jackson-dataformat-toml-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.21.4\jackson-core-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.21.4\jackson-datatype-jsr310-2.21.4.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.21\jackson-annotations-2.21.jar;C:\Users\Hp\.m2\repository\org\flywaydb\flyway-database-postgresql\11.7.2\flyway-database-postgresql-11.7.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-core\1.4.14\spring-modulith-starter-core-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-api\1.4.14\spring-modulith-api-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-core\1.4.14\spring-modulith-core-1.4.14.jar;C:\Users\Hp\.m2\repository\com\tngtech\archunit\archunit\1.4.2\archunit-1.4.2.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-moments\1.4.14\spring-modulith-moments-1.4.14.jar;C:\Users\Hp\.m2\repository\org\jmolecules\jmolecules-events\1.10.0\jmolecules-events-1.10.0.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-api\0.12.6\jjwt-api-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-impl\0.12.6\jjwt-impl-0.12.6.jar;C:\Users\Hp\.m2\repository\io\jsonwebtoken\jjwt-jackson\0.12.6\jjwt-jackson-0.12.6.jar;C:\Users\Hp\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.21.4\jackson-databind-2.21.4.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-starter-test\3.5.16\spring-boot-starter-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test\3.5.16\spring-boot-test-3.5.16.jar;C:\Users\Hp\.m2\repository\org\springframework\boot\spring-boot-test-autoconfigure\3.5.16\spring-boot-test-autoconfigure-3.5.16.jar;C:\Users\Hp\.m2\repository\com\jayway\jsonpath\json-path\2.9.0\json-path-2.9.0.jar;C:\Users\Hp\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\4.0.5\jakarta.xml.bind-api-4.0.5.jar;C:\Users\Hp\.m2\repository\jakarta\activation\jakarta.activation-api\2.1.4\jakarta.activation-api-2.1.4.jar;C:\Users\Hp\.m2\repository\net\minidev\json-smart\2.5.2\json-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\net\minidev\accessors-smart\2.5.2\accessors-smart-2.5.2.jar;C:\Users\Hp\.m2\repository\org\ow2\asm\asm\9.7.1\asm-9.7.1.jar;C:\Users\Hp\.m2\repository\org\assertj\assertj-core\3.27.7\assertj-core-3.27.7.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy\1.17.8\byte-buddy-1.17.8.jar;C:\Users\Hp\.m2\repository\org\awaitility\awaitility\4.2.2\awaitility-4.2.2.jar;C:\Users\Hp\.m2\repository\org\hamcrest\hamcrest\3.0\hamcrest-3.0.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter\5.12.2\junit-jupiter-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.12.2\junit-jupiter-api-5.12.2.jar;C:\Users\Hp\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-commons\1.12.2\junit-platform-commons-1.12.2.jar;C:\Users\Hp\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.12.2\junit-jupiter-params-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.12.2\junit-jupiter-engine-5.12.2.jar;C:\Users\Hp\.m2\repository\org\junit\platform\junit-platform-engine\1.12.2\junit-platform-engine-1.12.2.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-core\5.17.0\mockito-core-5.17.0.jar;C:\Users\Hp\.m2\repository\net\bytebuddy\byte-buddy-agent\1.17.8\byte-buddy-agent-1.17.8.jar;C:\Users\Hp\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\Hp\.m2\repository\org\mockito\mockito-junit-jupiter\5.17.0\mockito-junit-jupiter-5.17.0.jar;C:\Users\Hp\.m2\repository\org\skyscreamer\jsonassert\1.5.3\jsonassert-1.5.3.jar;C:\Users\Hp\.m2\repository\com\vaadin\external\google\android-json\0.0.20131108.vaadin1\android-json-0.0.20131108.vaadin1.jar;C:\Users\Hp\.m2\repository\org\springframework\spring-test\6.2.19\spring-test-6.2.19.jar;C:\Users\Hp\.m2\repository\org\xmlunit\xmlunit-core\2.10.4\xmlunit-core-2.10.4.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-test\6.5.11\spring-security-test-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-core\6.5.11\spring-security-core-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\security\spring-security-crypto\6.5.11\spring-security-crypto-6.5.11.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-starter-test\1.4.14\spring-modulith-starter-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-test\1.4.14\spring-modulith-test-1.4.14.jar;C:\Users\Hp\.m2\repository\org\springframework\modulith\spring-modulith-docs\1.4.14\spring-modulith-docs-1.4.14.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-core\3.1.0\structurizr-core-3.1.0.jar;C:\Users\Hp\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\Hp\.m2\repository\com\structurizr\structurizr-export\3.1.0\structurizr-export-3.1.0.jar;"/>
     <property name="sun.cpu.endian" value="little"/>
@@ -34,7 +34,7 @@
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="FILE_LOG_CHARSET" value="windows-1252"/>
     <property name="java.awt.headless" value="true"/>
-    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire15549293786837214914\surefirebooter-20261111124638916_3.jar"/>
+    <property name="surefire.real.class.path" value="C:\Users\Hp\AppData\Local\Temp\surefire11600605898665760377\surefirebooter-20261111184402121_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="java.runtime.version" value="17.0.21.0.2+1-LTS"/>
@@ -53,7 +53,7 @@
     <property name="user.dir" value="D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
-    <property name="PID" value="16448"/>
+    <property name="PID" value="24504"/>
     <property name="sun.os.patch.level" value=""/>
     <property name="CONSOLE_LOG_CHARSET" value="windows-1252"/>
     <property name="native.encoding" value="Cp1252"/>
@@ -68,9 +68,9 @@
     <property name="sahaj.devtools" value="true"/>
     <property name="LOGGED_APPLICATION_NAME" value="[sahaj-backend] "/>
   </properties>
-  <testcase name="everyRequestChecksTheSessionRow" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.013">
-    <system-out><![CDATA[2026-11-11 12:49:26.543  INFO [requestId=,tenantId=] o.s.t.c.s.AnnotationConfigContextLoaderUtils - Could not detect default configuration classes for test class [com.sahaj.platform.web.admin.AdminAuthControllerTest]: AdminAuthControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-2026-11-11 12:49:26.582  INFO [requestId=,tenantId=] o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.sahaj.SahajApplication for test class com.sahaj.platform.web.admin.AdminAuthControllerTest
+  <testcase name="everyRequestChecksTheSessionRow" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.017">
+    <system-out><![CDATA[2026-11-11 18:46:23.854  INFO [requestId=,tenantId=] o.s.t.c.s.AnnotationConfigContextLoaderUtils - Could not detect default configuration classes for test class [com.sahaj.platform.web.admin.AdminAuthControllerTest]: AdminAuthControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-11-11 18:46:23.916  INFO [requestId=,tenantId=] o.s.b.t.c.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.sahaj.SahajApplication for test class com.sahaj.platform.web.admin.AdminAuthControllerTest
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -81,220 +81,220 @@
 
  :: Spring Boot ::               (v3.5.16)
 
-2026-11-11 12:49:26.595  INFO [requestId=,tenantId=] c.s.p.w.a.AdminAuthControllerTest - Starting AdminAuthControllerTest using Java 17.0.21.0.2 with PID 16448 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
-2026-11-11 12:49:26.596  INFO [requestId=,tenantId=] c.s.p.w.a.AdminAuthControllerTest - The following 1 profile is active: "dev"
-2026-11-11 12:49:27.241  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
-2026-11-11 12:49:27.242  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
-2026-11-11 12:49:27.242  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 0 ms
-2026-11-11 12:49:27.249  INFO [requestId=,tenantId=] c.s.p.w.a.AdminAuthControllerTest - Started AdminAuthControllerTest in 0.665 seconds (process running for 168.141)
-2026-11-11 12:49:27.259  INFO [requestId=cbdbc816-2964-473f-821f-cb9f443a4172,tenantId=] sahaj.access - request method=GET path=/api/v1/admin/me status=200 durationMs=4 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=cbdbc816-2964-473f-821f-cb9f443a4172
-2026-11-11 12:49:27.262  INFO [requestId=0ec76ef5-a855-45c0-a27c-46686ac3d2cb,tenantId=] sahaj.access - request method=GET path=/api/v1/admin/me status=200 durationMs=1 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=0ec76ef5-a855-45c0-a27c-46686ac3d2cb
+2026-11-11 18:46:23.933  INFO [requestId=,tenantId=] c.s.p.w.a.AdminAuthControllerTest - Starting AdminAuthControllerTest using Java 17.0.21.0.2 with PID 24504 (started by Hp in D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend)
+2026-11-11 18:46:23.933  INFO [requestId=,tenantId=] c.s.p.w.a.AdminAuthControllerTest - The following 1 profile is active: "dev"
+2026-11-11 18:46:24.707  INFO [requestId=,tenantId=] o.s.b.t.m.w.SpringBootMockServletContext - Initializing Spring TestDispatcherServlet ''
+2026-11-11 18:46:24.707  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Initializing Servlet ''
+2026-11-11 18:46:24.708  INFO [requestId=,tenantId=] o.s.t.w.s.TestDispatcherServlet - Completed initialization in 1 ms
+2026-11-11 18:46:24.717  INFO [requestId=,tenantId=] c.s.p.w.a.AdminAuthControllerTest - Started AdminAuthControllerTest in 0.799 seconds (process running for 142.449)
+2026-11-11 18:46:24.733  INFO [requestId=5d2f2868-2711-45a6-b605-553d48916076,tenantId=] sahaj.access - request method=GET path=/api/v1/admin/me status=200 durationMs=6 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=5d2f2868-2711-45a6-b605-553d48916076
+2026-11-11 18:46:24.736  INFO [requestId=f972fba6-166f-4749-a63f-c04cb6e7b0d8,tenantId=] sahaj.access - request method=GET path=/api/v1/admin/me status=200 durationMs=2 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=f972fba6-166f-4749-a63f-c04cb6e7b0d8
 ]]></system-out>
   </testcase>
-  <testcase name="loginPassesTheServletRemoteAddressAndIgnoresForwardedHeaders" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.019">
-    <system-out><![CDATA[2026-11-11 12:49:27.282  INFO [requestId=2d2f5fc4-0e04-4c12-9213-b3116825f8e2,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=14 tenantId=- userId=- requestId=2d2f5fc4-0e04-4c12-9213-b3116825f8e2
+  <testcase name="loginPassesTheServletRemoteAddressAndIgnoresForwardedHeaders" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.02">
+    <system-out><![CDATA[2026-11-11 18:46:24.755  INFO [requestId=0b404cb0-67c5-4434-9bbb-bcbbc3e2f14f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=14 tenantId=- userId=- requestId=0b404cb0-67c5-4434-9bbb-bcbbc3e2f14f
 ]]></system-out>
   </testcase>
-  <testcase name="loginReturnsTheContractShapeWithNoStoreAndNoCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.287  INFO [requestId=5a3f3a44-39e1-4983-a68e-369ba43d626b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=5a3f3a44-39e1-4983-a68e-369ba43d626b
+  <testcase name="loginReturnsTheContractShapeWithNoStoreAndNoCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
+    <system-out><![CDATA[2026-11-11 18:46:24.762  INFO [requestId=e120f5cd-536c-4140-90d9-34f63ec5434a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=e120f5cd-536c-4140-90d9-34f63ec5434a
 ]]></system-out>
   </testcase>
-  <testcase name="refreshRotatesTheCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
-    <system-out><![CDATA[2026-11-11 12:49:27.295  INFO [requestId=c595ec60-a6e3-4f19-a955-40f93424e8e2,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=200 durationMs=3 tenantId=- userId=- requestId=c595ec60-a6e3-4f19-a955-40f93424e8e2
+  <testcase name="refreshRotatesTheCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.011">
+    <system-out><![CDATA[2026-11-11 18:46:24.773  INFO [requestId=ecfadccf-ee06-424e-afd6-283c95cb2205,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=200 durationMs=5 tenantId=- userId=- requestId=ecfadccf-ee06-424e-afd6-283c95cb2205
 ]]></system-out>
   </testcase>
   <testcase name="aDatabaseFailureInTheSessionCheckFailsClosedWith503" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.008">
-    <system-out><![CDATA[2026-11-11 12:49:27.302 ERROR [requestId=4b900f85-30f4-4fcb-98ba-4509f0f9f5d4,tenantId=] c.s.p.w.a.AdminJwtAuthenticationFilter - Admin session check failed type=java.lang.IllegalStateException
-2026-11-11 12:49:27.304  INFO [requestId=4b900f85-30f4-4fcb-98ba-4509f0f9f5d4,tenantId=] sahaj.access - request method=GET path=unmatched status=503 durationMs=3 tenantId=- userId=- requestId=4b900f85-30f4-4fcb-98ba-4509f0f9f5d4
+    <system-out><![CDATA[2026-11-11 18:46:24.780 ERROR [requestId=7accd1d2-2755-4b89-8409-f54b2e769f3d,tenantId=] c.s.p.w.a.AdminJwtAuthenticationFilter - Admin session check failed type=java.lang.IllegalStateException
+2026-11-11 18:46:24.783  INFO [requestId=7accd1d2-2755-4b89-8409-f54b2e769f3d,tenantId=] sahaj.access - request method=GET path=unmatched status=503 durationMs=4 tenantId=- userId=- requestId=7accd1d2-2755-4b89-8409-f54b2e769f3d
 ]]></system-out>
   </testcase>
-  <testcase name="anUnknownAdminRouteNeedsTheAdminRole" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.310  INFO [requestId=dba7d637-e562-4b06-975a-143002db40d4,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=dba7d637-e562-4b06-975a-143002db40d4
+  <testcase name="anUnknownAdminRouteNeedsTheAdminRole" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
+    <system-out><![CDATA[2026-11-11 18:46:24.790  INFO [requestId=f05527ca-bdd0-42c8-8886-973c59083fca,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=f05527ca-bdd0-42c8-8886-973c59083fca
 ]]></system-out>
   </testcase>
-  <testcase name="anUnexpectedFailureIsAGenericProblemWithoutDetail" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.011">
-    <system-out><![CDATA[2026-11-11 12:49:27.321 ERROR [requestId=b853e499-5c38-4227-a242-ad21180516da,tenantId=] c.s.p.w.a.AdminProblemExceptionHandler - An admin authenticator secret could not be decrypted. Check SAHAJ_ADMIN_TOTP_KEY.
-2026-11-11 12:49:27.321  INFO [requestId=b853e499-5c38-4227-a242-ad21180516da,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=500 durationMs=6 tenantId=- userId=- requestId=b853e499-5c38-4227-a242-ad21180516da
+  <testcase name="anUnexpectedFailureIsAGenericProblemWithoutDetail" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.012">
+    <system-out><![CDATA[2026-11-11 18:46:24.803 ERROR [requestId=232e3a7a-e703-44ff-9f82-4f02d2c43d95,tenantId=] c.s.p.w.a.AdminProblemExceptionHandler - An admin authenticator secret could not be decrypted. Check SAHAJ_ADMIN_TOTP_KEY.
+2026-11-11 18:46:24.804  INFO [requestId=232e3a7a-e703-44ff-9f82-4f02d2c43d95,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=500 durationMs=7 tenantId=- userId=- requestId=232e3a7a-e703-44ff-9f82-4f02d2c43d95
 ]]></system-out>
   </testcase>
-  <testcase name="enrolConflictsAndExpiry" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.013">
-    <system-out><![CDATA[2026-11-11 12:49:27.332  INFO [requestId=2c5d97ce-e827-401e-8b98-f4acf1631e9d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=409 durationMs=5 tenantId=- userId=- requestId=2c5d97ce-e827-401e-8b98-f4acf1631e9d
-2026-11-11 12:49:27.335  INFO [requestId=11bad32b-29a8-4b0f-b437-b58e9dd07641,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=401 durationMs=2 tenantId=- userId=- requestId=11bad32b-29a8-4b0f-b437-b58e9dd07641
+  <testcase name="enrolConflictsAndExpiry" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.012">
+    <system-out><![CDATA[2026-11-11 18:46:24.813  INFO [requestId=b297b0d7-4fcc-4293-9eb3-9033236ff6e0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=409 durationMs=4 tenantId=- userId=- requestId=b297b0d7-4fcc-4293-9eb3-9033236ff6e0
+2026-11-11 18:46:24.816  INFO [requestId=a83910d9-7e6d-4c8a-b905-e11c519cbaae,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=401 durationMs=1 tenantId=- userId=- requestId=a83910d9-7e6d-4c8a-b905-e11c519cbaae
 ]]></system-out>
   </testcase>
-  <testcase name="aPreAuthTokenIsNotABearerToken" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.341  INFO [requestId=767f9726-45bd-4cb1-8b7a-8cbcebcc0992,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=767f9726-45bd-4cb1-8b7a-8cbcebcc0992
+  <testcase name="aPreAuthTokenIsNotABearerToken" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 18:46:24.823  INFO [requestId=03f92410-39ad-41ba-b2eb-b766e3c47585,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=03f92410-39ad-41ba-b2eb-b766e3c47585
 ]]></system-out>
   </testcase>
   <testcase name="lockedProblemCarriesRetryAfterSecondsAndTheHeader" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
-    <system-out><![CDATA[2026-11-11 12:49:27.348  INFO [requestId=097ae616-0b4c-4ece-8665-eadd37fae1bf,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=423 durationMs=2 tenantId=- userId=- requestId=097ae616-0b4c-4ece-8665-eadd37fae1bf
+    <system-out><![CDATA[2026-11-11 18:46:24.830  INFO [requestId=77980982-c468-46ba-98dd-2eb996ba1e6b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=423 durationMs=2 tenantId=- userId=- requestId=77980982-c468-46ba-98dd-2eb996ba1e6b
 ]]></system-out>
   </testcase>
-  <testcase name="loginRefusesAPasswordOver128Characters" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.008">
-    <system-out><![CDATA[2026-11-11 12:49:27.356  INFO [requestId=ac90b06d-e57a-48c6-ab5f-e491bad302f2,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=400 durationMs=4 tenantId=- userId=- requestId=ac90b06d-e57a-48c6-ab5f-e491bad302f2
+  <testcase name="loginRefusesAPasswordOver128Characters" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.009">
+    <system-out><![CDATA[2026-11-11 18:46:24.840  INFO [requestId=e947088a-6060-4b9e-99cf-091363aab7b2,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=400 durationMs=6 tenantId=- userId=- requestId=e947088a-6060-4b9e-99cf-091363aab7b2
 ]]></system-out>
   </testcase>
   <testcase name="verifySetsTheScopedRefreshCookieAndReturnsTheResult" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
-    <system-out><![CDATA[2026-11-11 12:49:27.362  INFO [requestId=9d4866ab-68ea-460a-a134-88dfdf7b4f83,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=200 durationMs=1 tenantId=- userId=- requestId=9d4866ab-68ea-460a-a134-88dfdf7b4f83
+    <system-out><![CDATA[2026-11-11 18:46:24.846  INFO [requestId=994c6452-b365-425d-9c4f-dfccb77324dc,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=200 durationMs=1 tenantId=- userId=- requestId=994c6452-b365-425d-9c4f-dfccb77324dc
 ]]></system-out>
   </testcase>
-  <testcase name="enrolRefusesAMalformedPreAuthToken" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
-    <system-out><![CDATA[2026-11-11 12:49:27.368  INFO [requestId=fea9f683-2267-4350-b812-c1930c528ff9,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=400 durationMs=3 tenantId=- userId=- requestId=fea9f683-2267-4350-b812-c1930c528ff9
+  <testcase name="enrolRefusesAMalformedPreAuthToken" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
+    <system-out><![CDATA[2026-11-11 18:46:24.855  INFO [requestId=4112534d-1157-4024-a364-e75b25d5f3d3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=400 durationMs=4 tenantId=- userId=- requestId=4112534d-1157-4024-a364-e75b25d5f3d3
 ]]></system-out>
   </testcase>
   <testcase name="verifyAtEnrolmentCarriesTheRecoveryCodesOnce" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
-    <system-out><![CDATA[2026-11-11 12:49:27.376  INFO [requestId=67a90d6c-fafa-42fc-9776-30e477916505,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=200 durationMs=2 tenantId=- userId=- requestId=67a90d6c-fafa-42fc-9776-30e477916505
+    <system-out><![CDATA[2026-11-11 18:46:24.861  INFO [requestId=92284718-7652-40e3-8ce3-ddf4a65e434b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=200 durationMs=1 tenantId=- userId=- requestId=92284718-7652-40e3-8ce3-ddf4a65e434b
 ]]></system-out>
   </testcase>
-  <testcase name="refreshIgnoresTheClinicCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.381  INFO [requestId=13f54bc8-dbe8-46f1-9f0a-928b99e33aed,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=13f54bc8-dbe8-46f1-9f0a-928b99e33aed
+  <testcase name="refreshIgnoresTheClinicCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 18:46:24.866  INFO [requestId=8bb5dae2-f398-4227-9bd6-25dc88154e11,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=8bb5dae2-f398-4227-9bd6-25dc88154e11
 ]]></system-out>
   </testcase>
-  <testcase name="anEndedSessionAnswersAdminSessionEndedEvenWithAValidToken" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
-    <system-out><![CDATA[2026-11-11 12:49:27.388  INFO [requestId=8eb82978-e6a5-460b-bf04-6dbbf794ff04,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=1 tenantId=- userId=- requestId=8eb82978-e6a5-460b-bf04-6dbbf794ff04
+  <testcase name="anEndedSessionAnswersAdminSessionEndedEvenWithAValidToken" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
+    <system-out><![CDATA[2026-11-11 18:46:24.873  INFO [requestId=8bf25763-e816-42a1-a800-deebc3dbbe98,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=1 tenantId=- userId=- requestId=8bf25763-e816-42a1-a800-deebc3dbbe98
 ]]></system-out>
   </testcase>
-  <testcase name="verifyWrongCodeAndExpiredTokenProblems" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.008">
-    <system-out><![CDATA[2026-11-11 12:49:27.393  INFO [requestId=514719af-5702-42cd-b72f-934b795bae67,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=401 durationMs=1 tenantId=- userId=- requestId=514719af-5702-42cd-b72f-934b795bae67
-2026-11-11 12:49:27.396  INFO [requestId=8fbefef9-ab93-4a01-a1c3-cc7906099309,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=409 durationMs=1 tenantId=- userId=- requestId=8fbefef9-ab93-4a01-a1c3-cc7906099309
+  <testcase name="verifyWrongCodeAndExpiredTokenProblems" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
+    <system-out><![CDATA[2026-11-11 18:46:24.879  INFO [requestId=fc420d12-ae09-403c-8547-17cefa4ac07a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=401 durationMs=1 tenantId=- userId=- requestId=fc420d12-ae09-403c-8547-17cefa4ac07a
+2026-11-11 18:46:24.882  INFO [requestId=b87a6f0a-5b07-49d4-b9ee-0fc708a90a02,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=409 durationMs=1 tenantId=- userId=- requestId=b87a6f0a-5b07-49d4-b9ee-0fc708a90a02
 ]]></system-out>
   </testcase>
-  <testcase name="signOutNeedsAnAdminTokenRevokesAndClearsTheCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
-    <system-out><![CDATA[2026-11-11 12:49:27.403  INFO [requestId=b97ca575-558b-40e1-a093-85e1c1083588,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/sign-out status=204 durationMs=2 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=b97ca575-558b-40e1-a093-85e1c1083588
+  <testcase name="signOutNeedsAnAdminTokenRevokesAndClearsTheCookie" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
+    <system-out><![CDATA[2026-11-11 18:46:24.889  INFO [requestId=c5f2ed8f-b4d4-40be-94f4-e41afb3e12bf,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/sign-out status=204 durationMs=2 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=c5f2ed8f-b4d4-40be-94f4-e41afb3e12bf
 ]]></system-out>
   </testcase>
   <testcase name="verifyValidatesTheCodeFormats" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
-    <system-out><![CDATA[2026-11-11 12:49:27.409  INFO [requestId=0bd9e6c6-d983-4ced-b8a4-e1fb826219ad,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=400 durationMs=1 tenantId=- userId=- requestId=0bd9e6c6-d983-4ced-b8a4-e1fb826219ad
-2026-11-11 12:49:27.410  INFO [requestId=34629277-73dd-4cf5-a8d6-211fe7a16ea8,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=400 durationMs=1 tenantId=- userId=- requestId=34629277-73dd-4cf5-a8d6-211fe7a16ea8
+    <system-out><![CDATA[2026-11-11 18:46:24.895  INFO [requestId=8d2e6626-116f-47d0-be68-b5abf6e71da5,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=400 durationMs=1 tenantId=- userId=- requestId=8d2e6626-116f-47d0-be68-b5abf6e71da5
+2026-11-11 18:46:24.897  INFO [requestId=8e182d49-a130-42c6-9e7e-d2c00569388f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=400 durationMs=1 tenantId=- userId=- requestId=8e182d49-a130-42c6-9e7e-d2c00569388f
 ]]></system-out>
   </testcase>
-  <testcase name="theTwentyFirstSignInRequestFromOneAddressIs429" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.039">
-    <system-out><![CDATA[2026-11-11 12:49:27.416  INFO [requestId=e8848f8e-fb29-4a50-8d60-ef1a3dea2ae4,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=e8848f8e-fb29-4a50-8d60-ef1a3dea2ae4
-2026-11-11 12:49:27.418  INFO [requestId=cf1fc3a1-bab6-4ac4-968d-980f0e16ec13,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=cf1fc3a1-bab6-4ac4-968d-980f0e16ec13
-2026-11-11 12:49:27.420  INFO [requestId=db9c8a0a-c55d-4cc2-8117-009fc73afb3b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=db9c8a0a-c55d-4cc2-8117-009fc73afb3b
-2026-11-11 12:49:27.422  INFO [requestId=798e1e24-ce12-4476-a8af-d83a2c197422,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=798e1e24-ce12-4476-a8af-d83a2c197422
-2026-11-11 12:49:27.423  INFO [requestId=37dd6b83-01c2-41c2-8717-22c1077df8fa,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=37dd6b83-01c2-41c2-8717-22c1077df8fa
-2026-11-11 12:49:27.425  INFO [requestId=968f1d6f-15f7-45b5-ab3a-672c571f2e0a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=968f1d6f-15f7-45b5-ab3a-672c571f2e0a
-2026-11-11 12:49:27.426  INFO [requestId=3755f29c-9cbe-4953-91c7-4656ce290754,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=3755f29c-9cbe-4953-91c7-4656ce290754
-2026-11-11 12:49:27.428  INFO [requestId=093196ad-e64e-4f71-a959-47789efbf69c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=093196ad-e64e-4f71-a959-47789efbf69c
-2026-11-11 12:49:27.429  INFO [requestId=52d1e9f4-941e-485a-93ba-33a48b0c7bcc,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=52d1e9f4-941e-485a-93ba-33a48b0c7bcc
-2026-11-11 12:49:27.431  INFO [requestId=2936648a-3366-4b58-a290-d8f295cb55e1,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=2936648a-3366-4b58-a290-d8f295cb55e1
-2026-11-11 12:49:27.433  INFO [requestId=6a8ba9f3-40cd-4658-88b7-54d11f87ad0a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=6a8ba9f3-40cd-4658-88b7-54d11f87ad0a
-2026-11-11 12:49:27.434  INFO [requestId=70abbbdb-53b1-4ab7-80b5-dc955207eb28,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=70abbbdb-53b1-4ab7-80b5-dc955207eb28
-2026-11-11 12:49:27.436  INFO [requestId=870c060f-bf83-43c9-b982-a2f6a7d40b4d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=870c060f-bf83-43c9-b982-a2f6a7d40b4d
-2026-11-11 12:49:27.438  INFO [requestId=6950053d-8340-4c90-9a7d-fe59d58f2fd1,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=6950053d-8340-4c90-9a7d-fe59d58f2fd1
-2026-11-11 12:49:27.440  INFO [requestId=bd2a64ec-e2eb-4bf7-b852-f8d0b4e7fd5c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=bd2a64ec-e2eb-4bf7-b852-f8d0b4e7fd5c
-2026-11-11 12:49:27.441  INFO [requestId=d6514e2a-5262-4a95-a184-9e3415afc31c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=d6514e2a-5262-4a95-a184-9e3415afc31c
-2026-11-11 12:49:27.442  INFO [requestId=39b7cdad-c1ec-4967-9200-28ceee85ce7f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=39b7cdad-c1ec-4967-9200-28ceee85ce7f
-2026-11-11 12:49:27.444  INFO [requestId=002f2a7d-626b-42bd-aebe-03866ca7d0b6,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=002f2a7d-626b-42bd-aebe-03866ca7d0b6
-2026-11-11 12:49:27.445  INFO [requestId=4e414c0e-f2f4-453f-b498-7d566f9ba347,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=4e414c0e-f2f4-453f-b498-7d566f9ba347
-2026-11-11 12:49:27.446  INFO [requestId=5210acc9-b9ce-4570-b4bb-ae9d4667b1ea,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=5210acc9-b9ce-4570-b4bb-ae9d4667b1ea
-2026-11-11 12:49:27.447  INFO [requestId=91fd30df-2575-4f96-bf6f-4bbda27ac63c,tenantId=] sahaj.access - request method=POST path=unmatched status=429 durationMs=0 tenantId=- userId=- requestId=91fd30df-2575-4f96-bf6f-4bbda27ac63c
-2026-11-11 12:49:27.448  INFO [requestId=c2f45cc8-22db-4a53-9010-501e54d7b797,tenantId=] sahaj.access - request method=POST path=unmatched status=429 durationMs=0 tenantId=- userId=- requestId=c2f45cc8-22db-4a53-9010-501e54d7b797
-2026-11-11 12:49:27.450  INFO [requestId=eee8ca2e-1cfa-4d45-b189-1b9d4391daac,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=eee8ca2e-1cfa-4d45-b189-1b9d4391daac
+  <testcase name="theTwentyFirstSignInRequestFromOneAddressIs429" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.042">
+    <system-out><![CDATA[2026-11-11 18:46:24.903  INFO [requestId=aac9c45e-cb06-4c21-b9c3-a62c4caeb4f2,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=aac9c45e-cb06-4c21-b9c3-a62c4caeb4f2
+2026-11-11 18:46:24.905  INFO [requestId=ee71ae67-5a9b-4d2b-9e28-f66633415fa3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=ee71ae67-5a9b-4d2b-9e28-f66633415fa3
+2026-11-11 18:46:24.906  INFO [requestId=e645ec54-4e0a-49de-b4e5-c301991343dd,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=e645ec54-4e0a-49de-b4e5-c301991343dd
+2026-11-11 18:46:24.907  INFO [requestId=148cf9e2-4398-40b6-bd79-e21b97dc96b1,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=148cf9e2-4398-40b6-bd79-e21b97dc96b1
+2026-11-11 18:46:24.909  INFO [requestId=3df08b44-b663-4704-af63-5256fee17fba,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=3df08b44-b663-4704-af63-5256fee17fba
+2026-11-11 18:46:24.911  INFO [requestId=a39047c7-6ad8-46f8-9864-52a0c645f4e0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=a39047c7-6ad8-46f8-9864-52a0c645f4e0
+2026-11-11 18:46:24.912  INFO [requestId=bd55bdb6-ca1c-4b60-a114-804133aa75d5,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=bd55bdb6-ca1c-4b60-a114-804133aa75d5
+2026-11-11 18:46:24.914  INFO [requestId=9d4712c3-d521-4870-8b8d-a744af747179,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=9d4712c3-d521-4870-8b8d-a744af747179
+2026-11-11 18:46:24.915  INFO [requestId=812de5bf-e298-4486-90cd-923b230e76f7,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=812de5bf-e298-4486-90cd-923b230e76f7
+2026-11-11 18:46:24.917  INFO [requestId=f45e2fe2-24cf-441a-a526-8a1f7f668ef3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=f45e2fe2-24cf-441a-a526-8a1f7f668ef3
+2026-11-11 18:46:24.920  INFO [requestId=79b38e9f-cd48-478f-8409-48690e862a19,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=79b38e9f-cd48-478f-8409-48690e862a19
+2026-11-11 18:46:24.922  INFO [requestId=b4152d86-110e-47c1-8839-4d5dc898cbff,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=b4152d86-110e-47c1-8839-4d5dc898cbff
+2026-11-11 18:46:24.923  INFO [requestId=c464e10d-aca9-4352-a4c8-3c490fdbfb81,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=c464e10d-aca9-4352-a4c8-3c490fdbfb81
+2026-11-11 18:46:24.925  INFO [requestId=03ae86cd-e661-4d7b-b1cd-b7b5524548b3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=03ae86cd-e661-4d7b-b1cd-b7b5524548b3
+2026-11-11 18:46:24.927  INFO [requestId=4f35e900-a236-428c-8ef1-8b7c76ed7e03,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=4f35e900-a236-428c-8ef1-8b7c76ed7e03
+2026-11-11 18:46:24.929  INFO [requestId=f5f56b14-1b9b-4be5-aa32-fbc933ab8d1f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=f5f56b14-1b9b-4be5-aa32-fbc933ab8d1f
+2026-11-11 18:46:24.931  INFO [requestId=09044d19-1703-479f-97fb-1b3e4a14de55,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=09044d19-1703-479f-97fb-1b3e4a14de55
+2026-11-11 18:46:24.932  INFO [requestId=73f82c0a-204a-4b56-ac3b-e55f0a7b03d2,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=73f82c0a-204a-4b56-ac3b-e55f0a7b03d2
+2026-11-11 18:46:24.933  INFO [requestId=6ffef2bb-b0c6-42ec-b661-705ff2c86ac1,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=6ffef2bb-b0c6-42ec-b661-705ff2c86ac1
+2026-11-11 18:46:24.936  INFO [requestId=345f612b-c658-4bf8-9ab0-072cc6fe8c86,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=345f612b-c658-4bf8-9ab0-072cc6fe8c86
+2026-11-11 18:46:24.937  INFO [requestId=ecf227a6-f9b6-4e6f-88ea-43918f7a597a,tenantId=] sahaj.access - request method=POST path=unmatched status=429 durationMs=0 tenantId=- userId=- requestId=ecf227a6-f9b6-4e6f-88ea-43918f7a597a
+2026-11-11 18:46:24.938  INFO [requestId=60cb0b77-4b53-4719-8889-1f26c57b583f,tenantId=] sahaj.access - request method=POST path=unmatched status=429 durationMs=0 tenantId=- userId=- requestId=60cb0b77-4b53-4719-8889-1f26c57b583f
+2026-11-11 18:46:24.939  INFO [requestId=1a14bc72-11c4-4823-b9ba-0cf506da77dc,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=1a14bc72-11c4-4823-b9ba-0cf506da77dc
 ]]></system-out>
   </testcase>
   <testcase name="anAdminTokenIsRefusedOnTheClinicApi" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.008">
-    <system-out><![CDATA[2026-11-11 12:49:27.456  INFO [requestId=b567a6ea-c811-450b-bfc0-c26e07434023,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=b567a6ea-c811-450b-bfc0-c26e07434023
-2026-11-11 12:49:27.458  INFO [requestId=4a19980b-f33b-48df-9f6f-6d7fe183f97f,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=4a19980b-f33b-48df-9f6f-6d7fe183f97f
+    <system-out><![CDATA[2026-11-11 18:46:24.945  INFO [requestId=7921048b-5a96-40a5-a3d6-d7b8b55ff6b9,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=7921048b-5a96-40a5-a3d6-d7b8b55ff6b9
+2026-11-11 18:46:24.947  INFO [requestId=76da1efa-ddeb-4359-a195-205e3f8c9b7c,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=76da1efa-ddeb-4359-a195-205e3f8c9b7c
 ]]></system-out>
   </testcase>
-  <testcase name="aClinicRoleNeverSatisfiesAnAdminRoute" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.009">
-    <system-out><![CDATA[2026-11-11 12:49:27.462  WARN [requestId=,tenantId=] o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/api/v1/admin/me' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
-2026-11-11 12:49:27.466  INFO [requestId=046fb253-d554-412c-a402-18a90825394c,tenantId=] sahaj.access - request method=GET path=unmatched status=403 durationMs=0 tenantId=- userId=- requestId=046fb253-d554-412c-a402-18a90825394c
+  <testcase name="aClinicRoleNeverSatisfiesAnAdminRoute" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
+    <system-out><![CDATA[2026-11-11 18:46:24.953  WARN [requestId=,tenantId=] o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/api/v1/admin/me' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
+2026-11-11 18:46:24.954  INFO [requestId=2b6a8bfe-ef9c-4ec5-b08d-aa66a80d6366,tenantId=] sahaj.access - request method=GET path=unmatched status=403 durationMs=0 tenantId=- userId=- requestId=2b6a8bfe-ef9c-4ec5-b08d-aa66a80d6366
 ]]></system-out>
   </testcase>
-  <testcase name="credentialsInvalidProblem" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.474  INFO [requestId=e072bfc5-20e7-49a4-98ec-5863d40110fe,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=401 durationMs=1 tenantId=- userId=- requestId=e072bfc5-20e7-49a4-98ec-5863d40110fe
+  <testcase name="credentialsInvalidProblem" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
+    <system-out><![CDATA[2026-11-11 18:46:24.961  INFO [requestId=6a50064d-1d98-431e-b6c8-28504c731e8b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=401 durationMs=2 tenantId=- userId=- requestId=6a50064d-1d98-431e-b6c8-28504c731e8b
 ]]></system-out>
   </testcase>
   <testcase name="refreshWithoutTheCookieIsSessionEnded" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.478  INFO [requestId=d42b80e7-32f8-4f81-a103-e68e7bef5ca0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=d42b80e7-32f8-4f81-a103-e68e7bef5ca0
+    <system-out><![CDATA[2026-11-11 18:46:24.966  INFO [requestId=a6768058-ed45-49d9-ae59-d5c45d9f70c0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=a6768058-ed45-49d9-ae59-d5c45d9f70c0
 ]]></system-out>
   </testcase>
-  <testcase name="loginAcceptsSurroundingSpacesInTheEmail" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.483  INFO [requestId=5ef40648-416b-43ac-8c03-91062b064f44,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=5ef40648-416b-43ac-8c03-91062b064f44
+  <testcase name="loginAcceptsSurroundingSpacesInTheEmail" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 18:46:24.972  INFO [requestId=a3d69bfa-cb1f-43cd-bdf4-4e8d45ad57cc,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=a3d69bfa-cb1f-43cd-bdf4-4e8d45ad57cc
 ]]></system-out>
   </testcase>
-  <testcase name="noTokenIs401Unauthorized" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.003">
-    <system-out><![CDATA[2026-11-11 12:49:27.488  INFO [requestId=28eb6e05-1446-4b84-bbec-84e3bb5457d9,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=28eb6e05-1446-4b84-bbec-84e3bb5457d9
+  <testcase name="noTokenIs401Unauthorized" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 18:46:24.976  INFO [requestId=c2b0f872-9e64-41d5-9c84-0a2fe77892b7,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=c2b0f872-9e64-41d5-9c84-0a2fe77892b7
 ]]></system-out>
   </testcase>
   <testcase name="aClinicTokenIsIgnoredOnThePublicSignInRoute" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.493  INFO [requestId=29713ee1-a67a-435e-878b-0596b669bf1a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=0 tenantId=- userId=- requestId=29713ee1-a67a-435e-878b-0596b669bf1a
+    <system-out><![CDATA[2026-11-11 18:46:24.982  INFO [requestId=79a4a38e-bd36-4948-9dca-2bcab3c84791,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=200 durationMs=1 tenantId=- userId=- requestId=79a4a38e-bd36-4948-9dca-2bcab3c84791
 ]]></system-out>
   </testcase>
-  <testcase name="meReturnsTheSignedInAdmin" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
-    <system-out><![CDATA[2026-11-11 12:49:27.499  INFO [requestId=0e58da7d-4647-4765-8e07-69f1a13f9ad5,tenantId=] sahaj.access - request method=GET path=/api/v1/admin/me status=200 durationMs=1 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=0e58da7d-4647-4765-8e07-69f1a13f9ad5
+  <testcase name="meReturnsTheSignedInAdmin" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
+    <system-out><![CDATA[2026-11-11 18:46:24.989  INFO [requestId=6742eceb-b32a-4352-ade2-4d547182fa47,tenantId=] sahaj.access - request method=GET path=/api/v1/admin/me status=200 durationMs=2 tenantId=- userId=11111111-1111-1111-1111-111111111111 requestId=6742eceb-b32a-4352-ade2-4d547182fa47
 ]]></system-out>
   </testcase>
-  <testcase name="aReusedRefreshTokenIsSessionEnded" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
-    <system-out><![CDATA[2026-11-11 12:49:27.504  INFO [requestId=a3d945c2-3353-4c81-90ef-71dee520bf13,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=a3d945c2-3353-4c81-90ef-71dee520bf13
+  <testcase name="aReusedRefreshTokenIsSessionEnded" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.005">
+    <system-out><![CDATA[2026-11-11 18:46:24.995  INFO [requestId=056b9f54-1f9f-4cb3-aba5-86d3c846c6fa,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=056b9f54-1f9f-4cb3-aba5-86d3c846c6fa
 ]]></system-out>
   </testcase>
-  <testcase name="theThirtyFirstRefreshFromOneAddressIs429" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.05">
-    <system-out><![CDATA[2026-11-11 12:49:27.509  INFO [requestId=e01e187b-1431-470e-b0c1-fc16ed5afcf3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=e01e187b-1431-470e-b0c1-fc16ed5afcf3
-2026-11-11 12:49:27.511  INFO [requestId=290cf7ea-1c05-4cf5-8ed3-ad77a80f369d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=290cf7ea-1c05-4cf5-8ed3-ad77a80f369d
-2026-11-11 12:49:27.513  INFO [requestId=46b3520b-0a71-4ff8-beba-e838f8fd7313,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=46b3520b-0a71-4ff8-beba-e838f8fd7313
-2026-11-11 12:49:27.515  INFO [requestId=b0810f25-f5fe-4976-93ef-0b3a6bd824f3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=b0810f25-f5fe-4976-93ef-0b3a6bd824f3
-2026-11-11 12:49:27.516  INFO [requestId=21333a0d-f626-4254-a288-55e8a4665480,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=21333a0d-f626-4254-a288-55e8a4665480
-2026-11-11 12:49:27.518  INFO [requestId=ac5b5dc3-3401-40db-b908-2efbebff8aa7,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=ac5b5dc3-3401-40db-b908-2efbebff8aa7
-2026-11-11 12:49:27.521  INFO [requestId=1ab52f32-1020-47d4-871e-148b062afb38,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=1ab52f32-1020-47d4-871e-148b062afb38
-2026-11-11 12:49:27.523  INFO [requestId=f7fdd435-1b3d-4799-a175-62cabfe93c93,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=f7fdd435-1b3d-4799-a175-62cabfe93c93
-2026-11-11 12:49:27.524  INFO [requestId=6bbaa268-d442-490c-94e6-0d4cae4bd33b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=6bbaa268-d442-490c-94e6-0d4cae4bd33b
-2026-11-11 12:49:27.526  INFO [requestId=cd4a7bb9-90ac-4e80-8dae-302e5a36564f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=cd4a7bb9-90ac-4e80-8dae-302e5a36564f
-2026-11-11 12:49:27.527  INFO [requestId=80eb8255-e797-431d-b498-89866bd01ce0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=80eb8255-e797-431d-b498-89866bd01ce0
-2026-11-11 12:49:27.529  INFO [requestId=aba38140-560d-4c3d-be0e-b742e55ad334,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=aba38140-560d-4c3d-be0e-b742e55ad334
-2026-11-11 12:49:27.531  INFO [requestId=e0960979-38e1-463c-b0ac-d6b9a08a0323,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=e0960979-38e1-463c-b0ac-d6b9a08a0323
-2026-11-11 12:49:27.532  INFO [requestId=23f09b47-2b67-47b4-b4c9-49c212fee3dc,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=23f09b47-2b67-47b4-b4c9-49c212fee3dc
-2026-11-11 12:49:27.534  INFO [requestId=08d38c20-eb85-4356-8a31-2044a4dd5ad3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=08d38c20-eb85-4356-8a31-2044a4dd5ad3
-2026-11-11 12:49:27.535  INFO [requestId=1cfdc2c1-aa52-4d76-b252-3958aac1b2f0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=1cfdc2c1-aa52-4d76-b252-3958aac1b2f0
-2026-11-11 12:49:27.536  INFO [requestId=95f264da-366b-4b01-bfa9-5f13684a6a25,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=95f264da-366b-4b01-bfa9-5f13684a6a25
-2026-11-11 12:49:27.538  INFO [requestId=b05b5e56-2050-4d9a-941c-5803599eb912,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=b05b5e56-2050-4d9a-941c-5803599eb912
-2026-11-11 12:49:27.539  INFO [requestId=e0cd92d3-502a-48c2-a800-949b1a73a85d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=e0cd92d3-502a-48c2-a800-949b1a73a85d
-2026-11-11 12:49:27.540  INFO [requestId=92c90f53-1bf1-4e40-a391-f0cb78f61723,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=92c90f53-1bf1-4e40-a391-f0cb78f61723
-2026-11-11 12:49:27.542  INFO [requestId=368ee286-8314-4c79-a5f3-4e27b19a6c9f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=368ee286-8314-4c79-a5f3-4e27b19a6c9f
-2026-11-11 12:49:27.543  INFO [requestId=d838e82c-f4ab-4f33-bd81-132941dff82f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=d838e82c-f4ab-4f33-bd81-132941dff82f
-2026-11-11 12:49:27.544  INFO [requestId=e7f44adc-1835-4138-9906-e0f388547520,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=e7f44adc-1835-4138-9906-e0f388547520
-2026-11-11 12:49:27.545  INFO [requestId=e65d8900-aa26-4290-a653-1f39d8d55959,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=e65d8900-aa26-4290-a653-1f39d8d55959
-2026-11-11 12:49:27.547  INFO [requestId=919f2fb6-f034-4141-9185-8318ed520e0c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=919f2fb6-f034-4141-9185-8318ed520e0c
-2026-11-11 12:49:27.548  INFO [requestId=63aeba30-c73e-441d-803d-70ed23ce2d26,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=63aeba30-c73e-441d-803d-70ed23ce2d26
-2026-11-11 12:49:27.550  INFO [requestId=7dde9c74-7ae6-4af7-94db-587a2818fbc6,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=7dde9c74-7ae6-4af7-94db-587a2818fbc6
-2026-11-11 12:49:27.551  INFO [requestId=8b275e19-caa4-4107-8507-0442ead8cca5,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=8b275e19-caa4-4107-8507-0442ead8cca5
-2026-11-11 12:49:27.552  INFO [requestId=64ab6d18-db21-4331-9bb1-bb074bfe32f7,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=64ab6d18-db21-4331-9bb1-bb074bfe32f7
-2026-11-11 12:49:27.553  INFO [requestId=858f404c-230f-4f3b-91a6-c7cd0b5fbdf3,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=858f404c-230f-4f3b-91a6-c7cd0b5fbdf3
-2026-11-11 12:49:27.554  INFO [requestId=7a03e3d3-4bf7-44eb-82cb-c60f245c4a76,tenantId=] sahaj.access - request method=POST path=unmatched status=429 durationMs=0 tenantId=- userId=- requestId=7a03e3d3-4bf7-44eb-82cb-c60f245c4a76
+  <testcase name="theThirtyFirstRefreshFromOneAddressIs429" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.058">
+    <system-out><![CDATA[2026-11-11 18:46:25.000  INFO [requestId=6017d240-d448-4578-ba1b-06dffecdf668,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=6017d240-d448-4578-ba1b-06dffecdf668
+2026-11-11 18:46:25.004  INFO [requestId=7f9d392a-101c-49ca-b901-5a74bdf9e772,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=2 tenantId=- userId=- requestId=7f9d392a-101c-49ca-b901-5a74bdf9e772
+2026-11-11 18:46:25.007  INFO [requestId=595e282a-f645-4a6a-9d4c-56962443860d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=2 tenantId=- userId=- requestId=595e282a-f645-4a6a-9d4c-56962443860d
+2026-11-11 18:46:25.009  INFO [requestId=b0bdfe33-40af-4f26-8657-0ea2092425dd,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=b0bdfe33-40af-4f26-8657-0ea2092425dd
+2026-11-11 18:46:25.011  INFO [requestId=ff54356c-63a4-4724-bb99-40bf83930511,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=ff54356c-63a4-4724-bb99-40bf83930511
+2026-11-11 18:46:25.012  INFO [requestId=e7e55ac4-888a-4146-9825-d55a51b33012,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=e7e55ac4-888a-4146-9825-d55a51b33012
+2026-11-11 18:46:25.014  INFO [requestId=4496cbee-45f8-4f72-90c6-f699d877224f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=4496cbee-45f8-4f72-90c6-f699d877224f
+2026-11-11 18:46:25.016  INFO [requestId=1a064104-da70-416c-a1d3-58368baa28be,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=1a064104-da70-416c-a1d3-58368baa28be
+2026-11-11 18:46:25.018  INFO [requestId=e5b93fa8-2506-45e6-8494-126400aef55c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=e5b93fa8-2506-45e6-8494-126400aef55c
+2026-11-11 18:46:25.020  INFO [requestId=0ec98cde-04ea-410f-8278-01f8504b9e1d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=0ec98cde-04ea-410f-8278-01f8504b9e1d
+2026-11-11 18:46:25.022  INFO [requestId=c0d851f3-5121-4a64-b1eb-555369619778,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=c0d851f3-5121-4a64-b1eb-555369619778
+2026-11-11 18:46:25.024  INFO [requestId=9c95a5b8-4407-41cf-9ef9-735af2276fec,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=9c95a5b8-4407-41cf-9ef9-735af2276fec
+2026-11-11 18:46:25.026  INFO [requestId=7c3990fe-f05e-4bab-b27d-cf2df9d7a26b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=7c3990fe-f05e-4bab-b27d-cf2df9d7a26b
+2026-11-11 18:46:25.028  INFO [requestId=b09258bb-8f5b-4a0a-ab2a-ceaeb289fbc0,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=b09258bb-8f5b-4a0a-ab2a-ceaeb289fbc0
+2026-11-11 18:46:25.029  INFO [requestId=38b7c3ba-baf5-42e5-9679-b05641df254a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=38b7c3ba-baf5-42e5-9679-b05641df254a
+2026-11-11 18:46:25.030  INFO [requestId=fa3c25c7-7765-432a-a966-926cf4ccd539,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=fa3c25c7-7765-432a-a966-926cf4ccd539
+2026-11-11 18:46:25.032  INFO [requestId=77d15cd9-551d-4199-bb34-c82b15247964,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=77d15cd9-551d-4199-bb34-c82b15247964
+2026-11-11 18:46:25.033  INFO [requestId=150b357f-bc25-417d-84c2-7b6f27b560c6,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=150b357f-bc25-417d-84c2-7b6f27b560c6
+2026-11-11 18:46:25.034  INFO [requestId=c375fa75-979e-478e-873f-464adecb57ff,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=c375fa75-979e-478e-873f-464adecb57ff
+2026-11-11 18:46:25.036  INFO [requestId=63e86d17-98fe-4ca6-8e85-c44aa59b1213,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=63e86d17-98fe-4ca6-8e85-c44aa59b1213
+2026-11-11 18:46:25.038  INFO [requestId=633a3e18-d822-4e2c-8bc1-5dc4db16c9db,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=633a3e18-d822-4e2c-8bc1-5dc4db16c9db
+2026-11-11 18:46:25.040  INFO [requestId=1082da62-e671-4cd2-b165-addb4c96211f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=1082da62-e671-4cd2-b165-addb4c96211f
+2026-11-11 18:46:25.041  INFO [requestId=6abd47f2-47e8-49dc-824d-d33b33e6580d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=6abd47f2-47e8-49dc-824d-d33b33e6580d
+2026-11-11 18:46:25.043  INFO [requestId=30dfdea6-198f-4a1e-aee3-966034779e4a,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=30dfdea6-198f-4a1e-aee3-966034779e4a
+2026-11-11 18:46:25.044  INFO [requestId=8454fc89-fc77-4b05-a4be-03048909967e,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=8454fc89-fc77-4b05-a4be-03048909967e
+2026-11-11 18:46:25.046  INFO [requestId=3ba83789-3f0e-49e6-8956-c2dc8771ed34,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=3ba83789-3f0e-49e6-8956-c2dc8771ed34
+2026-11-11 18:46:25.047  INFO [requestId=07fd763a-fb6c-475c-b02e-3153ce01f664,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=07fd763a-fb6c-475c-b02e-3153ce01f664
+2026-11-11 18:46:25.049  INFO [requestId=43ef72f1-eab1-44e4-8100-763c6976e4dc,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=43ef72f1-eab1-44e4-8100-763c6976e4dc
+2026-11-11 18:46:25.050  INFO [requestId=9135f47a-941c-459e-801c-2e3d3c225f8d,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=0 tenantId=- userId=- requestId=9135f47a-941c-459e-801c-2e3d3c225f8d
+2026-11-11 18:46:25.052  INFO [requestId=22c68e96-57fc-4dba-913a-b5c74f2f343b,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/refresh status=401 durationMs=1 tenantId=- userId=- requestId=22c68e96-57fc-4dba-913a-b5c74f2f343b
+2026-11-11 18:46:25.053  INFO [requestId=976148ab-a0fd-4b8b-b39e-14f4249a0390,tenantId=] sahaj.access - request method=POST path=unmatched status=429 durationMs=0 tenantId=- userId=- requestId=976148ab-a0fd-4b8b-b39e-14f4249a0390
 ]]></system-out>
   </testcase>
   <testcase name="verifyAcceptsARecoveryCodeInPlaceOfACode" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
-    <system-out><![CDATA[2026-11-11 12:49:27.559  INFO [requestId=269ff7d0-426a-466c-8cc4-e2bbb6fb268f,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=200 durationMs=1 tenantId=- userId=- requestId=269ff7d0-426a-466c-8cc4-e2bbb6fb268f
+    <system-out><![CDATA[2026-11-11 18:46:25.058  INFO [requestId=5a339865-5e9c-4c6c-851c-71edcc508524,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=200 durationMs=1 tenantId=- userId=- requestId=5a339865-5e9c-4c6c-851c-71edcc508524
 ]]></system-out>
   </testcase>
   <testcase name="perEmailRateLimitProblem" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
-    <system-out><![CDATA[2026-11-11 12:49:27.563  INFO [requestId=ef0b0743-8075-4dad-acc9-8d85929896aa,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=429 durationMs=1 tenantId=- userId=- requestId=ef0b0743-8075-4dad-acc9-8d85929896aa
+    <system-out><![CDATA[2026-11-11 18:46:25.063  INFO [requestId=c94e3417-0858-4f91-b7cb-407a2dae20e8,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=429 durationMs=1 tenantId=- userId=- requestId=c94e3417-0858-4f91-b7cb-407a2dae20e8
 ]]></system-out>
   </testcase>
-  <testcase name="aClinicTokenIsRefusedOnAdminRoutes" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
-    <system-out><![CDATA[2026-11-11 12:49:27.567  INFO [requestId=68e3688e-474b-4f0f-8150-f4c0840ba4d3,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=1 tenantId=- userId=- requestId=68e3688e-474b-4f0f-8150-f4c0840ba4d3
-2026-11-11 12:49:27.568  INFO [requestId=4b74763e-e08b-454d-9a85-12f1d358538a,tenantId=] sahaj.access - request method=POST path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=4b74763e-e08b-454d-9a85-12f1d358538a
+  <testcase name="aClinicTokenIsRefusedOnAdminRoutes" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
+    <system-out><![CDATA[2026-11-11 18:46:25.067  INFO [requestId=d835ebbe-40d4-430b-9275-e1479a542231,tenantId=] sahaj.access - request method=GET path=unmatched status=401 durationMs=1 tenantId=- userId=- requestId=d835ebbe-40d4-430b-9275-e1479a542231
+2026-11-11 18:46:25.069  INFO [requestId=3c10ca7b-2eeb-451c-8a3e-243fb1fb552a,tenantId=] sahaj.access - request method=POST path=unmatched status=401 durationMs=1 tenantId=- userId=- requestId=3c10ca7b-2eeb-451c-8a3e-243fb1fb552a
 ]]></system-out>
   </testcase>
-  <testcase name="loginValidationNamesTheFieldAndNeverEchoesTheValue" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.017">
-    <system-out><![CDATA[2026-11-11 12:49:27.572  INFO [requestId=2526817b-995e-4220-a854-6eb4ebba3cc9,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=400 durationMs=1 tenantId=- userId=- requestId=2526817b-995e-4220-a854-6eb4ebba3cc9
+  <testcase name="loginValidationNamesTheFieldAndNeverEchoesTheValue" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.021">
+    <system-out><![CDATA[2026-11-11 18:46:25.074  INFO [requestId=f426c64f-1049-43eb-a378-2192d6b052a1,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=400 durationMs=1 tenantId=- userId=- requestId=f426c64f-1049-43eb-a378-2192d6b052a1
 ]]></system-out>
   </testcase>
-  <testcase name="everyAdminRequestBodyRefusesAnUnknownFieldWithoutEchoingItsName" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.007">
-    <system-out><![CDATA[2026-11-11 12:49:27.590  INFO [requestId=abc1a63d-ae32-4db2-b4c7-dce8d2bf2220,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=400 durationMs=1 tenantId=- userId=- requestId=abc1a63d-ae32-4db2-b4c7-dce8d2bf2220
-2026-11-11 12:49:27.591  INFO [requestId=404946c4-1c82-4cde-aed4-ba3a26ea805c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=400 durationMs=0 tenantId=- userId=- requestId=404946c4-1c82-4cde-aed4-ba3a26ea805c
-2026-11-11 12:49:27.592  INFO [requestId=221df4e9-c00d-4088-a149-96481745e037,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=400 durationMs=0 tenantId=- userId=- requestId=221df4e9-c00d-4088-a149-96481745e037
+  <testcase name="everyAdminRequestBodyRefusesAnUnknownFieldWithoutEchoingItsName" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.008">
+    <system-out><![CDATA[2026-11-11 18:46:25.095  INFO [requestId=53d106f2-2f0e-40ca-83fd-b8d0d31b6ca1,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/login status=400 durationMs=1 tenantId=- userId=- requestId=53d106f2-2f0e-40ca-83fd-b8d0d31b6ca1
+2026-11-11 18:46:25.096  INFO [requestId=56af87f2-3663-4402-88ac-ceb3c53c3fe9,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=400 durationMs=0 tenantId=- userId=- requestId=56af87f2-3663-4402-88ac-ceb3c53c3fe9
+2026-11-11 18:46:25.098  INFO [requestId=7a55c7d8-3e6a-4fbd-8ba9-f017fb1c10b8,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/verify status=400 durationMs=0 tenantId=- userId=- requestId=7a55c7d8-3e6a-4fbd-8ba9-f017fb1c10b8
 ]]></system-out>
   </testcase>
-  <testcase name="enrolReturnsTheContractShape" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
-    <system-out><![CDATA[2026-11-11 12:49:27.597  INFO [requestId=185166b0-865c-4847-8f33-6d11f95a9551,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=200 durationMs=1 tenantId=- userId=- requestId=185166b0-865c-4847-8f33-6d11f95a9551
+  <testcase name="enrolReturnsTheContractShape" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.006">
+    <system-out><![CDATA[2026-11-11 18:46:25.104  INFO [requestId=8571b443-41a0-4ccf-a0d6-1255bc26ed8c,tenantId=] sahaj.access - request method=POST path=/api/v1/admin/auth/totp/enrol status=200 durationMs=1 tenantId=- userId=- requestId=8571b443-41a0-4ccf-a0d6-1255bc26ed8c
 ]]></system-out>
   </testcase>
-  <testcase name="signOutWithoutATokenIs401AndDoesNothing" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.003">
-    <system-out><![CDATA[2026-11-11 12:49:27.600  INFO [requestId=14794a90-e121-4bb9-8cd4-f42daf767d8d,tenantId=] sahaj.access - request method=POST path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=14794a90-e121-4bb9-8cd4-f42daf767d8d
+  <testcase name="signOutWithoutATokenIs401AndDoesNothing" classname="com.sahaj.platform.web.admin.AdminAuthControllerTest" time="0.004">
+    <system-out><![CDATA[2026-11-11 18:46:25.108  INFO [requestId=98fc2c73-041d-43da-8a9a-b55a8ec8f351,tenantId=] sahaj.access - request method=POST path=unmatched status=401 durationMs=0 tenantId=- userId=- requestId=98fc2c73-041d-43da-8a9a-b55a8ec8f351
 ]]></system-out>
   </testcase>
 </testsuite>

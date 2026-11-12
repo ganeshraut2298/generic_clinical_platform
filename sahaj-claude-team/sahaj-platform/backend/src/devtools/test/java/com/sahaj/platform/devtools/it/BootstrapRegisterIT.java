@@ -82,6 +82,17 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
         }
     }
 
+    private static long preAuthRowsOf(UUID adminId) throws Exception {
+        try (Connection c = SampleAdminDb.migrator();
+             PreparedStatement s = c.prepareStatement("select count(*) from platform.platform_admin_preauth where admin_id = ?")) {
+            s.setObject(1, adminId);
+            try (ResultSet rs = s.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+
     private static long tenantRows() throws Exception {
         try (Connection c = SampleAdminDb.migrator()) {
             return SampleAdminDb.scalarLong(c, "select count(*) from platform.tenant");
@@ -108,7 +119,8 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
     // ---- S14 the happy path ------------------------------------------------------------------------------
 
     @Test
-    void validDetailsCreateTheFirstAdminNotEnrolledAnswer201WithAnEnrolTokenAndClearTheCookie() throws Exception {
+    void validDetailsCreateTheFirstAdminNotEnrolledAnswer201WithNoBodyNoPreAuthTokenAndClearTheCookie() throws Exception {
+        // ADR-018 Revision 5 (security L-4): the 201 has no body and register issues no pre-auth token.
         long tenantsBefore = tenantRows();
         Ticket ticket = newTicket(app);
         String email = uniqueEmail();
@@ -116,13 +128,13 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
         RawHttp.Response response = register(app, ticket, NAME, email, PASSWORD);
 
         assertThat(response.status()).isEqualTo(201);
-        assertThat(response.header("Content-Type")).startsWith("application/json");
-        assertThat(BootstrapSupport.noStoreProblem(response)).isEmpty();
-        JsonNode body = json(response);
-        assertThat(body.fieldNames()).toIterable().containsExactlyInAnyOrder("next", "preAuthToken", "expiresInSeconds");
-        assertThat(body.get("next").asText()).isEqualTo("ENROL");
-        assertThat(body.get("preAuthToken").asText()).matches(BootstrapSupport.TICKET_SHAPE);
-        assertThat(body.get("expiresInSeconds").asInt()).isEqualTo(300);
+        assertThat(response.body()).as("the 201 has an empty body").isEmpty();
+        assertThat(response.hasHeader("Content-Type")).as("no Content-Type").isFalse();
+        assertThat(response.hasHeader("Location")).as("no Location").isFalse();
+        assertThat(response.header("Content-Length")).as("Content-Length is absent or 0 (no body on the wire)").isIn(null, "0");
+        assertThat(response.header("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.header("Pragma")).isEqualTo("no-cache");
+        assertThat(response.header("X-Content-Type-Options")).as("nosniff on the 201 (BootstrapController, contract 0.5.0)").isEqualTo("nosniff");
         String cookie = BootstrapSupport.bindingCookieLine(response);
         assertThat(cookie).as("binding cookie cleared").isNotNull().contains("Max-Age=0").contains("Path=/api/v1/admin/bootstrap");
         assertThat(BootstrapSupport.setCookies(response)).as("no other cookie").hasSize(1);
@@ -137,6 +149,7 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
         assertThat(tenantRows()).as("no tenant row, no membership: the admin belongs to no clinic (BR11, BR14)").isEqualTo(tenantsBefore);
         assertThat(BootstrapDb.state().hasTicket()).as("the ticket is spent").isFalse();
         assertThat(BootstrapDb.state().failures()).isZero();
+        assertThat(preAuthRowsOf(admin.id())).as("register wrote no pre-auth row for the new admin (Revision 5)").isZero();
     }
 
     @Test
@@ -159,10 +172,8 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
         assertThat(row.get("request_id").asText()).isNotBlank();
         assertThat(row.get("target_tenant_id").isNull()).isTrue();
 
-        String preAuth = json(response).get("preAuthToken").asText();
         List<String> forbidden = List.of(email, PASSWORD, admin.hash(), ticket.value(), ticket.binding(), PIN,
-                BootstrapSupport.pinHash(), BootstrapSupport.atRestHash(ticket.value()), BootstrapSupport.atRestHash(ticket.binding()),
-                preAuth);
+                BootstrapSupport.pinHash(), BootstrapSupport.atRestHash(ticket.value()), BootstrapSupport.atRestHash(ticket.binding()));
         for (String text : SampleAdminDb.auditRowsSince(snapshot)) {
             for (String value : forbidden) {
                 assertThat(text).as("no audit column holds a secret value").doesNotContain(value);
@@ -176,7 +187,7 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
                     rs.next();
                     assertThat(rs.getString(1)).as("table " + table + " holds no plain password, PIN, ticket or binding")
                             .doesNotContain(PASSWORD).doesNotContain(PIN).doesNotContain(ticket.value())
-                            .doesNotContain(ticket.binding()).doesNotContain(preAuth);
+                            .doesNotContain(ticket.binding());
                 }
             }
         }
@@ -240,15 +251,23 @@ class BootstrapRegisterIT extends BootstrapHttpBase {
     }
 
     @Test
-    void theNewAdminCanFinishEnrolmentWithTheEnrolTokenAndThenSignInWithEmailAndPassword() throws Exception {
+    void theNewAdminSignsInFirstThenFinishesEnrolmentWithTheTokenOfThatSignInAndThenSignsInWithEmailAndPassword() throws Exception {
+        // ADR-018 Revision 5: register returns no token. The owner's first sign-in (the page's fallback, /admin/sign-in)
+        // issues its own ENROL token through admin_preauth_create, which is why that function stays a prerequisite.
         Ticket ticket = newTicket(app);
         String email = uniqueEmail();
-        JsonNode registered = json(register(app, ticket, NAME, email, PASSWORD));
-        String preAuth = registered.get("preAuthToken").asText();
+        assertThat(register(app, ticket, NAME, email, PASSWORD).status()).isEqualTo(201);
 
-        // The existing enrolment step, unchanged (ADR-018 D6 step 4).
+        RawHttp.Response first = app.post("/api/v1/admin/auth/login")
+                .json("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}").send();
+        assertThat(first.status()).isEqualTo(200);
+        assertThat(json(first).get("next").asText()).as("first sign-in of a not-enrolled admin").isEqualTo("ENROL");
+        String preAuth = json(first).get("preAuthToken").asText();
+        assertThat(preAuth).as("a token of the sign-in's own").matches(BootstrapSupport.TICKET_SHAPE);
+
+        // The existing enrolment step, unchanged.
         RawHttp.Response enrol = app.post("/api/v1/admin/auth/totp/enrol").json("{\"preAuthToken\":\"" + preAuth + "\"}").send();
-        assertThat(enrol.status()).as("enrol with the token that register returned").isEqualTo(200);
+        assertThat(enrol.status()).as("enrol with the token that the first sign-in returned").isEqualTo(200);
         String secretKey = json(enrol).get("secretKey").asText();
         byte[] secret = Base32.decode(secretKey.replace(" ", ""));
         String code = Totp.generate(secret, Totp.stepAt(Instant.now()), Totp.DIGITS);

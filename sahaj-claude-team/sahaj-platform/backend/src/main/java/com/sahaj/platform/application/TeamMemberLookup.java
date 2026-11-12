@@ -91,6 +91,24 @@ public class TeamMemberLookup implements TeamMemberPort {
                 .filter(specialty -> !specialty.isEmpty());
     }
 
+    /** SAH-43: name, role and status with the doctor details; empty when the member has no doctor profile row. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public Optional<DoctorDetails> doctorDetails(UUID tenantId, UUID membershipId) {
+        return teamRepository.findById(tenantId, membershipId)
+                .filter(TeamRow::hasDoctorProfile)
+                .map(row -> new DoctorDetails(row.id(), row.name(), row.role().name(), row.status().name(),
+                        blankToNull(row.specialty()), blankToNull(row.degree()), blankToNull(row.registrationNo())));
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String stripped = value.strip();
+        return stripped.isEmpty() ? null : stripped;
+    }
+
     private static TeamMember toTeamMember(TeamRow row) {
         return new TeamMember(row.id(), row.name(), row.role().name(), row.status() == MembershipStatus.ACTIVE,
                 row.feePaise());

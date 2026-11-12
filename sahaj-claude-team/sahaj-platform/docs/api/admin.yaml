@@ -9,7 +9,10 @@ info:
     start-time and request conditions hold and no platform admin exists yet. Adds the problem types
     bootstrap-pin-invalid (with triesLeft), bootstrap-locked and bootstrap-ticket-invalid. Both bootstrap calls
     answer 429 rate-limit with Retry-After 5 when their turn waits more than 10 seconds (nothing counted or
-    written). No other operation changes. (ADR-018 Revision 2, before approval: each bootstrap 400 is either
+    written). Every answer the bootstrap controller builds itself (the unlock 200, the register 201 and the 400,
+    401, 423 and 429 problems) carries X-Content-Type-Options nosniff; the bodyless 500 (BootstrapServerError) does
+    not, because its handler resets the response first, and the empty 404 (BootstrapNotFound) does not either: it
+    carries only Cache-Control no-store, byte-identical to DevNotFound. No other operation changes. (ADR-018 Revision 2, before approval: each bootstrap 400 is either
     bad-request for a body that cannot be read, or validation with fixed field texts; register lists at most two
     field errors.) (ADR-018 Revision 3, before approval: an unlock try is counted when it starts, before the PIN
     is compared, so a try that ends in 500 still counts; triesLeft values are unchanged. A control character or an
@@ -501,6 +504,8 @@ paths:
           description: 'bootstrap-pin-invalid - wrong PIN number 1 to 4, with triesLeft. Same answer whatever was typed.'
           headers:
             Cache-Control: { description: no-store, schema: { type: string } }
+            Pragma: { description: no-cache, schema: { type: string } }
+            X-Content-Type-Options: { description: nosniff, schema: { type: string } }
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -510,7 +515,7 @@ paths:
         '404': { $ref: '#/components/responses/BootstrapNotFound' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '423': { $ref: '#/components/responses/BootstrapLocked' }
-        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit - another unlock held the turn for more than 10 seconds; Retry-After 5; not counted' }
+        '429': { $ref: '#/components/responses/BootstrapBusy', description: 'rate-limit - another unlock held the turn for more than 10 seconds; Retry-After 5; not counted' }
         '500': { $ref: '#/components/responses/BootstrapServerError', description: 'Bodyless 500 (BootstrapServerError). If the PIN step had started, the try has been counted (and, for the 5th, the lock is set) whatever the PIN was; it is never a 200 or a 401. No ticket was issued.' }
   /bootstrap/register:
     post:
@@ -570,6 +575,7 @@ paths:
             Set-Cookie: { description: 'Clears sahaj_admin_bootstrap (Max-Age=0, Path=/api/v1/admin/bootstrap).', schema: { type: string } }
             Cache-Control: { description: no-store, schema: { type: string } }
             Pragma: { description: no-cache, schema: { type: string } }
+            X-Content-Type-Options: { description: nosniff, schema: { type: string } }
         '400':
           description: >-
             Only after a valid ticket and cookie (a body from which no valid ticket can be read is 401
@@ -601,6 +607,8 @@ paths:
           headers:
             Set-Cookie: { description: Clears sahaj_admin_bootstrap., schema: { type: string } }
             Cache-Control: { description: no-store, schema: { type: string } }
+            Pragma: { description: no-cache, schema: { type: string } }
+            X-Content-Type-Options: { description: nosniff, schema: { type: string } }
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -610,7 +618,7 @@ paths:
         '404': { $ref: '#/components/responses/BootstrapNotFound' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '423': { $ref: '#/components/responses/BootstrapLocked' }
-        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit - an unlock or another registration held the turn for more than 10 seconds; Retry-After 5; nothing created, ticket not spent' }
+        '429': { $ref: '#/components/responses/BootstrapBusy', description: 'rate-limit - an unlock or another registration held the turn for more than 10 seconds; Retry-After 5; nothing created, ticket not spent' }
         '500': { $ref: '#/components/responses/BootstrapServerError' }
 components:
   securitySchemes:
@@ -719,18 +727,38 @@ components:
       headers:
         Retry-After: { description: Seconds until the lock ends., schema: { type: integer, minimum: 1, maximum: 3600 } }
         Cache-Control: { description: no-store, schema: { type: string } }
+        Pragma: { description: no-cache, schema: { type: string } }
+        X-Content-Type-Options: { description: nosniff, schema: { type: string } }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
             locked: { summary: 'From /bootstrap/unlock; from /bootstrap/register the instance is /api/v1/admin/bootstrap/register', value: { type: 'https://sahaj.in/problems/bootstrap-locked', title: Registration is locked., status: 423, instance: /api/v1/admin/bootstrap/unlock, retryAfterSeconds: 3600 } }
+    BootstrapBusy:
+      description: >-
+        Dev-only rate-limit (ADR-018 D4, D6). The caller waited more than 10 seconds for its turn at the database
+        (an unlock or a registration held it). Nothing was counted, created or spent; the same ticket may be sent
+        again while it is valid. Same body as the shared rate-limit problem, with retryAfterSeconds 5 and the
+        operation's own fixed instance.
+      headers:
+        Retry-After: { description: Always 5., schema: { type: integer, const: 5 } }
+        Cache-Control: { description: no-store, schema: { type: string } }
+        Pragma: { description: no-cache, schema: { type: string } }
+        X-Content-Type-Options: { description: nosniff, schema: { type: string } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            busy: { summary: 'From /bootstrap/unlock; from /bootstrap/register the instance is /api/v1/admin/bootstrap/register', value: { type: 'https://sahaj.in/problems/rate-limit', title: Too many requests, status: 429, detail: Too many requests from this network. Try again later., instance: /api/v1/admin/bootstrap/unlock, retryAfterSeconds: 5 } }
     BootstrapServerError:
       description: >-
         Dev-only (ADR-018 D2, ADR-008 R4 pattern). An unexpected failure such as a database error. Status 500, empty
-        body, no Content-Type, Cache-Control no-store. Nothing was created and the ticket was not spent. The server
-        log line carries the exception class and SQLSTATE only.
+        body, no Content-Type, Cache-Control no-store, Pragma no-cache. No X-Content-Type-Options (there is no body
+        to sniff). Nothing was created and the ticket was not spent. The server log line carries the exception class
+        and SQLSTATE only.
       headers:
         Cache-Control: { description: no-store, schema: { type: string } }
+        Pragma: { description: no-cache, schema: { type: string } }
   schemas:
     Problem:
       type: object

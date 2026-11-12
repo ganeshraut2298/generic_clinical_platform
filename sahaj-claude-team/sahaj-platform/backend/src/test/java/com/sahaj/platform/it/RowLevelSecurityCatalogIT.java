@@ -29,13 +29,19 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
      * (app_user, sales_enquiry, flyway_schema_history), SAH-3.md (otp_challenge, consent_record),
      * SAH-4.md (tenant_slug, the RLS-free mirror of tenant.slug for cross-tenant lookups), SAH-6.md
      * (role_permission_default, a global reference grid) and SAH-7.md (specialty, specialty_template,
-     * opd.medicine, opd.diagnosis, all global reference/catalog data, SELECT only for sahaj_app).
+     * opd.medicine, opd.diagnosis, all global reference/catalog data, SELECT only for sahaj_app) and
+     * SAH-43-44.md (ADR-019 D2: the seven global EMR masters and template tables opd.emr_complaint, emr_investigation,
+     * emr_advice, emr_specialty_alias, emr_template, emr_template_section and emr_template_option, no tenant_id, changed
+     * by migration only, SELECT only for sahaj_app, like opd.medicine; the three template tables are also immutable
+     * by trigger).
      */
     private static final Set<String> NO_RLS_BY_DESIGN = Set.of(
             "platform.app_user", "platform.sales_enquiry", "platform.flyway_schema_history",
             "platform.otp_challenge", "platform.consent_record", "platform.tenant_slug",
             "platform.role_permission_default", "platform.specialty", "platform.specialty_template",
-            "opd.medicine", "opd.diagnosis");
+            "opd.medicine", "opd.diagnosis",
+            "opd.emr_complaint", "opd.emr_investigation", "opd.emr_advice", "opd.emr_specialty_alias",
+            "opd.emr_template", "opd.emr_template_section", "opd.emr_template_option");
 
     // ---- row level security on every tenant table ----
 

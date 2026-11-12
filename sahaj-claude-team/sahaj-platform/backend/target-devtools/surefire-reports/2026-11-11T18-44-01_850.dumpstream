@@ -1,0 +1,5 @@
+# Created at 2026-11-11T18:44:02.169
+Boot Manifest-JAR contains absolute paths in classpath 'D:\generi_clinical_platform\sahaj-claude-team\sahaj-platform\backend\target-devtools\test-classes'
+Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+'other' has different root
+

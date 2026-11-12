@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
  * SAH-42 canary (code review findings 2 and 3, security condition "do not switch the feature on until the database ITs ran").
  *
  * <p>The Bootstrap database test classes SKIP, with a message, while a HUMAN prerequisite is missing (role
- * {@code sahaj_admin_definer}, the admin tables, {@code platform.admin_preauth_create}). A skip is green, so a missing
+ * {@code sahaj_admin_definer}, the admin tables, {@code platform.admin_preauth_create}: the ordering guard and the owner's first sign-in, ADR-018 Revision 5). A skip is green, so a missing
  * prerequisite could hide that none of the 100+ database tests ran. This class makes that visible:
  *
  * <ul>

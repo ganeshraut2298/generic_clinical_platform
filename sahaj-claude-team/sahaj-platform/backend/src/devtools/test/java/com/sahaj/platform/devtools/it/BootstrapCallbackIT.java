@@ -31,7 +31,7 @@ import org.postgresql.util.PSQLException;
  *
  * <p>Runs today: the name checks (they fail before anything else) and the "first missing prerequisite" check, which expects the
  * callback's own readable message while the human prerequisites are missing. The remaining cases need the role
- * {@code sahaj_admin_definer}, the admin tables and {@code platform.admin_preauth_create} and skip with a message that names
+ * {@code sahaj_admin_definer}, the admin tables and {@code platform.admin_preauth_create} (kept as the ordering guard and for the owner's first sign-in; register no longer calls it, ADR-018 Revision 5) and skip with a message that names
  * what is missing. The SQL has never been executed against a full database.
  */
 class BootstrapCallbackIT {
