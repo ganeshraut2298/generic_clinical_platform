@@ -11,6 +11,7 @@ import { casePaperContext, emptyPastPage, record } from '../emr.fixtures';
 import { EmrFinishProfileEffects, EmrSignOutcome } from '../emr-finish.model';
 import { oncoBlock, surgeryBlock } from '../finish/finish.testing';
 import { EmrRecordView } from '../emr.model';
+import { specialtyRecord } from '../specialty/specialty.fixtures';
 import { EmrFinishFlow } from '../finish/emr-finish.flow';
 import { EmrAddendumDialogComponent } from './emr-addendum-dialog.component';
 import { EmrConfirmDialogComponent } from './emr-confirm-dialog.component';
@@ -394,6 +395,19 @@ describe('EmrRecordPage, phase 5 (SAH-51 finish, hold, addendum, SAH-67-4 Emerge
       http.expectOne('/api/v1/opd/visits/v1/visit-type').flush({ visitType: 'REVISIT', feeChange: { outcome: 'ALREADY_BILLED', beforePaise: 30000, afterPaise: 30000 } });
       await settle();
       expect(q('[data-testid=info-note]')!.textContent).toContain('Already billed. Ask billing to adjust.');
+    });
+  });
+
+  describe('Paediatrics layout (SAH-75-11 P4)', () => {
+    it('puts Growth today and Milestones side by side when both are in the part', async () => {
+      await boot(
+        specialtyRecord('paeds', [
+          { key: 'growth', component: 'GROWTH' as const, required: true },
+          { key: 'milestones', component: 'MILESTONES' as const },
+        ]),
+      );
+      http.match((req) => req.url.includes('/specialty-reference/')).forEach((req) => req.flush({ profile: 'paeds', tagNote: '' }));
+      expect(qa('app-section-card.half').map((c) => c.getAttribute('data-section') ?? c.querySelector('section')!.getAttribute('data-section'))).toEqual(['growth', 'milestones']);
     });
   });
 });

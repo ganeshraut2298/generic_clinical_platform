@@ -128,7 +128,11 @@ class EmrLibraryIT extends EmrSupport {
                 assertThat(f.get("valueKind").asText()).isNotBlank();
                 String expectedKind = kindOfType.get(f.get("type").asText());
                 if (expectedKind != null) {
-                    assertThat(f.get("valueKind").asText()).as(f.get("type") + " is stored as " + expectedKind).isEqualTo(expectedKind);
+                    String kind = f.get("valueKind").asText();
+                    boolean bound = "COVERED".equals(kind) || ("COMPONENT".equals(kind) && "SEARCH_LIST".equals(f.get("type").asText()));
+                    if (!bound) { // a field covered by a component (the doctor screen) is stored as COVERED, a bound SEARCH_LIST as COMPONENT
+                        assertThat(f.get("valueKind").asText()).as(f.get("type") + " is stored as " + expectedKind).isEqualTo(expectedKind);
+                    }
                 }
                 assertThat(Set.of("NONE", "FIELD", "MASTER", "SERVICES")).contains(f.get("optionsSource").asText());
                 assertThat(f.get("master").isNull()).as("a master only for the MASTER source")

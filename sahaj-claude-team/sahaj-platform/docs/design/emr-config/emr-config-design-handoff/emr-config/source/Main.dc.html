@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EMR configuration by department</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#0B6E69}a:hover{color:#084F4C}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; min-height: 1180px; font-size: 14px">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 16px 32px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <div style="font-size: 12px; color: #5B6B7F">Settings / Clinical setup / EMR configuration</div>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em">EMR configuration by department</h1>
+      <div style="font-size: 13px; color: #5B6B7F">Choose a department, then pick which EMR sections the doctor sees, in what order, and which are required.</div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+      <label style="display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #5B6B7F; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em">Clinic
+        <select style="font: inherit; font-size: 14px; text-transform: none; letter-spacing: 0; color: #0F1C2E; font-weight: 500; border: 1px solid #C9D2DC; border-radius: 8px; padding: 8px 10px; background: #FFFFFF; min-width: 200px"><option>[YOUR CLINIC NAME]</option></select>
+      </label>
+      <span style="{{dirtyStyle}}">{{dirtyText}}</span>
+      <a href="FormBuilder.dc.html" style="display: flex; align-items: center; gap: 6px; border: 1px solid #0B6E69; color: #0B6E69; background: #FFFFFF; border-radius: 8px; padding: 0 14px; min-height: 44px; box-sizing: border-box; font-size: 14px; font-weight: 600; text-decoration: none">+ Form builder</a>
+      <button type="button" onClick="{{saveDraft}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; color: #0F1C2E; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Save draft</button>
+      <button type="button" onClick="{{publish}}" style="{{publishStyle}}">Publish changes</button>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 24px 32px; align-items: flex-start">
+
+    <!-- Column A: departments -->
+    <aside style="flex: 1 1 260px; max-width: 320px; min-width: 240px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 700">Departments</h2>
+        <span style="font-size: 12px; color: #5B6B7F">{{deptCount}} available</span>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #5B6B7F">
+        <span>Search department</span>
+        <input type="search" value="{{query}}" onChange="{{onSearch}}" placeholder="e.g. Dental, Physiotherapy" style="font: inherit; font-size: 14px; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px; color: #0F1C2E">
+      </label>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <sc-for list="{{depts}}" as="d" hint-placeholder-count="8">
+          <button type="button" onClick="{{d.pick}}" style="{{d.rowStyle}}">
+            <span style="{{d.badgeStyle}}">{{d.init}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; text-align: left">
+              <span style="font-size: 14px; font-weight: 600; color: #0F1C2E">{{d.name}}</span>
+              <span style="font-size: 12px; color: #5B6B7F">{{d.count}}</span>
+            </span>
+            <span style="{{d.statusStyle}}">{{d.status}}</span>
+          </button>
+        </sc-for>
+        <sc-if value="{{noMatch}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #5B6B7F; padding: 8px 4px">No department matches “{{query}}”. Add it from a template below.</span></sc-if>
+      </div>
+      <a href="AddDepartment.dc.html" style="display: flex; justify-content: center; align-items: center; gap: 8px; border: 1px dashed #9AA8B8; border-radius: 10px; padding: 12px; min-height: 44px; box-sizing: border-box; font-weight: 600; text-decoration: none; color: #0B6E69">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add department from template
+      </a>
+    </aside>
+
+    <!-- Column B: sections / preview -->
+    <main style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center">
+          <div style="display: flex; gap: 12px; align-items: center">
+            <span style="{{deptBadgeLg}}">{{dept.init}}</span>
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{dept.name}}</h2>
+              <span style="font-size: 13px; color: #5B6B7F">{{enabledCount}} sections on · {{requiredCount}} required · version {{dept.ver}}</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+          <button type="button" onClick="{{resetDept}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 8px 12px; min-height: 40px; font-size: 13px; font-weight: 600; color: #3E4C5E; cursor: pointer">Reset to template</button>
+          <div role="tablist" aria-label="View" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+            <sc-for list="{{tabs}}" as="t" hint-placeholder-count="2">
+              <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+            </sc-for>
+          </div>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+          <span style="font-size: 12px; font-weight: 600; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Visit type</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{visits}}" as="v" hint-placeholder-count="4">
+              <button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button>
+            </sc-for>
+          </div>
+          <span style="font-size: 12px; color: #5B6B7F">{{visitCaption}}</span>
+        </div>
+      </section>
+
+      <sc-if value="{{isSections}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+            <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; overflow: hidden">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #E3E8EE; background: #FAFBFC">
+                <div style="display: flex; gap: 12px; align-items: center">
+                  <span style="{{g.numStyle}}">{{g.num}}</span>
+                  <div style="display: flex; flex-direction: column; gap: 2px">
+                  <h3 style="margin: 0; font-size: 15px; font-weight: 700">{{g.title}}</h3>
+                  <span style="font-size: 12px; color: #5B6B7F">{{g.sub}}</span>
+                  </div>
+                </div>
+                <span style="font-size: 12px; font-weight: 600; color: #3E4C5E">{{g.count}}</span>
+              </div>
+              <div style="display: flex; flex-direction: column">
+                <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="5">
+                  <div style="{{r.rowStyle}}">
+                    <div style="display: flex; flex-direction: column; gap: 0">
+                      <button type="button" onClick="{{r.up}}" aria-label="Move {{r.name}} up" style="border: 0; background: transparent; color: #5B6B7F; cursor: pointer; width: 28px; height: 22px; padding: 0; display: flex; align-items: center; justify-content: center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+                      </button>
+                      <button type="button" onClick="{{r.down}}" aria-label="Move {{r.name}} down" style="border: 0; background: transparent; color: #5B6B7F; cursor: pointer; width: 28px; height: 22px; padding: 0; display: flex; align-items: center; justify-content: center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                    </div>
+                    <button type="button" onClick="{{r.pick}}" style="flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; cursor: pointer; padding: 6px 0; display: flex; flex-direction: column; gap: 3px; min-height: 44px; justify-content: center">
+                      <span style="{{r.nameStyle}}">{{r.name}}</span>
+                      <span style="font-size: 12px; color: #5B6B7F">{{r.desc}}</span>
+                    </button>
+                    <span style="{{r.tagStyle}}">{{r.tag}}</span>
+                    <button type="button" onClick="{{r.movePart}}" title="{{r.moveTitle}}" style="flex: none; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 6px 10px; min-height: 32px; font-size: 12px; font-weight: 600; color: #3E4C5E; cursor: pointer; white-space: nowrap">{{r.moveLabel}}</button>
+                    <span style="font-size: 12px; color: #5B6B7F; white-space: nowrap">{{r.fields}}</span>
+                    <button type="button" aria-pressed="{{r.req}}" onClick="{{r.toggleReq}}" style="{{r.reqStyle}}">{{r.reqLabel}}</button>
+                    <button type="button" aria-pressed="{{r.on}}" aria-label="Show {{r.name}} in EMR" onClick="{{r.toggle}}" style="{{r.trackStyle}}"><span style="{{r.knobStyle}}"></span></button>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #FFFFFF; border: 1px dashed #0B6E69; border-radius: 12px; padding: 14px 18px">
+        <div style="display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">Have your own chart or form?</strong><span style="font-size: 12px; color: #5B6B7F">Build it in the Form builder: fields, scores, show-if rules and print layout. It appears here as a custom section.</span></div>
+        <a href="FormBuilder.dc.html" style="display: flex; align-items: center; border-radius: 8px; padding: 0 16px; min-height: 44px; background: #0B6E69; color: #FFFFFF; font-weight: 700; text-decoration: none">Open form builder</a>
+      </div>
+
+      <sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+        <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; overflow: hidden">
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; padding: 14px 20px; background: #0F1C2E; color: #FFFFFF">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 12px; color: #B8C4D3">Doctor screen preview · {{dept.name}} · {{visit}}</span>
+              <span style="font-size: 15px; font-weight: 600">[PATIENT NAME] · 34 F · UHID [ID]</span>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+              <sc-if value="{{hasScreen}}" hint-placeholder-val="{{ true }}">
+                <a href="{{screenHref}}" style="background: #FFFFFF; color: #0F1C2E; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; text-decoration: none">Open full doctor screen →</a>
+              </sc-if>
+              <span style="background: #1E3550; border-radius: 999px; padding: 4px 10px; font-size: 12px">ABHA linked</span>
+              <span style="background: #1E3550; border-radius: 999px; padding: 4px 10px; font-size: 12px">Allergy: [NONE RECORDED]</span>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 20px; background: #F7F9FA">
+            <sc-for list="{{cards}}" as="c" hint-placeholder-count="6">
+              <div style="{{c.style}}">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+                  <button type="button" onClick="{{c.pick}}" style="border: 0; background: transparent; padding: 0; cursor: pointer; font-size: 14px; font-weight: 700; color: #0F1C2E; text-align: left; min-height: 32px">{{c.name}}<span style="{{c.starStyle}}"> *</span></button>
+                  <span style="font-size: 11px; color: #5B6B7F">{{c.tag}}</span>
+                </div>
+                <sc-if value="{{c.isTeeth}}" hint-placeholder-val="{{ false }}">
+                  <div style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0">
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center">
+                      <sc-for list="{{teethUpper}}" as="tt" hint-placeholder-count="16"><span style="{{tt.style}}">{{tt.n}}</span></sc-for>
+                    </div>
+                    <div style="height: 1px; background: #C9D2DC; margin: 2px 24px"></div>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center">
+                      <sc-for list="{{teethLower}}" as="tt" hint-placeholder-count="16"><span style="{{tt.style}}">{{tt.n}}</span></sc-for>
+                    </div>
+                    <div style="display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 11px; color: #3E4C5E; padding-top: 4px">
+                      <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 3px; background: #FDE7CF; border: 1px solid #B45309"></span>Caries</span>
+                      <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 3px; background: #DCEBFB; border: 1px solid #1D5FA8"></span>Filled</span>
+                      <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 3px; background: #D7EFEC; border: 1px solid #0B6E69"></span>RCT</span>
+                      <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 3px; background: #FFFFFF; border: 1px dashed #5B6B7F"></span>Missing</span>
+                    </div>
+                  </div>
+                </sc-if>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+                  <sc-for list="{{c.fields}}" as="f" hint-placeholder-count="3">
+                    <div style="display: flex; flex-direction: column; gap: 4px">
+                      <span style="font-size: 12px; font-weight: 600; color: #3E4C5E">{{f.label}}<span style="{{f.starStyle}}"> *</span></span>
+                      <span style="border: 1px solid #D5DCE4; border-radius: 6px; padding: 7px 9px; font-size: 12px; color: #5B6B7F; background: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{f.ph}}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+    </main>
+
+    <!-- Column C: section settings -->
+    <aside style="flex: 1 1 320px; max-width: 380px; min-width: 280px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.06em">Section settings</span>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{sec.name}}</h2>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap"><span style="{{sec.groupStyle}}">{{sec.groupLabel}}</span><span style="font-size: 12px; color: #5B6B7F; padding: 3px 0">in {{dept.name}}</span></div>
+        <p style="margin: 0; font-size: 13px; color: #3E4C5E; line-height: 1.5">{{sec.desc}}</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <sc-for list="{{settings}}" as="s" hint-placeholder-count="5">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #EEF1F5">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 13px; font-weight: 600">{{s.label}}</span>
+              <span style="font-size: 12px; color: #5B6B7F">{{s.hint}}</span>
+            </div>
+            <button type="button" aria-pressed="{{s.on}}" aria-label="{{s.label}}" onClick="{{s.toggle}}" style="{{s.trackStyle}}"><span style="{{s.knobStyle}}"></span></button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <h3 style="margin: 0; font-size: 14px; font-weight: 700">Fields ({{fieldCount}})</h3>
+          <button type="button" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 600; color: #0B6E69; cursor: pointer; min-height: 36px">+ Add field</button>
+        </div>
+        <div style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+          <sc-for list="{{fields}}" as="f" hint-placeholder-count="4">
+            <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-bottom: 1px solid #EEF1F5; background: #FFFFFF">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA8B8" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="margin-top: 3px; flex: none"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg>
+              <div style="display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0">
+                <span style="font-size: 13px; font-weight: 600">{{f.label}}<span style="{{f.starStyle}}"> *</span></span>
+                <span style="font-size: 12px; color: #5B6B7F">{{f.meta}}</span>
+              </div>
+              <span style="font-size: 11px; font-weight: 600; color: #3E4C5E; background: #EEF1F5; border-radius: 6px; padding: 3px 7px; white-space: nowrap">{{f.type}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 14px; font-weight: 700">Who can fill this section</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <sc-for list="{{roles}}" as="ro" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{ro.on}}" onClick="{{ro.toggle}}" style="{{ro.style}}">{{ro.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="font-size: 12px; color: #3E4C5E; background: #F4F6F8; border-radius: 8px; padding: 10px 12px; line-height: 1.5">Changes apply to <strong>{{dept.name}} · {{visit}}</strong> after you publish. Visits already in progress keep the layout they started with.</div>
+    </aside>
+  </div>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 32px; top: 96px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3); display: flex; gap: 12px; align-items: center">
+      {{toast}}
+      <sc-if value="{{canUndo}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{undo}}" style="border: 0; background: transparent; color: #7FE0D6; font-weight: 700; cursor: pointer; min-height: 32px">Undo</button></sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0B6E69","options":["#0B6E69","#1D5FA8","#6D3FC0","#B4471F"]},"$preview":{"width":1440,"height":1180}}'>
+const FALLBACK = ['Findings|Rich text|Smart phrases and voice dictation|0', 'Template|Dropdown|Saved clinic templates|0', 'Attachments|File|Image / PDF|0'];
+function sec(name, g, desc, fields) { return { name: name, g: g, desc: desc, fields: (fields || FALLBACK).map(function (s) { var p = s.split('|'); return { label: p[0], type: p[1], meta: p[2] || '', req: p[3] === '1' }; }) }; }
+
+const S = {
+  vitals: sec('Vitals', 'core', 'BP, pulse, temperature, SpO2, weight, height and auto BMI. Usually filled by the assistant before the doctor sees the patient.', ['BP systolic|Number|mmHg · alert above 140|1', 'BP diastolic|Number|mmHg · alert above 90|1', 'Pulse|Number|per min|1', 'Temperature|Number|°F|0', 'SpO2|Number|%|0', 'Weight|Number|kg|1', 'Height|Number|cm|0', 'BMI|Calculated|from weight and height|0', 'RBS|Number|mg/dL|0']),
+  complaints: sec('Chief complaints', 'core', 'What the patient came in for, with duration and severity.', ['Complaint|Search list|SNOMED CT or clinic list|1', 'Duration|Number + unit|days / weeks / months|1', 'Severity|Dropdown|Mild / Moderate / Severe|0', 'Notes|Text|Free text|0']),
+  hpi: sec('History of present illness', 'core', 'A short story of the current illness. Supports voice dictation and saved phrases.', ['Narrative|Rich text|Voice dictation|0', 'Saved phrases|Chips|Clinic phrase library|0']),
+  history: sec('Past, family & personal history', 'core', 'Known illnesses, surgeries, family history and habits. Carried forward between visits.', ['Past illness|Multi-select|DM, HTN, TB, Thyroid, Asthma|0', 'Surgical history|Table|Procedure, year|0', 'Family history|Multi-select|By relation|0', 'Habits|Multi-select|Smoking, alcohol, tobacco chewing|0', 'Diet|Dropdown|Veg / Non-veg / Eggetarian|0']),
+  allergy: sec('Allergies', 'core', 'Drug and food allergies. A drug allergy shows a warning when that drug is prescribed.', ['Drug allergy|Search list|Warns on prescribing|1', 'Food / other|Text|Free text|0']),
+  exam: sec('General & systemic examination', 'core', 'General signs plus CVS, RS, P/A and CNS, with normal findings pre-filled.', ['General exam|Checklist|Pallor, icterus, cyanosis, clubbing, oedema|0', 'CVS|Text|Default: S1 S2 normal|0', 'RS|Text|Default: AEBE, clear|0', 'P/A|Text|Default: soft, non-tender|0', 'CNS|Text|Default: NAD|0']),
+  diagnosis: sec('Diagnosis', 'core', 'Provisional and final diagnosis, coded for reports and insurance.', ['Provisional diagnosis|Search list|ICD-10|1', 'Final diagnosis|Search list|ICD-10|0', 'Type|Dropdown|New / Chronic / Follow-up|0']),
+  investigations: sec('Investigations', 'core', 'Order lab and radiology tests, and record results with reference ranges.', ['Lab tests|Search list|Lab master and panels|0', 'Radiology|Search list|X-ray, USG, CT, MRI|0', 'Results|Table|Value, unit, reference range|0']),
+  rx: sec('Prescription (Rx)', 'core', 'Medicines with dose, frequency and duration. Generic name shown first, as the NMC requires.', ['Drug|Search list|Generic name first|1', 'Dose & frequency|Pattern|1-0-1, SOS, weekly|1', 'Duration|Number + unit|days|1', 'Timing|Dropdown|Before / after food|0', 'Instructions|Text|English, Hindi or Marathi|0']),
+  advice: sec('Advice & diet', 'core', 'Lifestyle advice and printable diet charts.', ['Advice|Chips|Clinic advice library|0', 'Diet chart|Template|Printable|0']),
+  procedures: sec('Procedures', 'core', 'Minor procedures done in the clinic. Each one adds its charge to the bill.', ['Procedure|Search list|Linked to rate card|0', 'Notes|Rich text|Free text|0']),
+  followup: sec('Follow-up', 'core', 'Next visit date. Can book the appointment and send a reminder.', ['Next visit|Date|Books the appointment|0', 'Reason|Text|Free text|0']),
+  referral: sec('Referral', 'core', 'Refer to another doctor or hospital, with an auto-generated letter.', ['Refer to|Doctor / hospital|Prints a referral letter|0', 'Reason|Text|Free text|0']),
+  attachments: sec('Attachments & images', 'core', 'Old reports, photos and scans for this visit.', ['Files|File|Image, PDF or link to scan|0']),
+
+  abha: sec('ABHA / ABDM link', 'comp', 'Link the visit to the patient’s ABHA ID so records can be shared through ABDM with their consent.', ['ABHA number|Text|14 digits, verified by OTP|0', 'Consent to share|Toggle|Patient consent via ABDM|0']),
+  consent: sec('Consent forms', 'comp', 'Procedure-specific consent forms with patient or guardian signature.', ['Form|Template|Per procedure|0', 'Signature|Signature|Patient / guardian|1']),
+  rxformat: sec('Prescription print format', 'comp', 'Letterhead with doctor’s registration number and degree, and the print language.', ['Header|Template|Registration no., degree|1', 'Language|Dropdown|English / Hindi / Marathi|0']),
+  pcpndt: sec('PCPNDT Form F', 'comp', 'Form F has to be filled for every obstetric ultrasound under the PCPNDT Act.', ['Form F|Template|Required for every obstetric USG|1', 'Referral slip|File|Upload|1', 'Declaration|Signature|Patient and doctor|1']),
+
+  chronic: sec('Chronic disease tracker', 'spec', 'Tracks BP, sugar and other readings across visits for long-term patients.', ['Condition|Dropdown|DM, HTN, Thyroid, Asthma|0', 'Trend|Chart|Readings over visits|0']),
+  adult_vax: sec('Adult vaccination', 'spec', 'Flu, pneumococcal, Td and other adult vaccines.'),
+  dental_chart: sec('Dental chart (odontogram)', 'spec', 'Tap a tooth to mark its condition. Uses FDI numbering by default.', ['Numbering|Dropdown|FDI (default) / Universal / Palmer|1', 'Dentition|Toggle|Adult 32 / Child 20 / Mixed|1', 'Tooth condition|Chart|Caries, missing, filled, RCT, crown|1', 'Surfaces|Multi-select|M, O, D, B, L|0']),
+  intraoral: sec('Intra-oral examination', 'spec', 'Soft tissue, oral hygiene and occlusion.', ['Soft tissue|Checklist|Gingiva, tongue, palate, mucosa|0', 'Oral hygiene|Dropdown|Good / Fair / Poor|0', 'Occlusion|Dropdown|Class I / II / III|0']),
+  extraoral: sec('Extra-oral examination', 'spec', 'Face, TMJ and lymph nodes.'),
+  perio: sec('Periodontal charting', 'spec', 'Pocket depth, bleeding and mobility for each tooth.', ['Probing depth|Table|6 sites per tooth|0', 'Bleeding on probing|Toggle|Per site|0', 'Mobility|Dropdown|Grade 0–3|0']),
+  tx_plan: sec('Treatment plan & estimate', 'spec', 'Planned procedures by tooth and phase, with a cost estimate the patient signs.', ['Procedure|Search list|By tooth|1', 'Phase|Dropdown|Phase 1 / 2 / 3|0', 'Estimate|Calculated|From rate card|1', 'Patient approval|Toggle|Signed estimate|0']),
+  dental_done: sec('Procedures done', 'spec', 'What was done today, on which tooth, and which sitting.', ['Procedure|Search list|RCT, extraction, scaling, filling|1', 'Tooth|Tooth picker|FDI|1', 'Sitting|Number|e.g. 2 of 3|0']),
+  dental_lab: sec('Lab work', 'spec', 'Crowns, bridges, dentures and aligners sent to the lab.', ['Item|Dropdown|Crown, bridge, denture, aligner|0', 'Lab|Dropdown|Vendor list|0', 'Due date|Date|Calendar|0']),
+  menstrual: sec('Menstrual history', 'spec', 'LMP, cycle pattern and flow. LMP is used to work out EDD.', ['LMP|Date|Used for EDD|1', 'Cycle|Pattern|Regular / irregular, days|0', 'Flow|Dropdown|Scanty / Normal / Heavy|0', 'Dysmenorrhoea|Toggle|Yes / No|0', 'Age at menarche|Number|years|0']),
+  obstetric: sec('Obstetric history', 'spec', 'Gravida, para, living and abortions, plus details of earlier pregnancies.', ['G P L A|Formula|Gravida, Para, Living, Abortion|1', 'Previous deliveries|Table|Year, mode, outcome, baby weight|0', 'Previous LSCS|Toggle|Marks pregnancy as high risk|0']),
+  anc: sec('ANC visit card', 'spec', 'Antenatal visit record with gestational age, EDD and risk flags.', ['Gestational age|Calculated|From LMP or USG|1', 'EDD|Calculated|Naegele’s rule|1', 'Fundal height|Number|cm|0', 'FHS|Number|bpm|0', 'Weight gain|Chart|Across visits|0', 'Td doses|Checklist|Td1, Td2, booster|0', 'Risk flags|Chips|Anaemia, PIH, GDM|0']),
+  gyn_exam: sec('P/A, P/S & P/V examination', 'spec', 'Abdominal, speculum and vaginal examination findings.', ['Per abdomen|Text|Free text|0', 'Per speculum|Text|Free text|0', 'Per vaginum|Text|Chaperone name recorded|0']),
+  usg: sec('USG findings', 'spec', 'Dating, NT, anomaly and growth scans.', ['Scan type|Dropdown|Dating, NT, anomaly, growth|0', 'Findings|Template|Free text|0', 'Report|File|Upload|0']),
+  infertility: sec('Infertility workup', 'spec', 'Hormone tests, follicle tracking and partner semen analysis.'),
+  contraception: sec('Contraception', 'spec', 'Method chosen, start date and follow-up.'),
+  growth: sec('Growth chart', 'spec', 'Weight, height and head size plotted on WHO and IAP charts.', ['Weight|Number|kg|1', 'Length / height|Number|cm|1', 'Head circumference|Number|cm, up to 2 years|0', 'Plot|Chart|WHO 0–5 y, IAP 5–18 y|0', 'Z-score|Calculated|Auto|0']),
+  immunization: sec('Immunization (IAP schedule)', 'spec', 'Due and overdue vaccines from date of birth, with batch numbers and reminders.', ['Schedule|Template|IAP or UIP|1', 'Due & overdue|Calculated|From date of birth|1', 'Given|Table|Vaccine, date, batch no.|1', 'Reminder|Toggle|SMS / WhatsApp|0']),
+  milestones: sec('Developmental milestones', 'spec', 'Motor, language and social milestones, with age-based red flags.', ['Domain|Checklist|Gross motor, fine motor, language, social|0', 'Red flags|Calculated|By age|0']),
+  birth: sec('Birth history', 'spec', 'Gestation at birth, birth weight, mode of delivery and NICU stay.'),
+  feeding: sec('Feeding history', 'spec', 'Breastfeeding, top feeds and weaning.'),
+  wtdose: sec('Weight-based dosing', 'spec', 'Works out the dose in mg/kg from the latest weight and warns above the maximum.', ['Dose|Calculated|mg/kg from latest weight|1', 'Maximum dose|Rule|Warns if exceeded|1']),
+  pain: sec('Pain assessment', 'spec', 'Pain score, where it hurts and what makes it better or worse.', ['Scale|Dropdown|VAS / NPRS / Wong-Baker|1', 'Score|Number|0–10|1', 'Site|Body map|Tap to mark|1', 'Nature|Dropdown|Sharp, dull, radiating|0', 'Aggravating / relieving|Text|Free text|0']),
+  posture: sec('Posture & gait', 'spec', 'Posture observation and gait pattern.'),
+  rom: sec('Range of motion (goniometry)', 'spec', 'Active and passive range for each joint and side, with the normal range shown.', ['Joint|Dropdown|Shoulder, knee, hip, spine…|1', 'Movement|Dropdown|Flexion, extension, abduction…|1', 'Active ROM|Number|degrees, L / R|1', 'Passive ROM|Number|degrees, L / R|0', 'Normal range|Reference|Auto by joint|0']),
+  mmt: sec('Manual muscle testing', 'spec', 'Muscle strength by group and side.', ['Muscle group|Dropdown|By region|1', 'Grade|Dropdown|Oxford 0–5|1', 'Side|Toggle|L / R|1']),
+  special_tests: sec('Special tests', 'spec', 'Orthopaedic and neuro tests with result.', ['Test|Search list|Lachman, SLR, Neer, Phalen…|0', 'Result|Dropdown|Positive / Negative|0']),
+  func_scales: sec('Outcome scales', 'spec', 'Standard function scores to show progress.', ['Scale|Dropdown|ODI, NDI, WOMAC, LEFS|0', 'Score|Calculated|Auto|0']),
+  goals: sec('Treatment goals', 'spec', 'Short-term and long-term goals.'),
+  modalities: sec('Treatment modalities', 'spec', 'Electrotherapy and other modalities given in the session.', ['Modality|Multi-select|IFT, TENS, US, SWD, hot pack, traction|1', 'Settings|Text|Time, intensity|0', 'Area|Body map|Tap to mark|0']),
+  hep: sec('Home exercise program', 'spec', 'Exercises with pictures, sets and reps, shared with the patient.', ['Exercise|Library|With pictures or video|0', 'Sets × reps|Pattern|e.g. 3 × 10|0', 'Share|Toggle|WhatsApp PDF|0']),
+  sessions: sec('Session & package tracker', 'spec', 'Tracks sessions used out of a package and the trend in pain and movement.', ['Package|Dropdown|e.g. 10 sessions|0', 'Session no.|Calculated|e.g. 3 of 10|1', 'Progress|Chart|Pain and ROM trend|0']),
+  ortho_local: sec('Local examination', 'spec', 'Look, feel and move for the affected part.'),
+  fracture: sec('Fracture & imaging', 'spec', 'Fracture type, side and X-ray findings.'),
+  cast: sec('Cast / splint', 'spec', 'Type, date applied and date due for removal.'),
+  va: sec('Visual acuity', 'spec', 'Distance and near vision for each eye.', ['Distance VA|Dropdown|Snellen 6/6…, per eye|1', 'Near VA|Dropdown|N6…N36|0', 'With pinhole|Dropdown|Per eye|0', 'With glasses|Dropdown|Per eye|0']),
+  refraction: sec('Refraction & glasses Rx', 'spec', 'Sphere, cylinder and axis for each eye, printed as a glasses prescription.', ['Sph / Cyl / Axis|Table|RE / LE|1', 'Add|Number|Near|0', 'PD|Number|mm|0', 'Print glasses Rx|Toggle|Yes / No|0']),
+  iop: sec('IOP', 'spec', 'Eye pressure for each eye and method used.'),
+  slitlamp: sec('Slit lamp examination', 'spec', 'Lids, conjunctiva, cornea, AC, iris and lens.'),
+  fundus: sec('Fundus', 'spec', 'Disc, macula and vessels.'),
+  otoscopy: sec('Ear examination', 'spec', 'Otoscopy findings for each ear.'),
+  nose_throat: sec('Nose & throat', 'spec', 'Anterior rhinoscopy, oral cavity and pharynx.'),
+  tuning: sec('Tuning fork tests', 'spec', 'Rinne and Weber.'),
+  audiometry: sec('Audiometry', 'spec', 'Pure tone audiogram upload or entry.'),
+  endoscopy: sec('Endoscopy findings', 'spec', 'Nasal or laryngeal endoscopy notes and images.'),
+  lesion_map: sec('Lesion body map', 'spec', 'Mark lesions on a body outline and describe them.', ['Body map|Body map|Front / back|1', 'Morphology|Dropdown|Macule, papule, plaque…|1', 'Distribution|Dropdown|Localised / generalised|0']),
+  derm_photos: sec('Clinical photos', 'spec', 'Before and after photos, taken with photo consent.', ['Photos|File|Before / after|0', 'Photo consent|Toggle|Required before upload|1']),
+  derm_proc: sec('Procedure sessions', 'spec', 'Peels, laser and other sessions with settings.'),
+  glucose: sec('Glucose & HbA1c log', 'spec', 'Sugar readings and HbA1c with a trend chart.', ['FBS|Number|mg/dL|0', 'PPBS|Number|mg/dL|0', 'HbA1c|Number|%|0', 'Trend|Chart|Across visits|0']),
+  foot: sec('Diabetic foot exam', 'spec', 'Sensation, pulses and ulcers.'),
+  insulin: sec('Insulin regimen', 'spec', 'Insulin type, units and timing.'),
+  screening: sec('Complication screening', 'spec', 'Eye, kidney and nerve checks with due dates.'),
+  ecg: sec('ECG', 'spec', 'ECG findings and upload.'),
+  echo: sec('Echo findings', 'spec', 'EF, valves and wall motion.'),
+  risk: sec('Risk scores', 'spec', 'Cardiovascular risk scores.'),
+  lipids: sec('Lipid trend', 'spec', 'Lipid profile across visits.'),
+  prakriti: sec('Prakriti assessment', 'spec', 'Vata, pitta and kapha constitution.'),
+  nadi: sec('Nadi pariksha', 'spec', 'Pulse examination findings.'),
+  ashtavidha: sec('Ashtavidha pariksha', 'spec', 'Eight-fold examination.'),
+  panchakarma: sec('Panchakarma plan', 'spec', 'Procedures, days and diet plan.'),
+  mse: sec('Mental status examination', 'spec', 'Appearance, mood, thought and cognition.'),
+  scales: sec('Rating scales', 'spec', 'Standard questionnaires scored automatically.', ['Scale|Dropdown|PHQ-9, GAD-7, HAM-D|0', 'Score|Calculated|Auto|0']),
+  onc_stage: sec('Cancer staging (TNM)', 'spec', 'Site, TNM and stage group, with the date it was staged.', ['Primary site|Search list|ICD-O topography|1', 'T / N / M|Dropdowns|AJCC 8th edition|1', 'Stage group|Calculated|From TNM|1', 'Staged on|Date|Clinical or pathological|0']),
+  onc_histo: sec('Histopathology and markers', 'spec', 'Biopsy report, grade, receptors and tumour markers with trend.', ['Histology|Search list|ICD-O morphology|1', 'Grade|Dropdown|1 / 2 / 3|0', 'ER / PR / HER2|Dropdowns|Breast only|0', 'Tumour marker|Number + trend|CA 15-3, CEA, PSA, CA-125|0']),
+  onc_ecog: sec('Performance status (ECOG)', 'spec', 'ECOG 0–4 before every cycle; 3 or more usually means no chemo.', ['ECOG|Single choice|0–4 with descriptions|1']),
+  onc_tox: sec('Side effects (CTCAE grade)', 'spec', 'Grade nausea, mucositis, neuropathy and others since the last cycle.', ['Side effect|Grid|Grade 0–4 each|1', 'Action|Rule|Grade 3+ → hold or reduce|1']),
+  onc_bsa: sec('BSA and dose calculator', 'spec', 'Height and weight give BSA; doses in mg/m² are calculated and checked.', ['Height / weight|Number|cm, kg|1', 'BSA|Calculated|Mosteller|1', 'Weight change|Calculated|Alert above 10%|0']),
+  onc_labs: sec('Pre-chemo blood check', 'spec', 'ANC, platelets, Hb, creatinine and bilirubin against the regimen’s limits.', ['Lab values|Table|From lab interface|1', 'Fit for chemo|Calculated|All limits met|1']),
+  onc_regimen: sec('Chemo order and cycles', 'spec', 'Regimen, dose level, double-check and send to day care; cycle course with payments.', ['Regimen|Template|AC, paclitaxel, CMF…|1', 'Dose level|Dropdown|100 / 90 / 80 / 75%|1', 'Second check|Toggle|Pharmacist or nurse|1', 'Cumulative dose|Calculated|Lifetime limits|0']),
+  onc_board: sec('Tumour board decision', 'spec', 'Multidisciplinary plan: surgery, chemo, radiotherapy, palliative.'),
+  onc_pain: sec('Pain and palliative care', 'spec', 'Pain score, WHO ladder step and symptom control.'),
+  onc_scheme: sec('Scheme / insurance (PM-JAY, MJPJAY)', 'comp', 'Package code, pre-approval and amount used per cycle.'),
+  sx_findings: sec('Surgical examination', 'spec', 'Abdomen, hernia sites, per-rectal, local findings on the body map.'),
+  sx_fitness: sec('Fitness for surgery', 'spec', 'ASA grade, other illnesses, blood thinners, PAC and pre-op tests.', ['ASA grade|Single choice|I–IV|1', 'Blood thinners|Dropdown|None, aspirin, clopidogrel…|1', 'Pre-op tests|Checklist|CBC, LFT, KFT, PT/INR, ECG, X-ray|1', 'PAC|Single choice|Fit / caution / unfit|1']),
+  sx_plan: sec('Surgery plan and OT booking', 'spec', 'Procedure, approach, anaesthesia, admission type, OT date and slot, package estimate.', ['Procedure|Search list|Procedure master + package|1', 'Anaesthesia|Dropdown|GA, spinal, local|1', 'OT date and slot|Calendar|OT schedule|1', 'Estimate|Calculated|Package rate|0']),
+  sx_consent: sec('Surgical consent', 'comp', 'Procedure, conversion, anaesthesia, blood and photo consent.', ['Consent items|Checklist|Per procedure|1', 'Signature|Signature|Patient and witness|1']),
+  sx_preop: sec('Pre-op orders', 'spec', 'Fasting, medicines to stop or continue, antibiotic, preparation.'),
+  sx_checklist: sec('WHO surgical safety checklist', 'comp', 'Sign in, time out and sign out in OT.'),
+  sx_opnote: sec('Operation notes', 'spec', 'Findings, steps, implants, blood loss, specimen sent.'),
+  sx_postop: sec('Post-op orders and wound check', 'spec', 'Drain, wound, stitch removal and day 7 / day 30 reviews.'),
+  sx_preauth: sec('Insurance pre-authorisation', 'comp', 'TPA, PM-JAY or MJPJAY pre-auth with estimate and reports.'),
+  therapy_notes: sec('Therapy notes (restricted)', 'spec', 'Session notes visible only to the treating doctor.')
+};
+
+const PART_T = ['onc_board', 'onc_regimen', 'onc_pain', 'onc_scheme', 'sx_plan', 'sx_consent', 'sx_preop', 'sx_preauth', 'sx_checklist', 'sx_opnote', 'sx_postop', 'diagnosis', 'investigations', 'rx', 'advice', 'procedures', 'followup', 'referral', 'consent', 'rxformat', 'adult_vax', 'tx_plan', 'dental_done', 'dental_lab', 'dental_chart', 'contraception', 'infertility', 'immunization', 'wtdose', 'goals', 'modalities', 'hep', 'sessions', 'cast', 'refraction', 'derm_proc', 'insulin', 'panchakarma', 'therapy_notes'];
+const CORE = ['vitals', 'complaints', 'hpi', 'history', 'allergy', 'exam', 'diagnosis', 'investigations', 'rx', 'advice', 'procedures', 'followup', 'referral', 'attachments'];
+const DEPTS = [
+  { id: 'gm', name: 'General Medicine', init: 'GM', status: 'Live', ver: 'v6', hue: '#1D5FA8', off: ['procedures', 'referral'], spec: ['chronic', 'adult_vax'] },
+  { id: 'dental', name: 'Dental', init: 'DN', status: 'Live', ver: 'v4', hue: '#0B6E69', off: ['exam', 'hpi', 'referral'], consent: true, spec: ['dental_chart', 'intraoral', 'extraoral', 'perio', 'tx_plan', 'dental_done', 'dental_lab'] },
+  { id: 'og', name: 'Obstetrics & Gynaecology', init: 'OG', status: 'Live', ver: 'v3', hue: '#A3366B', off: ['referral'], consent: true, pcpndt: true, spec: ['menstrual', 'obstetric', 'anc', 'gyn_exam', 'usg', 'infertility', 'contraception'] },
+  { id: 'paeds', name: 'Paediatrics', init: 'PD', status: 'Draft', ver: 'v1', hue: '#B4471F', off: ['referral', 'procedures'], spec: ['growth', 'immunization', 'milestones', 'birth', 'feeding', 'wtdose'] },
+  { id: 'physio', name: 'Physiotherapy', init: 'PT', status: 'Live', ver: 'v2', hue: '#6D3FC0', off: ['rx', 'investigations', 'exam', 'procedures'], spec: ['pain', 'posture', 'rom', 'mmt', 'special_tests', 'func_scales', 'goals', 'modalities', 'hep', 'sessions'] },
+  { id: 'ortho', name: 'Orthopaedics', init: 'OR', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: [], consent: true, spec: ['ortho_local', 'rom', 'special_tests', 'fracture', 'cast'] },
+  { id: 'eye', name: 'Ophthalmology', init: 'OP', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: ['exam'], spec: ['va', 'refraction', 'iop', 'slitlamp', 'fundus'] },
+  { id: 'ent', name: 'ENT', init: 'EN', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: ['exam'], spec: ['otoscopy', 'nose_throat', 'tuning', 'audiometry', 'endoscopy'] },
+  { id: 'derm', name: 'Dermatology & Cosmetology', init: 'DR', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: ['exam'], consent: true, spec: ['lesion_map', 'derm_photos', 'derm_proc'] },
+  { id: 'diab', name: 'Diabetology', init: 'DB', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: [], spec: ['glucose', 'foot', 'insulin', 'screening', 'chronic'] },
+  { id: 'cardio', name: 'Cardiology', init: 'CA', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: [], spec: ['ecg', 'echo', 'risk', 'lipids'] },
+  { id: 'ayush', name: 'AYUSH (Ayurveda)', init: 'AY', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: ['investigations'], spec: ['prakriti', 'nadi', 'ashtavidha', 'panchakarma'] },
+  { id: 'onco', name: 'Medical Oncology', init: 'ON', status: 'Draft', ver: 'v1', hue: '#9D174D', off: ['procedures', 'referral', 'exam'], consent: true, spec: ['onc_stage', 'onc_histo', 'onc_ecog', 'onc_tox', 'onc_bsa', 'onc_labs', 'onc_board', 'onc_regimen', 'onc_pain', 'onc_scheme'] },
+  { id: 'surgery', name: 'General Surgery', init: 'GS', status: 'Draft', ver: 'v1', hue: '#1E40AF', off: [], consent: true, spec: ['sx_findings', 'sx_fitness', 'sx_plan', 'sx_consent', 'sx_preop', 'sx_preauth', 'sx_checklist', 'sx_opnote', 'sx_postop'] },
+  { id: 'psych', name: 'Psychiatry & Counselling', init: 'PS', status: 'Template', ver: 'v0', hue: '#3E4C5E', off: ['exam', 'procedures'], spec: ['mse', 'scales', 'therapy_notes'] }
+];
+const REQ = ['complaints', 'diagnosis', 'rx', 'rxformat', 'dental_chart', 'pcpndt', 'anc', 'pain', 'va', 'immunization', 'growth', 'lesion_map'];
+const PRINT = ['vitals', 'complaints', 'diagnosis', 'rx', 'advice', 'followup', 'investigations', 'refraction', 'tx_plan', 'hep', 'anc', 'immunization'];
+const COPY = ['history', 'allergy', 'obstetric', 'menstrual', 'birth', 'dental_chart', 'chronic', 'immunization', 'growth', 'prakriti'];
+const ASSIST = ['vitals', 'complaints', 'history', 'allergy', 'attachments', 'abha', 'growth', 'va', 'refraction', 'glucose', 'iop', 'audiometry'];
+const VISITS = ['New consult', 'Follow-up', 'Procedure visit', 'Teleconsult'];
+const TEETH = { 16: 'caries', 26: 'filled', 36: 'rct', 46: 'missing', 47: 'caries', 11: 'filled' };
+const SCREENS = { gm: 'DoctorGeneral.dc.html', dental: 'DoctorDental.dc.html', og: 'DoctorGynae.dc.html', paeds: 'DoctorPaeds.dc.html', physio: 'DoctorPhysio.dc.html', onco: 'DoctorOncology.dc.html', surgery: 'DoctorSurgery.dc.html' };
+const SPAN2 = ['dental_chart', 'rx', 'anc', 'rom', 'vitals', 'tx_plan', 'refraction', 'growth', 'immunization'];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dept: 'dental', section: 'dental_chart', view: 'sections', visit: 'New consult', cfg: {}, order: {}, query: '', dirty: 0, toast: '', prev: null, ver: {} };
+  }
+  say(msg, patch, undoable) {
+    var self = this;
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3500);
+    var s = this.state;
+    this.setState(Object.assign({ toast: msg, prev: undoable ? { cfg: s.cfg, order: s.order, dirty: s.dirty } : null }, patch || {}));
+  }
+  deptOf(id) { return DEPTS.find(function (d) { return d.id === id; }); }
+  defaultOrder(d) {
+    var comp = ['abha', 'consent', 'rxformat'];
+    if (d.pcpndt) comp.push('pcpndt');
+    return CORE.concat(d.spec, comp);
+  }
+  orderOf(id) { return this.state.order[id] || this.defaultOrder(this.deptOf(id)); }
+  cfgOf(id, s) {
+    var d = this.deptOf(id);
+    var saved = this.state.cfg[id + ':' + s] || {};
+    var on = true;
+    if (S[s].g === 'core') on = d.off.indexOf(s) < 0;
+    if (s === 'consent') on = !!d.consent;
+    var base = { on: on, req: REQ.indexOf(s) >= 0, print: PRINT.indexOf(s) >= 0, copy: COPY.indexOf(s) >= 0, collapsed: false,
+      roles: { Doctor: true, Assistant: ASSIST.indexOf(s) >= 0, Reception: s === 'abha' || s === 'consent' } };
+    return Object.assign({}, base, saved, { roles: Object.assign({}, base.roles, saved.roles || {}) });
+  }
+  setCfg(id, s, patch) {
+    var cfg = Object.assign({}, this.state.cfg);
+    cfg[id + ':' + s] = Object.assign({}, cfg[id + ':' + s] || {}, patch);
+    this.setState({ cfg: cfg, dirty: this.state.dirty + 1 });
+  }
+  partOf(id, s) { var o = (this.state.parts || {})[id + ':' + s]; return o || (PART_T.indexOf(s) >= 0 ? 'T' : 'A'); }
+  move(id, s, dir) {
+    var arr = this.orderOf(id).slice();
+    var i = arr.indexOf(s), j = i + dir;
+    var self = this; while (j >= 0 && j < arr.length && self.partOf(id, arr[j]) !== self.partOf(id, s)) j += dir;
+    if (j < 0 || j >= arr.length) return;
+    var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    var order = Object.assign({}, this.state.order); order[id] = arr;
+    this.setState({ order: order, dirty: this.state.dirty + 1 });
+  }
+  track(on, A) {
+    return {
+      trackStyle: 'flex: none; width: 44px; height: 26px; border-radius: 999px; border: 0; padding: 3px; cursor: pointer; display: flex; align-items: center; background: ' + (on ? A : '#B7C2CE'),
+      knobStyle: 'width: 20px; height: 20px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(15,28,46,0.3); margin-left: ' + (on ? '18px' : '0')
+    };
+  }
+  renderVals() {
+    var self = this, st = this.state;
+    var A = this.props.accent || '#0B6E69';
+    var dept = this.deptOf(st.dept);
+    var order = this.orderOf(st.dept);
+    var sel = st.section;
+
+    var q = (st.query || '').toLowerCase().trim();
+    var depts = DEPTS.filter(function (d) { return !q || d.name.toLowerCase().indexOf(q) >= 0 || d.init.toLowerCase() === q; }).map(function (d) {
+      var o = self.orderOf(d.id), on = o.filter(function (s) { return self.cfgOf(d.id, s).on; }).length;
+      var active = d.id === st.dept;
+      var stc = d.status === 'Live' ? 'background: #E3F5EC; color: #146C43' : d.status === 'Draft' ? 'background: #FDF0DC; color: #8A4B08' : 'background: #EEF1F5; color: #3E4C5E';
+      return {
+        name: d.name, init: d.init, status: d.status,
+        count: on + ' of ' + o.length + ' sections on',
+        rowStyle: 'display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; cursor: pointer; border-radius: 10px; padding: 8px 10px; min-height: 52px; font: inherit; border: 1px solid ' + (active ? A : 'transparent') + '; background: ' + (active ? A + '14' : '#FFFFFF'),
+        badgeStyle: 'flex: none; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #FFFFFF; background: ' + d.hue,
+        statusStyle: 'flex: none; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 3px 8px; ' + stc,
+        pick: function () {
+          var first = self.orderOf(d.id).find(function (s) { return S[s].g === 'spec'; }) || 'vitals';
+          self.setState({ dept: d.id, section: first });
+        }
+      };
+    });
+
+    var enabled = order.filter(function (s) { return self.cfgOf(st.dept, s).on; });
+    var requiredCount = enabled.filter(function (s) { return self.cfgOf(st.dept, s).req; }).length;
+
+    function row(s) {
+      var c = self.cfgOf(st.dept, s), isSel = s === sel, t = self.track(c.on, A);
+      return {
+        name: S[s].name, desc: S[s].desc, fields: S[s].fields.length + ' fields',
+        on: c.on, req: c.req, reqLabel: c.req ? 'Required' : 'Optional',
+        trackStyle: t.trackStyle, knobStyle: t.knobStyle,
+        rowStyle: 'display: flex; gap: 12px; align-items: center; padding: 6px 16px 6px 10px; border-bottom: 1px solid #EEF1F5; background: ' + (isSel ? A + '12' : '#FFFFFF') + '; box-shadow: inset 3px 0 0 ' + (isSel ? A : 'transparent'),
+        nameStyle: 'font-size: 14px; font-weight: 600; color: ' + (c.on ? '#0F1C2E' : '#5B6B7F') + (c.on ? '' : '; text-decoration: line-through'),
+        reqStyle: 'flex: none; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 10px; min-height: 32px; cursor: pointer; border: 1px solid ' + (c.req ? '#B42318' : '#C9D2DC') + '; color: ' + (c.req ? '#B42318' : '#3E4C5E') + '; background: ' + (c.req ? '#FDECEA' : '#FFFFFF'),
+        tag: S[s].g === 'spec' ? 'Specialty' : S[s].g === 'comp' ? 'Compliance' : 'Common',
+        tagStyle: 'flex: none; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; ' + (S[s].g === 'spec' ? 'background: ' + A + '1F; color: ' + A : S[s].g === 'comp' ? 'background: #FDF0DC; color: #8A4B08' : 'background: #EEF1F5; color: #3E4C5E'),
+        moveLabel: self.partOf(st.dept, s) === 'A' ? 'To Treatment →' : '← To Assessment',
+        moveTitle: 'Move ' + S[s].name + ' to the other part',
+        movePart: function () { var x = Object.assign({}, st.parts || {}); x[st.dept + ':' + s] = self.partOf(st.dept, s) === 'A' ? 'T' : 'A'; self.setState({ parts: x, dirty: st.dirty + 1, toast: S[s].name + ' moved to ' + (x[st.dept + ':' + s] === 'A' ? 'Assessment' : 'Treatment') }); },
+        pick: function () { self.setState({ section: s }); },
+        toggle: function () { self.setCfg(st.dept, s, { on: !c.on }); },
+        toggleReq: function () { self.setCfg(st.dept, s, { req: !c.req }); },
+        up: function () { self.move(st.dept, s, -1); },
+        down: function () { self.move(st.dept, s, 1); }
+      };
+    }
+    var GROUPS = [
+      { p: 'A', num: '1', title: 'Assessment', sub: 'What the doctor finds: complaints, history, vitals, examination, findings' },
+      { p: 'T', num: '2', title: 'Treatment', sub: 'What the doctor decides and does: diagnosis, medicines, tests, procedures, follow-up' }
+    ];
+    var groups = GROUPS.map(function (G) {
+      var ids = order.filter(function (s) { return self.partOf(st.dept, s) === G.p; });
+      var on = ids.filter(function (s) { return self.cfgOf(st.dept, s).on; }).length;
+      return { num: G.num, title: G.title + ' · ' + dept.name, sub: G.sub, count: on + ' of ' + ids.length + ' on', rows: ids.map(row),
+        numStyle: 'flex: none; width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #FFFFFF; background: ' + (G.p === 'A' ? '#0F1C2E' : A) };
+    });
+
+    var cardIds = ['@A'].concat(enabled.filter(function (s) { return self.partOf(st.dept, s) === 'A'; }), ['@T'], enabled.filter(function (s) { return self.partOf(st.dept, s) === 'T'; }));
+    var cards = cardIds.map(function (s) {
+      if (s.charAt(0) === '@') {
+        var isA = s === '@A';
+        return { name: (isA ? '1 · Assessment' : '2 · Treatment'), isTeeth: false, tag: isA ? 'Doctor fills this first' : 'Opens after assessment', starStyle: 'display: none', fields: [], pick: function () {},
+          style: 'grid-column: span 2; display: flex; flex-direction: column; gap: 4px; border-radius: 10px; padding: 10px 14px; background: ' + (isA ? '#E7EBF0' : A + '1F') + '; border-left: 4px solid ' + (isA ? '#0F1C2E' : A) };
+      }
+      var c = self.cfgOf(st.dept, s), isSel = s === sel;
+      return {
+        name: S[s].name, isTeeth: s === 'dental_chart',
+        tag: S[s].g === 'spec' ? dept.init + ' specialty' : S[s].g === 'comp' ? 'Compliance' : 'Common',
+        starStyle: 'color: #B42318; display: ' + (c.req ? 'inline' : 'none'),
+        style: 'display: flex; flex-direction: column; gap: 10px; background: #FFFFFF; border-radius: 10px; padding: 14px; grid-column: span ' + (SPAN2.indexOf(s) >= 0 ? 2 : 1) + '; border: 1px solid ' + (isSel ? A : '#E3E8EE') + '; box-shadow: ' + (isSel ? '0 0 0 3px ' + A + '26' : 'none'),
+        fields: S[s].fields.slice(0, s === 'vitals' ? 6 : 4).map(function (f) { return { label: f.label, ph: f.meta || f.type, starStyle: 'color: #B42318; display: ' + (f.req ? 'inline' : 'none') }; }),
+        pick: function () { self.setState({ section: s }); }
+      };
+    });
+
+    function tooth(n) {
+      var k = TEETH[n];
+      var bg = k === 'caries' ? '#FDE7CF' : k === 'filled' ? '#DCEBFB' : k === 'rct' ? '#D7EFEC' : '#FFFFFF';
+      var bd = k === 'caries' ? '1px solid #B45309' : k === 'filled' ? '1px solid #1D5FA8' : k === 'rct' ? '1px solid #0B6E69' : k === 'missing' ? '1px dashed #5B6B7F' : '1px solid #C9D2DC';
+      return { n: n, style: 'width: 30px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #0F1C2E; background: ' + bg + '; border: ' + bd };
+    }
+    var up = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28].map(tooth);
+    var lo = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38].map(tooth);
+
+    var S0 = S[sel], c0 = this.cfgOf(st.dept, sel);
+    var gl = S0.g === 'spec' ? dept.name + ' specialty' : S0.g === 'comp' ? 'Compliance' : 'Common section';
+    var gs = S0.g === 'comp' ? 'background: #FDF0DC; color: #8A4B08' : S0.g === 'spec' ? 'background: ' + A + '1F; color: ' + A : 'background: #EEF1F5; color: #3E4C5E';
+    var SET = [
+      ['on', 'Show in EMR', 'Doctor sees this section in ' + dept.name],
+      ['req', 'Required to close visit', 'Visit cannot be completed until filled'],
+      ['print', 'Print on prescription', 'Appears on the printed Rx / summary'],
+      ['copy', 'Copy from last visit', 'Pre-fills with the previous values'],
+      ['collapsed', 'Collapsed by default', 'Doctor taps to open it']
+    ];
+    var settings = SET.map(function (x) {
+      var t = self.track(c0[x[0]], A);
+      return { label: x[1], hint: x[2], on: c0[x[0]], trackStyle: t.trackStyle, knobStyle: t.knobStyle,
+        toggle: function () { var p = {}; p[x[0]] = !c0[x[0]]; self.setCfg(st.dept, sel, p); } };
+    });
+    var roles = [['Doctor', 'Doctor'], ['Assistant', 'Nurse / assistant'], ['Reception', 'Reception']].map(function (r) {
+      var on = c0.roles[r[0]];
+      return { label: r[1], on: on,
+        style: 'font-size: 13px; font-weight: 600; border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? A : '#3E4C5E') + '; background: ' + (on ? A + '14' : '#FFFFFF'),
+        toggle: function () { var rr = Object.assign({}, c0.roles); rr[r[0]] = !on; self.setCfg(st.dept, sel, { roles: rr }); } };
+    });
+
+    var tabs = [['sections', 'Configure sections'], ['preview', 'Doctor screen preview']].map(function (t) {
+      var on = st.view === t[0];
+      return { label: t[1], on: on, pick: function () { self.setState({ view: t[0] }); },
+        style: 'border: 0; border-radius: 8px; padding: 8px 14px; min-height: 40px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#3E4C5E') + '; background: ' + (on ? '#FFFFFF' : 'transparent') + '; box-shadow: ' + (on ? '0 1px 2px rgba(15,28,46,0.15)' : 'none') };
+    });
+    var visits = VISITS.map(function (v) {
+      var on = st.visit === v;
+      return { label: v, on: on, pick: function () { self.setState({ visit: v }); },
+        style: 'font-size: 13px; font-weight: 600; border-radius: 8px; padding: 7px 12px; min-height: 36px; cursor: pointer; border: 1px solid ' + (on ? '#0F1C2E' : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#0F1C2E' : '#FFFFFF') };
+    });
+
+    return {
+      accent: A,
+      hasScreen: !!SCREENS[st.dept], screenHref: SCREENS[st.dept] || '#',
+      query: st.query, noMatch: depts.length === 0,
+      onSearch: function (e) { self.setState({ query: e && e.target ? e.target.value : '' }); },
+      dirtyText: st.dirty ? st.dirty + ' unsaved change' + (st.dirty > 1 ? 's' : '') : 'All changes published',
+      dirtyStyle: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 10px; background: ' + (st.dirty ? '#FDF0DC' : '#E3F5EC') + '; color: ' + (st.dirty ? '#8A4B08' : '#146C43'),
+      publishStyle: 'border: 1px solid ' + A + '; background: ' + (st.dirty ? A : '#FFFFFF') + '; color: ' + (st.dirty ? '#FFFFFF' : A) + '; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px',
+      saveDraft: function () { self.say(st.dirty ? 'Draft saved. Doctors still see the published layout.' : 'Nothing new to save'); },
+      publish: function () {
+        if (!st.dirty) { self.say('Nothing to publish'); return; }
+        var v = Object.assign({}, st.ver); var cur = parseInt((v[st.dept] || dept.ver).slice(1), 10) + 1; v[st.dept] = 'v' + cur;
+        self.say(dept.name + ' published as v' + cur + '. New visits use it from now.', { dirty: 0, ver: v });
+      },
+      resetDept: function () {
+        var cfg = {}; Object.keys(st.cfg).forEach(function (k) { if (k.indexOf(st.dept + ':') !== 0) cfg[k] = st.cfg[k]; });
+        var order = Object.assign({}, st.order); delete order[st.dept];
+        self.say(dept.name + ' reset to template', { cfg: cfg, order: order, dirty: st.dirty + 1 }, true);
+      },
+      undo: function () { if (st.prev) self.setState(Object.assign({ toast: '', prev: null }, st.prev)); },
+      toast: st.toast, canUndo: !!st.prev,
+      deptCount: DEPTS.length, depts: depts,
+      dept: Object.assign({}, dept, { ver: st.ver[st.dept] || dept.ver }),
+      deptBadgeLg: 'width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #FFFFFF; background: ' + dept.hue,
+      enabledCount: enabled.length, requiredCount: requiredCount,
+      tabs: tabs, visits: visits, visit: st.visit,
+      visitCaption: st.visit === 'New consult' ? 'Base layout for this department' : 'Starts from the New consult layout — changes here apply only to ' + st.visit,
+      isSections: st.view === 'sections', isPreview: st.view === 'preview',
+      groups: groups, cards: cards, teethUpper: up, teethLower: lo,
+      sec: { name: S0.name, desc: S0.desc, groupLabel: gl, groupStyle: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 3px 8px; ' + gs },
+      settings: settings, roles: roles,
+      fields: S0.fields.map(function (f) { return { label: f.label, type: f.type, meta: f.meta, starStyle: 'color: #B42318; display: ' + (f.req ? 'inline' : 'none') }; }),
+      fieldCount: S0.fields.length
+    };
+  }
+}
+</script>
+</body>
+</html>

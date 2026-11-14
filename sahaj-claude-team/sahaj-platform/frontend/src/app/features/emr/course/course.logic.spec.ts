@@ -1,6 +1,12 @@
 import { account, sitting } from './course.fixtures';
 import {
+  KIND_ACCENT,
+  STATUS_WORD,
   UNIT_WORD,
+  actionLabel,
+  dateProblem,
+  doneToast,
+  numberOf,
   amountHint,
   amountProblem,
   apiType,
@@ -148,5 +154,41 @@ describe('treatment course rules (SAH-58; B-1 tagged)', () => {
     expect(parseRupees('15.5')).toBeNull();
     expect(parseRupees('')).toBeNull();
     expect(parseRupees('-5')).toBeNull();
+  });
+});
+
+describe('course actions and numbers (SAH-75-10)', () => {
+  it('words each drawn action button', () => {
+    const s = sitting({ plannedDate: '2026-11-18' });
+    expect(actionLabel('MARK_DONE', 'SITTING', s)).toBe('Mark sitting done');
+    expect(actionLabel('MARK_DONE', 'CYCLE', s)).toBe('Mark cycle done');
+    expect(actionLabel('MISSED', 'SITTING', s)).toBe('Patient did not come');
+    expect(actionLabel('REBOOK', 'SITTING', s)).toBe('Rebook');
+    expect(actionLabel('RESCHEDULE', 'SITTING', s)).toBe('Reschedule: 18 Nov 2026 ▾');
+    expect(actionLabel('REMOVE', 'SITTING', s)).toBe('Remove');
+    expect(actionLabel('REQUEST_ADMISSION', 'SITTING', s)).toBe('Move to day care / IPD');
+    expect(actionLabel('REQUEST_ADMISSION', 'SITTING', sitting({ encounterKind: 'DAY_CARE' }))).toBe('Request admission');
+    expect(actionLabel('ADMIT', 'SITTING', s)).toBe('Admit now');
+  });
+
+  it('writes the toast after "Mark done" from the server\'s charge, or says it is billed in IPD', () => {
+    expect(doneToast('SITTING', sitting({ displayNo: 2, chargePaise: 150000 }))).toBe('Sitting 2 done · ₹1,500 added to the account');
+    expect(doneToast('CYCLE', sitting({ displayNo: 4, settledInIpd: true }))).toBe('Cycle 4 done · billed in IPD');
+  });
+
+  it('shows the renumbered number, else the stable one', () => {
+    expect(numberOf(sitting({ sittingNo: 3, displayNo: 2 }))).toBe(2);
+    expect(sittingLabel(sitting({ sittingNo: 3, displayNo: 2 }), 'STEP')).toBe('S2');
+  });
+
+  it('never accepts a date in the past', () => {
+    expect(dateProblem('2026-11-13', '2026-11-14')).toBe('Choose today or a later date.');
+    expect(dateProblem('2026-11-14', '2026-11-14')).toBeNull();
+    expect(dateProblem('', '2026-11-14')).toBe('Choose a date.');
+  });
+
+  it('has a status word for Missed and an accent for each kind', () => {
+    expect(STATUS_WORD.MISSED).toBe('Missed');
+    expect(KIND_ACCENT).toEqual({ DENTAL: '#0B6E69', ANC: '#A3366B', REHAB: '#6D3FC0', SURGERY: '#1E40AF', CHEMO: '#9D174D' });
   });
 });

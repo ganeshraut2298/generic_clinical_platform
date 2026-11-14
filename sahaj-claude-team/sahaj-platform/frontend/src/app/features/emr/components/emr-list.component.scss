@@ -59,6 +59,9 @@ ul {
   background: var(--muted-soft);
 
   button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     min-height: 44px;
     padding: 0 12px;
     border: 0;
@@ -156,6 +159,7 @@ ul {
 }
 
 .code {
+  margin-right: 6px;
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--muted-soft);
@@ -185,8 +189,9 @@ ul {
 }
 
 .attr {
-  min-height: 36px;
-  padding: 0 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  cursor: pointer;
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: var(--surface);

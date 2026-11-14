@@ -50,6 +50,12 @@ public final class EmrLayoutJson {
             }
             for (JsonNode field : node.path("fields")) {
                 ((ObjectNode) field).remove("valueKind");
+                // 0.7.1: an option without a hint is stored without the key, as every document before 0.7.1.
+                for (JsonNode option : field.path("options")) {
+                    if (option.path("hint").isNull()) {
+                        ((ObjectNode) option).remove("hint");
+                    }
+                }
             }
             array.add(node);
         }
@@ -100,7 +106,8 @@ public final class EmrLayoutJson {
         String type = text(f, "type", "TEXT");
         List<FieldOption> options = new ArrayList<>();
         for (JsonNode o : f.path("options")) {
-            options.add(new FieldOption(text(o, "key", null), text(o, "label", ""), o.path("isNone").asBoolean(false)));
+            options.add(new FieldOption(text(o, "key", null), text(o, "label", ""), o.path("isNone").asBoolean(false),
+                    o.path("alert").asBoolean(false), text(o, "hint", null)));
         }
         List<TableColumn> columns = new ArrayList<>();
         for (JsonNode c : f.path("columns")) {
@@ -110,7 +117,7 @@ public final class EmrLayoutJson {
                 text(f, "meta", ""), f.path("required").asBoolean(false), text(f, "optionsSource", "NONE"),
                 f.path("master").isTextual() ? f.path("master").asText() : null,
                 f.path("allowFreeText").asBoolean(false), List.copyOf(options), List.copyOf(columns),
-                number(f.path("min")), number(f.path("max")));
+                number(f.path("min")), number(f.path("max")), null, text(f, "presentation", "DEFAULT"));
     }
 
     // ---- settings (drafts) ----

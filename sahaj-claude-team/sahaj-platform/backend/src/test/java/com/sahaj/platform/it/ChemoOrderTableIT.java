@@ -275,7 +275,7 @@ class ChemoOrderTableIT extends EmrPhase3Support {
             String insert = f.insert(Fx.checkerCols() + Fx.confirmCols(), f.checkerVals(f.checker()) + f.confirmVals(f.checker(), FP1))
                     .replace("(record_id,", "(tenant_id, record_id,").replace(") values ('", ") values ('" + f.clinic().tenantId() + "', '");
             keep(c, insert);
-            DbAccess.execute(c, SENT);
+            DbAccess.execute(c, SENT + " where tenant_id = '" + f.clinic().tenantId() + "'"); // only this test's row: the table also holds other tests' SENT rows, which are immutable
             for (String sql : new String[] {"update opd.chemo_order set revision = revision + 1", "delete from opd.chemo_order", "truncate opd.chemo_order"}) {
                 SqlError err = expectError(c, sql);
                 assertThat(err.state()).as(sql).isEqualTo("42501");
@@ -284,7 +284,7 @@ class ChemoOrderTableIT extends EmrPhase3Support {
             return null;
         });
         assertThat(globalRows("select c.relforcerowsecurity::text from pg_class c where c.oid = 'opd.chemo_order'::regclass").get(0).get(0))
-                .as("row level security is forced again after the rollback").isEqualTo("t");
+                .as("row level security is forced again after the rollback").isEqualTo("true");
     }
 
     @Test
@@ -372,7 +372,7 @@ class ChemoOrderTableIT extends EmrPhase3Support {
     @Test
     void theTableHasTheClinicColumnForcedRowLevelSecurityAndOnePolicyForTheApp() throws Exception {
         assertThat(globalRows("select c.relrowsecurity::text, c.relforcerowsecurity::text, (select count(*) from pg_policy p where p.polrelid = c.oid)::text "
-                + "from pg_class c where c.oid = 'opd.chemo_order'::regclass").get(0)).containsExactly("t", "t", "1");
+                + "from pg_class c where c.oid = 'opd.chemo_order'::regclass").get(0)).containsExactly("true", "true", "1");
         assertThat(globalRows("select string_agg(r.rolname, ',') from pg_policy p join pg_roles r on r.oid = any (p.polroles) where p.polrelid = 'opd.chemo_order'::regclass").get(0).get(0))
                 .isEqualTo("sahaj_app");
         assertThat(globalCount("select count(*) from information_schema.columns where table_schema = 'opd' and table_name = 'chemo_order' and column_name = 'tenant_id' and is_nullable = 'NO'")).isOne();

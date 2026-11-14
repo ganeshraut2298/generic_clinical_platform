@@ -643,6 +643,14 @@ public final class EmrComponentValues {
 
     // ---- body map ----
 
+    /**
+     * SAH-75-5 (ADR-026 D5): the same pin rules, stamps and MLC rule as the shared BODY_MAP component, for the body map
+     * inside the oncology examination value.
+     */
+    public Result normalizeBodyMap(JsonNode value, JsonNode old, Context context) {
+        return bodyMap(value, old, context);
+    }
+
     private Result bodyMap(JsonNode value, JsonNode old, Context context) {
         ObjectNode input = object(value, "Send the body map as an object.");
         only(input, Set.of("component", "schemaVersion", "pins", "nextPinNo", "noFindingsConfirmed", "legacyText"),

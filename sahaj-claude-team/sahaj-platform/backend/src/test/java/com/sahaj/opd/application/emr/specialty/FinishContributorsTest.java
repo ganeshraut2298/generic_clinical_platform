@@ -255,6 +255,8 @@ class FinishContributorsTest {
 
         ArgumentCaptor<NewSitting> created = ArgumentCaptor.forClass(NewSitting.class);
         verify(courses).insertSitting(eq(TENANT), created.capture(), eq(ACTOR));
+        // treatment_course_sitting.add_option_key is checked ^[A-Z][A-Z0-9_]{1,39}$ (V2026_12_10_1120): the stored key, upper case
+        assertThat(created.getValue().addOptionKey()).isEqualTo("OPD_SITTING").matches("^[A-Z][A-Z0-9_]{1,39}$");
         assertThat(created.getValue().plannedDate()).isEqualTo(LocalDate.of(2026, 11, 20));
         assertThat(created.getValue().items()).hasSize(1);
         assertThat(created.getValue().chargePaise()).isEqualTo(20000);
@@ -696,7 +698,9 @@ class FinishContributorsTest {
     void thePhysioBlockHasTheSessionTheNextSessionTheCourseAndBothPainScores() throws Exception {
         UUID next = UUID.randomUUID();
         when(courses.sittingByVisit(TENANT, VISIT)).thenReturn(Optional.of(sitting(UUID.randomUUID(), 2, VISIT, null)));
-        when(courses.sittingsOf(eq(TENANT), any())).thenReturn(List.of(sitting(UUID.randomUUID(), 2, VISIT, null),
+        // the numbers shown are ranks among the sittings listed (ADR-026 D4 displayNo); a removed one is not listed
+        when(courses.sittingsOf(eq(TENANT), any())).thenReturn(List.of(sitting(UUID.randomUUID(), 1, UUID.randomUUID(), NOW),
+                sitting(UUID.randomUUID(), 2, VISIT, null),
                 sitting(next, 3, null, null)));
         ObjectNode pain = MAPPER.createObjectNode().put("score", 4);
         EmrRecordDocument document = documentWith("physio", "PAIN_SCORE", pain);
@@ -711,7 +715,7 @@ class FinishContributorsTest {
 
         assertThat(effects.courseId()).isEqualTo(COURSE);
         assertThat(effects.sessionNo()).isEqualTo(2);
-        assertThat(effects.packageSize()).isEqualTo(2);
+        assertThat(effects.packageSize()).isEqualTo(3);
         assertThat(effects.nextSessionNo()).isEqualTo(3);
         assertThat(effects.packageComplete()).isFalse();
         assertThat(effects.painScore()).isEqualTo(4);

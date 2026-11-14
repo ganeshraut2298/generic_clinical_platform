@@ -37,6 +37,7 @@ import com.sahaj.opd.application.emr.EmrRecordRepository.SignedCopy;
 import com.sahaj.opd.application.emr.EmrViews.DepartmentRef;
 import com.sahaj.opd.application.emr.EmrViews.OpenResult;
 import com.sahaj.opd.application.emr.EmrViews.RecordView;
+import com.sahaj.patient.api.AllergyStatus;
 import com.sahaj.patient.api.PatientClinicalPort;
 import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.platform.api.AuditLog;
@@ -286,6 +287,81 @@ class EmrRecordServiceTest {
         assertThat(doc.has("complaints")).isFalse();
     }
 
+    /** The layout of the copy tests: Menstrual with the 0.7.1 choice rows and a plain Notes section, both copying. */
+    private List<LayoutSection> copyLayout(String lastMenstrual, String lastNotes) {
+        List<LayoutSection> copying = List.of(
+                new LayoutSection("menstrual", "LIBRARY", "Menstrual", "SPECIALTY", "", "ASSESSMENT", 1, true, false,
+                        false, true, false, List.of("DOCTOR"), false, null,
+                        List.of(EmrTestData.choice("cycle", false, "regular", "irregular"),
+                                EmrTestData.choice("flow", false, "scanty", "normal", "heavy", "with_clots"),
+                                EmrTestData.field("lmp", "DATE", false))),
+                new LayoutSection("notes", "LIBRARY", "Notes", "COMMON", "", "ASSESSMENT", 2, true, false, false, true,
+                        false, List.of("DOCTOR"), false, null, List.of(EmrTestData.field("note", "TEXT", false))));
+        Department stored = layouts.find(TENANT, "gm").orElseThrow();
+        Department gm = new Department(stored.row(), stored.key(), stored.name(), stored.initials(), stored.colour(),
+                "general", stored.sourceKind(), stored.copiedFromKey(), stored.rooms(), stored.publishedVersion(),
+                stored.revision(), stored.draftLayout());
+        when(resolver.choose(TENANT, MEMBER)).thenReturn(new Resolution(gm,
+                new Published("STARTER", null, null, 3, copying), "DOCTOR_SPECIALTY"));
+        EmrRecordDocument previous = EmrRecordDocument.empty(EmrTestData.MAPPER);
+        if (lastMenstrual != null) {
+            previous.put("menstrual", (com.fasterxml.jackson.databind.node.ObjectNode) json(lastMenstrual), true, NOW,
+                    MEMBER);
+        }
+        if (lastNotes != null) {
+            previous.put("notes", (com.fasterxml.jackson.databind.node.ObjectNode) json(lastNotes), true, NOW, MEMBER);
+        }
+        when(records.latestSigned(TENANT, PATIENT, "gm")).thenReturn(Optional.of(new SignedCopy(UUID.randomUUID(),
+                Instant.parse("2026-10-01T05:00:00Z"), previous.toJson())));
+        when(records.findOpd(TENANT, VISIT)).thenReturn(Optional.empty());
+        when(records.findById(eq(TENANT), any(UUID.class))).thenReturn(Optional.of(opd(0)));
+        return copying;
+    }
+
+    private EmrRecordDocument openAndReadTheCopy() {
+        service.open(DOCTOR, new OpenInput("OPD_VISIT", VISIT));
+        ArgumentCaptor<NewRecord> created = ArgumentCaptor.forClass(NewRecord.class);
+        verify(records).insert(eq(TENANT), created.capture(), eq(USER));
+        return EmrRecordDocument.parse(EmrTestData.MAPPER, created.getValue().sections());
+    }
+
+    @Test
+    void copyFromLastVisitDropsAValueThatNoLongerFitsAndKeepsTheOnesThatDo() {
+        copyLayout("{\"cycle\":\"Regular, 28 days\",\"flow\":\"heavy\",\"lmp\":\"2026-09-20\"}", null);
+
+        EmrRecordDocument doc = openAndReadTheCopy();
+
+        assertThat(doc.has("menstrual")).isTrue();
+        assertThat(doc.values("menstrual").has("cycle")).isFalse();
+        assertThat(doc.values("menstrual").path("flow").asText()).isEqualTo("heavy");
+        assertThat(doc.values("menstrual").path("lmp").asText()).isEqualTo("2026-09-20");
+        assertThat(doc.copyPending("menstrual")).isTrue();
+    }
+
+    @Test
+    void aSectionWhereNothingFitsIsNotCopiedAndOtherSectionsStillAre() {
+        copyLayout("{\"flow\":\"spotting\",\"cycle\":true}", "{\"note\":\"old\"}");
+
+        EmrRecordDocument doc = openAndReadTheCopy();
+
+        assertThat(doc.has("menstrual")).isFalse();
+        assertThat(doc.values("notes").path("note").asText()).isEqualTo("old");
+    }
+
+    @Test
+    void whatIsCopiedPassesTheFirstDraftSaveWithoutAnError() {
+        List<LayoutSection> copying = copyLayout("{\"cycle\":\"Regular, 28 days\",\"flow\":\"normal\"}", null);
+        EmrRecordDocument doc = openAndReadTheCopy();
+        List<InvalidFieldsException.FieldMessage> errors = new java.util.ArrayList<>();
+
+        com.fasterxml.jackson.databind.node.ObjectNode cleaned = service.cleanValues("sections[0]", copying.get(0),
+                doc.values("menstrual"), errors, null, new EmrComponentValues.Context(NOW, MEMBER, null, null),
+                new java.util.ArrayList<>());
+
+        assertThat(errors).isEmpty();
+        assertThat(cleaned.path("flow").asText()).isEqualTo("normal");
+    }
+
     // ---- open: IPD and Emergency ----
 
     private AdmissionFacts admission(String status, Access access) {
@@ -396,6 +472,8 @@ class EmrRecordServiceTest {
         assertThat(created.getValue().erCaseId()).isEqualTo(CASE);
         EmrViews.RecordHeader header = result.record().header();
         assertThat(header.patientId()).isNull();
+        assertThat(header.allergyStatus()).isEqualTo(AllergyStatus.NOT_RECORDED);
+        assertThat(header.allergyText()).isNull();
         assertThat(header.patientName()).isEqualTo("Unknown male, about 40");
         assertThat(header.age()).isEqualTo(40);
         assertThat(header.sex()).isEqualTo("M");
@@ -447,6 +525,7 @@ class EmrRecordServiceTest {
         assertThat(header.patientName()).isEqualTo("Meena Patil");
         assertThat(header.initials()).isEqualTo("MP");
         assertThat(header.allergyText()).isNull();
+        assertThat(header.allergyStatus()).isEqualTo(AllergyStatus.NONE_RECORDED);
         assertThat(header.chronicText()).isEqualTo("Type 2 diabetes");
         assertThat(header.uhid()).isEqualTo("UH-000123");
         assertThat(header.visitOrdinal()).isEqualTo(3);
@@ -480,6 +559,32 @@ class EmrRecordServiceTest {
 
         assertThatThrownBy(() -> service.get(DOCTOR, RECORD)).isInstanceOfSatisfying(EmrProblemException.class,
                 ex -> assertThat(ex.slug()).isEqualTo("not-own-patient"));
+    }
+
+    private EmrViews.RecordHeader headerWithAllergy(String allergyText) {
+        when(patients.find(TENANT, PATIENT)).thenReturn(Optional.of(new PatientClinical(PATIENT, "UH-000123",
+                "Meena Patil", 41, "F", allergyText, null)));
+        when(records.findById(TENANT, RECORD)).thenReturn(Optional.of(opd(1)));
+        return service.get(DOCTOR, RECORD).header();
+    }
+
+    @Test
+    void theHeaderAllergyStatusIsRecordedOnlyForARealAllergyAndTheTextIsNullOtherwise() {
+        EmrViews.RecordHeader recorded = headerWithAllergy("Penicillin");
+        assertThat(recorded.allergyStatus()).isEqualTo(AllergyStatus.RECORDED);
+        assertThat(recorded.allergyText()).isEqualTo("Penicillin");
+
+        for (String none : new String[] {"No known allergy", "no known drug allergies.", "NKDA", " None ",
+            "none known"}) {
+            EmrViews.RecordHeader header = headerWithAllergy(none);
+            assertThat(header.allergyStatus()).as(none).isEqualTo(AllergyStatus.NONE_RECORDED);
+            assertThat(header.allergyText()).as(none).isNull();
+        }
+        for (String nothing : new String[] {null, "", "   ", "Not recorded", "Unknown", "?"}) {
+            EmrViews.RecordHeader header = headerWithAllergy(nothing);
+            assertThat(header.allergyStatus()).as(String.valueOf(nothing)).isEqualTo(AllergyStatus.NOT_RECORDED);
+            assertThat(header.allergyText()).as(String.valueOf(nothing)).isNull();
+        }
     }
 
     @Test

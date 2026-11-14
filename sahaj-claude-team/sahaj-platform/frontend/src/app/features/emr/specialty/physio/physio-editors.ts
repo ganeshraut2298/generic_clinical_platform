@@ -2,8 +2,10 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { formatDisplayDate } from '../../../../shared/format/ist-date';
 import { printSheet } from '../print-sheet';
+import { PainSiteFigureComponent, figureSex } from './pain-site-figure.component';
 import { REFERENCE_LISTS } from '../specialty.context';
 import { SpEditor, numberOrNull, textOrNull } from '../shared/sp-editor';
+import { SpSparklineComponent } from '../shared/sp-sparkline.component';
 import {
   GAITS,
   HEP_DOSE_TEXT,
@@ -47,6 +49,7 @@ import {
 @Component({
   selector: 'app-sp-pain-score',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [PainSiteFigureComponent, SpSparklineComponent],
   styleUrls: ['../specialty.shared.scss', './physio.scss'],
   template: `
     <div class="sp">
@@ -59,16 +62,22 @@ import {
         }
       </div>
       <div class="sp-row ends"><span class="sp-sub">No pain</span><span class="sp-sub">Worst pain</span></div>
+      @if (trendValues().length > 1) {
+        <app-sp-sparkline [values]="trendValues()" [label]="trendLabel()" data-testid="pain-trend" />
+      }
       <p class="sp-sub" data-testid="pain-text">{{ text() }}</p>
+      <span class="sp-lbl">Pain site</span>
+      <app-pain-site-figure [sex]="sex()" [marker]="val().siteMarker ?? null" [disabled]="disabled()" (markerChange)="patch({ siteMarker: $event })" />
       <label class="field">
-        <span class="sp-lbl">Pain site</span>
-        <input class="input" type="text" maxlength="80" [value]="val().site ?? ''" [disabled]="disabled()" (change)="patch({ site: txt($event) })" />
+        <span class="sp-lbl">Note on the pain site</span>
+        <input class="input" type="text" maxlength="120" placeholder="Right knee, medial side · worse on stairs, better with rest" [value]="val().site ?? ''" [disabled]="disabled()" (change)="patch({ site: txt($event) })" />
       </label>
     </div>
   `,
 })
 export class PainScoreComponent extends SpEditor<SpPainScore> {
   protected readonly component = 'PAIN_SCORE' as const;
+  protected readonly sex = computed(() => figureSex(this.ctx.store.patientSex()));
   protected blank(): SpPainScore {
     return { component: 'PAIN_SCORE', schemaVersion: 1, score: null };
   }
@@ -91,11 +100,30 @@ export class PainScoreComponent extends SpEditor<SpPainScore> {
     return textOrNull(e);
   }
 
+  /** The earlier sessions' scores, then today's, for the small trend line (SAH-75-11 P-3). */
+  protected readonly trendValues = computed(() => {
+    const earlier = [...(this.ctx.history()?.physioProgress?.painBySession ?? [])].sort((a, b) => a.sessionNo - b.sessionNo).map((x) => x.score);
+    const today = this.val().score;
+    return today == null ? earlier : [...earlier, today];
+  });
+  protected readonly trendLabel = computed(() => `Pain over the sessions: ${this.trendValues().join(', ')}`);
+
   protected readonly text = computed(() => {
     const p = this.ctx.history()?.physioProgress;
     const today = this.val().score;
     if (p?.onlyFirstVisit) {
       return 'Only the first visit is recorded.';
+    }
+    const by = [...(p?.painBySession ?? [])].sort((a, b) => a.sessionNo - b.sessionNo);
+    if (by.length > 0) {
+      const a = by[0].sessionNo;
+      const b = by[by.length - 1].sessionNo;
+      const head = `${a === b ? `Session ${a}` : `Sessions ${a}–${b}`}: ${by.map((x) => x.score).join(', ')}.`;
+      if (today == null) {
+        return head;
+      }
+      const diff = by[by.length - 1].score - today;
+      return `${head} Today: ${today}${diff > 0 ? ' — improving.' : diff === 0 ? ' — same as last session.' : ' — worse than last session.'}`;
     }
     if (!p || p.painLast == null) {
       return today == null ? 'Pick today’s pain score.' : `Today: ${today}.`;
@@ -156,7 +184,7 @@ export class PostureGaitComponent extends SpEditor<SpPostureGait> {
               <tr>
                 <td>{{ r.label }}</td>
                 <td><input class="input deg" type="number" inputmode="numeric" [value]="r.rightDeg ?? ''" [disabled]="disabled()" [attr.aria-label]="'Right ' + r.label + ' in degrees'" (change)="setDeg(r.movement, 'rightDeg', $event)" />°</td>
-                <td><input class="input deg" type="number" inputmode="numeric" [value]="r.leftDeg ?? ''" [disabled]="disabled()" [attr.aria-label]="'Left ' + r.label + ' in degrees'" (change)="setDeg(r.movement, 'leftDeg', $event)" />°</td>
+                <td data-testid="rom-left">{{ r.leftDeg === null ? '—' : r.leftDeg + '°' }}</td>
                 <td>{{ r.normalMax === null ? '—' : normal(r.normalMax) }}</td>
                 <td>
                   @if (pct(r); as p) {
@@ -169,9 +197,9 @@ export class PostureGaitComponent extends SpEditor<SpPostureGait> {
           </tbody>
         </table>
       </div>
-      @if (chips().length > 0) {
-        <div class="sp-row" role="group" aria-label="Outcome scores" data-testid="scale-chips">
-          @for (c of chips(); track c) {
+      @if (allChips().length > 0) {
+        <div class="sp-row" role="group" aria-label="Strength and outcome scores" data-testid="scale-chips">
+          @for (c of allChips(); track c) {
             <span class="chipnote">{{ c }}</span>
           }
         </div>
@@ -215,6 +243,17 @@ export class RomTableComponent extends SpEditor<SpRomTable> {
 
   /** "WOMAC 48 → 41" (mockup, range-of-motion card): the outcome scales scored today or earlier. */
   protected readonly chips = computed(() => scaleChipsOf(this.view()?.physio?.outcomeScales, this.ctx.value<SpOutcomeScales>(this.ctx.sectionKeyOf('OUTCOME_SCALES') ?? '', 'OUTCOME_SCALES'), this.fresh()));
+
+  /** "Quadriceps R 4/5 · L 5/5" for each muscle group tested in this visit (mockup, range-of-motion card; SAH-75-11 P-4). */
+  protected readonly strengthChips = computed(() => {
+    const key = this.ctx.sectionKeyOf('MMT_TABLE');
+    const mmt = key ? this.ctx.value<SpMmtTable>(key, 'MMT_TABLE') : null;
+    const items = jointItems(this.ctx.list(REFERENCE_LISTS.jointMmt), 'knee', KNEE_MMT);
+    return (mmt?.rows ?? [])
+      .filter((r) => r.right != null || r.left != null)
+      .map((r) => `${items.find((k) => k.key === r.group)?.label ?? r.group} R ${r.right ?? '–'}/5 · L ${r.left ?? '–'}/5`);
+  });
+  protected readonly allChips = computed(() => [...this.strengthChips(), ...this.chips()]);
 
   protected normal(max: number): string {
     return normalText(max);
@@ -739,6 +778,7 @@ export class SessionNoteComponent extends SpEditor<SpSessionNote> {
 
   constructor() {
     super();
+    this.registerFooterPrint(() => this.report());
     effect(() => {
       if (this.ctx.history() === null) {
         this.ctx.loadHistory();

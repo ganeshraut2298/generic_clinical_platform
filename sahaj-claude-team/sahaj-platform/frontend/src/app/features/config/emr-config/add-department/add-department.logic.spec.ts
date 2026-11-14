@@ -22,6 +22,23 @@ describe('add-department.logic', () => {
     expect(previewSections(detail)).toEqual(['ROM']);
   });
 
+  it('adds the design brackets to four physiotherapy section names', () => {
+    const detail = {
+      sections: [
+        section({ key: 'pain', name: 'Pain assessment', kind: 'SPECIALTY' }),
+        section({ key: 'mmt', name: 'Manual muscle testing', kind: 'SPECIALTY' }),
+        section({ key: 'func_scales', name: 'Outcome scales', kind: 'SPECIALTY' }),
+        section({ key: 'modalities', name: 'Treatment modalities', kind: 'SPECIALTY' }),
+      ],
+    };
+    expect(previewSections(detail)).toEqual([
+      'Pain assessment (VAS / NPRS)',
+      'Manual muscle testing (Oxford 0–5)',
+      'Outcome scales (ODI, NDI, WOMAC)',
+      'Treatment modalities (IFT, TENS, US)',
+    ]);
+  });
+
   it('clears every Print flag when the print template is not wanted', () => {
     const withPrint = sections().map((s) => ({ ...s, print: true }));
     expect(withPrintFlags(withPrint, true).every((s) => s.print)).toBe(true);

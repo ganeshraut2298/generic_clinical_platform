@@ -252,8 +252,10 @@ class EmrChemoOrderIT extends EmrSpecialtySupport {
     void aStaleOrderRevisionIs409ChemoOrderChangedAndASecondFirstSaveToo() throws Exception {
         Sheet sheet = passingSheet();
         problemOf(HttpMethod.PUT, orderUrl(sheet.rec()), sheet.rec().token(), passingOrder(7), 409, "chemo-order-changed");
-        problemOf(HttpMethod.PUT, orderUrl(sheet.rec()), sheet.rec().token(), passingOrder(0), 409, "chemo-order-changed");
-        saveOrder(sheet.rec(), passingOrder(sheet.revision()));
+        // a new order is revision 0, so the sheet's revision is the valid one for the next save; once that save has changed the order it is stale
+        String changed = orderBody(sheet.revision(), "PACLI_3W", 90, "\"allergyConfirmed\":true,\"consentNewSigned\":true,\"scheme\":\"APPROVED\"");
+        saveOrder(sheet.rec(), changed);
+        problemOf(HttpMethod.PUT, orderUrl(sheet.rec()), sheet.rec().token(), changed, 409, "chemo-order-changed");
         assertThat(count(sheet.rec().clinic(), "select count(*) from opd.chemo_order")).as("one order per record").isOne();
     }
 
@@ -323,9 +325,7 @@ class EmrChemoOrderIT extends EmrSpecialtySupport {
             assertThat(option.get("hasPin").asBoolean()).as("nobody has set a PIN yet").isFalse();
             assertThat(option.get("name").asText()).isNotBlank();
         }
-        assertThat(ids).as("the owner has no doctor details: not an option").doesNotContain(owner(clinic).membershipId().toString());
-        ownerWithDoctorDetails(clinic, "General physician", "MBBS", "REG-" + shortId());
-        assertThat(texts(get(orderUrl(sheet.rec()) + "/checker-options", sheet.rec().token()), "membershipId")).as("the owner with doctor details is").contains(owner(clinic).membershipId().toString());
+        assertThat(ids).as("the owner got a doctor profile from the setup wizard: an option").contains(owner(clinic).membershipId().toString());
     }
 
     @Test

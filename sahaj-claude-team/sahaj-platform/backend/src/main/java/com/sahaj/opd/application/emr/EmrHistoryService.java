@@ -53,6 +53,11 @@ public class EmrHistoryService {
                                 boolean hasMore) {
     }
 
+    /** SAH-75-8 (G16-1): the heading over the medicines of a past visit. */
+    public static final String MEDICINES = "MEDICINES";
+    public static final String DISCHARGE_MEDICINES = "DISCHARGE_MEDICINES";
+    public static final String TAKE_HOME_MEDICINES = "TAKE_HOME_MEDICINES";
+
     public record Line(String label, String value) {
     }
 
@@ -68,7 +73,15 @@ public class EmrHistoryService {
     public record PastVisitDetail(String kind, UUID id, boolean signed, List<Line> lines,
                                   List<DetailMedicine> medicines, List<DetailResult> results, List<String> tests,
                                   boolean canCopyMedicines, boolean canRepeatTests, String copyDisabledReason,
-                                  Open open) {
+                                  Open open, String medicinesHeading) {
+
+        /** The 0.6.0 shape: the heading is "Medicines". */
+        public PastVisitDetail(String kind, UUID id, boolean signed, List<Line> lines, List<DetailMedicine> medicines,
+                               List<DetailResult> results, List<String> tests, boolean canCopyMedicines,
+                               boolean canRepeatTests, String copyDisabledReason, Open open) {
+            this(kind, id, signed, lines, medicines, results, tests, canCopyMedicines, canRepeatTests,
+                    copyDisabledReason, open, MEDICINES);
+        }
     }
 
     public record Fact(String key, String label, String value, boolean important) {
@@ -87,16 +100,28 @@ public class EmrHistoryService {
     private final TeamMemberPort teamMembers;
     private final ObjectMapper mapper;
     private final EmrLayouts layouts;
+    /** SAH-75-8: tells an oncology day-care visit (a SENT chemotherapy order) from another; null in a plain unit test. */
+    private final com.sahaj.opd.application.emr.specialty.ChemoOrderRepository chemoOrders;
 
     /** Without the form layouts (a plain unit test): clinic form entries are then left out of the details. */
     public EmrHistoryService(EmrRecordService records, EmrRecordRepository repository, PatientIpdHistorySource ipd,
                              PatientClinicalPort patients, TeamMemberPort teamMembers, ObjectMapper mapper) {
-        this(records, repository, ipd, patients, teamMembers, mapper, null);
+        this(records, repository, ipd, patients, teamMembers, mapper, null, null);
+    }
+
+    /** Without the chemotherapy orders (a plain unit test): an oncology visit keeps the heading "Medicines". */
+    public EmrHistoryService(EmrRecordService records, EmrRecordRepository repository, PatientIpdHistorySource ipd,
+                             PatientClinicalPort patients, TeamMemberPort teamMembers, ObjectMapper mapper,
+                             EmrLayouts layouts) {
+        this(records, repository, ipd, patients, teamMembers, mapper, layouts, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public EmrHistoryService(EmrRecordService records, EmrRecordRepository repository, PatientIpdHistorySource ipd,
-                             PatientClinicalPort patients, TeamMemberPort teamMembers, ObjectMapper mapper, EmrLayouts layouts) {
+                             PatientClinicalPort patients, TeamMemberPort teamMembers, ObjectMapper mapper,
+                             EmrLayouts layouts,
+                             com.sahaj.opd.application.emr.specialty.ChemoOrderRepository chemoOrders) {
+        this.chemoOrders = chemoOrders;
         this.records = records;
         this.repository = repository;
         this.ipd = ipd;
@@ -272,7 +297,7 @@ public class EmrHistoryService {
                 lines.add(new Line("Reason for admission", a.reason()));
             }
             return new PastVisitDetail(kind, pastId, true, lines, List.of(), List.of(), List.of(), false, false, null,
-                    new Open("ADMISSION", pastId));
+                    new Open("ADMISSION", pastId), DISCHARGE_MEDICINES);
         }
         RecordRow past = repository.findById(tenantId, pastId).orElseThrow(EmrProblemException::pastVisitNotFound);
         if (!auth.patientId().equals(past.patientId()) || recordId.equals(pastId)
@@ -282,7 +307,7 @@ public class EmrHistoryService {
         boolean currentSigned = "SIGNED".equals(auth.row().status());
         if (!"SIGNED".equals(past.status())) {
             return new PastVisitDetail(kind, pastId, false, List.of(), List.of(), List.of(), List.of(), false, false,
-                    null, new Open("RECORD", pastId));
+                    null, new Open("RECORD", pastId), headingOf(kind, false));
         }
         EmrRecordDocument document = EmrRecordDocument.parse(mapper, past.sections());
         List<DetailMedicine> medicines = new ArrayList<>();
@@ -314,7 +339,22 @@ public class EmrHistoryService {
         boolean canMedicines = !currentSigned && !medicines.isEmpty();
         boolean canTests = !currentSigned && !tests.isEmpty();
         return new PastVisitDetail(kind, pastId, true, lines, medicines, results, tests, canMedicines, canTests,
-                currentSigned ? "RECORD_SIGNED" : null, new Open("RECORD", pastId));
+                currentSigned ? "RECORD_SIGNED" : null, new Open("RECORD", pastId),
+                headingOf(kind, takeHome(tenantId, past)));
+    }
+
+    /** "Medicines"; "Discharge medicines" for an IPD round; "Take-home medicines" for a day-care chemotherapy visit. */
+    static String headingOf(String kind, boolean takeHome) {
+        if ("IPD".equals(kind) || "IPD_ROUND".equals(kind)) {
+            return DISCHARGE_MEDICINES;
+        }
+        return takeHome ? TAKE_HOME_MEDICINES : MEDICINES;
+    }
+
+    /** An OPD record of the oncology profile with a SENT chemotherapy order (ADR-026 D10). */
+    private boolean takeHome(UUID tenantId, RecordRow past) {
+        return chemoOrders != null && "OPD_VISIT".equals(past.encounterType()) && "onco".equals(past.starterKey())
+                && chemoOrders.findByRecord(tenantId, past.id()).filter(o -> "SENT".equals(o.status)).isPresent();
     }
 
     private void collect(String sectionKey, JsonNode value, List<DetailMedicine> medicines, List<String> tests,

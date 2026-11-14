@@ -174,7 +174,7 @@ class EmrSpecialtyReferenceIT extends EmrSpecialtySupport {
         assertThat(keysOfList(paeds, "milestones")).containsExactly("walks_alone", "climbs_stairs_with_help", "scribbles_with_crayon", "feeds_self_with_spoon",
                 "points_to_show_interest", "says_6_or_more_words");
         assertThat(keysOfList(paeds, "paedsDoseRules")).containsExactly("PARACETAMOL_120_5", "PARACETAMOL_250_5", "IBUPROFEN_100_5");
-        assertThat(paeds.get("thresholds").get("paedsParacetamolMgPerKg").asDouble()).isEqualTo(15.0);
+        assertThat(paeds.get("thresholds").get("paedsParacetamol1205MgPerKg").asDouble()).isEqualTo(15.0);
         for (String rule : keysOfList(paeds, "paedsDoseRules")) {
             assertThat(item(paeds, "paedsDoseRules", rule).get("medicine").isNull()).as(rule + " points at a seeded master medicine").isFalse();
         }
@@ -211,7 +211,7 @@ class EmrSpecialtyReferenceIT extends EmrSpecialtySupport {
 
     @Test
     void onlyADoctorAVisitingDoctorOrAnOwnerWithDoctorDetailsReadsTheReferenceAndAnyWriteOnItIs403ForEveryRoleOwnerIncluded() throws Exception {
-        Clinic clinic = newClinic();
+        Clinic clinic = newClinic(true, false);
         Staff doctor = addDoctor(clinic, "General physician");
         Staff visiting = addStaff(clinic, "VISITING_DOCTOR", "Dr Visiting Test", "General physician", "MBBS", "REG-" + shortId());
         get(REFERENCE + "gm", doctor.token(clinic));
@@ -352,7 +352,7 @@ class EmrSpecialtyReferenceIT extends EmrSpecialtySupport {
 
     @Test
     void onlyADoctorAVisitingDoctorOrAnOwnerWithDoctorDetailsListsOrSavesATemplate() throws Exception {
-        Clinic clinic = newClinic();
+        Clinic clinic = newClinic(true, false);
         Staff visiting = addStaff(clinic, "VISITING_DOCTOR", "Dr Visiting Test", "General physician", "MBBS", "REG-" + shortId());
         post(VISIT_TEMPLATES, visiting.token(clinic), templateBody("From visiting", null, SOME_ITEMS), 201);
         for (String role : NOT_DOCTOR_ROLES) {

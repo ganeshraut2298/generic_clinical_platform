@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { casePaperContext } from '../../emr.fixtures';
 import { specialtyRecord } from '../specialty.fixtures';
-import { mountEditor, byText, click, typeInto } from '../specialty.testing';
+import { mountEditor, byText, click, typeInto, EMR_RECORDS } from '../specialty.testing';
 import { ConsentChecklistComponent } from '../shared/consent-checklist.component';
 import { emptyChart } from '../dental.logic';
 import { DentalDoneComponent, DentalPlanComponent, LabWorkComponent } from './dental-plan.component';
@@ -113,13 +113,47 @@ describe('Tooth chart (SAH-49-1)', () => {
     const h = mountEditor(ToothChartComponent, view(), 'dental_chart', { dental_chart: emptyChart('ADULT') });
     click(h.el, 'button[data-view="detail"]');
     h.fixture.detectChanges();
+    h.fixture.detectChanges();
+    h.http.expectOne(`${EMR_RECORDS}/r1/specialty-history`).flush({ profile: 'dental', someHidden: false, dentalToothHistory: [] });
+    h.fixture.detectChanges();
+    expect(h.el.querySelectorAll('.detail > .dcol')).toHaveLength(3);
     expect(h.el.textContent).toContain('Surfaces of 36 · tap to mark');
+    expect(h.el.textContent).toContain('Side view · crown and roots');
+    expect(h.el.querySelector('[data-testid="tooth-history-empty"]')?.textContent).toBe('No earlier work on this tooth.');
     expect(h.el.querySelector('[data-testid="surf-text"]')?.textContent).toContain('No surface marked');
     byText(h.el, 'button', 'G2').click();
     expect((h.store.specialtyValue('dental_chart') as SpToothChart).teeth[0]).toMatchObject({ tooth: 36, mobility: 2 });
     click(h.el, 'button[data-act="next-tooth"]');
     h.fixture.detectChanges();
     expect(h.el.textContent).toContain('Surfaces of 37');
+  });
+
+  it('lists the earlier work on the selected tooth from the signed visits', () => {
+    const h = mountEditor(ToothChartComponent, view(), 'dental_chart', { dental_chart: emptyChart('ADULT') });
+    click(h.el, 'button[data-view="detail"]');
+    h.fixture.detectChanges();
+    h.http.expectOne(`${EMR_RECORDS}/r1/specialty-history`).flush({
+      profile: 'dental',
+      someHidden: false,
+      dentalToothHistory: [
+        { tooth: '36', date: '2026-09-02', text: 'RCT · sitting 1 of 3' },
+        { tooth: '46', date: '2026-08-01', text: 'Scaling' },
+      ],
+    });
+    h.fixture.detectChanges();
+    const rows = Array.from(h.el.querySelectorAll('[data-testid="tooth-history"]')).map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('RCT · sitting 1 of 3');
+    expect(rows[0]).toContain('Sep 2026');
+    expect(h.el.querySelector('[data-testid="tooth-history-empty"]')).toBeNull();
+  });
+
+  it('gives the open-mouth slider the drawn range of 6 to 160', () => {
+    const h = mountEditor(ToothChartComponent, view(), 'dental_chart', { dental_chart: emptyChart('ADULT') });
+    click(h.el, 'button[data-view="3d"]');
+    h.fixture.detectChanges();
+    const ranges = Array.from(h.el.querySelectorAll<HTMLInputElement>('input[type="range"]')).map((i) => [i.min, i.max]);
+    expect(ranges).toContainEqual(['6', '160']);
   });
 
   it('keeps "All teeth healthy" as a confirmation', () => {
@@ -210,7 +244,9 @@ describe('Treatment plan and estimate (SAH-49-2, SAH-69-1)', () => {
     expect(req.request.headers.get('Idempotency-Key')).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
     req.flush({ id: 'c1' });
     h.fixture.detectChanges();
-    expect(h.el.querySelector('a[href="/app/courses/c1"]')).not.toBeNull();
+    // The course is shown by the embedded panel (SAH-75-3): it asks for this patient's dental courses.
+    h.http.expectOne((r) => r.url === '/api/v1/opd/emr/courses' && r.params.get('kind') === 'DENTAL').flush([]);
+    expect(h.el.querySelector('app-course-panel')).not.toBeNull();
   });
 
   it('prints the estimate with the clinic header, the rows, the total and the analyst line, then says so', () => {

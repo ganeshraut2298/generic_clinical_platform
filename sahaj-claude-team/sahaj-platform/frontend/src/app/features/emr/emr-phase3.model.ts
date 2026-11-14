@@ -251,6 +251,8 @@ export interface EmrPastVisitDetail {
   medicines: { name: string; frequency: EmrRxFrequency; days: number; when: EmrRxWhen }[];
   results: { test: string; value: string; abnormal: boolean }[];
   tests: string[];
+  /** 0.7.0 (SAH-75-8 G16-1): the heading of the medicines block; absent from an older server reads MEDICINES. */
+  medicinesHeading?: 'MEDICINES' | 'DISCHARGE_MEDICINES' | 'TAKE_HOME_MEDICINES';
   canCopyMedicines: boolean;
   canRepeatTests: boolean;
   copyDisabledReason: 'RECORD_SIGNED' | null;

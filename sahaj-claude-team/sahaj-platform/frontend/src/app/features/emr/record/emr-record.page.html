@@ -59,10 +59,11 @@
     </div>
   }
 
-  <div class="layout">
+  <div class="layout" [class.no-nav]="!chrome().nav">
+    @if (chrome().nav) {
     <nav class="nav surf" aria-label="EMR sections">
       @for (part of parts; track part) {
-        @let progress = progressOf(part);
+        @let navCounts = navCountsOf(part);
         <button
           type="button"
           class="nav-h"
@@ -72,26 +73,32 @@
         >
           <span class="nav-num">{{ part === 'ASSESSMENT' ? 1 : 2 }}</span>
           <span class="nav-l">{{ partLabel[part] }}</span>
-          <span class="nav-d">{{ progress?.sectionsDone }}/{{ progress?.sectionsTotal }}</span>
+          <span class="nav-d">{{ navCounts.done }}/{{ navCounts.total }}</span>
         </button>
         @for (item of navStates(part); track item.section.key) {
           <button type="button" class="nav-i" [class.on]="store.activeSection() === item.section.key" (click)="jump(item.section.key)">
             <span class="dot" [class.ok]="item.state?.done" [class.req]="!item.state?.done && item.section.required" aria-hidden="true">
               {{ item.state?.done ? '✓' : item.section.required ? '!' : '' }}
             </span>
-            <span class="nav-t">{{ item.section.name }}</span>
+            <span class="nav-t">{{ titleOf(item.section) }}</span>
             @if (item.section.required && !item.state?.done) {
               <span class="reqt">Required</span>
             }
           </button>
         }
       }
+      <div class="nav-foot" data-testid="nav-required">
+        <span>{{ requiredLine() }}</span>
+        <span class="bar" aria-hidden="true"><span class="fill" [class.full]="requiredAllDone()" [style.width.%]="requiredPct()"></span></span>
+      </div>
     </nav>
+    }
 
     <main class="main">
+      @if (chrome().partTabs) {
       <div class="parts" role="tablist" aria-label="Visit part">
         @for (part of parts; track part) {
-          @let progress = progressOf(part);
+          @let badge = badgeOf(part);
           <button
             type="button"
             role="tab"
@@ -99,17 +106,18 @@
             [attr.aria-selected]="store.part() === part"
             (click)="setPart(part)"
           >
-            <span class="pnum" [class.full]="progress?.complete">{{ progress?.complete ? '✓' : part === 'ASSESSMENT' ? 1 : 2 }}</span>
+            <span class="pnum" [class.full]="badge.full">{{ badge.full ? '✓' : part === 'ASSESSMENT' ? 1 : 2 }}</span>
             <span class="ptext">
               <b>{{ partLabel[part] }}</b>
               <small>{{ tabSubtitle(part) }}</small>
             </span>
-            <span class="badge" [class.full]="progress?.complete">{{ progress?.requiredDone }} of {{ progress?.requiredTotal }} required</span>
+            <span class="badge" [class.full]="badge.full" data-testid="part-badge">{{ badge.text }}</span>
           </button>
         }
       </div>
+      }
 
-      @if (store.part() === 'TREATMENT') {
+      @if (chrome().partTabs && store.part() === 'TREATMENT') {
         <div class="recap surf">
           <b>From assessment:</b>
           <span>{{ recap() }}</span>
@@ -119,26 +127,39 @@
         </div>
       }
 
+      @if (store.part() === 'ASSESSMENT' && assessmentTop(); as top) {
+        <ng-container *ngComponentOutlet="top" />
+      }
+
       <div class="cards">
         @for (section of currentSections(); track section.key) {
-          <app-section-card [section]="section" [specialty]="specialty()" />
+          @if (panelBefore(section.key) && panelKind(); as kind) {
+            <app-course-panel [kind]="kind" />
+          }
+          <app-section-card
+            [class.half]="isHalf(section)"
+            [section]="section"
+            [specialty]="specialty()"
+            [title]="titleOf(section)"
+            [area]="areaOf(section)"
+          />
+          @if (panelAfter(section.key) && panelKind(); as kind) {
+            <app-course-panel [kind]="kind" />
+          }
         } @empty {
           <p class="empty">No sections in this part.</p>
+        }
+        @if (panelAtEnd() && panelKind(); as kind) {
+          <app-course-panel [kind]="kind" />
         }
         @if (store.part() === 'ASSESSMENT' && assessmentExtra(); as extra) {
           <ng-container *ngComponentOutlet="extra" />
         }
       </div>
 
-      @if (store.part() === 'ASSESSMENT') {
+      @if (chrome().partTabs && store.part() === 'ASSESSMENT') {
         <div class="cont surf">
-          <span class="faint">
-            @if (store.progress()[0].complete) {
-              Assessment done.
-            } @else {
-              Still needed in assessment. You can still go ahead.
-            }
-          </span>
+          <span class="faint" data-testid="assessment-bar">{{ assessmentLine() }}</span>
           <button type="button" mat-flat-button data-act="continue" (click)="setPart('TREATMENT')">
             Continue to Treatment →
           </button>
@@ -159,7 +180,7 @@
         @if (store.rightTab() === 'history') {
           <app-past-visits [recordId]="r.id" [allergyLine]="store.allergyLine()" />
         } @else if (store.rightTab() === 'tools') {
-          <app-gm-tools />
+          <app-quick-tools />
         } @else {
           <app-case-paper-panel />
         }
@@ -194,6 +215,9 @@
       }
       <div class="fbtns">
         @if (!hold()) {
+          @if (printLabel(); as label) {
+            <button type="button" mat-stroked-button data-act="footer-print" (click)="footerPrint()">{{ label }}</button>
+          }
           <button
             type="button"
             mat-stroked-button

@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Multi-visit treatment course</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font-family:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid #1D5FA866;outline-offset:2px}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; width: 100%; font-size: 14px">
+
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap">
+    <div style="display: flex; flex-direction: column; gap: 3px">
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700">{{course.name}}</h3>
+        <span style="font-size: 11px; font-weight: 700; color: #3E4C5E; background: #EEF1F5; border-radius: 6px; padding: 2px 7px">{{course.id}}</span>
+      </div>
+      <span style="font-size: 12px; color: #5B6B7F">{{course.sub}}</span>
+    </div>
+    <div role="tablist" aria-label="Course view" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button></sc-for>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+    <sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+      <div style="{{s.style}}"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F">{{s.label}}</span><span style="font-size: 18px; font-weight: 700; color: {{s.color}}">{{s.value}}</span><span style="font-size: 11px; color: #5B6B7F">{{s.note}}</span></div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; gap: 0; align-items: flex-start; overflow-x: auto; padding: 4px 2px 8px">
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+      <button type="button" onClick="{{s.pick}}" title="{{s.title}}" style="{{s.wrap}}">
+        <span style="{{s.line}}"></span>
+        <span style="{{s.dot}}">{{s.mark}}</span>
+        <span style="font-size: 11px; font-weight: 700; color: #0F1C2E">{{s.label}}</span>
+        <span style="font-size: 10px; color: #5B6B7F">{{s.date}}</span>
+        <span style="{{s.encStyle}}">{{s.enc}}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{isTimeline}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <sc-for list="{{cards}}" as="c" hint-placeholder-count="3">
+        <div style="{{c.style}}">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+              <strong style="font-size: 14px">{{c.title}}</strong>
+              <span style="{{c.encStyle}}">{{c.enc}}</span>
+              <span style="{{c.statusStyle}}">{{c.status}}</span>
+            </div>
+            <span style="font-size: 13px; font-weight: 700">{{c.charge}}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px">
+            <sc-for list="{{c.items}}" as="i" hint-placeholder-count="2"><span style="font-size: 13px; color: #3E4C5E">• {{i}}</span></sc-for>
+          </div>
+          <span style="font-size: 12px; color: #5B6B7F">{{c.note}}</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{c.actions}}" as="a" hint-placeholder-count="2"><button type="button" onClick="{{a.run}}" style="{{a.style}}">{{a.label}}</button></sc-for>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border: 1px dashed #9AA8B8; border-radius: 10px; padding: 10px 12px">
+        <span style="font-size: 13px; font-weight: 600; color: #3E4C5E">{{addLabel}}</span>
+        <sc-for list="{{addOpts}}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{o.run}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer">+ {{o.label}}</button></sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isTable}}" hint-placeholder-val="{{ false }}">
+    <div style="overflow-x: auto">
+      <div style="min-width: 760px; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+        <div style="display: grid; grid-template-columns: 50px 80px 1.4fr 2.4fr 90px 100px; gap: 8px; padding: 8px 12px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">
+          <span>#</span><span>Date</span><span>Encounter</span><span>Work</span><span>Charge</span><span>Status</span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+          <div style="{{r.style}}"><span style="font-weight: 700">{{r.n}}</span><span>{{r.date}}</span><span>{{r.enc}}</span><span style="color: #3E4C5E">{{r.work}}</span><span style="font-weight: 600">{{r.charge}}</span><span style="{{r.statusStyle}}">{{r.status}}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isPay}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px">
+      <div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 10px; border: 2px solid {{accent}}; border-radius: 12px; padding: 14px">
+        <span style="font-size: 14px; font-weight: 700">Collect payment</span>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{payTypes}}" as="p" hint-placeholder-count="4">
+            <button type="button" aria-pressed="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}"><span style="font-weight: 700">{{p.label}}</span><span style="font-size: 12px; color: #3E4C5E">{{p.sub}}</span></button>
+          </sc-for>
+        </div>
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13px; color: #3E4C5E"><input type="checkbox" checked="{{useCredit}}" onChange="{{toggleCredit}}" style="width: 18px; height: 18px">Use advance balance first ({{creditText}})</label>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <button type="button" onClick="{{amtDown}}" aria-label="Less" style="width: 40px; height: 40px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer">−</button>
+          <span style="flex: 1; text-align: center; font-size: 26px; font-weight: 700">{{amountText}}</span>
+          <button type="button" onClick="{{amtUp}}" aria-label="More" style="width: 40px; height: 40px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer">+</button>
+        </div>
+        <span style="font-size: 12px; color: #5B6B7F; text-align: center">{{amountHint}}</span>
+        <div style="display: flex; gap: 6px">
+          <sc-for list="{{modes}}" as="m" hint-placeholder-count="3"><button type="button" aria-pressed="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button></sc-for>
+        </div>
+        <button type="button" onClick="{{collect}}" style="{{collectStyle}}">{{collectLabel}}</button>
+      </div>
+      <div style="flex: 2 1 420px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 14px; font-weight: 700">Receipts and adjustments</span>
+        <div style="border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+          <div style="display: grid; grid-template-columns: 70px 1.3fr 70px 1.5fr 90px 80px; gap: 8px; padding: 8px 12px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">
+            <span>Date</span><span>Type</span><span>Mode</span><span>Against</span><span>Amount</span><span>Receipt</span>
+          </div>
+          <sc-for list="{{ledger}}" as="l" hint-placeholder-count="3">
+            <div style="{{l.style}}"><span>{{l.date}}</span><span style="{{l.typeStyle}}">{{l.type}}</span><span>{{l.mode}}</span><span style="color: #3E4C5E">{{l.against}}</span><span style="font-weight: 700">{{l.amt}}</span><span style="font-size: 12px; color: #5B6B7F">{{l.ref}}</span></div>
+          </sc-for>
+        </div>
+        <span style="font-size: 12px; color: #5B6B7F">{{payNote}}</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #3E4C5E; background: #F4F6F8; border-radius: 8px; padding: 8px 12px">
+    <span style="font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; background: #DCEBFB; color: #164A84">OPD</span>each sitting opens its own OPD visit
+    <span style="font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; background: #EADFF8; color: #552F99; margin-left: 6px">IPD</span>admissions and day care link to the same course
+    <span style="margin-left: 6px">· one running account: advances and part payments carry across visits</span>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="align-self: flex-start; background: #0F1C2E; color: #FFFFFF; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","options":["dental","anc","physio","chemo","surgery"],"default":"dental"},"accent":{"editor":"color","default":"#0B6E69"},"$preview":{"width":1000,"height":760}}'>
+var DATA = {
+  dental: {
+    name: 'Dental treatment course', id: 'TC-0412', sub: 'Started 28 Oct 2026 · Dr. [DOCTOR NAME] · estimate signed by patient · sample rates', unit: 'Sitting',
+    sittings: [
+      { date: '28 Oct', enc: 'OPD', encId: 'OPD-10231', status: 'done', items: ['Examination and IOPA of 36', 'Composite filling 16 (O)'], charge: 1750, note: 'Plan explained, estimate signed.' },
+      { date: '04 Nov', enc: 'OPD', encId: 'OPD-10388', status: 'done', items: ['RCT 36 · sitting 1 of 3: access opening'], charge: 1500, note: 'Calcium hydroxide dressing.' },
+      { date: '11 Nov', enc: 'OPD', encId: 'OPD-10502', status: 'today', items: ['RCT 36 · sitting 2 of 3: cleaning and shaping'], charge: 1500, note: 'In the chair now.' },
+      { date: '18 Nov', enc: 'OPD', status: 'planned', items: ['RCT 36 · sitting 3 of 3: obturation', 'Composite filling 47 (MO)'], charge: 3000, note: 'Booked 10:30, chair 1.' },
+      { date: '25 Nov', enc: 'OPD', status: 'planned', items: ['Crown preparation 36 and impression'], charge: 2750, note: 'Lab work goes out after this sitting.' },
+      { date: '02 Dec', enc: 'OPD', status: 'planned', items: ['PFM crown 36 fixing'], charge: 2750, note: 'Depends on lab delivery.' },
+      { date: 'Dec', enc: 'IPD', encLabel: 'Day care', status: 'planned', items: ['Extraction 18', 'Implant placement 46 under sedation'], charge: 31200, note: 'Day-care admission with sedation. Needs fasting and an escort.' }
+    ],
+    ledger: [['28 Oct', 'Advance', 'UPI', 5000, 'Course advance', 'RC-2201'], ['04 Nov', 'Part payment', 'Cash', 1000, 'Sitting 2', 'RC-2287']],
+    addOpts: [['OPD sitting', 'OPD'], ['Day-care admission', 'IPD'], ['IPD admission', 'IPD']], dates: ['18 Nov', '20 Nov', '25 Nov', '02 Dec', 'Dec', 'Jan']
+  },
+  anc: {
+    name: 'Pregnancy care · ANC course', id: 'ANC-0087', sub: 'Booked 14 Jun 2026 · EDD 09 Feb 2027 · high risk (previous LSCS) · sample rates', unit: 'Visit',
+    sittings: [
+      { date: '14 Jun', enc: 'OPD', encId: 'OPD-08811', status: 'done', items: ['Booking visit, dating USG', 'Booking bloods'], charge: 2800, note: '8w 2d.' },
+      { date: '04 Aug', enc: 'OPD', encId: 'OPD-09502', status: 'done', items: ['NT scan, double marker', 'Td 1'], charge: 3400, note: '13w 2d.' },
+      { date: '15 Sep', enc: 'OPD', encId: 'OPD-09977', status: 'done', items: ['Anomaly scan'], charge: 2500, note: '19w 1d.' },
+      { date: '13 Oct', enc: 'OPD', encId: 'OPD-10190', status: 'done', items: ['Routine ANC, Hb'], charge: 600, note: '23w 1d.' },
+      { date: '11 Nov', enc: 'OPD', encId: 'OPD-10511', status: 'today', items: ['Routine ANC', 'OGTT, Td 2'], charge: 1200, note: '27w 1d. Today.' },
+      { date: '02 Dec', enc: 'OPD', status: 'planned', items: ['Growth scan with Form F', 'ANC'], charge: 2600, note: '30 weeks.' },
+      { date: '23 Dec', enc: 'OPD', status: 'planned', items: ['ANC, NST'], charge: 900, note: '33 weeks.' },
+      { date: '13 Jan', enc: 'OPD', status: 'planned', items: ['ANC, NST, pre-op tests'], charge: 2400, note: '36 weeks. Anaesthesia check.' },
+      { date: '~02 Feb', enc: 'IPD', encLabel: 'Delivery admission', status: 'planned', items: ['Planned repeat LSCS', '3 days in ward'], charge: 55000, note: 'Admission deposit is due by 36 weeks.' }
+    ],
+    ledger: [['14 Jun', 'Advance', 'UPI', 5000, 'ANC course advance', 'RC-1840'], ['15 Sep', 'Part payment', 'Card', 3000, 'Visits 2–3', 'RC-2012'], ['13 Oct', 'Visit payment', 'Cash', 600, 'Visit 4', 'RC-2140']],
+    addOpts: [['ANC visit', 'OPD'], ['Emergency admission', 'IPD'], ['Delivery admission', 'IPD']], dates: ['02 Dec', '09 Dec', '23 Dec', '13 Jan', '~02 Feb']
+  },
+  chemo: {
+    name: 'Chemotherapy · AC × 4 then paclitaxel × 4', id: 'CH-0193', sub: 'Neoadjuvant · started 02 Sep 2026 · every 21 days · MJPJAY scheme part-covers · sample rates', unit: 'Cycle',
+    sittings: [
+      { date: '02 Sep', enc: 'IPD', encLabel: 'Day care', encId: 'DC-3310', status: 'done', items: ['AC cycle 1 · full dose'], charge: 9500, note: 'BSA 1.62 m².' },
+      { date: '23 Sep', enc: 'IPD', encLabel: 'Day care', encId: 'DC-3402', status: 'done', items: ['AC cycle 2 · full dose'], charge: 9500, note: 'Nausea grade 1.' },
+      { date: '21 Oct', enc: 'IPD', encLabel: 'Day care', encId: 'DC-3561', status: 'done', items: ['AC cycle 3 · full dose + pegfilgrastim'], charge: 13500, note: 'Delayed 1 week for low neutrophils.' },
+      { date: '11 Nov', enc: 'IPD', encLabel: 'Day care', encId: 'DC-3640', status: 'today', items: ['AC cycle 4 · dose per today’s labs'], charge: 13500, note: 'Pre-chemo check in progress.' },
+      { date: '02 Dec', enc: 'IPD', encLabel: 'Day care', status: 'planned', items: ['Paclitaxel cycle 1'], charge: 14000, note: 'Pre-medication for allergy.' },
+      { date: '23 Dec', enc: 'IPD', encLabel: 'Day care', status: 'planned', items: ['Paclitaxel cycle 2'], charge: 14000, note: '' },
+      { date: '13 Jan', enc: 'IPD', encLabel: 'Day care', status: 'planned', items: ['Paclitaxel cycle 3'], charge: 14000, note: '' },
+      { date: '03 Feb', enc: 'IPD', encLabel: 'Day care', status: 'planned', items: ['Paclitaxel cycle 4'], charge: 14000, note: 'Then response scan.' },
+      { date: 'Mar', enc: 'IPD', encLabel: 'Surgery admission', status: 'planned', items: ['Modified radical mastectomy (surgical oncology)'], charge: 85000, note: 'After tumour board review.' }
+    ],
+    ledger: [['02 Sep', 'Scheme payment', 'MJPJAY', 30000, 'Cycles 1–4 pre-approved', 'PA-5531'], ['02 Sep', 'Advance', 'UPI', 5000, 'Patient share', 'RC-2190']],
+    addOpts: [['Chemo cycle', 'IPD'], ['Review OPD', 'OPD'], ['Admission for side effects', 'IPD']], dates: ['02 Dec', '09 Dec', '23 Dec', '13 Jan', '03 Feb', 'Mar']
+  },
+  surgery: {
+    name: 'Lap cholecystectomy episode', id: 'SG-0218', sub: 'Opened 21 Oct 2026 · Dr. [SURGEON NAME] · insurance pre-authorisation pending · sample rates', unit: 'Step',
+    sittings: [
+      { date: '21 Oct', enc: 'OPD', encId: 'OPD-10215', status: 'done', items: ['First consult, USG and LFT advised'], charge: 600, note: '' },
+      { date: '28 Oct', enc: 'OPD', encId: 'OPD-10301', status: 'done', items: ['USG review, surgery advised'], charge: 600, note: 'Gallstones, CBD normal.' },
+      { date: '11 Nov', enc: 'OPD', encId: 'OPD-10520', status: 'today', items: ['Pre-op visit: fitness, consent, OT booking'], charge: 600, note: 'Today.' },
+      { date: '18 Nov', enc: 'IPD', encLabel: 'Surgery admission', status: 'planned', items: ['Lap cholecystectomy under GA', '1–2 days in ward'], charge: 65000, note: 'Admit 7 am, OT 2 at 10 am.' },
+      { date: '25 Nov', enc: 'OPD', status: 'planned', items: ['Post-op day 7: wound check, stitch removal, histopathology'], charge: 0, note: 'Included in package.' },
+      { date: '18 Dec', enc: 'OPD', status: 'planned', items: ['Day 30 review'], charge: 0, note: 'Included in package.' }
+    ],
+    ledger: [['21 Oct', 'Visit payment', 'UPI', 600, 'Step 1', 'RC-2262'], ['28 Oct', 'Visit payment', 'Cash', 600, 'Step 2', 'RC-2301']],
+    addOpts: [['OPD review', 'OPD'], ['Re-admission', 'IPD'], ['Day-care procedure', 'IPD']], dates: ['18 Nov', '20 Nov', '25 Nov', '02 Dec', '18 Dec']
+  },
+  physio: {
+    name: 'Knee rehab package · 10 sessions', id: 'PK-0311', sub: 'Started 28 Oct 2026 · [THERAPIST NAME] · package rate · sample rates', unit: 'Session',
+    sittings: [
+      { date: '28 Oct', enc: 'OPD', encId: 'OPD-10240', status: 'done', items: ['Assessment', 'IFT, hot pack'], charge: 600, note: 'Pain 7/10.' },
+      { date: '31 Oct', enc: 'OPD', encId: 'OPD-10301', status: 'done', items: ['IFT, exercises'], charge: 600, note: 'Pain 6/10.' },
+      { date: '04 Nov', enc: 'OPD', encId: 'OPD-10392', status: 'done', items: ['IFT, exercises, taping'], charge: 600, note: 'Pain 5/10.' },
+      { date: '11 Nov', enc: 'OPD', encId: 'OPD-10518', status: 'today', items: ['IFT, hot pack, exercises'], charge: 600, note: 'Today.' },
+      { date: '14 Nov', enc: 'OPD', status: 'planned', items: ['Session 5'], charge: 600, note: '' },
+      { date: '18 Nov', enc: 'OPD', status: 'planned', items: ['Session 6'], charge: 600, note: '' },
+      { date: '21 Nov', enc: 'OPD', status: 'planned', items: ['Session 7'], charge: 600, note: '' },
+      { date: '25 Nov', enc: 'OPD', status: 'planned', items: ['Session 8'], charge: 600, note: '' },
+      { date: '28 Nov', enc: 'OPD', status: 'planned', items: ['Session 9'], charge: 600, note: '' },
+      { date: '02 Dec', enc: 'OPD', status: 'planned', items: ['Session 10 · review'], charge: 600, note: '' }
+    ],
+    ledger: [['28 Oct', 'Advance', 'UPI', 3000, 'Package advance', 'RC-2205']],
+    addOpts: [['Extra session', 'OPD'], ['Bedside session (IPD)', 'IPD']], dates: ['14 Nov', '16 Nov', '18 Nov', '21 Nov']
+  }
+};
+function inr(n) { var s = Math.round(Math.abs(n)).toString(), last = s.slice(-3), rest = s.slice(0, -3); if (rest) last = ',' + last; return (n < 0 ? '−' : '') + '₹' + rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + last; }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var D = DATA[props.kind] || DATA.dental;
+    this.state = { view: 'timeline', sittings: D.sittings.map(function (s) { return Object.assign({}, s); }), ledger: D.ledger.slice(), payType: 'today', amount: 0, custom: false, mode: 'UPI', useCredit: true, toast: '', rc: 2400, ipd: 2231 };
+  }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  say(msg, patch) { var self = this; if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3500); this.setState(Object.assign({ toast: msg }, patch || {})); }
+  renderVals() {
+    var self = this, st = this.state, D = DATA[this.props.kind] || DATA.dental, A = this.props.accent || '#0B6E69';
+    var S = st.sittings;
+    var total = S.reduce(function (a, s) { return a + s.charge; }, 0);
+    var billed = S.filter(function (s) { return s.status === 'done'; }).reduce(function (a, s) { return a + s.charge; }, 0);
+    var todayS = S.filter(function (s) { return s.status === 'today'; })[0];
+    var todayCharge = todayS ? todayS.charge : 0;
+    var paid = st.ledger.reduce(function (a, l) { return a + l[3]; }, 0);
+    var credit = Math.max(0, paid - billed);
+    var dueBefore = Math.max(0, billed - paid);
+    var dueToday = Math.max(0, billed + todayCharge - paid);
+    var ipdNext = S.filter(function (s) { return s.enc === 'IPD' && s.status === 'planned'; })[0];
+    var doneN = S.filter(function (s) { return s.status === 'done'; }).length;
+
+    var stats = [
+      ['Course estimate', inr(total), S.length + ' ' + D.unit.toLowerCase() + 's · ' + doneN + ' done', '#0F1C2E'],
+      ['Paid so far', inr(paid), st.ledger.length + ' receipt(s)', '#146C43'],
+      [credit > 0 ? 'Advance balance' : 'Due from earlier', inr(credit > 0 ? credit : dueBefore), credit > 0 ? 'Used against next charges' : 'Not paid yet', credit > 0 ? '#146C43' : '#B42318'],
+      ['Due today', inr(dueToday), todayS ? 'Today’s ' + D.unit.toLowerCase() + ' ' + inr(todayCharge) + (credit ? ' less advance' : '') : 'No ' + D.unit.toLowerCase() + ' today', dueToday ? '#B42318' : '#146C43']
+    ].map(function (x) { return { label: x[0], value: x[1], note: x[2], color: x[3], style: 'display: flex; flex-direction: column; gap: 2px; border: 1px solid #E3E8EE; border-radius: 10px; padding: 10px 12px; background: #FAFBFC' }; });
+
+    var STC = { done: ['Done', '#146C43', '#E3F5EC'], today: ['Today', '#FFFFFF', A], planned: ['Planned', '#3E4C5E', '#EEF1F5'], missed: ['Missed', '#B42318', '#FDECEA'] };
+    function encText(s) { return s.enc === 'IPD' ? 'IPD · ' + (s.encLabel || 'Admission') + (s.encId ? ' · ' + s.encId : ' · request') : 'OPD visit' + (s.encId ? ' · ' + s.encId : ' · booked'); }
+    function encStyle(s) { return 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; background: ' + (s.enc === 'IPD' ? '#EADFF8' : '#DCEBFB') + '; color: ' + (s.enc === 'IPD' ? '#552F99' : '#164A84'); }
+    function upd(i, patch, msg) { var a = S.slice(); a[i] = Object.assign({}, S[i], patch); if (msg) self.say(msg, { sittings: a }); else self.setState({ sittings: a }); }
+
+    var steps = S.map(function (s, i) {
+      var c = STC[s.status];
+      return { label: D.unit.charAt(0) + (i + 1), date: s.date, enc: s.enc === 'IPD' ? 'IPD' : 'OPD', mark: s.status === 'done' ? '✓' : String(i + 1), title: s.items.join(', '),
+        pick: function () { self.setState({ view: 'timeline' }); },
+        wrap: 'position: relative; flex: 0 0 auto; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: transparent; cursor: pointer; padding: 0',
+        line: 'position: absolute; top: 15px; left: ' + (i === 0 ? '50%' : '0') + '; right: ' + (i === S.length - 1 ? '50%' : '0') + '; height: 3px; background: ' + (s.status === 'done' ? '#146C43' : '#D5DCE4'),
+        dot: 'position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: ' + (s.status === 'planned' ? '#3E4C5E' : '#FFFFFF') + '; background: ' + (s.status === 'done' ? '#146C43' : s.status === 'today' ? A : s.status === 'missed' ? '#B42318' : '#FFFFFF') + '; border: ' + (s.status === 'planned' ? '2px dashed ' + (s.enc === 'IPD' ? '#6D3FC0' : '#9AA8B8') : '0') + '; box-shadow: ' + (s.status === 'today' ? '0 0 0 4px ' + A + '33' : 'none'),
+        encStyle: encStyle(s) };
+    });
+
+    var cards = S.map(function (s, i) {
+      var c = STC[s.status], acts = [];
+      if (s.status === 'today') {
+        acts.push(['Mark ' + D.unit.toLowerCase() + ' done', function () { upd(i, { status: 'done' }, D.unit + ' ' + (i + 1) + ' done · ' + inr(s.charge) + ' added to the account'); }, true]);
+        acts.push(['Patient did not come', function () { upd(i, { status: 'missed' }, 'Marked missed. Reminder sent to rebook.'); }]);
+      }
+      if (s.status === 'planned') {
+        acts.push(['Reschedule: ' + s.date + ' ▾', function () { var d = D.dates, j = (d.indexOf(s.date) + 1) % d.length; upd(i, { date: d[j] }); }]);
+        if (s.enc === 'OPD') acts.push(['Move to day care / IPD', function () { upd(i, { enc: 'IPD', encLabel: 'Day care' }, 'Will be done as a day-care admission. Admission request created.'); }]);
+        else acts.push(['Admit now', function () { var id = 'IP-' + (st.ipd + 1); self.say('Admitted · ' + id + '. Advance from this course is carried to the IPD bill.', { ipd: st.ipd + 1, sittings: S.map(function (x, k) { return k === i ? Object.assign({}, x, { encId: id, status: 'today' }) : (x.status === 'today' ? Object.assign({}, x, { status: 'done' }) : x); }) }); }, true]);
+        acts.push(['Remove', function () { self.say(D.unit + ' removed from plan', { sittings: S.filter(function (_, k) { return k !== i; }) }); }]);
+      }
+      if (s.status === 'missed') acts.push(['Rebook', function () { upd(i, { status: 'planned', date: D.dates[0] }, 'Rebooked for ' + D.dates[0]); }]);
+      return { title: D.unit + ' ' + (i + 1) + ' · ' + s.date, enc: encText(s), encStyle: encStyle(s), status: c[0], items: s.items, note: s.note, charge: inr(s.charge),
+        statusStyle: 'font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px; color: ' + c[1] + '; background: ' + c[2],
+        style: 'display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 12px 14px; border: ' + (s.status === 'today' ? '2px solid ' + A : '1px solid ' + (s.enc === 'IPD' ? '#CDB8F0' : '#E3E8EE')) + '; background: ' + (s.enc === 'IPD' ? '#FBF8FF' : s.status === 'done' ? '#FAFBFC' : '#FFFFFF'),
+        actions: acts.map(function (a) { return { label: a[0], run: a[1], style: 'border: 1px solid ' + (a[2] ? A : '#C9D2DC') + '; background: ' + (a[2] ? A : '#FFFFFF') + '; color: ' + (a[2] ? '#FFFFFF' : '#3E4C5E') + '; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-size: 12px; font-weight: 600; cursor: pointer' }; }) };
+    });
+    var addOpts = D.addOpts.map(function (o) {
+      return { label: o[0], run: function () { var ns = { date: D.dates[D.dates.length - 1], enc: o[1], encLabel: o[1] === 'IPD' ? o[0].replace(' admission', '').replace('Bedside session (IPD)', 'Bedside') : '', status: 'planned', items: [o[0] + ' · add work'], charge: o[1] === 'IPD' ? 0 : (S[S.length - 1] || {}).charge || 0, note: o[1] === 'IPD' ? 'Admission request. Rate set at admission.' : '' };
+        self.say(o[0] + ' added to the course', { sittings: S.concat([ns]) }); } };
+    });
+    var rows = S.map(function (s, i) {
+      var c = STC[s.status];
+      return { n: D.unit.charAt(0) + (i + 1), date: s.date, enc: encText(s), work: s.items.join(', '), charge: inr(s.charge), status: c[0],
+        statusStyle: 'font-size: 12px; font-weight: 700; color: ' + (s.status === 'today' ? A : c[1]),
+        style: 'display: grid; grid-template-columns: 50px 80px 1.4fr 2.4fr 90px 100px; gap: 8px; padding: 9px 12px; border-top: 1px solid #EEF1F5; font-size: 13px; align-items: center; background: ' + (s.status === 'today' ? A + '10' : s.enc === 'IPD' ? '#FBF8FF' : '#FFFFFF') };
+    });
+
+    /* payments */
+    var ipdDeposit = ipdNext ? Math.round(ipdNext.charge * 0.4 / 500) * 500 : 0;
+    var todayAmt = st.useCredit ? Math.max(0, todayCharge + dueBefore - credit) : todayCharge + dueBefore;
+    var PT = [
+      ['today', 'Today’s ' + D.unit.toLowerCase(), (todayS ? inr(todayCharge) : 'Nothing today') + (dueBefore ? ' + earlier due ' + inr(dueBefore) : '') + (credit && st.useCredit ? ' − advance ' + inr(Math.min(credit, todayCharge)) : ''), todayAmt],
+      ['balance', 'Full course balance', 'Clears the whole estimate', Math.max(0, total - paid)],
+      ['partial', 'Part payment', 'Any amount now, rest later', Math.min(Math.max(500, Math.round(todayAmt / 2 / 100) * 100), Math.max(500, total - paid))],
+      ['advance', ipdNext ? 'Advance / IPD deposit' : 'Advance', ipdNext ? 'Suggested deposit for ' + (ipdNext.encLabel || 'admission').toLowerCase() + ': ' + inr(ipdDeposit) : 'Kept as credit for next ' + D.unit.toLowerCase() + 's', ipdNext ? ipdDeposit : 2000]
+    ];
+    var cur = PT.filter(function (p) { return p[0] === st.payType; })[0];
+    var amount = st.custom ? st.amount : cur[3];
+    var payTypes = PT.map(function (p) {
+      var on = st.payType === p[0];
+      return { label: p[1], sub: p[2], on: on, pick: function () { self.setState({ payType: p[0], custom: false }); },
+        style: 'display: flex; flex-direction: column; gap: 2px; text-align: left; border-radius: 10px; padding: 10px 12px; min-height: 58px; cursor: pointer; color: #0F1C2E; border: ' + (on ? '2px solid ' + A : '1px solid #D5DCE4') + '; background: ' + (on ? A + '10' : '#FFFFFF') };
+    });
+    var modes = ['UPI', 'Cash', 'Card'].map(function (m) {
+      var on = st.mode === m;
+      return { label: m, on: on, pick: function () { self.setState({ mode: m }); },
+        style: 'flex: 1; font-size: 13px; font-weight: 600; border-radius: 8px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? '#0F1C2E' : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#0F1C2E' : '#FFFFFF') };
+    });
+    var TYPE_LABEL = { today: 'Visit payment', balance: 'Full balance', partial: 'Part payment', advance: ipdNext ? 'IPD deposit' : 'Advance' };
+    var ledger = st.ledger.map(function (l) {
+      var adv = l[1] === 'Advance' || l[1] === 'IPD deposit';
+      return { date: l[0], type: l[1], mode: l[2], amt: inr(l[3]), against: l[4], ref: l[5],
+        typeStyle: 'font-weight: 600; color: ' + (adv ? '#552F99' : '#0F1C2E'),
+        style: 'display: grid; grid-template-columns: 70px 1.3fr 70px 1.5fr 90px 80px; gap: 8px; padding: 9px 12px; border-top: 1px solid #EEF1F5; font-size: 13px; align-items: center; background: ' + (l[6] ? '#F2FAF5' : '#FFFFFF') };
+    });
+    var TABS = [['timeline', 'Visits'], ['table', 'Table'], ['payments', 'Payments']];
+    return {
+      accent: A, course: { name: D.name, id: D.id, sub: D.sub }, stats: stats, steps: steps, cards: cards, rows: rows, addOpts: addOpts,
+      addLabel: 'Add to this course:',
+      tabs: TABS.map(function (t) { var on = st.view === t[0]; return { label: t[1], on: on, pick: function () { self.setState({ view: t[0] }); }, style: 'border: 0; border-radius: 8px; padding: 7px 14px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#5B6B7F') + '; background: ' + (on ? '#FFFFFF' : 'transparent') + '; box-shadow: ' + (on ? '0 1px 2px rgba(15,28,46,0.15)' : 'none') }; }),
+      isTimeline: st.view === 'timeline', isTable: st.view === 'table', isPay: st.view === 'payments',
+      payTypes: payTypes, modes: modes, ledger: ledger,
+      useCredit: st.useCredit, toggleCredit: function () { self.setState({ useCredit: !st.useCredit, custom: false }); },
+      creditText: credit ? inr(credit) + ' available' : 'none available',
+      amountText: inr(amount),
+      amountHint: amount <= 0 ? 'Nothing to collect for this choice.' : st.payType === 'advance' ? 'Kept as credit and adjusted automatically in later bills' + (ipdNext ? ', including the IPD bill.' : '.') : st.payType === 'partial' ? 'Balance after this: ' + inr(Math.max(0, total - paid - amount)) + '. Use − / + to change.' : 'Use − / + to change the amount.',
+      amtDown: function () { self.setState({ custom: true, amount: Math.max(0, amount - 500) }); },
+      amtUp: function () { self.setState({ custom: true, amount: amount + 500 }); },
+      collectLabel: amount > 0 ? 'Collect ' + inr(amount) + ' by ' + st.mode : 'Nothing to collect',
+      collectStyle: 'border: 1px solid ' + (amount > 0 ? A : '#C9D2DC') + '; background: ' + (amount > 0 ? A : '#EEF1F5') + '; color: ' + (amount > 0 ? '#FFFFFF' : '#5B6B7F') + '; border-radius: 8px; min-height: 46px; font-size: 15px; font-weight: 700; cursor: ' + (amount > 0 ? 'pointer' : 'not-allowed'),
+      collect: function () {
+        if (amount <= 0) return;
+        var ref = 'RC-' + (st.rc + 1), t = TYPE_LABEL[st.payType];
+        var against = st.payType === 'today' ? D.unit + ' ' + (S.indexOf(todayS) + 1) + (credit && st.useCredit ? ' (after advance)' : '') : st.payType === 'advance' ? (ipdNext ? (ipdNext.encLabel || 'Admission') + ' deposit' : 'Credit for next ' + D.unit.toLowerCase() + 's') : 'Course balance';
+        self.say(inr(amount) + ' received by ' + st.mode + ' · receipt ' + ref + ' sent on WhatsApp', { ledger: st.ledger.concat([['11 Nov', t, st.mode, amount, against, ref, true]]), rc: st.rc + 1, custom: false });
+      },
+      payNote: 'Charges are added when a ' + D.unit.toLowerCase() + ' is marked done. Advances and IPD deposits stay as credit and are used first. Balance on the course: ' + inr(Math.max(0, total - paid)) + '.',
+      toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

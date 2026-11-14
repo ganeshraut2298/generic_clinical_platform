@@ -338,7 +338,7 @@ describe('BodyMapComponent (SAH-57)', () => {
       render([pin(1, { finding: 'TENDERNESS', severity: 'MODERATE', note: 'right lower' }), pin(2, { mlc: true, cause: 'ASSAULT', sizeCm: 0, side: 'BACK', where: 'Upper back' })]);
       expect(qa('th').map((h) => h.textContent!.trim())).toEqual(['#', 'Where', 'Finding', 'What happened', 'Size', 'Recorded', 'Delete']);
       const rows = qa('tbody tr');
-      expect(rows[0].textContent).toContain('tenderness · moderate');
+      expect(rows[0].textContent).toContain('Tenderness · moderate');
       expect(rows[0].textContent).toContain('Fall — right lower');
       expect(rows[0].textContent).toContain('2 cm');
       expect(rows[1].textContent).toContain('Upper back (back)');

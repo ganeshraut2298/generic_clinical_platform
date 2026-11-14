@@ -57,6 +57,7 @@ import com.sahaj.opd.application.emr.specialty.SpecialtyProfiles;
 import com.sahaj.opd.application.emr.specialty.SpecialtyRecordSupport;
 import com.sahaj.opd.application.emr.specialty.SpecialtyValues;
 import com.sahaj.opd.application.emr.EmrViews.UiState;
+import com.sahaj.patient.api.AllergyStatus;
 import com.sahaj.patient.api.PatientAge;
 import com.sahaj.patient.api.PatientClinicalPort;
 import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
@@ -291,6 +292,12 @@ public class EmrRecordService {
                     ObjectNode wrapper = mapper.createObjectNode();
                     wrapper.set("specialty", copied);
                     values = wrapper;
+                } else {
+                    // ADR-026 D13: leave out what no longer fits the new definition; nothing fits, nothing copied
+                    values = EmrCopyFit.fit(mapper, section, values);
+                    if (values == null) {
+                        continue;
+                    }
                 }
                 document.putCopied(section.key(), values, last.get().recordId(), signedOn, now, membershipId);
             }
@@ -1738,6 +1745,12 @@ public class EmrRecordService {
                     return true;
                 }
             }
+            // SAH-75-5: the oncology examination holds an optional body map of its own, counted in the same header flag.
+            JsonNode specialty = document.values(section.key()).path("specialty");
+            if ("ONC_EXAM".equals(specialty.path("component").asText())
+                    && EmrComponentValues.hasMlcPin(specialty.path("bodyMap"))) {
+                return true;
+            }
         }
         return false;
     }
@@ -1787,6 +1800,7 @@ public class EmrRecordService {
         String sex;
         String uhid = null;
         String allergy = null;
+        AllergyStatus allergyStatus = AllergyStatus.NOT_RECORDED;
         String chronic = null;
         if (patient != null) {
             name = patient.name();
@@ -1796,7 +1810,8 @@ public class EmrRecordService {
             age = ageDetail.years();
             sex = patient.sex();
             uhid = patient.uhid();
-            allergy = clean(patient.allergyText());
+            allergyStatus = headerAllergyStatus(patient);
+            allergy = allergyStatus == AllergyStatus.RECORDED ? clean(patient.allergyText()) : null;
             chronic = clean(patient.chronicText());
         } else {
             EmergencyCaseFacts facts = encounter.emergency();
@@ -1836,7 +1851,18 @@ public class EmrRecordService {
                 encounter.emergency().triageLevelName(), encounter.emergency().status());
         return new RecordHeader(patientId, name, initials(name), age, sex, uhid, allergy, chronic, lastVisitDaysAgo,
                 ordinal, visitType, new DoctorOnRecord(doctorId, doctorName, room), admission, emergency, mlc,
-                AgeDetail.from(ageDetail));
+                AgeDetail.from(ageDetail), allergyStatus);
+    }
+
+    /**
+     * ADR-026 D12 (opd.yaml 0.7.1): the status from patient.api with the shared none-word list. A stored placeholder
+     * that says nothing ("Not recorded", "Unknown", "Not known", "?") is NOT_RECORDED here, as it always showed no
+     * tag (OQ-45-23); so allergyText is never set for a status other than RECORDED.
+     */
+    static AllergyStatus headerAllergyStatus(PatientClinical patient) {
+        AllergyStatus status = patient.allergyStatus();
+        return status == AllergyStatus.RECORDED && clean(patient.allergyText()) == null
+                ? AllergyStatus.NOT_RECORDED : status;
     }
 
     /** Null for no text or for a placeholder such as "None known": the tags show only recorded text (OQ-45-23). */

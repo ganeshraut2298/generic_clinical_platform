@@ -71,4 +71,35 @@ class EmrLayoutJsonTest {
         assertThatThrownBy(() -> json.readLayout("not json")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> json.readSettings("{}")).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void anOptionHintIsReadFromTheLayoutAndAbsentInADocumentBefore071() {
+        String v3 = "{\"schemaVersion\":1,\"sections\":[{\"key\":\"contraception\",\"name\":\"C\",\"fields\":["
+                + "{\"key\":\"method\",\"label\":\"Method\",\"type\":\"SINGLE_CHOICE\",\"presentation\":\"CHIPS\","
+                + "\"options\":[{\"key\":\"condoms\",\"label\":\"Condoms\",\"isNone\":false,\"alert\":false,"
+                + "\"hint\":\"Barrier\"},{\"key\":\"cu_t\",\"label\":\"Cu-T\",\"hint\":\"IUCD, 5–10 years\"},"
+                + "{\"key\":\"other\",\"label\":\"Other\",\"isNone\":false}]}]}]}";
+        String v2 = v3.replace(",\"hint\":\"Barrier\"", "").replace(",\"hint\":\"IUCD, 5–10 years\"", "");
+
+        List<FieldOption> options = json.readLayout(v3).get(0).fields().get(0).options();
+        assertThat(options).extracting(FieldOption::hint).containsExactly("Barrier", "IUCD, 5–10 years", null);
+        assertThat(json.readLayout(v2).get(0).fields().get(0).options()).extracting(FieldOption::hint)
+                .containsOnlyNulls();
+    }
+
+    @Test
+    void aWrittenLayoutKeepsAHintAndLeavesTheKeyOutWhenThereIsNone() {
+        FieldDefinition method = new FieldDefinition("method", "Method", "SINGLE_CHOICE",
+                EmrValueKind.CHOICE, "", false, "FIELD", null, false,
+                List.of(new FieldOption("condoms", "Condoms", false, false, "Barrier"),
+                        new FieldOption("other", "Other", false, false, "  ")),
+                List.of(), null, null, null, "CHIPS");
+        LayoutSection section = EmrTestData.section("contraception", "SPECIALTY", "ASSESSMENT", true, false, false, method);
+
+        String written = json.writeLayout(List.of(section));
+
+        assertThat(written).contains("\"hint\":\"Barrier\"").doesNotContain("\"hint\":null");
+        assertThat(json.readLayout(written).get(0).fields().get(0).options()).extracting(FieldOption::hint)
+                .containsExactly("Barrier", null);
+    }
 }

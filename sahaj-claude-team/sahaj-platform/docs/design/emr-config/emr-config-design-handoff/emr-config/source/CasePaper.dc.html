@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Live case paper</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Caveat:wght@600&amp;family=Noto+Sans+Devanagari:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font-family:inherit}
+button:focus-visible{outline:3px solid #1D5FA866;outline-offset:2px}
+@media print{.cp-tools{display:none}}
+</style>
+</helmet>
+<div style="font-family: Inter, 'Noto Sans Devanagari', system-ui, sans-serif; color: #0F1C2E; font-size: 14px; display: flex; flex-direction: column; gap: 12px">
+
+  <div class="cp-tools" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="font-size: 13px; font-weight: 700; white-space: nowrap">{{fillText}}</span>
+      <span style="flex: 1; height: 8px; background: #EEF1F5; border-radius: 999px; overflow: hidden; display: flex"><span style="{{fillBar}}"></span></span>
+      <span style="font-size: 11px; font-weight: 700; color: #146C43; background: #E3F5EC; border-radius: 999px; padding: 3px 8px; white-space: nowrap">● Live</span>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+      <div role="group" aria-label="Paper size" style="display: flex; background: #EEF1F5; border-radius: 8px; padding: 3px; gap: 3px"><sc-for list="{{sizes}}" as="s" hint-placeholder-count="2"><button type="button" aria-pressed="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button></sc-for></div>
+      <div role="group" aria-label="Heading language" style="display: flex; background: #EEF1F5; border-radius: 8px; padding: 3px; gap: 3px"><sc-for list="{{langs}}" as="s" hint-placeholder-count="3"><button type="button" aria-pressed="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button></sc-for></div>
+      <button type="button" aria-pressed="{{hideEmpty}}" onClick="{{toggleEmpty}}" style="{{emptyStyle}}">{{emptyLabel}}</button>
+      <span style="flex: 1"></span>
+      <button type="button" onClick="{{share}}" style="border: 1px solid #146C43; background: #FFFFFF; color: #146C43; border-radius: 8px; padding: 0 12px; min-height: 36px; font-size: 12px; font-weight: 700; cursor: pointer">Share · WhatsApp / ABHA</button>
+      <button type="button" onClick="{{print}}" style="{{printStyle}}">Print</button>
+    </div>
+  </div>
+
+  <article aria-label="Case paper preview" style="{{sheet}}">
+    <header style="{{headStyle}}">
+      <div style="display: flex; gap: 10px; align-items: center">
+        <span style="{{logo}}">+</span>
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 1.15em; font-weight: 700">[CLINIC NAME]</span>
+          <span style="font-size: 0.8em; color: #5B6B7F">[ADDRESS] · [PHONE] · {{dept}}</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; text-align: right">
+        <span style="font-weight: 700">{{doctor}}</span>
+        <span style="font-size: 0.8em; color: #3E4C5E">{{qual}}</span>
+        <span style="font-size: 0.8em; color: #3E4C5E">Reg. No. {{reg}}</span>
+      </div>
+    </header>
+
+    <div style="display: grid; grid-template-columns: 1.4fr 1fr 1.2fr; gap: 4px 14px; font-size: 0.86em; background: #F7F9FB; border-radius: 6px; padding: 8px 10px">
+      <span><strong>{{patient}}</strong></span><span>{{meta}}</span><span style="text-align: right">{{when}}</span>
+      <span style="color: #5B6B7F">{{ids}}</span><span style="color: #5B6B7F">{{visit}}</span><span style="text-align: right; color: #5B6B7F">{{vitals}}</span>
+    </div>
+
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+      <section style="{{r.rowStyle}}">
+        <span style="{{r.hStyle}}">{{r.h}}</span>
+        <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0">
+          <sc-for list="{{r.items}}" as="i" hint-placeholder-count="2"><span style="{{r.itemStyle}}">{{i}}</span></sc-for>
+          <div style="{{r.rxWrap}}">
+            <sc-for list="{{r.rx}}" as="m" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 22px minmax(0, 1.6fr) 0.8fr 0.7fr minmax(0, 1.2fr); gap: 8px; padding: 5px 0; border-bottom: 1px dotted #D5DCE4; font-size: 0.92em">
+                <span style="color: #5B6B7F">{{m.n}}.</span><span style="font-weight: 700; letter-spacing: 0.02em">{{m.name}}</span><span>{{m.how}}</span><span>{{m.days}}</span><span style="color: #3E4C5E">{{m.note}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <span style="{{r.emptyStyle}}">Not recorded yet</span>
+        </div>
+      </section>
+    </sc-for>
+
+    <footer style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-top: 18px">
+      <span style="font-size: 0.72em; color: #5B6B7F; max-width: 60%">Medicines in generic names, capital letters (NMC). This visit is saved as an OP consultation record and can be shared to the patient’s ABHA. Not valid without signature.</span>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 180px">
+        <span style="font-family: 'Caveat', cursive; font-size: 1.3em; color: #1E3A8A; min-height: 26px">{{sign}}</span>
+        <span style="border-top: 1px solid #0F1C2E; width: 100%; text-align: center; font-size: 0.8em; padding-top: 3px">{{doctor}}</span>
+        <span style="font-size: 0.75em; color: #3E4C5E">Reg. No. {{reg}} · {{date}}</span>
+      </div>
+    </footer>
+  </article>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"paper":{"editor":null},"accent":{"editor":"color","default":"#1D5FA8"},"$preview":{"width":720,"height":1200}}'>
+var KEYS = ['complaints', 'allergies', 'history', 'exam', 'diagnosis', 'investigations', 'rx', 'procedures', 'advice', 'follow'];
+var H = {
+  en: ['Chief complaints', 'Allergies', 'Medical history', 'Examination', 'Diagnosis', 'Investigations advised', 'Medicines ℞', 'Procedures & services', 'Advice', 'Follow-up'],
+  mr: ['मुख्य तक्रारी', 'ॲलर्जी', 'पूर्वीचे आजार', 'तपासणी', 'निदान', 'सुचवलेल्या चाचण्या', 'औषधे ℞', 'प्रक्रिया व सेवा', 'सल्ला', 'पुढील भेट'],
+  hi: ['मुख्य शिकायतें', 'एलर्जी', 'पुरानी बीमारियाँ', 'जाँच', 'निदान', 'सुझाई गई जाँचें', 'दवाइयाँ ℞', 'प्रक्रिया व सेवाएँ', 'सलाह', 'अगली मुलाक़ात']
+};
+var SAMPLE = {
+  dept: 'General Medicine', doctor: 'Dr. [DOCTOR NAME]', qual: 'MBBS, MD (Medicine)', reg: '[MMC REG. NO.]',
+  patient: '[PATIENT NAME]', meta: '52 y · Male · 74 kg', ids: 'UHID [ID] · ABHA linked', visit: 'OPD · follow-up visit', vitals: 'BP 142/90 · P 82 · SpO₂ 98%',
+  sections: { complaints: ['Headache · 2 days'], allergies: ['No known drug allergy'], history: ['Hypertension · 4 years'], exam: ['Pallor absent, icterus absent'], diagnosis: ['Essential hypertension (I10)'], investigations: [], rx: [], procedures: [], advice: ['Low salt diet'], follow: ['After 15 days'] },
+  rx: [{ name: 'TELMISARTAN 40 MG', how: '1-0-0', days: '30 days', note: 'After food' }]
+};
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { size: 'A4', lang: 'en', hideEmpty: false, toast: '' }; }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  say(m) { var self = this; if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3000); this.setState({ toast: m }); }
+  renderVals() {
+    var self = this, st = this.state, P = this.props.paper || SAMPLE, A = this.props.accent || '#1D5FA8';
+    var S = P.sections || {}, rx = Array.isArray(P.rx) ? P.rx : [];
+    function seg(on) { return 'border: 0; border-radius: 6px; padding: 5px 10px; min-height: 30px; font-size: 12px; font-weight: 700; cursor: pointer; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 2px rgba(15,28,46,0.15)' : 'none'); }
+    var filled = 0;
+    var rows = [];
+    KEYS.forEach(function (k, i) {
+      var items = (Array.isArray(S[k]) ? S[k] : []).filter(Boolean), isRx = k === 'rx', has = isRx ? rx.length > 0 : items.length > 0;
+      if (has) filled++;
+      if (!has && st.hideEmpty) return;
+      var a5 = st.size === 'A5';
+      rows.push({
+        h: H[st.lang][i], items: isRx ? [] : items,
+        rx: isRx ? rx.map(function (m, j) { return { n: j + 1, name: String(m.name || '').toUpperCase(), how: m.how || '', days: m.days || '', note: m.note || '' }; }) : [],
+        rowStyle: 'display: grid; grid-template-columns: ' + (a5 ? '110px' : '150px') + ' minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px solid #EEF1F5' + (isRx ? '; background: linear-gradient(90deg, ' + A + '0D, transparent 40%)' : ''),
+        hStyle: 'font-size: 0.78em; font-weight: 700; text-transform: ' + (st.lang === 'en' ? 'uppercase' : 'none') + '; letter-spacing: 0.04em; color: ' + (has ? A : '#9AA8B8') + '; padding-top: 2px',
+        itemStyle: 'font-size: 0.92em; line-height: 1.45',
+        rxWrap: 'display: ' + (isRx && has ? 'flex' : 'none') + '; flex-direction: column',
+        emptyStyle: 'display: ' + (has ? 'none' : 'inline') + '; font-size: 0.82em; color: #9AA8B8; font-style: italic'
+      });
+    });
+    var a5 = st.size === 'A5';
+    return {
+      fillText: filled + ' of ' + KEYS.length + ' sections filled',
+      fillBar: 'width: ' + Math.round(filled / KEYS.length * 100) + '%; background: ' + (filled >= 7 ? '#146C43' : A),
+      sizes: ['A4', 'A5'].map(function (s) { return { label: s, on: st.size === s, pick: function () { self.setState({ size: s }); }, style: seg(st.size === s) }; }),
+      langs: [['en', 'English'], ['mr', 'मराठी'], ['hi', 'हिंदी']].map(function (l) { return { label: l[1], on: st.lang === l[0], pick: function () { self.setState({ lang: l[0] }); }, style: seg(st.lang === l[0]) }; }),
+      hideEmpty: st.hideEmpty, toggleEmpty: function () { self.setState({ hideEmpty: !st.hideEmpty }); },
+      emptyLabel: st.hideEmpty ? '✓ Hiding empty' : 'Hide empty',
+      emptyStyle: 'border: 1px solid ' + (st.hideEmpty ? A : '#C9D2DC') + '; background: ' + (st.hideEmpty ? A + '14' : '#FFFFFF') + '; color: ' + (st.hideEmpty ? A : '#3E4C5E') + '; border-radius: 8px; padding: 0 10px; min-height: 36px; font-size: 12px; font-weight: 600; cursor: pointer',
+      printStyle: 'border: 0; background: ' + A + '; color: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 36px; font-size: 12px; font-weight: 700; cursor: pointer',
+      print: function () { self.say('Sent to printer · ' + st.size + (filled < 5 ? ' · some sections are still empty' : '')); },
+      share: function () { self.say('Case paper sent on WhatsApp and linked to ABHA as an OP consultation record'); },
+      sheet: 'background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 4px; box-shadow: 0 6px 20px rgba(15,28,46,0.10); padding: ' + (a5 ? '18px 20px' : '26px 30px') + '; display: flex; flex-direction: column; gap: 6px; min-height: ' + (a5 ? '760px' : '1060px') + '; font-size: ' + (a5 ? '12px' : '14px') + '; width: ' + (a5 ? '78%' : '100%') + '; align-self: center; box-sizing: border-box',
+      headStyle: 'display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 2px solid ' + A + '; padding-bottom: 10px', logo: 'width: 34px; height: 34px; border-radius: 8px; background: ' + A + '; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px',
+      dept: P.dept || '', doctor: P.doctor || 'Dr. [DOCTOR NAME]', qual: P.qual || '', reg: P.reg || '[REG. NO.]',
+      patient: P.patient || '[PATIENT NAME]', meta: P.meta || '', ids: P.ids || '', visit: P.visit || '', vitals: P.vitals || '',
+      when: '11 Nov 2026 · ' + (P.time || '11:20 am'), date: '11 Nov 2026', sign: P.signed ? P.doctor : '',
+      rows: rows, toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

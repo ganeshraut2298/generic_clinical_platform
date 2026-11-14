@@ -19,6 +19,10 @@ export function sitting(over: Partial<CourseSitting> = {}): CourseSitting {
     ipdBillTotalPaise: null,
     opdVisitId: null,
     admissionId: null,
+    displayNo: over.sittingNo ?? 1,
+    doneSource: null,
+    regimenKey: null,
+    allowedActions: [],
     ...over,
   };
 }
@@ -37,7 +41,8 @@ export function course(over: Partial<TreatmentCourseView> = {}): TreatmentCourse
     patientId: 'p1',
     doctorMembershipId: 'm1',
     doctorName: 'Dr Test',
-    note: 'estimate signed by patient',
+    note: null,
+    estimateSigned: true,
     revision: 5,
     sittings: [
       sitting({ id: 's1', sittingNo: 1, status: 'DONE', encounterRef: 'OPD-10231', plannedDate: '2026-10-28', chargePaise: 175000, items: ['Examination', 'Filling 16'] }),

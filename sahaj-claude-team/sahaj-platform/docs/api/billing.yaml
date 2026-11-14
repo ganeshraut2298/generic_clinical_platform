@@ -1,8 +1,21 @@
 openapi: 3.1.0
 info:
   title: Sahaj Billing API
-  version: 0.3.0
+  version: 0.4.0
   description: >-
+    0.4.0 (14 Nov 2026, SAH-75-3 and SAH-75-10, DEC-052; ADR-026 D4). No path, problem type or table is added; the
+    course account reads three new facts of the course plan through opd.api TreatmentCoursePort. (1) A sitting removed
+    from the plan ("Remove") is not returned by the port and is out of the estimate, the counts and the IPD deposit
+    suggestion; nothing paid against it is touched (an IPD deposit earmarked to it stays as credit). (2) A MISSED sitting
+    ("Patient did not come") is not done: no charge, still in the estimate until it is rebooked or removed. (3) A sitting
+    is DONE when the doctor presses "Mark <unit> done" or signs its visit, whichever comes first; the charge is counted
+    from that state on every read, so it is counted once ("Charges are added when a <unit> is marked done."). (4)
+    todayChargePaise is the sum of the TODAY sittings not settled in IPD (TODAY now also covers an unlinked OPD sitting
+    planned for today). (5) nextPlannedAdmission gains displayNo (the renumbered S<n>; sittingNo stays the stable key);
+    derived "Advance used · <unit> n" lines use displayNo; printed receipt "against" texts are kept as recorded. The
+    panel embedded in the doctor screens (SAH-75-3) reads this account unchanged; a doctor sees it and canCollect stays
+    false for doctors.
+
     0.3.0 (13 Nov 2026, EMR phase 5, ADR-025 D7, D14; additive). (1) BillItem.source gains EMR_PLAN: a dental plan row
     marked done today, added once by the doctor's "Complete & send to billing" (SAH-69-3) at the row's charge from the
     estimate (tariff price or the typed amount, DEC-044 H17), named by the procedure; added also to a bill that has a
@@ -410,11 +423,11 @@ components:
         paidPaise: { type: integer, minimum: 0, description: '"Paid so far · n receipt(s)".' }
         creditPaise: { type: integer, minimum: 0 }
         dueFromEarlierPaise: { type: integer, minimum: 0, description: 'Shown "Due from earlier · Not paid yet" when credit is 0.' }
-        todayChargePaise: { type: integer, minimum: 0 }
+        todayChargePaise: { type: integer, minimum: 0, description: '0.4.0: the sum of the TODAY sittings not settled in IPD.' }
         dueTodayPaise: { type: integer, minimum: 0, description: '"Due today": today''s charge plus due from earlier, less credit.' }
         balancePaise: { type: integer, minimum: 0, description: '"Balance on the course: ₹ x".' }
-        sittingCount: { type: integer, minimum: 0 }
-        doneCount: { type: integer, minimum: 0 }
+        sittingCount: { type: integer, minimum: 0, description: '0.4.0: removed sittings not counted.' }
+        doneCount: { type: integer, minimum: 0, description: '0.4.0: DONE only; "Course estimate · n <unit>s · m done" never counts MISSED.' }
         receiptCount: { type: integer, minimum: 0 }
         nextPlannedAdmission:
           type: [object, 'null']
@@ -423,6 +436,7 @@ components:
           properties:
             sittingId: { type: string, format: uuid }
             sittingNo: { type: integer }
+            displayNo: { type: integer, minimum: 1, description: '0.4.0 (ADR-026 D4). The number shown, rank among non-removed sittings.' }
             chargePaise: { type: integer, minimum: 0 }
             note: { type: [string, 'null'], description: 'For example "Admission deposit is due by 36 weeks." (no reminder, no block).' }
         suggestions:

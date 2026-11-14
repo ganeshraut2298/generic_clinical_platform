@@ -209,7 +209,7 @@ class EmrSpecialtyScreensIT extends EmrSpecialtySupport {
     @Test
     void aProcedureInTheClinicsTariffTakesTheTariffPriceNotATypedAmount() throws Exception {
         Rec rec = specialtyRec("dental");
-        post("/api/v1/opd/services", rec.clinic().owner(), "{\"name\":\"Root canal\",\"category\":\"Lab\",\"priceRupees\":3000}", 201);
+        post("/api/v1/opd/services", rec.clinic().owner(), "{\"name\":\"Root canal treatment\",\"category\":\"Lab\",\"priceRupees\":3000}", 201);
         Rec saved = save(rec, spSection("tx_plan", "DENTAL_PLAN", plan(planRow(uuid(), 16, "ROOT_CANAL", "Root canal", 3, null, "PLANNED"), false)));
         JsonNode row = valueOf(saved.record(), "tx_plan", "specialty").get("rows").get(0);
         assertThat(row.get("estimateSource").asText()).isEqualTo("TARIFF");
@@ -822,7 +822,7 @@ class EmrSpecialtyScreensIT extends EmrSpecialtySupport {
     @Test
     void aDecisionCannotBeRecordedOnAProfileThatHasNone() throws Exception {
         Rec gm = specialtyRec("gm");
-        refuseScreen(gm, 400, "validation", "{\"oncDecision\":{\"choice\":\"STOP\",\"reasonKey\":null}}");
+        refuseScreen(gm, 400, "not-applicable", "{\"oncDecision\":{\"choice\":\"STOP\",\"reasonKey\":null}}");
         refuseScreen(gm, 400, "validation", "{\"mode\":\"ANC\"}");
         Rec ok = saveScreen(gm, "{}");
         assertThat(ok.revision()).isGreaterThan(gm.revision());

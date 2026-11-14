@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Body map · local examination</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button,select,input{font-family:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #1D5FA866;outline-offset:2px}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; width: 100%; font-size: 14px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap">
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <h3 style="margin: 0; font-size: 15px; font-weight: 700">{{title}}</h3>
+      <span style="font-size: 12px; color: #5B6B7F">Tap the body to drop a pin, drag a pin to move it, then record what you found and what happened.</span>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
+      <div role="tablist" aria-label="Body" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+        <sc-for list="{{sexes}}" as="s" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button></sc-for>
+      </div>
+      <div style="display: flex; gap: 6px; align-items: center"><span style="font-size: 12px; font-weight: 600; color: #3E4C5E">Skin</span>
+        <sc-for list="{{tones}}" as="t" hint-placeholder-count="3"><button type="button" aria-pressed="{{t.on}}" aria-label="{{t.label}} skin tone" title="{{t.label}}" onClick="{{t.pick}}" style="{{t.style}}"></button></sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start">
+    <div style="flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; align-items: center">
+      <div style="display: flex; gap: 6px; align-items: center">
+        <sc-for list="{{views}}" as="v" hint-placeholder-count="2"><button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button></sc-for>
+        <button type="button" onClick="{{turn}}" style="display: flex; gap: 6px; align-items: center; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 12px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5"/></svg>Turn
+        </button>
+      </div>
+      <div style="position: relative; border-radius: 14px; background: radial-gradient(ellipse at 50% 30%, #FFFFFF 0%, #EEF2F6 75%); border: 1px solid #E3E8EE; overflow: hidden">
+        <svg width="270" height="540" viewBox="{{vb}}" role="img" aria-label="{{aria}}" onPointerDown="{{svgDown}}" onPointerMove="{{svgMove}}" onPointerUp="{{svgUp}}" onPointerLeave="{{svgLeave}}" style="{{svgStyle}}">
+          <defs>
+            <linearGradient id="bmSkin" gradientUnits="userSpaceOnUse" x1="40" y1="0" x2="200" y2="0">
+              <stop offset="0" stop-color="{{skin.edge}}"/><stop offset="0.32" stop-color="{{skin.mid}}"/><stop offset="0.5" stop-color="{{skin.hi}}"/><stop offset="0.68" stop-color="{{skin.mid}}"/><stop offset="1" stop-color="{{skin.edge}}"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="120" cy="476" rx="70" ry="6" fill="rgba(15,28,46,0.10)"/>
+          <path d="{{hairBack}}" fill="{{hairCol}}"/>
+          <sc-for list="{{regions}}" as="r" hint-placeholder-count="17"><path d="{{r.d}}" fill="url(#bmSkin)" stroke="url(#bmSkin)" stroke-width="3.2" stroke-linejoin="round"/></sc-for>
+          <path d="{{details}}" fill="none" stroke="{{detailCol}}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="{{hairFront}}" fill="{{hairCol}}"/>
+          <sc-for list="{{regions}}" as="r" hint-placeholder-count="17"><path d="{{r.d}}" fill="{{r.fill}}" stroke="{{r.stroke}}" stroke-width="{{r.sw}}" stroke-linejoin="round"/></sc-for>
+          <sc-for list="{{pins}}" as="p" hint-placeholder-count="2">
+            <g onPointerDown="{{p.down}}" style="cursor: grab">
+              <circle cx="{{p.x}}" cy="{{p.y}}" r="{{p.halo}}" fill="{{p.col}}" opacity="0.25"/>
+              <circle cx="{{p.x}}" cy="{{p.y}}" r="{{p.r}}" fill="{{p.col}}" stroke="#FFFFFF" stroke-width="{{p.sw}}"/>
+              <text x="{{p.x}}" y="{{p.ty}}" text-anchor="middle" font-size="{{p.fs}}" font-weight="700" fill="#FFFFFF" font-family="Inter, sans-serif">{{p.n}}</text>
+            </g>
+          </sc-for>
+        </svg>
+        <div style="position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px">
+          <button type="button" onClick="{{zoomIn}}" aria-label="Zoom in" style="width: 34px; height: 34px; border-radius: 8px; border: 1px solid #C9D2DC; background: #FFFFFF; font-size: 18px; font-weight: 700; cursor: pointer">+</button>
+          <button type="button" onClick="{{zoomOut}}" aria-label="Zoom out" style="width: 34px; height: 34px; border-radius: 8px; border: 1px solid #C9D2DC; background: #FFFFFF; font-size: 18px; font-weight: 700; cursor: pointer">−</button>
+          <button type="button" onClick="{{zoomReset}}" aria-label="Fit whole body" title="Fit whole body" style="width: 34px; height: 34px; border-radius: 8px; border: 1px solid #C9D2DC; background: #FFFFFF; font-size: 11px; font-weight: 700; cursor: pointer">Fit</button>
+        </div>
+        <span style="position: absolute; right: 10px; top: 10px; font-size: 11px; font-weight: 700; color: #3E4C5E; background: rgba(255,255,255,0.85); border-radius: 6px; padding: 3px 7px">{{viewTag}}</span>
+        <span style="position: absolute; left: 10px; bottom: 10px; font-size: 11px; font-weight: 600; color: #3E4C5E; background: rgba(255,255,255,0.85); border-radius: 6px; padding: 3px 7px">R</span>
+        <span style="position: absolute; right: 10px; bottom: 10px; font-size: 11px; font-weight: 600; color: #3E4C5E; background: rgba(255,255,255,0.85); border-radius: 6px; padding: 3px 7px">{{rightTag}}</span>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E; width: 270px">Or pick a body part
+        <select onChange="{{pickPart}}" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 8px 10px">
+          <option value="">Choose…</option>
+          <sc-for list="{{partOpts}}" as="o" hint-placeholder-count="10"><option value="{{o.id}}">{{o.label}}</option></sc-for>
+        </select>
+      </label>
+    </div>
+
+    <div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+      <sc-if value="{{hasSel}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 10px; border: 2px solid {{selCol}}; border-radius: 12px; padding: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+            <div style="display: flex; gap: 10px; align-items: center">
+              <span style="width: 28px; height: 28px; border-radius: 999px; background: {{selCol}}; color: #FFFFFF; font-weight: 700; display: flex; align-items: center; justify-content: center">{{sel.n}}</span>
+              <div style="display: flex; flex-direction: column"><strong style="font-size: 15px">{{sel.where}}</strong><span style="font-size: 12px; color: #5B6B7F">{{sel.meta}}</span></div>
+            </div>
+            <button type="button" onClick="{{delSel}}" style="border: 1px solid #F3C1BC; background: #FFFFFF; color: #B42318; border-radius: 8px; padding: 0 12px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer">Delete pin</button>
+          </div>
+          <sc-for list="{{fields}}" as="f" hint-placeholder-count="4">
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">{{f.label}}</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap">
+                <sc-for list="{{f.opts}}" as="o" hint-placeholder-count="5"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button></sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+            <div style="display: flex; gap: 6px; align-items: center"><span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Size</span>
+              <button type="button" onClick="{{sizeDown}}" aria-label="Smaller" style="width: 32px; height: 32px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; font-weight: 700; cursor: pointer">−</button>
+              <span style="min-width: 56px; text-align: center; font-weight: 700">{{sel.size}}</span>
+              <button type="button" onClick="{{sizeUp}}" aria-label="Larger" style="width: 32px; height: 32px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; font-weight: 700; cursor: pointer">+</button>
+            </div>
+            <label style="display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; color: {{mlcCol}}"><input type="checkbox" checked="{{sel.mlc}}" onChange="{{toggleMlc}}" style="width: 18px; height: 18px">Medico-legal case (MLC)</label>
+          </div>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #3E4C5E">What happened / notes
+            <input value="{{sel.note}}" onChange="{{onNote}}" placeholder="e.g. fell from bike yesterday evening, abrasion with gravel" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px">
+          </label>
+          <sc-if value="{{sel.mlc}}" hint-placeholder-val="{{ false }}">
+            <span style="font-size: 12px; color: #8E1B12; background: #FDECEA; border-radius: 8px; padding: 8px 10px">MLC: record time of examination, who brought the patient, and inform the police as per hospital policy. Photos are kept with the record.</span>
+          </sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{noSel}}" hint-placeholder-val="{{ false }}">
+        <div style="border: 1px dashed #9AA8B8; border-radius: 12px; padding: 18px; font-size: 13px; color: #5B6B7F; text-align: center">Tap anywhere on the body to drop pin {{nextN}}. Use Turn to see the back, + to zoom in on small areas.</div>
+      </sc-if>
+
+      <div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 13px; font-weight: 700">Findings register ({{count}})</span><span style="font-size: 12px; color: #5B6B7F">{{mlcCount}}</span></div>
+      <div style="overflow-x: auto">
+        <div style="min-width: 560px; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+          <div style="display: grid; grid-template-columns: 30px 1.6fr 1fr 1.2fr 0.7fr 1.1fr 36px; gap: 8px; padding: 8px 10px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">
+            <span>#</span><span>Where</span><span>Finding</span><span>What happened</span><span>Size</span><span>Recorded</span><span></span>
+          </div>
+          <sc-for list="{{register}}" as="r" hint-placeholder-count="2">
+            <div style="{{r.style}}">
+              <button type="button" onClick="{{r.go}}" aria-label="Show pin {{r.n}}" style="{{r.numStyle}}">{{r.n}}</button>
+              <span style="font-weight: 600">{{r.where}}<span style="{{r.mlcStyle}}">MLC</span></span><span>{{r.finding}}</span><span style="color: #3E4C5E">{{r.cause}}</span><span>{{r.size}}</span><span style="font-size: 12px; color: #5B6B7F">{{r.at}}</span>
+              <button type="button" onClick="{{r.del}}" aria-label="Delete finding {{r.n}}" style="border: 0; background: transparent; color: #B42318; width: 32px; height: 32px; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+            </div>
+          </sc-for>
+          <sc-if value="{{emptyReg}}" hint-placeholder-val="{{ false }}"><div style="padding: 14px; text-align: center; font-size: 13px; color: #5B6B7F; border-top: 1px solid #EEF1F5">No local findings yet.</div></sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="align-self: flex-start; background: #0F1C2E; color: #FFFFFF; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"sex":{"editor":"enum","options":["male","female","other"],"default":"male"},"title":{"editor":"text","default":"Local examination · body map"},"who":{"editor":null},"onChange":{"editor":null},"$preview":{"width":1000,"height":780}}'>
+var SEX = {
+  male: { sh: 60, ch: 48, wa: 38, hp: 44, nk: 12, hrx: 21, hry: 27 },
+  female: { sh: 52, ch: 44, wa: 33, hp: 50, nk: 10.5, hrx: 20, hry: 26 },
+  other: { sh: 56, ch: 46, wa: 36, hp: 47, nk: 11, hrx: 20.5, hry: 26.5 }
+};
+var TONES = { light: ['Light', '#F6D9C2', '#E9BE9C', '#C9906C'], wheat: ['Wheatish', '#E3B48D', '#C98E63', '#9C6342'], dark: ['Dark', '#A8714C', '#8A5636', '#5E3620'] };
+var FIND = [['Wound', '#B42318'], ['Swelling', '#B45309'], ['Tenderness', '#A3366B'], ['Bruise', '#6D3FC0'], ['Burn', '#C2410C'], ['Rash', '#BE185D'], ['Lump', '#0B6E69'], ['Fracture?', '#1D4ED8'], ['Scar', '#475569'], ['Pain', '#1D5FA8']];
+var CAUSE = ['No injury (illness)', 'Fall', 'Road accident', 'Assault', 'Animal bite', 'Burn', 'Sports', 'Work injury'];
+var SEV = ['Mild', 'Moderate', 'Severe'];
+var NAMES = {
+  front: { head: 'Head and face', neck: 'Neck', torso1: 'Chest', torso2: 'Abdomen', pelvis: 'Groin and pelvis', uarm: 'shoulder and upper arm', farm: 'forearm', hand: 'hand', thigh: 'thigh', leg: 'knee and leg', foot: 'foot' },
+  back: { head: 'Back of head', neck: 'Back of neck', torso1: 'Upper back', torso2: 'Lower back', pelvis: 'Buttocks', uarm: 'upper arm (back)', farm: 'forearm (back)', hand: 'back of hand', thigh: 'back of thigh', leg: 'calf', foot: 'heel and sole' }
+};
+function smooth(pts, t) {
+  t = t == null ? 0.55 : t; var n = pts.length, d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+  for (var i = 0; i < n; i++) {
+    var p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    var c1 = [p1[0] + (p2[0] - p0[0]) / 6 * t, p1[1] + (p2[1] - p0[1]) / 6 * t], c2 = [p2[0] - (p3[0] - p1[0]) / 6 * t, p2[1] - (p3[1] - p1[1]) / 6 * t];
+    d += ' C' + c1[0].toFixed(1) + ' ' + c1[1].toFixed(1) + ' ' + c2[0].toFixed(1) + ' ' + c2[1].toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+  }
+  return d + ' Z';
+}
+function ellipsePts(cx, cy, rx, ry, n) { var a = []; for (var i = 0; i < n; i++) { var t = i / n * Math.PI * 2; a.push([cx + rx * Math.sin(t), cy - ry * Math.cos(t)]); } return a; }
+function inPoly(x, y, pts) { var c = false; for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) { var xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1]; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c; } return c; }
+function buildBody(sex, view) {
+  var P = SEX[sex] || SEX.male, C = 120;
+  // patient's right side is on the viewer's left in the front view, on the viewer's right in the back view
+  function side(isRight) { var s = (view === 'front') === isRight ? -1 : 1; return function (d) { return C + s * d; }; }
+  var R = [];
+  function add(id, label, pts) { R.push({ id: id, label: label, pts: pts }); }
+  var sh = P.sh, ch = P.ch, wa = P.wa, hp = P.hp, nk = P.nk;
+  var L_ = side(false), Rr = side(true);
+  add('head', 'head', ellipsePts(C, 34, P.hrx, P.hry, 18));
+  add('neck', 'neck', [[C - nk, 54], [C + nk, 54], [C + nk + 2, 74], [C - nk - 2, 74]]);
+  add('torso1', 'torso1', [[C - nk - 2, 74], [C + nk + 2, 74], [C + sh - 16, 79], [C + ch + 2, 94], [C + ch, 110], [C + ch - 1, 130], [C + ch - 3, 150], [C - ch + 3, 150], [C - ch + 1, 130], [C - ch, 110], [C - ch - 2, 94], [C - sh + 16, 79]]);
+  add('torso2', 'torso2', [[C - ch + 3, 150], [C + ch - 3, 150], [C + wa + 2, 166], [C + wa, 182], [C + hp - 4, 205], [C - hp + 4, 205], [C - wa, 182], [C - wa - 2, 166]]);
+  add('pelvis', 'pelvis', [[C - hp + 4, 205], [C + hp - 4, 205], [C + hp, 218], [C + hp - 1, 230], [C + 3, 240], [C - 3, 240], [C - hp + 1, 230], [C - hp, 218]]);
+  [[true, 'R'], [false, 'L']].forEach(function (sd) {
+    var f = side(sd[0]), pre = sd[1], nm = sd[0] ? 'Right ' : 'Left ';
+    add(pre + 'uarm', nm + 'uarm', [[f(sh - 16), 79], [f(sh - 4), 81], [f(sh + 5), 95], [f(sh + 7), 125], [f(sh + 6), 182], [f(sh - 12), 182], [f(ch), 110], [f(ch + 2), 94]]);
+    add(pre + 'farm', nm + 'farm', [[f(sh + 6), 182], [f(sh + 6), 215], [f(sh + 3), 255], [f(sh - 9), 255], [f(sh - 11), 215], [f(sh - 12), 182]]);
+    add(pre + 'hand', nm + 'hand', [[f(sh + 3), 255], [f(sh + 5), 274], [f(sh + 3), 294], [f(sh - 2), 306], [f(sh - 7), 300], [f(sh - 10), 276], [f(sh - 9), 255]]);
+    add(pre + 'thigh', nm + 'thigh', [[f(hp), 218], [f(hp + 1), 255], [f(hp - 6), 300], [f(30), 335], [f(4), 335], [f(4), 290], [f(3), 240], [f(hp - 1), 230]]);
+    add(pre + 'leg', nm + 'leg', [[f(30), 335], [f(32), 370], [f(27), 405], [f(22), 440], [f(6), 440], [f(5), 400], [f(4), 360], [f(4), 335]]);
+    add(pre + 'foot', nm + 'foot', view === 'front' ? [[f(22), 440], [f(24), 458], [f(25), 472], [f(3), 472], [f(4), 455], [f(6), 440]] : [[f(22), 440], [f(22), 458], [f(19), 470], [f(9), 470], [f(6), 458], [f(6), 440]]);
+  });
+  R.forEach(function (r) {
+    var base = r.id.replace(/^[RL]/, ''), side_ = r.id.charAt(0) === 'R' && r.id !== 'R' && base !== r.id ? 'Right ' : (r.id.charAt(0) === 'L' && base !== r.id ? 'Left ' : '');
+    r.base = base; r.name = side_ + NAMES[view][base];
+    r.name = r.name.charAt(0).toUpperCase() + r.name.slice(1);
+    r.d = smooth(r.pts);
+    var cx = 0, cy = 0; r.pts.forEach(function (p) { cx += p[0]; cy += p[1]; }); r.cx = cx / r.pts.length; r.cy = cy / r.pts.length;
+  });
+  // anatomical detail lines
+  var d = '';
+  function q(a, b, c) { d += ' M' + a[0] + ' ' + a[1] + ' Q' + b[0] + ' ' + b[1] + ' ' + c[0] + ' ' + c[1]; }
+  if (view === 'front') {
+    q([C - nk - 1, 80], [C - sh / 2, 76], [C - sh + 14, 82]); q([C + nk + 1, 80], [C + sh / 2, 76], [C + sh - 14, 82]);
+    if (sex === 'female') { q([C - ch + 4, 118], [C - ch / 2, 146], [C - 6, 132]); q([C + ch - 4, 118], [C + ch / 2, 146], [C + 6, 132]); }
+    else { q([C - ch + 6, 124], [C - ch / 2, 134], [C - 3, 124]); q([C + ch - 6, 124], [C + ch / 2, 134], [C + 3, 124]); }
+    d += ' M' + C + ' 150 L' + C + ' 200';
+    d += ' M' + (C - 2) + ' 176 a2 2.6 0 1 0 4 0 a2 2.6 0 1 0 -4 0';
+    q([C - hp + 6, 206], [C - hp / 2, 222], [C - 6, 236]); q([C + hp - 6, 206], [C + hp / 2, 222], [C + 6, 236]);
+    q([C - 26, 330], [C - 17, 337], [C - 8, 330]); q([C + 26, 330], [C + 17, 337], [C + 8, 330]);
+  } else {
+    d += ' M' + C + ' 76 L' + C + ' 205';
+    q([C - ch + 4, 96], [C - ch / 2 - 4, 126], [C - 10, 120]); q([C + ch - 4, 96], [C + ch / 2 + 4, 126], [C + 10, 120]);
+    d += ' M' + C + ' 214 L' + C + ' 238';
+    q([C - hp + 6, 238], [C - hp / 2, 246], [C - 4, 240]); q([C + hp - 6, 238], [C + hp / 2, 246], [C + 4, 240]);
+    q([C - 28, 330], [C - 17, 326], [C - 6, 330]); q([C + 28, 330], [C + 17, 326], [C + 6, 330]);
+    d += ' M' + (C - 6) + ' 166 Q' + C + ' 170 ' + (C + 6) + ' 166';
+  }
+  return { regions: R, details: d };
+}
+function hair(sex, view) {
+  var C = 120;
+  if (sex === 'female') {
+    var back = 'M' + (C - 23) + ' 30 Q' + (C - 28) + ' 70 ' + (C - 24) + ' 96 Q' + C + ' 104 ' + (C + 24) + ' 96 Q' + (C + 28) + ' 70 ' + (C + 23) + ' 30 Q' + C + ' 0 ' + (C - 23) + ' 30 Z';
+    var front = view === 'front' ? 'M' + (C - 21) + ' 30 Q' + (C - 18) + ' 8 ' + C + ' 7 Q' + (C + 18) + ' 8 ' + (C + 21) + ' 30 Q' + (C + 12) + ' 18 ' + C + ' 17 Q' + (C - 12) + ' 18 ' + (C - 21) + ' 30 Z' : back;
+    return [view === 'front' ? back : '', front];
+  }
+  var top = sex === 'male' ? 22 : 30;
+  var cap = view === 'front' ? 'M' + (C - 21) + ' ' + top + ' Q' + (C - 19) + ' 6 ' + C + ' 6 Q' + (C + 19) + ' 6 ' + (C + 21) + ' ' + top + ' Q' + (C + 12) + ' 15 ' + C + ' 15 Q' + (C - 12) + ' 15 ' + (C - 21) + ' ' + top + ' Z'
+    : 'M' + (C - 21) + ' ' + (top + 18) + ' Q' + (C - 23) + ' 6 ' + C + ' 6 Q' + (C + 23) + ' 6 ' + (C + 21) + ' ' + (top + 18) + ' Q' + C + ' ' + (top + 26) + ' ' + (C - 21) + ' ' + (top + 18) + ' Z';
+  return ['', cap];
+}
+var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function nowStr() { var d = new Date(); function z(n) { return (n < 10 ? '0' : '') + n; } return z(d.getDate()) + ' ' + MON[d.getMonth()] + ' · ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sex: props.sex || 'male', tone: 'wheat', view: 'front', zoom: 1, cx: 120, cy: 240, flipping: false, sel: 1, nextId: 2, toast: '',
+      pins: [{ id: 1, view: 'front', x: 133, y: 188, region: 'torso2', where: 'Abdomen', finding: 'Tenderness', cause: 'No injury (illness)', sev: 'Moderate', size: 0, note: 'Right lower abdomen, no guarding', mlc: false, at: '11 Nov · 11:04', by: 'Dr. [DOCTOR NAME]' }] };
+  }
+  componentDidMount() { this.report(this.state.pins); }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); if (this._f) clearTimeout(this._f); }
+  report(pins) { if (typeof this.props.onChange === 'function') this.props.onChange(pins.map(function (p) { return { where: p.where + (p.view === 'back' ? ' (back)' : ''), finding: p.finding, cause: p.cause, mlc: p.mlc }; })); }
+  setPins(pins, msg, extra) {
+    var self = this;
+    if (msg) { if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3000); }
+    this.setState(Object.assign({ pins: pins }, msg ? { toast: msg } : {}, extra || {}));
+    this.report(pins);
+  }
+  toSvg(e, svg) {
+    var r = svg.getBoundingClientRect(), z = this.state.zoom, w = 240 / z, h = 480 / z;
+    return [this.state.cx - w / 2 + (e.clientX - r.left) / r.width * w, this.state.cy - h / 2 + (e.clientY - r.top) / r.height * h];
+  }
+  renderVals() {
+    var self = this, st = this.state, A = '#1D5FA8';
+    var body = buildBody(st.sex, st.view), H = hair(st.sex, st.view), T = TONES[st.tone];
+    var selPin = st.pins.filter(function (p) { return p.id === st.sel; })[0];
+    function regionAt(x, y) { for (var i = 0; i < body.regions.length; i++) if (inPoly(x, y, body.regions[i].pts)) return body.regions[i]; return null; }
+    function colOf(f) { var c = FIND.filter(function (x) { return x[0] === f; })[0]; return c ? c[1] : '#1D5FA8'; }
+    function updSel(patch, msg) { var a = st.pins.map(function (p) { return p.id === st.sel ? Object.assign({}, p, patch) : p; }); self.setPins(a, msg); }
+    function place(reg, x, y) {
+      var id = st.nextId;
+      var pin = { id: id, view: st.view, x: x, y: y, region: reg.id, where: reg.name, finding: 'Wound', cause: 'Fall', sev: 'Mild', size: 2, note: '', mlc: false, at: nowStr(), by: self.props.who || 'Dr. [DOCTOR NAME]' };
+      self.setPins(st.pins.concat([pin]), 'Pin ' + id + ' on ' + reg.name.toLowerCase() + '. Pick the finding and what happened.', { sel: id, nextId: id + 1 });
+    }
+    var z = st.zoom, w = 240 / z, h = 480 / z;
+    var regions = body.regions.map(function (r) {
+      var on = selPin && selPin.view === st.view && selPin.region === r.id;
+      var has = st.pins.some(function (p) { return p.view === st.view && p.region === r.id; });
+      return { d: r.d, fill: on ? 'rgba(29,95,168,0.10)' : has ? 'rgba(180,35,24,0.06)' : 'rgba(255,255,255,0)', stroke: on ? A : 'none', sw: on ? 1.6 / z : 0 };
+    });
+    var pins = st.pins.filter(function (p) { return p.view === st.view; }).map(function (p) {
+      var sel = p.id === st.sel, r = (sel ? 9 : 7.5) / Math.sqrt(z);
+      return { n: p.id, x: p.x.toFixed(1), y: p.y.toFixed(1), ty: (p.y + r * 0.42).toFixed(1), r: r.toFixed(2), halo: (r * (sel ? 2 : 1.4)).toFixed(2), sw: (2 / Math.sqrt(z)).toFixed(2), fs: (r * 1.15).toFixed(2), col: colOf(p.finding),
+        down: function (e) { if (e && e.stopPropagation) e.stopPropagation(); self._drag = p.id; self._moved = false; self.setState({ sel: p.id }); } };
+    });
+    var fields = selPin ? [
+      ['Finding', FIND.map(function (f) { return f[0]; }), 'finding'],
+      ['What happened', CAUSE, 'cause'],
+      ['Severity', SEV, 'sev']
+    ].map(function (f) {
+      return { label: f[0], opts: f[1].map(function (o) {
+        var on = selPin[f[2]] === o, c = f[2] === 'finding' ? colOf(o) : A;
+        return { label: o, on: on, pick: function () { var patch = {}; patch[f[2]] = o; if (f[2] === 'cause' && (o === 'Road accident' || o === 'Assault' || o === 'Burn')) patch.mlc = true; updSel(patch, patch.mlc && !selPin.mlc ? 'Marked as medico-legal (MLC) for ' + o.toLowerCase() : null); },
+          style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 11px; min-height: 34px; cursor: pointer; border: 1px solid ' + (on ? c : '#D5DCE4') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? c : '#FFFFFF') };
+      }) };
+    }) : [];
+    var sexes = [['male', 'Male'], ['female', 'Female'], ['other', 'Other']].map(function (s) {
+      var on = st.sex === s[0];
+      return { label: s[1], on: on, pick: function () { self.setState({ sex: s[0] }); },
+        style: 'border: 0; border-radius: 8px; padding: 7px 14px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#0F1C2E' : 'transparent') };
+    });
+    var tones = Object.keys(TONES).map(function (k) {
+      var on = st.tone === k;
+      return { label: TONES[k][0], on: on, pick: function () { self.setState({ tone: k }); }, style: 'width: 28px; height: 28px; border-radius: 999px; cursor: pointer; background: ' + TONES[k][2] + '; border: ' + (on ? '3px solid #0F1C2E' : '1px solid #C9D2DC') };
+    });
+    function setView(v) {
+      if (v === st.view) return;
+      if (self._f) clearTimeout(self._f);
+      self.setState({ flipping: true });
+      self._f = setTimeout(function () { self.setState({ view: v, flipping: false, zoom: 1, cx: 120, cy: 240 }); }, 180);
+    }
+    var views = [['front', 'Front'], ['back', 'Back']].map(function (v) {
+      var on = st.view === v[0];
+      return { label: v[1], on: on, pick: function () { setView(v[0]); },
+        style: 'border: 1px solid ' + (on ? A : '#C9D2DC') + '; background: ' + (on ? A : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; border-radius: 8px; padding: 0 14px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer' };
+    });
+    var register = st.pins.map(function (p) {
+      var c = colOf(p.finding), sel = p.id === st.sel;
+      return { n: p.id, where: p.where + (p.view === 'back' ? ' (back)' : ''), finding: p.finding + ' · ' + p.sev.toLowerCase(), cause: p.cause + (p.note ? ' — ' + p.note : ''), size: p.size ? p.size + ' cm' : '—', at: p.at + ' · ' + p.by,
+        mlcStyle: 'margin-left: 6px; font-size: 10px; font-weight: 700; color: #FFFFFF; background: #B42318; border-radius: 4px; padding: 1px 5px; display: ' + (p.mlc ? 'inline' : 'none'),
+        numStyle: 'width: 26px; height: 26px; border-radius: 999px; border: 0; cursor: pointer; font-size: 12px; font-weight: 700; color: #FFFFFF; background: ' + c,
+        style: 'display: grid; grid-template-columns: 30px 1.6fr 1fr 1.2fr 0.7fr 1.1fr 36px; gap: 8px; padding: 8px 10px; border-top: 1px solid #EEF1F5; align-items: center; font-size: 13px; background: ' + (sel ? '#F2F7FD' : '#FFFFFF'),
+        go: function () { self.setState({ sel: p.id }); if (p.view !== st.view) setView(p.view); },
+        del: function () { self.setPins(st.pins.filter(function (x) { return x.id !== p.id; }), 'Finding ' + p.id + ' deleted', { sel: st.sel === p.id ? null : st.sel }); } };
+    });
+    var mlcN = st.pins.filter(function (p) { return p.mlc; }).length;
+    return {
+      title: this.props.title || 'Local examination · body map',
+      sexes: sexes, tones: tones, views: views, skin: { hi: T[1], mid: T[2], edge: T[3] },
+      detailCol: st.tone === 'dark' ? 'rgba(30,15,8,0.35)' : 'rgba(90,50,30,0.25)',
+      hairBack: H[0], hairFront: H[1], hairCol: st.tone === 'light' ? '#3B2A20' : '#1F1612',
+      regions: regions, details: body.details, pins: pins,
+      vb: (st.cx - w / 2).toFixed(1) + ' ' + (st.cy - h / 2).toFixed(1) + ' ' + w.toFixed(1) + ' ' + h.toFixed(1),
+      aria: (st.sex === 'other' ? 'Body' : st.sex.charAt(0).toUpperCase() + st.sex.slice(1) + ' body') + ', ' + st.view + ' view, ' + pins.length + ' pin(s)',
+      svgStyle: 'display: block; touch-action: none; user-select: none; cursor: ' + (z > 1 ? 'move' : 'crosshair') + '; transition: transform 0.18s ease; transform: scaleX(' + (st.flipping ? 0.02 : 1) + ')',
+      viewTag: st.view === 'front' ? 'FRONT' : 'BACK', rightTag: 'L',
+      svgDown: function (e) { self._down = e && e.currentTarget ? { x: e.clientX, y: e.clientY, cx: st.cx, cy: st.cy, svg: e.currentTarget } : null; self._moved = false; },
+      svgMove: function (e) {
+        if (!e || !e.currentTarget) return;
+        if (self._drag) {
+          var pt = self.toSvg(e, e.currentTarget); self._moved = true;
+          self.setState({ pins: self.state.pins.map(function (p) { return p.id === self._drag ? Object.assign({}, p, { x: pt[0], y: pt[1] }) : p; }) });
+          return;
+        }
+        var d = self._down; if (!d) return;
+        var dx = e.clientX - d.x, dy = e.clientY - d.y;
+        if (Math.abs(dx) + Math.abs(dy) > 5) self._moved = true;
+        if (self._moved && st.zoom > 1) { var r = d.svg.getBoundingClientRect(); self.setState({ cx: d.cx - dx / r.width * (240 / st.zoom), cy: d.cy - dy / r.height * (480 / st.zoom) }); }
+      },
+      svgUp: function (e) {
+        if (self._drag) {
+          var id = self._drag; self._drag = null;
+          var p = self.state.pins.filter(function (x) { return x.id === id; })[0];
+          if (p && self._moved) { var reg = regionAt(p.x, p.y); if (reg) self.setPins(self.state.pins.map(function (x) { return x.id === id ? Object.assign({}, x, { region: reg.id, where: reg.name }) : x; }), 'Pin ' + id + ' moved to ' + reg.name.toLowerCase()); else self.report(self.state.pins); }
+          self._down = null; return;
+        }
+        var d = self._down; self._down = null;
+        if (!d || self._moved || !e || !e.currentTarget) return;
+        var pt = self.toSvg(e, e.currentTarget), reg = regionAt(pt[0], pt[1]);
+        if (reg) place(reg, pt[0], pt[1]); else self.setState({ sel: null });
+      },
+      svgLeave: function () { if (self._drag) { self._drag = null; self.report(self.state.pins); } self._down = null; },
+      zoomIn: function () { var nz = Math.min(4, st.zoom * 1.5); var c = selPin && selPin.view === st.view ? [selPin.x, selPin.y] : [st.cx, st.cy]; self.setState({ zoom: nz, cx: c[0], cy: c[1] }); },
+      zoomOut: function () { var nz = Math.max(1, st.zoom / 1.5); self.setState(nz === 1 ? { zoom: 1, cx: 120, cy: 240 } : { zoom: nz }); },
+      zoomReset: function () { self.setState({ zoom: 1, cx: 120, cy: 240 }); },
+      turn: function () { setView(st.view === 'front' ? 'back' : 'front'); },
+      partOpts: body.regions.map(function (r) { return { id: r.id, label: r.name }; }),
+      pickPart: function (e) { var id = e && e.target ? e.target.value : ''; var reg = body.regions.filter(function (r) { return r.id === id; })[0]; if (reg) place(reg, reg.cx, reg.cy); },
+      hasSel: !!selPin, noSel: !selPin, nextN: st.nextId,
+      sel: selPin ? { n: selPin.id, where: selPin.where + (selPin.view === 'back' ? ' (back)' : ''), meta: 'Recorded ' + selPin.at + ' by ' + selPin.by, size: selPin.size ? selPin.size + ' cm' : 'not measured', mlc: selPin.mlc, note: selPin.note } : { n: '', where: '', meta: '', size: '', mlc: false, note: '' },
+      selCol: selPin ? colOf(selPin.finding) : A, fields: fields,
+      sizeDown: function () { if (selPin) updSel({ size: Math.max(0, Math.round((selPin.size - 0.5) * 10) / 10) }); },
+      sizeUp: function () { if (selPin) updSel({ size: Math.round((selPin.size + 0.5) * 10) / 10 }); },
+      toggleMlc: function () { if (selPin) updSel({ mlc: !selPin.mlc }); },
+      mlcCol: selPin && selPin.mlc ? '#B42318' : '#3E4C5E',
+      onNote: function (e) { if (selPin) updSel({ note: e && e.target ? e.target.value : '' }); },
+      delSel: function () { if (selPin) self.setPins(st.pins.filter(function (p) { return p.id !== selPin.id; }), 'Pin ' + selPin.id + ' deleted', { sel: null }); },
+      register: register, count: st.pins.length, emptyReg: st.pins.length === 0,
+      mlcCount: mlcN ? mlcN + ' medico-legal' : 'Tap a number to find the pin',
+      toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

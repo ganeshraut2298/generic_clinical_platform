@@ -1,15 +1,21 @@
 <section class="emr surf panel" aria-labelledby="emr-title">
   <header class="emr-h">
     <div class="emr-t">
+      <nav class="crumb faint t-xs" aria-label="Path" data-testid="emr-crumb">
+        <span>Clinic setup</span> / <span>Specialty template</span> / <span aria-current="page">EMR configuration</span>
+      </nav>
       <h2 id="emr-title">EMR configuration by department</h2>
       <p class="muted">
         Choose a department, then pick which EMR sections the doctor sees, in what order, and which are required.
       </p>
-      @if (clinicName()) {
-        <p class="faint t-xs">Clinic: {{ clinicName() }}</p>
-      }
     </div>
     <div class="emr-a">
+      <label class="clinic">
+        <span class="field-label">Clinic</span>
+        <select class="input" disabled data-testid="emr-clinic">
+          <option>{{ clinicName() }}</option>
+        </select>
+      </label>
       @let chip = store.chip();
       <span
         class="pill"
@@ -26,7 +32,7 @@
           mat-stroked-button
           type="button"
           data-act="save-draft"
-          [disabled]="store.busy() !== null || store.viewLoading() || !store.view()"
+          [attr.aria-busy]="store.busy() !== null"
           (click)="store.saveDraft()"
         >
           {{ store.busy() === 'save' ? 'Saving' : 'Save draft' }}
@@ -35,7 +41,7 @@
           mat-flat-button
           type="button"
           data-act="publish"
-          [disabled]="store.busy() !== null || store.viewLoading() || !store.view()"
+          [attr.aria-busy]="store.busy() !== null"
           (click)="store.publish()"
         >
           {{ store.busy() === 'publish' ? 'Publishing' : 'Publish changes' }}
@@ -117,6 +123,7 @@
                   </button>
                 }
               </div>
+              <span class="faint t-xs" data-testid="base-layout-note">Base layout for this department</span>
             </div>
           </section>
 

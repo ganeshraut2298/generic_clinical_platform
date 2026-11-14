@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { formatDisplayDate, formatDisplayDateTimeOfInstant } from '../../../../shared/format/ist-date';
 import { detailOr, problemSlug } from '../../emr-errors';
+import { LANGUAGE_CHOICES, LANGUAGE_NAME } from '../../paper/case-paper.logic';
 import { SpEditor, textOrNull, toggled } from '../shared/sp-editor';
 import { SpecialtyApi } from '../specialty.api';
 import { REFERENCE_LISTS, SpecialtyRxLine } from '../specialty.context';
+import { INTENT_LABEL } from './onc-journey.logic';
 import {
   CHECK_ACTION_LABEL,
   CHECK_LABEL,
@@ -40,6 +42,9 @@ interface TakeHomeRow {
   name: string;
   /** The dose line and the reason, for the screen. */
   text: string;
+  /** The reason (right under the name) and the dose (on the right of the row). */
+  why: string;
+  dose: string;
   /** Ticked at the start of a cycle (Pegfilgrastim follows the suggestion instead). */
   defaultOn: boolean;
   /** The prescription line the tick adds. */
@@ -312,13 +317,14 @@ const TAKE_HOME_NAME: Record<string, string> = {
 
       <!-- E · Take-home -->
       <h4 class="sp-h">E · Take-home medicines</h4>
-      <p class="sp-sub">Generic names first. Ticked lines go on the prescription.</p>
+      <p class="sp-sub" data-testid="take-sub">Generic names first · printed in {{ languageName() }}</p>
       <ul class="plain">
         @for (m of takeHome(); track m.key) {
           <li>
-            <label class="chk">
+            <label class="chk row">
               <input type="checkbox" [checked]="val().takeHome.includes(m.key)" [disabled]="disabled()" (change)="toggleTake(m.key)" />
-              <span><b>{{ m.name }}</b> <span class="sp-sub">{{ m.text }}{{ m.key === 'PEGFILGRASTIM_6' && pegNote() ? ' · suggested: fever / regimen' : '' }}</span></span>
+              <span class="tn"><b>{{ m.name }}</b><span class="sp-sub">{{ m.why }}{{ m.key === 'PEGFILGRASTIM_6' && pegNote() ? ' · suggested: fever / regimen' : '' }}</span></span>
+              <b class="td">{{ m.dose }}</b>
             </label>
           </li>
         }
@@ -342,7 +348,16 @@ const TAKE_HOME_NAME: Record<string, string> = {
           <dd><input class="input" type="text" maxlength="200" [value]="val().imagingText ?? ''" [disabled]="disabled()" aria-label="Imaging" placeholder="For example after cycle 4" (change)="patch({ imagingText: txt($event) })" /></dd>
         </div>
       </dl>
-      <button type="button" class="btn" disabled title="Needs the WhatsApp service">Send chemo calendar on WhatsApp <span class="later">Later</span></button>
+      <div class="wa" role="group" aria-label="WhatsApp calendar" data-testid="wa-calendar">
+        <b>WhatsApp calendar</b>
+        <div class="sp-row">
+          @for (l of languageChoices; track l.key) {
+            <button type="button" class="chip sq" [attr.aria-pressed]="printLanguage() === l.key" [class.on]="printLanguage() === l.key" disabled title="Needs the WhatsApp service">{{ l.label }}</button>
+          }
+        </div>
+        <span class="sp-sub grow">Dates, fever warning (call if ≥ 38 °C), blood test reminders and the daily symptom check.</span>
+        <button type="button" class="btn" disabled title="Needs the WhatsApp service">Send chemo calendar on WhatsApp <span class="later">Later</span></button>
+      </div>
 
       <span class="sp-lbl">Referrals</span>
       <div class="sp-row" role="group" aria-label="Referrals">
@@ -396,6 +411,8 @@ export class ChemoPlanComponent extends SpEditor<SpChemoPlan> {
         key: m.key as TakeHome,
         name: m.name,
         text: `${m.dose} · ${m.why}`,
+        why: m.why,
+        dose: m.dose,
         defaultOn: TAKE_HOME_DEFAULT.includes(m.key),
         line: this.drawnLine(m.key),
       }));
@@ -407,6 +424,8 @@ export class ChemoPlanComponent extends SpEditor<SpChemoPlan> {
         key: i.key as TakeHome,
         name: i.label,
         text: [dose, i.note].filter((x) => !!x).join(' · '),
+        why: i.note ?? '',
+        dose,
         defaultOn: i.defaultOn === true,
         line: {
           name: i.medicine?.name ?? i.label,
@@ -428,6 +447,10 @@ export class ChemoPlanComponent extends SpEditor<SpChemoPlan> {
   /** The start values of this cycle still apply: nothing was ticked or unticked by the doctor yet. */
   private readonly startValues = signal(false);
   protected readonly pegNote = computed(() => this.startValues() && this.pegSuggested());
+
+  protected readonly languageChoices = LANGUAGE_CHOICES;
+  protected readonly printLanguage = this.ctx.store.printLanguage;
+  protected readonly languageName = computed(() => LANGUAGE_NAME[this.printLanguage()]);
 
   protected readonly protocols = computed<ChemoProtocol[]>(() => this.ctx.reference()?.protocols ?? []);
   protected readonly exam = computed(() => {
@@ -473,13 +496,24 @@ export class ChemoPlanComponent extends SpEditor<SpChemoPlan> {
     }
     return `Cycle ${cycle ?? '—'} · Day 1${proto ? ` · ${proto}${o.levelPct < 100 ? ` at ${o.levelPct}%` : ''}` : ''}`;
   });
-  protected readonly sub = computed(() => `${this.order()?.decision ? 'Decision: ' + decisionLabel(this.order()!.decision) : 'Waiting for decision'} · Day care`);
+  /** "Decision: <decision> · Day-care bed <n> · Intent: <intent>", or "Waiting for decision"; a part with no value is left out (O2-2). */
+  protected readonly sub = computed(() => {
+    const o = this.order();
+    const onco = this.ctx.view()?.onco;
+    const intent = onco?.journey?.record?.intent;
+    const parts = [
+      o?.decision ? `Decision: ${decisionLabel(o.decision)}` : 'Waiting for decision',
+      onco?.dayCareBed ? `Day-care bed ${onco.dayCareBed}` : null,
+      intent ? `Intent: ${INTENT_LABEL[intent]}` : null,
+    ];
+    return parts.filter((x): x is string => !!x).join(' · ');
+  });
 
   protected readonly stages = computed(() => {
     const st = this.order()?.stages ?? {};
-    const flags = [!!st.decided, !!st.dosesChecked, !!st.secondCheck, st.pharmacy === 'SENT', false];
+    const flags = [!!st.decided, !!st.dosesChecked, !!st.secondCheck, st.pharmacy === 'SENT', false, false];
     const firstOpen = flags.findIndex((f) => !f);
-    return STAGE_LABELS.map((label, i) => ({ label, n: String(i + 1), done: flags[i], now: i === firstOpen && i < 4, later: i === 4 }));
+    return STAGE_LABELS.map((label, i) => ({ label, n: String(i + 1), done: flags[i] ?? false, now: i === firstOpen && i < 4, later: i >= 4 }));
   });
 
   protected readonly holdTitle = computed(() => (this.order()?.decision === 'STOP' ? 'Stop chemotherapy · move to supportive / palliative care' : 'Delay chemotherapy by 1 week'));

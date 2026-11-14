@@ -3,7 +3,7 @@
     <div class="grp-h">
       <span class="pnum" [class.t]="group.part === 'TREATMENT'" aria-hidden="true">{{ partHead[group.part].num }}</span>
       <div class="grp-t">
-        <h3 [id]="'emr-part-' + group.part">{{ partHead[group.part].num }} · {{ partHead[group.part].title }} · {{ departmentName() }}</h3>
+        <h3 [id]="'emr-part-' + group.part">{{ partHead[group.part].title }} · {{ departmentName() }}</h3>
         <span class="faint t-xs">{{ partHead[group.part].sub }}</span>
       </div>
       <span class="pill p-wait">{{ group.on }} of {{ group.sections.length }} on</span>
@@ -69,9 +69,6 @@
             [disabled]="!store.canEdit() || (!s.shown && !s.required)"
             (click)="store.toggleRequired(s.key)"
           >
-            @if (s.required) {
-              <span class="star" aria-hidden="true">*</span>
-            }
             {{ s.required ? 'Required' : 'Optional' }}
           </button>
 

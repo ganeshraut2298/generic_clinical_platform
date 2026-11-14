@@ -1,12 +1,16 @@
 <div class="cfgpage">
   <div class="pagehead">
-    <div>
-      <h1>Clinic setup</h1>
-      <p class="lead">
-        Everything that decides how your OPD runs. Changes save as you make them, and each one is
-        logged with who made it.
-      </p>
-    </div>
+    @if (current()?.key === 'specialty') {
+      <h1 class="sr-only">Clinic setup</h1>
+    } @else {
+      <div>
+        <h1>Clinic setup</h1>
+        <p class="lead">
+          Everything that decides how your OPD runs. Changes save as you make them, and each one is
+          logged with who made it.
+        </p>
+      </div>
+    }
     <div class="row">
       @if (viewOnly()) {
         <span class="pill p-warn"><app-icon name="lock" [size]="13" /> View only</span>

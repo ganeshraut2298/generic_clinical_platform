@@ -14,7 +14,7 @@ import { editorLoader } from './specialty-registry';
   imports: [NgComponentOutlet],
   template: `
     @if (editor(); as component) {
-      <ng-container *ngComponentOutlet="component; inputs: { sectionKey: section().key }" />
+      <ng-container *ngComponentOutlet="component; inputs: inputs()" />
     } @else {
       <p class="faint t-xs" aria-busy="true">Loading</p>
     }
@@ -22,6 +22,12 @@ import { editorLoader } from './specialty-registry';
 })
 export class SpecialtyHostComponent {
   readonly section = input.required<EmrLayoutSection>();
+  /** Which part of a split editor to draw (Obstetrics: the ANC column or the Quick tools cards); null draws all of it. */
+  readonly area = input<'main' | 'tools' | null>(null);
+  protected readonly inputs = computed<Record<string, unknown>>(() => {
+    const area = this.area();
+    return area ? { sectionKey: this.section().key, area } : { sectionKey: this.section().key };
+  });
   protected readonly editor = signal<Type<unknown> | null>(null);
   private readonly component = computed(() => this.section().specialtyEditor?.component ?? null);
 

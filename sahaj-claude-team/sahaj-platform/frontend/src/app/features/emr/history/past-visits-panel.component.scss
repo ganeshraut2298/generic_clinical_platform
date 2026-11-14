@@ -97,8 +97,19 @@
 }
 
 .visits {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--line);
+  }
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 20px;
   list-style: none;
   display: flex;
   flex-direction: column;
@@ -106,13 +117,25 @@
 }
 
 .visit {
+  position: relative;
   border: 1px solid var(--line);
-  border-left: 4px solid var(--pri);
   border-radius: var(--r-sm);
   background: var(--glass-hi);
 
-  &.ipd {
-    border-left-color: var(--sec);
+  /* The timeline dot on a vertical line at the left (VisitHistory.dc.html:168). */
+  &::before {
+    content: '';
+    position: absolute;
+    left: -19px;
+    top: 16px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--pri);
+    box-shadow: 0 0 0 3px var(--surface);
+  }
+  &.ipd::before {
+    background: var(--sec);
   }
 }
 

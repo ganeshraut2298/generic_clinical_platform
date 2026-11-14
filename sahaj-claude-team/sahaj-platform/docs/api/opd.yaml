@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sahaj OPD API
-  version: 0.6.3
+  version: 0.7.1
   description: >-
     Phase 1 contract, SAH-7 (and SAH-9, SAH-11, SAH-12, SAH-14, SAH-15, SAH-18 as tagged). Reads are for any logged-in
     clinic user; writes are owner only (403 otherwise) unless an operation says otherwise. Errors are RFC 9457
@@ -182,6 +182,53 @@ info:
     price), and unitPaise (required) is added for display. The existing qty is the quantity. billTotalPaise is the sum
     of the lines' amountPaise. (4) D1, behaviour only: an allergy review sent in the same draft save that changes the
     visit's allergy classes (for example with the first class) is cleared and writes no EMR_ALLERGY_ALERT_REVIEWED.
+
+    0.7.0 (14 Nov 2026, SAH-75 EMR design alignment, DEC-052 and its addendum; ADR-026). Additive except where a
+    line says "changed". No new module, permission or external service. (1) SAH-75-3 embedded course: GET /emr/courses
+    gains the optional kind filter; POST /emr/courses accepts kind SURGERY (the "Start course" entry; the OT booking
+    then reuses the patient's latest ACTIVE SURGERY course of the same doctor, ADR-026 D3); TreatmentCourseView gains
+    estimateSigned (the sub line "estimate signed by patient"). (2) SAH-75-10 course actions (supersedes DEC-043 item
+    11): new POST …/sittings/{sittingId}/mark-done, /missed, /rebook, /reschedule, /remove, /admission-request.
+    Changed: CourseSittingStatus gains MISSED; TODAY also covers an unlinked OPD sitting planned for today; a removed
+    sitting is no longer returned; CourseSitting gains displayNo (the renumbered S<n>), regimenKey, allowedActions;
+    the sign marks a linked sitting done only when it is not done yet (one state, one charge). Sitting inputs gain
+    regimenKey (CHEMO). PUT …/sittings/{sittingId} refuses MISSED; link-visit accepts a TODAY unlinked sitting. (3)
+    SAH-75-4 and SAH-75-6 configuration data: EmrFieldDefinition gains presentation (CHIPS) and EmrFieldOption gains
+    alert; the starter layouts change by forward seed migrations only (new starter layout versions); a department's
+    section set is the latest version plus the current starter plus live forms, and starter sections a published
+    department lacks are returned as hidden rows the owner can show (ADR-026 D2). (4) SAH-75-5 body map: SpOncExam
+    gains bodyMap; SpPainScore gains siteMarker and site may hold 120 characters; the new library section local_exam
+    (one BODY_MAP field) needs no contract change. (5) SAH-75-6: new specialty component DENTAL_MED_HISTORY
+    (SpDentalMedHistory) on section dental_medhx; EmrSpecialtyView.dental gains medicalAlerts; its Penicillin chip
+    joins the visit's allergy classes for the SAH-48 check, and its allergy chips join the patient record write-back at
+    signing (OQ-75-16, ADR-025 D13 extended); reference lists dentalMedConditions, dentalMedMedicines,
+    dentalMedAllergies. (6) SAH-75-7: new PUT /emr/records/{recordId}/cancer-journey (per-patient Cancer journey,
+    append-only versions); EmrSpecialtyView.onco gains journey, watch and dayCareBed. The scheme balance chip has no
+    source and is not in the contract (OQ-75-8, ADR-026 H4). (7) SAH-75-9: SpImmunization "Mark all due as given"
+    covers overdue vaccines (description only). (8) BR75-9: og ANC mode also hides menstrual (hiddenSectionKeys). (9)
+    SAH-75-8, SAH-75-11: EmrPastVisitDetail gains medicinesHeading; EmrSpecialtyHistory gains dentalToothHistory,
+    physioProgress.painBySession and oncologyCycles[].lesions; SpPreauth.sent means "requested by the clinic". New
+    problem type: journey-changed (409). New audit actions: COURSE_SITTING_MARKED_DONE, COURSE_SITTING_MISSED,
+    COURSE_SITTING_REBOOKED, COURSE_SITTING_RESCHEDULED, COURSE_SITTING_REMOVED, COURSE_SITTING_ADMISSION_REQUESTED,
+    EMR_DENTAL_MEDHX_REVIEWED, ONC_JOURNEY_UPDATED (ids, numbers, status words, dates and field names only). Values
+    tagged "value from the EMR mockup, not clinically reviewed" (BR75-5). No answer, log line or audit value holds a
+    patient name, chip value, journey value, finding or sitting item outside the screens that show them.
+
+    0.7.1 (14 Nov 2026, SAH-75 follow-up of the frontend hand-back, ADR-026 D12 to D14). Adds no path, problem type,
+    permission or audit action. (1) D12 "No known allergy" chips: EmrRecordHeader gains allergyStatus RECORDED |
+    NONE_RECORDED | NOT_RECORDED, worked out by the patient module from the patient record's allergy text (the text the
+    existing sign write-back writes, "No known allergy", or a none word typed at the front desk). Changed (narrower):
+    header.allergyText is null unless allergyStatus is RECORDED, so a recorded "none" never shows as a red
+    "Allergy: No known allergy" tag. Paediatrics draws "No known allergy" and Oncology "No known drug allergy" (grey)
+    only for NONE_RECORDED; other departments show no tag for it, as before. (2) D13 Gynae menstrual history and
+    contraception as drawn: library data only (forward seed migration): menstrual.cycle, menstrual.cycle_length,
+    menstrual.flow (adds "With clots") and menstrual.dysmenorrhoea (label "Pain") become single-choice chip rows;
+    contraception gains the field method (six tiles with a second line). EmrFieldOption gains hint (the tile's second
+    line); a CHIPS field whose options carry a hint draws as tiles. Changed: copy from last visit leaves out a value
+    that no longer fits the new record's field definition (for example old free text in menstrual.cycle). (3) D14
+    Oncology Assessment card order as drawn (Side effects, Examination, Labs, ECOG; the decision card follows ECOG):
+    starter placement only, new starter layout version for og and onco. Values tagged "value from the EMR mockup, not
+    clinically reviewed".
 servers:
   - url: /api/v1/opd
 security:
@@ -1656,10 +1703,13 @@ paths:
       description: >-
         SAH-58-1 (ADR-022 D12). The courses of one patient of this clinic, newest first. Money is read from
         GET /api/v1/billing/courses/{courseId}/account. NURSE, PHARMACIST, COUNSELLOR 403. A patient of another clinic
-        gives an empty list (RLS).
+        gives an empty list (RLS). 0.7.0 (SAH-75-3, ADR-026 D3): optional kind filter for the panel embedded in a
+        doctor screen (dental DENTAL, og ANC, physio REHAB, surgery SURGERY, onco CHEMO); newest ACTIVE first. An empty
+        list shows "No course started yet." and "Start course" (OQ-75-12).
       x-required-role: OWNER, DOCTOR, VISITING_DOCTOR, FRONT_DESK, BILLING
       parameters:
         - { name: patientId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: kind, in: query, required: false, schema: { $ref: '#/components/schemas/TreatmentCourseKind' }, description: '0.7.0. Only courses of this kind.' }
       responses:
         '200':
           description: Courses
@@ -1683,6 +1733,11 @@ paths:
         order, items "<tooth> · <procedure>", charge = the row's estimate split in equal parts rounded to ₹ 50 with the
         last sitting taking the rest (tagged; ADR-023 H11); the note "estimate signed by patient" when the estimate is
         signed. No open plan row: 400 validation. SURGERY courses are made by POST /emr/records/{recordId}/surgery-booking.
+        0.7.0 (SAH-75-3, ADR-026 D3; changed): the "Start course" entry of each embedded panel calls this operation
+        with the kind of its department, SURGERY included; the OT booking then reuses the ACTIVE SURGERY course started
+        from its record, else the patient's latest ACTIVE SURGERY course of the same doctor (any for OWNER), else creates
+        one. fromPlan with a signed estimate sets estimateSigned; the text "estimate signed by patient" is no longer
+        written into note. A CHEMO sitting may carry regimenKey.
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       parameters:
@@ -1712,7 +1767,9 @@ paths:
         IPD"). addOptions lists the add choices of the kind (DAY_CARE and IPD left out when IPD is OFF). canPlan is true
         for the course's doctor and an OWNER with doctor details; canAdmit for OWNER and FRONT_DESK when IPD is on.
         Money is in billing (GET /api/v1/billing/courses/{courseId}/account). No log line holds the patient name or
-        the items.
+        the items. 0.7.0 (SAH-75-10, ADR-026 D4; changed): statuses REMOVED (not returned), DONE, MISSED, TODAY,
+        PLANNED in that order of precedence; displayNo renumbers the sittings shown; allowedActions per sitting for the
+        caller. The same view is embedded in the doctor screens (SAH-75-3).
       x-required-role: OWNER, DOCTOR, VISITING_DOCTOR, FRONT_DESK, BILLING
       responses:
         '200': { description: The course, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
@@ -1763,6 +1820,8 @@ paths:
         is linked (409 sitting-not-available); a change to DAY_CARE or IPD sets admissionRequested ("Will be done as a
         day-care admission. Admission request created."; the IPD request list is SAH-67-3). revision of the course must
         match (409 course-changed). Audit COURSE_SITTING_CHANGED (date, kind, charge before and after; no item text).
+        0.7.0: a MISSED sitting answers 409 sitting-not-available ("Rebook it first"); a removed one 404
+        sitting-not-found; regimenKey (CHEMO only, else 400 validation) is optional and absent keeps it.
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       requestBody:
@@ -1788,7 +1847,9 @@ paths:
         an OPD visit of the course's patient in this clinic, not linked to another sitting (409 visit-already-linked);
         the sitting must be an unlinked PLANNED OPD sitting (409 sitting-not-available). The sitting becomes TODAY and
         DONE when that visit's record is signed (SAH-51). Repeating the same link: 200, nothing written. Audit
-        COURSE_SITTING_VISIT_LINKED.
+        COURSE_SITTING_VISIT_LINKED. 0.7.0: an unlinked OPD sitting in status TODAY (planned for today) is accepted as
+        PLANNED is; MISSED, DONE and removed sittings are not (409 sitting-not-available, 404 for removed). The sign
+        sets the linked sitting's doneAt only when it is not set yet (ADR-025 D1 step 9 narrowed, ADR-026 D4).
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       requestBody:
@@ -1801,6 +1862,173 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found, sitting-not-found or encounter-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, visit-already-linked or sitting-not-available.' }
+  /emr/courses/{courseId}/sittings/{sittingId}/mark-done:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sittingId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-75]
+      operationId: markCourseSittingDone
+      summary: '"Mark <unit> done" on the Today card'
+      description: >-
+        SAH-75-10 (ADR-026 D4). TODAY → DONE: sets doneAt, doneSource MARK_DONE and the doctor. The charge is not a
+        stored row: billing counts a DONE sitting's charge on every read, so marking done here and signing the linked
+        visit (SAH-58-2, ADR-025 D1 step 9) end in the same single state and one charge, whichever comes first. Toast
+        "<Unit> <displayNo> done · ₹ <chargePaise> added to the account"; when settledInIpd the charge stays on the IPD
+        bill and the toast reads "<Unit> <displayNo> done · billed in IPD" (ADR-026 H2). Optional visitId (the OPD visit
+        of the EMR hosting the panel): when the sitting has no link it is linked first in the same transaction, with
+        the link-visit checks (audit COURSE_SITTING_VISIT_LINKED too). PLANNED, MISSED or DONE: 409
+        sitting-not-available or sitting-done; stale revision or a second press: 409 course-changed "This sitting
+        changed. Reload."; removed: 404 sitting-not-found. Only the course's doctor or an OWNER with doctor details
+        (403 not-own-patient); FRONT_DESK and BILLING 403 (they collect only); NURSE, PHARMACIST, COUNSELLOR 403; another
+        clinic's course 404. Audit COURSE_SITTING_MARKED_DONE (course id; sittingId, sittingNo, displayNo, status
+        before and after; no items).
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CourseSittingMarkDoneInput' } } }
+      responses:
+        '200': { description: Done, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found, sitting-not-found or encounter-not-found.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done, sitting-not-available or visit-already-linked.' }
+  /emr/courses/{courseId}/sittings/{sittingId}/missed:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sittingId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-75]
+      operationId: markCourseSittingMissed
+      summary: '"Patient did not come"'
+      description: >-
+        SAH-75-10 (ADR-026 D4). TODAY with no linked visit or admission → MISSED (missedAt, the doctor). No charge;
+        nothing in billing changes. Toast "Marked missed." (OQ-75-4: no reminder is sent or claimed). A linked sitting
+        (the patient came) or any other status: 409 sitting-not-available. Roles, 409 course-changed and 404 as
+        mark-done. Audit COURSE_SITTING_MISSED.
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CourseSittingRevisionInput' } } }
+      responses:
+        '200': { description: Missed, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+  /emr/courses/{courseId}/sittings/{sittingId}/rebook:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sittingId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-75]
+      operationId: rebookCourseSitting
+      summary: '"Rebook" a missed sitting'
+      description: >-
+        SAH-75-10 (ADR-026 D4). MISSED → PLANNED (TODAY when the date is today, OPD): clears missedAt and sets
+        plannedDate. The date must be today or later in Asia/Kolkata (400 validation "Choose today or a later date.").
+        Not MISSED: 409 sitting-not-available. Toast "Rebooked for <date>". Booking a chair or an appointment stays the
+        "next sitting" flow (SAH-69-3). Roles, 409 course-changed and 404 as mark-done. Audit COURSE_SITTING_REBOOKED
+        (dates before and after).
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CourseSittingDateInput' } } }
+      responses:
+        '200': { description: Rebooked, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+  /emr/courses/{courseId}/sittings/{sittingId}/reschedule:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sittingId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-75]
+      operationId: rescheduleCourseSitting
+      summary: '"Reschedule: <date> ▾" on a planned sitting'
+      description: >-
+        SAH-75-10 (ADR-026 D4). PLANNED (any encounter kind) → the new plannedDate, today or later (400 validation
+        "Choose today or a later date."); an OPD sitting moved to today shows TODAY. Date only: items, charge and kind
+        do not change (use PUT …/sittings/{sittingId} for those). The design's sample date list is not used. Other
+        statuses: 409 sitting-not-available or sitting-done. Roles, 409 course-changed and 404 as mark-done. Audit
+        COURSE_SITTING_RESCHEDULED.
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CourseSittingDateInput' } } }
+      responses:
+        '200': { description: Rescheduled, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+  /emr/courses/{courseId}/sittings/{sittingId}/remove:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sittingId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-75]
+      operationId: removeCourseSitting
+      summary: '"Remove" a planned sitting from the plan'
+      description: >-
+        SAH-75-10 (ADR-026 D4). PLANNED only (TODAY, MISSED: 409 sitting-not-available; DONE: 409 sitting-done). The
+        row is kept with removedAt (never deleted) and leaves the view, the counts, the step strip, the estimate and the
+        IPD request list; the later sittings' displayNo move up (sittingNo never changes, ADR-026 H1). No receipt,
+        payment or advance is touched; an IPD deposit earmarked to it stays as course credit. Toast "<Unit> removed from
+        plan". Roles, 409 course-changed and 404 as mark-done. Audit COURSE_SITTING_REMOVED (course id, sittingId,
+        sittingNo, displayNo, status before; no items).
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CourseSittingRevisionInput' } } }
+      responses:
+        '200': { description: Removed, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+  /emr/courses/{courseId}/sittings/{sittingId}/admission-request:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: sittingId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-75]
+      operationId: requestCourseSittingAdmission
+      summary: '"Move to day care / IPD" (OPD sitting) or "Request admission" (planned day-care or IPD sitting)'
+      description: >-
+        SAH-75-10 (ADR-026 D4, OQ-75-5, OQ-45-31). A PLANNED OPD sitting becomes encounterKind DAY_CARE (default) or the
+        IPD sent, with admissionRequested true and its charge kept; the card shows "IPD · Day care · request" and the
+        toast "Will be done as a day-care admission. Admission request created.". A PLANNED DAY_CARE or IPD sitting
+        gets admissionRequested true (the doctor's "Request admission"; OWNER and FRONT_DESK see "Admit now", which opens
+        the existing SAH-23 sheet with treatmentCourseSittingId). The request reaches ipd's GET
+        /api/v1/ipd/admission-requests through the existing opd.api TreatmentCoursePort (opd never calls ipd). Already
+        requested: 200, nothing written. IPD OFF: 403 module-off. A sitting linked to a visit or admission, MISSED or
+        DONE: 409 sitting-not-available or sitting-done. Roles, 409 course-changed and 404 as mark-done. Audit
+        COURSE_SITTING_ADMISSION_REQUESTED (encounter kind before and after).
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CourseSittingAdmissionRequestInput' } } }
+      responses:
+        '200': { description: Requested, content: { application/json: { schema: { $ref: '#/components/schemas/TreatmentCourseView' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-own-patient or module-off.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
   /emr/specialty-reference/{profile}:
     parameters:
       - { name: profile, in: path, required: true, schema: { $ref: '#/components/schemas/EmrSpecialtyProfile' } }
@@ -2276,7 +2504,9 @@ paths:
         SENT_TO_OPD. For every type: allergies and long-term conditions written back to the patient record when
         changed (removals only with confirmAllergyRemoval; a record changed since the visit opened is left as it is and
         the answer says CONFLICT, the sign still completes); master items counted once for "Your most used" (typed
-        items never); a linked course sitting marked done; status SIGNED with the signer and the time; the edit hold
+        items never); a linked course sitting marked done (0.7.0: only when not already done by "Mark <unit> done",
+        ADR-026 D4, so one state and one charge); 0.7.0 (OQ-75-16, ADR-026 D6): the allergies written back also include
+        the allergy chips of the Dental "Medical history and alerts" card; status SIGNED with the signer and the time; the edit hold
         released. One audit EMR_RECORD_SIGNED (ids, counts and outcome keys only). share.whatsappPrescription true is
         400 needs-whatsapp-service (DEC-040). After a 200 the client prints and returns to the Queue (OPD) or IPD
         (round, Emergency) with the same filter and view. 0.6.1: outcome.prints names the documents to print, in
@@ -2443,6 +2673,36 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed, encounter-closed, emr-record-held (0.6.2, holderName), already-admitted or idempotency-conflict (0.6.2: also the same key on another record).' }
+  /emr/records/{recordId}/cancer-journey:
+    parameters:
+      - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [SAH-75]
+      operationId: saveCancerJourney
+      summary: Save the patient's Cancer journey (stage, biology, intent, line, board date)
+      description: >-
+        SAH-75-7 (ADR-026 D7; OQ-75-7 answered by the human: a simple edit form per patient opened from the strip; the
+        form layout is ours). The journey belongs to the record's patient, not to the visit: each save appends version
+        expectedVersion + 1 (earlier versions are kept, never changed); the strip reads the latest
+        (EmrSpecialtyView.onco.journey). The record's access applies: clinic.consultation.write, own patient (OWNER with
+        doctor details any); the record must be an OPD_VISIT of the onco profile (else 400 not-applicable) and DRAFT
+        (SIGNED: 409 emr-record-signed). expectedVersion is the version read (0 when none): stale 409 journey-changed
+        ("The journey was changed. Reload."). Values outside the lists or limits (a stage group not in the list, Ki-67
+        above 100, a board date more than 365 days ahead): 400 validation with fieldErrors. Lists are not clinically
+        reviewed (ADR-026 H6). NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR 403; another clinic's record 404.
+        Audit ONC_JOURNEY_UPDATED (version and the names of the changed fields; never a value). Never logged.
+      x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
+      x-required-permission: clinic.consultation.write
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CancerJourneyInput' } } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/CancerJourney' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation or not-applicable.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
+        '404': { $ref: '#/components/responses/Problem', description: record-not-found }
+        '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed or journey-changed.' }
   /emr/records/{recordId}/free-slots:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2954,7 +3214,9 @@ components:
       properties:
         key: { $ref: '#/components/schemas/FieldKey' }
         label: { type: string, minLength: 1, maxLength: 80 }
-        isNone: { type: boolean, description: 'The "None" or "Nothing abnormal" option of a required choice field (SAH-53-1).' }
+        isNone: { type: boolean, description: 'The "None" or "Nothing abnormal" option of a required choice field (SAH-53-1). 0.7.0: with presentation CHIPS, choosing it clears the field''s other chips and choosing another clears it.' }
+        alert: { type: boolean, default: false, description: '0.7.0 (SAH-75-6, ADR-026 D6). Shown red when chosen (for example a tobacco habit, an ulcer). Seed data, tagged; false when absent (older versions).' }
+        hint: { type: [string, 'null'], minLength: 1, maxLength: 60, description: '0.7.1 (ADR-026 D13). Second line of a tile, as drawn (Contraception "Barrier", "Daily pill", "IUCD, 5–10 years"). Seed data, tagged; null when absent (options and versions saved before 0.7.1, and every option without a drawn second line).' }
     EmrTableColumn:
       type: object
       required: [key, label]
@@ -2978,6 +3240,20 @@ components:
         columns: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/EmrTableColumn' }, description: 'TABLE kind only; one column entry "Entry" when the mockup gives none.' }
         min: { type: [number, 'null'], description: 'NUMBER kinds only; null in the seed (no range is drawn).' }
         max: { type: [number, 'null'] }
+        presentation:
+          type: string
+          enum: [DEFAULT, CHIPS]
+          default: DEFAULT
+          description: >-
+            0.7.0 (SAH-75-6, ADR-026 D6). CHIPS: a CHOICE field is a single-choice chip row (pressing the chosen chip again
+            clears it) and a MULTI_CHOICE field a many-choice chip row; chips are 44 px high (OQ-45-30). Seed data (the
+            Dental assessment cards dental_hx, dental_pain, dental_extraoral, dental_intraoral, dental_xray,
+            dental_medhx). DEFAULT when absent (versions and starter layouts saved before 0.7.0). Stored values do not
+            change: CHOICE an option key, MULTI_CHOICE an array of option keys. 0.7.1 (ADR-026 D13): also menstrual.cycle,
+            menstrual.cycle_length, menstrual.flow, menstrual.dysmenorrhoea ("Pain") and contraception.method. When at least
+            one option of a CHIPS field has a hint, the field draws as tiles instead of a chip row: one tile per option in
+            a three-column grid (two below 600 px), label in bold and the hint as a second line, at least 56 px high, the
+            chosen tile with a 2 px accent border and the accent tint; choice and clearing rules are the chip rules.
         component:
           type: [object, 'null']
           description: '0.4.0 (ADR-022 D2). Set only when valueKind is COMPONENT. Fixed in code from the field type and options source.'
@@ -3070,7 +3346,7 @@ components:
         - type: object
           required: [layoutVersion, sections]
           properties:
-            layoutVersion: { type: integer, minimum: 1, description: 'Starter layout version (changes only by migration).' }
+            layoutVersion: { type: integer, minimum: 1, description: 'Starter layout version (changes only by migration). 0.7.0: every starter moves to a new version by the SAH-75-4 seed (rxformat not required everywhere; required and shown defaults of the doctor screens; local_exam in gm and surgery; the six Dental cards); visits already opened keep their version.' }
             sections: { type: array, items: { $ref: '#/components/schemas/EmrLayoutSection' }, description: 'Every section, hidden ones too, in starter order.' }
     EmrDepartmentStatus:
       type: string
@@ -3110,7 +3386,18 @@ components:
             canEdit: { type: boolean }
             revision: { type: integer, format: int64, minimum: 0, description: 'Send back with Save draft or Publish. 0 for a department never saved.' }
             layoutSource: { type: string, enum: [DRAFT, PUBLISHED, STARTER], description: 'Where the working layout comes from; also the baseline of the unsaved-changes count.' }
-            sections: { type: array, items: { $ref: '#/components/schemas/EmrLayoutSection' }, description: 'Every section, hidden ones too, in the working order.' }
+            sections:
+              type: array
+              items: { $ref: '#/components/schemas/EmrLayoutSection' }
+              description: >-
+                Every section, hidden ones too, in the working order. 0.7.0 (SAH-75-4, ADR-026 D2; changed): the
+                department's section set is the latest published version's sections plus the current starter layout's
+                sections (when the department has a starterKey) plus live forms, and Save draft and Publish check
+                against that set. A starter section the working copy lacks is appended at its starter position: for a
+                department with a published version with shown false and required false (offered for adding: the owner
+                switches Show on; doctors see nothing new until a publish), for a department never published with the
+                starter's own settings. Nothing is written by the read. A section never leaves the set. "Reset to
+                template" returns the current starter's settings.
     EmrDraftSaveResult:
       type: object
       required: [outcome, department]
@@ -3218,7 +3505,7 @@ components:
     EmrRecordHeader:
       type: object
       description: 'SAH-47-1, SAH-52-1. Screen only: never logged, audited or put in an error message.'
-      required: [patientId, patientName, initials, age, sex, uhid, allergyText, chronicText, lastVisitDaysAgo, visitOrdinal, visitType, doctor, admission, emergency]
+      required: [patientId, patientName, initials, age, sex, uhid, allergyText, allergyStatus, chronicText, lastVisitDaysAgo, visitOrdinal, visitType, doctor, admission, emergency]
       properties:
         patientId: { type: [string, 'null'], format: uuid, description: 'Null for an Emergency case not yet admitted (no patient record exists, ADR-005).' }
         patientName: { type: string, maxLength: 120, description: 'For an Emergency case without a patient, the case display name (for example "Unknown male, about 40").' }
@@ -3227,7 +3514,21 @@ components:
         ageDetail: { oneOf: [{ $ref: '#/components/schemas/AgeDetail' }, { type: 'null' }], description: '0.5.3 (SAH-73-4). Null when patientId is null. The Paediatrics header shows it ("18 months · Boy"); other departments show age as before.' }
         sex: { type: string, enum: [F, M, O] }
         uhid: { type: [string, 'null'], description: 'Null shows "New patient".' }
-        allergyText: { type: [string, 'null'], description: 'Red tag "Allergy: <text>" only when recorded; null shows no allergy tag (never "No known allergy", OQ-45-23).' }
+        allergyText: { type: [string, 'null'], description: 'Red tag "Allergy: <text>" only when recorded; null shows no red tag (OQ-45-23). Changed in 0.7.1 (ADR-026 D12): null unless allergyStatus is RECORDED.' }
+        allergyStatus:
+          type: string
+          enum: [RECORDED, NONE_RECORDED, NOT_RECORDED]
+          description: >-
+            0.7.1 (SAH-75-7, SAH-75-11 P6, ADR-026 D12; OQ-45-23). Worked out by the patient module from the patient
+            record's allergy text (patient.api PatientClinical.allergyStatus), never from the request. NOT_RECORDED: no
+            text (null or blank); nothing was asked or written. NONE_RECORDED: the whole text, trimmed, ignoring case and
+            trailing full stops, is one none word: none, nil, nka, nkda, none known, no known allergy, no known allergies,
+            no known drug allergy, no known drug allergies (the doctor's explicit "None" at sign writes "No known
+            allergy", ADR-025 D13; the Dental "None" chip writes the same, ADR-026 D6). RECORDED: any other text
+            (allergyText holds it). Paediatrics draws the grey chip "No known allergy" and Oncology the grey watch chip
+            "No known drug allergy" only for NONE_RECORDED; every department shows the red tag only for RECORDED and
+            nothing for NOT_RECORDED. Null patientId (Emergency case without a patient): NOT_RECORDED. Screen only: never
+            logged, audited or put in a problem detail.
         chronicText: { type: [string, 'null'], description: 'Amber tag "Known: <text>".' }
         mlc: { type: boolean, description: '0.4.0 (SAH-57-3). True when a body map of this record has an MLC pin: header tag "MLC" (text and colour).' }
         lastVisitDaysAgo: { type: [integer, 'null'], minimum: 0, description: '"Last visit: n days ago"; null when there is no earlier visit.' }
@@ -3286,7 +3587,7 @@ components:
         values: { type: object, additionalProperties: true, description: 'Field key to value, shaped by the field''s valueKind (EmrValueKind). Empty object when nothing is entered.' }
         copiedFrom:
           type: [object, 'null']
-          description: '"Copied from <date>": the last signed record of the same department.'
+          description: '"Copied from <date>": the last signed record of the same department. 0.7.1 (ADR-026 D13): a generic field value is copied only when it fits the new record''s field definition (same valueKind; for CHOICE and MULTI_CHOICE fields with FIELD options, every key is an option of the new definition); a value that does not fit is left out, never an error. When nothing of a section fits, the section is not copied.'
           required: [recordId, date]
           properties:
             recordId: { type: string, format: uuid }
@@ -3331,7 +3632,7 @@ components:
         addenda: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/EmrAddendum' }, description: '0.6.0 (SAH-51-5). Newest last; shown under the signature as "Addendum · <date and time> · Dr. <name>: <reason>. <text>".' }
         admission: { $ref: '#/components/schemas/EmrAdmissionState' }
         canAddAddendum: { type: boolean, description: '0.6.0. SIGNED, the caller is the record''s doctor or OWNER with doctor details, fewer than 50 addenda.' }
-        allergyAlerts: { type: array, maxItems: 60, items: { $ref: '#/components/schemas/EmrAllergyAlert' }, description: '0.4.0 (SAH-48-2, ADR-022 D5). Drug-class clashes of active prescription rows (and form medicine lists) with the allergy classes picked in this visit''s Allergies section.' }
+        allergyAlerts: { type: array, maxItems: 60, items: { $ref: '#/components/schemas/EmrAllergyAlert' }, description: '0.4.0 (SAH-48-2, ADR-022 D5). Drug-class clashes of active prescription rows (and form medicine lists) with the allergy classes picked in this visit''s Allergies section. 0.7.0 (SAH-75-6, ADR-026 D6): also the classes of the allergy chips of the Dental "Medical history and alerts" card (PENICILLIN); the class-set change rule of ADR-022 D5 applies to the union.' }
         completeBlockers: { type: array, items: { type: string, enum: [ALLERGY_ALERT] }, description: '0.4.0. ALLERGY_ALERT: footer "Remove the drug or confirm the allergy alert before completing." in place of "Still needed"; readyToComplete is false.' }
         lastSignedPrescription:
           type: [object, 'null']
@@ -3751,6 +4052,7 @@ components:
         medicines:
           type: array
           items: { type: object, required: [name, frequency, days, when], properties: { name: { type: string }, frequency: { $ref: '#/components/schemas/EmrRxFrequency' }, days: { type: integer }, when: { $ref: '#/components/schemas/EmrRxWhen' } } }
+        medicinesHeading: { type: string, enum: [MEDICINES, DISCHARGE_MEDICINES, TAKE_HOME_MEDICINES], description: '0.7.0 (SAH-75-8 G16-1). "Medicines" for an OPD visit; "Discharge medicines" for IPD and IPD_ROUND rows; "Take-home medicines" for an OPD record of the oncology profile with a SENT chemotherapy order (day-care chemotherapy visit). Absent reads MEDICINES.' }
         results:
           type: array
           items: { type: object, required: [test, value, abnormal], properties: { test: { type: string }, value: { type: string }, abnormal: { type: boolean, description: 'As stored; "Abnormal" in red.' } } }
@@ -4023,8 +4325,13 @@ components:
       description: 'Encounter chip OPD, Day care, IPD.'
     CourseSittingStatus:
       type: string
-      enum: [PLANNED, TODAY, DONE]
-      description: 'Computed on read: TODAY when a linked OPD visit is today''s or a linked admission is not discharged; DONE when the linked visit''s record is signed (SAH-51) or the admission is discharged.'
+      enum: [PLANNED, TODAY, DONE, MISSED]
+      description: >-
+        Computed on read: TODAY when a linked OPD visit is today's or a linked admission is not discharged; DONE when the
+        linked visit's record is signed (SAH-51) or the admission is discharged. 0.7.0 (SAH-75-10, ADR-026 D4; changed),
+        in this order: a removed sitting is never returned; DONE also when doneAt is set by "Mark <unit> done"; MISSED
+        ("Patient did not come", red); TODAY also for an unlinked OPD sitting whose plannedDate is today (Asia/Kolkata);
+        else PLANNED. Chips "Done", "Today", "Planned", "Missed".
     CourseAddOption:
       type: object
       required: [key, label, encounterKind]
@@ -4035,7 +4342,7 @@ components:
         encounterKind: { $ref: '#/components/schemas/CourseEncounterKind' }
     CourseSitting:
       type: object
-      required: [id, sittingNo, encounterKind, encounterLabel, encounterRef, plannedDate, status, items, chargePaise, note, admissionRequested, settledInIpd, ipdBillTotalPaise, opdVisitId, admissionId]
+      required: [id, sittingNo, encounterKind, encounterLabel, encounterRef, plannedDate, status, items, chargePaise, note, admissionRequested, settledInIpd, ipdBillTotalPaise, opdVisitId, admissionId, displayNo, doneSource, regimenKey, allowedActions]
       properties:
         id: { type: string, format: uuid }
         sittingNo: { type: integer, minimum: 1, description: 'Shown S<n>; never reused.' }
@@ -4052,6 +4359,20 @@ components:
         ipdBillTotalPaise: { type: [integer, 'null'], description: 'Running or final bill total of the linked admission ("Billed in IPD · ₹ x").' }
         opdVisitId: { type: [string, 'null'], format: uuid }
         admissionId: { type: [string, 'null'], format: uuid }
+        displayNo: { type: integer, minimum: 1, description: '0.7.0 (ADR-026 D4). The number shown (S<n>, "<Unit> n", physio "Session n of m", the oncology cycle): rank among the course''s non-removed sittings by sittingNo, so a removal renumbers the later ones. sittingNo stays the stable key.' }
+        doneSource: { type: [string, 'null'], enum: [MARK_DONE, SIGN, null], description: '0.7.0. How doneAt was set; null for a sitting not done by either (also a sitting done by discharge, and rows done before 0.7.0, which read as SIGN).' }
+        regimenKey: { type: [string, 'null'], pattern: '^[A-Z][A-Z0-9_]{1,39}$', description: '0.7.0 (SAH-75-7, ADR-026 D7). CHEMO courses only: the protocol of this cycle (ChemoProtocol key, for example AC, PACLI_3W); drives the plan chips "AC1", "P1". Null for other kinds.' }
+        allowedActions:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [MARK_DONE, MISSED, REBOOK, RESCHEDULE, REMOVE, REQUEST_ADMISSION, ADMIT] }
+          description: >-
+            0.7.0 (SAH-75-10). What the caller may do on this sitting now; the client draws the buttons from it and the
+            server checks again. TODAY: MARK_DONE "Mark <unit> done" and, when unlinked, MISSED "Patient did not come";
+            MISSED: REBOOK; PLANNED: RESCHEDULE "Reschedule: <date> ▾", REMOVE, and for an OPD sitting REQUEST_ADMISSION
+            "Move to day care / IPD", for a DAY_CARE or IPD sitting ADMIT "Admit now" (OWNER, FRONT_DESK when IPD is TRIAL
+            or ON) or REQUEST_ADMISSION "Request admission" (a doctor who is not the owner, when not yet requested);
+            DONE: none. Empty for FRONT_DESK and BILLING except ADMIT; DAY_CARE and IPD actions left out when IPD is OFF.
     TreatmentCourseSummary:
       type: object
       required: [id, courseNo, kind, unit, name, startedOn, status, sittingCount, doneCount]
@@ -4063,13 +4384,13 @@ components:
         name: { type: string, maxLength: 120 }
         startedOn: { type: string, format: date }
         status: { type: string, enum: [ACTIVE] }
-        sittingCount: { type: integer, minimum: 0 }
-        doneCount: { type: integer, minimum: 0 }
+        sittingCount: { type: integer, minimum: 0, description: '0.7.0: removed sittings are not counted.' }
+        doneCount: { type: integer, minimum: 0, description: '0.7.0: DONE only (MISSED is not done).' }
     TreatmentCourseView:
       allOf:
         - { $ref: '#/components/schemas/TreatmentCourseSummary' }
         - type: object
-          required: [patientId, doctorMembershipId, doctorName, note, revision, sittings, addOptions, canPlan, canAdmit, accountNote]
+          required: [patientId, doctorMembershipId, doctorName, note, revision, sittings, addOptions, canPlan, canAdmit, accountNote, estimateSigned]
           properties:
             patientId: { type: string, format: uuid }
             doctorMembershipId: { type: string, format: uuid }
@@ -4081,6 +4402,7 @@ components:
             canPlan: { type: boolean, description: 'The course''s doctor or an OWNER with doctor details.' }
             canAdmit: { type: boolean, description: '"Admit now" for OWNER and FRONT_DESK when IPD is TRIAL or ON: opens the existing IPD admission sheet with treatmentCourseSittingId.' }
             accountNote: { type: string, description: '"one running account: advances and part payments carry across visits".' }
+            estimateSigned: { type: boolean, description: '0.7.0 (SAH-75-10, G15-4). The sub line reads "Started <date> · <doctor>" and adds "estimate signed by patient" only when true (set by fromPlan with a signed estimate; a course from before 0.7.0 whose note is exactly that text reads true). The words "sample rates" never exist.' }
     TreatmentCourseCreateInput:
       type: object
       additionalProperties: false
@@ -4107,6 +4429,7 @@ components:
         items: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 200 } }
         chargePaise: { type: integer, minimum: 0, maximum: 10000000000, multipleOf: 100, description: 'Whole rupees.' }
         note: { type: [string, 'null'], maxLength: 300 }
+        regimenKey: { type: [string, 'null'], pattern: '^[A-Z][A-Z0-9_]{1,39}$', description: '0.7.0 (ADR-026 D7). CHEMO courses only (else 400 validation); an existing ChemoProtocol key (else 400 validation).' }
     CourseSittingAddInput:
       type: object
       additionalProperties: false
@@ -4115,6 +4438,7 @@ components:
         revision: { type: integer, format: int64, minimum: 0 }
         addOptionKey: { type: string, pattern: '^[a-z][a-z0-9_]{1,39}$' }
         plannedDate: { type: [string, 'null'], format: date }
+        regimenKey: { type: [string, 'null'], pattern: '^[A-Z][A-Z0-9_]{1,39}$', description: '0.7.0. CHEMO only. Absent or null on a chemo_cycle option copies the previous cycle sitting''s regimen.' }
     CourseSittingChangeInput:
       type: object
       additionalProperties: false
@@ -4126,6 +4450,7 @@ components:
         items: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 200 } }
         chargePaise: { type: integer, minimum: 0, maximum: 10000000000, multipleOf: 100 }
         note: { type: [string, 'null'], maxLength: 300, description: 'For example "Admission deposit is due by 36 weeks." (stored text; no reminder, no block).' }
+        regimenKey: { type: [string, 'null'], pattern: '^[A-Z][A-Z0-9_]{1,39}$', description: '0.7.0. CHEMO only; absent keeps the stored value.' }
     CourseSittingLinkVisitInput:
       type: object
       additionalProperties: false
@@ -4133,6 +4458,34 @@ components:
       properties:
         revision: { type: integer, format: int64, minimum: 0 }
         visitId: { type: string, format: uuid }
+    CourseSittingRevisionInput:
+      type: object
+      additionalProperties: false
+      description: '0.7.0 (SAH-75-10). The course revision the screen holds; stale is 409 course-changed "This sitting changed. Reload.".'
+      required: [revision]
+      properties:
+        revision: { type: integer, format: int64, minimum: 0 }
+    CourseSittingMarkDoneInput:
+      type: object
+      additionalProperties: false
+      required: [revision]
+      properties:
+        revision: { type: integer, format: int64, minimum: 0 }
+        visitId: { type: [string, 'null'], format: uuid, description: 'The OPD visit of the EMR hosting the panel; links an unlinked sitting first (link-visit checks). Null or absent: no link.' }
+    CourseSittingDateInput:
+      type: object
+      additionalProperties: false
+      required: [revision, plannedDate]
+      properties:
+        revision: { type: integer, format: int64, minimum: 0 }
+        plannedDate: { type: string, format: date, description: 'Today or later, Asia/Kolkata (400 validation "Choose today or a later date.").' }
+    CourseSittingAdmissionRequestInput:
+      type: object
+      additionalProperties: false
+      required: [revision]
+      properties:
+        revision: { type: integer, format: int64, minimum: 0 }
+        encounterKind: { type: [string, 'null'], enum: [DAY_CARE, IPD, null], default: DAY_CARE, description: 'For an OPD sitting: the kind it moves to (the drawn button moves to DAY_CARE). Ignored for a DAY_CARE or IPD sitting.' }
     # ---------------------------------------------------------------- 0.5.0 · EMR phase 4 (ADR-023) ----
     EmrSpecialtyProfile:
       type: string
@@ -4140,8 +4493,10 @@ components:
       description: 'ADR-023 D1. The mockup SCREENS map: chosen by the record snapshot''s starterKey on OPD_VISIT records. Every other starter, no starter, IPD_ROUND and ER_ASSESSMENT use the generic renderer (no profile).'
     EmrSpecialtyComponent:
       type: string
-      enum: [VITALS_LOG, EXAM_GENERAL, TOOTH_CHART, DENTAL_PLAN, DENTAL_DONE, LAB_WORK, CONSENT_CHECKLIST, ANC_CHECK, FORM_F, GYNAE_EXAM, GROWTH, IMMUNIZATION, MILESTONES, WEIGHT_DOSE, PAIN_SCORE, POSTURE_GAIT, ROM_TABLE, MMT_TABLE, SPECIAL_TESTS, GOALS, MODALITIES, HOME_EXERCISES, SESSION_NOTE, SURGICAL_EXAM, SURGERY_FITNESS, SURGERY_PLAN, PREAUTH, PREOP_ORDERS, ONC_TOX, ONC_EXAM, ONC_LABS, ONC_ECOG, CHEMO_PLAN, OUTCOME_SCALES]
+      enum: [VITALS_LOG, EXAM_GENERAL, TOOTH_CHART, DENTAL_PLAN, DENTAL_DONE, LAB_WORK, CONSENT_CHECKLIST, ANC_CHECK, FORM_F, GYNAE_EXAM, GROWTH, IMMUNIZATION, MILESTONES, WEIGHT_DOSE, PAIN_SCORE, POSTURE_GAIT, ROM_TABLE, MMT_TABLE, SPECIAL_TESTS, GOALS, MODALITIES, HOME_EXERCISES, SESSION_NOTE, SURGICAL_EXAM, SURGERY_FITNESS, SURGERY_PLAN, PREAUTH, PREOP_ORDERS, ONC_TOX, ONC_EXAM, ONC_LABS, ONC_ECOG, CHEMO_PLAN, OUTCOME_SCALES, DENTAL_MED_HISTORY]
       description: >-
+        0.7.0 (SAH-75-6, ADR-026 D6): dental dental_medhx DENTAL_MED_HISTORY ("Medical history and alerts"). The other
+        five Dental assessment cards are library sections with presentation CHIPS (generic renderer), not editors.
         ADR-023 D3 anchor map: gm vitals VITALS_LOG, exam EXAM_GENERAL; dental dental_chart TOOTH_CHART, tx_plan
         DENTAL_PLAN, dental_done DENTAL_DONE, dental_lab LAB_WORK, consent CONSENT_CHECKLIST; og anc ANC_CHECK, pcpndt
         FORM_F, gyn_exam GYNAE_EXAM; paeds growth GROWTH, immunization IMMUNIZATION, milestones MILESTONES, wtdose
@@ -4188,6 +4543,7 @@ components:
         - { $ref: '#/components/schemas/SpOncEcog' }
         - { $ref: '#/components/schemas/SpChemoPlan' }
         - { $ref: '#/components/schemas/SpOutcomeScales' }
+        - { $ref: '#/components/schemas/SpDentalMedHistory' }
     SpStamp:
       type: object
       readOnly: true
@@ -4475,7 +4831,7 @@ components:
     SpImmunization:
       type: object
       additionalProperties: false
-      description: 'SAH-62-2 (tagged C-5). Only vaccines DUE_TODAY or OVERDUE may be added; a vaccine given in an earlier record cannot be added or removed (400 validation). givenOn = today, stamped. Done: scheduleReviewed or one vaccine given today.'
+      description: 'SAH-62-2 (tagged C-5). Only vaccines DUE_TODAY or OVERDUE may be added; a vaccine given in an earlier record cannot be added or removed (400 validation). givenOn = today, stamped. Done: scheduleReviewed or one vaccine given today. 0.7.0 (SAH-75-9, ADR-026 D8; supersedes ADR-023 D4 "due today only"): "Mark all due as given" adds every DUE_TODAY and every OVERDUE vaccine of EmrSpecialtyView.paeds.vaccines in one save, never a LATER one; toast "<n> vaccines recorded" (batch numbers Later, OQ-75-13). A vaccineKey sent twice is stored once. Clinical rule from the mockup, not clinically reviewed.'
       required: [component, schemaVersion, givenToday, scheduleReviewed]
       properties:
         component: { type: string, const: IMMUNIZATION }
@@ -4505,13 +4861,23 @@ components:
     SpPainScore:
       type: object
       additionalProperties: false
-      description: 'SAH-63-1 (tagged C-6). NPRS 0 "no pain" to 10 "worst pain". Done: a score.'
+      description: 'SAH-63-1 (tagged C-6). NPRS 0 "no pain" to 10 "worst pain". Done: a score. 0.7.0 (SAH-75-5, OQ-75-3, ADR-026 D5): card "Pain site" is one marker on the shared body figure (front view, "R" and "L" as drawn) set by tapping the body, plus the one-line note in site (for example "Right knee, medial side · worse on stairs, better with rest"); no findings register, no MLC. Done unchanged.'
       required: [component, schemaVersion, score]
       properties:
         component: { type: string, const: PAIN_SCORE }
         schemaVersion: { type: integer, const: 1 }
         score: { type: [integer, 'null'], minimum: 0, maximum: 10 }
-        site: { type: [string, 'null'], maxLength: 80 }
+        site: { type: [string, 'null'], maxLength: 120, description: '0.7.0: the note under the figure (was 80). Clinical text: never logged.' }
+        siteMarker:
+          type: [object, 'null']
+          additionalProperties: false
+          description: '0.7.0. The marked region; null when none. A point outside the figure (no region at that point) is 400 validation and the rest of the save is refused with it.'
+          required: [side, x, y, region]
+          properties:
+            side: { type: string, enum: [FRONT], description: 'Front view only, as drawn (ADR-026 H8).' }
+            x: { type: number, minimum: 0, maximum: 1 }
+            y: { type: number, minimum: 0, maximum: 1 }
+            region: { type: string, pattern: '^[a-z][a-z0-9_]{1,39}$', description: 'Body-map region key (EmrBodyMapPin.region list, fixed in code).' }
     SpPostureGait:
       type: object
       additionalProperties: false
@@ -4717,7 +5083,7 @@ components:
       properties:
         component: { type: string, const: PREAUTH }
         schemaVersion: { type: integer, const: 1 }
-        sent: { type: boolean, description: '"Pre-authorisation sent".' }
+        sent: { type: boolean, description: '"Pre-authorisation sent". 0.7.0 (SAH-75-11 G-S7): means the clinic requested pre-authorisation; the button reads "Send pre-authorisation to <payer>", then "✓ Pre-authorisation sent to <payer>", and the toast never claims the payer received it (no integration).' }
         sentOn: { type: [string, 'null'], format: date }
         reference: { type: [string, 'null'], maxLength: 60 }
     SpPreopOrders:
@@ -4804,6 +5170,14 @@ components:
           properties:
             device: { type: [string, 'null'], enum: [PORT, PICC, PERIPHERAL, null] }
             checks: { type: array, uniqueItems: true, items: { type: string, enum: [FLUSHES_FREELY, BLOOD_RETURN, NO_REDNESS_SWELLING, NO_PAIN, DRESSING_CLEAN, FLUSHED_4_WEEKS] }, description: 'Ready for a vesicant when FLUSHES_FREELY, BLOOD_RETURN and NO_REDNESS_SWELLING are ticked (PORT only).' }
+        bodyMap:
+          oneOf: [{ $ref: '#/components/schemas/EmrBodyMapValue' }, { type: 'null' }]
+          description: >-
+            0.7.0 (SAH-75-5, ADR-026 D5). The Examination tab "Body map" ("Body map · mark lumps, nodes, skin lesions,
+            port site"; second line "Optional" with no pins, "n marked" with pins), opening on the patient's recorded
+            sex. Same rules as every body map (ADR-022 D8): pin numbers, server-stamped properties, the MLC rule L-1 and
+            the EMR_MLC_FLAG_CHANGED audit, and EmrRecordHeader.mlc counts it. Optional: ONC_EXAM Done does not need it.
+            Null or absent when nothing is marked.
     SpOncLabs:
       type: object
       additionalProperties: false
@@ -4889,6 +5263,31 @@ components:
             properties:
               scale: { type: string, enum: [ODI, NDI, WOMAC, LEFS] }
               score: { type: [integer, 'null'], minimum: 0, maximum: 100, description: 'Whole points; the per-scale maximum above applies.' }
+    SpDentalMedHistory:
+      type: object
+      additionalProperties: false
+      description: >-
+        0.7.0 (SAH-75-6, ADR-026 D6; tagged). Dental card "Medical history and alerts" / "Ask before any injection,
+        extraction or surgery" on section dental_medhx. Groups "Conditions", "Medicines", "Allergies" (round chips, many
+        at once; a chosen chip shows "✓ " and, except NONE, red). NONE together with another key of the same group is 400
+        validation (the client clears one when the other is chosen). Button "Mark as reviewed" sets reviewedWithPatient
+        true ("✓ Reviewed with patient", card border back to normal); pressing again sets it false and clears review.
+        Done (and the required flag of the Dental starter): reviewedWithPatient true; the assessment bar otherwise reads
+        "Still needed in assessment: medical history review." Alert banners are computed by the server
+        (EmrSpecialtyView.dental.medicalAlerts). PENICILLIN joins the visit's allergy classes for the SAH-48 drug-class
+        check (ADR-022 D5 rules unchanged). At signing the allergy chips join the visit's confirmed allergy list written to
+        the patient record (OQ-75-16, ADR-025 D13 extended): labels "Penicillin", "Local anaesthetic", "Latex",
+        "Painkillers (NSAIDs)"; NONE is an explicit None only when no allergy is recorded in this card or the Allergies
+        section. Audit EMR_DENTAL_MEDHX_REVIEWED ({reviewed}); never the chips. Clinical data: never logged.
+      required: [component, schemaVersion, conditions, medicines, allergies, reviewedWithPatient]
+      properties:
+        component: { type: string, const: DENTAL_MED_HISTORY }
+        schemaVersion: { type: integer, const: 1 }
+        conditions: { type: array, uniqueItems: true, items: { type: string, enum: [DIABETES, HIGH_BP, HEART_DISEASE, THYROID, ASTHMA, BLEEDING_DISORDER, EPILEPSY, PREGNANT, NONE] }, description: 'Diabetes, High BP, Heart disease, Thyroid, Asthma, Bleeding disorder, Epilepsy, Pregnant, None.' }
+        medicines: { type: array, uniqueItems: true, items: { type: string, enum: [BLOOD_THINNERS, ASPIRIN, BISPHOSPHONATES, STEROIDS, THYROID_MEDICINE, NONE] }, description: 'Blood thinners, Aspirin, Bisphosphonates, Steroids, Thyroid medicine, None.' }
+        allergies: { type: array, uniqueItems: true, items: { type: string, enum: [PENICILLIN, LOCAL_ANAESTHETIC, LATEX, NSAIDS, NONE] }, description: 'Penicillin, Local anaesthetic, Latex, "Painkillers (NSAIDs)", None. Only PENICILLIN has a drug class (ADR-026 H15).' }
+        reviewedWithPatient: { type: boolean }
+        review: { oneOf: [{ $ref: '#/components/schemas/SpStamp' }, { type: 'null' }], readOnly: true, description: 'Server stamp of the review (who and when); null when not reviewed.' }
     OncDecisionKey:
       type: string
       enum: [GIVE_AS_PLANNED, GIVE_REDUCED, DELAY_1_WEEK, CHANGE_REGIMEN, STOP]
@@ -4945,7 +5344,7 @@ components:
           description: >-
             0.5.1 (ADR-023 D13; stories SAH-61-1, SAH-61-3, SAH-63; mockup isAnc, isGyn, isAssess, isSession). Sections
             the effective mode hides ("The screen shows only the sections for the visit type you pick."): og ANC hides
-            gyn_exam, infertility, contraception; og GYNAE hides obstetric, anc, pcpndt, usg, except that pcpndt is not
+            gyn_exam, infertility, contraception and (0.7.0, BR75-9, ADR-026 D9) menstrual; og GYNAE hides obstetric, anc, pcpndt, usg, except that pcpndt is not
             hidden while og.formFRequired is true (legal duty, H21); physio FIRST_VISIT hides modalities, sessions;
             physio SESSION hides special_tests, posture; empty for the other profiles. Only keys present in the record's
             layout are listed. A hidden section keeps its stored values (a draft save may still carry them), is not
@@ -4960,6 +5359,28 @@ components:
             estimateState: { type: string, enum: [NOT_SIGNED, SIGNED, CHANGED] }
             doneTodayRowIds: { type: array, items: { type: string, format: uuid } }
             childTabDefault: { type: boolean, description: '0.5.3 (SAH-73-5, ADR-023 H15): true when the effective age is under 13 completed years: from the date of birth as of today IST when recorded (12 years 11 months opens Child, exactly 13 opens Adult), else from the whole-number age. The doctor can still switch the tab; the open tab is not stored.' }
+            medicalAlerts:
+              type: array
+              maxItems: 7
+              description: >-
+                0.7.0 (SAH-75-6, ADR-026 D6; tagged). Banners inside "Medical history and alerts", in this order, each only
+                when its condition holds: PENICILLIN_ALLERGY "Penicillin allergy." "Avoid amoxicillin; use a non-penicillin
+                antibiotic." (allergy PENICILLIN); BLEEDING_RISK "Bleeding risk." "Check INR or stop advice with the
+                physician before extraction or surgery." (BLOOD_THINNERS, ASPIRIN or BLEEDING_DISORDER); DIABETES
+                "Diabetes." "Check sugar before surgery; healing is slower."; BP_HEART "BP / heart." "Check BP; limit
+                adrenaline in local anaesthetic." (HIGH_BP or HEART_DISEASE); PREGNANT "Pregnant." "Avoid X-rays unless
+                essential; second trimester is safest for treatment."; BISPHOSPHONATES "Bisphosphonates." "Risk of jaw bone
+                problems after extraction or implant."; TOBACCO_USE "Tobacco use." "Screen the mouth for pre-cancer patches
+                and counsel to quit." (dental_hx habits tobacco_chewing, gutkha, paan_betel or smoking in this record). They
+                warn; they never block (the drug-class block is allergyAlerts). The recap reads "<complaints> · pain n/10 ·
+                n medical alert(s): <titles>".
+              items:
+                type: object
+                required: [key, title, text]
+                properties:
+                  key: { type: string, enum: [PENICILLIN_ALLERGY, BLEEDING_RISK, DIABETES, BP_HEART, PREGNANT, BISPHOSPHONATES, TOBACCO_USE] }
+                  title: { type: string }
+                  text: { type: string }
         og:
           type: [object, 'null']
           properties:
@@ -5061,6 +5482,92 @@ components:
             cycleNo: { type: [integer, 'null'] }
             nextCycle: { type: [object, 'null'], properties: { defaultDate: { type: string, format: date }, label: { type: string, enum: [NEXT_CHEMO, REBOOKED_CHEMO] }, bloodTestDate: { type: string, format: date }, echo: { type: string, description: '"Before next cycle" when last LVEF < 55 %, else "Before paclitaxel".' } } }
             orderStatus: { type: string, enum: [NONE, DRAFT, SENT, HELD] }
+            journey: { $ref: '#/components/schemas/OncJourneyStrip' }
+            watch:
+              type: object
+              required: [doxorubicinGivenMgM2, doxorubicinLimitMgM2]
+              description: >-
+                0.7.0 (SAH-75-7, ADR-026 D7). Watch chips on the right of the patient line. "Doxorubicin <given> / 450
+                mg/m²" (amber) shown only when doxorubicinGivenMgM2 is not null. The scheme chip ("<scheme> · ₹ <amount>
+                left") has no data source in Sahaj and is never shown (OQ-75-8, ADR-026 H4). "No known drug allergy" follows
+                the header rule (only when "none" was recorded, OQ-45-23): 0.7.1, shown (grey) only when
+                header.allergyStatus is NONE_RECORDED (ADR-026 D12).
+              properties:
+                doxorubicinGivenMgM2: { type: [number, 'null'], description: 'The outside dose entered on the latest SENT order plus the doxorubicin of the patient''s SENT orders in this clinic (per m² × level), excluding this record''s own order; null when none. The order sheet''s own check (cumulativeDoxorubicinMgM2, rule C-8) is unchanged.' }
+                doxorubicinLimitMgM2: { type: number, const: 450, description: 'Lifetime anthracycline limit, tagged C-8.' }
+            dayCareBed: { type: [string, 'null'], maxLength: 40, description: '0.7.0 (SAH-75-11 O2-2). Bed label of the admission linked to today''s CHEMO sitting (read from ipd through CourseAdmissionSource); the order sheet sub line "Decision: <decision> · Day-care bed <n> · Intent: <intent>" leaves the part out when null.' }
+    OncJourneyStrip:
+      type: object
+      required: [record, diagnosisText, plan]
+      description: >-
+        0.7.0 (SAH-75-7, ADR-026 D7). "Cancer journey snapshot": five cells built by the server on every record read and
+        save (never half filled). Diagnosis: diagnosisText (line 1) and "Stage <stageGroup> · <tnmText>" (line 2, accent);
+        Biology: markersText and "Ki-67 <ki67Pct>% · <geneticsText>"; Intent · line: "<intent> · <setting>" and "<lineNo
+        as 1st, 2nd …> line · board <boardDate>"; Plan: "Plan · <plan.title>" with "Cycle <cycleNo> of <cycleCount> · day
+        1" (or "Cycle n delayed") and one chip per cycle; Response (clinical): onco.response and onco.sums.pctFromBaseline
+        ("Not measured" without lesions). A part with no value is left out; a cell with no value reads "Not recorded".
+        Screen only: never logged.
+      properties:
+        record: { oneOf: [{ $ref: '#/components/schemas/CancerJourney' }, { type: 'null' }], description: 'The patient''s latest journey version; null: stage, biology and intent cells read "Not recorded" and "Edit" opens an empty form.' }
+        diagnosisText: { type: [string, 'null'], maxLength: 200, description: 'First active diagnosis item of this record, else of the patient''s latest SIGNED oncology record; null "Not recorded".' }
+        plan:
+          type: [object, 'null']
+          description: 'From the patient''s newest ACTIVE CHEMO course; null reads "No chemotherapy plan".'
+          required: [courseId, title, cycleNo, cycleCount, cycles]
+          properties:
+            courseId: { type: string, format: uuid }
+            title: { type: string, maxLength: 200, description: 'Runs of consecutive regimens of the cycle sittings, "AC ×4 → Paclitaxel ×4"; the course name when no regimen is set.' }
+            cycleNo: { type: [integer, 'null'], minimum: 1, description: 'displayNo among the cycle sittings of today''s (or the next planned) cycle.' }
+            cycleCount: { type: integer, minimum: 0, description: 'Non-removed chemo_cycle sittings.' }
+            cycles:
+              type: array
+              maxItems: 50
+              items:
+                type: object
+                required: [sittingId, label, state]
+                properties:
+                  sittingId: { type: string, format: uuid }
+                  label: { type: string, maxLength: 8, description: 'Regimen short label + ordinal within that regimen ("AC1", "P1"; AC, P for both paclitaxel protocols, TC; tagged), "C<n>" with no regimen.' }
+                  state: { type: string, enum: [GIVEN, TODAY, PLANNED, DELAYED, MISSED], description: 'GIVEN green "Given" (DONE); TODAY accent "Today"; PLANNED grey "Planned"; DELAYED amber "Delayed 1 week" (today''s cycle while the recorded decision is DELAY_1_WEEK); MISSED red "Missed" (not drawn, ADR-026 H12).' }
+    CancerJourney:
+      type: object
+      description: '0.7.0 (SAH-75-7, ADR-026 D7). One version of the patient''s Cancer journey. Lists are ours, not clinically reviewed (ADR-026 H6). Clinical data: never logged, audited (values) or put in a problem detail.'
+      required: [version, stageGroup, tnmText, markersText, ki67Pct, geneticsText, intent, setting, lineNo, boardDate, recordedAt, recordedByName]
+      properties:
+        version: { type: integer, minimum: 1 }
+        stageGroup: { oneOf: [{ $ref: '#/components/schemas/CancerStageGroup' }, { type: 'null' }] }
+        tnmText: { type: [string, 'null'], maxLength: 40, description: 'For example "cT2 cN2 M0".' }
+        markersText: { type: [string, 'null'], maxLength: 80, description: 'For example "ER+ PR+ HER2−".' }
+        ki67Pct: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        geneticsText: { type: [string, 'null'], maxLength: 60, description: 'For example "BRCA pending".' }
+        intent: { type: [string, 'null'], enum: [CURATIVE, PALLIATIVE, null], description: '"Curative", "Palliative".' }
+        setting: { type: [string, 'null'], enum: [NEOADJUVANT, ADJUVANT, DEFINITIVE, ADVANCED, null], description: '"Neoadjuvant", "Adjuvant", "Definitive", "Advanced / metastatic".' }
+        lineNo: { type: [integer, 'null'], minimum: 1, maximum: 10, description: '"1st line", "2nd line" …' }
+        boardDate: { type: [string, 'null'], format: date, description: 'Tumour board date; "board 26 Jul".' }
+        recordedAt: { type: string, format: date-time, readOnly: true }
+        recordedByName: { type: string, readOnly: true, description: 'Read through platform.api, never copied.' }
+    CancerStageGroup:
+      type: string
+      enum: ['0', I, IA, IB, IC, II, IIA, IIB, IIC, III, IIIA, IIIB, IIIC, IV, IVA, IVB, IVC]
+      description: '0.7.0. Stage groups offered by the journey form; another value is 400 validation (ADR-026 H6).'
+    CancerJourneyInput:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      description: 'Every field optional; a field sent null clears it in the new version, an absent field keeps the previous version''s value.'
+      properties:
+        expectedVersion: { type: integer, minimum: 0, description: 'The version read (0 when none); stale 409 journey-changed.' }
+        stageGroup: { oneOf: [{ $ref: '#/components/schemas/CancerStageGroup' }, { type: 'null' }] }
+        tnmText: { type: [string, 'null'], minLength: 1, maxLength: 40 }
+        markersText: { type: [string, 'null'], minLength: 1, maxLength: 80 }
+        ki67Pct: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        geneticsText: { type: [string, 'null'], minLength: 1, maxLength: 60 }
+        intent: { type: [string, 'null'], enum: [CURATIVE, PALLIATIVE, null] }
+        setting: { type: [string, 'null'], enum: [NEOADJUVANT, ADJUVANT, DEFINITIVE, ADVANCED, null] }
+        lineNo: { type: [integer, 'null'], minimum: 1, maximum: 10 }
+        boardDate: { type: [string, 'null'], format: date, description: 'Not before 1900-01-01 and not more than 365 days after today (Asia/Kolkata); 400 validation otherwise.' }
+        tenantId: { description: 'Accepted and ignored.' }
+        clinicId: { description: 'Accepted and ignored.' }
     EmrSpecialtyReference:
       type: object
       description: 'ADR-023 D4. Lists and thresholds per profile; every block carries the tag. Display labels are the mockup''s words. Only the block of the requested profile is set.'
@@ -5071,7 +5578,7 @@ components:
         lists:
           type: object
           propertyNames:
-            enum: [gmSigns, gmSystems, gmFollowUp, dentalConditions, dentalSurfaces, dentalMobility, dentalShades, dentalGumTones, dentalSuggestions, dentalNextIntervals, dentalLabItems, ancSymptoms, ancDueOrders, ancScans, ancSupplements, gynaeQuickOrders, iapGroups, iapVaccines, milestones, paedsDoseRules, physioGaits, physioModalities, jointRom, jointMmt, jointSpecialTests, outcomeScales, surgeryProcedures, surgeryPayers, surgeryConsentItems, surgeryTests, surgeryPreopOrders, surgeryBlood, oncSymptoms, oncEvents, oncSystems, oncSystemChips, oncLabs, oncEcog, oncDecisions, oncDeviationReasons, oncDoseLevels, oncReductionReasons, oncTakeHome, oncReferrals]
+            enum: [gmSigns, gmSystems, gmFollowUp, dentalConditions, dentalSurfaces, dentalMobility, dentalShades, dentalGumTones, dentalSuggestions, dentalNextIntervals, dentalLabItems, dentalMedConditions, dentalMedMedicines, dentalMedAllergies, ancSymptoms, ancDueOrders, ancScans, ancSupplements, gynaeQuickOrders, iapGroups, iapVaccines, milestones, paedsDoseRules, physioGaits, physioModalities, jointRom, jointMmt, jointSpecialTests, outcomeScales, surgeryProcedures, surgeryPayers, surgeryConsentItems, surgeryTests, surgeryPreopOrders, surgeryBlood, oncSymptoms, oncEvents, oncSystems, oncSystemChips, oncLabs, oncEcog, oncDecisions, oncDeviationReasons, oncDoseLevels, oncReductionReasons, oncTakeHome, oncReferrals]
           additionalProperties: { type: array, items: { $ref: '#/components/schemas/EmrReferenceItem' } }
           description: >-
             0.5.1 (ADR-023 D13.1): fixed list names. The response for a profile has exactly that profile's lists below,
@@ -5090,7 +5597,9 @@ components:
             (ENUM SpDentalPlan procedureKey, one item per condition and procedure pair: group = the condition key,
             number = phase, defaults.sittings = sittings planned at start, tariff = the clinic's match or null "Not in
             tariff"); dentalNextIntervals (keys 3d, 7d, 14d, 1m; number and group as gmFollowUp); dentalLabItems (ENUM
-            SpLabWork item).
+            SpLabWork item); 0.7.0 (SAH-75-6): dentalMedConditions, dentalMedMedicines, dentalMedAllergies (ENUM
+            SpDentalMedHistory conditions, medicines, allergies, drawn order, NONE last; dentalMedAllergies PENICILLIN has
+            group = PENICILLIN, the drug class).
 
             og: ancSymptoms (ENUM SpAncCheck symptoms); ancDueOrders (ENUM SpAncCheck orders key; sub = the window, for
             example "24–28 w", "give today"); ancScans (ENUM SpAncCheck scans key; sub = the window); ancSupplements (keys
@@ -5208,7 +5717,18 @@ components:
             sugar: { type: array, maxItems: 5, items: { type: object, properties: { date: { type: string, format: date }, mgdl: { type: number } } } }
         ancVisits: { type: array, maxItems: 40, items: { type: object, properties: { date: { type: string, format: date }, gestationalAge: { type: [string, 'null'] }, weightKg: { type: [number, 'null'] }, bp: { type: [string, 'null'] }, fundalHeightCm: { type: [integer, 'null'] }, hbGdl: { type: [number, 'null'] }, note: { type: [string, 'null'] }, today: { type: boolean } } } }
         growthPoints: { type: array, maxItems: 100, items: { type: object, properties: { date: { type: string, format: date }, ageMonths: { type: [number, 'null'], description: '0.5.3 (ADR-024 D7): the age at the point''s date, completed months + remaining days ÷ 30.4375, one decimal (chart position only). Null without a date of birth or for a date before it; such a point is not plotted.' }, weightKg: { type: [number, 'null'] }, lengthCm: { type: [number, 'null'] }, headCircCm: { type: [number, 'null'] } } } }
-        oncologyCycles: { type: array, maxItems: 60, items: { type: object, properties: { cycleNo: { type: integer }, date: { type: string, format: date }, protocolKey: { type: string }, levelPct: { type: integer }, weightKg: { type: [number, 'null'] }, bsaUsed: { type: [number, 'null'] }, labs: { type: object, additionalProperties: { type: [number, 'null'] } }, grades: { type: [object, 'null'], additionalProperties: { type: [integer, 'null'] } } } } }
+        oncologyCycles: { type: array, maxItems: 60, items: { type: object, properties: { cycleNo: { type: integer }, date: { type: string, format: date }, protocolKey: { type: string }, levelPct: { type: integer }, weightKg: { type: [number, 'null'] }, bsaUsed: { type: [number, 'null'] }, labs: { type: object, additionalProperties: { type: [number, 'null'] } }, grades: { type: [object, 'null'], additionalProperties: { type: [integer, 'null'] } }, lesions: { type: array, maxItems: 10, description: '0.7.0 (SAH-75-11 O-6). Lesion sizes recorded at that cycle (ONC_EXAM of the SIGNED record of the cycle; empty before SAH-51 signs it), for the lesion trend line.', items: { type: object, required: [name, cm], properties: { name: { type: string, maxLength: 60 }, cm: { type: [number, 'null'] } } } } } } }
+        dentalToothHistory:
+          type: array
+          maxItems: 200
+          description: '0.7.0 (SAH-75-11 D6). Earlier work per tooth for "History of <tooth>": plan rows marked done in the patient''s SIGNED dental records in this clinic, newest first; the client filters by tooth and shows "No earlier work on this tooth." when none (wording not drawn). Empty for other profiles.'
+          items:
+            type: object
+            required: [tooth, date, text]
+            properties:
+              tooth: { type: string, pattern: '^[1-8][1-8]$', description: 'FDI tooth number.' }
+              date: { type: string, format: date }
+              text: { type: string, maxLength: 200, description: 'The procedure as written on the plan row (sitting n of m when more than one).' }
         physioProgress:
           type: [object, 'null']
           properties:
@@ -5220,6 +5740,7 @@ components:
             romLast: { type: [object, 'null'], additionalProperties: true }
             goalsAchieved: { type: array, items: { type: string } }
             onlyFirstVisit: { type: boolean, description: '"Only the first visit is recorded."' }
+            painBySession: { type: array, maxItems: 60, description: '0.7.0 (SAH-75-11 P-3). PAIN_SCORE of the earlier SIGNED sessions of the active REHAB course, by displayNo, for "Sessions 1–3: 7, 6, 5. Today: n — improving." (the comparison word is the client''s: improving, same as last session, worse than last session).', items: { type: object, required: [sessionNo, score], properties: { sessionNo: { type: integer, minimum: 1 }, score: { type: integer, minimum: 0, maximum: 10 } } } }
     EmrRevisionInput:
       type: object
       additionalProperties: false

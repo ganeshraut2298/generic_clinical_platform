@@ -56,8 +56,8 @@ class PhysioFinishContributor implements SpecialtyFinishContributor {
         }
         List<SittingRow> all = courses.sittingsOf(ctx.tenantId(), List.of(current.get().courseId()));
         Optional<SittingRow> next = nextPlanned(all, current.get());
-        return new ProfileEffects.Physio(current.get().courseId(), current.get().sittingNo(), all.size(),
-                next.map(SittingRow::sittingNo).orElse(null), next.isEmpty(), painScore, previous);
+        return new ProfileEffects.Physio(current.get().courseId(), rank(all, current.get()), all.size(),
+                next.map(s -> rank(all, s)).orElse(null), next.isEmpty(), painScore, previous);
     }
 
     /** The pain score of the patient's latest earlier SIGNED Physiotherapy record that has one. */
@@ -135,7 +135,17 @@ class PhysioFinishContributor implements SpecialtyFinishContributor {
     /** The first later session that has no visit yet and is not done. */
     private static Optional<SittingRow> nextPlanned(List<SittingRow> all, SittingRow current) {
         return all.stream().filter(s -> s.sittingNo() > current.sittingNo() && s.opdVisitId() == null
-                && s.admissionId() == null && s.doneAt() == null).findFirst();
+                && s.admissionId() == null && s.doneAt() == null && s.missedAt() == null).findFirst();
+    }
+
+    /** The number shown for a session (ADR-026 D4): its rank among the course's sittings that are not removed. */
+    private static int rank(List<SittingRow> all, SittingRow sitting) {
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).id().equals(sitting.id())) {
+                return i + 1;
+            }
+        }
+        return sitting.sittingNo();
     }
 
     private static LocalTime parse(String value) {

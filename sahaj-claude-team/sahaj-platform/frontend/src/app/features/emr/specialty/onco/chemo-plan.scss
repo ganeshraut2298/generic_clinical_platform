@@ -3,9 +3,9 @@
 }
 
 .stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -15,6 +15,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--muted-soft);
     color: var(--ink-3);
 
     &.done {
@@ -172,6 +175,15 @@
   gap: 8px;
   min-height: 44px;
 
+  &.row {
+    display: flex;
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+  }
+
   input {
     width: 20px;
     height: 20px;
@@ -188,4 +200,27 @@
 
 .deg {
   width: 96px;
+}
+
+.tn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.td {
+  font-size: 0.8125rem;
+  text-align: right;
+}
+
+.wa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--good-soft);
 }

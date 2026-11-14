@@ -103,8 +103,9 @@ class EmrPhase3PrivacyIT extends EmrPhase3Support {
         Rec derm = switchDepartment(startRecord(clinic, doctor, f.patient()), "derm");
         Rec pinned = save(derm, oneField("lesion_map", "body_map", bodyMap(false, accident)));
         bodies.ok(pinned.record());
-        refused(bodies, HttpMethod.PUT, RECORDS + "/" + pinned.id() + "/draft", pinned.token(),
-                draftBody(pinned.revision(), "ASSESSMENT", null, oneField("lesion_map", "body_map", bodyMap(false, pin(1, "FALL", false)))).toString(), 400);
+        // changing the cause of a pin is allowed (SAH-57-2: the flag follows what is sent, otherwise as sent); not a refusal
+        bodies.ok(saveRecordDraft(pinned.token(), pinned.id(),
+                draftBody(pinned.revision(), "ASSESSMENT", null, oneField("lesion_map", "body_map", bodyMap(false, pin(1, "FALL", false)))), 200));
         // medicines, favourites, allergy classes, print choices, the case paper
         bodies.ok(get(EMR_MEDICINES + "?q=" + SEARCH, doctor.token(clinic)));
         bodies.ok(get(FAVOURITES, doctor.token(clinic)));
@@ -139,6 +140,7 @@ class EmrPhase3PrivacyIT extends EmrPhase3Support {
         JsonNode live = formAction(clinic, saveForm, "publish", 200);
         bodies.ok(live);
         refused(bodies, HttpMethod.PUT, FORMS + "/" + live.get("formKey").asText() + "/draft", clinic.owner(), draft.put(UNKNOWN, BAD).toString(), 400);
+        draft.remove(UNKNOWN); // a body with an unknown property is a 400 before the role is looked at; the 403 is asked with a valid body
         refused(bodies, HttpMethod.PUT, FORMS + "/" + live.get("formKey").asText() + "/draft", doctor.token(clinic), draft.toString(), 403);
         Rec withForm = startRecord(clinic, doctor, f.patient());
         Rec filled = save(withForm, sectionValues(live.get("formKey").asText(), "{\"note\":\"" + FORMTEXT + "\"}"));

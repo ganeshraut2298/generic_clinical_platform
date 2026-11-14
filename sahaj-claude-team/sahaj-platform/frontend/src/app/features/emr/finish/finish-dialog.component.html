@@ -6,8 +6,21 @@
   </div>
 </div>
 
+<ng-template #profileLinesTpl>
+  @if (lines().length > 0) {
+    <div class="eff" data-testid="finish-profile">
+      @for (line of lines(); track $index) {
+        <span class="pline">{{ line }}</span>
+      }
+    </div>
+  }
+</ng-template>
+
 <mat-dialog-content class="body">
   @if (check(); as c) {
+    @if (profile() === 'og') {
+      <ng-container *ngTemplateOutlet="profileLinesTpl" />
+    }
     <div class="sum" data-testid="finish-summary">
       @for (row of rows(); track $index) {
         <div class="srow">
@@ -47,12 +60,8 @@
       <p class="eff" data-testid="finish-followup">{{ line }}</p>
     }
 
-    @if (lines().length > 0) {
-      <div class="eff" data-testid="finish-profile">
-        @for (line of lines(); track $index) {
-          <span class="pline">{{ line }}</span>
-        }
-      </div>
+    @if (profile() !== 'og') {
+      <ng-container *ngTemplateOutlet="profileLinesTpl" />
     }
 
     @if (billLines().length > 0) {

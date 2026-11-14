@@ -1,7 +1,10 @@
 package com.sahaj.opd.web;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sahaj.opd.application.emr.EmrInputs.RevisionInput;
+import com.sahaj.opd.application.emr.specialty.CancerJourneyService;
+import com.sahaj.opd.application.emr.specialty.CancerJourneyService.JourneyView;
 import com.sahaj.opd.application.emr.specialty.SpecialtyHistoryService;
 import com.sahaj.opd.application.emr.specialty.SpecialtyReferenceService;
 import com.sahaj.opd.application.emr.specialty.SurgeryBookingService;
@@ -17,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,13 +42,16 @@ public class EmrSpecialtyController implements EmrApi {
     private final SpecialtyHistoryService history;
     private final SurgeryBookingService booking;
     private final VisitTemplateService templates;
+    private final CancerJourneyService journey;
 
     public EmrSpecialtyController(SpecialtyReferenceService reference, SpecialtyHistoryService history,
-                                  SurgeryBookingService booking, VisitTemplateService templates) {
+                                  SurgeryBookingService booking, VisitTemplateService templates,
+                                  CancerJourneyService journey) {
         this.reference = reference;
         this.history = history;
         this.booking = booking;
         this.templates = templates;
+        this.journey = journey;
     }
 
     @GetMapping("/specialty-reference/{profile}")
@@ -65,6 +72,13 @@ public class EmrSpecialtyController implements EmrApi {
                               @RequestHeader(value = "Idempotency-Key", required = false) String key,
                               @RequestBody RevisionInput input) {
         return booking.book(ClinicUser.current(), recordId, key, input == null ? null : input.revision());
+    }
+
+    /** SAH-75-7 (ADR-026 D7): appends a version of the patient's Cancer journey; the body is read field by field. */
+    @PutMapping("/records/{recordId}/cancer-journey")
+    @PreAuthorize(DOCTOR_OR_OWNER)
+    public JourneyView saveCancerJourney(@PathVariable UUID recordId, @RequestBody JsonNode body) {
+        return journey.save(ClinicUser.current(), recordId, body);
     }
 
     @GetMapping("/visit-templates")

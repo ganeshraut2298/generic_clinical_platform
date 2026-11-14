@@ -11,6 +11,8 @@ import {
   ChemoOrderActionInput,
   ChemoOrderInput,
   ChemoOrderView,
+  CancerJourney,
+  CancerJourneyInput,
   ChemoSecondCheckPinInput,
   EmrSpecialtyHistory,
   EmrSpecialtyProfile,
@@ -46,6 +48,11 @@ export class SpecialtyApi {
       { revision },
       { headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }) },
     );
+  }
+
+  /** SAH-75-7: appends a version of the patient's Cancer journey (409 journey-changed when the version read is stale). */
+  saveCancerJourney(recordId: string, body: CancerJourneyInput): Observable<CancerJourney> {
+    return this.http.put<CancerJourney>(`${this.emr}/records/${recordId}/cancer-journey`, body);
   }
 
   // ---- chemotherapy order (SAH-66) ----

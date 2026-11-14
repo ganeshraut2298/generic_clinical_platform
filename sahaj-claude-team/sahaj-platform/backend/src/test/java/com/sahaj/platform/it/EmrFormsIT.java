@@ -185,26 +185,27 @@ class EmrFormsIT extends EmrPhase3Support {
     @Test
     void everyRoleReadsTheListAndAFormButOnlyTheOwnerChangesAnythingAndATokenThatClaimsOwnerIsRefusedToo() throws Exception {
         Clinic clinic = newClinic();
+        java.util.Map<String, org.springframework.test.web.servlet.request.RequestPostProcessor> tokens = tokensOfEveryRole(clinic);
         JsonNode form = createForm(clinic, "gcs", null);
         String path = FORMS + "/" + form.get("formKey").asText();
         for (String role : ALL_ROLES) {
-            JsonNode list = get(FORMS, clinic.as(role));
+            JsonNode list = get(FORMS, tokens.get(role));
             boolean owner = "OWNER".equals(role);
             assertThat(list.get("canEdit").asBoolean()).as(role).isEqualTo(owner);
             assertThat(list.get("canApprove").asBoolean()).as(role).isEqualTo(owner);
-            JsonNode view = get(path, clinic.as(role));
+            JsonNode view = get(path, tokens.get(role));
             assertThat(view.get("canEdit").asBoolean()).as(role).isEqualTo(owner);
             assertThat(view.get("definition").get("fields")).hasSize(6);
         }
         ObjectNode draft = formDraftBody(form);
         String revision = revisionBody(form);
         for (String role : NON_OWNER_ROLES) {
-            problemKeyed(HttpMethod.POST, FORMS, clinic.as(role), "{\"starterKey\":\"gcs\",\"name\":\"Nope\"}", key(), 403, "forbidden");
-            problemOf(HttpMethod.PUT, path + "/draft", clinic.as(role), draft.toString(), 403, "forbidden");
+            problemKeyed(HttpMethod.POST, FORMS, tokens.get(role), "{\"starterKey\":\"gcs\",\"name\":\"Nope\"}", key(), 403, "forbidden");
+            problemOf(HttpMethod.PUT, path + "/draft", tokens.get(role), draft.toString(), 403, "forbidden");
             for (String action : new String[] {"submit", "approve", "publish", "retire"}) {
-                problemOf(HttpMethod.POST, path + "/" + action, clinic.as(role), revision, 403, "forbidden");
+                problemOf(HttpMethod.POST, path + "/" + action, tokens.get(role), revision, 403, "forbidden");
             }
-            problemOf(HttpMethod.POST, path + "/send-back", clinic.as(role), "{\"revision\":0,\"reason\":\"No\"}", 403, "forbidden");
+            problemOf(HttpMethod.POST, path + "/send-back", tokens.get(role), "{\"revision\":0,\"reason\":\"No\"}", 403, "forbidden");
         }
         // a nurse whose token says OWNER: the service re-reads the membership
         Staff nurse = addNonDoctor(clinic, "NURSE");
@@ -695,8 +696,10 @@ class EmrFormsIT extends EmrPhase3Support {
             return null;
         });
         db().asMigrator(c -> {
-            assertThat(expectError(c, "update opd.emr_form_version set published_by = published_by").state()).isNotNull();
-            assertThat(expectError(c, "delete from opd.emr_form_version").state()).isNotNull();
+            // the table owner has no row policy (the policies are for sahaj_app, the tables are FORCEd): it sees no row, so a row
+            // update or delete changes nothing; the statement-level truncate trigger is the owner's wall
+            assertThat(DbAccess.count(c, "select count(*) from opd.emr_form_version")).as("the owner sees no row").isZero();
+            assertThat(expectError(c, "truncate opd.emr_form_version").state()).isIn("42501", "0A000");
             return null;
         });
         assertThat(count(clinic, "select count(*) from opd.emr_form_version")).isEqualTo(1);

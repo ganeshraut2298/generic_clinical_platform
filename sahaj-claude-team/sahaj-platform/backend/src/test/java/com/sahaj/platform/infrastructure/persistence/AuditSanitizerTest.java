@@ -61,6 +61,29 @@ class AuditSanitizerTest {
     }
 
     @Test
+    void keepsTheAllergyClassKeyOfTheReviewAuditRowButNoOtherAllergyValue() {
+        // B-1: EMR_ALLERGY_ALERT_REVIEWED carries allergyClass; only the exact key with a class key from the fixed set is kept
+        assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("allergyClass", "SULFA", "rowId", "r1")))
+                .containsEntry("allergyClass", "SULFA").containsEntry("rowId", "r1");
+        assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("allergyClass", "PENICILLIN")))
+                .containsEntry("allergyClass", "PENICILLIN");
+        assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("allergyClass", List.of("SULFA", "PENICILLIN"))))
+                .containsEntry("allergyClass", List.of("SULFA", "PENICILLIN"));
+
+        for (Object notAClassKey : new Object[] {"Peanuts, rash on face", "sulfa", "PEANUT", "", 7, true, List.of(),
+                List.of("SULFA", "Peanuts"), List.of(List.of("SULFA"))}) {
+            assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("allergyClass", notAClassKey)))
+                    .as("allergyClass with " + notAClassKey).containsEntry("allergyClass", AuditSanitizer.REDACTED);
+        }
+        assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("allergy", "SULFA", "allergyText", "SULFA",
+                "allergyClassNote", "SULFA", "allergyClasses", "SULFA", "allergyClassLabel", "SULFA"))).containsOnly(
+                        Map.entry("allergy", AuditSanitizer.REDACTED), Map.entry("allergyText", AuditSanitizer.REDACTED),
+                        Map.entry("allergyClassNote", AuditSanitizer.REDACTED),
+                        Map.entry("allergyClasses", AuditSanitizer.REDACTED),
+                        Map.entry("allergyClassLabel", AuditSanitizer.REDACTED));
+    }
+
+    @Test
     void keepsTheColleagueCheckAuditFieldsIdsAndTriesLeftIntact() {
         // SAH-32: PLATFORM_PIN_COLLEAGUE_CHECK_FAILED holds ids and a number only; none of the keys may be redacted
         Map<String, Object> result = AuditSanitizer.sanitize("STAFF_PIN", Map.of(

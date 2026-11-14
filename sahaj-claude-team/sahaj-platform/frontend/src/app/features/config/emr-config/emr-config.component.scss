@@ -129,3 +129,19 @@
     flex-direction: column;
   }
 }
+
+.crumb {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.clinic {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  select {
+    min-width: 200px;
+    min-height: 44px;
+  }
+}

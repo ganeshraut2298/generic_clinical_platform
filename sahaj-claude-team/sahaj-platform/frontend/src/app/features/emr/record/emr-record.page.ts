@@ -33,6 +33,7 @@ import { SignPrintData, SignPrints } from '../finish/sign-prints.service';
 import { LANGUAGE_NAME } from '../paper/case-paper.logic';
 import { EmrAddendum, EmrFinishPrint } from '../emr-finish.model';
 import { PART_HEAD } from '../../config/emr-config/emr-config.logic';
+import { RIGHT_TAB_SUBTITLE, assessmentBar, cardNumber, gmRecap, badgeFull, badgeText, oncoCounts, surgeryRecap } from './frame.logic';
 import { EmrNavigationState } from '../emr-launcher.service';
 import { EMR_COMPONENT_CONTEXT } from '../emr-context';
 import { CasePaperPanelComponent } from '../paper/case-paper-panel.component';
@@ -46,9 +47,13 @@ import { EmrConfirmData, EmrConfirmDialogComponent } from './emr-confirm-dialog.
 import { EmrHeaderComponent } from './emr-header.component';
 import { drName, saveStatusText } from './emr-save-status';
 import { EmrLeaveChoice, EmrLeaveDialogComponent } from './emr-leave-dialog.component';
-import { GmToolsComponent } from '../specialty/gm/gm-tools.component';
+import { QuickToolsComponent } from '../specialty/quick-tools.component';
+import { CoursePanelComponent } from '../course/course-panel.component';
 import { SpecialtyContext } from '../specialty/specialty.context';
-import { PROFILE_CHROME } from '../specialty/specialty-registry';
+import { fitnessOf, specialtyOf } from '../specialty/specialty.logic';
+import { dentalRecap, medicalAlerts } from '../specialty/dental/dental-medhistory.logic';
+import { isComponentValue } from '../components/component-values.logic';
+import { accentVars, chromeOf } from '../specialty/specialty-registry';
 import { SpecialtyStripComponent } from '../specialty/specialty-strip.component';
 import { EmrRecordStore, RightTab } from './emr-record.store';
 import { SectionCardComponent } from './section-card.component';
@@ -61,12 +66,6 @@ const READ_ONLY_TEXT: Record<EmrReadOnlyReason, string> = {
   HELD_BY_OTHER: 'Another doctor has this visit open for editing.',
   IPD_READ_ONLY: 'IPD is read-only for this clinic, so this EMR opens read-only.',
   HISTORY: 'This is an earlier signed visit. It opens read-only.',
-};
-
-/** Part tab words: General Medicine has its own, every other department uses the SAH-45 part lines (SAH-47-2). */
-const GM_SUBTITLE: Record<EmrPart, string> = {
-  ASSESSMENT: 'Complaints and examination',
-  TREATMENT: 'Diagnosis, medicines, tests and services',
 };
 
 const RIGHT_TABS: readonly { id: RightTab; label: string }[] = [
@@ -92,11 +91,13 @@ const TOOLS_TAB: { id: RightTab; label: string } = { id: 'tools', label: 'Quick 
     PastVisitsPanelComponent,
     CasePaperPanelComponent,
     NgComponentOutlet,
-    GmToolsComponent,
+    QuickToolsComponent,
+    CoursePanelComponent,
     SpecialtyStripComponent,
   ],
   providers: [EmrRecordStore, EmrFinishFlow, EmrAutosave, SpecialtyContext, SignPrints, { provide: EMR_COMPONENT_CONTEXT, useExisting: EmrRecordStore }],
   styleUrl: './emr-record.page.scss',
+  host: { '[style]': 'accent()' },
   templateUrl: './emr-record.page.html',
 })
 export class EmrRecordPage implements OnInit {
@@ -111,6 +112,8 @@ export class EmrRecordPage implements OnInit {
   protected readonly flow = inject(EmrFinishFlow);
   private readonly autosave = inject(EmrAutosave);
   private readonly paperPanel = viewChild(CasePaperPanelComponent);
+  private readonly specialtyCtx = inject(SpecialtyContext);
+  private readonly pendingFooterPrint = signal<'handler' | 'paper' | null>(null);
 
   protected readonly stageNote = signal<string | null>(null);
   private readonly hadPrevious: boolean;
@@ -118,11 +121,16 @@ export class EmrRecordPage implements OnInit {
 
   protected readonly partLabel = PART_LABEL;
   /** Quick tools (visit templates, trend) are drawn on the General Medicine screen (ADR-023 D1). */
-  protected readonly rightTabs = computed(() => (this.store.profile() && PROFILE_CHROME[this.store.profile()!].quickTools ? [...RIGHT_TABS, TOOLS_TAB] : RIGHT_TABS));
-  protected readonly chrome = computed(() => (this.store.profile() ? PROFILE_CHROME[this.store.profile()!] : null));
-  protected readonly finishLabel = computed(() => this.chrome()?.finishLabel ?? 'Complete visit');
+  protected readonly chrome = computed(() => chromeOf(this.store.profile()));
+  protected readonly rightTabs = computed(() => (this.chrome().quickTools ? [...RIGHT_TABS, TOOLS_TAB] : RIGHT_TABS));
+  protected readonly finishLabel = computed(() => this.chrome().finishLabel);
+  /** Department accent (BR75-10) as the colour variables the EMR page and its panels use; none for other departments. */
+  protected readonly accent = computed(() => accentVars(this.chrome().accent));
+  protected readonly printLabel = computed(() => this.chrome().printLabel?.(this.store.visitMode()) ?? null);
   /** A card after the last Assessment section (the oncology decision); loaded when the profile has one. */
   protected readonly assessmentExtra = signal<Type<unknown> | null>(null);
+  /** A bar above the Assessment cards (the oncology "Assessment steps", SAH-75-11 O-4). */
+  protected readonly assessmentTop = signal<Type<unknown> | null>(null);
   protected readonly parts: readonly EmrPart[] = ['ASSESSMENT', 'TREATMENT'];
 
   protected readonly record = this.store.record;
@@ -170,13 +178,65 @@ export class EmrRecordPage implements OnInit {
     const reason = this.store.record()?.readOnlyReason;
     return reason ? READ_ONLY_TEXT[reason] : null;
   });
-  protected readonly isGeneralMedicine = computed(() => this.store.record()?.layout.starterKey === 'gm');
-  protected readonly currentSections = computed(() => this.store.sectionsOf(this.store.part()));
+  /** Sections whose cards sit in the Quick tools tab instead of the left column (P5, P-5). */
+  private readonly toolKeys = computed(() => new Set(this.chrome().quickTools?.sectionKeys ?? []));
+  /** With part tabs: the open part. Without (Gynae, Paediatrics, Physiotherapy): every section in published order. */
+  protected readonly currentSections = computed(() => {
+    const moved = this.toolKeys();
+    const list = this.chrome().partTabs ? this.store.sectionsOf(this.store.part()) : this.store.visibleLayout();
+    return moved.size === 0 ? list : list.filter((s) => !moved.has(s.key));
+  });
+  /** Obstetrics: the ANC and Gynae editors draw only their main part while the Quick tools tab holds the rest. */
+  /** Paediatrics: Growth and Milestones sit side by side when both are in this part (SAH-75-11 P4). */
+  protected isHalf(section: { key: string }): boolean {
+    if (this.store.profile() !== 'paeds' || (section.key !== 'growth' && section.key !== 'milestones')) {
+      return false;
+    }
+    const keys = this.currentSections().map((s) => s.key);
+    return keys.includes('growth') && keys.includes('milestones');
+  }
+
+  protected areaOf(section: { key: string }): 'main' | null {
+    return this.chrome().quickTools?.kind === 'og' && (section.key === 'anc' || section.key === 'gyn_exam') ? 'main' : null;
+  }
+  /**
+   * The course panel (SAH-75-3): the section it sits above or below; at the end of the Treatment part when the
+   * layout does not show its "before" section. Null when the department has none or the mode hides it.
+   */
+  private readonly panelPlace = computed<{ before: string | null; after: string | null; atEnd: boolean } | null>(() => {
+    const spec = this.chrome().coursePanel;
+    if (!spec || (spec.mode && this.store.visitMode() !== spec.mode)) {
+      return null;
+    }
+    const keys = new Set(this.currentSections().map((s) => s.key));
+    if (spec.after) {
+      return keys.has(spec.after) ? { before: null, after: spec.after, atEnd: false } : null;
+    }
+    if (spec.before && keys.has(spec.before)) {
+      return { before: spec.before, after: null, atEnd: false };
+    }
+    const atEnd = !this.chrome().partTabs || this.store.part() === 'TREATMENT';
+    return atEnd ? { before: null, after: null, atEnd: true } : null;
+  });
+  protected readonly panelKind = computed(() => this.chrome().coursePanel?.kind ?? null);
+  protected panelBefore(key: string): boolean {
+    return this.panelPlace()?.before === key;
+  }
+  protected panelAfter(key: string): boolean {
+    return this.panelPlace()?.after === key;
+  }
+  protected readonly panelAtEnd = computed(() => this.panelPlace()?.atEnd === true);
+
+  protected titleOf(section: { key: string; name: string }): string {
+    const title = this.chrome().cardTitles?.[section.key] ?? section.name;
+    const number = cardNumber(this.chrome().numberedCards, this.currentSections().map((s) => s.key), section.key);
+    return number === null ? title : `${number} · ${title}`;
+  }
   protected readonly specialty = computed(() => this.store.record()?.layout.starterKey ?? null);
   protected readonly footerTone = computed(() => (this.store.ready() ? 'good' : 'crit'));
   protected readonly paperSubtitle = this.store.paperSubtitle;
 
-  /** "From assessment:" in Treatment: the complaints, then the other assessment sections that are done. */
+  /** "From assessment:" in Treatment: General Medicine has its own sentence (G10); others the complaints, then the sections done. */
   protected readonly recap = computed(() => {
     const complaints = this.store.values()['complaints'];
     const texts: string[] = [];
@@ -185,11 +245,47 @@ export class EmrRecordPage implements OnInit {
         if (Array.isArray(value)) {
           for (const entry of value) {
             if (typeof entry === 'object' && entry !== null && 'text' in entry) {
-              texts.push(String((entry as { text: unknown }).text));
+              const e = entry as { text: unknown; attr1?: unknown };
+              const duration = typeof e.attr1 === 'string' && e.attr1.trim() !== '' ? ` (${e.attr1.trim()})` : '';
+              texts.push(`${String(e.text)}${duration}`);
             }
           }
         }
       }
+    }
+    if (this.store.profile() === 'gm') {
+      const vitals = specialtyOf(this.store.values()['vitals']);
+      const last = vitals?.component === 'VITALS_LOG' ? (vitals.entries[vitals.entries.length - 1] ?? null) : null;
+      const map = this.store.values()['local_exam']?.['body_map'];
+      const pins = isComponentValue(map) && map.component === 'BODY_MAP' ? map.pins : [];
+      return gmRecap({
+        complaints: texts,
+        bp: last?.bpSystolic != null && last.bpDiastolic != null ? `${last.bpSystolic}/${last.bpDiastolic}` : null,
+        pulse: last?.pulse ?? null,
+        pins,
+      });
+    }
+    if (this.store.profile() === 'surgery') {
+      const keyOf = (component: string): string | undefined => this.store.layout().find((x) => x.specialtyEditor?.component === component)?.key;
+      const exam = specialtyOf(this.store.values()[keyOf('SURGICAL_EXAM') ?? '']);
+      const fit = specialtyOf(this.store.values()[keyOf('SURGERY_FITNESS') ?? '']);
+      const fitness = fit?.component === 'SURGERY_FITNESS' ? fit : null;
+      return surgeryRecap({
+        complaints: texts,
+        murphy: exam?.component === 'SURGICAL_EXAM' ? (exam.murphySign ?? null) : null,
+        asa: fitness?.asa ?? null,
+        fitness: fitnessOf(fitness).text,
+      });
+    }
+    if (this.store.profile() === 'dental') {
+      const med = specialtyOf(this.store.values()['dental_medhx']);
+      const habits = this.store.values()['dental_hx']?.['habits'];
+      const score = this.store.values()['dental_pain']?.['score'];
+      return dentalRecap(
+        texts,
+        typeof score === 'string' && /^o\d+$/.test(score) ? score.slice(1) : null,
+        medicalAlerts(med?.component === 'DENTAL_MED_HISTORY' ? med : null, Array.isArray(habits) ? (habits as string[]) : []),
+      );
     }
     const done = this.store
       .sectionsOf('ASSESSMENT')
@@ -237,9 +333,29 @@ export class EmrRecordPage implements OnInit {
       }
     });
     effect(() => {
-      const loader = this.chrome()?.assessmentExtra;
+      const pending = this.pendingFooterPrint();
+      const handler = this.specialtyCtx.footerPrintHandler();
+      const panel = this.paperPanel();
+      if (pending === 'handler' && handler) {
+        untracked(() => {
+          this.pendingFooterPrint.set(null);
+          handler();
+        });
+      } else if (pending === 'paper' && panel) {
+        untracked(() => {
+          this.pendingFooterPrint.set(null);
+          panel.printNow();
+        });
+      }
+    });
+    effect(() => {
+      const loader = this.chrome().assessmentExtra;
       if (loader) {
         void loader().then((type) => this.assessmentExtra.set(type));
+      }
+      const top = this.chrome().assessmentTop;
+      if (top) {
+        void top().then((type) => this.assessmentTop.set(type));
       }
     });
   }
@@ -253,12 +369,54 @@ export class EmrRecordPage implements OnInit {
   }
 
   protected tabSubtitleOf(tab: { id: RightTab }): string {
-    return tab.id === 'history' ? 'OPD + IPD' : tab.id === 'paper' ? this.paperSubtitle() : 'Helpers for this visit';
+    return tab.id === 'paper' ? this.paperSubtitle() : RIGHT_TAB_SUBTITLE[tab.id];
   }
 
   protected tabSubtitle(part: EmrPart): string {
-    return this.isGeneralMedicine() ? GM_SUBTITLE[part] : PART_HEAD[part].sub;
+    return this.chrome().partSubtitles?.[part] ?? PART_HEAD[part].sub;
   }
+
+  /** "n of m required" (or "n of m done" in oncology) and whether the part is complete (a tick). */
+  protected badgeOf(part: EmrPart): { text: string; full: boolean } {
+    const chrome = this.chrome();
+    const progress = this.progressOf(part);
+    const counts =
+      chrome.badgeWord === 'done'
+        ? oncoCounts(part, this.store.visibleLayout(), this.store.footerItems())
+        : { done: progress?.requiredDone ?? 0, total: progress?.requiredTotal ?? 0 };
+    return { text: badgeText(chrome.badgeWord, counts), full: badgeFull(counts) };
+  }
+
+  /** The nav group count "n/m": the required sections of the part that are done. */
+  protected navCountsOf(part: EmrPart): { done: number; total: number } {
+    const progress = this.progressOf(part);
+    return { done: progress?.requiredDone ?? 0, total: progress?.requiredTotal ?? 0 };
+  }
+
+  private readonly requiredTotals = computed(() => {
+    const all = this.store.progress();
+    return { done: all.reduce((n, p) => n + p.requiredDone, 0), total: all.reduce((n, p) => n + p.requiredTotal, 0) };
+  });
+  protected readonly requiredLine = computed(() => `${this.requiredTotals().done} of ${this.requiredTotals().total} required done`);
+  protected readonly requiredAllDone = computed(() => this.requiredTotals().done >= this.requiredTotals().total);
+  protected readonly requiredPct = computed(() => (this.requiredTotals().total === 0 ? 100 : (100 * this.requiredTotals().done) / this.requiredTotals().total));
+
+  /** The dark bar under Assessment: what is still needed, or what comes next (mockup aFooter). */
+  protected readonly assessmentLine = computed(() => {
+    const needed = new Set(this.store.needed());
+    const missing = this.store
+      .sectionsOf('ASSESSMENT')
+      .filter((s) => needed.has(s.key))
+      .map((s) => (this.chrome().neededWords?.[s.key] ?? this.titleOf(s)).toLowerCase());
+    const complaints = this.store.stateOf('complaints');
+    return assessmentBar({
+      profile: this.store.profile(),
+      missing,
+      done: this.store.progress()[0].complete,
+      hasComplaints: complaints ? complaints.done : true,
+      view: this.store.specialtyView(),
+    });
+  });
 
   protected progressOf(part: EmrPart) {
     return this.store.progress().find((p) => p.part === part);
@@ -266,6 +424,30 @@ export class EmrRecordPage implements OnInit {
 
   protected navStates(part: EmrPart) {
     return this.store.sectionsOf(part).map((section) => ({ section, state: this.store.stateOf(section.key) }));
+  }
+
+  /**
+   * The footer print button (Print estimate, Print ANC card, Print vaccination card, Progress report, Print Rx):
+   * runs the print of the card that owns it; when that card is not on screen yet its part or tab opens first.
+   */
+  protected footerPrint(): void {
+    const handler = this.specialtyCtx.footerPrintHandler();
+    if (handler) {
+      handler();
+      return;
+    }
+    const profile = this.store.profile();
+    if (profile === 'og' && this.store.visitMode() === 'GYNAE') {
+      this.store.rightTab.set('paper');
+      this.pendingFooterPrint.set('paper');
+      return;
+    }
+    if (profile === 'dental') {
+      this.store.setPart('TREATMENT');
+    } else if (profile === 'physio') {
+      this.store.rightTab.set('tools');
+    }
+    this.pendingFooterPrint.set('handler');
   }
 
   protected setRightTab(tab: RightTab): void {

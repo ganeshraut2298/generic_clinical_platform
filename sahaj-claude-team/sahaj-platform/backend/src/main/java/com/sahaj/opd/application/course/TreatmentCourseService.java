@@ -7,6 +7,10 @@ import com.sahaj.opd.api.TreatmentCoursePort.SittingFacts;
 import com.sahaj.opd.application.VisitRepository;
 import com.sahaj.opd.application.VisitRepository.VisitRow;
 import com.sahaj.opd.application.course.CourseInputs.AddSittingInput;
+import com.sahaj.opd.application.course.CourseInputs.AdmissionRequestInput;
+import com.sahaj.opd.application.course.CourseInputs.DateInput;
+import com.sahaj.opd.application.course.CourseInputs.MarkDoneInput;
+import com.sahaj.opd.application.course.CourseInputs.RevisionInput;
 import com.sahaj.opd.application.course.CourseInputs.ChangeSittingInput;
 import com.sahaj.opd.application.course.CourseInputs.CreateInput;
 import com.sahaj.opd.application.course.CourseInputs.LinkVisitInput;
@@ -29,8 +33,10 @@ import com.sahaj.opd.application.emr.EmrRecordRepository;
 import com.sahaj.opd.application.emr.EmrRecordService;
 import com.sahaj.opd.application.emr.EmrRecordService.Authorized;
 import com.sahaj.opd.application.emr.specialty.DentalCoursePlanner;
+import com.sahaj.opd.application.emr.specialty.SpecialtyReferenceRepository;
 import com.sahaj.platform.api.AuditLog;
 import com.sahaj.platform.api.ClinicUser;
+import com.sahaj.platform.api.ConflictException;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
 import com.sahaj.platform.api.ModuleEntitlementPort;
@@ -46,6 +52,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -69,11 +76,13 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Who: reads are for OWNER, DOCTOR, VISITING_DOCTOR, FRONT_DESK and BILLING (the controller and this class both check);
  * create, add, change and link need {@code clinic.consultation.write} and, for an existing course, the course's own doctor
- * or an owner with doctor details (403 not-own-patient). A sitting's status is computed on every read, never stored: DONE
- * when its visit's record is signed (SAH-51) or its admission is discharged, TODAY when its visit was made today or its
- * admission is still admitted, else PLANNED. Adds, changes and links run under the course row lock, so two adds at once
- * are both kept and numbered in order; the same Idempotency-Key makes one change. Audits carry ids, dates, kinds and money
- * only: never the items or notes. This class never logs.
+ * or an owner with doctor details (403 not-own-patient). A sitting's status is computed on every read, never stored
+ * ({@link SittingStatuses}, ADR-026 D4): REMOVED (not returned), DONE (marked done, its visit signed or its admission
+ * discharged), MISSED, TODAY or PLANNED. Adds, changes, links and the six actions of SAH-75-10 (mark done, patient did
+ * not come, rebook, reschedule, remove, admission request) run under the course row lock, so two adds at once are both
+ * kept and numbered in order; the same Idempotency-Key makes one change. The number shown ({@code displayNo}) is the rank
+ * among the sittings not removed; {@code sittingNo} stays the stable key. Audits carry ids, dates, kinds, status words
+ * and money only: never the items or notes. This class never logs.
  */
 @Service
 public class TreatmentCourseService {
@@ -85,6 +94,7 @@ public class TreatmentCourseService {
     private static final Set<String> ADMIT_ROLES = Set.of("OWNER", "FRONT_DESK");
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("^[A-Za-z0-9_-]{8,64}$");
     private static final Pattern HTML = Pattern.compile("<[a-zA-Z/!]");
+    private static final Pattern REGIMEN_KEY = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
     private static final long MAX_CHARGE = 10_000_000_000L;
     private static final int MAX_SITTINGS = 50;
     private static final int MAX_LIST = 200;
@@ -101,13 +111,25 @@ public class TreatmentCourseService {
     private final Clock clock;
     /** ADR-023 D7: builds the sittings of a dental course from the record's plan; null in a plain unit test. */
     private final DentalCoursePlanner planner;
+    /** ADR-026 D7: the chemotherapy protocol library a sitting's regimen key is checked against; null in a plain test. */
+    private final SpecialtyReferenceRepository reference;
 
     public TreatmentCourseService(EmrAccess access, EmrRecordService records, TreatmentCourseRepository courses,
                                   VisitRepository visits, EmrRecordRepository emrRecords, TeamMemberPort team,
                                   ModuleEntitlementPort entitlements,
                                   ObjectProvider<CourseAdmissionSource> admissionSource, AuditLog auditLog,
                                   Clock clock) {
-        this(access, records, courses, visits, emrRecords, team, entitlements, admissionSource, auditLog, clock, null);
+        this(access, records, courses, visits, emrRecords, team, entitlements, admissionSource, auditLog, clock, null,
+                null);
+    }
+
+    public TreatmentCourseService(EmrAccess access, EmrRecordService records, TreatmentCourseRepository courses,
+                                  VisitRepository visits, EmrRecordRepository emrRecords, TeamMemberPort team,
+                                  ModuleEntitlementPort entitlements,
+                                  ObjectProvider<CourseAdmissionSource> admissionSource, AuditLog auditLog,
+                                  Clock clock, DentalCoursePlanner planner) {
+        this(access, records, courses, visits, emrRecords, team, entitlements, admissionSource, auditLog, clock,
+                planner, null);
     }
 
     @Autowired
@@ -115,8 +137,9 @@ public class TreatmentCourseService {
                                   VisitRepository visits, EmrRecordRepository emrRecords, TeamMemberPort team,
                                   ModuleEntitlementPort entitlements,
                                   ObjectProvider<CourseAdmissionSource> admissionSource, AuditLog auditLog,
-                                  Clock clock, DentalCoursePlanner planner) {
+                                  Clock clock, DentalCoursePlanner planner, SpecialtyReferenceRepository reference) {
         this.planner = planner;
+        this.reference = reference;
         this.access = access;
         this.records = records;
         this.courses = courses;
@@ -133,12 +156,26 @@ public class TreatmentCourseService {
 
     @Transactional(readOnly = true)
     public List<SummaryView> list(ClinicUser user, UUID patientId) {
+        return list(user, patientId, null);
+    }
+
+    /** 0.7.0 (ADR-026 D3): the optional {@code kind} filter of the embedded panel; newest ACTIVE course first. */
+    @Transactional(readOnly = true)
+    public List<SummaryView> list(ClinicUser user, UUID patientId, String kind) {
         requireRead(user);
         if (patientId == null) {
             throw invalid("patientId", "Choose a patient.");
         }
+        if (kind != null && CourseKinds.kind(kind).isEmpty()) {
+            throw invalid("kind", "Choose the kind of course.");
+        }
         UUID tenantId = user.tenantId();
-        List<CourseRow> rows = courses.forPatient(tenantId, patientId, MAX_LIST);
+        List<CourseRow> rows = new ArrayList<>(courses.forPatient(tenantId, patientId, MAX_LIST));
+        if (kind != null) {
+            rows.removeIf(row -> !kind.equals(row.kind()));
+        }
+        // The repository answers newest first; a stable sort puts ACTIVE ones ahead and keeps that order.
+        rows.sort(Comparator.comparing((CourseRow row) -> "ACTIVE".equals(row.status()) ? 0 : 1));
         Map<UUID, List<SittingRow>> sittings = group(courses.sittingsOf(tenantId, ids(rows)));
         List<SummaryView> result = new ArrayList<>();
         for (CourseRow row : rows) {
@@ -193,7 +230,7 @@ public class TreatmentCourseService {
                 new NewCourse(courseNo, authorized.patientId(), kind.kind(), kind.unit(),
                         valid.name == null ? kind.defaultName() : valid.name, valid.note, member.membershipId(),
                         LocalDate.now(clock.withZone(INDIA)), authorized.row().id(), authorized.row().createdAt(),
-                        idempotencyKey, hash), user.userId());
+                        idempotencyKey, hash, valid.estimateSigned), user.userId());
         if (fromPlan) {
             planner.linkCourse(tenantId, user.userId(), authorized.row(), courseId, member.membershipId(),
                     clock.instant());
@@ -205,7 +242,7 @@ public class TreatmentCourseService {
             String note = plan.note == null && CourseKinds.isAdmission(encounter)
                     ? CourseKinds.ADMISSION_REQUEST_NOTE : plan.note;
             courses.insertSitting(tenantId, new NewSitting(courseId, number++, encounter, plan.option.storedKey(),
-                    plan.plannedDate, plan.items, plan.chargePaise, note, null, null), user.userId());
+                    plan.plannedDate, plan.items, plan.chargePaise, note, null, null, plan.regimenKey), user.userId());
             estimate += plan.chargePaise;
         }
         Map<String, Object> after = new LinkedHashMap<>();
@@ -250,12 +287,25 @@ public class TreatmentCourseService {
         if (existing.size() >= MAX_SITTINGS) {
             throw invalid("addOptionKey", "A course can have at most 50 entries.");
         }
+        List<FieldMessage> regimenErrors = new ArrayList<>();
+        String regimen = cleanRegimen("regimenKey", course.kind(), input.regimenKey(), regimenErrors);
+        if (!regimenErrors.isEmpty()) {
+            throw new InvalidFieldsException(regimenErrors);
+        }
+        if (regimen == null && "CHEMO_CYCLE".equals(option.storedKey())) {
+            // ADR-026 D7: a new chemotherapy cycle takes the regimen of the previous cycle.
+            for (SittingRow earlierCycle : existing) {
+                if ("CHEMO_CYCLE".equals(earlierCycle.addOptionKey()) && earlierCycle.regimenKey() != null) {
+                    regimen = earlierCycle.regimenKey();
+                }
+            }
+        }
         boolean admission = CourseKinds.isAdmission(option.encounterKind());
         long charge = admission || existing.isEmpty() ? 0 : existing.get(existing.size() - 1).chargePaise();
         int number = courses.nextSittingNo(tenantId, courseId);
         courses.insertSitting(tenantId, new NewSitting(courseId, number, option.encounterKind(), option.storedKey(),
                 input.plannedDate(), List.of(), charge, admission ? CourseKinds.ADMISSION_REQUEST_NOTE : null,
-                idempotencyKey, hash), user.userId());
+                idempotencyKey, hash, regimen), user.userId());
         courses.bumpRevision(tenantId, courseId, user.userId());
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("sittingNo", number);
@@ -273,13 +323,17 @@ public class TreatmentCourseService {
         CourseRow course = courses.findForUpdate(tenantId, courseId).orElseThrow(TreatmentCourseService::courseNotFound);
         requireCourseDoctor(user, member, course);
         SittingRow sitting = sittingOf(tenantId, courseId, sittingId);
-        SittingChange change = validateChange(input);
+        SittingChange change = validateChange(input, course.kind());
         requireRevision(course, input.revision());
         Computed computed = compute(tenantId, List.of(sitting));
         String status = computed.status(sitting);
         if ("DONE".equals(status)) {
             throw EmrProblemException.of(409, "sitting-done", "This entry is done",
                     "This entry is done and can no longer be changed.");
+        }
+        if ("MISSED".equals(status)) {
+            throw EmrProblemException.of(409, "sitting-not-available", "Entry not available",
+                    "This entry was missed. Rebook it first.");
         }
         boolean kindChanged = !change.encounterKind().equals(sitting.encounterKind());
         if (kindChanged && (sitting.opdVisitId() != null || sitting.admissionId() != null)) {
@@ -331,7 +385,7 @@ public class TreatmentCourseService {
                     "This visit is already linked to an entry of a course.");
         }
         if (!"OPD".equals(sitting.encounterKind()) || sitting.opdVisitId() != null || sitting.admissionId() != null
-                || !"PLANNED".equals(compute(tenantId, List.of(sitting)).status(sitting))) {
+                || !isLinkable(compute(tenantId, List.of(sitting)).status(sitting))) {
             throw sittingNotAvailable();
         }
         courses.linkVisit(tenantId, sittingId, visit.id(), user.userId());
@@ -354,7 +408,8 @@ public class TreatmentCourseService {
                 CourseAdmission admission = s.admissionId() == null ? null : computed.admissions.get(s.admissionId());
                 sittings.add(new SittingFacts(s.id(), s.sittingNo(), s.encounterKind(), s.plannedDate(),
                         s.chargePaise(), s.note(), computed.status(s), s.opdVisitId(), s.admissionId(),
-                        admission == null ? null : admission.ipNumber(), s.admissionId() != null, computed.doneAt(s)));
+                        admission == null ? null : admission.ipNumber(), s.admissionId() != null, computed.doneAt(s),
+                        computed.displayNo(s)));
             }
             return new CourseFacts(row.id(), courseNo(row.courseNo()), row.patientId(), row.kind(), row.unit(),
                     row.name(), row.doctorMembershipId(), List.copyOf(sittings));
@@ -379,7 +434,7 @@ public class TreatmentCourseService {
         Optional<CourseRow> course = courses.find(tenantId, sitting.courseId());
         if (course.isEmpty() || !"ACTIVE".equals(course.get().status()) || !course.get().patientId().equals(patientId)
                 || !CourseKinds.isAdmission(sitting.encounterKind()) || sitting.admissionId() != null
-                || sitting.doneAt() != null) {
+                || sitting.doneAt() != null || sitting.removedAt() != null || sitting.missedAt() != null) {
             return Optional.empty();
         }
         return Optional.of(new com.sahaj.opd.api.TreatmentCoursePort.AdmittableSitting(course.get().id(),
@@ -402,16 +457,248 @@ public class TreatmentCourseService {
         return out;
     }
 
+    /**
+     * Links the admission to the sitting (ADR-022 D12). 0.7.0 (ADR-026 D4): a sitting that was removed, missed or is
+     * already done is refused with 409 course-sitting-not-available (ipd answers it as it answers a sitting that is not
+     * admittable) and nothing is written.
+     */
     @Transactional
     public void linkAdmission(UUID tenantId, UUID actorUserId, UUID sittingId, UUID admissionId) {
         SittingRow sitting = courses.sittingForUpdate(tenantId, sittingId)
                 .orElseThrow(() -> new IllegalStateException("The course sitting to link was not found"));
+        if (sitting.removedAt() != null || sitting.missedAt() != null || sitting.doneAt() != null) {
+            throw new ConflictException("course-sitting-not-available", "Course entry not available",
+                    "This entry of the treatment course cannot be admitted now.");
+        }
         courses.linkAdmission(tenantId, sittingId, admissionId, actorUserId);
         courses.bumpRevision(tenantId, sitting.courseId(), actorUserId);
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("sittingNo", sitting.sittingNo());
         after.put("admissionId", admissionId);
         auditLog.record("COURSE_SITTING_ADMISSION_LINKED", ENTITY, sitting.courseId(), null, after);
+    }
+
+    // ---- the six sitting actions (SAH-75-10, ADR-026 D4) ----
+
+    /** "Mark <unit> done": TODAY to DONE; the sitting's charge is counted by billing from the DONE state. */
+    @Transactional
+    public CourseView markDone(ClinicUser user, UUID courseId, UUID sittingId, MarkDoneInput input) {
+        Long revision = input == null ? null : input.revision();
+        Locked locked = lockForAction(user, courseId, sittingId, revision);
+        UUID tenantId = user.tenantId();
+        locked.requireNotDone();
+        if (!"TODAY".equals(locked.status)) {
+            throw sittingNotAvailable();
+        }
+        SittingRow sitting = locked.sitting;
+        UUID linkedVisit = null;
+        if (input.visitId() != null && sitting.opdVisitId() == null && sitting.admissionId() == null) {
+            VisitRow visit = visits.findById(tenantId, input.visitId())
+                    .filter(v -> v.patientId().equals(locked.course.patientId()))
+                    .orElseThrow(EmrProblemException::encounterNotFound);
+            if (courses.sittingByVisit(tenantId, visit.id()).isPresent()) {
+                throw EmrProblemException.of(409, "visit-already-linked", "Visit already linked",
+                        "This visit is already linked to an entry of a course.");
+            }
+            courses.linkVisit(tenantId, sitting.id(), visit.id(), user.userId());
+            linkedVisit = visit.id();
+        }
+        courses.markDoneByHand(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId());
+        courses.bumpRevision(tenantId, courseId, user.userId());
+        if (linkedVisit != null) {
+            Map<String, Object> linked = new LinkedHashMap<>();
+            linked.put("sittingNo", sitting.sittingNo());
+            linked.put("visitId", linkedVisit);
+            auditLog.record("COURSE_SITTING_VISIT_LINKED", ENTITY, courseId, null, linked);
+        }
+        audit("COURSE_SITTING_MARKED_DONE", courseId, locked, "DONE", sitting.plannedDate(), sitting.plannedDate(),
+                sitting.encounterKind(), sitting.encounterKind());
+        return view(user, courses.find(tenantId, courseId).orElseThrow());
+    }
+
+    /** "Patient did not come": TODAY without a link to MISSED; no charge. */
+    @Transactional
+    public CourseView markMissed(ClinicUser user, UUID courseId, UUID sittingId, RevisionInput input) {
+        Locked locked = lockForAction(user, courseId, sittingId, input == null ? null : input.revision());
+        UUID tenantId = user.tenantId();
+        locked.requireNotDone();
+        SittingRow sitting = locked.sitting;
+        if (!"TODAY".equals(locked.status) || sitting.opdVisitId() != null || sitting.admissionId() != null) {
+            throw sittingNotAvailable();
+        }
+        courses.markMissed(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId());
+        courses.bumpRevision(tenantId, courseId, user.userId());
+        audit("COURSE_SITTING_MISSED", courseId, locked, "MISSED", sitting.plannedDate(), sitting.plannedDate(),
+                sitting.encounterKind(), sitting.encounterKind());
+        return view(user, courses.find(tenantId, courseId).orElseThrow());
+    }
+
+    /** "Rebook": MISSED to PLANNED (TODAY when the new date is today, OPD). */
+    @Transactional
+    public CourseView rebook(ClinicUser user, UUID courseId, UUID sittingId, DateInput input) {
+        LocalDate date = requireDate(input);
+        Locked locked = lockForAction(user, courseId, sittingId, input.revision());
+        UUID tenantId = user.tenantId();
+        locked.requireNotDone();
+        SittingRow sitting = locked.sitting;
+        if (!"MISSED".equals(locked.status)) {
+            throw sittingNotAvailable();
+        }
+        courses.rebook(tenantId, sitting.id(), date, user.userId());
+        courses.bumpRevision(tenantId, courseId, user.userId());
+        audit("COURSE_SITTING_REBOOKED", courseId, locked, plannedOrToday(sitting, date), sitting.plannedDate(), date,
+                sitting.encounterKind(), sitting.encounterKind());
+        return view(user, courses.find(tenantId, courseId).orElseThrow());
+    }
+
+    /** "Reschedule": the planned date of a PLANNED sitting. */
+    @Transactional
+    public CourseView reschedule(ClinicUser user, UUID courseId, UUID sittingId, DateInput input) {
+        LocalDate date = requireDate(input);
+        Locked locked = lockForAction(user, courseId, sittingId, input.revision());
+        UUID tenantId = user.tenantId();
+        locked.requireNotDone();
+        SittingRow sitting = locked.sitting;
+        if (!"PLANNED".equals(locked.status)) {
+            throw sittingNotAvailable();
+        }
+        courses.reschedule(tenantId, sitting.id(), date, user.userId());
+        courses.bumpRevision(tenantId, courseId, user.userId());
+        audit("COURSE_SITTING_RESCHEDULED", courseId, locked, plannedOrToday(sitting, date), sitting.plannedDate(),
+                date, sitting.encounterKind(), sitting.encounterKind());
+        return view(user, courses.find(tenantId, courseId).orElseThrow());
+    }
+
+    /**
+     * "Remove": PLANNED only. A sitting linked to a visit is refused (409 sitting-not-available): the visit's sign would
+     * mark it done (tech-lead decision on the removed/done exclusion, docs/database/SAH-75.md).
+     */
+    @Transactional
+    public CourseView remove(ClinicUser user, UUID courseId, UUID sittingId, RevisionInput input) {
+        Locked locked = lockForAction(user, courseId, sittingId, input == null ? null : input.revision());
+        UUID tenantId = user.tenantId();
+        locked.requireNotDone();
+        SittingRow sitting = locked.sitting;
+        if (!"PLANNED".equals(locked.status) || sitting.opdVisitId() != null || sitting.admissionId() != null) {
+            throw sittingNotAvailable();
+        }
+        courses.remove(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId());
+        courses.bumpRevision(tenantId, courseId, user.userId());
+        audit("COURSE_SITTING_REMOVED", courseId, locked, "REMOVED", sitting.plannedDate(), sitting.plannedDate(),
+                sitting.encounterKind(), sitting.encounterKind());
+        return view(user, courses.find(tenantId, courseId).orElseThrow());
+    }
+
+    /**
+     * "Move to day care / IPD" (an OPD sitting) and "Request admission" (a planned day-care or IPD sitting). The request
+     * reaches ipd through {@code TreatmentCoursePort.openAdmissionSittings}; opd never calls ipd. Asking again for a
+     * sitting that is already requested answers the course and writes nothing.
+     */
+    @Transactional
+    public CourseView requestAdmission(ClinicUser user, UUID courseId, UUID sittingId, AdmissionRequestInput input) {
+        String chosen = input == null || input.encounterKind() == null ? CourseKinds.ENCOUNTER_DAY_CARE
+                : input.encounterKind();
+        if (!CourseKinds.isAdmission(chosen)) {
+            throw invalid("encounterKind", "Choose day care or IPD.");
+        }
+        Locked locked = lockForAction(user, courseId, sittingId, input == null ? null : input.revision());
+        UUID tenantId = user.tenantId();
+        locked.requireNotDone();
+        if (ipdOff(tenantId)) {
+            throw moduleOff();
+        }
+        SittingRow sitting = locked.sitting;
+        if (!"PLANNED".equals(locked.status) || sitting.opdVisitId() != null || sitting.admissionId() != null) {
+            throw sittingNotAvailable();
+        }
+        boolean admissionKind = CourseKinds.isAdmission(sitting.encounterKind());
+        if (admissionKind && sitting.admissionRequested()) {
+            return view(user, locked.course);
+        }
+        String kindAfter = admissionKind ? sitting.encounterKind() : chosen;
+        courses.requestAdmission(tenantId, sitting.id(), kindAfter, user.userId());
+        courses.bumpRevision(tenantId, courseId, user.userId());
+        audit("COURSE_SITTING_ADMISSION_REQUESTED", courseId, locked, "PLANNED", sitting.plannedDate(),
+                sitting.plannedDate(), sitting.encounterKind(), kindAfter);
+        return view(user, courses.find(tenantId, courseId).orElseThrow());
+    }
+
+    /** The course, the sitting and its status, read under the course row lock after the role, 404 and revision checks. */
+    private final class Locked {
+        final TeamMember member;
+        final CourseRow course;
+        final SittingRow sitting;
+        final String status;
+        final int displayNo;
+
+        Locked(TeamMember member, CourseRow course, SittingRow sitting, String status, int displayNo) {
+            this.member = member;
+            this.course = course;
+            this.sitting = sitting;
+            this.status = status;
+            this.displayNo = displayNo;
+        }
+
+        /** A DONE sitting refuses every action: corrections are addenda on its visit. */
+        void requireNotDone() {
+            if ("DONE".equals(status)) {
+                throw EmrProblemException.of(409, "sitting-done", "This entry is done",
+                        "This entry is done and can no longer be changed.");
+            }
+        }
+    }
+
+    private Locked lockForAction(ClinicUser user, UUID courseId, UUID sittingId, Long revision) {
+        TeamMember member = access.requireConsultationWrite(user);
+        UUID tenantId = user.tenantId();
+        if (revision == null || revision < 0) {
+            throw invalid("revision", "Reload the page and try again.");
+        }
+        CourseRow course = courses.findForUpdate(tenantId, courseId).orElseThrow(TreatmentCourseService::courseNotFound);
+        requireCourseDoctor(user, member, course);
+        SittingRow sitting = sittingOf(tenantId, courseId, sittingId);
+        if (revision != course.revision()) {
+            throw EmrProblemException.of(409, "course-changed", "Course changed", "This sitting changed. Reload.");
+        }
+        Computed computed = compute(tenantId, courses.sittingsOf(tenantId, List.of(courseId)));
+        return new Locked(member, course, sitting, computed.status(sitting), computed.displayNo(sitting));
+    }
+
+    private LocalDate requireDate(DateInput input) {
+        if (input == null || input.plannedDate() == null) {
+            throw invalid("plannedDate", "Choose today or a later date.");
+        }
+        if (input.plannedDate().isBefore(LocalDate.now(clock.withZone(INDIA)))) {
+            throw invalid("plannedDate", "Choose today or a later date.");
+        }
+        return input.plannedDate();
+    }
+
+    /** TODAY when an unlinked OPD sitting is set to today, else PLANNED. */
+    private String plannedOrToday(SittingRow sitting, LocalDate date) {
+        boolean unlinked = sitting.opdVisitId() == null && sitting.admissionId() == null;
+        return unlinked && CourseKinds.ENCOUNTER_OPD.equals(sitting.encounterKind())
+                && date.equals(LocalDate.now(clock.withZone(INDIA))) ? "TODAY" : "PLANNED";
+    }
+
+    /** The audit of one action: ids, numbers, status words and dates only; never the items, notes or names. */
+    private void audit(String action, UUID courseId, Locked locked, String statusAfter, LocalDate dateBefore,
+                       LocalDate dateAfter, String kindBefore, String kindAfter) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("sittingId", locked.sitting.id());
+        values.put("sittingNo", locked.sitting.sittingNo());
+        values.put("displayNo", locked.displayNo);
+        values.put("statusBefore", locked.status);
+        values.put("statusAfter", statusAfter);
+        values.put("plannedDateBefore", dateBefore == null ? null : dateBefore.toString());
+        values.put("plannedDateAfter", dateAfter == null ? null : dateAfter.toString());
+        values.put("encounterKindBefore", kindBefore);
+        values.put("encounterKindAfter", kindAfter);
+        auditLog.record(action, ENTITY, courseId, null, values);
+    }
+
+    private static boolean isLinkable(String status) {
+        return "PLANNED".equals(status) || "TODAY".equals(status);
     }
 
     // ---- computing statuses ----
@@ -422,11 +709,16 @@ public class TreatmentCourseService {
         final Map<UUID, VisitRow> visitOf = new HashMap<>();
         final Map<UUID, EmrRecordRepository.RecordRow> recordOf = new HashMap<>();
         final Map<UUID, CourseAdmission> admissions = new HashMap<>();
+        private final Map<UUID, Integer> displayNos = new HashMap<>();
 
         Computed(UUID tenantId, List<SittingRow> sittings) {
             this.sittings = sittings;
             Set<UUID> admissionIds = new LinkedHashSet<>();
+            int rank = 0;
             for (SittingRow s : sittings) {
+                if (s.removedAt() == null) {
+                    displayNos.put(s.id(), ++rank);
+                }
                 if (s.opdVisitId() != null) {
                     visits.findById(tenantId, s.opdVisitId()).ifPresent(v -> visitOf.put(s.id(), v));
                     emrRecords.findOpd(tenantId, s.opdVisitId()).ifPresent(r -> recordOf.put(s.id(), r));
@@ -441,23 +733,19 @@ public class TreatmentCourseService {
             }
         }
 
+        /** The number shown: the 1-based rank among the non-removed sittings by sitting number (ADR-026 D4, H1). */
+        int displayNo(SittingRow s) {
+            return displayNos.getOrDefault(s.id(), s.sittingNo());
+        }
+
+        /**
+         * The status in the order of ADR-026 D4: REMOVED, DONE (done_at, a signed visit, a discharged admission),
+         * MISSED, TODAY (a linked visit made today, a linked admission not discharged, or an unlinked OPD sitting
+         * planned for today), else PLANNED.
+         */
         String status(SittingRow s) {
-            if (s.doneAt() != null) {
-                return "DONE";
-            }
-            EmrRecordRepository.RecordRow record = recordOf.get(s.id());
-            if (record != null && "SIGNED".equals(record.status())) {
-                return "DONE";
-            }
-            if (s.admissionId() != null) {
-                CourseAdmission admission = admissions.get(s.admissionId());
-                return admission != null && "DISCHARGED".equals(admission.status()) ? "DONE" : "TODAY";
-            }
-            VisitRow visit = visitOf.get(s.id());
-            if (visit != null && visit.createdAt().atZone(INDIA).toLocalDate().equals(LocalDate.now(clock.withZone(INDIA)))) {
-                return "TODAY";
-            }
-            return "PLANNED";
+            return SittingStatuses.status(s, LocalDate.now(clock.withZone(INDIA)), visitOf.get(s.id()),
+                    recordOf.get(s.id()), s.admissionId() == null ? null : admissions.get(s.admissionId()));
         }
 
         Instant doneAt(SittingRow s) {
@@ -477,19 +765,28 @@ public class TreatmentCourseService {
 
     private SummaryView summary(CourseRow row, Computed computed) {
         int done = (int) computed.sittings.stream().filter(s -> "DONE".equals(computed.status(s))).count();
+        int count = (int) computed.sittings.stream().filter(s -> s.removedAt() == null).count();
         return new SummaryView(row.id(), courseNo(row.courseNo()), row.kind(), row.unit(), row.name(),
-                row.startedOn(), row.status(), computed.sittings.size(), done);
+                row.startedOn(), row.status(), count, done);
+    }
+
+    /** Who is looking: the role, whether they may plan this course, and whether IPD is on. */
+    private record Caller(String role, boolean canPlan, boolean ipdOn) {
     }
 
     private CourseView view(ClinicUser user, CourseRow row) {
         UUID tenantId = user.tenantId();
         Computed computed = compute(tenantId, courses.sittingsOf(tenantId, List.of(row.id())));
-        List<SittingView> sittings = new ArrayList<>();
-        for (SittingRow s : computed.sittings) {
-            sittings.add(sittingView(row, s, computed));
-        }
         String ipd = entitlements.forTenant(tenantId).ipdState();
         boolean ipdOff = ipd == null || "off".equals(ipd);
+        boolean canPlan = canPlan(user, row);
+        Caller caller = new Caller(user.role(), canPlan, "trial".equals(ipd) || "on".equals(ipd));
+        List<SittingView> sittings = new ArrayList<>();
+        for (SittingRow s : computed.sittings) {
+            if (s.removedAt() == null) {
+                sittings.add(sittingView(row, s, computed, caller));
+            }
+        }
         List<AddOptionView> options = new ArrayList<>();
         for (AddOption option : CourseKinds.options(row.kind())) {
             if (!(ipdOff && CourseKinds.isAdmission(option.encounterKind()))) {
@@ -499,26 +796,73 @@ public class TreatmentCourseService {
         boolean canAdmit = ADMIT_ROLES.contains(user.role()) && ("trial".equals(ipd) || "on".equals(ipd));
         String doctorName = team.find(tenantId, row.doctorMembershipId()).map(TeamMember::name).orElse("Doctor");
         SummaryView s = summary(row, computed);
+        boolean legacySigned = row.note() != null && DentalCoursePlanner.SIGNED_NOTE.equalsIgnoreCase(row.note().strip());
         return new CourseView(row.id(), s.courseNo(), row.kind(), row.unit(), row.name(), row.startedOn(),
                 row.status(), s.sittingCount(), s.doneCount(), row.patientId(), row.doctorMembershipId(), doctorName,
-                row.note(), row.revision(), List.copyOf(sittings), List.copyOf(options), canPlan(user, row), canAdmit,
-                CourseKinds.ACCOUNT_NOTE);
+                row.note(), row.revision(), List.copyOf(sittings), List.copyOf(options),
+                canPlan, canAdmit, CourseKinds.ACCOUNT_NOTE, row.estimateSigned() || legacySigned);
     }
 
-    private SittingView sittingView(CourseRow course, SittingRow s, Computed computed) {
+    private SittingView sittingView(CourseRow course, SittingRow s, Computed computed, Caller caller) {
         CourseAdmission admission = s.admissionId() == null ? null : computed.admissions.get(s.admissionId());
         VisitRow visit = computed.visitOf.get(s.id());
         String ref = admission != null ? admission.ipNumber() : visit != null ? "Token " + visit.tokenNo() : null;
-        String label = CourseKinds.option(course.kind(), s.addOptionKey()).map(AddOption::label)
-                .orElse(switch (s.encounterKind()) {
-                    case "DAY_CARE" -> "Day care";
-                    case "IPD" -> "IPD";
-                    default -> "OPD";
-                });
+        String kindLabel = switch (s.encounterKind()) {
+            case "DAY_CARE" -> "Day care";
+            case "IPD" -> "IPD";
+            default -> "OPD";
+        };
+        // A sitting moved to day care or IPD no longer carries the label of the option it was added with.
+        String label = CourseKinds.option(course.kind(), s.addOptionKey())
+                .filter(o -> o.encounterKind().equals(s.encounterKind())).map(AddOption::label).orElse(kindLabel);
         boolean settled = s.admissionId() != null;
-        return new SittingView(s.id(), s.sittingNo(), s.encounterKind(), label, ref, s.plannedDate(),
-                computed.status(s), s.items(), s.chargePaise(), s.note(), s.admissionRequested(), settled,
-                settled && admission != null ? admission.billTotalPaise() : null, s.opdVisitId(), s.admissionId());
+        String status = computed.status(s);
+        return new SittingView(s.id(), s.sittingNo(), s.encounterKind(), label, ref, s.plannedDate(), status,
+                s.items(), s.chargePaise(), s.note(), s.admissionRequested(), settled,
+                settled && admission != null ? admission.billTotalPaise() : null, s.opdVisitId(), s.admissionId(),
+                computed.displayNo(s), s.doneAt() == null ? null : s.doneSource() == null ? "SIGN" : s.doneSource(),
+                s.regimenKey(), allowedActions(caller, s, status));
+    }
+
+    /**
+     * What the caller may do with this sitting now (ADR-026 D4); the client draws its buttons from it and the server
+     * checks again. DONE has none; a front desk or billing user gets ADMIT at most; day-care and IPD actions need IPD on.
+     */
+    static List<String> allowedActions(Caller caller, SittingRow s, String status) {
+        List<String> actions = new ArrayList<>();
+        boolean linked = s.opdVisitId() != null || s.admissionId() != null;
+        boolean admissionKind = CourseKinds.isAdmission(s.encounterKind());
+        if (caller.canPlan) {
+            switch (status) {
+                case "TODAY" -> {
+                    actions.add("MARK_DONE");
+                    if (!linked) {
+                        actions.add("MISSED");
+                    }
+                }
+                case "MISSED" -> actions.add("REBOOK");
+                case "PLANNED" -> {
+                    actions.add("RESCHEDULE");
+                    if (s.opdVisitId() == null) {
+                        actions.add("REMOVE");
+                    }
+                    if (caller.ipdOn && !linked) {
+                        boolean doctor = DOCTOR_ROLES.contains(caller.role);
+                        if (!admissionKind || (doctor && !s.admissionRequested())) {
+                            actions.add("REQUEST_ADMISSION");
+                        }
+                    }
+                }
+                default -> {
+                    // DONE: nothing
+                }
+            }
+        }
+        if ("PLANNED".equals(status) && caller.ipdOn && admissionKind && !linked
+                && ADMIT_ROLES.contains(caller.role)) {
+            actions.add("ADMIT");
+        }
+        return List.copyOf(actions);
     }
 
     private boolean canPlan(ClinicUser user, CourseRow course) {
@@ -560,7 +904,7 @@ public class TreatmentCourseService {
     }
 
     private SittingRow sittingOf(UUID tenantId, UUID courseId, UUID sittingId) {
-        return courses.sittingForUpdate(tenantId, sittingId).filter(s -> s.courseId().equals(courseId))
+        return courses.sittingForUpdate(tenantId, sittingId).filter(s -> s.courseId().equals(courseId) && s.removedAt() == null)
                 .orElseThrow(() -> EmrProblemException.of(404, "sitting-not-found", "Entry not found",
                         "There is no such entry in this course."));
     }
@@ -596,12 +940,14 @@ public class TreatmentCourseService {
 
     // ---- input validation ----
 
-    private record Plan(AddOption option, LocalDate plannedDate, List<String> items, long chargePaise, String note) {
+    private record Plan(AddOption option, LocalDate plannedDate, List<String> items, long chargePaise, String note,
+                        String regimenKey) {
     }
 
     private static final class Validated {
         String name;
         String note;
+        boolean estimateSigned;
         final List<Plan> plans = new ArrayList<>();
     }
 
@@ -622,11 +968,10 @@ public class TreatmentCourseService {
         }
         AddOption option = CourseKinds.option("DENTAL", "opd_sitting").orElseThrow();
         for (DentalCoursePlanner.Sitting sitting : plan.sittings()) {
-            valid.plans.add(new Plan(option, null, List.of(sitting.item()), sitting.chargePaise(), null));
+            valid.plans.add(new Plan(option, null, List.of(sitting.item()), sitting.chargePaise(), null, null));
         }
-        if (valid.note == null && plan.estimateSigned()) {
-            valid.note = DentalCoursePlanner.SIGNED_NOTE;
-        }
+        // ADR-026 D3 (G15-4): the flag, not a note text, says the estimate was signed.
+        valid.estimateSigned = plan.estimateSigned();
     }
 
     private Validated validateCreate(CreateInput input) {
@@ -674,7 +1019,8 @@ public class TreatmentCourseService {
             List<String> items = cleanItems(where + ".items", plan.items() == null ? List.of() : plan.items(), errors);
             long charge = cleanCharge(where + ".chargePaise", plan.chargePaise(), errors);
             String note = cleanNote(where + ".note", plan.note(), errors);
-            valid.plans.add(new Plan(option.get(), plan.plannedDate(), items, charge, note));
+            String regimen = cleanRegimen(where + ".regimenKey", input.kind(), plan.regimenKey(), errors);
+            valid.plans.add(new Plan(option.get(), plan.plannedDate(), items, charge, note, regimen));
         }
         if (!errors.isEmpty()) {
             throw new InvalidFieldsException(errors);
@@ -682,7 +1028,7 @@ public class TreatmentCourseService {
         return valid;
     }
 
-    private SittingChange validateChange(ChangeSittingInput input) {
+    private SittingChange validateChange(ChangeSittingInput input, String courseKind) {
         List<FieldMessage> errors = new ArrayList<>();
         if (input == null) {
             throw invalid("revision", "Reload the page and try again.");
@@ -696,10 +1042,31 @@ public class TreatmentCourseService {
         List<String> items = cleanItems("items", input.items(), errors);
         long charge = cleanCharge("chargePaise", input.chargePaise(), errors);
         String note = cleanNote("note", input.note(), errors);
+        String regimen = cleanRegimen("regimenKey", courseKind, input.regimenKey(), errors);
         if (!errors.isEmpty()) {
             throw new InvalidFieldsException(errors);
         }
-        return new SittingChange(input.encounterKind(), input.plannedDate(), items, charge, note);
+        return new SittingChange(input.encounterKind(), input.plannedDate(), items, charge, note, regimen);
+    }
+
+    /**
+     * 0.7.0 (ADR-026 D7): the regimen key of a CHEMO sitting, upper case, an existing protocol of the library; null when
+     * none was sent. For another kind of course a key is a validation error.
+     */
+    private String cleanRegimen(String where, String courseKind, String given, List<FieldMessage> errors) {
+        if (given == null) {
+            return null;
+        }
+        if (!"CHEMO".equals(courseKind)) {
+            errors.add(new FieldMessage(where, "Only a chemotherapy course has a regimen."));
+            return null;
+        }
+        if (!REGIMEN_KEY.matcher(given).matches()
+                || (reference != null && reference.load().protocol(given) == null)) {
+            errors.add(new FieldMessage(where, "Choose one of the chemotherapy regimens."));
+            return null;
+        }
+        return given;
     }
 
     private static List<String> cleanItems(String where, List<String> items, List<FieldMessage> errors) {

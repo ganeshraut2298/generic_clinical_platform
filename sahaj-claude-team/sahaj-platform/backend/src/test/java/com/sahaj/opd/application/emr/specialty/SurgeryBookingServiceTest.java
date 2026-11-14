@@ -288,4 +288,86 @@ class SurgeryBookingServiceTest {
         sections = sections.replace("\"otDate\":\"2026-11-24\",", "");
         assertThatThrownBy(() -> service.book(DOCTOR, RECORD, KEY, 4L)).isInstanceOf(InvalidFieldsException.class);
     }
+
+    // ---- SAH-75-3 (ADR-026 D3, H11): an episode started at the first consult carries to the pre-op visit ----
+
+    private CourseRow surgeryCourse(UUID id, UUID doctorMembership, UUID originRecord, String status) {
+        return new CourseRow(id, 3, PATIENT, "SURGERY", "STEP", "Surgery episode", null, doctorMembership,
+                LocalDate.parse("2026-11-01"), status, 0, null, NOW, originRecord);
+    }
+
+    @Test
+    void theOtBookingReusesThePatientsLatestActiveSurgeryCourseOfTheSameDoctorWhenNotStartedFromThisRecord() {
+        UUID earlier = UUID.randomUUID();
+        when(courses.forPatient(eq(TENANT), eq(PATIENT), org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(
+                surgeryCourse(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "ACTIVE"),
+                surgeryCourse(earlier, MEMBER, UUID.randomUUID(), "ACTIVE"),
+                surgeryCourse(UUID.randomUUID(), MEMBER, UUID.randomUUID(), "ACTIVE")));
+        when(courses.find(TENANT, earlier)).thenReturn(Optional.of(surgeryCourse(earlier, MEMBER, null, "ACTIVE")));
+        when(courses.nextSittingNo(TENANT, earlier)).thenReturn(1);
+
+        var result = service.book(DOCTOR, RECORD, KEY, 4L);
+
+        assertThat(result.courseId()).isEqualTo(earlier);
+        verify(courses, never()).insertCourse(any(), any(), any());
+        ArgumentCaptor<NewSitting> sitting = ArgumentCaptor.forClass(NewSitting.class);
+        verify(courses).insertSitting(eq(TENANT), sitting.capture(), eq(USER));
+        assertThat(sitting.getValue().courseId()).isEqualTo(earlier);
+    }
+
+    @Test
+    void theCourseStartedFromThisRecordStillWinsOverAnotherCourseOfTheSameDoctor() {
+        UUID fromRecord = UUID.randomUUID();
+        when(courses.forPatient(eq(TENANT), eq(PATIENT), org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(
+                surgeryCourse(UUID.randomUUID(), MEMBER, UUID.randomUUID(), "ACTIVE"),
+                surgeryCourse(fromRecord, MEMBER, RECORD, "ACTIVE")));
+        when(courses.find(TENANT, fromRecord)).thenReturn(Optional.of(surgeryCourse(fromRecord, MEMBER, RECORD, "ACTIVE")));
+        when(courses.nextSittingNo(TENANT, fromRecord)).thenReturn(1);
+
+        assertThat(service.book(DOCTOR, RECORD, KEY, 4L).courseId()).isEqualTo(fromRecord);
+    }
+
+    @Test
+    void aCourseOfAnotherDoctorOrNotActiveIsNotReusedAndANewOneIsMade() {
+        when(courses.forPatient(eq(TENANT), eq(PATIENT), org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(
+                surgeryCourse(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "ACTIVE"),
+                surgeryCourse(UUID.randomUUID(), MEMBER, UUID.randomUUID(), "COMPLETED")));
+
+        var result = service.book(DOCTOR, RECORD, KEY, 4L);
+
+        assertThat(result.courseId()).isEqualTo(COURSE);
+        verify(courses).insertCourse(eq(TENANT), any(NewCourse.class), eq(USER));
+    }
+
+    @Test
+    void theOwnerMayReuseASurgeryCourseOfAnyDoctor() {
+        UUID other = UUID.randomUUID();
+        doctor = new TeamMember(MEMBER, "Owner", "OWNER", true, 0);
+        when(courses.forPatient(eq(TENANT), eq(PATIENT), org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(
+                surgeryCourse(other, UUID.randomUUID(), UUID.randomUUID(), "ACTIVE")));
+        when(courses.find(TENANT, other)).thenReturn(Optional.of(surgeryCourse(other, UUID.randomUUID(), null, "ACTIVE")));
+        when(courses.nextSittingNo(TENANT, other)).thenReturn(1);
+
+        assertThat(service.book(DOCTOR, RECORD, KEY, 4L).courseId()).isEqualTo(other);
+        verify(courses, never()).insertCourse(any(), any(), any());
+    }
+
+    @Test
+    void aBookedSittingThatWasRemovedFromThePlanIsReplacedByANewOneNotRevived() {
+        service.book(DOCTOR, RECORD, KEY, 4L);
+        sections = sections.replace("2026-11-24", "2026-11-26");
+        SittingRow removed = new SittingRow(SITTING, COURSE, 1, "IPD", "RE_ADMISSION", LocalDate.parse("2026-11-24"),
+                List.of("Lap cholecystectomy"), 6_500_000, null, null, null, true, null, null, null,
+                Instant.parse("2026-11-13T05:00:00Z"), null, null);
+        when(courses.sittingForUpdate(TENANT, SITTING)).thenReturn(Optional.of(removed));
+        when(courses.nextSittingNo(TENANT, COURSE)).thenReturn(2);
+        org.mockito.Mockito.clearInvocations(courses);
+
+        service.book(DOCTOR, RECORD, "key-0000002", 4L);
+
+        verify(courses, never()).updateSitting(any(), any(), any(), any());
+        ArgumentCaptor<NewSitting> sitting = ArgumentCaptor.forClass(NewSitting.class);
+        verify(courses).insertSitting(eq(TENANT), sitting.capture(), eq(USER));
+        assertThat(sitting.getValue().sittingNo()).isEqualTo(2);
+    }
 }

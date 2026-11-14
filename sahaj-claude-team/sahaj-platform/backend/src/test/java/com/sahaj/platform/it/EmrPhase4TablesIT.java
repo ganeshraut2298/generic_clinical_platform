@@ -152,7 +152,7 @@ class EmrPhase4TablesIT extends EmrPhase3Support {
         db().asMigrator(c -> {
             assertThat(expectError(c, "update opd.emr_chemo_protocol set label = 'Changed' where protocol_key = 'AC'").message()).contains("immutable");
             assertThat(expectError(c, "delete from opd.emr_chemo_protocol where protocol_key = 'AC'").message()).contains("immutable");
-            assertThat(expectError(c, "truncate opd.emr_chemo_protocol").message()).contains("immutable");
+            assertThat(expectError(c, "truncate opd.emr_chemo_protocol").message()).as("refused: by the trigger, or first by a foreign key that references the table").matches("(?s).*(immutable|referenced in a foreign key).*");
             expectOk(c, "insert into opd.emr_chemo_protocol (protocol_key, label, sub_line, interval_days, emetic_risk, position, definition) values "
                     + "('QA_PROBE', 'Probe', 'Probe line', 14, 'LOW', 99, '{\"schemaVersion\":1,\"drugs\":[],\"premeds\":[]}'::jsonb)");
             assertThat(expectError(c, "update opd.emr_chemo_protocol set label = 'Changed' where protocol_key = 'QA_PROBE'").message())
@@ -299,10 +299,10 @@ class EmrPhase4TablesIT extends EmrPhase3Support {
     // ================= S-101 · backward compatibility =================
 
     @Test
-    void theSevenPhase4MigrationFilesWereAppliedInOrderWithoutFailure() throws Exception {
+    void theEightPhase4MigrationFilesWereAppliedInOrderWithoutFailure() throws Exception {
         List<List<String>> applied = db().asMigrator(c -> allRows(c, "select version, success::text from platform.flyway_schema_history where version like '2026.12.11.%' order by installed_rank"));
         assertThat(applied.stream().map(r -> r.get(0)).toList()).containsExactly("2026.12.11.1000", "2026.12.11.1010", "2026.12.11.1020", "2026.12.11.1030",
-                "2026.12.11.1100", "2026.12.11.1110", "2026.12.11.1120");
+                "2026.12.11.1100", "2026.12.11.1110", "2026.12.11.1120", "2026.12.11.1130");
         applied.forEach(r -> assertThat(r.get(1)).as(r.get(0)).isEqualTo("true"));
         long failed = db().asMigrator(c -> DbAccess.count(c, "select count(*) from platform.flyway_schema_history where not success"));
         assertThat(failed).isZero();

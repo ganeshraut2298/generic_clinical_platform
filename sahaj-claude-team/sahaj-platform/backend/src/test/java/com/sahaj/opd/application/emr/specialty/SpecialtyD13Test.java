@@ -266,13 +266,14 @@ class SpecialtyD13Test {
 
     @Test
     void theModeHidesTheSectionsOfTheStoriesAndPcpndtStaysWhileFormFIsRequiredH21() {
+        // BR75-9 (ADR-026 D9): ANC also hides the Menstrual history, so a newly required one counts in Gynae mode only
         assertThat(SpecialtyProfiles.hiddenSections("og", "ANC", false)).containsExactly("gyn_exam", "infertility",
-                "contraception");
+                "contraception", "menstrual");
         assertThat(SpecialtyProfiles.hiddenSections("og", "GYNAE", false)).containsExactly("obstetric", "anc", "pcpndt",
                 "usg");
         assertThat(SpecialtyProfiles.hiddenSections("og", "GYNAE", true)).containsExactly("obstetric", "anc", "usg");
         assertThat(SpecialtyProfiles.hiddenSections("og", "ANC", true)).as("Form F only matters in Gynae mode")
-                .containsExactly("gyn_exam", "infertility", "contraception");
+                .containsExactly("gyn_exam", "infertility", "contraception", "menstrual");
         assertThat(SpecialtyProfiles.hiddenSections("physio", "FIRST_VISIT", false)).containsExactly("modalities",
                 "sessions");
         assertThat(SpecialtyProfiles.hiddenSections("physio", "SESSION", false)).containsExactly("special_tests",
@@ -310,7 +311,8 @@ class SpecialtyD13Test {
     private static final Map<String, List<String>> LIST_NAMES = Map.of(
             "gm", List.of("gmSigns", "gmSystems", "gmFollowUp"),
             "dental", List.of("dentalConditions", "dentalSurfaces", "dentalMobility", "dentalShades", "dentalGumTones",
-                    "dentalSuggestions", "dentalNextIntervals", "dentalLabItems"),
+                    "dentalSuggestions", "dentalNextIntervals", "dentalLabItems", "dentalMedConditions",
+                    "dentalMedMedicines", "dentalMedAllergies"),
             "og", List.of("ancSymptoms", "ancDueOrders", "ancScans", "ancSupplements", "gynaeQuickOrders"),
             "paeds", List.of("iapGroups", "iapVaccines", "milestones", "paedsDoseRules"),
             "physio", List.of("physioGaits", "physioModalities", "jointRom", "jointMmt", "jointSpecialTests",
@@ -366,7 +368,7 @@ class SpecialtyD13Test {
     }
 
     @Test
-    void everyProfileHasExactlyItsFixedListNamesAndTheSetIsTheFortyFourOfTheContract() {
+    void everyProfileHasExactlyItsFixedListNamesAndTheSetIsTheFortySevenOfTheContract() {
         int total = 0;
         for (Map.Entry<String, List<String>> entry : LIST_NAMES.entrySet()) {
             List<String> names = new ArrayList<>();
@@ -374,7 +376,7 @@ class SpecialtyD13Test {
             assertThat(names).as(entry.getKey()).containsExactlyInAnyOrderElementsOf(entry.getValue());
             total += names.size();
         }
-        assertThat(total).isEqualTo(44);
+        assertThat(total).isEqualTo(47);
     }
 
     @Test

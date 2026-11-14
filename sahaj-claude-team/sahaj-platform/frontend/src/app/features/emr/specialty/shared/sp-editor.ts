@@ -1,4 +1,4 @@
-import { Directive, computed, inject, input } from '@angular/core';
+import { DestroyRef, Directive, computed, inject, input } from '@angular/core';
 import { SpecialtyContext } from '../specialty.context';
 import { EmrSpecialtyValue } from '../specialty.model';
 
@@ -22,6 +22,11 @@ export abstract class SpEditor<T extends EmrSpecialtyValue> {
   /** Nothing unsaved in this section: the server's computed answer is the one to show. */
   protected readonly fresh = computed(() => this.ctx.fresh(this.sectionKey()));
   protected readonly view = this.ctx.view;
+
+  /** Hands the screen's footer print button the print of this card, while the card is on screen (call from the constructor). */
+  protected registerFooterPrint(run: () => void): void {
+    inject(DestroyRef).onDestroy(this.ctx.registerFooterPrint(run));
+  }
 
   protected patch(change: Partial<T>): void {
     if (this.disabled()) {

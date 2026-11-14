@@ -30,7 +30,17 @@ export class SectionCardComponent {
 
   readonly section = input.required<EmrLayoutSection>();
   readonly specialty = input<StarterKey | null>(null);
+  /** The card title of the design where it differs from the library name (profile chrome). */
+  readonly title = input<string | null>(null);
+  readonly area = input<'main' | 'tools' | null>(null);
+  protected readonly heading = computed(() => this.title() ?? this.section().name);
 
+  /** The second line of a chip card ("Shapes the treatment plan and advice"): the library description of a section drawn as chips. */
+  protected readonly subLine = computed(() => {
+    const section = this.section();
+    const chipCard = section.fields.some((f) => f.presentation === 'CHIPS') || section.specialtyEditor?.component === 'DENTAL_MED_HISTORY';
+    return chipCard && section.description.trim() !== '' ? section.description : null;
+  });
   protected readonly collapsed = computed(() => this.store.isCollapsed(this.section().key));
   protected readonly state = computed(() => this.store.stateOf(this.section().key));
   protected readonly statusText = computed(() => {

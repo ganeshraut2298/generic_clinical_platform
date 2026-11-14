@@ -22,7 +22,28 @@ public final class EmrModel {
     private EmrModel() {
     }
 
-    public record FieldOption(String key, String label, @JsonProperty("isNone") boolean isNone) {
+    /**
+     * One choice of a field. {@code alert} (0.7.0, SAH-75-6, ADR-026 D6) draws the chip red when chosen; false for every
+     * option of a layout written before 0.7.0. {@code hint} (0.7.1, ADR-026 D13) is the second line of a tile (1 to 60
+     * characters); null for every option of a layout written before 0.7.1 and for an option without a drawn second line.
+     * A blank hint is read as null.
+     */
+    public record FieldOption(String key, String label, @JsonProperty("isNone") boolean isNone, boolean alert,
+                              String hint) {
+
+        public FieldOption {
+            hint = hint == null || hint.isBlank() ? null : hint;
+        }
+
+        /** An option with no hint (every option before 0.7.1). */
+        public FieldOption(String key, String label, boolean isNone, boolean alert) {
+            this(key, label, isNone, alert, null);
+        }
+
+        /** An option that is not an alert and has no hint (every library option before 0.7.0). */
+        public FieldOption(String key, String label, boolean isNone) {
+            this(key, label, isNone, false, null);
+        }
     }
 
     public record TableColumn(String key, String label) {
@@ -35,24 +56,48 @@ public final class EmrModel {
     public record FieldDefinition(String key, String label, String type, EmrValueKind valueKind, String meta,
                                   boolean required, String optionsSource, String master, boolean allowFreeText,
                                   List<FieldOption> options, List<TableColumn> columns, BigDecimal min,
-                                  BigDecimal max, ComponentRef component) {
+                                  BigDecimal max, ComponentRef component, String presentation) {
 
+        /** The two presentations of a field (0.7.0, SAH-75-4 and 75-6): the usual control, or chips. */
+        public static final String PRESENTATION_DEFAULT = "DEFAULT";
+        public static final String PRESENTATION_CHIPS = "CHIPS";
+
+        public FieldDefinition {
+            presentation = PRESENTATION_CHIPS.equals(presentation) ? PRESENTATION_CHIPS : PRESENTATION_DEFAULT;
+        }
+
+        /** Without a component or presentation (the shape before 0.7.0). */
         public FieldDefinition(String key, String label, String type, EmrValueKind valueKind, String meta,
                                boolean required, String optionsSource, String master, boolean allowFreeText,
                                List<FieldOption> options, List<TableColumn> columns, BigDecimal min,
                                BigDecimal max) {
             this(key, label, type, valueKind, meta, required, optionsSource, master, allowFreeText, options, columns,
-                    min, max, null);
+                    min, max, null, PRESENTATION_DEFAULT);
+        }
+
+        /** With a component and the default presentation. */
+        public FieldDefinition(String key, String label, String type, EmrValueKind valueKind, String meta,
+                               boolean required, String optionsSource, String master, boolean allowFreeText,
+                               List<FieldOption> options, List<TableColumn> columns, BigDecimal min,
+                               BigDecimal max, ComponentRef component) {
+            this(key, label, type, valueKind, meta, required, optionsSource, master, allowFreeText, options, columns,
+                    min, max, component, PRESENTATION_DEFAULT);
         }
 
         public FieldDefinition asComponent(ComponentRef ref) {
             return new FieldDefinition(key, label, type, EmrValueKind.COMPONENT, meta, required, optionsSource,
-                    master, allowFreeText, options, columns, min, max, ref);
+                    master, allowFreeText, options, columns, min, max, ref, presentation);
         }
 
         public FieldDefinition asCovered() {
             return new FieldDefinition(key, label, type, EmrValueKind.COVERED, meta, false, optionsSource, master,
-                    allowFreeText, options, columns, min, max, null);
+                    allowFreeText, options, columns, min, max, null, presentation);
+        }
+
+        /** The same field with the given presentation (a CHIPS or DEFAULT value; anything else reads DEFAULT). */
+        public FieldDefinition withPresentation(String newPresentation) {
+            return new FieldDefinition(key, label, type, valueKind, meta, required, optionsSource, master,
+                    allowFreeText, options, columns, min, max, component, newPresentation);
         }
 
         public boolean fillable() {

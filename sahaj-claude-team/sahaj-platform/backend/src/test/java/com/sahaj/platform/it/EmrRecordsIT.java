@@ -182,6 +182,15 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(layoutKeys(second)).doesNotContain("chronic");
     }
 
+    /** The record without {@code editHold.expiresAt}: the hold is renewed at every open, so its expiry moves. */
+    private static JsonNode withoutHoldExpiry(JsonNode record) {
+        ObjectNode copy = record.deepCopy();
+        if (copy.get("editHold") != null && copy.get("editHold").isObject()) {
+            ((ObjectNode) copy.get("editHold")).remove("expiresAt");
+        }
+        return copy;
+    }
+
     @Test
     void openingAgainIsSafeToRepeatItFindsTheSameRecordChangesNothingAndEveryOpenWritesOneAuditEntryWithIdsOnly() throws Exception {
         Ctx c = ctx();
@@ -191,7 +200,7 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(second.get("created").asBoolean()).isFalse();
         assertThat(second.get("stageOutcome").asText()).isEqualTo("ALREADY_WITH_DOCTOR");
         assertThat(third.get("record").get("id").asText()).isEqualTo(first.get("record").get("id").asText());
-        assertThat(second.get("record")).isEqualTo(first.get("record"));
+        assertThat(withoutHoldExpiry(second.get("record"))).as("only the edit hold expiry moves at every open").isEqualTo(withoutHoldExpiry(first.get("record")));
         assertThat(recordRows(c.clinic())).isEqualTo(1);
         assertThat(count(c.clinic(), "select count(*) from platform.audit_event where action = 'VISIT_STAGE_MOVED' and entity_id = '" + c.visitId() + "'"))
                 .as("no duplicate stage is written").isEqualTo(1);
@@ -205,7 +214,7 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(created.get("departmentKey").asText()).isEqualTo("gm");
         assertThat(opened.get(0).get(3)).isEqualTo(c.doctor().userId().toString());
         assertThat(opened.get(0).get(1) + opened.get(0).get(2)).doesNotContain("Ramesh").doesNotContain("Kulkarni");
-        assertThat(get(RECORDS + "/" + first.get("record").get("id").asText(), c.token())).isEqualTo(first.get("record"));
+        assertThat(withoutHoldExpiry(get(RECORDS + "/" + first.get("record").get("id").asText(), c.token()))).isEqualTo(withoutHoldExpiry(first.get("record")));
     }
 
     @Test
@@ -278,7 +287,8 @@ class EmrRecordsIT extends EmrSupport {
 
     @Test
     void onlyADoctorAVisitingDoctorOrAnOwnerWithDoctorDetailsOpensAndEveryOtherRoleIs403WithNothingWritten() throws Exception {
-        Ctx c = ctx();
+        Clinic bare = newClinic(true, false);
+        Ctx c = ctxFor(bare, addDoctor(bare, "General physician"));
         for (String role : NOT_DOCTOR_ROLES) {
             Staff staff = addNonDoctor(c.clinic(), role);
             problemOf(HttpMethod.POST, OPEN, staff.token(c.clinic()), openBody("OPD_VISIT", c.visitId()), 403, "forbidden");
@@ -483,7 +493,7 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(recordSection(cleared, "history").get("values").size()).isZero();
         assertThat(recordSection(cleared, "complaints").get("values").size()).isEqualTo(1);
         // what is stored is one document per section, with the shape version
-        assertThat(row(c.clinic(), "select schema_version::text, jsonb_typeof(sections), (sections ? 'complaints')::text, revision::text, ui_part "
+        assertThat(row(c.clinic(), "select schema_version::text, jsonb_typeof(sections), jsonb_exists(sections, 'complaints')::text, revision::text, ui_part "
                 + "from opd.emr_record where id = ?::uuid", id)).containsExactly("1", "object", "true", "4", "ASSESSMENT");
         // one audit entry per save: who and the section keys, never a value
         List<List<String>> saves = auditRows(c.clinic(), "EMR_RECORD_DRAFT_SAVED");
@@ -520,12 +530,7 @@ class EmrRecordsIT extends EmrSupport {
         JsonNode filled = save(c, blank, sectionValues("hpi", "{\"narrative\":\"Fever for three days\"}"));
         assertThat(recordSection(filled, "hpi").get("status").asText()).isEqualTo("DONE");
         assertThat(filled.get("parts").get(0).get("sectionsDone").asInt()).isEqualTo(2);
-        // vitals has required fields but is not a required section: it is Optional until they are all filled
-        JsonNode vitals = save(c, filled, sectionValues("vitals", "{\"bp_systolic\":120,\"bp_diastolic\":80}"));
-        assertThat(recordSection(vitals, "vitals").get("status").asText()).isEqualTo("OPTIONAL");
-        JsonNode vitalsDone = save(c, vitals, sectionValues("vitals", "{\"bp_systolic\":120,\"bp_diastolic\":80,\"pulse\":72,\"weight\":61.5}"));
-        assertThat(recordSection(vitalsDone, "vitals").get("status").asText()).isEqualTo("DONE");
-        assertThat(texts(vitalsDone.get("stillNeeded"), null)).doesNotContain("vitals");
+        // vitals is filled with the vitals log editor since SAH-60 (specialty only; see EmrSpecialtyScreensIT), so it is not tried with plain values here
     }
 
     @Test
@@ -613,9 +618,9 @@ class EmrRecordsIT extends EmrSupport {
                 {"complaints", "{\"complaint\":[{\"itemKey\":null,\"text\":\"" + "t".repeat(201) + "\",\"newToList\":true}]}", "complaint"},
                 {"complaints", "{\"complaint\":[{\"itemKey\":null,\"text\":\"\",\"newToList\":true}]}", "complaint"},
                 {"complaints", "{\"complaint\":[{\"itemKey\":null,\"newToList\":true}]}", "complaint"},
-                {"vitals", "{\"bp_systolic\":\"120\"}", "bp_systolic"},
-                {"vitals", "{\"bp_systolic\":2000000}", "bp_systolic"},
-                {"vitals", "{\"bmi\":22}", "bmi"},
+                {"vitals", "{\"bp_systolic\":\"120\"}", "values"}, // the vitals section takes specialty only (SAH-60)
+                {"vitals", "{\"bp_systolic\":2000000}", "values"},
+                {"vitals", "{\"bmi\":22}", "values"},
                 {"history", "{\"past_illness\":[\"covid\"]}", "past_illness"},
                 {"history", "{\"past_illness\":\"dm\"}", "past_illness"},
                 {"history", "{\"diet\":\"vegan\"}", "diet"},
@@ -628,7 +633,7 @@ class EmrRecordsIT extends EmrSupport {
             JsonNode problem = problem(call(HttpMethod.PUT, RECORDS + "/" + id + "/draft", c.token(),
                     draftBody(0, "ASSESSMENT", null, sectionValues(b[0], b[1])).toString()), 400);
             assertThat(problem.get("type").asText()).as(b[0] + " " + b[1]).isEqualTo(PROBLEM_BASE + "validation");
-            assertThat(problem.get("fieldErrors").get(0).get("field").asText()).as(b[1])
+            assertThat(problem.get("fieldErrors").get(0).get("field").asText()).as(b[1] + " -> " + problem.get("fieldErrors"))
                     .isEqualTo("values".equals(b[2]) ? "sections[0].values" : "sections[0].values." + b[2]);
             assertThat(problem.toString()).as("no value is echoed").doesNotContain("script").doesNotContain("extreme").doesNotContain("Appendectomy")
                     .doesNotContain("zxqunknownfield");
@@ -639,8 +644,6 @@ class EmrRecordsIT extends EmrSupport {
         // the same limits accept their edge values
         JsonNode edge = saveRecordDraft(c.token(), id, draftBody(0, "ASSESSMENT", null,
                 sectionValues("complaints", "{\"notes\":\"" + "n".repeat(2000) + "\"}"),
-                sectionValues("vitals", "{\"bp_systolic\":1000000,\"temperature\":98.6,\"weight\":61.1234}"),
-                sectionValues("followup", "{\"next_visit\":\"2026-12-31\"}"),
                 sectionValues("history", "{\"surgical_history\":[{\"procedure\":\"Appendectomy\",\"year\":\"2019\"}],\"habits\":[\"smoking\",\"alcohol\"]}")), 200);
         assertThat(edge.get("revision").asLong()).isEqualTo(1);
     }
@@ -773,10 +776,10 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(switched.get("layout").get("choiceSource").asText()).isEqualTo("SWITCHED");
         assertThat(switched.get("revision").asLong()).isEqualTo(2);
         assertThat(layoutKeys(switched)).contains("dental_chart", "complaints").doesNotContain("chronic");
-        assertThat(recordSection(switched, "complaints").get("values").size()).as("a section in both layouts keeps its values").isEqualTo(2);
+        assertThat(recordSection(switched, "complaints").get("values").size()).as("a section in both layouts keeps its values (the complaint list; duration and severity are covered by the list)").isEqualTo(1);
         // the value of the section that is not in the new layout is kept in the record but not shown
         assertThat(switched.toString()).doesNotContain("\"condition\"");
-        assertThat(row(c.clinic(), "select (sections ? 'chronic')::text, department_key, choice_source, layout_kind from opd.emr_record where id = ?::uuid", id))
+        assertThat(row(c.clinic(), "select jsonb_exists(sections, 'chronic')::text, department_key, choice_source, layout_kind from opd.emr_record where id = ?::uuid", id))
                 .containsExactly("true", "dental", "SWITCHED", "STARTER_LAYOUT");
         // back to General Medicine: the value is there again
         JsonNode back = put(RECORDS + "/" + id + "/department", c.token(), "{\"departmentKey\":\"gm\",\"revision\":2}", 200);

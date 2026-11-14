@@ -58,7 +58,9 @@ class CourseAdmissionSourceAdapterTest {
 
         Map<UUID, CourseAdmission> result = adapter.admissions(TENANT, List.of(ADMITTED));
 
-        assertThat(result.get(ADMITTED)).isEqualTo(new CourseAdmission(ADMITTED, "IP/26-27/0001", "ADMITTED", 450_000));
+        assertThat(result.get(ADMITTED)).isEqualTo(new CourseAdmission(ADMITTED, "IP/26-27/0001", "ADMITTED", 450_000, "101"));
+        // SAH-75-11 O2-2: the bed code travels with the admission for the oncology order sheet line "Day-care bed <n>"
+        assertThat(result.get(ADMITTED).bedLabel()).isEqualTo("101");
         verify(discharges, never()).findFinalBill(any(), any());
     }
 

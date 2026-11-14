@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Form builder — custom clinical forms</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+button,input,select,textarea{font-family:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #0B6E6966;outline-offset:2px}
+a{color:#0B6E69}a:hover{color:#084F4C}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; min-height: 1400px; font-size: 14px; display: flex; flex-direction: column">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between">
+    <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+      <div style="font-size: 12px; color: #5B6B7F"><a href="Main.dc.html">Settings / EMR configuration</a> / Form builder</div>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+        <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Form name</span>
+          <input value="{{form.name}}" onChange="{{onName}}" style="font: inherit; font-size: 20px; font-weight: 700; color: #0F1C2E; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; min-width: 340px; background: #F7F9FB">
+        </label>
+        <span style="{{statusStyle}}">{{statusText}}</span>
+        <span style="font-size: 12px; color: #5B6B7F">{{fieldCountText}}</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
+      <div role="tablist" aria-label="Mode" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button></sc-for>
+      </div>
+      <button type="button" onClick="{{saveDraft}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Save draft</button>
+      <button type="button" onClick="{{publish}}" style="border: 1px solid #0B6E69; background: #0B6E69; color: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 700; cursor: pointer">{{publishLabel}}</button>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 18px; padding: 18px 24px; align-items: flex-start; flex: 1">
+
+    <aside style="{{leftStyle}}">
+      <div role="tablist" aria-label="Palette" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+        <sc-for list="{{leftTabs}}" as="t" hint-placeholder-count="2"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button></sc-for>
+      </div>
+      <sc-if value="{{isPalette}}" hint-placeholder-val="{{ true }}">
+        <span style="font-size: 12px; color: #5B6B7F">Drag a field onto the form, or tap to add it below the selected field.</span>
+        <sc-for list="{{palette}}" as="g" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.06em">{{g.label}}</span>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{g.items}}" as="i" hint-placeholder-count="6">
+                <button type="button" draggable="true" onDragStart="{{i.dragStart}}" onDragEnd="{{dragEnd}}" onClick="{{i.add}}" title="{{i.hint}}" style="display: flex; gap: 8px; align-items: center; text-align: left; border: 1px solid #D5DCE4; background: #FFFFFF; border-radius: 8px; padding: 8px; min-height: 40px; cursor: grab; font-size: 12px; font-weight: 600; color: #0F1C2E">
+                  <span style="{{i.iconStyle}}">{{i.icon}}</span>{{i.label}}
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{isTemplates}}" hint-placeholder-val="{{ false }}">
+        <span style="font-size: 12px; color: #5B6B7F">Start from a form clinics in India already use. Everything stays editable.</span>
+        <sc-for list="{{templates}}" as="t" hint-placeholder-count="6">
+          <button type="button" onClick="{{t.load}}" style="{{t.style}}"><span style="font-weight: 700">{{t.name}}</span><span style="font-size: 12px; color: #5B6B7F">{{t.sub}}</span></button>
+        </sc-for>
+      </sc-if>
+    </aside>
+
+    <main style="{{mainStyle}}">
+      <sc-if value="{{notPrint}}" hint-placeholder-val="{{ true }}">
+      <div style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid #EEF1F5; padding-bottom: 12px">
+          <div style="display: flex; flex-direction: column; gap: 3px">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{form.name}}</h2>
+            <span style="font-size: 12px; color: #5B6B7F">{{formMeta}}</span>
+          </div>
+          <span style="{{modeBadgeStyle}}">{{modeBadge}}</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px 14px">
+          <sc-for list="{{fv}}" as="f" hint-placeholder-count="10">
+            <div draggable="{{f.draggable}}" onDragStart="{{f.dragStart}}" onDragOver="{{f.dragOver}}" onDrop="{{f.drop}}" onDragEnd="{{dragEnd}}" style="{{f.wrap}}">
+              <button type="button" onClick="{{f.select}}" aria-label="Select field {{f.label}}" style="{{f.overlay}}"></button>
+              <sc-if value="{{f.showTools}}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; right: 8px; top: -14px; z-index: 3; display: flex; gap: 2px; background: #0F1C2E; border-radius: 8px; padding: 3px">
+                  <button type="button" onClick="{{f.up}}" aria-label="Move up" title="Move up" style="width: 30px; height: 28px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; font-weight: 700">↑</button>
+                  <button type="button" onClick="{{f.down}}" aria-label="Move down" title="Move down" style="width: 30px; height: 28px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; font-weight: 700">↓</button>
+                  <button type="button" onClick="{{f.dup}}" aria-label="Duplicate" title="Duplicate" style="height: 28px; border: 0; background: transparent; color: #FFFFFF; cursor: pointer; font-size: 12px; font-weight: 600; padding: 0 8px">Copy</button>
+                  <button type="button" onClick="{{f.del}}" aria-label="Delete field" title="Delete" style="height: 28px; border: 0; background: transparent; color: #FFB4AE; cursor: pointer; font-size: 12px; font-weight: 600; padding: 0 8px">Delete</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{f.isSection}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 2px; border-left: 4px solid #0B6E69; padding-left: 10px">
+                  <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F1C2E">{{f.label}}</h3>
+                  <span style="font-size: 12px; color: #5B6B7F">{{f.help}}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{f.isNote}}" hint-placeholder-val="{{ false }}">
+                <div style="font-size: 13px; color: #164A84; background: #EEF5FD; border-radius: 8px; padding: 10px 12px">{{f.label}}</div>
+              </sc-if>
+              <sc-if value="{{f.hasLabel}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 6px">
+                  <span style="font-size: 13px; font-weight: 600; color: #3E4C5E">{{f.label}}<span style="{{f.starStyle}}"> *</span></span>
+                  <span style="display: flex; gap: 4px">
+                    <sc-for list="{{f.badges}}" as="b" hint-placeholder-count="1"><span style="{{b.style}}">{{b.label}}</span></sc-for>
+                  </span>
+                </div>
+              </sc-if>
+              <sc-if value="{{f.isInput}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; align-items: center; gap: 6px">
+                  <input type="{{f.inputType}}" value="{{f.value}}" onChange="{{f.onInput}}" placeholder="{{f.placeholder}}" style="{{f.inputStyle}}">
+                  <span style="font-size: 12px; color: #5B6B7F; white-space: nowrap">{{f.unit}}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{f.isLong}}" hint-placeholder-val="{{ false }}">
+                <textarea rows="3" onChange="{{f.onInput}}" placeholder="{{f.placeholder}}" style="{{f.inputStyle}}">{{f.value}}</textarea>
+              </sc-if>
+              <sc-if value="{{f.isChips}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 6px; flex-wrap: wrap">
+                  <sc-for list="{{f.opts}}" as="o" hint-placeholder-count="3"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}<span style="{{o.scoreStyle}}">{{o.score}}</span></button></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{f.isSelect}}" hint-placeholder-val="{{ false }}">
+                <select onChange="{{f.onInput}}" style="{{f.inputStyle}}">
+                  <option value="">Choose…</option>
+                  <sc-for list="{{f.opts}}" as="o" hint-placeholder-count="3"><option value="{{o.label}}" selected="{{o.on}}">{{o.label}}</option></sc-for>
+                </select>
+              </sc-if>
+              <sc-if value="{{f.isCalc}}" hint-placeholder-val="{{ false }}">
+                <div style="{{f.calcStyle}}"><span style="font-size: 22px; font-weight: 700">{{f.calcValue}}</span><span style="font-size: 12px">{{f.calcNote}}</span></div>
+              </sc-if>
+              <sc-if value="{{f.isBlock}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 10px; align-items: center; border: 1.5px dashed #B8CFD8; border-radius: 10px; padding: 12px; background: #FCFEFF; min-height: 52px">
+                  <span style="width: 36px; height: 36px; border-radius: 8px; background: #E3F3F1; color: #0B6E69; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: none">{{f.icon}}</span>
+                  <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 600">{{f.blockTitle}}</span><span style="font-size: 12px; color: #5B6B7F">{{f.blockSub}}</span></span>
+                </div>
+              </sc-if>
+              <span style="{{f.flagStyle}}">{{f.flag}}</span>
+              <span style="{{f.helpStyle}}">{{f.help}}</span>
+            </div>
+          </sc-for>
+          <div onDragOver="{{endOver}}" onDrop="{{endDrop}}" style="{{endZone}}">{{endText}}</div>
+        </div>
+
+        <sc-if value="{{isPreview}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid #EEF1F5; padding-top: 12px">
+            <span style="{{pvStatusStyle}}">{{pvStatus}}</span>
+            <div style="display: flex; gap: 8px">
+              <button type="button" onClick="{{clearValues}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 14px; min-height: 44px; font-weight: 600; cursor: pointer">Clear</button>
+              <button type="button" onClick="{{submit}}" style="border: 1px solid #0B6E69; background: #0B6E69; color: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 700; cursor: pointer">Save to patient record</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{isPrint}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <sc-for list="{{paperOpts}}" as="p" hint-placeholder-count="2"><button type="button" aria-pressed="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">{{p.label}}</button></sc-for>
+            <span style="font-size: 12px; color: #5B6B7F">Values come from the Preview tab.</span>
+          </div>
+          <div style="{{paperStyle}}">
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #0F1C2E; padding-bottom: 8px">
+              <div style="display: flex; flex-direction: column"><strong style="font-size: 15px">[CLINIC NAME]</strong><span style="font-size: 11px; color: #3E4C5E">[ADDRESS] · [PHONE]</span></div>
+              <div style="display: flex; flex-direction: column; text-align: right"><strong style="font-size: 13px">{{form.name}}</strong><span style="font-size: 11px; color: #3E4C5E">{{form.version}} · [DATE]</span></div>
+            </div>
+            <div style="display: flex; gap: 16px; font-size: 11px; color: #3E4C5E; border-bottom: 1px solid #C9D2DC; padding: 6px 0">
+              <span>Patient: [NAME]</span><span>Age / sex: [AGE / SEX]</span><span>UHID: [ID]</span>
+            </div>
+            <sc-for list="{{printRows}}" as="r" hint-placeholder-count="8">
+              <div style="{{r.style}}"><span style="{{r.labelStyle}}">{{r.label}}</span><span style="font-weight: 600">{{r.value}}</span></div>
+            </sc-for>
+            <div style="margin-top: auto; display: flex; justify-content: flex-end; padding-top: 24px"><div style="border-top: 1px solid #0F1C2E; padding-top: 4px; font-size: 11px; min-width: 180px; text-align: center">Signature · Dr. [DOCTOR NAME] · Reg. no. [REG NO]</div></div>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+
+    <aside style="{{rightStyle}}">
+      <div role="tablist" aria-label="Settings" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+        <sc-for list="{{rightTabs}}" as="t" hint-placeholder-count="2"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button></sc-for>
+      </div>
+
+      <sc-if value="{{isFieldTab}}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{noField}}" hint-placeholder-val="{{ false }}">
+          <div style="border: 1px dashed #9AA8B8; border-radius: 10px; padding: 16px; font-size: 13px; color: #5B6B7F; text-align: center">Select a field on the form to change it.</div>
+        </sc-if>
+        <sc-if value="{{hasField}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; gap: 8px; align-items: center">
+            <span style="{{pf.iconStyle}}">{{pf.icon}}</span>
+            <div style="display: flex; flex-direction: column"><strong style="font-size: 14px">{{pf.typeName}}</strong><span style="font-size: 11px; color: #5B6B7F">Key: {{pf.key}}</span></div>
+          </div>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #3E4C5E">{{pf.labelCaption}}
+            <input value="{{pf.label}}" onChange="{{pf.onLabel}}" style="font: inherit; font-size: 14px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px">
+          </label>
+          <sc-if value="{{pf.canHelp}}" hint-placeholder-val="{{ true }}">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #3E4C5E">Help text
+              <input value="{{pf.help}}" onChange="{{pf.onHelp}}" placeholder="Shown under the field" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 8px 10px">
+            </label>
+          </sc-if>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Width on the form</span>
+            <div style="display: flex; gap: 6px"><sc-for list="{{pf.widths}}" as="w" hint-placeholder-count="3"><button type="button" aria-pressed="{{w.on}}" onClick="{{w.pick}}" style="{{w.style}}">{{w.label}}</button></sc-for></div>
+          </div>
+          <sc-for list="{{pf.toggles}}" as="t" hint-placeholder-count="3">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 4px 0">
+              <span style="display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 600">{{t.label}}</span><span style="font-size: 11px; color: #5B6B7F">{{t.hint}}</span></span>
+              <button type="button" aria-pressed="{{t.on}}" aria-label="{{t.label}}" onClick="{{t.toggle}}" style="{{t.track}}"><span style="{{t.knob}}"></span></button>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{pf.hasOpts}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+              <div style="display: flex; justify-content: space-between"><span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Options and scores</span><span style="font-size: 11px; color: #5B6B7F">score is used by Σ fields</span></div>
+              <sc-for list="{{pf.opts}}" as="o" hint-placeholder-count="3">
+                <div style="display: flex; gap: 6px; align-items: center">
+                  <input value="{{o.label}}" onChange="{{o.onLabel}}" aria-label="Option {{o.n}}" style="flex: 1; min-width: 0; font: inherit; font-size: 13px; border: 1px solid #C9D2DC; border-radius: 6px; padding: 6px 8px">
+                  <button type="button" onClick="{{o.minus}}" aria-label="Lower score" style="width: 28px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; cursor: pointer">−</button>
+                  <span style="min-width: 22px; text-align: center; font-size: 13px; font-weight: 700">{{o.score}}</span>
+                  <button type="button" onClick="{{o.plus}}" aria-label="Higher score" style="width: 28px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; cursor: pointer">+</button>
+                  <button type="button" onClick="{{o.remove}}" aria-label="Remove option" style="width: 28px; height: 30px; border: 0; background: transparent; color: #B42318; cursor: pointer; font-weight: 700">×</button>
+                </div>
+              </sc-for>
+              <button type="button" onClick="{{pf.addOpt}}" style="align-self: flex-start; border: 1px dashed #9AA8B8; background: #FFFFFF; border-radius: 8px; padding: 6px 12px; min-height: 34px; font-size: 12px; font-weight: 600; cursor: pointer">+ Add option</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{pf.isNum}}" hint-placeholder-val="{{ false }}">
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+              <sc-for list="{{pf.numProps}}" as="n" hint-placeholder-count="4">
+                <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #3E4C5E">{{n.label}}
+                  <input value="{{n.value}}" onChange="{{n.on}}" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 6px; padding: 7px 8px">
+                </label>
+              </sc-for>
+              <span style="grid-column: span 2; font-size: 11px; color: #5B6B7F">Values outside the normal range are flagged in red on the form.</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{pf.isCalc}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+              <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Adds up the scores of</span>
+              <sc-for list="{{pf.sources}}" as="s" hint-placeholder-count="4">
+                <label style="display: flex; gap: 8px; align-items: center; font-size: 13px"><input type="checkbox" checked="{{s.on}}" onChange="{{s.toggle}}" style="width: 18px; height: 18px">{{s.label}}</label>
+              </sc-for>
+              <span style="font-size: 12px; font-weight: 700; color: #3E4C5E; margin-top: 4px">Extra rules</span>
+              <sc-for list="{{pf.rules}}" as="r" hint-placeholder-count="2">
+                <div style="display: flex; gap: 6px; align-items: center; font-size: 12px; background: #FAFBFC; border-radius: 6px; padding: 6px 8px">
+                  <span style="flex: 1">{{r.text}}</span>
+                  <button type="button" onClick="{{r.remove}}" aria-label="Remove rule" style="border: 0; background: transparent; color: #B42318; cursor: pointer; font-weight: 700; width: 24px; height: 24px">×</button>
+                </div>
+              </sc-for>
+              <sc-if value="{{pf.canAddRule}}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{pf.addRule}}" style="align-self: flex-start; border: 1px dashed #9AA8B8; background: #FFFFFF; border-radius: 8px; padding: 6px 12px; min-height: 34px; font-size: 12px; font-weight: 600; cursor: pointer">{{pf.addRuleLabel}}</button>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{pf.isBand}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+              <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Bands for {{pf.bandSource}}</span>
+              <sc-for list="{{pf.bands}}" as="b" hint-placeholder-count="3">
+                <div style="display: flex; gap: 6px; align-items: center">
+                  <span style="font-size: 12px; color: #5B6B7F; width: 34px">from</span>
+                  <button type="button" onClick="{{b.minus}}" aria-label="Lower" style="width: 26px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; cursor: pointer">−</button>
+                  <span style="min-width: 22px; text-align: center; font-weight: 700">{{b.from}}</span>
+                  <button type="button" onClick="{{b.plus}}" aria-label="Higher" style="width: 26px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; cursor: pointer">+</button>
+                  <input value="{{b.label}}" onChange="{{b.onLabel}}" aria-label="Band label" style="flex: 1; min-width: 0; font: inherit; font-size: 12px; border: 1px solid #C9D2DC; border-radius: 6px; padding: 6px 8px">
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{pf.canLogic}}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+              <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Show this field</span>
+              <select onChange="{{pf.onLogicField}}" aria-label="Show only when field" style="font: inherit; font-size: 13px; border: 1px solid #C9D2DC; border-radius: 6px; padding: 7px 8px">
+                <option value="" selected="{{pf.always}}">Always</option>
+                <sc-for list="{{pf.logicFields}}" as="l" hint-placeholder-count="3"><option value="{{l.id}}" selected="{{l.on}}">Only when “{{l.label}}” …</option></sc-for>
+              </select>
+              <sc-if value="{{pf.hasLogic}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center">
+                  <span style="font-size: 12px; color: #3E4C5E">is</span>
+                  <sc-for list="{{pf.logicVals}}" as="v" hint-placeholder-count="2"><button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button></sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Who can fill it</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{pf.roles}}" as="r" hint-placeholder-count="4"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.toggle}}" style="{{r.style}}">{{r.label}}</button></sc-for></div>
+          </div>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #3E4C5E">Standard code (optional)
+            <input value="{{pf.code}}" onChange="{{pf.onCode}}" placeholder="SNOMED CT or LOINC, for reports and ABDM" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 8px 10px">
+          </label>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{isFormTab}}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{settings}}" as="g" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">{{g.label}}</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{g.opts}}" as="o" hint-placeholder-count="3"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button></sc-for></div>
+            <span style="font-size: 11px; color: #5B6B7F">{{g.hint}}</span>
+          </div>
+        </sc-for>
+        <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+          <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Versions</span>
+          <sc-for list="{{versions}}" as="v" hint-placeholder-count="3">
+            <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #EEF1F5"><span style="font-weight: 700">{{v.v}}</span><span style="flex: 1; color: #3E4C5E">{{v.what}}</span><span style="{{v.style}}">{{v.state}}</span></div>
+          </sc-for>
+          <span style="font-size: 11px; color: #5B6B7F">Records already filled keep the version they were filled in.</span>
+        </div>
+      </sc-if>
+    </aside>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; top: 92px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3); max-width: 420px">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+var T = {
+  text: ['Short text', 'Aa', 'input', 'basic'], longtext: ['Long text', '¶', 'long', 'basic'], number: ['Number', '123', 'input', 'basic'], date: ['Date', 'Date', 'input', 'basic'], time: ['Time', 'Time', 'input', 'basic'],
+  yesno: ['Yes / No', 'Y/N', 'chips', 'basic'], single: ['Single choice', '1 of', 'chips', 'basic'], multi: ['Multiple choice', 'Any', 'chips', 'basic'], dropdown: ['Dropdown', 'List', 'select', 'basic'],
+  vitals: ['Vitals block', 'BP', 'block', 'clinical'], pain: ['Pain scale 0–10', '0–10', 'chips', 'clinical'], bodymap: ['Body map', 'Body', 'block', 'clinical'], tooth: ['Tooth chart', 'Teeth', 'block', 'clinical'],
+  meds: ['Medicine list', 'Rx', 'block', 'clinical'], icd: ['Diagnosis (ICD-10)', 'ICD', 'block', 'clinical'], labs: ['Lab tests', 'Lab', 'block', 'clinical'], calc: ['Score (Σ)', 'Σ', 'calc', 'clinical'], band: ['Score band', 'Band', 'calc', 'clinical'],
+  section: ['Section heading', 'H', 'section', 'layout'], note: ['Info note', 'i', 'note', 'layout'], sign: ['Signature', 'Sign', 'block', 'layout'], photo: ['Photo / image', 'Img', 'block', 'layout'], file: ['File upload', 'File', 'block', 'layout'], ink: ['Handwriting pad', 'Pen', 'block', 'layout']
+};
+var BLOCK = { vitals: 'BP, pulse, SpO2, temperature, weight, height', bodymap: 'Uses the shared body map: pins, findings, what happened', tooth: 'Uses the shared FDI tooth chart', meds: 'Medicine, dose, frequency, days; allergy check', icd: 'Search diagnosis with ICD-10 code', labs: 'Pick tests; results come back here', sign: 'Doctor signs on tablet or with stylus', photo: 'Camera or gallery; kept with the record', file: 'PDF or image from outside', ink: 'Write freely with a stylus' };
+var ROLES = ['Doctor', 'Nurse', 'Reception', 'Patient'];
+function F(id, type, label, x) { return Object.assign({ id: id, type: type, label: label, help: '', req: false, width: 6, opts: [], unit: '', min: '', max: '', lo: '', hi: '', showIf: null, sources: [], rules: [], bands: [], source: '', print: true, copy: false, roles: ['Doctor'], code: '' }, x || {}); }
+function O(list) { return list.map(function (s) { var p = s.split('|'); return { label: p[0], score: p[1] ? +p[1] : 0 }; }); }
+var TEMPLATES = {
+  foot: { name: 'Diabetic foot examination', sub: 'Risk score, ulcer follow-up, advice', dept: ['General Medicine', 'Diabetology'], part: 'Assessment', fields: function () { return [
+    F('h1', 'section', 'History', { help: 'Ask the patient' }),
+    F('dur', 'number', 'Duration of diabetes', { unit: 'years', width: 3, min: '0', max: '60' }),
+    F('tx', 'single', 'Current treatment', { width: 3, opts: O(['Diet only', 'Tablets', 'Insulin', 'Tablets + insulin']) }),
+    F('ulc', 'yesno', 'Previous foot ulcer', { width: 3, req: true, opts: O(['Yes|2', 'No|0']) }),
+    F('amp', 'yesno', 'Previous amputation', { width: 3, req: true, opts: O(['Yes|2', 'No|0']) }),
+    F('h2', 'section', 'Examination', { help: 'Both feet' }),
+    F('mono', 'number', 'Monofilament: sites felt', { unit: 'of 10', width: 2, req: true, min: '0', max: '10', lo: '8', hi: '10', code: 'LOINC 32443-7' }),
+    F('vib', 'single', 'Vibration sense', { width: 2, opts: O(['Normal|0', 'Reduced|1', 'Absent|1']) }),
+    F('pul', 'multi', 'Foot pulses felt', { width: 2, opts: O(['DP right', 'DP left', 'PT right', 'PT left']) }),
+    F('ulnow', 'yesno', 'Ulcer present now', { width: 6, req: true, opts: O(['Yes|2', 'No|0']) }),
+    F('uldet', 'longtext', 'Ulcer site, size and depth', { width: 3, showIf: { field: 'ulnow', value: 'Yes' }, req: true }),
+    F('ulph', 'photo', 'Photo of the ulcer', { width: 3, showIf: { field: 'ulnow', value: 'Yes' } }),
+    F('h3', 'section', 'Risk', { help: 'Worked out automatically' }),
+    F('score', 'calc', 'Foot risk score', { width: 3, sources: ['ulc', 'amp', 'vib', 'ulnow'], rules: [{ field: 'mono', op: '<', value: 8, points: 1 }, { field: 'pul', op: 'count<', value: 4, points: 1 }] }),
+    F('band', 'band', 'Risk category', { width: 3, source: 'score', bands: [{ from: 0, label: 'Low risk: check every year' }, { from: 1, label: 'Moderate: check every 6 months' }, { from: 3, label: 'High: check every 1–3 months, refer' }] }),
+    F('adv', 'multi', 'Advice given', { width: 6, opts: O(['Daily foot check', 'Proper footwear', 'Nail care', 'Stop smoking', 'Refer to podiatry']) }),
+    F('sig', 'sign', 'Examined by', { width: 6 })
+  ]; } },
+  gcs: { name: 'Glasgow Coma Scale', sub: 'Eye, verbal, motor · total and severity', dept: ['General Medicine', 'Emergency'], part: 'Assessment', fields: function () { return [
+    F('h1', 'section', 'Glasgow Coma Scale', { help: 'Best response' }),
+    F('eye', 'single', 'Eye opening', { width: 6, req: true, opts: O(['Spontaneous|4', 'To speech|3', 'To pain|2', 'None|1']) }),
+    F('ver', 'single', 'Verbal response', { width: 6, req: true, opts: O(['Oriented|5', 'Confused|4', 'Inappropriate words|3', 'Sounds only|2', 'None|1']) }),
+    F('mot', 'single', 'Motor response', { width: 6, req: true, opts: O(['Obeys commands|6', 'Localises pain|5', 'Withdraws|4', 'Abnormal flexion|3', 'Extension|2', 'None|1']) }),
+    F('tot', 'calc', 'GCS total', { width: 3, sources: ['eye', 'ver', 'mot'] }),
+    F('sev', 'band', 'Severity', { width: 3, source: 'tot', bands: [{ from: 0, label: 'Severe (3–8)' }, { from: 9, label: 'Moderate (9–12)' }, { from: 13, label: 'Mild (13–15)' }] })
+  ]; } },
+  morse: { name: 'Morse fall risk scale', sub: 'IPD and day care · nursing', dept: ['IPD wards'], part: 'Assessment', fields: function () { return [
+    F('h1', 'section', 'Morse fall scale', { help: 'Nurse fills on admission and every shift' }),
+    F('m1', 'yesno', 'History of falling (3 months)', { width: 3, opts: O(['Yes|25', 'No|0']), roles: ['Nurse'] }),
+    F('m2', 'yesno', 'Secondary diagnosis', { width: 3, opts: O(['Yes|15', 'No|0']), roles: ['Nurse'] }),
+    F('m3', 'single', 'Walking aid', { width: 6, opts: O(['None / bed rest / nurse helps|0', 'Crutches, cane or walker|15', 'Holds furniture|30']), roles: ['Nurse'] }),
+    F('m4', 'yesno', 'IV line or heparin lock', { width: 3, opts: O(['Yes|20', 'No|0']), roles: ['Nurse'] }),
+    F('m5', 'single', 'Gait', { width: 3, opts: O(['Normal|0', 'Weak|10', 'Impaired|20']), roles: ['Nurse'] }),
+    F('m6', 'single', 'Mental status', { width: 6, opts: O(['Knows own limits|0', 'Forgets limits|15']), roles: ['Nurse'] }),
+    F('mt', 'calc', 'Morse score', { width: 3, sources: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'] }),
+    F('mb', 'band', 'Fall risk', { width: 3, source: 'mt', bands: [{ from: 0, label: 'Low (0–24)' }, { from: 25, label: 'Moderate (25–44)' }, { from: 45, label: 'High (45+): fall precautions' }] })
+  ]; } },
+  mlc: { name: 'MLC injury report', sub: 'Medico-legal case · body map · police details', dept: ['General Medicine', 'Emergency', 'Orthopaedics'], part: 'Assessment', fields: function () { return [
+    F('n1', 'note', 'Medico-legal case. Write exactly what you see. Do not guess the weapon if not sure.'),
+    F('h1', 'section', 'Brought by'),
+    F('by', 'text', 'Brought by (name, relation)', { width: 3, req: true }),
+    F('ps', 'text', 'Police station / buckle no.', { width: 3 }),
+    F('dt', 'date', 'Date of examination', { width: 2, req: true }), F('tm', 'time', 'Time of examination', { width: 2, req: true }),
+    F('al', 'yesno', 'Smell of alcohol', { width: 2, opts: O(['Yes', 'No']) }),
+    F('h2', 'section', 'Injuries'),
+    F('bm', 'bodymap', 'Injuries on body map', { width: 6, req: true }),
+    F('nat', 'single', 'Nature of injuries', { width: 3, opts: O(['Simple', 'Grievous', 'Dangerous to life']) }),
+    F('wp', 'dropdown', 'Caused by', { width: 3, opts: O(['Blunt object', 'Sharp object', 'Firearm', 'Burn', 'Fall', 'Not sure']) }),
+    F('sg', 'sign', 'Medical officer', { width: 6, req: true })
+  ]; } },
+  pac: { name: 'Pre-anaesthetic check-up', sub: 'ASA grade, airway, fasting, consent', dept: ['Surgery', 'Dental', 'Obstetrics & Gynaecology'], part: 'Assessment', fields: function () { return [
+    F('h1', 'section', 'Fitness for anaesthesia'),
+    F('asa', 'single', 'ASA grade', { width: 6, req: true, opts: O(['I', 'II', 'III', 'IV', 'V']) }),
+    F('mal', 'single', 'Airway (Mallampati)', { width: 3, opts: O(['I', 'II', 'III', 'IV']) }),
+    F('fast', 'yesno', 'Fasting 6 hours', { width: 3, req: true, opts: O(['Yes', 'No']) }),
+    F('fn', 'note', 'Not fasting: postpone unless emergency.', { showIf: { field: 'fast', value: 'No' } }),
+    F('vt', 'vitals', 'Vitals', { width: 6 }), F('lb', 'labs', 'Tests needed', { width: 6 }),
+    F('cons', 'yesno', 'Consent signed', { width: 6, req: true, opts: O(['Yes', 'No']) }),
+    F('sg', 'sign', 'Anaesthetist', { width: 6 })
+  ]; } },
+  blank: { name: 'Untitled form', sub: 'Start with an empty page', dept: ['General Medicine'], part: 'Assessment', fields: function () { return [F('h1', 'section', 'Section 1')]; } }
+};
+function slug(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 28) || 'field'; }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var t = TEMPLATES.foot;
+    this.state = { mode: 'build', left: 'fields', right: 'field', name: t.name, fields: t.fields(), sel: 'mono', vals: {}, errors: false, dropAt: -1, toast: '', paper: 'A4', uid: 1,
+      cfg: { dept: { 'General Medicine': true, 'Diabetology': true }, part: 'Assessment', visit: { 'New consult': true, 'Follow-up': true }, fill: { Doctor: true, Nurse: true }, lang: 'English + Marathi', approval: true },
+      ver: 'v3', published: false };
+  }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  say(msg, patch) { var self = this; if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3500); this.setState(Object.assign({ toast: msg }, patch || {})); }
+  renderVals() {
+    var self = this, st = this.state, A = '#0B6E69', FS = st.fields;
+    var byId = {}; FS.forEach(function (f) { byId[f.id] = f; });
+    var build = st.mode === 'build', preview = st.mode === 'preview';
+    function setFields(nf, extra) { self.setState(Object.assign({ fields: nf, published: false }, extra || {})); }
+    function upd(id, patch) { setFields(FS.map(function (f) { return f.id === id ? Object.assign({}, f, patch) : f; })); }
+    function newField(type) {
+      var n = st.uid + 1, id = type + n, d = T[type];
+      var x = { width: (type === 'section' || type === 'note' || T[type][2] === 'block' || type === 'longtext') ? 6 : 3 };
+      if (type === 'yesno') x.opts = O(['Yes|1', 'No|0']);
+      if (type === 'single' || type === 'multi' || type === 'dropdown') x.opts = O(['Option 1', 'Option 2', 'Option 3']);
+      if (type === 'pain') x.opts = O(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+      if (type === 'calc') x.sources = FS.filter(function (f) { return T[f.type][2] === 'chips' && f.opts.some(function (o) { return o.score; }); }).map(function (f) { return f.id; });
+      if (type === 'band') { var c = FS.filter(function (f) { return f.type === 'calc'; })[0]; x.source = c ? c.id : ''; x.bands = [{ from: 0, label: 'Low' }, { from: 3, label: 'Moderate' }, { from: 6, label: 'High' }]; }
+      if (type === 'note') return F(id, type, 'Write an instruction for the person filling the form.', x);
+      return F(id, type, d[0], x);
+    }
+    function insertAt(i, f) { var a = FS.slice(); a.splice(i, 0, f); setFields(a, { sel: f.id, uid: st.uid + 1, dropAt: -1, right: 'field' }); self.say(T[f.type][0] + ' added. Set it up on the right.'); }
+    var selIdx = FS.map(function (f) { return f.id; }).indexOf(st.sel);
+
+    /* ---------- engine ---------- */
+    var V = st.vals;
+    function optScore(f, v) { if (v == null || v === '') return 0; if (f.type === 'multi') return f.opts.filter(function (o) { return (v || []).indexOf(o.label) >= 0; }).reduce(function (a, o) { return a + o.score; }, 0); var o = f.opts.filter(function (o) { return o.label === v; })[0]; return o ? o.score : 0; }
+    function visible(f) { if (!f.showIf) return true; var v = V[f.showIf.field]; return Array.isArray(v) ? v.indexOf(f.showIf.value) >= 0 : v === f.showIf.value; }
+    function calcVal(f) {
+      var answered = false, s = 0;
+      f.sources.forEach(function (id) { var src = byId[id]; if (!src || !visible(src)) return; if (V[id] != null && V[id] !== '' && !(Array.isArray(V[id]) && !V[id].length)) answered = true; s += optScore(src, V[id]); });
+      f.rules.forEach(function (r) { var v = V[r.field]; if (v == null || v === '') return; answered = true; if (r.op === '<' && parseFloat(v) < r.value) s += r.points; if (r.op === 'count<' && (v || []).length < r.value) s += r.points; });
+      return answered ? s : null;
+    }
+    function bandOf(f) { var src = byId[f.source]; if (!src) return null; var v = calcVal(src); if (v == null) return null; var b = null; f.bands.slice().sort(function (a, c) { return a.from - c.from; }).forEach(function (x) { if (v >= x.from) b = x; }); return b ? { label: b.label, idx: f.bands.indexOf(b), n: f.bands.length } : null; }
+    function numFlag(f, v) { if (v === '' || v == null || f.type !== 'number') return ''; var n = parseFloat(v); if (isNaN(n)) return 'Not a number'; if (f.min !== '' && n < +f.min || f.max !== '' && n > +f.max) return 'Outside ' + f.min + '–' + f.max; if (f.lo !== '' && n < +f.lo || f.hi !== '' && n > +f.hi) return 'Outside normal (' + f.lo + '–' + f.hi + ')'; return ''; }
+    function filled(f) { var v = V[f.id]; if (T[f.type][2] === 'block') return !!V[f.id]; return !(v == null || v === '' || (Array.isArray(v) && !v.length)); }
+
+    var fv = FS.map(function (f, i) {
+      var d = T[f.type], kind = d[2], sel = build && f.id === st.sel, vis = build || visible(f), v = V[f.id];
+      var span = f.width === 2 ? 2 : f.width === 3 ? 3 : 6;
+      var err = preview && st.errors && f.req && vis && !filled(f);
+      var flag = preview ? numFlag(f, v) : '';
+      var calc = f.type === 'calc' ? calcVal(f) : null, band = f.type === 'band' ? bandOf(f) : null;
+      var bandCols = [['#E3F5EC', '#146C43'], ['#FDF0DC', '#8A4B08'], ['#FDECEA', '#B42318']];
+      var bc = band ? bandCols[Math.min(2, Math.round(band.idx / Math.max(1, band.n - 1) * 2))] : ['#EEF1F5', '#3E4C5E'];
+      var badges = [];
+      if (build && f.showIf) badges.push(['Shows if ' + (byId[f.showIf.field] ? byId[f.showIf.field].label : '?') + ' = ' + f.showIf.value, '#EADFF8', '#552F99']);
+      if (build && f.opts.some(function (o) { return o.score; })) badges.push(['Scored', '#E3F3F1', '#0B6E69']);
+      if (build && f.code) badges.push([f.code.split(' ')[0], '#EEF1F5', '#3E4C5E']);
+      if (build && !f.print) badges.push(['Not printed', '#FDF0DC', '#8A4B08']);
+      var opts = kind === 'chips' || kind === 'select' ? f.opts.map(function (o) {
+        var on = f.type === 'multi' ? (v || []).indexOf(o.label) >= 0 : v === o.label;
+        return { label: (on && f.type === 'multi' ? '✓ ' : '') + o.label, on: on, score: o.score ? '+' + o.score : '',
+          scoreStyle: 'margin-left: 6px; font-size: 10px; font-weight: 700; opacity: 0.8; display: ' + (o.score && build ? 'inline' : 'none'),
+          pick: function () { if (!preview) return; var x = Object.assign({}, V); if (f.type === 'multi') { var a = (v || []).slice(); var k = a.indexOf(o.label); if (k >= 0) a.splice(k, 1); else a.push(o.label); x[f.id] = a; } else x[f.id] = on ? '' : o.label; self.setState({ vals: x }); },
+          style: 'font-size: 13px; font-weight: 600; border-radius: ' + (f.type === 'multi' ? '999px' : '8px') + '; padding: 7px 12px; min-height: 36px; cursor: pointer; border: 1px solid ' + (on ? A : '#D5DCE4') + '; color: ' + (on ? (f.type === 'multi' ? '#084F4C' : '#FFFFFF') : '#3E4C5E') + '; background: ' + (on ? (f.type === 'multi' ? A + '14' : A) : '#FFFFFF') };
+      }) : [];
+      return {
+        label: f.label, help: f.help, icon: d[1], blockTitle: f.label, blockSub: BLOCK[f.type] || '',
+        isSection: f.type === 'section', isNote: f.type === 'note', hasLabel: f.type !== 'section' && f.type !== 'note',
+        isInput: kind === 'input', isLong: kind === 'long', isChips: kind === 'chips', isSelect: kind === 'select', isCalc: kind === 'calc', isBlock: kind === 'block',
+        inputType: f.type === 'number' ? 'text' : f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text',
+        value: Array.isArray(v) ? v.join(', ') : (v || ''), unit: f.unit, placeholder: f.type === 'number' ? (f.min !== '' ? f.min + '–' + f.max : '') : (build ? 'Doctor types here' : ''),
+        inputStyle: 'flex: 1; width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; color: #0F1C2E; border: 1px solid ' + (err || flag ? '#B42318' : '#C9D2DC') + '; border-radius: 8px; padding: 9px 10px; background: ' + (flag ? '#FDF3F2' : '#FFFFFF'),
+        onInput: function (e) { if (!preview) return; var x = Object.assign({}, V); x[f.id] = e && e.target ? e.target.value : ''; self.setState({ vals: x }); },
+        opts: opts, starStyle: 'color: #B42318; display: ' + (f.req ? 'inline' : 'none'),
+        badges: badges.map(function (b) { return { label: b[0], style: 'font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 6px; background: ' + b[1] + '; color: ' + b[2] + '; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis' }; }),
+        calcValue: f.type === 'calc' ? (calc == null ? '—' : String(calc)) : (band ? band.label : '—'),
+        calcNote: f.type === 'calc' ? (build ? 'Adds ' + f.sources.length + ' field(s)' + (f.rules.length ? ' + ' + f.rules.length + ' rule(s)' : '') : 'Worked out from your answers') : (build ? 'From ' + (byId[f.source] ? byId[f.source].label : '—') : ''),
+        calcStyle: 'display: flex; flex-direction: column; gap: 2px; border-radius: 10px; padding: 10px 14px; background: ' + (f.type === 'band' ? bc[0] : '#F4F8FD') + '; color: ' + (f.type === 'band' ? bc[1] : '#164A84') + '; font-weight: ' + (f.type === 'band' ? 700 : 400),
+        flag: err ? 'Required' : flag, flagStyle: 'font-size: 12px; font-weight: 700; color: #B42318; display: ' + (err || flag ? 'block' : 'none'),
+        helpStyle: 'font-size: 12px; color: #5B6B7F; display: ' + (f.help && f.type !== 'section' ? 'block' : 'none'),
+        draggable: build ? 'true' : 'false',
+        wrap: 'position: relative; grid-column: span ' + span + '; display: ' + (vis ? 'flex' : 'none') + '; flex-direction: column; gap: 6px; border-radius: 10px; padding: ' + (build ? '10px 12px' : '0') + '; border: ' + (build ? (sel ? '2px solid ' + A : '1px dashed ' + (st.dropAt === i ? A : 'transparent')) : '0') + '; background: ' + (sel ? A + '08' : 'transparent') + '; box-shadow: ' + (st.dropAt === i ? '0 -3px 0 0 ' + A : 'none') + (build ? '; cursor: grab' : '') + (f.showIf && build ? '; opacity: 0.85' : ''),
+        overlay: 'position: absolute; inset: 0; z-index: 2; border: 0; background: transparent; cursor: pointer; display: ' + (build ? 'block' : 'none'),
+        select: function () { self.setState({ sel: f.id, right: 'field' }); },
+        showTools: sel,
+        up: function () { if (i === 0) return; var a = FS.slice(); var t = a[i - 1]; a[i - 1] = a[i]; a[i] = t; setFields(a); },
+        down: function () { if (i === FS.length - 1) return; var a = FS.slice(); var t = a[i + 1]; a[i + 1] = a[i]; a[i] = t; setFields(a); },
+        dup: function () { var c = Object.assign({}, f, { id: f.type + (st.uid + 1), label: f.label + ' (copy)' }); var a = FS.slice(); a.splice(i + 1, 0, c); setFields(a, { sel: c.id, uid: st.uid + 1 }); },
+        del: function () { setFields(FS.filter(function (x) { return x.id !== f.id; }), { sel: FS[i + 1] ? FS[i + 1].id : (FS[i - 1] ? FS[i - 1].id : null) }); self.say('“' + f.label + '” deleted'); },
+        dragStart: function (e) { if (!build) return; self._drag = { kind: 'move', id: f.id }; if (e && e.dataTransfer) { try { e.dataTransfer.setData('text/plain', f.id); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} } },
+        dragOver: function (e) { if (!build || !self._drag) return; if (e && e.preventDefault) e.preventDefault(); if (st.dropAt !== i) self.setState({ dropAt: i }); },
+        drop: function (e) {
+          if (e && e.preventDefault) e.preventDefault(); var d = self._drag; self._drag = null; if (!d) return;
+          if (d.kind === 'new') insertAt(i, newField(d.type));
+          else { var a = FS.slice(), from = a.map(function (x) { return x.id; }).indexOf(d.id); if (from < 0 || from === i) { self.setState({ dropAt: -1 }); return; } var m = a.splice(from, 1)[0]; a.splice(from < i ? i - 1 : i, 0, m); setFields(a, { dropAt: -1, sel: m.id }); }
+        }
+      };
+    });
+
+    /* ---------- palette ---------- */
+    var GROUPS = [['basic', 'Basic fields'], ['clinical', 'Clinical'], ['layout', 'Layout and sign-off']];
+    var palette = GROUPS.map(function (g) {
+      return { label: g[1], items: Object.keys(T).filter(function (k) { return T[k][3] === g[0]; }).map(function (k) {
+        return { label: T[k][0], icon: T[k][1], hint: 'Drag onto the form or tap to add', iconStyle: 'flex: none; min-width: 28px; height: 24px; border-radius: 6px; background: #E3F3F1; color: #0B6E69; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; padding: 0 3px',
+          add: function () { insertAt(selIdx >= 0 ? selIdx + 1 : FS.length, newField(k)); },
+          dragStart: function (e) { self._drag = { kind: 'new', type: k }; if (e && e.dataTransfer) { try { e.dataTransfer.setData('text/plain', k); e.dataTransfer.effectAllowed = 'copy'; } catch (x) {} } } };
+      }) };
+    });
+    var templates = Object.keys(TEMPLATES).map(function (k) {
+      var t = TEMPLATES[k], on = st.name === t.name;
+      return { name: t.name, sub: t.sub,
+        load: function () { var d = {}; t.dept.forEach(function (x) { d[x] = true; }); self.say('Loaded “' + t.name + '”. Change anything, then publish.', { name: t.name, fields: t.fields(), sel: null, vals: {}, errors: false, mode: 'build', left: 'fields', cfg: Object.assign({}, st.cfg, { dept: d, part: t.part }), published: false }); },
+        style: 'display: flex; flex-direction: column; gap: 2px; text-align: left; border-radius: 10px; padding: 10px 12px; min-height: 52px; cursor: pointer; color: #0F1C2E; border: ' + (on ? '2px solid ' + A : '1px solid #D5DCE4') + '; background: ' + (on ? A + '10' : '#FFFFFF') };
+    });
+
+    /* ---------- properties ---------- */
+    var f = byId[st.sel], pf = {};
+    if (f) {
+      var kind = T[f.type][2];
+      function tg(label, hint, key) { var on = !!f[key]; return { label: label, hint: hint, on: on, toggle: function () { var p = {}; p[key] = !on; upd(f.id, p); }, track: 'flex: none; width: 44px; height: 26px; border-radius: 999px; border: 0; padding: 3px; cursor: pointer; display: flex; align-items: center; background: ' + (on ? A : '#B7C2CE'), knob: 'width: 20px; height: 20px; border-radius: 999px; background: #FFFFFF; margin-left: ' + (on ? '18px' : '0') }; }
+      var toggles = [];
+      if (f.type !== 'section' && f.type !== 'note' && kind !== 'calc') toggles.push(tg('Required', 'Form cannot be saved without it', 'req'));
+      toggles.push(tg('Print on paper', 'Shown on the printed form', 'print'));
+      if (kind === 'input' || kind === 'chips' || kind === 'long') toggles.push(tg('Copy from last visit', 'Pre-fills the previous answer', 'copy'));
+      var prior = FS.slice(0, FS.indexOf(f)).filter(function (x) { return T[x.type][2] === 'chips' || x.type === 'dropdown'; });
+      var lf = f.showIf ? byId[f.showIf.field] : null;
+      pf = {
+        typeName: T[f.type][0], icon: T[f.type][1], key: slug(f.label), label: f.label, help: f.help, code: f.code,
+        labelCaption: f.type === 'note' ? 'Text' : f.type === 'section' ? 'Heading' : 'Label',
+        iconStyle: 'flex: none; min-width: 36px; height: 36px; border-radius: 8px; background: #E3F3F1; color: #0B6E69; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700',
+        onLabel: function (e) { upd(f.id, { label: e && e.target ? e.target.value : '' }); },
+        onHelp: function (e) { upd(f.id, { help: e && e.target ? e.target.value : '' }); },
+        onCode: function (e) { upd(f.id, { code: e && e.target ? e.target.value : '' }); },
+        canHelp: f.type !== 'note',
+        widths: [[6, 'Full'], [3, 'Half'], [2, 'Third']].map(function (w) { var on = f.width === w[0]; return { label: w[1], on: on, pick: function () { upd(f.id, { width: w[0] }); }, style: 'flex: 1; font-size: 12px; font-weight: 600; border-radius: 8px; min-height: 34px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') }; }),
+        toggles: toggles,
+        hasOpts: kind === 'chips' || kind === 'select',
+        opts: f.opts.map(function (o, i) {
+          function setO(p) { var a = f.opts.map(function (x, j) { return j === i ? Object.assign({}, x, p) : x; }); upd(f.id, { opts: a }); }
+          return { n: i + 1, label: o.label, score: o.score, onLabel: function (e) { setO({ label: e && e.target ? e.target.value : '' }); }, minus: function () { setO({ score: o.score - 1 }); }, plus: function () { setO({ score: o.score + 1 }); }, remove: function () { upd(f.id, { opts: f.opts.filter(function (_, j) { return j !== i; }) }); } };
+        }),
+        addOpt: function () { upd(f.id, { opts: f.opts.concat([{ label: 'Option ' + (f.opts.length + 1), score: 0 }]) }); },
+        isNum: f.type === 'number',
+        numProps: [['Unit', 'unit'], ['Normal from', 'lo'], ['Lowest allowed', 'min'], ['Normal to', 'hi'], ['Highest allowed', 'max']].filter(function (x) { return true; }).map(function (n) { return { label: n[0], value: f[n[1]], on: function (e) { var p = {}; p[n[1]] = e && e.target ? e.target.value : ''; upd(f.id, p); } }; }),
+        isCalc: f.type === 'calc',
+        sources: FS.filter(function (x) { return (T[x.type][2] === 'chips' || x.type === 'dropdown') && x.id !== f.id; }).map(function (x) { var on = f.sources.indexOf(x.id) >= 0; return { label: x.label + (x.opts.some(function (o) { return o.score; }) ? '' : ' (no scores yet)'), on: on, toggle: function () { upd(f.id, { sources: on ? f.sources.filter(function (y) { return y !== x.id; }) : f.sources.concat([x.id]) }); } }; }),
+        rules: f.rules.map(function (r, i) { var src = byId[r.field]; return { text: '+' + r.points + ' if ' + (src ? src.label : '?') + (r.op === 'count<' ? ' has fewer than ' + r.value + ' ticked' : ' is below ' + r.value), remove: function () { upd(f.id, { rules: f.rules.filter(function (_, j) { return j !== i; }) }); } }; }),
+        canAddRule: FS.some(function (x) { return x.type === 'number'; }),
+        addRuleLabel: '+ Add rule on a number field',
+        addRule: function () { var n = FS.filter(function (x) { return x.type === 'number'; })[0]; upd(f.id, { rules: f.rules.concat([{ field: n.id, op: '<', value: n.lo !== '' ? +n.lo : 1, points: 1 }]) }); },
+        isBand: f.type === 'band', bandSource: byId[f.source] ? byId[f.source].label : '—',
+        bands: f.bands.map(function (b, i) { function setB(p) { upd(f.id, { bands: f.bands.map(function (x, j) { return j === i ? Object.assign({}, x, p) : x; }) }); } return { from: b.from, label: b.label, minus: function () { setB({ from: Math.max(0, b.from - 1) }); }, plus: function () { setB({ from: b.from + 1 }); }, onLabel: function (e) { setB({ label: e && e.target ? e.target.value : '' }); } }; }),
+        canLogic: f.type !== 'section' && prior.length > 0,
+        always: !f.showIf,
+        logicFields: prior.map(function (x) { return { id: x.id, label: x.label, on: !!f.showIf && f.showIf.field === x.id }; }),
+        onLogicField: function (e) { var id = e && e.target ? e.target.value : ''; if (!id) { upd(f.id, { showIf: null }); return; } var src = byId[id]; upd(f.id, { showIf: { field: id, value: src && src.opts[0] ? src.opts[0].label : '' } }); },
+        hasLogic: !!lf,
+        logicVals: lf ? lf.opts.map(function (o) { var on = f.showIf.value === o.label; return { label: o.label, on: on, pick: function () { upd(f.id, { showIf: { field: lf.id, value: o.label } }); }, style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 10px; min-height: 32px; cursor: pointer; border: 1px solid ' + (on ? '#6D3FC0' : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#6D3FC0' : '#FFFFFF') }; }) : [],
+        roles: ROLES.map(function (r) { var on = f.roles.indexOf(r) >= 0; return { label: r, on: on, toggle: function () { upd(f.id, { roles: on ? f.roles.filter(function (x) { return x !== r; }) : f.roles.concat([r]) }); }, style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 12px; min-height: 32px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? A : '#3E4C5E') + '; background: ' + (on ? A + '14' : '#FFFFFF') }; })
+      };
+    }
+
+    /* ---------- form settings ---------- */
+    function chipGroup(label, key, list, multi, hint) {
+      var cur = st.cfg[key];
+      return { label: label, hint: hint, opts: list.map(function (o) {
+        var on = multi ? !!(cur && cur[o]) : cur === o;
+        return { label: (on && multi ? '✓ ' : '') + o, on: on,
+          pick: function () { var c = Object.assign({}, st.cfg); if (multi) { var x = Object.assign({}, cur || {}); if (on) delete x[o]; else x[o] = true; c[key] = x; } else c[key] = o; self.setState({ cfg: c, published: false }); },
+          style: 'font-size: 12px; font-weight: 600; border-radius: ' + (multi ? '999px' : '8px') + '; padding: 6px 11px; min-height: 32px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? (multi ? '#084F4C' : '#FFFFFF') : '#3E4C5E') + '; background: ' + (on ? (multi ? A + '14' : A) : '#FFFFFF') };
+      }) };
+    }
+    var settings = [
+      chipGroup('Use in departments', 'dept', ['General Medicine', 'Diabetology', 'Dental', 'Obstetrics & Gynaecology', 'Paediatrics', 'Physiotherapy', 'Orthopaedics', 'Surgery', 'Emergency', 'IPD wards'], true, 'Appears as a custom section in these departments’ EMR.'),
+      chipGroup('EMR part', 'part', ['Assessment', 'Treatment'], false, 'Where the section sits on the doctor’s screen.'),
+      chipGroup('Visit types', 'visit', ['New consult', 'Follow-up', 'Procedure visit', 'Teleconsult', 'IPD daily round'], true, ''),
+      chipGroup('Filled by', 'fill', ROLES, true, 'Patient: sent as a WhatsApp link or filled on a tablet at the desk.'),
+      chipGroup('Print language', 'lang', ['English', 'English + Marathi', 'English + Hindi'], false, ''),
+      { label: 'Approval before publishing', hint: st.cfg.approval ? 'Medical director approves each new version.' : 'Publishes straight away.', opts: [['On', true], ['Off', false]].map(function (o) { var on = st.cfg.approval === o[1]; return { label: o[0], on: on, pick: function () { self.setState({ cfg: Object.assign({}, st.cfg, { approval: o[1] }) }); }, style: 'font-size: 12px; font-weight: 600; border-radius: 8px; padding: 6px 11px; min-height: 32px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') }; }) }
+    ];
+    var depts = Object.keys(st.cfg.dept || {});
+    var verNum = parseInt(st.ver.slice(1), 10);
+    var versions = [['v' + verNum, st.published ? 'Your changes' : 'Your changes (draft)', st.published ? (st.cfg.approval ? 'Waiting approval' : 'Live') : 'Draft'], ['v' + (verNum - 1), 'Added foot pulses and photo', st.published ? 'Replaced' : 'Live'], ['v' + (verNum - 2), 'First version', 'Replaced']].filter(function (x) { return parseInt(x[0].slice(1), 10) > 0; }).map(function (x) {
+      return { v: x[0], what: x[1], state: x[2], style: 'font-weight: 700; color: ' + (x[2] === 'Live' ? '#146C43' : x[2] === 'Draft' ? '#8A4B08' : x[2] === 'Waiting approval' ? '#6D3FC0' : '#5B6B7F') };
+    });
+
+    /* ---------- preview & print ---------- */
+    var visReq = FS.filter(function (x) { return x.req && visible(x); });
+    var missing = visReq.filter(function (x) { return !filled(x); });
+    var flags = FS.filter(function (x) { return visible(x) && numFlag(x, V[x.id]); });
+    var printRows = FS.filter(function (x) { return x.print && visible(x); }).map(function (x) {
+      var v = V[x.id], val = x.type === 'calc' ? (calcVal(x) == null ? '' : String(calcVal(x))) : x.type === 'band' ? ((bandOf(x) || {}).label || '') : Array.isArray(v) ? v.join(', ') : (v || '');
+      if (T[x.type][2] === 'block' && !val) val = x.type === 'sign' ? '' : '[attached in EMR]';
+      var head = x.type === 'section';
+      return { label: x.label, value: head || x.type === 'note' ? '' : (val || '________________'),
+        labelStyle: head ? 'font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em' : 'color: #3E4C5E',
+        style: 'display: flex; justify-content: space-between; gap: 12px; padding: ' + (head ? '10px 0 4px' : '5px 0') + '; border-bottom: ' + (head ? '1px solid #0F1C2E' : '1px dotted #C9D2DC') + '; font-size: ' + (x.type === 'note' ? '10px' : '11.5px') };
+    });
+    var MODES = [['build', 'Build'], ['preview', 'Preview'], ['print', 'Print']];
+    var narrow = st.mode !== 'build';
+    return {
+      form: { name: st.name, version: st.ver },
+      onName: function (e) { self.setState({ name: e && e.target ? e.target.value : '', published: false }); },
+      statusText: st.published ? (st.cfg.approval ? st.ver + ' · waiting approval' : st.ver + ' · live') : st.ver + ' · draft',
+      statusStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: ' + (st.published ? '#E3F5EC' : '#FDF0DC') + '; color: ' + (st.published ? '#146C43' : '#8A4B08'),
+      fieldCountText: FS.filter(function (x) { return x.type !== 'section' && x.type !== 'note'; }).length + ' fields · ' + FS.filter(function (x) { return x.showIf; }).length + ' with logic · ' + FS.filter(function (x) { return x.type === 'calc' || x.type === 'band'; }).length + ' scores',
+      modes: MODES.map(function (m) { var on = st.mode === m[0]; return { label: m[1], on: on, pick: function () { self.setState({ mode: m[0], errors: false, dropAt: -1 }); }, style: 'border: 0; border-radius: 8px; padding: 8px 16px; min-height: 38px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#0F1C2E' : 'transparent') }; }),
+      saveDraft: function () { self.say('Draft saved'); },
+      publishLabel: st.cfg.approval ? 'Send for approval' : 'Publish',
+      publish: function () { if (!depts.length) { self.say('Pick at least one department in Form settings first.', { right: 'form' }); return; } self.say(st.cfg.approval ? st.ver + ' sent to the medical director. After approval it appears in ' + depts.join(', ') + ' (' + st.cfg.part + ').' : st.ver + ' is live in ' + depts.join(', ') + ' under ' + st.cfg.part + '.', { published: true }); },
+      leftStyle: 'flex: 0 0 280px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 14px; display: ' + (st.mode === 'build' ? 'flex' : 'none') + '; flex-direction: column; gap: 12px',
+      mainStyle: 'flex: 999 1 560px; min-width: 0; max-width: ' + (narrow ? '900px' : 'none') + '; margin: 0 auto; display: flex; flex-direction: column; gap: 14px',
+      rightStyle: 'flex: 0 1 340px; min-width: 300px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 14px; display: ' + (st.mode === 'build' ? 'flex' : 'none') + '; flex-direction: column; gap: 12px',
+      leftTabs: [['fields', 'Fields'], ['templates', 'Templates']].map(function (t) { var on = st.left === t[0]; return { label: t[1], on: on, pick: function () { self.setState({ left: t[0] }); }, style: 'flex: 1; border: 0; border-radius: 8px; padding: 7px 10px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#5B6B7F') + '; background: ' + (on ? '#FFFFFF' : 'transparent') }; }),
+      isPalette: st.left === 'fields', isTemplates: st.left === 'templates', palette: palette, templates: templates,
+      rightTabs: [['field', 'Field'], ['form', 'Form settings']].map(function (t) { var on = st.right === t[0]; return { label: t[1], on: on, pick: function () { self.setState({ right: t[0] }); }, style: 'flex: 1; border: 0; border-radius: 8px; padding: 7px 10px; min-height: 36px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#5B6B7F') + '; background: ' + (on ? '#FFFFFF' : 'transparent') }; }),
+      isFieldTab: st.right === 'field', isFormTab: st.right === 'form', hasField: !!f, noField: !f, pf: pf,
+      settings: settings, versions: versions,
+      formMeta: (depts.join(', ') || 'No department yet') + ' · ' + st.cfg.part + ' · filled by ' + Object.keys(st.cfg.fill || {}).join(', ').toLowerCase(),
+      modeBadge: build ? 'Building · tap a field to edit, drag to reorder' : preview ? 'Preview · fill it like a doctor; rules and scores run live' : '',
+      modeBadgeStyle: 'font-size: 12px; font-weight: 600; border-radius: 8px; padding: 6px 10px; background: ' + (build ? '#EEF1F5' : '#E3F3F1') + '; color: ' + (build ? '#3E4C5E' : '#0B6E69'),
+      fv: fv, notPrint: st.mode !== 'print', isPrint: st.mode === 'print', isPreview: preview,
+      endOver: function (e) { if (!build || !self._drag) return; if (e && e.preventDefault) e.preventDefault(); if (st.dropAt !== FS.length) self.setState({ dropAt: FS.length }); },
+      endDrop: function (e) { if (e && e.preventDefault) e.preventDefault(); var d = self._drag; self._drag = null; if (!d) return; if (d.kind === 'new') insertAt(FS.length, newField(d.type)); else { var a = FS.slice(), from = a.map(function (x) { return x.id; }).indexOf(d.id); var m = a.splice(from, 1)[0]; a.push(m); setFields(a, { dropAt: -1, sel: m.id }); } },
+      dragEnd: function () { self._drag = null; if (st.dropAt !== -1) self.setState({ dropAt: -1 }); },
+      endZone: 'grid-column: span 6; display: ' + (build ? 'flex' : 'none') + '; align-items: center; justify-content: center; min-height: 56px; border-radius: 10px; font-size: 13px; color: ' + (st.dropAt === FS.length ? A : '#5B6B7F') + '; border: 2px dashed ' + (st.dropAt === FS.length ? A : '#D5DCE4') + '; background: ' + (st.dropAt === FS.length ? A + '0D' : 'transparent'),
+      endText: 'Drop a field here, or tap one on the left',
+      pvStatus: st.errors && missing.length ? missing.length + ' required field(s) missing: ' + missing.map(function (x) { return x.label; }).join(', ') : flags.length ? flags.length + ' value(s) outside the normal range' : visReq.length - missing.length + ' of ' + visReq.length + ' required fields filled',
+      pvStatusStyle: 'font-size: 13px; font-weight: 600; color: ' + (st.errors && missing.length || flags.length ? '#B42318' : '#3E4C5E'),
+      clearValues: function () { self.setState({ vals: {}, errors: false }); },
+      submit: function () { if (missing.length) { self.say('Fill the fields marked Required first.', { errors: true }); return; } self.say('Saved to the patient’s EMR under ' + st.cfg.part + ' as “' + st.name + '” (' + st.ver + ').', { errors: false }); },
+      paperOpts: ['A4', 'A5'].map(function (p) { var on = st.paper === p; return { label: p, on: on, pick: function () { self.setState({ paper: p }); }, style: 'font-size: 12px; font-weight: 600; border-radius: 8px; padding: 6px 12px; min-height: 32px; cursor: pointer; border: 1px solid ' + (on ? '#0F1C2E' : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#0F1C2E' : '#FFFFFF') }; }),
+      paperStyle: 'width: ' + (st.paper === 'A4' ? '640px' : '452px') + '; min-height: ' + (st.paper === 'A4' ? '905px' : '640px') + '; box-sizing: border-box; background: #FFFFFF; box-shadow: 0 1px 2px rgba(15,28,46,0.12), 0 18px 40px -18px rgba(15,28,46,0.35); padding: 32px 36px; display: flex; flex-direction: column; gap: 2px; font-family: Inter, Arial, sans-serif',
+      printRows: printRows,
+      toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

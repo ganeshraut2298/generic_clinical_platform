@@ -1,13 +1,15 @@
 /**
- * Types for the treatment course: the plan is `docs/api/opd.yaml` 0.4.0 (`/emr/courses/**`), the
- * money is `docs/api/billing.yaml` 0.2.0 (`/billing/courses/**`). Written by hand; no field is
+ * Types for the treatment course: the plan is `docs/api/opd.yaml` 0.7.0 (`/emr/courses/**`), the
+ * money is `docs/api/billing.yaml` 0.4.0 (`/billing/courses/**`). Written by hand; no field is
  * invented. Amounts are integer paise. Patient and clinical text are for the screen only.
  */
 
 export type TreatmentCourseKind = 'DENTAL' | 'ANC' | 'CHEMO' | 'SURGERY' | 'REHAB';
 export type CourseUnit = 'SITTING' | 'VISIT' | 'CYCLE' | 'STEP' | 'SESSION';
 export type CourseEncounterKind = 'OPD' | 'DAY_CARE' | 'IPD';
-export type CourseSittingStatus = 'PLANNED' | 'TODAY' | 'DONE';
+export type CourseSittingStatus = 'PLANNED' | 'TODAY' | 'DONE' | 'MISSED';
+/** 0.7.0 (SAH-75-10): what the caller may do on a sitting now; the buttons are drawn from it, the server checks again. */
+export type CourseSittingAction = 'MARK_DONE' | 'MISSED' | 'REBOOK' | 'RESCHEDULE' | 'REMOVE' | 'REQUEST_ADMISSION' | 'ADMIT';
 
 export interface CourseAddOption {
   key: string;
@@ -31,6 +33,11 @@ export interface CourseSitting {
   ipdBillTotalPaise: number | null;
   opdVisitId: string | null;
   admissionId: string | null;
+  /** 0.7.0: the number shown (S<n>, "Sitting n"): rank among the non-removed sittings; sittingNo stays the stable key. */
+  displayNo: number;
+  doneSource: 'MARK_DONE' | 'SIGN' | null;
+  regimenKey: string | null;
+  allowedActions: CourseSittingAction[];
 }
 
 export interface TreatmentCourseSummary {
@@ -56,10 +63,13 @@ export interface TreatmentCourseView extends TreatmentCourseSummary {
   canPlan: boolean;
   canAdmit: boolean;
   accountNote: string;
+  /** 0.7.0: the sub line adds "estimate signed by patient" only when true. */
+  estimateSigned: boolean;
 }
 
 export interface CourseSittingPlanInput {
   addOptionKey: string;
+  regimenKey?: string | null;
   plannedDate?: string | null;
   items?: string[];
   chargePaise?: number;
@@ -96,6 +106,24 @@ export interface CourseSittingLinkVisitInput {
   visitId: string;
 }
 
+/** 0.7.0 (SAH-75-10): the bodies of the six sitting actions. */
+export interface CourseSittingRevisionInput {
+  revision: number;
+}
+export interface CourseSittingMarkDoneInput {
+  revision: number;
+  visitId?: string | null;
+}
+export interface CourseSittingDateInput {
+  revision: number;
+  /** Today or later, Asia/Kolkata (400 validation otherwise). */
+  plannedDate: string;
+}
+export interface CourseSittingAdmissionRequestInput {
+  revision: number;
+  encounterKind?: 'DAY_CARE' | 'IPD' | null;
+}
+
 // ---- billing: the running account ----
 
 export type PaymentMode = 'CASH' | 'UPI' | 'CARD';
@@ -125,7 +153,7 @@ export interface CourseAccount {
   sittingCount: number;
   doneCount: number;
   receiptCount: number;
-  nextPlannedAdmission: { sittingId: string; sittingNo: number; chargePaise: number; note: string | null } | null;
+  nextPlannedAdmission: { sittingId: string; sittingNo: number; displayNo?: number; chargePaise: number; note: string | null } | null;
   suggestions: { partPaymentPaise: number | null; ipdDepositPaise: number | null };
   canCollect: boolean;
   ledger: CourseLedgerLine[];

@@ -31,6 +31,20 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${SAHAJ_DB_POOL_SIZE:10}
+      # DEC-054: one stuck request must never wedge the server. Every wait on the database is bounded:
+      #   lock_timeout       a row or advisory lock that is not free within 10 s ends the statement (SQLSTATE 55P03)
+      #   statement_timeout  a statement that runs longer than 30 s is cancelled (57014)
+      # Both reach PostgreSQL as start-up parameters of every pooled connection (the pgjdbc "options" property), so no
+      # code path, new or old, can forget them, and nothing has to run after the connection is handed out. They apply to
+      # the request pool only (Flyway has its own connection). A statement that needs longer sets its own
+      # "set local statement_timeout" (StaffPin does, JdbcStaffPinRepository). ProblemExceptionHandler answers either one
+      # as 503 database-busy. Env: SAHAJ_DB_LOCK_TIMEOUT_MS, SAHAJ_DB_STATEMENT_TIMEOUT_MS.
+      data-source-properties:
+        options: "-c lock_timeout=${SAHAJ_DB_LOCK_TIMEOUT_MS:10000} -c statement_timeout=${SAHAJ_DB_STATEMENT_TIMEOUT_MS:30000}"
+      # A request that finds no free connection gives up after 10 s (the Hikari default is 30 s) with 503 database-busy.
+      connection-timeout: ${SAHAJ_DB_CONNECTION_TIMEOUT_MS:10000}
+      # A connection held for over 60 s is logged once with the stack of the code that took it: names a stuck request.
+      leak-detection-threshold: ${SAHAJ_DB_LEAK_DETECTION_MS:60000}
   flyway:
     # Flyway runs as sahaj_migrator on its own connection; it never shares the request pool.
     # Schemas are created by scripts/setup/create-database.mjs, not by Flyway.

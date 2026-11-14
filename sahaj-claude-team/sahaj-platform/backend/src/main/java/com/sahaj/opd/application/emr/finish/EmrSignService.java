@@ -23,6 +23,7 @@ import com.sahaj.opd.application.VisitService.FinishMove;
 import com.sahaj.opd.application.VisitView;
 import com.sahaj.opd.application.course.TreatmentCourseRepository;
 import com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow;
+import com.sahaj.opd.application.emr.EmrAllergyCheck;
 import com.sahaj.opd.application.emr.EmrComponentBinding;
 import com.sahaj.opd.application.emr.EmrMaster;
 import com.sahaj.opd.application.emr.EmrModel.FieldDefinition;
@@ -69,6 +70,8 @@ import com.sahaj.opd.application.emr.specialty.ProfileEffects;
 import com.sahaj.opd.application.emr.specialty.SpecialtyFinishContributor;
 import com.sahaj.opd.application.emr.specialty.SpecialtyFinishContributor.FinishContext;
 import com.sahaj.opd.application.emr.specialty.SpecialtyFinishContributor.ProfileResult;
+import com.sahaj.opd.domain.emr.specialty.DentalRules;
+import com.sahaj.patient.api.AllergyStatus;
 import com.sahaj.patient.api.PatientClinicalPort;
 import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.patient.api.PatientClinicalUpdatePort;
@@ -76,6 +79,7 @@ import com.sahaj.patient.api.PatientClinicalUpdatePort.FactsChange;
 import com.sahaj.patient.api.PatientClinicalUpdatePort.FactsOutcome;
 import com.sahaj.platform.api.AuditLog;
 import com.sahaj.platform.api.ClinicUser;
+import com.sahaj.platform.api.ConflictException;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
 import com.sahaj.platform.api.NotFoundException;
@@ -136,8 +140,6 @@ public class EmrSignService {
     private static final Set<String> ER_KINDS = Set.of("DISCHARGE", "ADMIT", "REFER_OUT", "SEND_TO_OPD");
     /** The only text the visit writes for "no allergy" (OQ-45-23). */
     static final String NO_KNOWN_ALLERGY = "No known allergy";
-    private static final Set<String> NONE_TOKENS = Set.of("none", "nil", "nka", "nkda", "no known allergy",
-            "no known allergies", "no known drug allergy", "no known drug allergies");
 
     private final EmrRecordService records;
     private final EmrRecordRepository recordRows;
@@ -475,9 +477,13 @@ public class EmrSignService {
         // step 9: the linked treatment course sitting is done
         Optional<SittingRow> sitting = courses.sittingByVisit(tenantId, visit.id());
         UUID doneId = null;
-        if (sitting.isPresent()) {
-            courses.markDone(tenantId, sitting.get().id(), work.now, user.userId());
-            courses.bumpRevision(tenantId, sitting.get().courseId(), user.userId());
+        // ADR-026 D4: ONE charge. done_at is set only when it is empty ("Mark done" may have come first, then this is a
+        // no-op), and a REMOVED sitting is skipped (removed and done exclude each other in the table).
+        if (sitting.isPresent() && !sitting.get().removed()) {
+            if (sitting.get().doneAt() == null) {
+                courses.markDone(tenantId, sitting.get().id(), work.now, user.userId());
+                courses.bumpRevision(tenantId, sitting.get().courseId(), user.userId());
+            }
             doneId = sitting.get().id();
         }
         CourseOutcome next = profile.course();
@@ -767,8 +773,17 @@ public class EmrSignService {
         List<UUID> blocked = new ArrayList<>();
         List<UUID> needReason = new ArrayList<>();
         String firstStop = null;
-        for (LineCheck check : port.check(user.tenantId(), user.userId(), ctx.member().role(), ctx.row().ipdAdmissionId(),
-                lines)) {
+        List<LineCheck> checked;
+        try {
+            checked = port.check(user.tenantId(), user.userId(), ctx.member().role(), ctx.row().ipdAdmissionId(), lines);
+        } catch (ConflictException closed) {
+            // opd.yaml 0.6.3, DEC-051 D2: a discharged admission is 409 encounter-closed, as on the sign path
+            if ("not-admitted".equals(closed.problemType())) {
+                throw EmrProblemException.encounterClosed();
+            }
+            throw closed;
+        }
+        for (LineCheck check : checked) {
             out.add(orderCheck(check));
             if ("BLOCKED".equals(check.outcome())) {
                 blocked.add(check.clientKey());
@@ -911,8 +926,13 @@ public class EmrSignService {
         return outcome.name();
     }
 
-    /** The active Allergies items and the free text, as the visit confirmed them. */
-    private static List<String> allergyTexts(EmrRecordDocument document) {
+    /**
+     * The active Allergies items and the free text, as the visit confirmed them, plus (SAH-75-6, OQ-75-16, ADR-025 D13
+     * extended) the allergy chips of the Dental "Medical history and alerts" card as their labels; its None chip counts as
+     * the token "None", so the H25 rule decides: it is an explicit None only when no allergy is recorded in either place.
+     * Repeats (ignoring case) are written once.
+     */
+    static List<String> allergyTexts(EmrRecordDocument document) {
         List<String> out = new ArrayList<>();
         JsonNode values = document.values("allergy");
         collectTexts(values.path("drug_allergy"), out);
@@ -920,7 +940,22 @@ public class EmrSignService {
         if (other.isTextual() && !other.asText().isBlank()) {
             out.add(other.asText().strip());
         }
-        return out;
+        JsonNode medhx = document.values(EmrAllergyCheck.DENTAL_MEDHX_SECTION).path("specialty");
+        if ("DENTAL_MED_HISTORY".equals(medhx.path("component").asText())) {
+            for (JsonNode chip : medhx.path("allergies")) {
+                String label = DentalRules.MED_LABELS.get(chip.asText());
+                if (label != null) {
+                    out.add(label);
+                }
+            }
+        }
+        List<String> distinct = new ArrayList<>();
+        for (String text : out) {
+            if (distinct.stream().noneMatch(d -> d.equalsIgnoreCase(text))) {
+                distinct.add(text);
+            }
+        }
+        return distinct;
     }
 
     /**
@@ -953,10 +988,12 @@ public class EmrSignService {
         return labels;
     }
 
-    /** True for what a doctor types or picks to say there is no allergy ("None", "NKDA", "No known allergy"). */
+    /**
+     * True for what a doctor types or picks to say there is no allergy ("None", "NKDA", "No known allergy"): the one
+     * shared none-word list of patient.api (ADR-026 D12), the same that the record header and the IPD medicine chip use.
+     */
     static boolean isNoneToken(String text) {
-        String t = text == null ? "" : text.strip().toLowerCase(Locale.ROOT).replaceAll("\\.+$", "");
-        return NONE_TOKENS.contains(t);
+        return AllergyStatus.isNoneWord(text);
     }
 
     private static void collectTexts(JsonNode node, List<String> out) {

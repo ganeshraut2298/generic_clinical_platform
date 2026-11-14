@@ -677,7 +677,7 @@ class EmergencyTableIT extends EmergencySupport {
                 + "and privilege_type in ('INSERT', 'UPDATE')"))
                 .isEqualTo("age:INSERT,bay:INSERT,client_key:INSERT,complaint:INSERT,display_name:INSERT,identity_pending:INSERT,level:INSERT,"
                         + "mobile:INSERT,registered_by:INSERT,sex:INSERT,admission_id:UPDATE,closed_at:UPDATE,closed_by:UPDATE,level:UPDATE,"
-                        + "mobile:UPDATE,patient_id:UPDATE,seen_at:UPDATE,seen_by:UPDATE,status:UPDATE,version:UPDATE");
+                        + "mobile:UPDATE,patient_id:UPDATE,seen_at:UPDATE,seen_by:UPDATE,sent_to_opd_visit_id:UPDATE,status:UPDATE,version:UPDATE");
         assertThat(ownerText("select count(*)::text from pg_trigger where tgrelid in ('ipd.emergency_case'::regclass, "
                 + "'ipd.emergency_triage_event'::regclass) and not tgisinternal")).isEqualTo("5");
     }

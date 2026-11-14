@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { formatDisplayDateTimeOfInstant, formatDisplayDate } from '../../../../shared/format/ist-date';
 import { SpEditor, textOrNull } from '../shared/sp-editor';
+import { BpValue, SpBpStepperComponent } from '../shared/sp-bp-stepper.component';
+import { SpSparklineComponent } from '../shared/sp-sparkline.component';
 import { SpStepperComponent } from '../shared/sp-stepper.component';
 import { SpTrendChartComponent } from '../shared/sp-trend-chart.component';
 import { REFERENCE_LISTS, SpecialtyContext } from '../specialty.context';
 import { newId, vitalsFlags } from '../specialty.logic';
-import { EmrFlag, SpExamGeneral, SpSignState, SpSystemFinding, SpVitalsEntry, SpVitalsLog } from '../specialty.model';
+import { EmrFlag, EmrHistoryVitals, SpExamGeneral, SpSignState, SpSystemFinding, SpVitalsEntry, SpVitalsLog } from '../specialty.model';
 
 type GeView = 'today' | 'history' | 'trend';
 
@@ -99,8 +101,8 @@ export class GmTrendComponent {
 @Component({
   selector: 'app-sp-vitals-log',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SpStepperComponent, GmTrendComponent],
-  styleUrl: '../specialty.shared.scss',
+  imports: [SpStepperComponent, SpBpStepperComponent, SpSparklineComponent],
+  styleUrls: ['../specialty.shared.scss'],
   template: `
     <div class="sp">
       <div class="sp-row">
@@ -121,6 +123,13 @@ export class GmTrendComponent {
       @if (shown() === 'today') {
         <p class="sp-sub" data-testid="vitals-sub">{{ sub() }}</p>
         <div class="sp-grid">
+          <app-sp-bp-stepper
+            [systolic]="draft().bpSystolic"
+            [diastolic]="draft().bpDiastolic"
+            [note]="flagOf('bpSystolic')"
+            [disabled]="disabled()"
+            (valueChange)="setBp($event)"
+          />
           @for (f of fields(); track f.key) {
             <app-sp-stepper
               [label]="f.label"
@@ -141,9 +150,7 @@ export class GmTrendComponent {
             <button type="button" class="btn pri" data-act="record-vitals" [disabled]="!canRecord()" (click)="record()">
               Record general examination
             </button>
-            @if (!canRecord()) {
-              <span class="sp-sub">Type at least one reading, then record.</span>
-            }
+            <span class="sp-sub" data-testid="ge-summary">{{ summary() }}</span>
           </div>
         }
         @if (serverFlags().length > 0) {
@@ -192,9 +199,56 @@ export class GmTrendComponent {
           <p class="sp-sub">Some readings are hidden</p>
         }
       } @else {
-        <app-gm-trend />
+        <div class="six" data-testid="ge-trends">
+          @for (t of trends(); track t.key) {
+            <div class="tcard" [class.bad]="t.bad">
+              <div class="trow">
+                <span class="sp-lbl">{{ t.label }}</span>
+                <b class="tlast" [class.bad]="t.bad">{{ t.last }}</b>
+              </div>
+              <app-sp-sparkline [values]="t.values" [bad]="t.bad" [label]="t.aria" />
+              <span class="sp-sub">{{ t.note }}</span>
+            </div>
+          } @empty {
+            <p class="sp-sub" data-testid="trend-empty">No readings yet. They appear once a reading is recorded.</p>
+          }
+        </div>
       }
     </div>
+  `,
+  styles: `
+    .six {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .tcard {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--glass-hi);
+    }
+    .trow {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .tlast {
+      font-size: 1rem;
+      color: var(--good);
+    }
+    .tlast.bad {
+      color: var(--crit);
+    }
+    @media (max-width: 720px) {
+      .six {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   `,
 })
 export class VitalsLogComponent extends SpEditor<SpVitalsLog> {
@@ -209,9 +263,17 @@ export class VitalsLogComponent extends SpEditor<SpVitalsLog> {
     { key: 'trend', label: 'Trend' },
   ];
   protected readonly shown = signal<GeView>('today');
-  private readonly draft = signal<Partial<SpVitalsEntry>>({});
+  protected readonly draft = signal<Partial<SpVitalsEntry>>({});
   protected readonly unit = computed<'F' | 'C'>(() => (this.ctx.profile() === 'onco' ? 'C' : 'F'));
-  protected readonly fields = computed(() => vitalFields(this.unit()));
+  /** The five single-value readings; BP is its own control that writes both of its values. */
+  protected readonly fields = computed(() => vitalFields(this.unit()).filter((f) => f.key !== 'bpSystolic' && f.key !== 'bpDiastolic'));
+  /** General Medicine records the six values together (mockup #DoctorGeneral); other profiles keep partial entries. */
+  protected readonly needsAllSix = computed(() => this.ctx.profile() === 'gm');
+  private readonly filledCount = computed(() => {
+    const d = this.draft();
+    const bp = d.bpSystolic != null && d.bpDiastolic != null ? 1 : 0;
+    return bp + [d.pulse, d.spo2, d.temperature, d.respRate, d.pain].filter((v) => v !== null && v !== undefined).length;
+  });
   protected readonly history = computed(() => this.ctx.history()?.vitals ?? []);
   protected readonly historyCount = computed(() => this.history().length + this.unsavedEntries().length);
   protected readonly limitReached = computed(() => this.val().entries.length >= 20);
@@ -221,7 +283,7 @@ export class VitalsLogComponent extends SpEditor<SpVitalsLog> {
   constructor() {
     super();
     effect(() => {
-      if (this.shown() === 'history' && this.ctx.history() === null) {
+      if (this.shown() !== 'today' && this.ctx.history() === null) {
         this.ctx.loadHistory();
       }
     });
@@ -230,9 +292,85 @@ export class VitalsLogComponent extends SpEditor<SpVitalsLog> {
   /** Entries recorded in this visit that the server has not stored yet. */
   protected readonly unsavedEntries = computed(() => (this.fresh() ? [] : [...this.val().entries].reverse()));
 
-  protected readonly canRecord = computed(
-    () => !this.limitReached() && Object.values(this.draft()).some((v) => v !== null && v !== undefined),
-  );
+  protected readonly canRecord = computed(() => {
+    if (this.limitReached()) {
+      return false;
+    }
+    if (this.needsAllSix()) {
+      return this.filledCount() === 6;
+    }
+    return Object.values(this.draft()).some((v) => v !== null && v !== undefined);
+  });
+
+  /** The line beside "Record general examination" (mockup #DoctorGeneral geSummary); only the entry modes that are on are named. */
+  protected readonly summary = computed(() => {
+    if (!this.needsAllSix()) {
+      return this.canRecord() ? '' : 'Type at least one reading, then record.';
+    }
+    const filled = this.filledCount();
+    if (filled === 6) {
+      const d = this.draft();
+      return `Ready: BP ${d.bpSystolic}/${d.bpDiastolic} · PR ${d.pulse} · SpO2 ${d.spo2} · Temp ${d.temperature?.value} · RR ${d.respRate} · Pain ${d.pain}`;
+    }
+    return filled > 0 ? `${6 - filled} value(s) still empty.` : 'Type the 6 values, then record them.';
+  });
+
+  /** Readings of this visit and earlier visits, newest first, as the numbers the six charts need. */
+  private readonly readings = computed(() => {
+    const unsaved = this.unsavedEntries().map((e) => ({
+      sys: e.bpSystolic ?? null,
+      pulse: e.pulse ?? null,
+      spo2: e.spo2 ?? null,
+      temp: e.temperature?.value ?? null,
+      rr: e.respRate ?? null,
+      pain: e.pain ?? null,
+    }));
+    const earlier = this.history().map((r) => ({
+      sys: r.bp ? Number(r.bp.split('/')[0]) || null : null,
+      pulse: r.pulse ?? null,
+      spo2: r.spo2 ?? null,
+      temp: r.temperature != null && r.temperature !== '' ? Number(r.temperature) : null,
+      rr: r.respRate ?? null,
+      pain: r.pain ?? null,
+    }));
+    return [...unsaved, ...earlier];
+  });
+
+  /** "Trend" view: six small charts, each with the last value, the line and a sentence (mockup #DoctorGeneral). */
+  protected readonly trends = computed(() => {
+    const rows = this.readings();
+    if (rows.length === 0) {
+      return [];
+    }
+    const unit = this.unit();
+    type Row = (typeof rows)[number];
+    const defs: { key: string; label: string; unit: string; pick: (r: Row) => number | null; field: string }[] = [
+      { key: 'bp', label: 'BP (systolic)', unit: '', pick: (r) => r.sys, field: 'bp' },
+      { key: 'pr', label: 'PR', unit: ' /min', pick: (r) => r.pulse, field: 'pulse' },
+      { key: 'spo2', label: 'SpO2', unit: ' %', pick: (r) => r.spo2, field: 'spo2' },
+      { key: 'temp', label: 'Temp', unit: unit === 'F' ? ' °F' : ' °C', pick: (r) => r.temp, field: 'temperature' },
+      { key: 'rr', label: 'RR', unit: ' /min', pick: (r) => r.rr, field: 'respRate' },
+      { key: 'pain', label: 'Pain', unit: ' /10', pick: (r) => r.pain, field: 'pain' },
+    ];
+    const latest = this.history()[0];
+    const lastEntry = this.unsavedEntries()[0];
+    const probe: SpVitalsEntry | null = lastEntry ?? (latest ? this.entryOf(latest) : null);
+    const flags = vitalsFlags(probe, this.ctx.profile());
+    return defs.map((d) => {
+      const values = rows.map(d.pick).filter((v): v is number => v !== null).reverse();
+      const lastValue = values[values.length - 1];
+      const flag = flags.find((f) => f.field === d.field) ?? null;
+      return {
+        key: d.key,
+        label: d.label,
+        values,
+        last: lastValue === undefined ? '—' : `${lastValue}${d.unit}`,
+        bad: flag !== null,
+        note: lastValue === undefined ? 'No reading yet' : flag ? `${flag.label} at the last reading` : 'Within normal range',
+        aria: `${d.label} over ${values.length} visit${values.length === 1 ? '' : 's'}: ${values.join(', ')}`,
+      };
+    });
+  });
 
   protected readonly sub = computed(() => {
     const entries = this.val().entries;
@@ -250,6 +388,24 @@ export class VitalsLogComponent extends SpEditor<SpVitalsLog> {
       return (d as SpVitalsEntry['temperature'])?.value ?? null;
     }
     return (d as number | null | undefined) ?? null;
+  }
+
+  protected setBp(bp: BpValue): void {
+    this.draft.set({ ...this.draft(), bpSystolic: bp.systolic, bpDiastolic: bp.diastolic });
+  }
+
+  private entryOf(r: EmrHistoryVitals): SpVitalsEntry {
+    const [sys, dia] = r.bp ? r.bp.split('/').map(Number) : [null, null];
+    return {
+      id: 'earlier',
+      bpSystolic: sys || null,
+      bpDiastolic: dia || null,
+      pulse: r.pulse ?? null,
+      spo2: r.spo2 ?? null,
+      temperature: r.temperature ? { value: Number(r.temperature), unit: this.unit() } : null,
+      respRate: r.respRate ?? null,
+      pain: r.pain ?? null,
+    };
   }
 
   protected setDraft(key: VitalField['key'], value: number | null): void {

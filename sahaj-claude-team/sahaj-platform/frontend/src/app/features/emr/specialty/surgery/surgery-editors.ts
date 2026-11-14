@@ -130,7 +130,7 @@ export class SurgicalExamComponent extends SpEditor<SpSurgicalExam> {
 @Component({
   selector: 'app-sp-surgery-fitness',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styleUrl: '../specialty.shared.scss',
+  styleUrls: ['../specialty.shared.scss'],
   template: `
     <div class="sp">
       <span class="sp-lbl">ASA grade</span>
@@ -167,19 +167,55 @@ export class SurgicalExamComponent extends SpEditor<SpSurgicalExam> {
         }
       }
 
-      <h4 class="sp-h">Pre-op work-up</h4>
-      <p class="msg" [class.good]="summary().state === 'FIT'" [class.crit]="summary().state === 'NOT_FIT'" [class.warn]="summary().state === 'TESTS_PENDING' || summary().state === 'PAC_NOT_DONE'" data-testid="fit-text">
-        {{ fitText() }}
-      </p>
-      <div class="sp-grid">
-        @for (t of tests; track t.label) {
-          <button type="button" class="tile" [attr.data-state]="rowState_(t.keys)" [disabled]="disabled()" (click)="cycle(t.keys)">
-            <b>{{ t.label }}</b><span [class.note]="rowState_(t.keys) === 'NORMAL'" [class.alert]="rowState_(t.keys) === 'ABNORMAL'">{{ stateLabel[rowState_(t.keys)] }}</span>
-          </button>
-        }
-      </div>
-      <p class="sp-sub">Tap a test to move it: pending → normal → abnormal.</p>
+      <section class="workup" data-testid="preop-card" aria-labelledby="preop-h">
+        <div class="sp-row between">
+          <h4 class="sp-h" id="preop-h">Pre-op work-up<span class="star" aria-hidden="true"> *</span></h4>
+          <span
+            class="pill"
+            [class.p-good]="summary().state === 'FIT'"
+            [class.p-crit]="summary().state === 'NOT_FIT'"
+            [class.p-warn]="summary().state === 'TESTS_PENDING' || summary().state === 'PAC_NOT_DONE'"
+            data-testid="fit-text"
+            >{{ fitText() }}</span
+          >
+        </div>
+        <div class="tests3">
+          @for (t of tests; track t.label) {
+            <button type="button" class="tile" [attr.data-state]="rowState_(t.keys)" [disabled]="disabled()" (click)="cycle(t.keys)">
+              <b>{{ t.label }}</b><span [class.note]="rowState_(t.keys) === 'NORMAL'" [class.alert]="rowState_(t.keys) === 'ABNORMAL'">{{ stateLabel[rowState_(t.keys)] }}</span>
+            </button>
+          }
+        </div>
+        <p class="sp-sub">Tap a test to move it: pending → normal → abnormal.</p>
+      </section>
     </div>
+  `,
+  styles: `
+    .workup {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--glass-hi);
+    }
+    .between {
+      justify-content: space-between;
+    }
+    .star {
+      color: var(--crit);
+    }
+    .tests3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    @media (max-width: 720px) {
+      .tests3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   `,
 })
 export class SurgeryFitnessComponent extends SpEditor<SpSurgeryFitness> {
@@ -312,8 +348,12 @@ const OT_SLOTS = ['OT 1 · 08:00', 'OT 2 · 10:00', 'OT 2 · 13:30'];
       <p class="msg" [class.good]="preauthSent() || val().payer === 'SELF'" data-testid="preauth-line">{{ preauthLine() }}</p>
       @if (val().payer !== 'SELF' && preauthKey() && !disabled()) {
         <button type="button" class="btn" data-act="toggle-preauth" (click)="togglePreauth()">
-          {{ preauthSent() ? 'Undo pre-authorisation sent' : 'Mark pre-authorisation sent to ' + payerLabel[val().payer] }}
+          {{ preauthSent() ? 'Undo pre-authorisation sent' : 'Send pre-authorisation to ' + payerLabel[val().payer] }}
         </button>
+      }
+
+      @if (preauthNote(); as note) {
+        <p class="sp-sub" role="status" data-testid="preauth-note">{{ note }}</p>
       }
 
       <div class="sp-row">
@@ -387,6 +427,7 @@ export class SurgeryPlanComponent extends SpEditor<SpSurgeryPlan> {
   private readonly server = computed(() => (this.fresh() ? (this.view()?.surgery ?? null) : null));
   protected readonly deposit = computed(() => this.server()?.depositPaise ?? depositPaise(this.val().payer, this.packagePaise()));
   protected readonly chip = computed(() => this.server()?.payerChip ?? payerChip(this.val().payer, this.preauthSent()));
+  protected readonly preauthNote = signal<string | null>(null);
   protected readonly payerGood = computed(() => this.val().payer === 'SELF' || this.preauthSent());
   protected readonly preauthLine = computed(() =>
     this.val().payer === 'SELF'
@@ -462,6 +503,8 @@ export class SurgeryPlanComponent extends SpEditor<SpSurgeryPlan> {
     }
     const current = this.ctx.value<SpPreauth>(key, 'PREAUTH') ?? { component: 'PREAUTH' as const, schemaVersion: 1 as const, sent: false };
     this.ctx.set(key, { ...current, sent: !current.sent });
+    // Sending to the payer is Later (no integration): the visit records that the clinic requested it, and the words say so (G-S7).
+    this.preauthNote.set(current.sent ? null : `Pre-authorisation recorded as requested. Nothing is sent to ${PAYER_LABEL[this.val().payer]} from here.`);
   }
 
   protected book(): void {

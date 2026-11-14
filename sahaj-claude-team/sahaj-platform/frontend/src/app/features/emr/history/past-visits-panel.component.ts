@@ -242,6 +242,11 @@ export class PastVisitsPanelComponent implements OnInit {
     return this.open() === rowKey(visit);
   }
 
+  /** "Medicines", "Discharge medicines" (IPD) or "Take-home medicines" (day-care chemotherapy), as the server says (VisitHistory.dc.html:171). */
+  protected medicinesHeading(d: EmrPastVisitDetail): string {
+    return d.medicinesHeading === 'DISCHARGE_MEDICINES' ? 'Discharge medicines' : d.medicinesHeading === 'TAKE_HOME_MEDICINES' ? 'Take-home medicines' : 'Medicines';
+  }
+
   protected medicineLine(m: EmrPastVisitDetail['medicines'][number]): string {
     return `${m.name} · ${frequencyLabel(m.frequency).split(' ')[0]} · ${m.days} days · ${whenLabel(m.when)}`;
   }

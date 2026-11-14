@@ -33,6 +33,15 @@ final class SpecialtyShapes {
 
     private static final Shape SIGN = Sp.nullable(e("ABSENT", "PRESENT"));
 
+    /** An EmrBodyMapValue: its pins and stamps are checked and stamped by the shared body map rules (SAH-75-5). */
+    private static final Shape BODY_MAP = (v, p, errors) -> {
+        if (!v.isObject()) {
+            errors.add(p, "Send the body map as an object.");
+            return null;
+        }
+        return v;
+    };
+
     private static final Shape SYSTEM = Sp.nullable(obj(
             req("state", e("NORMAL", "ABNORMAL")),
             opt("text", sN(1000)),
@@ -138,7 +147,9 @@ final class SpecialtyShapes {
                     req("ageBandMonths", i(0, 216)),
                     req("achieved", set(s(1, 40), 40)),
                     req("notYet", set(s(1, 40), 40))))),
-            Map.entry("PAIN_SCORE", obj(header("PAIN_SCORE", req("score", iN(0, 10)), opt("site", sN(80))))),
+            Map.entry("PAIN_SCORE", obj(header("PAIN_SCORE", req("score", iN(0, 10)), opt("site", sN(120)),
+                    opt("siteMarker", Sp.nullable(obj(req("side", e("FRONT")), req("x", n(0, 1)), req("y", n(0, 1)),
+                            req("region", s(2, 40)))))))),
             Map.entry("POSTURE_GAIT", obj(header("POSTURE_GAIT",
                     req("gait", eN("NORMAL", "ANTALGIC", "WITH_STICK", "WITH_WALKER"))))),
             Map.entry("ROM_TABLE", obj(header("ROM_TABLE",
@@ -230,7 +241,8 @@ final class SpecialtyShapes {
                     req("line", obj(
                             req("device", eN("PORT", "PICC", "PERIPHERAL")),
                             req("checks", set(e("FLUSHES_FREELY", "BLOOD_RETURN", "NO_REDNESS_SWELLING", "NO_PAIN",
-                                    "DRESSING_CLEAN", "FLUSHED_4_WEEKS"), 6))))))),
+                                    "DRESSING_CLEAN", "FLUSHED_4_WEEKS"), 6)))),
+                    opt("bodyMap", Sp.nullable(BODY_MAP))))),
             Map.entry("ONC_LABS", obj(header("ONC_LABS",
                     req("drawnAt", dateTimeN()),
                     req("values", obj(
@@ -251,6 +263,13 @@ final class SpecialtyShapes {
             Map.entry("OUTCOME_SCALES", obj(header("OUTCOME_SCALES", req("rows", arr(obj(
                     req("scale", e("ODI", "NDI", "WOMAC", "LEFS")),
                     req("score", iN(0, 100))), 4))))),
+            Map.entry("DENTAL_MED_HISTORY", obj(header("DENTAL_MED_HISTORY",
+                    req("conditions", set(e("DIABETES", "HIGH_BP", "HEART_DISEASE", "THYROID", "ASTHMA",
+                            "BLEEDING_DISORDER", "EPILEPSY", "PREGNANT", "NONE"), 9)),
+                    req("medicines", set(e("BLOOD_THINNERS", "ASPIRIN", "BISPHOSPHONATES", "STEROIDS",
+                            "THYROID_MEDICINE", "NONE"), 6)),
+                    req("allergies", set(e("PENICILLIN", "LOCAL_ANAESTHETIC", "LATEX", "NSAIDS", "NONE"), 5)),
+                    req("reviewedWithPatient", bool()), srv("review")))),
             Map.entry("DENTAL_DONE", obj(header("DENTAL_DONE"))),
             Map.entry("WEIGHT_DOSE", obj(header("WEIGHT_DOSE"))));
 

@@ -82,7 +82,7 @@ class CardFactsIT extends CardSetupSupport {
             assertThat(row.has("uhid") && row.has("runningBillPaise") && row.has("wardId") && row.has("roomName")).isTrue();
             if (!"FRONT_DESK".equals(role)) {
                 assertThat(keys(row.get("clinical"))).as(role + " clinical keys are the SAH-36 ones")
-                        .containsExactlyInAnyOrder("escalation", "latestEws", "vitalsDue", "allergy");
+                        .containsExactlyInAnyOrder("escalation", "latestEws", "vitalsDue", "allergy", "roundDoneToday");
             }
         }
     }
@@ -167,7 +167,7 @@ class CardFactsIT extends CardSetupSupport {
             assertThat(tiles.get("rr").get("value").asInt()).isEqualTo(22);
             assertThat(instant(tiles.get("recordedAt"))).isNotNull();
             assertThat(tiles.get("recordedByName").asText()).isEqualTo(ownerName);
-            assertThat(keys(clinical)).containsExactlyInAnyOrder("escalation", "latestEws", "vitalsDue", "allergy", "diagnosis",
+            assertThat(keys(clinical)).containsExactlyInAnyOrder("escalation", "latestEws", "vitalsDue", "allergy", "roundDoneToday", "diagnosis",
                     "latestVitals");
             if ("OWNER".equals(who[0])) {
                 assertThat(row.has("mobile")).as("owner: the mobile property is sent when Mobile is on").isTrue();

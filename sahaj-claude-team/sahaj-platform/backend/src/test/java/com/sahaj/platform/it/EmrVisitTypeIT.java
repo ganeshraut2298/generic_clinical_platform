@@ -103,7 +103,7 @@ class EmrVisitTypeIT extends EmrSupport {
 
     @Test
     void onlyTheDoctorOfTheVisitOrAnOwnerWithDoctorDetailsCanChangeTheTypeAndFrontDeskSetsItAtRegistrationOnly() throws Exception {
-        Clinic clinic = newClinic();
+        Clinic clinic = newClinic(true, false);
         Staff doctor = addDoctor(clinic, "General physician");
         Staff other = addDoctor(clinic, "Dentist");
         String id = issueVisit(clinic, doctor.membershipId()).get("id").asText();

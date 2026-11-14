@@ -616,4 +616,81 @@ class EmrDepartmentServiceTest {
         assertThatThrownBy(() -> EmrDepartmentService.cleanInitials("abc", "x")).isInstanceOf(InvalidFieldsException.class);
         assertThat(EmrDepartmentService.cleanInitials("AB1", "x")).isEqualTo("AB1");
     }
+
+    // ---- SAH-75-4 (ADR-026 D2): the set is the latest version plus the current starter plus live forms ----
+
+    /** The starter has since gained local_exam (after vitals); the published version does not hold it. */
+    private void starterGainsLocalExam() {
+        List<LayoutSection> v2 = new ArrayList<>(gm);
+        v2.add(1, EmrTestData.section("local_exam", "SPECIALTY", "ASSESSMENT", true, false, false));
+        when(library.currentStarterLayout("gm")).thenReturn(Optional.of(
+                new StarterLayoutRow("gm", 2, EmrTestData.JSON.writeLayout(v2))));
+    }
+
+    private void publishedVersionOfGm() {
+        when(departments.latestVersion(TENANT, DEPT_ID)).thenReturn(Optional.of(new EmrDepartmentRepository.VersionRow(
+                UUID.randomUUID(), DEPT_ID, 1, EmrTestData.JSON.writeLayout(gm), java.time.Instant.now(), OWNER_USER)));
+    }
+
+    @Test
+    void aPublishedDepartmentIsShownTheNewStarterSectionAsAHiddenRowItCanSwitchOn() {
+        starterGainsLocalExam();
+        publishedVersionOfGm();
+        when(departments.find(TENANT, "gm")).thenReturn(Optional.of(row("gm", "General Medicine", 1, 4, null)));
+
+        DepartmentView view = service.get(OWNER, "gm");
+
+        assertThat(view.sections()).extracting(LayoutSection::key).containsExactly("vitals", "local_exam", "allergy", "rx");
+        assertThat(view.sections().get(1).shown()).isFalse();
+        assertThat(view.sections().get(1).required()).isFalse();
+        assertThat(view.hasDraft()).isFalse();
+        assertThat(view.sectionsTotal()).isEqualTo(4);
+    }
+
+    @Test
+    void theSaveCheckAcceptsTheSetWithTheOfferedRowAndTheOldSetIsASectionSetMismatch() {
+        starterGainsLocalExam();
+        publishedVersionOfGm();
+        when(departments.findForUpdate(TENANT, "gm")).thenReturn(Optional.of(row("gm", "General Medicine", 1, 4, null)));
+        when(departments.find(TENANT, "gm")).thenReturn(Optional.of(row("gm", "General Medicine", 1, 4, null)));
+        when(departments.saveDraft(eq(TENANT), eq(DEPT_ID), eq(4L), any(), eq(OWNER_USER))).thenReturn(true);
+        List<SectionSettingsInput> full = new ArrayList<>(asInput(EmrLayoutRules.settings(gm)));
+        full.add(1, in("local_exam", "ASSESSMENT", true, false));
+
+        DraftSaveResult saved = service.saveDraft(OWNER, "gm", new LayoutInput(4L, "EDIT", full));
+
+        assertThat(saved.outcome()).isEqualTo("SAVED");
+        assertThatThrownBy(() -> service.saveDraft(OWNER, "gm",
+                new LayoutInput(4L, "EDIT", asInput(EmrLayoutRules.settings(gm)))))
+                .isInstanceOfSatisfying(EmrProblemException.class, ex -> assertThat(ex.slug()).isEqualTo("section-set-mismatch"));
+    }
+
+    @Test
+    void resetToTemplateReturnsTheCurrentStarterSettingsIncludingTheNewSectionAndPassesTheSetCheck() {
+        starterGainsLocalExam();
+        publishedVersionOfGm();
+        when(departments.find(TENANT, "gm")).thenReturn(Optional.of(row("gm", "General Medicine", 1, 4, null)));
+
+        EmrViews.ResetTarget target = service.resetTarget(OWNER, "gm");
+
+        assertThat(target.basis()).isEqualTo("STARTER");
+        assertThat(target.sections()).extracting(EmrModel.SectionSettings::key).containsExactly("vitals", "local_exam",
+                "allergy", "rx");
+        assertThat(target.sections().get(1).shown()).isTrue();
+        List<SectionSettingsInput> body = asInput(target.sections());
+        assertThat(EmrLayoutRules.validate(body, new EmrLayouts(library, departments, EmrTestData.MAPPER)
+                .base(TENANT, new EmrLayouts(library, departments, EmrTestData.MAPPER).find(TENANT, "gm").orElseThrow())))
+                .hasSize(4);
+    }
+
+    @Test
+    void doctorsStillSeeOnlyThePublishedVersionAfterTheStarterGainsASection() {
+        starterGainsLocalExam();
+        publishedVersionOfGm();
+        when(departments.find(TENANT, "gm")).thenReturn(Optional.of(row("gm", "General Medicine", 1, 4, null)));
+
+        EmrViews.PublishedLayout layout = service.publishedLayout(OWNER, "gm");
+
+        assertThat(layout.sections()).extracting(LayoutSection::key).containsExactly("vitals", "allergy", "rx");
+    }
 }

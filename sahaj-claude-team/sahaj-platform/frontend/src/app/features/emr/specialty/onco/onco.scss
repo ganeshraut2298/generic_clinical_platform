@@ -108,3 +108,32 @@
   border: 1px solid var(--line);
   background: var(--glass-hi);
 }
+
+.spk {
+  width: 90px;
+}
+
+.vtile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+
+  &.bad {
+    border-color: var(--crit);
+    background: var(--crit-soft);
+  }
+
+  b {
+    font-size: 1.125rem;
+  }
+}
+
+.lesion-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

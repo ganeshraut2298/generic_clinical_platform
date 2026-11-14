@@ -17,7 +17,8 @@ import {
   EmrPrintPreferences,
   PrintLanguage,
 } from '../emr-phase3.model';
-import { PaperModel, composePaper, readyFooter, subtitle } from '../paper/case-paper.logic';
+import { LANGUAGE_NAME, PaperModel, composePaper, subtitle } from '../paper/case-paper.logic';
+import { dentalAllergyFooter, readyFooterText } from './frame.logic';
 import { istToday } from '../../../shared/format/ist-date';
 import {
   DoneContext,
@@ -242,17 +243,44 @@ export class EmrRecordStore implements EmrComponentContext {
     const open = this.profile() ? this.footerItems().length : this.needed().length;
     return open === 0 && !this.alertBlocked();
   });
-  readonly footer = computed(() => {
-    if (this.alertBlocked()) {
-      return ALERT_BLOCK_TEXT;
+  /** Medicine rows on screen (the Paediatrics footer "m medicine(s) prescribed"). */
+  private readonly medicineCount = computed(() => {
+    let n = 0;
+    for (const section of Object.values(this.values())) {
+      for (const value of Object.values(section)) {
+        if (isComponentValue(value) && value.component === 'PRESCRIPTION') {
+          n += rowsOf(value).filter((r) => r.name.trim() !== '').length;
+        }
+      }
     }
-    if (this.profile()) {
+    return n;
+  });
+  readonly footer = computed(() => {
+    const profile = this.profile();
+    if (this.alertBlocked()) {
+      const first = this.allergyAlerts().find((a) => !a.reviewed);
+      return profile === 'dental' && first?.allergyClass === 'PENICILLIN' ? dentalAllergyFooter(first.medicineName) : ALERT_BLOCK_TEXT;
+    }
+    const ready = (): string => {
+      const immunization = specialtyOf(this.values()['immunization']);
+      const anc = specialtyOf(this.values()['anc']);
+      return readyFooterText({
+        profile,
+        mode: this.visitMode(),
+        languageName: this.paperContext() ? LANGUAGE_NAME[this.printLanguage()] : null,
+        view: this.specialtyView(),
+        nextAncWeeks: anc?.component === 'ANC_CHECK' ? (anc.nextAncWeeks ?? null) : null,
+        vaccinesToday: immunization?.component === 'IMMUNIZATION' ? immunization.givenToday.length : 0,
+        medicines: this.medicineCount(),
+      });
+    };
+    if (profile) {
       const items = this.footerItems();
-      return items.length === 0 ? readyFooter(this.paperContext() ? this.printLanguage() : null) : footerSentence(items);
+      return items.length === 0 ? ready() : footerSentence(items);
     }
     const needed = this.needed();
     if (needed.length === 0) {
-      return readyFooter(this.paperContext() ? this.printLanguage() : null);
+      return ready();
     }
     return footerText(needed, (key) => this.nameOf(key));
   });
@@ -285,6 +313,11 @@ export class EmrRecordStore implements EmrComponentContext {
           }
         }
       }
+    }
+    // The Penicillin chip of the Dental card "Medical history and alerts" joins the visit's allergy classes (SAH-75-6, ADR-026 D6).
+    const med = specialtyOf(this.values()['dental_medhx']);
+    if (med?.component === 'DENTAL_MED_HISTORY' && med.allergies.includes('PENICILLIN')) {
+      out.add('PENICILLIN');
     }
     return out;
   });

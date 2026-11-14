@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, DOCUMENT, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { CoursePanelComponent } from '../../course/course-panel.component';
 import { newClientKey } from '../../../../shared/client-key';
 import { formatInrPaise } from '../../../../shared/format/inr';
 import { istToday } from '../../../../shared/format/ist-date';
@@ -34,7 +34,7 @@ const BLANK_PLAN: SpDentalPlan = { component: 'DENTAL_PLAN', schemaVersion: 1, r
 @Component({
   selector: 'app-sp-dental-plan',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [CoursePanelComponent],
   styleUrls: ['../specialty.shared.scss', './dental-plan.component.scss'],
   template: `
     <div class="sp">
@@ -149,8 +149,8 @@ const BLANK_PLAN: SpDentalPlan = { component: 'DENTAL_PLAN', schemaVersion: 1, r
         <button type="button" class="btn pri" data-act="start-course" [disabled]="disabled() || openRows() === 0 || starting() || !!course()" (click)="startCourse()">
           {{ course() ? 'Course started' : 'Start treatment course from this plan' }}
         </button>
-        @if (course(); as c) {
-          <a class="link" [routerLink]="['/app/courses', c]">Open the course</a>
+        @if (course()) {
+          <app-course-panel kind="DENTAL" [showStart]="false" />
         }
         @if (courseError(); as e) {
           <span class="msg crit" role="alert">{{ e }}</span>
@@ -163,6 +163,11 @@ export class DentalPlanComponent extends SpEditor<SpDentalPlan> {
   protected readonly component = 'DENTAL_PLAN' as const;
   private readonly courses = inject(CourseApi);
   private readonly doc = inject(DOCUMENT);
+
+  constructor() {
+    super();
+    this.registerFooterPrint(() => this.print());
+  }
 
   protected blank(): SpDentalPlan {
     return BLANK_PLAN;

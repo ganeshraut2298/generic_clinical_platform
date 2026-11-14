@@ -34,11 +34,11 @@ public class JdbcEmrLibraryRepository implements EmrLibraryRepository {
             """;
     private static final String FIELDS = """
             select section_key, field_key, label, field_type, meta, required, options_source, options_master,
-                   allow_free_text, min_value, max_value, columns::text as columns
+                   allow_free_text, min_value, max_value, columns::text as columns, presentation
             from opd.emr_section_field order by section_key, position
             """;
     private static final String OPTIONS = """
-            select section_key, field_key, option_key, label, is_none
+            select section_key, field_key, option_key, label, is_none, is_alert, hint
             from opd.emr_section_field_option order by section_key, field_key, position
             """;
     private static final String USED_BY = """
@@ -97,7 +97,8 @@ public class JdbcEmrLibraryRepository implements EmrLibraryRepository {
         jdbc.sql(OPTIONS).query(rs -> {
             options.computeIfAbsent(rs.getString("section_key") + "/" + rs.getString("field_key"),
                     k -> new ArrayList<>())
-                    .add(new FieldOption(rs.getString("option_key"), rs.getString("label"), rs.getBoolean("is_none")));
+                    .add(new FieldOption(rs.getString("option_key"), rs.getString("label"), rs.getBoolean("is_none"),
+                            rs.getBoolean("is_alert"), rs.getString("hint")));
         });
         Map<String, List<FieldDefinition>> result = new LinkedHashMap<>();
         jdbc.sql(FIELDS).query(rs -> {
@@ -110,7 +111,7 @@ public class JdbcEmrLibraryRepository implements EmrLibraryRepository {
                     rs.getString("label"), type, EmrFieldType.valueKind(type), nullToEmpty(rs.getString("meta")),
                     rs.getBoolean("required"), rs.getString("options_source"), rs.getString("options_master"),
                     rs.getBoolean("allow_free_text"), List.copyOf(options.getOrDefault(section + "/" + key, List.of())),
-                    columns(rs.getString("columns")), min, max));
+                    columns(rs.getString("columns")), min, max, null, rs.getString("presentation")));
         });
         return result;
     }

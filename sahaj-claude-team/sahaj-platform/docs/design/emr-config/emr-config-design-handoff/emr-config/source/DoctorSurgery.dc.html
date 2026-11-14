@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Doctor screen — General Surgery</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+button,input,select{font-family:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #1E40AF66;outline-offset:2px}
+a{color:#1E40AF}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; font-size: 14px; min-height: 2600px; display: flex; flex-direction: column">
+
+  <div style="background: #0F1C2E; color: #FFFFFF; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 24px">
+    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+      <span style="font-weight: 700; font-size: 16px">Smart Clinic</span>
+      <span style="background: #1E40AF; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600">General Surgery · OPD room 5</span>
+      <nav aria-label="Main" style="display: flex; gap: 4px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 8px 12px; border-radius: 8px; background: #1E3550; font-size: 13px; font-weight: 600">Queue (9 waiting)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">OT schedule</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Ward patients</a>
+      </nav>
+    </div>
+    <span style="font-size: 13px; color: #B8C4D3">Dr. [SURGEON NAME], MS (General Surgery)</span>
+  </div>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+    <div style="display: flex; gap: 14px; align-items: center">
+      <span style="width: 48px; height: 48px; border-radius: 999px; background: #DBE4FB; color: #1E40AF; display: flex; align-items: center; justify-content: center; font-weight: 700">VP</span>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 17px; font-weight: 700">[PATIENT NAME]</span>
+        <span style="font-size: 13px; color: #5B6B7F">45 y · Male · UHID [ID] · gallstones · pre-op visit</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <span style="background: #FDF0DC; color: #8A4B08; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600">Mild asthma</span>
+      <span style="background: #EEF1F5; color: #3E4C5E; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600">Past: appendicectomy 2019</span>
+      <span style="{{payerChip}}">{{payerText}}</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 24px; align-items: flex-start; flex: 1">
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <div role="tablist" aria-label="Visit part" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{parts}}" as="p" hint-placeholder-count="2">
+          <button type="button" role="tab" aria-selected="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">
+            <span style="{{p.numStyle}}">{{p.num}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; flex: 1; text-align: left"><span style="font-size: 16px; font-weight: 700">{{p.label}}</span><span style="font-size: 12px; opacity: 0.85">{{p.sub}}</span></span>
+            <span style="{{p.badgeStyle}}">{{p.badge}}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="{{aStyle}}">
+        <div id="complaints"><dc-import name="EmrList" kind="complaints" spec="surgery" title="Chief complaints" required="{{ true }}" accent="#1E40AF" who="Dr. [SURGEON NAME]" on-change="{{cp_complaints}}" hint-size="100%,230px"></dc-import></div>
+
+        <sc-for list="{{cards}}" as="a" hint-placeholder-count="2">
+          <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 15px; font-weight: 700">{{a.title}}</h2><span style="font-size: 12px; color: #5B6B7F">{{a.sub}}</span></div>
+            <sc-for list="{{a.groups}}" as="g" hint-placeholder-count="3">
+              <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap">
+                <span style="width: 160px; flex: none; font-size: 13px; font-weight: 600; color: #3E4C5E; padding-top: 8px">{{g.label}}</span>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 240px"><sc-for list="{{g.opts}}" as="o" hint-placeholder-count="4"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button></sc-for></div>
+              </div>
+            </sc-for>
+          </section>
+        </sc-for>
+
+        <div id="local"><dc-import name="BodyMap" sex="male" title="Local examination · body map" who="Dr. [SURGEON NAME]" hint-size="100%,780px"></dc-import></div>
+
+        <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 15px; font-weight: 700">Pre-op work-up <span style="color: #B42318">*</span></h2><span style="{{fitStyle}}">{{fitText}}</span></div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+            <sc-for list="{{tests}}" as="t" hint-placeholder-count="9">
+              <button type="button" onClick="{{t.cycle}}" style="{{t.style}}"><span style="font-size: 13px; font-weight: 700">{{t.name}}</span><span style="font-size: 12px">{{t.state}}</span></button>
+            </sc-for>
+          </div>
+          <span style="font-size: 12px; color: #5B6B7F">Tap a test to move it: pending → normal → abnormal.</span>
+        </section>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #0F1C2E; color: #FFFFFF; border-radius: 12px; padding: 14px 18px">
+          <span style="font-size: 13px">{{aFooter}}</span>
+          <button type="button" onClick="{{goT}}" style="border: 0; background: #FFFFFF; color: #0F1C2E; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 700; cursor: pointer">Continue to Treatment →</button>
+        </div>
+      </div>
+
+      <div style="{{tStyle}}">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #3E4C5E">
+          <strong style="color: #0F1C2E">From assessment:</strong><span>{{aRecap}}</span>
+          <button type="button" onClick="{{goA}}" style="margin-left: auto; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-weight: 600; cursor: pointer">← Back to assessment</button>
+        </div>
+        <div id="diagnosis"><dc-import name="EmrList" kind="diagnosis" spec="surgery" title="Diagnosis" required="{{ true }}" accent="#1E40AF" who="Dr. [SURGEON NAME]" on-change="{{cp_diagnosis}}" hint-size="100%,230px"></dc-import></div>
+
+        <section style="background: #FFFFFF; border: 2px solid #1E40AF; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Surgery plan and OT booking <span style="color: #B42318">*</span></h2><span style="{{bookStyle}}">{{bookText}}</span></div>
+          <sc-for list="{{plan}}" as="g" hint-placeholder-count="5">
+            <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap">
+              <span style="width: 150px; flex: none; font-size: 13px; font-weight: 600; color: #3E4C5E; padding-top: 8px">{{g.label}}</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 240px"><sc-for list="{{g.opts}}" as="o" hint-placeholder-count="4"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button></sc-for></div>
+            </div>
+          </sc-for>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; background: #F4F7FD; border-radius: 10px; padding: 12px">
+            <sc-for list="{{est}}" as="e" hint-placeholder-count="4"><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F">{{e.k}}</span><span style="font-size: 15px; font-weight: 700">{{e.v}}</span></div></sc-for>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+            <button type="button" onClick="{{sendPreauth}}" style="{{preauthStyle}}">{{preauthLabel}}</button>
+            <button type="button" onClick="{{bookOt}}" style="{{bookBtnStyle}}">{{bookLabel}}</button>
+          </div>
+        </section>
+
+        <div style="display: flex; gap: 16px; flex-wrap: wrap">
+          <section style="flex: 1 1 300px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 15px; font-weight: 700">Consent <span style="color: #B42318">*</span></h2><span style="font-size: 12px; font-weight: 700; color: #3E4C5E">{{consentCount}}</span></div>
+            <sc-for list="{{consent}}" as="c" hint-placeholder-count="5">
+              <label style="display: flex; gap: 10px; align-items: center; font-size: 13px; min-height: 34px; cursor: pointer"><input type="checkbox" checked="{{c.on}}" onChange="{{c.toggle}}" style="width: 18px; height: 18px; accent-color: #1E40AF">{{c.label}}</label>
+            </sc-for>
+          </section>
+          <section style="flex: 1 1 300px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 15px; font-weight: 700">Pre-op orders</h2><span style="font-size: 12px; color: #5B6B7F">Go to ward and OT with the booking</span></div>
+            <sc-for list="{{orders}}" as="c" hint-placeholder-count="6">
+              <label style="display: flex; gap: 10px; align-items: center; font-size: 13px; min-height: 34px; cursor: pointer"><input type="checkbox" checked="{{c.on}}" onChange="{{c.toggle}}" style="width: 18px; height: 18px; accent-color: #1E40AF">{{c.label}}</label>
+            </sc-for>
+            <span style="font-size: 12px; color: #5B6B7F">WHO surgical safety checklist opens in OT on the day.</span>
+          </section>
+        </div>
+
+        <div id="course"><dc-import name="TreatmentCourse" kind="surgery" accent="#1E40AF" hint-size="100%,760px"></dc-import></div>
+        <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="surgery" title="Doctor’s advice" required="{{ false }}" accent="#1E40AF" who="Dr. [SURGEON NAME]" hint-size="100%,230px"></dc-import></div>
+      </div>
+    </main>
+
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="surgery" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#1E40AF" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+    </div>
+    </aside>
+  </div>
+
+  <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; box-shadow: 0 -4px 12px rgba(15,28,46,0.06)">
+    <span style="{{footStyle}}">{{footText}}</span>
+    <div style="display: flex; gap: 10px">
+      <button type="button" onClick="{{saveDraft}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Save draft</button>
+      <button type="button" onClick="{{complete}}" style="{{completeStyle}}">Complete visit</button>
+    </div>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; bottom: 84px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3); max-width: 460px">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":2600}}'>
+var CARDS = [
+  { title: 'Surgical examination', sub: 'Abdomen, hernia sites and per-rectal', groups: [['abd', 'Abdomen', 'multi', ['Soft', 'Tender right upper', 'Tender right lower', 'Guarding', 'Distended', 'Lump felt']], ['murphy', 'Murphy sign', 'single', ['Positive', 'Negative']], ['jaundice', 'Jaundice', 'single', ['No', 'Yes']], ['hernia', 'Hernia sites', 'multi', ['Normal', 'Right inguinal', 'Left inguinal', 'Umbilical', 'Incisional']], ['pr', 'Per-rectal', 'single', ['Not needed', 'Normal', 'Piles', 'Fissure', 'Mass']]] },
+  { title: 'Fitness for surgery', sub: 'Asked and checked before booking', groups: [['asa', 'ASA grade', 'single', ['I', 'II', 'III', 'IV']], ['como', 'Other illness', 'multi', ['None', 'Diabetes', 'High BP', 'Heart disease', 'Asthma / COPD', 'Kidney disease']], ['thin', 'Blood thinners', 'single', ['None', 'Aspirin', 'Clopidogrel', 'Warfarin / DOAC']], ['pac', 'Anaesthesia check (PAC)', 'single', ['Not done', 'Fit', 'Fit with caution', 'Unfit']]] }
+];
+var TESTS = ['CBC', 'LFT', 'KFT', 'PT / INR', 'Blood sugar', 'ECG', 'Chest X-ray', 'HIV, HBsAg, HCV', 'Blood group'];
+var PROC = { 'Lap cholecystectomy': [65000, 'GA', '1–2 days'], 'Open cholecystectomy': [75000, 'GA', '4–5 days'], 'Lap hernia repair (TEP)': [70000, 'GA', '1 day'], 'Open mesh hernioplasty': [45000, 'Spinal', '2 days'], 'Lap appendicectomy': [55000, 'GA', '1–2 days'], 'Haemorrhoidectomy': [35000, 'Spinal', '1 day'], 'Excision of lipoma': [12000, 'Local', 'Day care'], 'Incision and drainage': [8000, 'Local', 'Day care'] };
+function inr(n) { var s = Math.round(n).toString(), last = s.slice(-3), rest = s.slice(0, -3); if (rest) last = ',' + last; return '₹' + rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + last; }
+
+function cpN(a, mode) { return (Array.isArray(a) ? a : []).map(function (x) { if (!x) return ''; if (typeof x === 'string') return x; var t = x.name || ''; if (mode === 'dx' && x.code) t += ' (' + x.code + ')'; else if (mode === 'c' && x.a1) t += ' · ' + x.a1; return t; }).filter(Boolean); }
+function cpKeys(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }); }
+
+function casePaper(st, r, cp) {
+  var e = st.ex || {};
+  return { dept: 'General Surgery · OPD', doctor: 'Dr. [SURGEON NAME]', qual: 'MBBS, MS (General Surgery)', reg: '[MMC REG. NO.]', patient: '[PATIENT NAME]', meta: '45 y · Male', ids: 'UHID [ID]', visit: 'Pre-op visit', vitals: 'ASA ' + (e.asa || ''),
+    sections: { complaints: cpN(cp.complaints, 'c'), allergies: ['No known drug allergy'], history: cpKeys(e.como),
+      exam: ['Abdomen: ' + cpKeys(e.abd).join(', ') + ' · Murphy’s sign ' + (e.murphy || '') + ' · jaundice ' + (e.jaundice || ''), 'Fitness: ASA ' + (e.asa || '') + ' · ' + (e.pac || '')],
+      diagnosis: cpN(cp.diagnosis, 'dx'), investigations: Object.keys(st.tests || {}).map(function (k) { return k + ' · ' + ['result pending', 'normal', 'abnormal'][st.tests[k]] ; }), procedures: [st.proc + ' · ' + st.approach + ' · ' + st.anaes + ' · ' + st.date + ', ' + st.slot + (st.booked ? ' (booked)' : ' (planned)')],
+      advice: cpN(cp.advice).concat(cpKeys(st.orders)), follow: ['Admit on ' + st.date + ' · ' + st.adm] }, rx: [] };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { part: 'A', cC: 0, cNames: '', cD: 0, toast: '',
+      ex: { abd: { 'Tender right upper': true }, murphy: 'Positive', jaundice: 'No', hernia: { Normal: true }, pr: 'Not needed', asa: 'II', como: { 'Asthma / COPD': true }, thin: 'None', pac: 'Fit with caution' },
+      tests: { CBC: 1, LFT: 1, KFT: 1, 'PT / INR': 0, 'Blood sugar': 1, ECG: 1, 'Chest X-ray': 0, 'HIV, HBsAg, HCV': 1, 'Blood group': 1 },
+      proc: 'Lap cholecystectomy', approach: 'Laparoscopic, may convert to open', anaes: 'GA', adm: 'IPD 1–2 days', date: 'Tue 18 Nov', slot: 'OT 2 · 10:00', payer: 'Insurance (TPA)', blood: 'Group and save', preauth: false, booked: false,
+      consent: { 'Procedure, benefits and risks explained': true, 'Possible conversion to open surgery': false, 'Anaesthesia consent': false, 'Blood transfusion consent': false, 'Photos / video for records': false },
+      orders: { 'Nothing by mouth from midnight': true, 'Inhaler on the morning of surgery': true, 'Antibiotic at induction: cefazolin 2 g IV': true, 'Part preparation in ward': false, 'Clot prevention: stockings, early walking': true, 'Admit 7 am, OT at 10 am': false } };
+  }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  say(m, p) { var self = this; if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3500); this.setState(Object.assign({ toast: m }, p || {})); }
+  _rv() {
+    var self = this, st = this.state, A = '#1E40AF';
+    function pill(on, multi, warn) { return 'font-size: 13px; font-weight: 600; border-radius: ' + (multi ? '999px' : '8px') + '; padding: 7px 12px; min-height: 36px; cursor: pointer; border: 1px solid ' + (on ? (warn ? '#B42318' : A) : '#D5DCE4') + '; color: ' + (on ? (warn ? '#B42318' : (multi ? '#1E3A8A' : '#FFFFFF')) : '#3E4C5E') + '; background: ' + (on ? (warn ? '#FDECEA' : (multi ? '#DBE4FB' : A)) : '#FFFFFF'); }
+    var cards = CARDS.map(function (c) {
+      return { title: c.title, sub: c.sub, groups: c.groups.map(function (g) {
+        var key = g[0], multi = g[2] === 'multi', val = st.ex[key];
+        return { label: g[1], opts: g[3].map(function (o) {
+          var on = multi ? !!(val && val[o]) : val === o;
+          var warn = on && ((key === 'murphy' && o === 'Positive') || (key === 'jaundice' && o === 'Yes') || (key === 'thin' && o !== 'None') || (key === 'pac' && o === 'Unfit') || (key === 'como' && o !== 'None'));
+          return { label: (on && multi ? '✓ ' : '') + o, on: on, style: pill(on, multi, warn),
+            pick: function () { var x = Object.assign({}, st.ex); if (multi) { var m = Object.assign({}, val || {}); if (o === 'None' || o === 'Normal' || o === 'Soft') m = on ? {} : (function () { var y = {}; y[o] = true; return y; })(); else { delete m['None']; delete m['Normal']; if (on) delete m[o]; else m[o] = true; } x[key] = m; } else x[key] = on ? '' : o; self.setState({ ex: x }); } };
+        }) };
+      }) };
+    });
+    var TS = [['Pending', '#FDF0DC', '#8A4B08'], ['Normal', '#E3F5EC', '#146C43'], ['Abnormal', '#FDECEA', '#B42318']];
+    var tests = TESTS.map(function (t) { var v = st.tests[t] || 0, c = TS[v]; return { name: t, state: c[0], cycle: function () { var x = Object.assign({}, st.tests); x[t] = (v + 1) % 3; self.setState({ tests: x }); }, style: 'display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; border-radius: 10px; padding: 8px 10px; min-height: 52px; cursor: pointer; border: 1px solid ' + c[2] + '33; background: ' + c[1] + '; color: ' + c[2] }; });
+    var pending = TESTS.filter(function (t) { return !st.tests[t]; }), abn = TESTS.filter(function (t) { return st.tests[t] === 2; });
+    var unfit = st.ex.pac === 'Unfit' || abn.length > 0, fitOk = !pending.length && !unfit && st.ex.pac && st.ex.pac !== 'Not done';
+    var fitText = unfit ? 'Not fit yet: ' + (abn.length ? abn.join(', ') + ' abnormal' : 'PAC unfit') : pending.length ? pending.length + ' test(s) pending: ' + pending.join(', ') : st.ex.pac === 'Not done' ? 'PAC not done' : 'Fit for surgery';
+    function chipsRow(label, key, list, extra) {
+      return { label: label, opts: list.map(function (o) { var on = st[key] === o; return { label: o, on: on, style: pill(on, false, false), pick: function () { var p = {}; p[key] = o; p.booked = false; if (extra) Object.assign(p, extra(o)); self.setState(p); } }; }) };
+    }
+    var P = PROC[st.proc];
+    var plan = [
+      chipsRow('Procedure', 'proc', Object.keys(PROC), function (o) { return { anaes: PROC[o][1], adm: PROC[o][2] === 'Day care' ? 'Day care' : 'IPD ' + PROC[o][2], preauth: false }; }),
+      chipsRow('Approach', 'approach', ['Laparoscopic, may convert to open', 'Open', 'Not applicable']),
+      chipsRow('Anaesthesia', 'anaes', ['GA', 'Spinal', 'Local', 'Local + sedation']),
+      chipsRow('Admission', 'adm', ['Day care', 'IPD 1 day', 'IPD 1–2 days', 'IPD 2 days', 'IPD 4–5 days']),
+      chipsRow('OT date', 'date', ['Mon 17 Nov', 'Tue 18 Nov', 'Thu 20 Nov', 'Sat 22 Nov']),
+      chipsRow('OT and time', 'slot', ['OT 1 · 08:00', 'OT 2 · 10:00', 'OT 2 · 13:30']),
+      chipsRow('Blood', 'blood', ['Not needed', 'Group and save', '1 unit reserved']),
+      chipsRow('Who pays', 'payer', ['Self', 'Insurance (TPA)', 'MJPJAY / PM-JAY', 'Company'], function () { return { preauth: false }; })
+    ];
+    var cons = Object.keys(st.consent), consDone = cons.filter(function (k) { return st.consent[k]; }).length;
+    var needPre = st.payer !== 'Self';
+    var deposit = st.payer === 'Self' ? Math.round(P[0] * 0.5 / 1000) * 1000 : 10000;
+    var est = [['Package (sample rate)', inr(P[0])], ['Anaesthesia', st.anaes], ['Stay', st.adm], ['Deposit at admission', inr(deposit)]].map(function (e) { return { k: e[0], v: e[1] }; });
+    var canBook = st.cD > 0 && consDone === cons.length && (!needPre || st.preauth);
+    var aDone = (st.cC > 0 ? 1 : 0) + (fitOk ? 1 : 0), tDone = (st.cD > 0 ? 1 : 0) + (st.booked ? 1 : 0);
+    function partBtn(p, i, done) { var on = st.part === p[0], full = done === 2; return { num: full ? '✓' : String(i + 1), label: p[1], sub: p[2], on: on, badge: done + ' of 2 required', pick: function () { self.setState({ part: p[0] }); },
+      style: 'display: flex; gap: 12px; align-items: center; border-radius: 12px; padding: 12px 16px; min-height: 64px; cursor: pointer; text-align: left; border: 2px solid ' + (on ? A : '#E3E8EE') + '; background: ' + (on ? A : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#0F1C2E'),
+      numStyle: 'flex: none; width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; background: ' + (full ? '#146C43' : on ? '#FFFFFF' : '#EEF1F5') + '; color: ' + (full ? '#FFFFFF' : '#0F1C2E'),
+      badgeStyle: 'flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 9px; background: ' + (full ? '#E3F5EC' : on ? 'rgba(255,255,255,0.2)' : '#FDECEA') + '; color: ' + (full ? '#146C43' : on ? '#FFFFFF' : '#B42318') }; }
+    function checks(key) { return Object.keys(st[key]).map(function (k) { var on = st[key][k]; return { label: k, on: on, toggle: function () { var x = Object.assign({}, st[key]); x[k] = !on; var p = {}; p[key] = x; if (key === 'consent') p.booked = false; self.setState(p); } }; }); }
+    var ready = st.cC > 0 && st.cD > 0 && st.booked;
+    var missingBook = []; if (!st.cD) missingBook.push('diagnosis'); if (consDone < cons.length) missingBook.push((cons.length - consDone) + ' consent item(s)'); if (needPre && !st.preauth) missingBook.push('pre-authorisation');
+    return {
+      parts: [partBtn(['A', 'Assessment', 'Complaints, examination, body map, fitness'], 0, aDone), partBtn(['T', 'Treatment', 'Diagnosis, surgery plan, consent, episode, payments'], 1, tDone)],
+      aStyle: 'display: ' + (st.part === 'A' ? 'flex' : 'none') + '; flex-direction: column; gap: 16px', tStyle: 'display: ' + (st.part === 'T' ? 'flex' : 'none') + '; flex-direction: column; gap: 16px',
+      goT: function () { self.setState({ part: 'T' }); }, goA: function () { self.setState({ part: 'A' }); },
+      onComplaints: function (items) { var a = Array.isArray(items) ? items : []; self.setState({ cC: a.length, cNames: a.map(function (x) { return x.name + ' (' + x.a1 + ')'; }).join(', ') }); },
+      onDiagnosis: function (items) { self.setState({ cD: Array.isArray(items) ? items.length : 0 }); },
+      cards: cards, tests: tests, fitText: fitText,
+      fitStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: ' + (fitOk ? '#E3F5EC' : unfit ? '#FDECEA' : '#FDF0DC') + '; color: ' + (fitOk ? '#146C43' : unfit ? '#B42318' : '#8A4B08'),
+      aFooter: (st.cC ? '' : 'Add complaints. ') + fitText + '.',
+      aRecap: (st.cNames || 'no complaints') + ' · Murphy ' + (st.ex.murphy || '–').toLowerCase() + ' · ASA ' + (st.ex.asa || '–') + ' · ' + fitText.toLowerCase(),
+      plan: plan, est: est,
+      payerText: st.payer === 'Self' ? 'Self-pay' : st.payer + (st.preauth ? ' · pre-auth sent' : ' · pre-auth pending'),
+      payerChip: 'border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; background: ' + (st.preauth || st.payer === 'Self' ? '#E3F5EC' : '#FDF0DC') + '; color: ' + (st.preauth || st.payer === 'Self' ? '#146C43' : '#8A4B08'),
+      preauthLabel: !needPre ? 'No pre-authorisation needed (self-pay)' : st.preauth ? '✓ Pre-authorisation sent to ' + st.payer : 'Send pre-authorisation to ' + st.payer,
+      preauthStyle: 'border: 1px solid ' + (needPre && !st.preauth ? A : '#C9D2DC') + '; background: #FFFFFF; color: ' + (needPre && !st.preauth ? A : '#5B6B7F') + '; border-radius: 8px; padding: 0 14px; min-height: 44px; font-weight: 600; cursor: ' + (needPre && !st.preauth ? 'pointer' : 'default'),
+      sendPreauth: function () { if (!needPre || st.preauth) return; self.say('Pre-authorisation sent with diagnosis, plan, estimate ' + inr(P[0]) + ' and USG report.', { preauth: true }); },
+      bookLabel: st.booked ? '✓ Booked: ' + st.date + ', ' + st.slot : 'Book OT and admission',
+      bookBtnStyle: 'border: 1px solid ' + (canBook && !st.booked ? A : '#C9D2DC') + '; background: ' + (st.booked ? '#E3F5EC' : canBook ? A : '#EEF1F5') + '; color: ' + (st.booked ? '#146C43' : canBook ? '#FFFFFF' : '#5B6B7F') + '; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 700; cursor: ' + (canBook && !st.booked ? 'pointer' : 'not-allowed'),
+      bookOt: function () { if (st.booked) return; if (!canBook) { self.say('Before booking: ' + missingBook.join(', ') + '.'); return; } self.say(st.proc + ' booked for ' + st.date + ', ' + st.slot + '. Ward bed requested; admission SMS sent.', { booked: true }); },
+      bookText: st.booked ? 'Booked' : canBook ? 'Ready to book' : 'Needs: ' + missingBook.join(', '),
+      bookStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: ' + (st.booked ? '#E3F5EC' : canBook ? '#DBE4FB' : '#FDF0DC') + '; color: ' + (st.booked ? '#146C43' : canBook ? A : '#8A4B08'),
+      consent: checks('consent'), consentCount: consDone + ' of ' + cons.length, orders: checks('orders'),
+      footText: ready ? 'Ready to complete. Admission letter and pre-op instructions will print.' : 'Still needed: ' + [st.cC ? '' : 'complaints', st.cD ? '' : 'diagnosis', st.booked ? '' : 'OT booking'].filter(Boolean).join(', ') + '.',
+      footStyle: 'font-size: 13px; font-weight: 600; color: ' + (ready ? '#146C43' : '#B42318'),
+      completeStyle: 'border: 1px solid ' + (ready ? A : '#C9D2DC') + '; background: ' + (ready ? A : '#EEF1F5') + '; color: ' + (ready ? '#FFFFFF' : '#5B6B7F') + '; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: ' + (ready ? 'pointer' : 'not-allowed'),
+      complete: function () { self.say(ready ? 'Visit completed · admission letter, pre-op advice and estimate printed' : 'Finish the highlighted items first'); },
+      saveDraft: function () { self.say('Draft saved'); },
+      toast: st.toast
+    };
+  }
+
+  renderVals() {
+    var self = this, st = this.state, r = this._rv(), MAP = {"complaints": "onComplaints", "diagnosis": "onDiagnosis", "advice": null}, TOOLS = false, cp = st.cp || {};
+    Object.keys(MAP).forEach(function (k) {
+      var orig = MAP[k] ? r[MAP[k]] : null;
+      r['cp_' + k] = function (items) { if (typeof orig === 'function') orig(items); var a = Array.isArray(items) ? items : []; self.setState(function (s0) { var x = Object.assign({}, s0.cp || {}); x[k] = a; return { cp: x }; }); };
+    });
+    var paper = casePaper(st, r, cp), S = paper.sections || {}, n = 0;
+    Object.keys(S).forEach(function (k) { if (S[k] && S[k].length) n++; }); if (paper.rx && paper.rx.length) n++;
+    var rt = st.rtab || 'history', A = '#1E40AF';
+    var tabs = [['history', 'Past visits', 'OPD + IPD'], ['paper', 'Case paper', n + ' of 10 filled · live']];
+    if (TOOLS) tabs.push(['tools', 'Quick tools', 'Helpers for this visit']);
+    r.rTabs = tabs.map(function (t) { var on = rt === t[0]; return { label: t[1], sub: t[2], on: on, pick: function () { self.setState({ rtab: t[0] }); },
+      style: 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 48px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none') }; });
+    function pane(k) { return 'display: ' + (rt === k ? 'flex' : 'none') + '; flex-direction: column; gap: 16px'; }
+    r.rpHistory = pane('history'); r.rpPaper = pane('paper'); r.rpTools = pane('tools');
+    r.paper = paper;
+    return r;
+  }
+}
+</script>
+</body>
+</html>

@@ -42,7 +42,7 @@ abstract class EmrIpdSupport extends ScopeSupport {
             + "{\"id\":\"5b1f1f0e-0a00-4c00-8000-000000000003\",\"medicineId\":null,\"name\":\"Paracetamol 500 mg\",\"form\":null,"
             + "\"frequency\":\"1-0-1\",\"days\":3,\"when\":\"AFTER_FOOD\",\"source\":\"TYPED\"}]}}";
     private static final String RXFORMAT = "{\"header\":{\"text\":\"Header with registration number\"}}";
-    private static final String INVESTIGATION = "{\"investigation\":{\"component\":\"EMR_LIST\",\"kind\":\"INVESTIGATIONS\",\"schemaVersion\":1,"
+    private static final String INVESTIGATION = "{\"lab_tests\":{\"component\":\"EMR_LIST\",\"kind\":\"INVESTIGATIONS\",\"schemaVersion\":1,"
             + "\"items\":[{\"id\":\"5b1f1f0e-0a00-4c00-8000-000000000009\",\"itemKey\":null,\"text\":\"Zxqtest blood count\","
             + "\"newToList\":true,\"active\":true}]}}";
 
@@ -144,9 +144,15 @@ abstract class EmrIpdSupport extends ScopeSupport {
         return "{\"drug\":{\"component\":\"IPD_ORDERS\",\"schemaVersion\":1,\"rows\":[" + String.join(",", rows) + "]}}";
     }
 
-    /** The four required sections of General Medicine with the given Prescription values; returns the saved record. */
+    /** The required sections of General Medicine with the given Prescription values; returns the saved record. */
     protected JsonNode fillWith(RequestPostProcessor who, JsonNode record, String rxValues) throws Exception {
-        return saveDraft(who, record.get("id").asText(), draft(record.get("revision").asLong(),
+        // Vitals is a required section of General Medicine since V2026_12_14_1010 (SAH-75): the vitals log editor on an OPD visit, plain
+        // values on an Emergency assessment and an IPD round (their layout has no vitals editor)
+        String vitals = !"OPD_VISIT".equals(record.path("encounterType").asText())
+                ? section("vitals", "{\"bp_systolic\":120,\"bp_diastolic\":80,\"pulse\":72,\"weight\":61.5}")
+                : section("vitals", "{\"specialty\":{\"component\":\"VITALS_LOG\",\"schemaVersion\":1,\"entries\":[{\"id\":\"5b1f1f0e-0a00-4c00-8000-00000000000a\","
+                        + "\"bpSystolic\":120,\"bpDiastolic\":80,\"pulse\":72,\"spo2\":98,\"temperature\":{\"value\":98.6,\"unit\":\"F\"},\"respRate\":16}]}}");
+        return saveDraft(who, record.get("id").asText(), draft(record.get("revision").asLong(), vitals,
                 section("complaints", COMPLAINTS), section("diagnosis", DIAGNOSIS), section("rx", rxValues),
                 section("rxformat", RXFORMAT)), 200);
     }
@@ -177,6 +183,11 @@ abstract class EmrIpdSupport extends ScopeSupport {
             throws Exception {
         return problemKeyed(HttpMethod.POST, EMR_RECORDS + "/" + record.get("id").asText() + "/sign", who,
                 signBody(record.get("revision").asLong(), choicesJson), idemKey(), status, slug);
+    }
+
+    protected JsonNode checkRefused(RequestPostProcessor who, JsonNode record, String choicesJson, int status, String slug)
+            throws Exception {
+        return problemOf(HttpMethod.POST, EMR_RECORDS + "/" + record.get("id").asText() + "/finish-check", who, choicesJson, status, slug);
     }
 
     protected static List<String> texts(JsonNode array, String field) {

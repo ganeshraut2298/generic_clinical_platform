@@ -62,6 +62,7 @@ describe('AddDepartmentPage', () => {
         ? [summary(), summary({ departmentKey: 'dental', name: 'Dental', initials: 'DN', status: 'LIVE', publishedVersion: 2 })]
         : [summary()],
     });
+    http.expectOne(`${EMR}/starter-departments/physio`).flush(PHYSIO);
     await settle();
     el = fixture.nativeElement as HTMLElement;
   }
@@ -85,7 +86,6 @@ describe('AddDepartmentPage', () => {
 
   async function pickPhysio(): Promise<void> {
     qa('.tcard')[0].click();
-    http.expectOne(`${EMR}/starter-departments/physio`).flush(PHYSIO);
     await settle();
   }
 
@@ -132,14 +132,15 @@ describe('AddDepartmentPage', () => {
       expect(qa('.copylist .member')[0].textContent).toContain('Dental');
     });
 
-    it('shows the Template preview for the chosen template and the Turned off line', async () => {
+    it('opens on Physiotherapy with its Template preview and the Turned off line', async () => {
       await boot();
-      await pickPhysio();
+      expect(qa('.tcard')[0].getAttribute('aria-pressed')).toBe('true');
       const right = q('.right')!.textContent!;
       expect(right).toContain('Template preview');
       expect(right).toContain('Physiotherapy');
       expect(right).toContain('Built for session-based care');
       expect(right).toContain('Range of motion (goniometry)');
+      expect(right).not.toContain('Pick a template');
       expect(right).toContain('Turned off by default: Prescription (Rx), Investigations and Systemic examination. You can switch them back on.');
     });
 
@@ -150,10 +151,8 @@ describe('AddDepartmentPage', () => {
       expect(box.checked).toBe(true);
     });
 
-    it('does not go on without a template and a name', async () => {
+    it('does not go on without a name', async () => {
       await boot();
-      expect(act('next').disabled).toBe(true);
-      await pickPhysio();
       expect(act('next').disabled).toBe(true);
       await type('#dept-name', 'Physio annexe');
       expect(act('next').disabled).toBe(false);
@@ -174,8 +173,8 @@ describe('AddDepartmentPage', () => {
       act('next').click();
       await settle();
       expect(qa('.grp-h h3').map((h) => h.textContent!.trim())).toEqual([
-        '1 · Assessment · Physio annexe',
-        '2 · Treatment · Physio annexe',
+        'Assessment · Physio annexe',
+        'Treatment · Physio annexe',
       ]);
       act('back').click();
       await settle();

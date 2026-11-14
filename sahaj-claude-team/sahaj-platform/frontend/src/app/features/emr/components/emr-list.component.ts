@@ -372,6 +372,26 @@ export class EmrListComponent implements OnInit {
     return which === 2 && this.kind() === 'ADVICE' && WHATSAPP_SEND_BY.has(key);
   }
 
+  /** The chip pill: each press moves to the next value of the list (mockup #EmrList), skipping switched-off ones. */
+  protected cycleAttr(item: EmrListItem, which: 1 | 2): void {
+    const choices = this.specOf(which).choices.filter((c) => !this.isChoiceDisabled(which, c.key));
+    const current = which === 1 ? item.attr1 : item.attr2;
+    const at = choices.findIndex((c) => c.key === current);
+    const next = choices[(at + 1) % choices.length];
+    if (!next || next.key === current || this.disabled()) {
+      return;
+    }
+    if (isLockedByBill(this.kind(), item)) {
+      this.notice.set(ALREADY_BILLED_TEXT);
+      return;
+    }
+    this.notice.set(null);
+    this.emit(this.items().map((i) => (i.id === item.id ? { ...i, [which === 1 ? 'attr1' : 'attr2']: next.key } : i)));
+    if (this.kind() === 'ADVICE' && which === 1 && next.key !== 'EN') {
+      this.advice.ensure(item, this.specialty());
+    }
+  }
+
   protected onAttr(item: EmrListItem, which: 1 | 2, event: Event): void {
     const select = event.target as HTMLSelectElement;
     const key = select.value;

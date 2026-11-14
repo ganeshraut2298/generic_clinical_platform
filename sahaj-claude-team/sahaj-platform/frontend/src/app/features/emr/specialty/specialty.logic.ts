@@ -91,8 +91,10 @@ export function isSpecialtyEmpty(value: EmrSpecialtyValue): boolean {
       return value.givenToday.length === 0 && !value.scheduleReviewed;
     case 'MILESTONES':
       return value.achieved.length === 0 && value.notYet.length === 0;
+    case 'DENTAL_MED_HISTORY':
+      return value.conditions.length === 0 && value.medicines.length === 0 && value.allergies.length === 0 && !value.reviewedWithPatient;
     case 'PAIN_SCORE':
-      return value.score == null && !value.site;
+      return value.score == null && !value.site && !value.siteMarker;
     case 'POSTURE_GAIT':
       return value.gait == null;
     case 'ROM_TABLE':
@@ -132,6 +134,7 @@ export function isSpecialtyEmpty(value: EmrSpecialtyValue): boolean {
         !value.newLesionSeen &&
         Object.values(value.signs).every((s) => !s) &&
         Object.values(value.systems).every((s) => !s) &&
+        !(value.bodyMap && (value.bodyMap.pins.length > 0 || value.bodyMap.noFindingsConfirmed)) &&
         !value.line.device
       );
     case 'ONC_LABS':
@@ -189,6 +192,13 @@ export function sanitizeSpecialty(value: EmrSpecialtyValue): EmrSpecialtyValue {
       break;
     case 'ONC_EXAM':
       (copy['lesions'] as unknown[]).forEach((l) => drop(l, ['lastCm']));
+      if (copy['bodyMap'] && typeof copy['bodyMap'] === 'object') {
+        drop(copy['bodyMap'], ['nextPinNo', 'legacyText']);
+        ((copy['bodyMap'] as { pins?: unknown[] }).pins ?? []).forEach((p) => drop(p, ['recordedAt', 'recordedByMembershipId', 'recordedByName']));
+      }
+      break;
+    case 'DENTAL_MED_HISTORY':
+      drop(copy, ['review']);
       break;
     case 'ONC_LABS':
       drop(copy, ['source']);
@@ -292,6 +302,8 @@ export function isSpecialtyDone(
       return value.scheduleReviewed || value.givenToday.length > 0;
     case 'MILESTONES':
       return value.achieved.length + value.notYet.length > 0;
+    case 'DENTAL_MED_HISTORY':
+      return value.reviewedWithPatient;
     case 'PAIN_SCORE':
       return value.score != null;
     case 'POSTURE_GAIT':

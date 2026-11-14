@@ -508,3 +508,33 @@
     }
   }
 }
+
+/* SAH-75-10: Missed (red dot, red chip), IPD steps dashed in the IPD colour, the link of the embedded panel. */
+.step.missed .mark {
+  border: 0;
+  background: var(--crit);
+  color: var(--crit-ink);
+}
+
+.step.ipd:not(.done):not(.today):not(.missed) .mark {
+  border-color: var(--sec);
+}
+
+.card.missed {
+  border-color: var(--crit);
+}
+
+.st.missed {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.full {
+  align-self: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--pri-text);
+  font-weight: 600;
+  text-decoration: underline;
+}

@@ -1,16 +1,31 @@
 <ng-template #card let-s>
-  <article class="card" [class.sel]="s.key === store.selectedSectionKey()">
+  <article class="card" [class.sel]="s.key === store.selectedSectionKey()" [class.span2]="spansTwo(s)" [attr.data-section]="s.key">
     <div class="card-h">
       <button type="button" class="cname" (click)="store.pickSection(s.key)">
         {{ s.name }}@if (s.required) {<span class="star" aria-hidden="true"> *</span>}
       </button>
       <span class="tag">{{ tag(s) }}</span>
-      @if (s.required) {
-        <span class="pill p-crit">Missing</span>
-      }
     </div>
-    @if (isSpecialEditor(s)) {
-      <p class="placeholder faint t-xs">The special editor for this section comes in a later step.</p>
+    @if (s.key === 'dental_chart') {
+      <div class="teeth" data-testid="preview-teeth" role="img" aria-label="Example tooth chart">
+        <div class="trow">
+          @for (t of teethUpper; track t.n) {
+            <span class="tooth {{ t.state }}">{{ t.n }}</span>
+          }
+        </div>
+        <div class="tline"></div>
+        <div class="trow">
+          @for (t of teethLower; track t.n) {
+            <span class="tooth {{ t.state }}">{{ t.n }}</span>
+          }
+        </div>
+        <div class="tleg">
+          <span><i class="sw caries"></i>Caries</span>
+          <span><i class="sw filled"></i>Filled</span>
+          <span><i class="sw rct"></i>RCT</span>
+          <span><i class="sw missing"></i>Missing</span>
+        </div>
+      </div>
     }
     @if (s.fields.length === 0) {
       <p class="faint t-xs">This section has no fields.</p>
@@ -19,7 +34,7 @@
         @for (f of fieldsOf(s); track f.key) {
           <div class="fr">
             <span class="flabel">{{ f.label }}@if (f.required) {<span class="star" aria-hidden="true"> *</span>}</span>
-            <span class="faint t-xs fph">{{ f.meta || typeLabel(f.type) }}</span>
+            <span class="fph">{{ f.meta || typeLabel(f.type) }}</span>
           </div>
         }
       </div>

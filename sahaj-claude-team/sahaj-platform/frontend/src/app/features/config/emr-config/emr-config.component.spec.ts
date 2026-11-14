@@ -90,15 +90,21 @@ describe('EmrConfigComponent', () => {
         'Choose a department, then pick which EMR sections the doctor sees, in what order, and which are required.',
       );
       expect(el.textContent).toContain('Sunrise Clinic');
+      expect(q('[data-testid=emr-crumb]')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+        'Clinic setup / Specialty template / EMR configuration',
+      );
+      const clinic = q<HTMLSelectElement>('[data-testid=emr-clinic]')!;
+      expect(clinic.disabled).toBe(true);
+      expect(clinic.options[0].textContent).toContain('Sunrise Clinic');
       const cards = qa('.dcard');
       expect(cards).toHaveLength(2);
       expect(cards[0].textContent).toContain('GM');
       expect(cards[0].textContent).toContain('General Medicine');
       expect(cards[0].textContent).toContain('6 of 6 sections on');
       expect(cards[0].textContent).toContain('Template');
-      expect(cards[0].textContent).toContain('v0');
+      expect(cards[0].textContent).not.toContain('v0');
       expect(cards[1].textContent).toContain('Live');
-      expect(cards[1].textContent).toContain('v4');
+      expect(cards[1].textContent).not.toContain('v4');
     });
 
     it('selects the first department and its first Specialty section', async () => {
@@ -159,7 +165,7 @@ describe('EmrConfigComponent', () => {
     it('groups the sections by part with the counts', async () => {
       await boot();
       const heads = qa('.grp-h h3').map((h) => h.textContent!.trim());
-      expect(heads).toEqual(['1 · Assessment · General Medicine', '2 · Treatment · General Medicine']);
+      expect(heads).toEqual(['Assessment · General Medicine', 'Treatment · General Medicine']);
       expect(qa('.grp-h .pill').map((p) => p.textContent!.trim())).toEqual(['3 of 3 on', '3 of 3 on']);
     });
 
@@ -264,7 +270,7 @@ describe('EmrConfigComponent', () => {
   });
 
   describe('preview (SAH-45-6)', () => {
-    it('draws the doctor screen from the draft, with a Missing state for required sections', async () => {
+    it('draws the doctor screen from the draft, with the red star and no Missing pill on required sections', async () => {
       await boot();
       showSwitch('Prescription (Rx)').click();
       qa('[role=tab]').find((t) => t.textContent!.includes('Doctor screen preview'))!.click();
@@ -275,9 +281,15 @@ describe('EmrConfigComponent', () => {
       expect(preview.textContent).toContain('Doctor fills this first');
       expect(preview.textContent).toContain('2 · Treatment');
       expect(preview.textContent).toContain('Opens after assessment');
-      expect(preview.textContent).toContain('Missing');
+      expect(preview.querySelectorAll('.card-h .pill')).toHaveLength(0);
+      expect(preview.querySelector('.card .star')).not.toBeNull();
       expect(preview.textContent).not.toContain('Prescription (Rx)');
-      expect(preview.textContent).toContain('The special editor for this section comes in a later step.');
+      expect(preview.textContent).not.toContain('comes in a later step');
+      const chart = preview.querySelector('[data-section=dental_chart]')!;
+      expect(chart.querySelectorAll('.tooth')).toHaveLength(32);
+      expect(chart.textContent).toContain('Caries');
+      expect(chart.textContent).toContain('Missing');
+      expect(chart.classList.contains('span2')).toBe(true);
     });
   });
 
@@ -339,7 +351,7 @@ describe('EmrConfigComponent', () => {
       act('save-draft').click();
       await settle();
       expect(act('save-draft').textContent).toContain('Saving');
-      expect(act('save-draft').disabled).toBe(true);
+      expect(act('save-draft').disabled).toBe(false);
       http.expectOne(`${EMR}/departments/gm/draft`).flush({ outcome: 'NOTHING_NEW', department: departmentView() });
     });
 
@@ -371,7 +383,7 @@ describe('EmrConfigComponent', () => {
       );
       expect(chip()).toBe('All changes published');
       expect(qa('.dcard')[0].textContent).toContain('Live');
-      expect(qa('.dcard')[0].textContent).toContain('v1');
+      expect(qa('.dcard')[0].textContent).not.toContain('v1');
     });
 
     it('applies nothing and offers a reload when someone else changed the department (409)', async () => {

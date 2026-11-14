@@ -3,6 +3,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { ageText } from '../../../shared/format/patient-age';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { EmrVisitType } from '../emr.model';
+import { noAllergyText } from './allergy-chip.logic';
+import { courseSummary } from '../specialty/dental.logic';
 import { EmrTriageDialogComponent } from './emr-triage-dialog.component';
 import { TITLE_BY_ENCOUNTER, lastVisitText, visitLine } from './emr-record.logic';
 import { EmrRecordStore } from './emr-record.store';
@@ -63,6 +65,41 @@ export class EmrHeaderComponent {
   protected readonly visitText = computed(() => {
     const h = this.header();
     return h ? visitLine(h.visitType, h.visitOrdinal) : null;
+  });
+  /** Dental: the running treatment after the UHID, from the treatment plan on screen (SAH-75-11 D9). */
+  protected readonly courseLine = computed(() => {
+    if (this.store.profile() !== 'dental') {
+      return null;
+    }
+    const key = this.store.layout().find((s) => s.specialtyEditor?.component === 'DENTAL_PLAN')?.key;
+    const value = key ? this.store.specialtyValue(key) : null;
+    return value && value.component === 'DENTAL_PLAN' ? courseSummary(value.rows) : null;
+  });
+  /**
+   * The chip on the right of the patient line: Paediatrics the vaccines (P6), Surgery the payer and its
+   * pre-authorisation (G-S6; "Self-pay" green, "pending" amber, "sent" green) (SAH-75-11).
+   */
+  protected readonly profileChip = computed<{ text: string; tone: 'crit' | 'warn' | 'good'; id: string } | null>(() => {
+    const specialty = this.store.record()?.specialty;
+    const profile = this.store.profile();
+    if (profile === 'paeds' && specialty?.paeds) {
+      const pending = (specialty.paeds.dueTodayCount ?? 0) + (specialty.paeds.overdueCount ?? 0);
+      return pending > 0 ? { text: `${pending} vaccine(s) pending`, tone: 'crit', id: 'vaccine-chip' } : { text: 'Vaccines up to date', tone: 'good', id: 'vaccine-chip' };
+    }
+    if (profile === 'surgery' && specialty?.surgery?.payerChip) {
+      const text = specialty.surgery.payerChip;
+      return { text, tone: text.includes('pending') ? 'warn' : 'good', id: 'payer-chip' };
+    }
+    return null;
+  });
+  /** Paediatrics "No known allergy" (grey), only when the record says none was recorded (ADR-026 D12). Oncology draws its own in the journey strip. */
+  protected readonly noAllergyChip = computed(() =>
+    this.store.profile() === 'paeds' ? noAllergyText('paeds', this.header()?.allergyStatus) : null,
+  );
+  /** The red tag text: only a recorded allergy (a "none" is never drawn as "Allergy: none", ADR-026 D12). */
+  protected readonly redAllergy = computed(() => {
+    const h = this.header();
+    return h && h.allergyStatus !== 'NONE_RECORDED' ? h.allergyText : null;
   });
   protected readonly lastVisit = computed(() => lastVisitText(this.header()?.lastVisitDaysAgo ?? null));
   protected readonly isOpd = computed(() => this.store.record()?.encounterType === 'OPD_VISIT');

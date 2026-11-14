@@ -73,7 +73,12 @@ abstract class IpdBillingSupport extends SweepSupport {
     // ---------------- clinic and beds ----------------
 
     protected Clinic hospital() throws Exception {
-        Clinic clinic = newClinic();
+        return hospital(true);
+    }
+
+    /** {@code ownerIsDoctor} false: the owner has no doctor details (the setup wizard gives the owner a doctor profile). */
+    protected Clinic hospital(boolean ownerIsDoctor) throws Exception {
+        Clinic clinic = newClinic(true, ownerIsDoctor);
         ok(HttpMethod.POST, TRIAL, clinic.owner(), null, 200);
         ok(HttpMethod.POST, WARDS, clinic.owner(), "{\"name\":\"General ward\"}", 201);
         return clinic;

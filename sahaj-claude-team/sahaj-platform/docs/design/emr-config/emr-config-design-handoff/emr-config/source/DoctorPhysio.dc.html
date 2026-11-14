@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Therapist screen — Physiotherapy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#6D3FC0}a:hover{color:#552F99}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; font-size: 14px; min-height: 1240px; display: flex; flex-direction: column">
+
+  <div style="background: #0F1C2E; color: #FFFFFF; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 24px">
+    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+      <span style="font-weight: 700; font-size: 16px">Smart Clinic</span>
+      <span style="background: #6D3FC0; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600">Physiotherapy</span>
+      <nav aria-label="Main" style="display: flex; gap: 4px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 8px 12px; border-radius: 8px; background: #1E3550; font-size: 13px; font-weight: 600">Today&#39;s sessions (9)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Packages</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Exercise library</a>
+      </nav>
+    </div>
+    <span style="font-size: 13px; color: #B8C4D3">[THERAPIST NAME], BPT · MPT (Ortho)</span>
+  </div>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+    <div style="display: flex; gap: 14px; align-items: center">
+      <span style="width: 48px; height: 48px; border-radius: 999px; background: #EADFF8; color: #6D3FC0; display: flex; align-items: center; justify-content: center; font-weight: 700">MJ</span>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 17px; font-weight: 700">[PATIENT NAME]</span>
+        <span style="font-size: 13px; color: #5B6B7F">58 y · Female · Right knee osteoarthritis · Referred by Dr. [ORTHO NAME]</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 220px">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600"><span>Session 4 of 10</span><span style="color: #5B6B7F">Knee package</span></div>
+        <div style="display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px">
+          <sc-for list="{{sessions}}" as="s" hint-placeholder-count="10"><span style="{{s}}"></span></sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div role="tablist" aria-label="Visit mode" style="display: flex; gap: 4px; padding: 12px 24px 0">
+    <sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+      <button type="button" role="tab" aria-selected="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 24px 20px; align-items: flex-start; flex: 1">
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+      <div id="complaints">
+        <dc-import name="EmrList" on-change="{{cp_complaints}}" kind="complaints" spec="physio" title="Chief complaints" required="{{ true }}" accent="#6D3FC0" who="[THERAPIST NAME]" hint-size="100%,230px"></dc-import>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 16px">
+        <section style="flex: 1 1 340px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Pain today <span style="color: #B42318">*</span></h2><span style="font-size: 12px; color: #5B6B7F">NPRS 0–10</span></div>
+          <div style="display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px">
+            <sc-for list="{{pain}}" as="p" hint-placeholder-count="11">
+              <button type="button" aria-pressed="{{p.on}}" onClick="{{p.pick}}" aria-label="Pain {{p.n}}" style="{{p.style}}">{{p.n}}</button>
+            </sc-for>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: #5B6B7F"><span>No pain</span><span>Worst pain</span></div>
+          <div style="display: flex; gap: 14px; align-items: center; background: #FAFBFC; border-radius: 10px; padding: 10px 12px">
+            <svg role="img" aria-label="Pain trend by session: 7, 6, 5, then today" viewBox="0 0 160 50" style="width: 160px; height: 50px; flex: none">
+              <polyline points="10,12 55,18 100,26 145,{{painY}}" fill="none" stroke="#6D3FC0" stroke-width="2.5"/>
+              <circle cx="10" cy="12" r="3.5" fill="#6D3FC0"/><circle cx="55" cy="18" r="3.5" fill="#6D3FC0"/><circle cx="100" cy="26" r="3.5" fill="#6D3FC0"/><circle cx="145" cy="{{painY}}" r="5" fill="#0F1C2E"/>
+            </svg>
+            <span style="font-size: 13px; color: #3E4C5E">{{painText}}</span>
+          </div>
+        </section>
+
+        <section style="flex: 1 1 240px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; align-items: center">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 700; align-self: flex-start">Pain site</h2>
+          <svg role="img" aria-label="Body outline with the right knee marked" viewBox="0 0 120 240" style="width: 120px; height: 240px">
+            <circle cx="60" cy="22" r="16" fill="#EEF1F5" stroke="#9AA8B8"/>
+            <rect x="38" y="42" width="44" height="80" rx="14" fill="#EEF1F5" stroke="#9AA8B8"/>
+            <rect x="20" y="46" width="14" height="70" rx="7" fill="#EEF1F5" stroke="#9AA8B8"/>
+            <rect x="86" y="46" width="14" height="70" rx="7" fill="#EEF1F5" stroke="#9AA8B8"/>
+            <rect x="40" y="120" width="17" height="110" rx="8" fill="#EEF1F5" stroke="#9AA8B8"/>
+            <rect x="63" y="120" width="17" height="110" rx="8" fill="#EEF1F5" stroke="#9AA8B8"/>
+            <circle cx="48" cy="172" r="11" fill="#6D3FC0" fill-opacity="0.35" stroke="#6D3FC0" stroke-width="2"/>
+            <text x="2" y="176" font-size="9" fill="#3E4C5E">R</text><text x="110" y="176" font-size="9" fill="#3E4C5E">L</text>
+          </svg>
+          <span style="font-size: 12px; color: #3E4C5E; text-align: center">Right knee, medial side · worse on stairs, better with rest</span>
+        </section>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Range of motion &amp; strength · knee</h2><span style="font-size: 12px; color: #5B6B7F">Normal range shown for comparison</span></div>
+        <div style="overflow-x: auto">
+          <div style="min-width: 620px; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+            <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 2fr; gap: 10px; padding: 8px 12px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">
+              <span>Movement</span><span>Right</span><span>Left</span><span>Normal</span><span>Right vs normal</span>
+            </div>
+            <sc-for list="{{rom}}" as="r" hint-placeholder-count="4">
+              <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 2fr; gap: 10px; padding: 10px 12px; border-top: 1px solid #EEF1F5; align-items: center; font-size: 13px">
+                <span style="font-weight: 600">{{r.move}}</span>
+                <input aria-label="{{r.move}} right" value="{{r.right}}" style="font: inherit; font-weight: 700; color: #6D3FC0; border: 1px solid #C9D2DC; border-radius: 6px; padding: 5px 8px; width: 70px">
+                <span>{{r.left}}</span>
+                <span style="color: #5B6B7F">{{r.normal}}</span>
+                <span style="display: flex; align-items: center; gap: 8px"><span style="flex: 1; height: 8px; background: #EEF1F5; border-radius: 999px; overflow: hidden"><span style="{{r.bar}}"></span></span><span style="font-size: 12px; color: #3E4C5E; width: 36px">{{r.pct}}</span></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px">
+          <span style="background: #EEF1F5; border-radius: 8px; padding: 6px 10px">Quadriceps <strong>R 4/5 · L 5/5</strong></span>
+          <span style="background: #EEF1F5; border-radius: 8px; padding: 6px 10px">Hamstrings <strong>R 4/5 · L 5/5</strong></span>
+          <span style="background: #EEF1F5; border-radius: 8px; padding: 6px 10px">WOMAC <strong>48 → 41</strong></span>
+        </div>
+      </section>
+
+      <sc-if value="{{isSession}}" hint-placeholder-val="{{ true }}">
+      <section style="{{modSecStyle}}">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Treatment given today <span style="color: #B42318">*</span></h2><span style="font-size: 12px; color: #5B6B7F">{{modCount}}</span></div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+          <sc-for list="{{mods}}" as="m" hint-placeholder-count="6">
+            <button type="button" aria-pressed="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">
+              <span style="font-weight: 700; font-size: 14px">{{m.name}}</span>
+              <span style="font-size: 12px; color: #3E4C5E">{{m.params}}</span>
+            </button>
+          </sc-for>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Session note
+          <input placeholder="e.g. tolerated well, no increase in pain" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px">
+        </label>
+      </section>
+      </sc-if>
+      <sc-if value="{{isAssess}}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Special tests · knee</h2><span style="font-size: 12px; color: #5B6B7F">Tap once for positive, again for negative, again to clear</span></div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+          <sc-for list="{{tests}}" as="t" hint-placeholder-count="6">
+            <button type="button" onClick="{{t.cycle}}" style="{{t.style}}"><span style="font-weight: 700">{{t.name}}</span><span style="{{t.resStyle}}">{{t.res}}</span></button>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Gait</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{gait}}" as="g" hint-placeholder-count="4"><button type="button" aria-pressed="{{g.on}}" onClick="{{g.pick}}" style="{{g.style}}">{{g.label}}</button></sc-for>
+          </div>
+        </div>
+      </section>
+      </sc-if>
+
+      <div id="course">
+        <dc-import name="TreatmentCourse" kind="physio" accent="#6D3FC0" hint-size="100%,820px"></dc-import>
+      </div>
+      <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="physio" title="Doctor’s advice" required="{{ false }}" accent="#6D3FC0" who="[THERAPIST NAME]" hint-size="100%,230px"></dc-import></div>
+    </main>
+
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="physio" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#6D3FC0" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 14px; font-weight: 700">Home exercises ({{hepCount}})</h2></div>
+        <sc-for list="{{hep}}" as="h" hint-placeholder-count="4">
+          <div style="display: flex; gap: 10px; align-items: center; padding: 8px; border: 1px solid #EEF1F5; border-radius: 10px">
+            <span style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: #EADFF8; display: flex; align-items: center; justify-content: center; color: #6D3FC0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v6l-3 7M12 13l3 7M8 10h8"/></svg>
+            </span>
+            <span style="display: flex; flex-direction: column; gap: 2px; flex: 1"><span style="font-size: 13px; font-weight: 600">{{h.name}}</span><span style="font-size: 12px; color: #5B6B7F">{{h.dose}}</span></span>
+            <button type="button" onClick="{{h.remove}}" aria-label="Remove {{h.name}}" style="border: 0; background: transparent; width: 36px; height: 36px; cursor: pointer; color: #5B6B7F"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div>
+        </sc-for>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{lib}}" as="l" hint-placeholder-count="3"><button type="button" onClick="{{l.add}}" style="border: 1px dashed #9AA8B8; background: #FFFFFF; border-radius: 999px; padding: 6px 10px; min-height: 34px; font-size: 12px; color: #3E4C5E; cursor: pointer">+ {{l.name}}</button></sc-for>
+        </div>
+        <button type="button" onClick="{{sendHep}}" style="border: 1px solid #6D3FC0; background: #FFFFFF; color: #6D3FC0; border-radius: 8px; min-height: 44px; font-weight: 600; cursor: pointer">Send to patient on WhatsApp</button>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 4px">
+        <h2 style="margin: 0 0 4px; font-size: 14px; font-weight: 700">Goals · tap when achieved</h2>
+        <sc-for list="{{goals}}" as="g" hint-placeholder-count="3">
+          <button type="button" aria-pressed="{{g.on}}" onClick="{{g.toggle}}" style="display: flex; gap: 10px; align-items: center; border: 0; background: transparent; padding: 8px 0; min-height: 40px; cursor: pointer; text-align: left; font-size: 13px; color: #0F1C2E"><span style="{{g.dot}}">{{g.mark}}</span>{{g.label}}</button>
+        </sc-for>
+      </section>
+
+      
+    </div>
+    </aside>
+  </div>
+
+  <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; box-shadow: 0 -4px 12px rgba(15,28,46,0.06)">
+    <span style="{{footStyle}}">{{footText}}</span>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap">
+      <button type="button" onClick="{{report}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Progress report</button>
+      <button type="button" onClick="{{complete}}" style="{{completeStyle}}">Complete session &amp; book next</button>
+    </div>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; bottom: 84px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3)">{{toast}}</div>
+  </sc-if>
+
+  <sc-if value="{{modal}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(15,28,46,0.55); display: flex; align-items: flex-start; justify-content: center; padding-top: 200px">
+      <div role="dialog" aria-label="Session summary" style="width: 520px; max-width: calc(100% - 32px); background: #FFFFFF; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px rgba(15,28,46,0.35)">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Complete session 4?</h2>
+        <div style="display: flex; flex-direction: column; gap: 6px; background: #FAFBFC; border-radius: 10px; padding: 12px 14px; font-size: 13px">
+          <sc-for list="{{summary}}" as="s" hint-placeholder-count="3"><span>• {{s}}</span></sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Book session 5</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{slots}}" as="s" hint-placeholder-count="4"><button type="button" aria-pressed="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button></sc-for>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap">
+          <button type="button" onClick="{{closeModal}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Back</button>
+          <button type="button" onClick="{{finish}}" style="border: 1px solid #6D3FC0; background: #6D3FC0; color: #FFFFFF; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: pointer">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":2300}}'>
+
+function cpN(a, mode) { return (Array.isArray(a) ? a : []).map(function (x) { if (!x) return ''; if (typeof x === 'string') return x; var t = x.name || ''; if (mode === 'dx' && x.code) t += ' (' + x.code + ')'; else if (mode === 'c' && x.a1) t += ' · ' + x.a1; return t; }).filter(Boolean); }
+function cpKeys(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }); }
+
+function casePaper(st, r, cp) {
+  var pos = (r.tests || []).filter(function (t) { return t.res && t.res !== 'Not done'; }).map(function (t) { return t.name + ': ' + t.res; });
+  return { dept: 'Physiotherapy', doctor: '[THERAPIST NAME], PT', qual: 'BPTh, MPTh (Musculoskeletal)', reg: '[MSOTPT COUNCIL REG. NO.]', patient: '[PATIENT NAME]', meta: '58 y · Female', ids: 'UHID [ID] · Ref: Dr. [ORTHO NAME]', visit: 'Session 4 of 10', vitals: 'Pain ' + st.pain + '/10',
+    sections: { complaints: cpN(cp.complaints, 'c'), allergies: ['No known drug allergy'], history: ['Right knee osteoarthritis'], exam: ['Pain score ' + st.pain + '/10 · gait ' + (st.gait || '')].concat(pos),
+      diagnosis: cpN(cp.diagnosis, 'dx').length ? cpN(cp.diagnosis, 'dx') : ['Right knee osteoarthritis (M17.1)'], investigations: [], procedures: cpKeys(st.mods), advice: ['Home exercise programme: ' + (r.hepCount || 0) + ' exercises'].concat(cpN(cp.advice)), follow: ['Next session ' + (st.slot || '')] }, rx: [] };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pain: 4, mode: 'session', mods: { IFT: true, 'Hot pack': true, Ultrasound: false, TENS: false, 'Exercise therapy': true, Taping: false },
+      hep: [0, 1, 2, 3], goals: { 0: true, 1: false, 2: false }, tests: { 0: 0, 1: 0, 2: 1, 3: 0, 4: 2, 5: 0 }, gait: 'Antalgic', slot: 'Thu 10:00', toast: '', modal: false };
+  }
+  say(msg, patch) {
+    var self = this;
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3000);
+    this.setState(Object.assign({ toast: msg }, patch || {}));
+  }
+  _rv() {
+    var self = this, st = this.state, A = '#6D3FC0';
+    var sessions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (i) { return 'height: 8px; border-radius: 999px; background: ' + (i < 4 ? '#146C43' : i === 4 ? A : '#E3E8EE'); });
+    var pain = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+      var on = st.pain === n;
+      return { n: n, on: on, pick: function () { self.setState({ pain: n }); },
+        style: 'height: 40px; border-radius: 8px; font-weight: 700; cursor: pointer; border: 1px solid ' + (on ? '#0F1C2E' : '#D5DCE4') + '; color: ' + (on ? '#FFFFFF' : '#0F1C2E') + '; background: ' + (on ? '#0F1C2E' : n <= 3 ? '#EAF6EF' : n <= 6 ? '#FDF3E3' : '#FDECEA') };
+    });
+    var MODS = [['IFT', '15 min · knee, 4-pole'], ['Hot pack', '10 min · before exercise'], ['Ultrasound', '1 MHz · 5 min'], ['TENS', '20 min · conventional'], ['Exercise therapy', 'Supervised, 20 min'], ['Taping', 'Patella, unloading']];
+    var mods = MODS.map(function (m) {
+      var on = !!st.mods[m[0]];
+      return { name: (on ? '✓ ' : '') + m[0], params: m[1], on: on,
+        pick: function () { var x = Object.assign({}, st.mods); x[m[0]] = !on; self.setState({ mods: x }); },
+        style: 'display: flex; flex-direction: column; gap: 4px; text-align: left; border-radius: 10px; padding: 12px; min-height: 64px; cursor: pointer; color: #0F1C2E; border: ' + (on ? '2px solid ' + A : '1px solid #D5DCE4') + '; background: ' + (on ? A + '10' : '#FFFFFF') };
+    });
+    var ROM = [['Flexion', 105, 130, 135], ['Extension', -5, 0, 0], ['Flexion (passive)', 112, 135, 135]];
+    var rom = ROM.map(function (r) {
+      var pct = r[3] === 0 ? (r[1] === 0 ? 100 : 90) : Math.round(r[1] / r[3] * 100);
+      return { move: r[0], right: r[1] + '°', left: r[2] + '°', normal: (r[3] === 0 ? '0°' : '0–' + r[3] + '°'), pct: pct + '%',
+        bar: 'display: block; height: 8px; border-radius: 999px; width: ' + pct + '%; background: ' + (pct >= 90 ? '#146C43' : A) };
+    });
+    var modes = [['assess', 'First visit: assessment'], ['session', 'Session notes']].map(function (m) {
+      var on = st.mode === m[0];
+      return { label: m[1], on: on, pick: function () { self.setState({ mode: m[0] }); },
+        style: 'border: 0; border-bottom: 3px solid ' + (on ? A : 'transparent') + '; background: transparent; padding: 10px 14px; min-height: 44px; font-size: 14px; font-weight: 600; cursor: pointer; color: ' + (on ? A : '#3E4C5E') };
+    });
+    var painY = Math.max(4, Math.min(46, 12 + (7 - st.pain) * 7));
+    var diff = 5 - st.pain;
+    var LIB = [['Quadriceps sets', '3 × 10 · twice a day'], ['Straight leg raise', '3 × 10 · twice a day'], ['Heel slides', '2 × 15 · daily'], ['Terminal knee extension', '2 × 12 · with band'], ['Mini squats', '2 × 10 · holding a chair'], ['Step-ups', '2 × 10 · low step'], ['Calf stretch', '3 × 30 s']];
+    var hep = st.hep.map(function (i) { return { name: LIB[i][0], dose: LIB[i][1], remove: function () { self.setState({ hep: st.hep.filter(function (x) { return x !== i; }) }); } }; });
+    var lib = LIB.map(function (l, i) { return { i: i, name: l[0] }; }).filter(function (l) { return st.hep.indexOf(l.i) < 0; }).map(function (l) { return { name: l.name, add: function () { self.say(l.name + ' added', { hep: st.hep.concat([l.i]) }); } }; });
+    var GOALS = ['Short term: pain below 4 by session 5', 'Knee bend to 120° by session 10', 'Climb one floor of stairs without support'];
+    var goals = GOALS.map(function (g, i) {
+      var on = !!st.goals[i];
+      return { label: g, on: on, mark: on ? '✓' : '', toggle: function () { var x = Object.assign({}, st.goals); x[i] = !on; self.setState({ goals: x }); },
+        dot: 'flex: none; width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #FFFFFF; background: ' + (on ? '#146C43' : '#FFFFFF') + '; border: ' + (on ? '0' : '1.5px solid #9AA8B8') };
+    });
+    var TESTS = ['McMurray (medial)', 'Lachman', 'Patellar grind', 'Anterior drawer', 'Valgus stress', 'Apley compression'];
+    var RES = [['Not done', '#5B6B7F', '#FFFFFF', '#D5DCE4'], ['Positive', '#B42318', '#FDECEA', '#B42318'], ['Negative', '#146C43', '#E3F5EC', '#146C43']];
+    var tests = TESTS.map(function (t, i) {
+      var r = RES[st.tests[i] || 0];
+      return { name: t, res: r[0], cycle: function () { var x = Object.assign({}, st.tests); x[i] = ((st.tests[i] || 0) + 1) % 3; self.setState({ tests: x }); },
+        style: 'display: flex; flex-direction: column; gap: 4px; text-align: left; border-radius: 10px; padding: 10px 12px; min-height: 60px; cursor: pointer; color: #0F1C2E; background: ' + r[2] + '; border: 1px solid ' + r[3],
+        resStyle: 'font-size: 12px; font-weight: 700; color: ' + r[1] };
+    });
+    var gait = ['Normal', 'Antalgic', 'With stick', 'With walker'].map(function (g) {
+      var on = st.gait === g;
+      return { label: g, on: on, pick: function () { self.setState({ gait: g }); },
+        style: 'font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 12px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+    });
+    var modOn = Object.keys(st.mods).filter(function (k) { return st.mods[k]; });
+    return {
+      sessions: sessions, pain: pain, mods: mods, rom: rom, modes: modes, painY: painY,
+      painText: 'Sessions 1–3: 7, 6, 5. Today: ' + st.pain + (diff > 0 ? ' — improving.' : diff === 0 ? ' — same as last session.' : ' — worse than last session.'),
+      hep: hep, hepCount: hep.length, lib: lib, goals: goals, tests: tests, gait: gait,
+      isSession: st.mode === 'session', isAssess: st.mode === 'assess',
+      modCount: modOn.length + ' selected',
+      modSecStyle: 'background: #FFFFFF; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px; border: 1px solid ' + (modOn.length ? '#E3E8EE' : '#F3C1BC'),
+      footText: modOn.length ? 'Completing marks session 4 as used and books session 5.' : 'Select at least one treatment given today.',
+      footStyle: 'font-size: 13px; font-weight: 600; color: ' + (modOn.length ? '#146C43' : '#B42318'),
+      completeStyle: 'border: 1px solid ' + (modOn.length ? A : '#C9D2DC') + '; background: ' + (modOn.length ? A : '#EEF1F5') + '; color: ' + (modOn.length ? '#FFFFFF' : '#5B6B7F') + '; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: ' + (modOn.length ? 'pointer' : 'not-allowed'),
+      complete: function () { if (modOn.length) self.setState({ modal: true }); else self.say('Pick the treatments given today first'); },
+      report: function () { self.say('Progress report (sessions 1–4) ready to share with referring doctor'); },
+      sendHep: function () { self.say(hep.length + ' exercises sent on WhatsApp with pictures'); },
+      closeModal: function () { self.setState({ modal: false }); },
+      finish: function () { self.say('Session 4 done · session 5 booked ' + st.slot, { modal: false }); },
+      slots: ['Wed 17:00', 'Thu 10:00', 'Thu 18:30', 'Fri 11:00'].map(function (s) {
+        var on = st.slot === s;
+        return { label: s, on: on, pick: function () { self.setState({ slot: s }); },
+          style: 'font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 12px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+      }),
+      summary: ['Pain ' + st.pain + '/10 (was 5 last session)', 'Treatment: ' + (modOn.join(', ') || 'none'), hep.length + ' home exercises'],
+      toast: st.toast, modal: st.modal
+    };
+  }
+
+  renderVals() {
+    var self = this, st = this.state, r = this._rv(), MAP = {"complaints": null, "advice": null}, TOOLS = true, cp = st.cp || {};
+    Object.keys(MAP).forEach(function (k) {
+      var orig = MAP[k] ? r[MAP[k]] : null;
+      r['cp_' + k] = function (items) { if (typeof orig === 'function') orig(items); var a = Array.isArray(items) ? items : []; self.setState(function (s0) { var x = Object.assign({}, s0.cp || {}); x[k] = a; return { cp: x }; }); };
+    });
+    var paper = casePaper(st, r, cp), S = paper.sections || {}, n = 0;
+    Object.keys(S).forEach(function (k) { if (S[k] && S[k].length) n++; }); if (paper.rx && paper.rx.length) n++;
+    var rt = st.rtab || 'history', A = '#6D3FC0';
+    var tabs = [['history', 'Past visits', 'OPD + IPD'], ['paper', 'Case paper', n + ' of 10 filled · live']];
+    if (TOOLS) tabs.push(['tools', 'Quick tools', 'Helpers for this visit']);
+    r.rTabs = tabs.map(function (t) { var on = rt === t[0]; return { label: t[1], sub: t[2], on: on, pick: function () { self.setState({ rtab: t[0] }); },
+      style: 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 48px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none') }; });
+    function pane(k) { return 'display: ' + (rt === k ? 'flex' : 'none') + '; flex-direction: column; gap: 16px'; }
+    r.rpHistory = pane('history'); r.rpPaper = pane('paper'); r.rpTools = pane('tools');
+    r.paper = paper;
+    return r;
+  }
+}
+</script>
+</body>
+</html>

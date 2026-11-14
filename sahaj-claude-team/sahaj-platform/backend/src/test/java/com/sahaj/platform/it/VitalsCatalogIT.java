@@ -133,7 +133,8 @@ class VitalsCatalogIT extends VitalsSupport {
                 "trg_emr_department_version_no_truncate", "trg_emr_form_starter_immutable", "trg_emr_form_starter_no_truncate",
                 "trg_emr_form_version_immutable", "trg_emr_form_version_no_truncate", "trg_emr_chemo_protocol_immutable",
                 "trg_emr_chemo_protocol_no_truncate", "trg_emr_record_signed_guard", "trg_emr_record_addendum_no_update_delete",
-                "trg_emr_record_addendum_no_truncate", "trg_emr_admission_request_guard", "trg_emr_admission_request_no_truncate");
+                "trg_emr_record_addendum_no_truncate", "trg_emr_admission_request_guard", "trg_emr_admission_request_no_truncate",
+                "trg_emr_record_insert_draft");
         for (String expected : new String[] {"opd.emr_record.trg_emr_record_signed_guard", "opd.emr_record_addendum.trg_emr_record_addendum_no_update_delete",
                 "opd.emr_record_addendum.trg_emr_record_addendum_no_truncate", "opd.emr_admission_request.trg_emr_admission_request_guard",
                 "opd.emr_admission_request.trg_emr_admission_request_no_truncate"}) {

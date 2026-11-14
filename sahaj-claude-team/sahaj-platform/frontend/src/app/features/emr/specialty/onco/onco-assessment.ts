@@ -1,7 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
+import { BodyMapComponent } from '../../components/body-map.component';
+import { pinsOf } from '../../components/body-map.logic';
+import { EmrBodyMapValue } from '../../emr-phase3.model';
 import { REFERENCE_LISTS } from '../specialty.context';
-import { newId, TOX_KEYS } from '../specialty.logic';
+import { newId, TOX_KEYS, vitalsFlags } from '../specialty.logic';
 import { SpEditor, numberOrNull, textOrNull, toggled } from '../shared/sp-editor';
+import { SpSparklineComponent } from '../shared/sp-sparkline.component';
 import { SpStepperComponent } from '../shared/sp-stepper.component';
 import {
   BREAST_SKIN,
@@ -29,11 +33,12 @@ import {
   SpOncLabs,
   SpOncTox,
   SpSignState,
+  SpVitalsLog,
   SpSystemFinding,
   ToxKey,
 } from '../specialty.model';
 
-type ExamTab = 'v' | 't' | 's' | 'p';
+type ExamTab = 'v' | 't' | 'b' | 's' | 'p';
 
 /**
  * ONC_TOX (SAH-65-1; tagged C-8): "1 · Side effects since last cycle". Nine symptoms with the CTCAE
@@ -187,7 +192,7 @@ const SIGN_CYCLE: Record<string, SpSignState> = { none: 'ABSENT', ABSENT: 'PRESE
 @Component({
   selector: 'app-sp-onc-exam',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SpStepperComponent],
+  imports: [SpStepperComponent, BodyMapComponent, SpSparklineComponent],
   styleUrls: ['../specialty.shared.scss', './onco.scss'],
   template: `
     <div class="sp">
@@ -200,6 +205,15 @@ const SIGN_CYCLE: Record<string, SpSignState> = { none: 'ABSENT', ABSENT: 'PRESE
 
       @switch (tab()) {
         @case ('v') {
+          <div class="sp-grid" role="group" aria-label="Vitals of this visit" data-testid="exam-vitals">
+            @for (v of vitalTiles(); track v.label) {
+              <div class="vtile" [class.bad]="v.alert">
+                <span class="sp-lbl">{{ v.label }}</span>
+                <b>{{ v.value }}</b>
+                <span class="sp-sub">{{ v.note }}</span>
+              </div>
+            }
+          </div>
           <div class="sp-grid">
             <app-sp-stepper label="Height" unit="cm" [value]="val().heightCm" [stepBy]="0.5" [start]="160" [min]="50" [max]="250" [disabled]="disabled()" (valueChange)="patch({ heightCm: $event })" />
             <app-sp-stepper label="Weight" unit="kg" [value]="val().weightKg" [stepBy]="0.1" [start]="60" [min]="2" [max]="300" [disabled]="disabled()" (valueChange)="patch({ weightKg: $event })" />
@@ -226,7 +240,7 @@ const SIGN_CYCLE: Record<string, SpSignState> = { none: 'ABSENT', ABSENT: 'PRESE
           <span class="sp-lbl">Measurable lesions · longest diameter (cm, calliper)</span>
           <div class="scroll">
             <table class="tbl" aria-label="Lesions">
-              <thead><tr><th>Lesion</th><th>Baseline</th><th>Last</th><th>Today</th><th>Change</th><th><span class="sr-only">Remove</span></th></tr></thead>
+              <thead><tr><th>Lesion</th><th>Baseline</th><th>{{ lastHead() }}</th><th>Today</th><th>Trend</th><th>Change</th><th><span class="sr-only">Remove</span></th></tr></thead>
               <tbody>
                 @for (l of val().lesions; track l.id) {
                   <tr>
@@ -240,16 +254,22 @@ const SIGN_CYCLE: Record<string, SpSignState> = { none: 'ABSENT', ABSENT: 'PRESE
                         <button type="button" class="mini" [attr.aria-label]="'Increase ' + l.name" [disabled]="disabled()" (click)="stepLesion(l.id, 0.1)">+</button>
                       </div>
                     </td>
+                    <td><div class="spk"><app-sp-sparkline [values]="trendOf(l)" [label]="'Size of ' + l.name + ' over the cycles: ' + trendOf(l).join(', ')" /></div></td>
                     <td><span class="ch" [attr.data-colour]="colour(l)">{{ change(l) }}</span></td>
                     <td>@if (!disabled()) {<button type="button" class="link" [attr.aria-label]="'Remove ' + l.name" (click)="removeLesion(l.id)">×</button>}</td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="6" class="sp-sub">No lesion measured. Add one below.</td></tr>
+                  <tr><td colspan="7" class="sp-sub">No lesion measured. Add one below.</td></tr>
                 }
               </tbody>
             </table>
           </div>
           @if (!disabled() && val().lesions.length < 10) {
+            <div class="lesion-chips" role="group" aria-label="Quick add a lesion">
+              @for (n of quickLesions; track n) {
+                <button type="button" class="chip sq" data-act="quick-lesion" (click)="addQuick(n)">+ {{ n }}</button>
+              }
+            </div>
             <div class="sp-row">
               <input class="input grow" type="text" maxlength="60" placeholder="Lesion name" aria-label="Lesion name" [value]="lName()" (input)="lName.set(txtv($event))" />
               <input class="input num" type="number" step="0.1" min="0" max="50" placeholder="Baseline cm" aria-label="Baseline size in centimetres" [value]="lBase() ?? ''" (input)="lBase.set(numv($event))" />
@@ -266,6 +286,16 @@ const SIGN_CYCLE: Record<string, SpSignState> = { none: 'ABSENT', ABSENT: 'PRESE
               <button type="button" class="chip" [class.on]="val().breastSkin.includes(b.key)" [disabled]="disabled()" (click)="patch({ breastSkin: toggledB(val().breastSkin, b.key) })">{{ val().breastSkin.includes(b.key) ? '✓ ' : '+ ' }}{{ b.label }}</button>
             }
           </div>
+        }
+        @case ('b') {
+          <app-body-map
+            title="Body map · mark lumps, nodes, skin lesions, port site"
+            [value]="val().bodyMap ?? null"
+            [disabled]="disabled()"
+            [inputId]="'onc-body-map'"
+            [allowNoFindings]="false"
+            (valueChange)="setBodyMap($event)"
+          />
         }
         @case ('s') {
           <div class="sp-row">
@@ -319,6 +349,7 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
   protected readonly tabs: { key: ExamTab; label: string }[] = [
     { key: 'v', label: 'Vitals & general' },
     { key: 't', label: 'Tumour & response' },
+    { key: 'b', label: 'Body map' },
     { key: 's', label: 'Systems' },
     { key: 'p', label: 'Port / line' },
   ];
@@ -345,6 +376,15 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
   protected readonly lBase = signal<number | null>(null);
   protected readonly onco = this.ctx.onco;
 
+  constructor() {
+    super();
+    effect(() => {
+      if (this.tab() === 't' && this.ctx.history() === null) {
+        this.ctx.loadHistory();
+      }
+    });
+  }
+
   protected readonly bsaText = computed(() => {
     const used = this.onco()?.bsaUsed ?? bsa(this.val().heightCm, this.val().weightKg, this.val().capAt2).used;
     return used == null ? 'not worked out yet (needs height and weight)' : `${used.toFixed(2)} m²`;
@@ -356,6 +396,23 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
   protected readonly weightNote = computed(() => {
     const o = this.onco();
     return o?.cycle1WeightKg != null ? `Cycle 1: ${o.cycle1WeightKg} kg${o.weightChangePct != null ? ` · ${this.pctText()}` : ''}` : 'Cycle 1 weight is taken from today’s weight.';
+  });
+  /** The vitals of this visit, read from the Vitals card (VITALS_LOG), as tiles in the first tab (SAH-75-11 O-3). Nothing is typed here. */
+  protected readonly vitalTiles = computed(() => {
+    const key = this.ctx.sectionKeyOf('VITALS_LOG');
+    const log = key ? this.ctx.value<SpVitalsLog>(key, 'VITALS_LOG') : null;
+    const last = log?.entries[log.entries.length - 1] ?? null;
+    const flags = vitalsFlags(last, this.ctx.profile());
+    const tile = (label: string, value: string | null, field: string) => {
+      const flag = flags.find((f) => f.field === field) ?? null;
+      return { label, value: value ?? '—', alert: !!flag?.alert, note: value === null ? 'Not recorded yet' : (flag?.label ?? 'Normal') };
+    };
+    return [
+      tile('BP', last?.bpSystolic != null && last.bpDiastolic != null ? `${last.bpSystolic}/${last.bpDiastolic}` : null, 'bp'),
+      tile('PR', last?.pulse != null ? String(last.pulse) : null, 'pulse'),
+      tile('Temp', last?.temperature ? `${last.temperature.value} °${last.temperature.unit}` : null, 'temperature'),
+      tile('SpO₂', last?.spo2 != null ? `${last.spo2} %` : null, 'spo2'),
+    ];
   });
   protected readonly noneText = computed(() => (Object.values(this.val().signs).some((s) => s === 'PRESENT') ? '' : 'None present'));
 
@@ -375,11 +432,21 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
         const r = this.onco()?.response;
         return r ? RESPONSE_LABEL[r] : 'Not measured';
       }
+      case 'b': {
+        const n = pinsOf(this.val().bodyMap).length;
+        return n > 0 ? `${n} marked` : 'Optional';
+      }
       case 's':
         return `${this.systems().filter((s) => this.finding(s.key)).length} of ${this.systems().length} checked`;
       default:
         return this.onco()?.lineReady === true ? 'Ready' : 'Check blood return';
     }
+  }
+
+  /** The body map tab's value; an empty map is stored as none so an untouched optional tab adds nothing. */
+  protected setBodyMap(value: unknown): void {
+    const map = value as EmrBodyMapValue | null;
+    this.patch({ bodyMap: map && (pinsOf(map).length > 0 || map.noFindingsConfirmed) ? map : null });
   }
 
   protected txtv(e: Event): string {
@@ -459,6 +526,32 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
     this.patch({ lesions: this.val().lesions.filter((l) => l.id !== id) });
   }
 
+  /** The drawn quick-add names (mockup #DoctorOncology); a new lesion starts at 1.0 cm and the doctor measures from there. */
+  protected readonly quickLesions = ['Supraclavicular node', 'Skin nodule', 'Opposite breast'];
+
+  protected addQuick(name: string): void {
+    if (this.val().lesions.length >= 10) {
+      return;
+    }
+    this.patch({ lesions: [...this.val().lesions, { id: newId(), name, baselineCm: 1, todayCm: 1 }] });
+  }
+
+  /** "Last (C3)": the number of the latest earlier cycle. */
+  protected readonly lastHead = computed(() => {
+    const cycles = this.ctx.history()?.oncologyCycles ?? [];
+    const last = cycles[cycles.length - 1];
+    return last ? `Last (C${last.cycleNo})` : 'Last';
+  });
+
+  /** Baseline, the sizes of the earlier cycles and today's size, for the small trend line. */
+  protected trendOf(l: SpOncExam['lesions'][number]): number[] {
+    const earlier = (this.ctx.history()?.oncologyCycles ?? [])
+      .map((c) => c.lesions?.find((x) => x.name === l.name)?.cm ?? null)
+      .filter((v): v is number => v !== null);
+    const today = l.todayCm ?? l.lastCm ?? null;
+    return [l.baselineCm, ...earlier, ...(today === null ? [] : [today])];
+  }
+
   protected addLesion(): void {
     const name = this.lName().trim();
     const base = this.lBase();
@@ -516,7 +609,7 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
 @Component({
   selector: 'app-sp-onc-labs',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SpStepperComponent],
+  imports: [SpStepperComponent, SpSparklineComponent],
   styleUrls: ['../specialty.shared.scss', './onco.scss'],
   template: `
     <div class="sp">
@@ -537,12 +630,13 @@ export class OncExamComponent extends SpEditor<SpOncExam> {
       }
       <div class="scroll">
         <table class="tbl" aria-label="Pre-chemo labs">
-          <thead><tr><th>Test</th><th>Earlier cycles</th><th>Today</th><th>Needed</th><th>Check</th></tr></thead>
+          <thead><tr><th>Test</th><th>{{ cycleHead() }}</th><th>Trend</th><th>Today</th><th>Needed</th><th>Check</th></tr></thead>
           <tbody>
             @for (l of rows; track l.key) {
               <tr>
                 <td>{{ l.label }} <span class="sp-sub">{{ l.unit }}</span></td>
                 <td class="sp-sub">{{ earlier(l.key) }}</td>
+                <td><div class="spk"><app-sp-sparkline [values]="trend(l.key)" [limit]="l.min ?? l.max" [bad]="failed(l.key)" [label]="l.label + ' over the cycles: ' + trend(l.key).join(', ')" /></div></td>
                 <td>
                   <app-sp-stepper [label]="l.label" [unit]="l.unit" [value]="val().values[l.key]" [stepBy]="l.step" [start]="startOf(l.key)" [min]="0" [disabled]="disabled()" (valueChange)="setValue(l.key, $event)" />
                 </td>
@@ -618,6 +712,19 @@ export class OncLabsComponent extends SpEditor<SpOncLabs> {
 
   protected failed(key: string): boolean {
     return (this.onco()?.labFails ?? []).some((f) => f.key === key);
+  }
+
+  /** "C1 · C2 · C3": the cycles whose values are listed. */
+  protected readonly cycleHead = computed(() => {
+    const cycles = (this.ctx.history()?.oncologyCycles ?? []).slice(-3);
+    return cycles.length > 0 ? cycles.map((c) => `C${c.cycleNo}`).join(' · ') : 'Earlier cycles';
+  });
+
+  /** The earlier cycles' values then today's, for the trend line with the dashed limit. */
+  protected trend(key: (typeof LAB_ROWS)[number]['key']): number[] {
+    const earlier = (this.ctx.history()?.oncologyCycles ?? []).slice(-3).map((c) => c.labs[key]).filter((v): v is number => v != null);
+    const today = this.val().values[key];
+    return today == null ? earlier : [...earlier, today];
   }
 
   protected earlier(key: string): string {

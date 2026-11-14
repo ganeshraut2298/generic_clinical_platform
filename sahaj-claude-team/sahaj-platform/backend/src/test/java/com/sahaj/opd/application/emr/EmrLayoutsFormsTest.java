@@ -129,15 +129,16 @@ class EmrLayoutsFormsTest {
 
         List<LayoutSection> base = layouts.base(TENANT, added);
 
-        assertThat(base).extracting(LayoutSection::key).containsExactly("vitals", FOOT);
-        LayoutSection form = base.get(1);
+        // ADR-026 D2: the set is the version's sections plus the starter's, so the form sits after the starter sections
+        assertThat(base).extracting(LayoutSection::key).containsExactly("vitals", "complaints", "rx", FOOT);
+        LayoutSection form = base.get(3);
         assertThat(form.name()).isEqualTo("Foot check");
         assertThat(form.shown()).isFalse();
         assertThat(form.required()).isTrue();
         assertThat(form.copy()).isTrue();
         assertThat(form.collapsed()).isTrue();
         assertThat(form.whoCanFill()).containsExactly("DOCTOR", "NURSE");
-        assertThat(form.position()).isEqualTo(2);
+        assertThat(form.position()).isEqualTo(4);
     }
 
     @Test

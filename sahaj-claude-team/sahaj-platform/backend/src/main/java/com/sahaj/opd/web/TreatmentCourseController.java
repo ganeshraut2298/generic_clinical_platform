@@ -1,6 +1,10 @@
 package com.sahaj.opd.web;
 
 import com.sahaj.opd.application.course.CourseInputs.AddSittingInput;
+import com.sahaj.opd.application.course.CourseInputs.AdmissionRequestInput;
+import com.sahaj.opd.application.course.CourseInputs.DateInput;
+import com.sahaj.opd.application.course.CourseInputs.MarkDoneInput;
+import com.sahaj.opd.application.course.CourseInputs.RevisionInput;
 import com.sahaj.opd.application.course.CourseInputs.ChangeSittingInput;
 import com.sahaj.opd.application.course.CourseInputs.CreateInput;
 import com.sahaj.opd.application.course.CourseInputs.LinkVisitInput;
@@ -45,8 +49,9 @@ public class TreatmentCourseController implements EmrApi {
 
     @GetMapping
     @PreAuthorize(READ_ROLES)
-    public List<SummaryView> list(@RequestParam(name = "patientId", required = false) UUID patientId) {
-        return service.list(ClinicUser.current(), patientId);
+    public List<SummaryView> list(@RequestParam(name = "patientId", required = false) UUID patientId,
+                                  @RequestParam(name = "kind", required = false) String kind) {
+        return service.list(ClinicUser.current(), patientId, kind);
     }
 
     @PostMapping
@@ -84,5 +89,47 @@ public class TreatmentCourseController implements EmrApi {
     public CourseView linkVisit(@PathVariable UUID courseId, @PathVariable UUID sittingId,
                                 @RequestBody LinkVisitInput input) {
         return service.linkVisit(ClinicUser.current(), courseId, sittingId, input);
+    }
+
+    @PostMapping("/{courseId}/sittings/{sittingId}/mark-done")
+    @PreAuthorize(WRITE_ROLES)
+    public CourseView markDone(@PathVariable UUID courseId, @PathVariable UUID sittingId,
+                               @RequestBody MarkDoneInput input) {
+        return service.markDone(ClinicUser.current(), courseId, sittingId, input);
+    }
+
+    @PostMapping("/{courseId}/sittings/{sittingId}/missed")
+    @PreAuthorize(WRITE_ROLES)
+    public CourseView missed(@PathVariable UUID courseId, @PathVariable UUID sittingId,
+                             @RequestBody RevisionInput input) {
+        return service.markMissed(ClinicUser.current(), courseId, sittingId, input);
+    }
+
+    @PostMapping("/{courseId}/sittings/{sittingId}/rebook")
+    @PreAuthorize(WRITE_ROLES)
+    public CourseView rebook(@PathVariable UUID courseId, @PathVariable UUID sittingId,
+                             @RequestBody DateInput input) {
+        return service.rebook(ClinicUser.current(), courseId, sittingId, input);
+    }
+
+    @PostMapping("/{courseId}/sittings/{sittingId}/reschedule")
+    @PreAuthorize(WRITE_ROLES)
+    public CourseView reschedule(@PathVariable UUID courseId, @PathVariable UUID sittingId,
+                                 @RequestBody DateInput input) {
+        return service.reschedule(ClinicUser.current(), courseId, sittingId, input);
+    }
+
+    @PostMapping("/{courseId}/sittings/{sittingId}/remove")
+    @PreAuthorize(WRITE_ROLES)
+    public CourseView remove(@PathVariable UUID courseId, @PathVariable UUID sittingId,
+                             @RequestBody RevisionInput input) {
+        return service.remove(ClinicUser.current(), courseId, sittingId, input);
+    }
+
+    @PostMapping("/{courseId}/sittings/{sittingId}/admission-request")
+    @PreAuthorize(WRITE_ROLES)
+    public CourseView admissionRequest(@PathVariable UUID courseId, @PathVariable UUID sittingId,
+                                       @RequestBody AdmissionRequestInput input) {
+        return service.requestAdmission(ClinicUser.current(), courseId, sittingId, input);
     }
 }

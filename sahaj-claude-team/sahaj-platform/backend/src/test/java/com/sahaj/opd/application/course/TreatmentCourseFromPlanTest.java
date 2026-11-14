@@ -122,7 +122,7 @@ class TreatmentCourseFromPlanTest {
     }
 
     @Test
-    void openRowsBecomeSittingsAndTheSignedEstimateIsNotedOnTheCourse() {
+    void openRowsBecomeSittingsAndTheSignedEstimateIsFlaggedOnTheCourse() {
         String rows = row("a1", 16, "Composite filling (O)", "PLANNED", 1, 1, "[150000]") + ","
                 + row("b2", 26, "Root canal treatment", "PLANNED", 3, 1, "[150000,150000,150000]") + ","
                 + row("c3", 31, "Extraction", "DONE", 1, 1, "[120000]") + ","
@@ -132,7 +132,9 @@ class TreatmentCourseFromPlanTest {
         assertThat(service.create(DOCTOR, KEY, fromPlan()).created()).isTrue();
         ArgumentCaptor<NewCourse> course = ArgumentCaptor.forClass(NewCourse.class);
         verify(courses).insertCourse(eq(TENANT), course.capture(), eq(USER));
-        assertThat(course.getValue().note()).isEqualTo("estimate signed by patient");
+        // ADR-026 D3: the flag says it, the note text is no longer written
+        assertThat(course.getValue().note()).isNull();
+        assertThat(course.getValue().estimateSigned()).isTrue();
         assertThat(course.getValue().originRecordId()).isEqualTo(RECORD);
         ArgumentCaptor<NewSitting> sittings = ArgumentCaptor.forClass(NewSitting.class);
         verify(courses, times(6)).insertSitting(eq(TENANT), sittings.capture(), eq(USER));

@@ -177,6 +177,15 @@ describe('profile lines of "Check before completing" (ADR-025 D7, opd.yaml 0.6.1
       },
     };
 
+    it('reads the contraception from the method tile when the layout has it, and from the older fields when not', () => {
+      const withMethod = [
+        section({ key: 'contraception', fields: [field({ key: 'method', valueKind: 'CHOICE', options: [{ key: 'cu_t', label: 'Cu-T', isNone: false, hint: 'IUCD, 5–10 years' }] }), field({ key: 'findings' })] }),
+      ];
+      expect(recordFacts(withMethod, { contraception: { method: 'cu_t', findings: 'Counselled' } } as never).gynae.contraception).toBe('Cu-T');
+      expect(recordFacts(withMethod, { contraception: { findings: 'Counselled' } } as never).gynae.contraception).toBeNull();
+      expect(recordFacts(layout, values as never).gynae.contraception).toBe('Condoms');
+    });
+
     it('reads the medicines, the gynae choices in lower case, the active orders, the home exercises and the modalities', () => {
       const f = recordFacts(layout, values as never);
       expect(f.medicines).toEqual(['ORS']);

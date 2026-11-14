@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sahaj.opd.application.VisitRepository;
 import com.sahaj.opd.application.course.TreatmentCourseRepository;
+import com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow;
 import com.sahaj.opd.application.emr.EmrProblemException;
 import com.sahaj.opd.application.emr.EmrRecordDocument;
 import com.sahaj.opd.application.emr.EmrRecordRepository;
@@ -231,6 +232,27 @@ public class ChemoOrderService implements SpecialtyRecordSupport.ChemoOrderHook 
         auditLog.record("CHEMO_ORDER_SAVED", ENTITY, row.id, null, audit);
         ChemoOrderRow saved = orders.findById(tenantId, row.id).orElseThrow();
         return logic.sheet(tenantId, saved, fresh, recordId);
+    }
+
+    /**
+     * ADR-026 D7: sending the order sets the regimen of the cycle sitting linked to this visit, when that sitting has none
+     * (the plan chips "AC1", "P1" read it). A sitting of another kind of course, a removed one or one that already has a
+     * regimen is left alone.
+     */
+    private void setRegimenOfLinkedCycle(UUID tenantId, UUID actorUserId, RecordRow row, String protocolKey) {
+        if (row.opdVisitId() == null || protocolKey == null) {
+            return;
+        }
+        Optional<SittingRow> sitting = courses.sittingByVisit(tenantId, row.opdVisitId());
+        if (sitting.isEmpty() || sitting.get().removed() || sitting.get().regimenKey() != null) {
+            return;
+        }
+        boolean chemo = courses.find(tenantId, sitting.get().courseId()).filter(c -> "CHEMO".equals(c.kind()))
+                .isPresent();
+        if (chemo) {
+            courses.setRegimenIfEmpty(tenantId, sitting.get().id(), protocolKey, actorUserId);
+            courses.bumpRevision(tenantId, sitting.get().courseId(), actorUserId);
+        }
     }
 
     private UUID activeChemoCourse(UUID tenantId, UUID patientId) {
@@ -521,6 +543,7 @@ public class ChemoOrderService implements SpecialtyRecordSupport.ChemoOrderHook 
         audit.put("role", order.checkerRole);
         audit.put("way", order.confirmedVia);
         auditLog.record("CHEMO_ORDER_SENT", ENTITY, order.id, null, audit);
+        setRegimenOfLinkedCycle(tenantId, user.userId(), ctx.row(), order.protocolKey);
         return logic.sheet(tenantId, orders.findById(tenantId, order.id).orElseThrow(), fresh, recordId);
     }
 

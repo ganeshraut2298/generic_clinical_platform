@@ -11,6 +11,7 @@ import {
   EmrListItem,
   EmrListValue,
   EmrPrescriptionValue,
+  PaperSize,
   PrintLanguage,
 } from '../emr-phase3.model';
 import { EmrSpecialtyReference, EmrSpecialtyView } from '../specialty/specialty.model';
@@ -208,7 +209,30 @@ export function scalarText(field: EmrFieldDefinition, value: unknown): string | 
   }
 }
 
+/** The words of one field of a section as they print (an option's label), or null when it has no value. */
+function fieldText(section: EmrLayoutSection, key: string, values: Record<string, unknown>): string | null {
+  const field = section.fields.find((f) => f.key === key);
+  return field ? scalarText(field, values[key]) : null;
+}
+
+/**
+ * Dental examination lines (SAH-75-6; DoctorDental.dc.html:488): "Extra-oral: face <v>, TMJ <v>, nodes <v>" and
+ * "Intra-oral: oral hygiene <v>, gingiva <v>, occlusion <v>"; an empty value is left out, and a line with none is not printed.
+ */
+const DENTAL_EXAM_LINES: Readonly<Record<string, { head: string; parts: readonly [string, string][] }>> = {
+  dental_extraoral: { head: 'Extra-oral', parts: [['face', 'face'], ['tmj', 'TMJ'], ['lymph_nodes', 'nodes']] },
+  dental_intraoral: { head: 'Intra-oral', parts: [['oral_hygiene', 'oral hygiene'], ['gingiva', 'gingiva'], ['occlusion', 'occlusion']] },
+};
+
 function sectionLines(section: EmrLayoutSection, values: Record<string, unknown>, input: PaperInput): { lines: string[]; rx: PaperRx[] } {
+  const dentalExam = DENTAL_EXAM_LINES[section.key];
+  if (dentalExam) {
+    const parts = dentalExam.parts.flatMap(([key, word]) => {
+      const text = fieldText(section, key, values);
+      return text ? [`${word} ${text}`] : [];
+    });
+    return { lines: parts.length > 0 ? [`${dentalExam.head}: ${parts.join(', ')}`] : [], rx: [] };
+  }
   const lines: string[] = [];
   let rx: PaperRx[] = [];
   if (section.source === 'FORM' && section.form) {
@@ -327,4 +351,9 @@ export function footerLines(capitals: boolean, abhaSharing: boolean, signed = fa
 /** "Ready to complete. Prescription prints in Marathi with English drug names." (SAH-48-3). */
 export function readyFooter(language: PrintLanguage | null): string {
   return language ? `Ready to complete. Prescription prints in ${LANGUAGE_NAME[language]} with English drug names.` : 'Ready to complete.';
+}
+
+/** "Sent to printer · A4", with " · some sections are still empty" when fewer than 5 sections are filled (CasePaper.dc.html:139). */
+export function sentToPrinter(size: PaperSize, filled: number): string {
+  return `Sent to printer · ${size}${filled < 5 ? ' · some sections are still empty' : ''}`;
 }

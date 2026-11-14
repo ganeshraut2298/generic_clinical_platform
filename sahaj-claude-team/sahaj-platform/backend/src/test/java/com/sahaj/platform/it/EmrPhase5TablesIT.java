@@ -69,7 +69,7 @@ class EmrPhase5TablesIT extends EmrSignSupport {
                     "signed_at = now() + interval '1 day'", "signed_by = '" + UUID.randomUUID() + "'",
                     "signed_by_membership_id = '" + UUID.randomUUID() + "'", "sign_idempotency_key = 'zzzzzzzz12'",
                     "sign_request_hash = repeat('b', 64)", "sign_result = '{\"a\": 1}'::jsonb",
-                    "patient_facts_fingerprint = repeat('b', 64)", "form_refs = '[]'::jsonb", "department_name = 'Changed'",
+                    "patient_facts_fingerprint = repeat('b', 64)", "form_refs = '[\"x\"]'::jsonb", "department_name = 'Changed'",
                     "edit_hold_membership_id = '" + membership + "', edit_hold_user_id = '" + user + "', edit_hold_expires_at = now()",
                     "patient_id = null", "screen_state = '{}'::jsonb"};
             for (String assignment : frozen) {

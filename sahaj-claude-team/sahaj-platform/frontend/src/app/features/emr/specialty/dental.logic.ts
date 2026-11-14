@@ -198,6 +198,12 @@ export function isDuplicateRow(rows: readonly SpPlanRow[], tooth: number, text: 
 export const STATUS_LABEL: Record<PlanStatus, string> = { PLANNED: 'Planned', IN_PROGRESS: 'In progress', DONE: 'Done' };
 const NEXT_STATUS: Record<PlanStatus, PlanStatus> = { PLANNED: 'IN_PROGRESS', IN_PROGRESS: 'DONE', DONE: 'PLANNED' };
 
+/** The running treatment for the header: "RCT on 36 in progress, sitting 2 of 3" (SAH-75-11 D9); null without a multi-sitting row in progress. */
+export function courseSummary(rows: readonly Pick<SpPlanRow, 'tooth' | 'procedureText' | 'status' | 'sittingsPlanned' | 'currentSitting'>[]): string | null {
+  const row = rows.find((r) => r.status === 'IN_PROGRESS' && r.sittingsPlanned > 1);
+  return row ? `${row.procedureText} on ${row.tooth} in progress, sitting ${row.currentSitting} of ${row.sittingsPlanned}` : null;
+}
+
 /** "Tap a status to move it forward": Planned → In progress → Done → Planned. */
 export function nextStatus(status: PlanStatus): PlanStatus {
   return NEXT_STATUS[status];

@@ -58,6 +58,19 @@ describe('CoursePage (SAH-58)', () => {
   };
   const toast = () => q('[data-testid=course-toast]')?.textContent?.trim();
 
+  /** Today's sitting (s2) may be marked done or missed; the planned one (s3) rescheduled, removed or moved to day care. */
+  function actionsCourse(over: Partial<TreatmentCourseView> = {}): TreatmentCourseView {
+    const base = course();
+    return course({
+      sittings: [
+        base.sittings[0],
+        { ...base.sittings[1], displayNo: 2, allowedActions: ['MARK_DONE', 'MISSED'] },
+        { ...base.sittings[2], displayNo: 3, allowedActions: ['RESCHEDULE', 'REMOVE', 'REQUEST_ADMISSION'] },
+      ],
+      ...over,
+    });
+  }
+
   afterEach(() => {
     vi.useRealTimers();
     http.verify();
@@ -200,12 +213,12 @@ describe('CoursePage (SAH-58)', () => {
       expect(q('[data-act=move]')).toBeNull();
     });
 
-    it('moves a planned OPD sitting to day care and says an admission request was created', () => {
-      boot();
-      click('[data-act=move]');
-      const req = http.expectOne(`${OPD}/c1/sittings/s3`);
-      expect(req.request.method).toBe('PUT');
-      expect(req.request.body).toMatchObject({ revision: 5, encounterKind: 'DAY_CARE', chargePaise: 300000 });
+    it('moves a planned OPD sitting to day care and says an admission request was created (SAH-75-10)', () => {
+      boot(actionsCourse());
+      click('[data-action=REQUEST_ADMISSION]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s3/admission-request`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ revision: 5, encounterKind: 'DAY_CARE' });
       req.flush(course({ revision: 6 }));
       http.expectOne(`${BILLING}/c1/account`).flush(account());
       fixture.detectChanges();
@@ -245,11 +258,13 @@ describe('CoursePage (SAH-58)', () => {
     });
 
     it('shows the server message when the course was changed elsewhere', () => {
-      boot();
-      click('[data-act=move]');
-      http.expectOne(`${OPD}/c1/sittings/s3`).flush({ type: 'https://sahaj.in/problems/course-changed', title: 'x', status: 409 }, { status: 409, statusText: 'Conflict' });
+      boot(actionsCourse());
+      click('[data-action=REMOVE]');
+      http.expectOne(`${OPD}/c1/sittings/s3/remove`).flush({ type: 'https://sahaj.in/problems/course-changed', title: 'x', status: 409 }, { status: 409, statusText: 'Conflict' });
+      http.expectOne(`${OPD}/c1`).flush(course({ revision: 6 }));
+      http.expectOne(`${BILLING}/c1/account`).flush(account());
       fixture.detectChanges();
-      expect(q('[data-testid=plan-error]')!.textContent).toContain('Someone else changed this course.');
+      expect(q('[data-testid=plan-error]')!.textContent).toContain('This sitting changed. Reload.');
     });
 
     it('links today\'s visit to a planned sitting when the course is opened from today\'s EMR', () => {
@@ -272,9 +287,9 @@ describe('CoursePage (SAH-58)', () => {
     });
 
     it('opens the admission sheet for "Admit now" with the patient and the sitting, then reloads', () => {
-      boot(course({ canAdmit: true, sittings: [sitting({ id: 's9', sittingNo: 9, encounterKind: 'IPD', encounterLabel: 'Delivery admission', admissionRequested: true })] }));
+      boot(course({ canAdmit: true, sittings: [sitting({ id: 's9', sittingNo: 9, encounterKind: 'IPD', encounterLabel: 'Delivery admission', admissionRequested: true, allowedActions: ['ADMIT'] })] }));
       dialogResult = { ipNumber: 'IP-2232' };
-      click('[data-act=admit]');
+      click('[data-action=ADMIT]');
       expect(dialogOpen.mock.calls[0][1].data).toEqual({ patientId: 'p1', treatmentCourseSittingId: 's9' });
       http.expectOne(`${OPD}/c1`).flush(course());
       http.expectOne(`${BILLING}/c1/account`).flush(account());
@@ -285,7 +300,149 @@ describe('CoursePage (SAH-58)', () => {
 
     it('offers "Admit now" only to those who may admit, and only for a planned stay', () => {
       boot(course({ canAdmit: false, sittings: [sitting({ encounterKind: 'IPD', encounterLabel: 'Delivery admission' })] }));
-      expect(q('[data-act=admit]')).toBeNull();
+      expect(q('[data-action=ADMIT]')).toBeNull();
+    });
+  });
+
+  describe('sitting actions drawn from the server\'s list (SAH-75-10)', () => {
+    const refresh = (next: TreatmentCourseView): void => {
+      http.expectOne(`${BILLING}/c1/account`).flush(account());
+      fixture.detectChanges();
+      expect(next).toBeTruthy();
+    };
+
+    it('draws one button for each allowed action, in the words of the design, and none for a done sitting', () => {
+      boot(actionsCourse());
+      const today = qa('article.card')[1];
+      expect(Array.from(today.querySelectorAll('[data-action]')).map((b) => b.textContent!.trim())).toEqual(['Mark sitting done', 'Patient did not come']);
+      const planned = qa('article.card')[2];
+      const words = Array.from(planned.querySelectorAll('[data-action]')).map((b) => b.textContent!.trim());
+      expect(words).toEqual(['Reschedule: 18 Nov 2026 ▾', 'Remove', 'Move to day care / IPD']);
+      expect(qa('article.card')[0].querySelectorAll('[data-action]')).toHaveLength(0);
+    });
+
+    it('draws no action for a role the server gave none (front desk, billing)', () => {
+      boot(course({ canPlan: false }), account({ canCollect: false }), { role: 'BILLING' });
+      expect(qa('[data-action]')).toHaveLength(0);
+    });
+
+    it('marks today\'s sitting done with the revision and the visit of the EMR, and says the charge the server returns', () => {
+      boot(actionsCourse(), account(), { visitId: 'v7' });
+      click('[data-action=MARK_DONE]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s2/mark-done`);
+      expect(req.request.body).toEqual({ revision: 5, visitId: 'v7' });
+      const base = course();
+      req.flush(course({ revision: 6, sittings: [base.sittings[0], { ...base.sittings[1], displayNo: 2, status: 'DONE', chargePaise: 150000 }, base.sittings[2]] }));
+      refresh(base);
+      expect(toast()).toBe('Sitting 2 done · ₹1,500 added to the account');
+    });
+
+    it('says "billed in IPD" when the sitting is settled in IPD', () => {
+      boot(actionsCourse());
+      click('[data-action=MARK_DONE]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s2/mark-done`);
+      const base = course();
+      req.flush(course({ revision: 6, sittings: [base.sittings[0], { ...base.sittings[1], displayNo: 2, status: 'DONE', settledInIpd: true }, base.sittings[2]] }));
+      refresh(base);
+      expect(toast()).toBe('Sitting 2 done · billed in IPD');
+    });
+
+    it('marks "Patient did not come" with no charge and the toast "Marked missed."', () => {
+      boot(actionsCourse());
+      click('[data-action=MISSED]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s2/missed`);
+      expect(req.request.body).toEqual({ revision: 5 });
+      const base = course();
+      req.flush(course({ revision: 6, sittings: [base.sittings[0], { ...base.sittings[1], status: 'MISSED', allowedActions: ['REBOOK'] }, base.sittings[2]] }));
+      refresh(base);
+      expect(toast()).toBe('Marked missed.');
+      expect(qa('article.card')[1].textContent).toContain('Missed');
+      expect(qa('article.card')[1].querySelector('[data-action=REBOOK]')!.textContent!.trim()).toBe('Rebook');
+    });
+
+    it('rebooks a missed sitting for a chosen date, today or later', () => {
+      const base = course();
+      boot(course({ sittings: [{ ...base.sittings[0], status: 'MISSED', allowedActions: ['REBOOK'] }] }));
+      click('[data-action=REBOOK]');
+      const input = q<HTMLInputElement>('[data-testid=date-choice] input')!;
+      input.value = '2020-01-01';
+      input.dispatchEvent(new Event('input'));
+      click('[data-act=confirm-date]');
+      expect(q('[data-testid=date-error]')!.textContent).toBe('Choose today or a later date.');
+      http.expectNone(`${OPD}/c1/sittings/s1/rebook`);
+      input.value = '2099-12-01';
+      input.dispatchEvent(new Event('input'));
+      click('[data-act=confirm-date]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s1/rebook`);
+      expect(req.request.body).toEqual({ revision: 5, plannedDate: '2099-12-01' });
+      req.flush(course({ revision: 6 }));
+      refresh(base);
+      expect(toast()).toBe('Rebooked for 1 Dec 2099');
+    });
+
+    it('reschedules a planned sitting to a new date with the revision', () => {
+      boot(actionsCourse());
+      click('[data-action=RESCHEDULE]');
+      const input = q<HTMLInputElement>('[data-testid=date-choice] input')!;
+      input.value = '2099-12-05';
+      input.dispatchEvent(new Event('input'));
+      click('[data-act=confirm-date]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s3/reschedule`);
+      expect(req.request.body).toEqual({ revision: 5, plannedDate: '2099-12-05' });
+      req.flush(course({ revision: 6 }));
+      refresh(course());
+      expect(toast()).toContain('moved to 5 Dec 2099');
+    });
+
+    it('removes a planned sitting and says "<Unit> removed from plan"', () => {
+      boot(actionsCourse());
+      click('[data-action=REMOVE]');
+      const req = http.expectOne(`${OPD}/c1/sittings/s3/remove`);
+      expect(req.request.body).toEqual({ revision: 5 });
+      req.flush(course({ revision: 6 }));
+      refresh(course());
+      expect(toast()).toBe('Sitting removed from plan');
+    });
+
+    it('names a sitting by its renumbered number, not the stable one (after a removal)', () => {
+      const base = course();
+      boot(course({ sittings: [{ ...base.sittings[0], sittingNo: 1, displayNo: 1 }, { ...base.sittings[2], sittingNo: 3, displayNo: 2 }] }));
+      expect(qa('.steps .sl').map((e) => e.textContent!.trim())).toEqual(['S1', 'S2']);
+      expect(qa('article.card strong')[1].textContent).toContain('Sitting 2');
+    });
+
+    it('shows a second press or a stale screen as "This sitting changed. Reload." and reads the course again', () => {
+      boot(actionsCourse());
+      click('[data-action=MARK_DONE]');
+      http.expectOne(`${OPD}/c1/sittings/s2/mark-done`).flush({ type: 'https://sahaj.in/problems/course-changed', title: 'x', status: 409 }, { status: 409, statusText: 'Conflict' });
+      http.expectOne(`${OPD}/c1`).flush(course({ revision: 6 }));
+      refresh(course());
+      expect(q('[data-testid=plan-error]')!.textContent).toContain('This sitting changed. Reload.');
+    });
+
+    it('shows the server\'s message for a refused action and leaves the screen as it was', () => {
+      boot(actionsCourse());
+      click('[data-action=MISSED]');
+      http.expectOne(`${OPD}/c1/sittings/s2/missed`).flush({ type: 'https://sahaj.in/problems/sitting-not-available', title: 'x', status: 409, detail: 'The patient came for this sitting.' }, { status: 409, statusText: 'Conflict' });
+      fixture.detectChanges();
+      expect(q('[data-testid=plan-error]')!.textContent).toContain('The patient came for this sitting.');
+      expect(qa('article.card')[1].querySelectorAll('[data-action]')).toHaveLength(2);
+    });
+
+    it('sub line adds "estimate signed by patient" only when the estimate was signed (G15-4)', () => {
+      boot(course({ estimateSigned: false, note: null }));
+      expect(q('.hl')!.textContent).toContain('Started 28 Oct 2026 · Dr Test');
+      expect(q('.hl')!.textContent).not.toContain('estimate signed by patient');
+      expect(q('.hl')!.textContent).not.toContain('sample rates');
+    });
+
+    it('shows a chip, a dot and a card for Missed in red, and the Table says Missed', () => {
+      const base = course();
+      boot(course({ sittings: [{ ...base.sittings[0], status: 'MISSED' }] }));
+      expect(q('.step.missed')).not.toBeNull();
+      expect(q('article.card.missed')).not.toBeNull();
+      view('table');
+      expect(q('[data-testid=course-table]')!.textContent).toContain('Missed');
     });
   });
 

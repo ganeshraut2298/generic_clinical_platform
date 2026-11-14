@@ -200,7 +200,7 @@ function slug(label: string): string {
       </div>
       <div class="sp-row">
         @if (!disabled()) {
-          <button type="button" class="btn" data-act="mark-all-due" [disabled]="dueToday().length === 0" (click)="markAllDue()">Mark all due as given</button>
+          <button type="button" class="btn" data-act="mark-all-due" [disabled]="saving()" (click)="markAllDue()">Mark all due as given</button>
         }
         <label class="chk">
           <input type="checkbox" [checked]="val().scheduleReviewed" [disabled]="disabled()" (change)="patch({ scheduleReviewed: tick($event) })" />
@@ -209,6 +209,9 @@ function slug(label: string): string {
         <button type="button" class="btn" data-act="print-card" (click)="printCard()">Print vaccination card</button>
       </div>
       <p class="sp-sub" data-testid="vax-note">{{ note() }}</p>
+      @if (toast(); as t) {
+        <p class="sp-sub" role="status" data-testid="vax-toast">{{ t }}</p>
+      }
       @if (cardMessage(); as m) {
         <p class="sp-sub" role="status" data-testid="card-message">{{ m }}</p>
       }
@@ -224,6 +227,11 @@ export class ImmunizationComponent extends SpEditor<SpImmunization> {
 
   private readonly doc = inject(DOCUMENT);
   protected readonly cardMessage = signal<string | null>(null);
+
+  constructor() {
+    super();
+    this.registerFooterPrint(() => this.printCard());
+  }
 
   protected readonly groups = computed<VaccineGroup[]>(() => {
     const vaccines = this.ctx.list(REFERENCE_LISTS.iapVaccines);
@@ -262,7 +270,8 @@ export class ImmunizationComponent extends SpEditor<SpImmunization> {
     return g.vaccines.some((v) => this.state(v.key) === 'DUE_TODAY' || this.state(v.key) === 'OVERDUE');
   }
 
-  protected readonly dueToday = computed(() => this.groups().flatMap((g) => g.vaccines).filter((v) => this.state(v.key) === 'DUE_TODAY'));
+  protected readonly toast = signal<string | null>(null);
+  protected readonly saving = computed(() => this.ctx.store.saving());
   protected readonly pending = computed(() =>
     this.groups().flatMap((g) => g.vaccines).filter((v) => ['DUE_TODAY', 'OVERDUE'].includes(this.state(v.key))),
   );
@@ -293,16 +302,27 @@ export class ImmunizationComponent extends SpEditor<SpImmunization> {
 
   protected toggle(key: string): void {
     const state = this.state(key);
+    const label = this.groups().flatMap((g) => g.vaccines).find((v) => v.key === key)?.label ?? key;
     if (state === 'TODAY') {
       this.patch({ givenToday: this.val().givenToday.filter((g) => g.vaccineKey !== key) });
+      this.toast.set(`${label} unmarked`);
     } else if (state === 'DUE_TODAY' || state === 'OVERDUE') {
       this.patch({ givenToday: [...this.val().givenToday, { vaccineKey: key }] });
+      this.toast.set(`${label} recorded as given today`);
     }
   }
 
+  /**
+   * "Mark all due as given" records every vaccine due today and every overdue one in one save, never a vaccine
+   * that is not yet due or already given (SAH-75-9; supersedes SAH-62-2 "due today only"). A second press
+   * finds nothing left to add, so each vaccine is recorded once.
+   */
   protected markAllDue(): void {
-    const keys = this.dueToday().map((v) => v.key);
-    this.patch({ givenToday: [...this.val().givenToday, ...keys.filter((k) => !this.todayKeys().has(k)).map((vaccineKey) => ({ vaccineKey }))] });
+    const keys = this.pending().map((v) => v.key).filter((k) => !this.todayKeys().has(k));
+    if (keys.length > 0) {
+      this.patch({ givenToday: [...this.val().givenToday, ...keys.map((vaccineKey) => ({ vaccineKey }))] });
+    }
+    this.toast.set(`${keys.length} vaccines recorded`);
   }
 
   protected tick(e: Event): boolean {
@@ -404,8 +424,11 @@ export class MilestonesComponent extends SpEditor<SpMilestones> {
       <div class="dose">
         <div><span class="sp-lbl">Dose rule</span><b>{{ rule().perKg }} mg/kg</b></div>
         <div><span class="sp-lbl">Per dose</span><b data-testid="dose-mg">{{ dose() ? dose()!.mg + ' mg' : '—' }}</b></div>
-        <div><span class="sp-lbl">Give</span><b data-testid="dose-ml">{{ dose() ? dose()!.ml.toFixed(1) + ' ml' : '—' }}</b></div>
-        <div class="sp-sub">{{ rule().freq }}</div>
+      </div>
+      <div class="give" data-testid="dose-give">
+        <span class="give-l">Give</span>
+        <b class="give-v" data-testid="dose-ml">{{ dose() ? dose()!.ml.toFixed(1) + ' ml' : '—' }}</b>
+        <span class="give-f">{{ rule().freq }}</span>
       </div>
       @if (dose()?.capped) {
         <p class="sp-sub">The dose is limited to {{ rule().maxMg }} mg.</p>

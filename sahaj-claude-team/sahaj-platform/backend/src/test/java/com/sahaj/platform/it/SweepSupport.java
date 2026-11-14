@@ -39,8 +39,12 @@ abstract class SweepSupport extends OpdJourneySupport {
     }
 
     protected JsonNode ok(HttpMethod method, String path, RequestPostProcessor auth, String body, int expected) throws Exception {
-        MvcResult r = call(method, path, auth, body).andExpect(status().is(expected)).andReturn();
+        MvcResult r = call(method, path, auth, body).andReturn();
         String text = r.getResponse().getContentAsString();
+        if (r.getResponse().getStatus() != expected) { // the answer is part of the message: it names the field that was refused (test data only)
+            throw new AssertionError("Response status expected:<" + expected + "> but was:<" + r.getResponse().getStatus() + "> for "
+                    + method + " " + path.replaceAll("[0-9a-f]{8}-[0-9a-f-]{27}", "<id>") + " answer: " + (text.length() > 700 ? text.substring(0, 700) : text));
+        }
         return text.isEmpty() ? null : objectMapper.readTree(text);
     }
 

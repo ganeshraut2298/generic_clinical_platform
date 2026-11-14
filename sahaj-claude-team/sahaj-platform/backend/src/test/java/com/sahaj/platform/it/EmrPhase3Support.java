@@ -320,9 +320,12 @@ abstract class EmrPhase3Support extends EmrSupport {
 
     protected JsonNode okKeyed(HttpMethod method, String path, RequestPostProcessor auth, String body, String key,
                                int expected) throws Exception {
-        String text = callKeyed(method, path, auth, body, key)
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(expected))
-                .andReturn().getResponse().getContentAsString();
+        org.springframework.mock.web.MockHttpServletResponse response = callKeyed(method, path, auth, body, key).andReturn().getResponse();
+        String text = response.getContentAsString();
+        if (response.getStatus() != expected) { // the answer names what was refused (test data only)
+            throw new AssertionError("Response status expected:<" + expected + "> but was:<" + response.getStatus() + "> for " + method + " "
+                    + path.replaceAll("[0-9a-f]{8}-[0-9a-f-]{27}", "<id>") + " answer: " + (text.length() > 700 ? text.substring(0, 700) : text));
+        }
         return text.isEmpty() ? null : objectMapper.readTree(text);
     }
 

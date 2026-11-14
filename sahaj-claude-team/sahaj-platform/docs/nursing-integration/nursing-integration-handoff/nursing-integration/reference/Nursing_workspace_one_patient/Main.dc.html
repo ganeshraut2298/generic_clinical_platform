@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nursing workspace · sample layout</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EEF2F7}
+.fileBtn:focus-within{outline:3px solid #0B6E6955;outline-offset:2px}
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.sk{background:linear-gradient(90deg,#EEF1F5 0,#F7F9FB 50%,#EEF1F5 100%);background-size:800px 100%;animation:shimmer 1.2s infinite linear;border-radius:8px}
+a{color:#0B6E69}a:hover{color:#084F4B}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #0B6E6955;outline-offset:2px}
+textarea,select,input{font-family:inherit}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #B5470855}70%{box-shadow:0 0 0 7px #B5470800}100%{box-shadow:0 0 0 0 #B5470800}}
+@keyframes pulsered{0%{box-shadow:0 0 0 0 #B4231855}70%{box-shadow:0 0 0 7px #B4231800}100%{box-shadow:0 0 0 0 #B4231800}}
+@keyframes rise{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+@keyframes scanline{0%{top:14%}50%{top:82%}100%{top:14%}}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #EEF2F7; font-family: Inter, system-ui, sans-serif; color: #0B1220; font-size: 14px; position: relative">
+
+  <header style="background: #0B1220; color: #FFFFFF; display: flex; align-items: center; gap: 14px; padding: 10px 24px; flex-wrap: wrap; position: relative">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="width: 32px; height: 32px; border-radius: 9px; background: #0B6E69; display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </span>
+      <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 16px">{{T.ws}}</span>
+    </div>
+    <span style="font-size: 13px; color: #C7D0DD">MICU · Nursing station 2 · Morning shift 7 AM–3 PM · 11:05 AM</span>
+    <a href="Departments.dc.html" style="display: flex; align-items: center; color: #FFFFFF; text-decoration: none; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; font-weight: 600; font-size: 13px">Change department</a>
+    <span style="flex: 1"></span>
+    <a href="NurseRound.dc.html" style="display: flex; align-items: center; gap: 8px; background: #0B6E69; color: #FFFFFF; text-decoration: none; border-radius: 10px; padding: 0 14px; min-height: 36px; font-weight: 700; font-size: 13px">{{T.round}}</a>
+    <a href="MyConsole.dc.html" style="display: flex; align-items: center; color: #FFFFFF; text-decoration: none; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; font-weight: 600; font-size: 13px">{{T.console}}</a>
+    <a href="Workload.dc.html" style="display: flex; align-items: center; color: #FFFFFF; text-decoration: none; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; font-weight: 600; font-size: 13px">Workload</a>
+    <div role="group" aria-label="Language" style="display: flex; border: 1px solid #2B3850; border-radius: 10px; overflow: hidden"><sc-for list="{{langs}}" as="lg" hint-placeholder-count="3"><button type="button" onClick="{{lg.pick}}" aria-pressed="{{lg.on}}" style="{{lg.style}}">{{lg.l}}</button></sc-for></div>
+    <button type="button" onClick="{{toggleBell}}" aria-label="Alerts, {{alertCount}} open" style="{{bellStyle}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg>
+      <span>{{alertLabel}}</span>
+    </button>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #E6EBF2"><span style="width: 30px; height: 30px; border-radius: 999px; background: #2B3850; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px">AP</span>Sr. Anjali Pawar</span>
+
+    <sc-if value="{{bellOpen}}" hint-placeholder-val="{{ false }}">
+      <div role="dialog" aria-label="Open alerts" style="position: absolute; right: 24px; top: 54px; width: 400px; background: #FFFFFF; color: #0B1220; border-radius: 16px; box-shadow: 0 20px 50px -12px #0B122066; z-index: 30; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><b style="font-size: 14px">Alerts for my patients</b><small style="font-size: 11px; color: #475467">Close by themselves when resolved</small></div>
+        <sc-if value="{{noAlerts}}" hint-placeholder-val="{{ false }}"><div style="padding: 16px; text-align: center; color: #067647; font-weight: 600; background: #E7F4EE; border-radius: 12px">No open alerts</div></sc-if>
+        <sc-for list="{{alertList}}" as="a" hint-placeholder-count="2">
+          <div style="{{a.style}}">
+            <span style="flex: 1; min-width: 0"><b style="font-size: 13px">{{a.t}}</b><br><small style="font-size: 12px; color: #475467">{{a.s}}</small></span>
+            <button type="button" onClick="{{a.open}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 9px; min-height: 34px; padding: 0 12px; font-weight: 600; font-size: 12px">Open</button>
+          </div>
+        </sc-for>
+        <sc-for list="{{alertDone}}" as="a" hint-placeholder-count="1">
+          <div style="display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: #F5F7FA; font-size: 12px; color: #475467"><span style="color: #067647; font-weight: 700">✓</span><span style="flex: 1">{{a.t}}</span></div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </header>
+
+  <nav aria-label="My patients" style="background: #FFFFFF; border-bottom: 1px solid #E2E7EF; padding: 10px 24px; display: flex; gap: 8px; overflow-x: auto; align-items: center">
+    <button type="button" onClick="{{openPal}}" style="display: flex; align-items: center; gap: 8px; border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 12px; padding: 0 12px; min-height: 44px; font-weight: 700; font-size: 13px; color: #0B1220; white-space: nowrap; flex: none">{{T.allpts}} <span style="font-size: 11px; color: #475467; border: 1px solid #CDD5DF; border-radius: 6px; padding: 1px 5px">Ctrl K</span></button>
+    <button type="button" onClick="{{prevPt}}" aria-label="Previous patient" style="flex: none; width: 40px; height: 44px; border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 12px; font-size: 16px; font-weight: 700">‹</button>
+    <sc-for list="{{beds}}" as="b" hint-placeholder-count="5">
+      <button type="button" onClick="{{b.pick}}" aria-pressed="{{b.on}}" style="{{b.style}}">
+        <span style="{{b.dot}}"></span>
+        <span style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25">
+          <b style="font-size: 13px">{{b.bed}} · {{b.name}}</b>
+          <small style="font-size: 11px; color: {{b.subColor}}">{{b.sub}}</small>
+        </span>
+      </button>
+    </sc-for>
+    <button type="button" onClick="{{nextPt}}" aria-label="Next patient" style="flex: none; width: 40px; height: 44px; border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 12px; font-size: 16px; font-weight: 700">›</button>
+    <span style="font-size: 11px; color: #667085; white-space: nowrap; flex: none">{{T.keys}}</span>
+  </nav>
+
+  <main style="max-width: 1440px; margin: 0 auto; padding: 20px 24px 120px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+
+    <sc-if value="{{loading}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Loading patient" aria-busy="true" style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; gap: 20px; align-items: center">
+        <span class="sk" style="width: 56px; height: 56px; border-radius: 16px; flex: none"></span>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px"><span class="sk" style="height: 22px; width: 40%"></span><span class="sk" style="height: 14px; width: 60%"></span><span class="sk" style="height: 14px; width: 30%"></span></div>
+        <span class="sk" style="width: 260px; height: 72px; border-radius: 16px"></span>
+      </section>
+    </sc-if>
+    <sc-if value="{{notLoading}}" hint-placeholder-val="{{ true }}">
+    <section aria-label="Patient" style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 2px #0B12200A, 0 8px 24px -16px #0B122033; animation: rise .25s ease-out">
+      <span style="width: 56px; height: 56px; border-radius: 16px; background: #E6F2F1; color: #0B6E69; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">{{p.ini}}</span>
+      <div style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 420px; min-width: 0">
+        <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap">
+          <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 24px; font-weight: 700">{{p.name}}</h1>
+          <span style="color: #475467; font-size: 14px">{{p.meta}}</span>
+        </div>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: #475467"><span>UHID {{p.uhid}}</span><span>{{p.ip}}</span><span>{{p.doc}}</span><span>Wt {{p.wt}} kg</span></div>
+        <div style="font-size: 14px">{{p.dx}}</div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px">
+          <sc-for list="{{p.flags}}" as="f" hint-placeholder-count="4"><span style="{{f.style}}">{{f.t}}</span></sc-for>
+        </div>
+      </div>
+      <div style="{{esc.box}}">
+        <div style="{{esc.ring}}"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px">{{p.news}}</b><small style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em">NEWS2</small></div>
+        <div style="display: flex; flex-direction: column; gap: 3px; max-width: 260px">
+          <b style="color: {{esc.color}}; font-size: 14px">{{esc.title}}</b>
+          <span style="font-size: 12px; color: {{esc.sub}}">{{esc.l1}}</span>
+          <span style="font-size: 12px; color: {{esc.sub}}">{{esc.l2}}</span>
+          <sc-if value="{{esc.demo}}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{esc.next}}" style="align-self: flex-start; margin-top: 4px; background: transparent; border: 1px dashed #98A2B3; border-radius: 8px; min-height: 30px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #475467">{{esc.nextLabel}}</button>
+          </sc-if>
+          <button type="button" onClick="{{msgToggle}}" style="{{msgBtnStyle}}">{{msgLabel}}</button>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <button type="button" onClick="{{openRec}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 12px; padding: 0 18px; min-height: 44px; font-weight: 600; font-size: 14px">{{T.record}}</button>
+        <a href="PhoneGive.dc.html" style="display: flex; align-items: center; justify-content: center; background: #FFFFFF; color: #0B1220; border: 1px solid #CDD5DF; border-radius: 12px; padding: 0 18px; min-height: 40px; font-weight: 600; font-size: 13px; text-decoration: none">{{T.phone}}</a>
+      </div>
+    </section>
+    </sc-if>
+
+    <sc-if value="{{msgOpen}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Messages with the doctor" style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><b style="font-size: 16px; flex: 1">{{T.msgDoc}} · {{docName}} · about {{p.first}}</b><span style="{{msgStatusStyle}}">{{msgStatus}}</span><button type="button" onClick="{{msgToggle}}" aria-label="Close messages" style="border: 0; background: transparent; min-height: 40px; min-width: 40px; font-size: 16px; color: #475467">✕</button></div>
+        <sc-if value="{{noMsgs}}" hint-placeholder-val="{{ false }}"><div style="padding: 12px; text-align: center; color: #475467; font-size: 13px; background: #F5F7FA; border-radius: 12px">No messages with {{docName}} about {{p.first}} yet. Start with an SBAR summary.</div></sc-if>
+        <div style="display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow: auto">
+          <sc-for list="{{msgs}}" as="mg" hint-placeholder-count="2"><div style="{{mg.row}}"><div style="{{mg.bubble}}">{{mg.text}}</div><small style="{{mg.metaStyle}}">{{mg.meta}}</small></div></sc-for>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: flex-end">
+          <textarea value="{{msgDraft}}" onChange="{{setDraft}}" rows="2" placeholder="Write to {{docName}}" aria-label="Message to the doctor" style="flex: 1; border: 1px solid #CDD5DF; border-radius: 12px; padding: 10px 12px; font-size: 14px; resize: vertical; line-height: 1.45"></textarea>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <button type="button" onClick="{{insertSbar}}" style="border: 1px solid #CDD5DF; background: #FFFFFF; color: #344054; border-radius: 10px; min-height: 36px; padding: 0 12px; font-size: 12px; font-weight: 600">Insert SBAR</button>
+            <button type="button" onClick="{{sendMsg}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 10px; min-height: 40px; padding: 0 16px; font-weight: 700">Send</button>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><small style="font-size: 12px; color: #475467; flex: 1; min-width: 260px">Messages are saved to the record and cannot be recalled; send a correction if needed. If it is urgent, call as well.</small>
+          <sc-if value="{{showMsgDemo}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{demoSeen}}" style="background: transparent; border: 1px dashed #98A2B3; border-radius: 8px; min-height: 32px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #475467">Simulate: doctor reads</button><button type="button" onClick="{{demoAck}}" style="background: transparent; border: 1px dashed #98A2B3; border-radius: 8px; min-height: 32px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #475467">Simulate: doctor acknowledges</button></sc-if>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{recOpen}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Record vitals" style="background: #FFFFFF; border: 2px solid #0B6E69; border-radius: 18px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><b style="font-size: 16px">Record vitals · {{p.name}} · 11:05 AM</b><button type="button" onClick="{{closeRec}}" aria-label="Close" style="border: 0; background: transparent; min-height: 44px; min-width: 44px; font-size: 18px; color: #475467">✕</button></div>
+        <div style="{{dev.style}}"><span style="flex: 1; min-width: 240px">{{dev.msg}}</span>
+          <sc-if value="{{dev.canToggle}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{dev.toggle}}" style="border: 1px solid #CDD5DF; background: #FFFFFF; color: #344054; border-radius: 10px; min-height: 36px; padding: 0 12px; font-size: 12px; font-weight: 600">{{dev.btn}}</button></sc-if>
+          <sc-if value="{{dev.canFail}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{dev.fail}}" style="background: transparent; border: 1px dashed #98A2B3; border-radius: 8px; min-height: 32px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #475467">Simulate: monitor offline</button></sc-if>
+          <sc-if value="{{dev.canRetry}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{dev.retry}}" style="border: 1px solid #CDD5DF; background: #FFFFFF; color: #344054; border-radius: 10px; min-height: 36px; padding: 0 12px; font-size: 12px; font-weight: 600">Try the monitor again</button></sc-if>
+        </div>
+        <sc-if value="{{dev.hasPump}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #475467">{{dev.pump}}</span></sc-if>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px">
+          <sc-for list="{{recFields}}" as="f" hint-placeholder-count="7">
+            <label style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: #475467">{{f.l}}<input value="{{f.v}}" aria-label="{{f.l}}" style="border: 1px solid #CDD5DF; border-radius: 10px; padding: 0 10px; min-height: 42px; font-size: 16px; font-weight: 600; color: #0B1220"><small style="{{f.srcStyle}}">{{f.src}}</small></label>
+          </sc-for>
+        </div>
+        <div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{saveRec}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 10px; padding: 0 16px; min-height: 40px; font-weight: 600">Save vitals</button></div>
+      </section>
+    </sc-if>
+
+    <div style="display: flex; gap: 18px; flex-wrap: wrap; align-items: stretch">
+      <section aria-label="Trends and assessment" style="flex: 4 1 440px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">{{T.trends}}</h2>
+          <div role="group" aria-label="View" style="display: flex; background: #EEF1F5; border-radius: 12px; padding: 3px">
+            <button type="button" onClick="{{showTrends}}" style="{{segTrends}}">{{T.trendsBtn}}</button>
+            <button type="button" onClick="{{showAssess}}" style="{{segAssess}}">{{T.assessBtn}}</button>
+          </div>
+        </div>
+        <sc-if value="{{isTrends}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div role="group" aria-label="Measure" style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{metrics}}" as="m" hint-placeholder-count="6"><button type="button" onClick="{{m.pick}}" style="{{m.style}}">{{m.l}}</button></sc-for>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+              <div style="background: #F5F7FA; border-radius: 12px; padding: 8px 12px"><small style="display: block; font-size: 11px; font-weight: 700; color: #475467; text-transform: uppercase; letter-spacing: 0.05em">Now</small><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; color: {{cur.nowColor}}">{{cur.now}}</b> <small style="color: #475467">{{cur.unit}}</small></div>
+              <div style="background: #F5F7FA; border-radius: 12px; padding: 8px 12px"><small style="display: block; font-size: 11px; font-weight: 700; color: #475467; text-transform: uppercase; letter-spacing: 0.05em">24 h change</small><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">{{cur.delta}}</b></div>
+              <div style="background: #F5F7FA; border-radius: 12px; padding: 8px 12px"><small style="display: block; font-size: 11px; font-weight: 700; color: #475467; text-transform: uppercase; letter-spacing: 0.05em">Target</small><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">{{cur.target}}</b></div>
+            </div>
+            <svg viewBox="0 0 520 200" role="img" aria-label="{{cur.l}} over the last 24 hours" style="width: 100%; height: auto">
+              <rect x="40" y="{{cur.bandY}}" width="470" height="{{cur.bandH}}" fill="#E7F4EE"></rect>
+              <sc-for list="{{cur.grid}}" as="g" hint-placeholder-count="3">
+                <line x1="40" x2="510" y1="{{g.y}}" y2="{{g.y}}" stroke="#E6EAF0"></line>
+                <text x="34" y="{{g.ty}}" text-anchor="end" font-size="11" fill="#667085">{{g.v}}</text>
+              </sc-for>
+              <line x1="40" x2="510" y1="176" y2="176" stroke="#CDD5DF"></line>
+              <sc-for list="{{times}}" as="t" hint-placeholder-count="7"><text x="{{t.x}}" y="194" text-anchor="middle" font-size="11" fill="#667085">{{t.l}}</text></sc-for>
+              <polyline points="{{cur.pts}}" fill="none" stroke="{{cur.color}}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
+              <sc-for list="{{cur.dots}}" as="d" hint-placeholder-count="7"><circle cx="{{d.x}}" cy="{{d.y}}" r="{{d.r}}" fill="{{d.fill}}" stroke="{{d.stroke}}" stroke-width="2.5"><title>{{d.tip}}</title></circle></sc-for>
+              <text x="{{cur.lastX}}" y="{{cur.lastY}}" text-anchor="end" font-size="13" font-weight="700" fill="#0B1220">{{cur.now}}</text>
+            </svg>
+            <span style="font-size: 12px; color: #475467">Green band: {{cur.bandLabel}} · red dots are outside it</span>
+            <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+              <sc-for list="{{vitals}}" as="v" hint-placeholder-count="5">
+                <div style="{{v.style}}"><small style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #475467">{{v.l}}</small><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; color: {{v.color}}">{{v.v}}</b><small style="font-size: 11px; color: #475467">{{v.sub}}</small></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{isAssess}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{scales}}" as="s" hint-placeholder-count="5">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #E2E7EF; border-radius: 14px">
+                <span style="{{s.ring}}"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 16px">{{s.score}}</b></span>
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><b style="font-size: 14px">{{s.name}}</b><span style="font-size: 12px; color: #475467">{{s.band}} · {{s.last}}</span></div>
+                <span style="{{s.dueStyle}}">{{s.due}}</span>
+              </div>
+            </sc-for>
+            <div style="border-top: 1px solid #EEF1F5; margin-top: 4px; padding-top: 12px; display: flex; flex-direction: column; gap: 10px">
+              <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap"><b style="font-size: 15px; flex: 1">{{T.photos}}</b><small style="font-size: 11px; color: #475467">Photo consent taken on admission · photos stay in the record</small></div>
+              <sc-if value="{{noSites}}" hint-placeholder-val="{{ false }}"><div style="padding: 14px; border-radius: 12px; background: #F5F7FA; text-align: center; font-size: 13px; color: #475467">No wounds, lines or drains to photograph for {{p.first}}.</div></sc-if>
+              <sc-for list="{{sites}}" as="si" hint-placeholder-count="1">
+                <div style="border: 1px solid #E2E7EF; border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px">
+                  <div style="display: flex; align-items: center; gap: 10px"><div style="flex: 1; min-width: 0"><b style="font-size: 14px">{{si.n}}</b><br><small style="font-size: 12px; color: #475467">{{si.s}}</small></div>
+                    <label class="fileBtn" style="position: relative; display: flex; align-items: center; gap: 6px; background: #0B6E69; color: #FFFFFF; border-radius: 10px; min-height: 40px; padding: 0 12px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Add photo
+                      <input type="file" accept="image/*" capture="environment" onChange="{{si.add}}" aria-label="{{si.aria}}" style="position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer">
+                    </label>
+                  </div>
+                  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px">
+                    <sc-for list="{{si.photos}}" as="ph" hint-placeholder-count="2">
+                      <figure style="margin: 0; flex: none; width: 96px; display: flex; flex-direction: column; gap: 4px">
+                        <sc-if value="{{ph.real}}" hint-placeholder-val="{{ false }}"><img src="{{ph.src}}" alt="{{ph.alt}}" style="width: 96px; height: 72px; object-fit: cover; border-radius: 10px; border: 2px solid #0B6E69"></sc-if>
+                        <sc-if value="{{ph.fake}}" hint-placeholder-val="{{ true }}"><div style="{{ph.ph}}" role="img" aria-label="Earlier photo, {{ph.cap}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 8"></path></svg></div></sc-if>
+                        <figcaption style="font-size: 11px; color: #475467; text-align: center">{{ph.cap}}</figcaption>
+                      </figure>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </section>
+
+      <section aria-label="Compliance" style="flex: 6 1 620px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+          <div style="width: 70px; height: 70px; border-radius: 999px; background: {{ring}}; display: flex; align-items: center; justify-content: center; flex: none">
+            <div style="width: 54px; height: 54px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 17px">{{pct}}%</div>
+          </div>
+          <div style="flex: 1; min-width: 200px">
+            <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">{{T.compliance}}</h2>
+            <span style="font-size: 13px; color: #475467">{{doneCount}} of {{totalCount}} applicable standards met · {{naCount}} not applicable · updates by itself from the record</span>
+          </div>
+          <span style="background: #FDF0EF; color: #B42318; border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700">{{overdueCount}} overdue</span>
+        </div>
+        <div role="group" aria-label="Show only" style="display: flex; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{cfilters}}" as="f" hint-placeholder-count="3"><button type="button" onClick="{{f.pick}}" style="{{f.style}}">{{f.l}}</button></sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <sc-for list="{{bundles}}" as="b" hint-placeholder-count="6">
+            <div style="border: 1px solid #E2E7EF; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; align-items: center; gap: 8px"><b style="font-size: 14px; flex: 1">{{b.name}}</b><span style="font-size: 12px; font-weight: 700; color: {{b.pctColor}}">{{b.done}}/{{b.total}}</span></div>
+              <span style="font-size: 11px; color: #475467">{{b.refs}}</span>
+              <div style="height: 6px; background: #EEF1F5; border-radius: 999px; overflow: hidden"><div style="height: 6px; width: {{b.pct}}%; background: {{b.pctColor}}; border-radius: 999px"></div></div>
+              <sc-if value="{{b.showFold}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{b.fold}}" style="align-self: flex-start; border: 0; background: transparent; color: #0B6E69; font-size: 12px; font-weight: 700; min-height: 30px; padding: 0">{{b.foldLabel}}</button></sc-if>
+              <sc-if value="{{b.open}}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{b.items}}" as="it" hint-placeholder-count="3">
+                <button type="button" onClick="{{it.toggle}}" style="display: flex; align-items: center; gap: 9px; border: 0; background: transparent; text-align: left; padding: 4px 0; min-height: 32px; color: #0B1220; font-size: 13px">
+                  <span style="{{it.box}}">{{it.mark}}</span><span style="flex: 1; {{it.textStyle}}">{{it.t}}</span><span style="{{it.tagStyle}}">{{it.tag}}</span>
+                </button>
+              </sc-for>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #475467; line-height: 1.5">Mapped to NABH Hospital Standards 6th edition, NABH Nursing Excellence 2nd edition, JCI International Patient Safety Goals and the Bio-Medical Waste Management Rules, 2016, at chapter level. Items marked "auto" tick themselves from the record. This screen does not claim accreditation or certification.</p>
+      </section>
+    </div>
+
+    <section aria-label="Shift timeline" style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">{{T.timeline}}</h2>
+        <span style="background: #FDF0EF; color: #B42318; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{tl.over}} {{T.overdue}}</span>
+        <span style="background: #FEF6E0; color: #8A5300; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{tl.due}} {{T.thisHour}}</span>
+        <span style="background: #E7F4EE; color: #067647; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{tl.done}} {{T.done}}</span>
+        <span style="flex: 1"></span>
+        <div role="group" aria-label="Show" style="display: flex; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{tl.filters}}" as="f" hint-placeholder-count="7"><button type="button" onClick="{{f.pick}}" style="{{f.style}}">{{f.l}}</button></sc-for>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px">
+        <sc-for list="{{tl.cols}}" as="c" hint-placeholder-count="8">
+          <div style="{{c.style}}">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 6px"><b style="font-size: 12px; color: {{c.hc}}">{{c.l}}</b><sc-if value="{{c.now}}" hint-placeholder-val="{{ false }}"><span style="background: #0B6E69; color: #FFFFFF; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 1px 6px">NOW</span></sc-if></div>
+            <sc-for list="{{c.items}}" as="it" hint-placeholder-count="2">
+              <button type="button" onClick="{{it.act}}" title="{{it.tip}}" style="{{it.style}}"><span style="{{it.dot}}"></span><span style="flex: 1; min-width: 0; text-align: left; line-height: 1.25">{{it.l}}<br><small style="font-size: 10px; opacity: 0.85">{{it.s}}</small></span></button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #475467">
+        <sc-for list="{{tl.legend}}" as="l" hint-placeholder-count="6"><span style="display: flex; align-items: center; gap: 6px"><i style="{{l.dot}}"></i>{{l.l}}</span></sc-for>
+        <span style="flex: 1"></span><span>{{T.tlHint}}</span>
+      </div>
+    </section>
+
+    <section aria-label="Medication" style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">{{T.meds}}</h2>
+        <span style="background: #FDF0EF; color: #B42318; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{medOver}} {{T.overdue}}</span>
+        <span style="background: #FEF6E0; color: #8A5300; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{medDue}} {{T.dueNow}}</span>
+        <span style="background: #E7F4EE; color: #067647; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{medGiven}} {{T.given}}</span>
+        <span style="flex: 1"></span>
+        <span style="font-size: 12px; color: #475467">Due doses open the scan flow · tap a given dose to mark it recorded in error</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 300px minmax(0, 1fr); border: 1px solid #E2E7EF; border-radius: 14px; overflow: hidden">
+        <div style="background: #F5F7FA; padding: 8px 14px; font-size: 11px; font-weight: 700; color: #475467; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #E2E7EF">Medicine · dose · route</div>
+        <div style="background: #F5F7FA; border-bottom: 1px solid #E2E7EF; position: relative; height: 30px">
+          <sc-for list="{{hours}}" as="h" hint-placeholder-count="9"><span style="position: absolute; top: 8px; left: {{h.x}}%; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: #475467">{{h.l}}</span></sc-for>
+          <span style="position: absolute; top: 2px; left: {{nowX}}%; transform: translateX(-50%); background: #0B6E69; color: #FFFFFF; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px">NOW 11:05</span>
+        </div>
+        <sc-for list="{{meds}}" as="m" hint-placeholder-count="5">
+          <div style="padding: 10px 14px; border-bottom: 1px solid #EEF1F5; display: flex; flex-direction: column; gap: 3px; min-height: 52px; justify-content: center">
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap"><b style="font-size: 13px">{{m.n}}</b>
+              <sc-if value="{{m.ha}}" hint-placeholder-val="{{ false }}"><span style="background: #B42318; color: #FFFFFF; border-radius: 6px; padding: 1px 6px; font-size: 10px; font-weight: 700">HIGH-ALERT</span></sc-if>
+              <sc-if value="{{m.prn}}" hint-placeholder-val="{{ false }}"><span style="background: #EAF0FD; color: #1D4FB8; border-radius: 6px; padding: 1px 6px; font-size: 10px; font-weight: 700">PRN</span></sc-if>
+            </div>
+            <small style="font-size: 12px; color: #475467">{{m.s}}</small>
+          </div>
+          <div style="position: relative; border-bottom: 1px solid #EEF1F5; min-height: 52px">
+            <span style="position: absolute; top: 0; bottom: 0; left: {{nowX}}%; width: 2px; background: #0B6E6966"></span>
+            <sc-for list="{{m.doses}}" as="d" hint-placeholder-count="2"><button type="button" onClick="{{d.pick}}" aria-label="{{d.aria}}" style="{{d.style}}">{{d.l}}</button></sc-for>
+          </div>
+        </sc-for>
+        <sc-if value="{{noActMeds}}" hint-placeholder-val="{{ false }}"><div style="grid-column: 1 / -1; padding: 16px; text-align: center; font-size: 13px; color: #475467">Nothing due right now for {{p.first}}. Medicines with nothing due are folded away.</div></sc-if>
+      </div>
+      <sc-if value="{{foldMeds.any}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{foldMeds.toggle}}" style="align-self: flex-start; border: 0; background: transparent; color: #0B6E69; font-size: 13px; font-weight: 700; min-height: 32px; padding: 0">{{foldMeds.l}}</button></sc-if>
+      <sc-if value="{{errDose}}" hint-placeholder-val="{{ false }}">
+        <div style="border: 1px solid #F4C7C2; background: #FFF8F7; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; gap: 10px; align-items: center"><b style="flex: 1; font-size: 14px">{{errInfo.t}}</b><button type="button" onClick="{{closeErr}}" style="border: 0; background: transparent; min-height: 36px; font-weight: 600; color: #475467">Close</button></div>
+          <span style="font-size: 13px; color: #475467">{{errInfo.s}}</span>
+          <sc-if value="{{errInfo.can}}" hint-placeholder-val="{{ false }}">
+            <span style="font-size: 12px; font-weight: 700; color: #344054">Mark as recorded in error · the original entry is kept, struck through, with your name, time and reason</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{errReasons}}" as="r" hint-placeholder-count="4"><button type="button" onClick="{{r.pick}}" style="border: 1px solid #F4C7C2; background: #FFFFFF; color: #B42318; border-radius: 999px; min-height: 34px; padding: 0 12px; font-size: 12px; font-weight: 600">{{r.l}}</button></sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </section>
+
+    <section aria-label="Nursing orders" style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">{{T.orders}}</h2>
+        <span style="background: #FEF6E0; color: #8A5300; border-radius: 10px; padding: 5px 10px; font-size: 12px; font-weight: 700">{{toAck}} {{T.toAck}}</span>
+      </div>
+      <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start">
+        <div style="flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+          <h3 style="margin: 0; font-size: 15px">{{T.labs}}</h3>
+          <sc-if value="{{noLabs}}" hint-placeholder-val="{{ false }}"><div style="border: 1px dashed #CDD5DF; border-radius: 14px; padding: 18px; text-align: center; display: flex; flex-direction: column; gap: 4px"><b style="font-size: 14px">No lab tests ordered for {{p.first}}</b><span style="font-size: 12px; color: #475467">New orders from the doctor appear here with the right tube and a Collect button.</span></div></sc-if>
+          <sc-if value="{{crit.open}}" hint-placeholder-val="{{ false }}">
+            <div style="background: #B42318; color: #FFFFFF; border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+              <div style="flex: 1; min-width: 220px"><b style="display: block; font-size: 14px">Critical value · {{crit.t}}</b><small style="font-size: 12px; opacity: 0.9">Reported {{crit.at}} · tell the doctor and record the read-back</small></div>
+              <button type="button" onClick="{{crit.readBack}}" style="background: #FFFFFF; color: #B42318; border: 0; border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 700; font-size: 13px">Record read-back</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{crit.closed}}" hint-placeholder-val="{{ false }}">
+            <div style="background: #E7F4EE; color: #067647; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600">✓ Critical {{crit.t}} read back to {{crit.doc}} at 11:05 AM · alert closed everywhere</div>
+          </sc-if>
+          <sc-for list="{{labs}}" as="l" hint-placeholder-count="3">
+            <div style="border: 1px solid #E2E7EF; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+                <span style="{{l.tube}}" title="{{l.tubeName}}"></span><b style="font-size: 14px; flex: 1">{{l.n}}</b>
+                <sc-if value="{{l.stat}}" hint-placeholder-val="{{ false }}"><span style="background: #B42318; color: #FFFFFF; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700">STAT</span></sc-if>
+                <button type="button" onClick="{{l.next}}" style="{{l.btnStyle}}">{{l.btn}}</button>
+              </div>
+              <div style="display: flex; align-items: center"><sc-for list="{{l.steps}}" as="s" hint-placeholder-count="4"><span style="{{s.style}}">{{s.l}}</span></sc-for></div>
+              <small style="font-size: 12px; color: {{l.noteColor}}">{{l.note}}</small>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+          <h3 style="margin: 0; font-size: 15px">{{T.gen}}</h3>
+          <sc-for list="{{gen}}" as="g" hint-placeholder-count="4">
+            <div style="{{g.card}}"><span style="{{g.cat}}">{{g.c}}</span>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><b style="font-size: 13px">{{g.t}}</b><small style="font-size: 12px; color: #475467">{{g.s}}</small></div>
+              <button type="button" onClick="{{g.ack}}" style="{{g.btnStyle}}">{{g.btn}}</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Nurse note" style="display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start">
+      <div style="flex: 6 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px; flex: 1">{{T.note}} · {{p.first}}</h2>
+          <div role="group" aria-label="Note format" style="display: flex; background: #EEF1F5; border-radius: 12px; padding: 3px"><sc-for list="{{formats}}" as="f" hint-placeholder-count="3"><button type="button" onClick="{{f.pick}}" style="{{f.style}}">{{f.l}}</button></sc-for></div>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap"><span style="font-size: 12px; color: #475467; align-self: center">Insert:</span><sc-for list="{{chips}}" as="c" hint-placeholder-count="4"><button type="button" onClick="{{c.add}}" style="border: 1px dashed #B9C3D0; background: #FFFFFF; color: #344054; border-radius: 999px; padding: 0 12px; min-height: 32px; font-size: 12px; font-weight: 500">+ {{c.t}}</button></sc-for></div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+          <button type="button" onClick="{{dictate}}" aria-pressed="{{dictOn}}" style="{{dictStyle}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>{{dictLabel}}</button>
+          <sc-if value="{{canAttach}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{toggleAttach}}" style="{{attachStyle}}">{{attachLabel}}</button></sc-if>
+          <span style="font-size: 12px; color: #0B6E69; font-weight: 600">{{dictStatus}}</span>
+        </div>
+        <sc-if value="{{dictErrOn}}" hint-placeholder-val="{{ false }}"><div role="alert" style="background: #FEF6E0; color: #7A4A00; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 600; display: flex; gap: 8px; align-items: center"><span style="flex: 1">{{dictErr}}</span><button type="button" onClick="{{clearDictErr}}" style="border: 0; background: transparent; color: #7A4A00; font-weight: 700; min-height: 30px">OK</button></div></sc-if>
+        <sc-for list="{{noteFields}}" as="nf" hint-placeholder-count="3">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #344054">
+            <span style="display: flex; align-items: center; gap: 8px"><span style="width: 22px; height: 22px; border-radius: 7px; background: #E6F2F1; color: #0B6E69; display: inline-flex; align-items: center; justify-content: center; font-size: 12px">{{nf.k}}</span>{{nf.l}}</span>
+            <textarea value="{{nf.v}}" onChange="{{nf.set}}" rows="2" placeholder="{{nf.ph}}" style="border: 1px solid #CDD5DF; border-radius: 12px; padding: 10px 12px; font-size: 14px; color: #0B1220; resize: vertical; line-height: 1.45"></textarea>
+          </label>
+        </sc-for>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <span style="font-size: 12px; color: #475467; flex: 1; min-width: 220px">You have 10 seconds to undo after signing. After that, a wrong note is marked "recorded in error" and kept, never deleted.</span>
+          <button type="button" onClick="{{sign}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 12px; min-height: 44px; padding: 0 20px; font-weight: 600">{{T.sign}}</button>
+        </div>
+      </div>
+      <div style="flex: 4 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px">{{T.notesAdm}}</h2><span style="font-size: 12px; color: #475467">{{notesCount}} signed</span></div>
+        <sc-if value="{{noNotes}}" hint-placeholder-val="{{ false }}"><div style="border: 1px dashed #CDD5DF; border-radius: 14px; padding: 18px; text-align: center; display: flex; flex-direction: column; gap: 4px"><b style="font-size: 14px">No notes yet this admission</b><span style="font-size: 12px; color: #475467">Your first signed note for {{p.first}} will show here.</span></div></sc-if>
+        <sc-for list="{{notes}}" as="n" hint-placeholder-count="2">
+          <article style="{{n.box}}">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px"><b style="font-size: 13px">{{n.time}}</b><span style="background: #EEF1F5; border-radius: 6px; padding: 1px 7px; font-weight: 600; color: #344054">{{n.type}}</span><span style="color: #475467">{{n.by}}</span><span style="margin-left: auto; color: {{n.stColor}}; font-weight: 600">{{n.st}}</span></div>
+            <p style="{{n.textStyle}}">{{n.text}}</p>
+            <sc-if value="{{n.hasPhoto}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #475467; font-weight: 600">{{n.photo}}</span></sc-if>
+            <sc-if value="{{n.isErr}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #B42318; font-weight: 600">{{n.errLine}}</span></sc-if>
+            <sc-if value="{{n.canErr}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{n.askErr}}" style="align-self: flex-start; border: 0; background: transparent; color: #475467; font-size: 12px; font-weight: 600; min-height: 28px; padding: 0; text-decoration: underline">Mark as recorded in error</button></sc-if>
+            <sc-if value="{{n.asking}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{n.reasons}}" as="r" hint-placeholder-count="3"><button type="button" onClick="{{r.pick}}" style="border: 1px solid #F4C7C2; background: #FFFFFF; color: #B42318; border-radius: 999px; min-height: 32px; padding: 0 10px; font-size: 12px; font-weight: 600">{{r.l}}</button></sc-for></div>
+            </sc-if>
+          </article>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+
+  <sc-if value="{{giving}}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: #0B122080; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 20px">
+      <div role="dialog" aria-label="Give medicine" style="width: min(760px, 100%); max-height: calc(100vh - 40px); overflow: auto; background: #FFFFFF; border-radius: 22px; box-shadow: 0 30px 80px -20px #0B1220AA; display: flex; flex-direction: column; animation: rise .2s ease-out">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E7EF; display: flex; gap: 12px; align-items: center">
+          <div style="flex: 1; min-width: 0"><small style="font-size: 11px; font-weight: 700; color: #0B6E69; text-transform: uppercase; letter-spacing: 0.05em">Give medicine · {{p.name}} · {{p.bed}}</small><br><b style="font-size: 18px">{{gv.n}}</b><br><span style="font-size: 13px; color: #475467">{{gv.s}} · scheduled {{gv.t}}</span></div>
+          <button type="button" onClick="{{cancelGive}}" aria-label="Close" style="width: 44px; height: 44px; border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 12px; font-size: 16px">✕</button>
+        </div>
+        <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+          <sc-for list="{{gv.steps}}" as="st" hint-placeholder-count="2">
+            <div style="{{st.box}}">
+              <span style="{{st.num}}">{{st.mark}}</span>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+                <b style="font-size: 14px">{{st.t}}</b>
+                <span style="font-size: 13px; color: {{st.msgColor}}; font-weight: {{st.msgWeight}}">{{st.msg}}</span>
+                <sc-if value="{{st.showScan}}" hint-placeholder-val="{{ false }}">
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+                    <div style="position: relative; width: 120px; height: 72px; border-radius: 10px; background: #0B1220; overflow: hidden; flex: none" aria-hidden="true"><span style="position: absolute; left: 10%; right: 10%; height: 2px; background: #3DDC97; box-shadow: 0 0 8px #3DDC97; animation: scanline 2s infinite"></span><span style="position: absolute; inset: 12px 18px; border: 2px solid #FFFFFF66; border-radius: 6px"></span></div>
+                    <button type="button" onClick="{{st.scan}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 12px; min-height: 48px; padding: 0 18px; font-weight: 700">{{st.scanLabel}}</button>
+                    <button type="button" onClick="{{st.wrong}}" style="background: transparent; border: 1px dashed #98A2B3; border-radius: 10px; min-height: 36px; padding: 0 10px; font-size: 11px; font-weight: 600; color: #475467">{{st.wrongLabel}}</button>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{gv.ready}}" hint-placeholder-val="{{ false }}">
+            <div style="border: 1px solid #E2E7EF; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+              <b style="font-size: 14px">Checked by the system</b>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+                <sc-for list="{{gv.auto}}" as="a" hint-placeholder-count="4"><span style="{{a.style}}">{{a.t}}</span></sc-for>
+              </div>
+              <sc-if value="{{gv.ha}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; background: #FFF8F7; border: 1px solid #F4C7C2; border-radius: 12px; padding: 10px 12px">
+                  <span style="flex: 1 1 100%; font-size: 13px; font-weight: 700; color: #B42318">High-alert medicine: a second nurse checks drug, dose, patient and route</span>
+                  <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #344054">Second nurse<select onChange="{{gv.setWit}}" style="border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 13px"><option value="">Choose</option><option>Br. Nikhil Jadhav</option><option>Sr. Rupali More</option></select></label>
+                  <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #344054">Their PIN<input value="{{gv.pin}}" onChange="{{gv.setPin}}" inputmode="numeric" maxlength="4" placeholder="4 digits" style="border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 15px; width: 110px"></label>
+                  <span style="font-size: 12px; color: {{gv.witColor}}; font-weight: 600">{{gv.witMsg}}</span>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <div style="border-top: 1px solid #EEF1F5; padding-top: 10px; display: flex; flex-direction: column; gap: 8px">
+            <button type="button" onClick="{{gv.toggleOv}}" style="align-self: flex-start; border: 0; background: transparent; color: #475467; font-size: 13px; font-weight: 600; min-height: 32px; padding: 0; text-decoration: underline">{{gv.ovLabel}}</button>
+            <sc-if value="{{gv.ovOpen}}" hint-placeholder-val="{{ false }}">
+              <div style="background: #FEF6E0; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px">
+                <span style="font-size: 12px; color: #7A4A00">Only when a scan is impossible. The override, your reason and your name go to the pharmacy and quality team.</span>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{gv.ovReasons}}" as="r" hint-placeholder-count="4"><button type="button" onClick="{{r.pick}}" style="{{r.style}}">{{r.l}}</button></sc-for></div>
+                <input value="{{gv.ovNote}}" onChange="{{gv.setOvNote}}" placeholder="What you checked instead, e.g. name and DOB read from the case file" style="border: 1px solid #E9C46A; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 13px; background: #FFFFFF">
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        <div style="padding: 14px 20px; border-top: 1px solid #E2E7EF; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #FAFBFC; border-radius: 0 0 22px 22px">
+          <span style="flex: 1; font-size: 12px; color: {{gv.footColor}}; font-weight: 600">{{gv.foot}}</span>
+          <button type="button" onClick="{{gv.notGiven}}" style="background: #FFFFFF; border: 1px solid #CDD5DF; border-radius: 12px; min-height: 44px; padding: 0 16px; font-weight: 600">Not given…</button>
+          <button type="button" onClick="{{gv.confirm}}" style="{{gv.btn}}">Confirm given</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{palOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: #0B122066; z-index: 45; display: flex; justify-content: center; align-items: flex-start; padding-top: 110px">
+      <div role="dialog" aria-label="Find a patient" style="width: min(560px, calc(100% - 40px)); background: #FFFFFF; border-radius: 18px; box-shadow: 0 30px 80px -20px #0B1220AA; padding: 12px; display: flex; flex-direction: column; gap: 6px; animation: rise .15s ease-out">
+        <input autofocus="" value="{{palQ}}" onChange="{{setPalQ}}" onKeyDown="{{palKey}}" placeholder="Type a bed, name or UHID" aria-label="Find a patient" style="border: 0; border-bottom: 1px solid #E2E7EF; padding: 6px 8px 12px; font-size: 18px; outline: none">
+        <sc-for list="{{palList}}" as="pp" hint-placeholder-count="5"><button type="button" onClick="{{pp.pick}}" style="{{pp.style}}"><b style="font-size: 14px">{{pp.bed}} · {{pp.name}}</b><small style="font-size: 12px; color: #475467">{{pp.sub}}</small></button></sc-for>
+        <sc-if value="{{palEmpty}}" hint-placeholder-val="{{ false }}"><div style="padding: 16px; text-align: center; font-size: 13px; color: #475467">No patient on your list matches “{{palQ}}”. Check the bed number, or <a href="PatientSwitch.dc.html">search all wards</a>.</div></sc-if>
+        <small style="font-size: 11px; color: #667085; padding: 4px 8px">Enter opens the first match · Esc closes · ← → switch beds when not typing</small>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{toastOn}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; background: #0B1220; color: #FFFFFF; border-radius: 14px; padding: 10px 10px 14px 16px; display: flex; gap: 14px; align-items: center; box-shadow: 0 20px 40px -12px #0B1220AA; animation: rise .2s ease-out; min-width: 420px">
+      <span style="flex: 1; font-size: 14px">{{toast.msg}}</span>
+      <sc-if value="{{toast.canUndo}}" hint-placeholder-val="{{ false }}">
+        <button type="button" onClick="{{undo}}" style="background: #FFFFFF; color: #0B1220; border: 0; border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 700; display: flex; align-items: center; gap: 8px">Undo <span style="font-size: 12px; color: #475467">{{toast.secs}} s</span></button>
+      </sc-if>
+      <div style="position: absolute; left: 12px; right: 12px; bottom: 5px; height: 3px; background: #FFFFFF22; border-radius: 999px; overflow: hidden"><div style="height: 3px; width: {{toast.pct}}%; background: #3DDC97"></div></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      pi: 0, view: 'trends', metric: 'news', rec: false, bell: false,
+      done: {}, dose: {}, give: null, scan: {}, ack: {}, lab: {}, tlDone: {},
+      alerts: { '0:esc': 'open', '0:crit': 'open', '1:esc': 'open' },
+      cf: 'all', tlf: 'all', fmt: 'DAR', note: { a: '', b: '', c: '' },
+      signed: [], errNote: null, errDose: null, toast: null, seq: 100,
+      lang: 'en', msgOpen: false, msgs: {}, msgDraft: '', msgDemo: {}, dev: {}, photos: {}, open: {}, showDone: false, pal: false, palQ: '', dict: null, dictErr: '', loadUntil: 0, noteAtt: false
+    };
+  }
+  sw(i) { return { pi: (i + 5) % 5, give: null, scan: {}, errDose: null, errNote: null, note: { a: '', b: '', c: '' }, rec: false, msgOpen: false, msgDraft: '', noteAtt: false, pal: false, palQ: '', loadUntil: Date.now() + 450 }; }
+  componentDidMount() {
+    var self = this;
+    this.tick = setInterval(function () { var s = self.state; if (s.toast || s.dict || Date.now() < s.loadUntil + 300) self.forceUpdate(); }, 250);
+    this.onKey = function (e) {
+      var tg = e.target && e.target.tagName, typing = tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT', s = self.state;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); self.setState({ pal: !s.pal, palQ: '' }); return; }
+      if (e.key === 'Escape') { self.setState({ pal: false, bell: false, msgOpen: false, give: null, scan: {} }); return; }
+      if (typing || s.pal || s.give) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); self.setState(self.sw(s.pi + (e.key === 'ArrowRight' ? 1 : -1))); }
+    };
+    if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { clearInterval(this.tick); if (typeof window !== 'undefined') window.removeEventListener('keydown', this.onKey); if (this.rec) { try { this.rec.stop(); } catch (e) {} } }
+  renderVals() {
+    var S = this.state, self = this, set = function (o) { self.setState(o); };
+    var NOW = 11 + 5 / 60;
+    var pill = function (on) { return 'border: 0; border-radius: 9px; padding: 0 14px; min-height: 34px; font-weight: 600; font-size: 13px; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#0B6E69' : '#475467') + '; box-shadow: ' + (on ? '0 1px 3px #0B122022' : 'none'); };
+    var chipS = function (on) { return 'border-radius: 999px; min-height: 32px; padding: 0 12px; font-size: 12px; font-weight: 600; border: 1px solid ' + (on ? '#0B6E69' : '#CDD5DF') + '; background: ' + (on ? '#0B6E69' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054'); };
+    var tlab = function (h) { var hh = Math.floor(h), mm = Math.round((h - hh) * 60); return ((hh % 12) || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + (hh < 12 ? ' AM' : ' PM'); };
+    var tone = { crit: ['#B42318', '#FDF0EF'], warn: ['#8A5300', '#FEF6E0'], good: ['#067647', '#E7F4EE'], info: ['#344054', '#EEF1F5'], mute: ['#344054', '#EEF1F5'] };
+    var toast = function (msg, undo) { set({ toast: { msg: msg, undo: undo || null, until: Date.now() + 10000 } }); };
+    /* labels only: drug names, values and clinical terms stay in English */
+    var LG = {
+      en: { ws: 'Nursing workspace', round: 'Start 11 AM round', console: 'My console', allpts: 'All patients', keys: '← → switch bed', record: '+ Record vitals', phone: 'Open on phone', trends: 'Trends and assessment', trendsBtn: 'Trends', assessBtn: 'Assessment', compliance: 'Compliance', timeline: 'Shift timeline · 7 AM to 3 PM', overdue: 'overdue', thisHour: 'this hour', done: 'done', tlHint: 'Tap an item to act on it. Medicines open the scan flow.', meds: 'Medication · today', dueNow: 'due now', given: 'given', orders: 'Nursing orders', toAck: 'to acknowledge', labs: 'Lab investigations', gen: 'General orders', note: 'Nurse note', sign: 'Sign note', notesAdm: 'Notes this admission', photos: 'Wound and site photos', msgDoc: 'Message doctor', dictate: 'Dictate', stop: 'Stop dictating', lOver: 'Act now · overdue', lDue: 'Due this hour', lDone: 'Done', lLater: 'Later' },
+      mr: { ws: 'नर्सिंग कार्यक्षेत्र', round: '11 वाजताची फेरी सुरू करा', console: 'माझे कन्सोल', allpts: 'सर्व रुग्ण', keys: '← → बेड बदला', record: '+ व्हायटल्स नोंदवा', phone: 'फोनवर उघडा', trends: 'ट्रेंड्स आणि मूल्यमापन', trendsBtn: 'ट्रेंड्स', assessBtn: 'मूल्यमापन', compliance: 'अनुपालन', timeline: 'शिफ्टचे वेळापत्रक · सकाळी 7 ते दुपारी 3', overdue: 'उशीर झालेले', thisHour: 'या तासात', done: 'पूर्ण', tlHint: 'काम करण्यासाठी आयटमवर टॅप करा. औषधांवर स्कॅन उघडते.', meds: 'औषधे · आज', dueNow: 'आता द्यायची', given: 'दिलेली', orders: 'नर्सिंग ऑर्डर्स', toAck: 'स्वीकारायच्या', labs: 'लॅब तपासण्या', gen: 'सामान्य ऑर्डर्स', note: 'नर्स नोंद', sign: 'नोंदीवर सही करा', notesAdm: 'या भरतीतील नोंदी', photos: 'जखम आणि साइटचे फोटो', msgDoc: 'डॉक्टरांना संदेश', dictate: 'बोलून लिहा', stop: 'बोलणे थांबवा', lOver: 'आत्ता करा · उशीर', lDue: 'या तासात', lDone: 'पूर्ण', lLater: 'नंतर' },
+      hi: { ws: 'नर्सिंग कार्यक्षेत्र', round: '11 बजे का राउंड शुरू करें', console: 'मेरा कंसोल', allpts: 'सभी मरीज़', keys: '← → बेड बदलें', record: '+ वाइटल्स दर्ज करें', phone: 'फ़ोन पर खोलें', trends: 'ट्रेंड्स और आकलन', trendsBtn: 'ट्रेंड्स', assessBtn: 'आकलन', compliance: 'अनुपालन', timeline: 'शिफ्ट टाइमलाइन · सुबह 7 से दोपहर 3', overdue: 'देरी से', thisHour: 'इस घंटे', done: 'पूरे', tlHint: 'काम करने के लिए आइटम पर टैप करें। दवाओं पर स्कैन खुलता है।', meds: 'दवाइयाँ · आज', dueNow: 'अभी देनी हैं', given: 'दी गईं', orders: 'नर्सिंग आदेश', toAck: 'स्वीकार करने हैं', labs: 'लैब जाँचें', gen: 'सामान्य आदेश', note: 'नर्स नोट', sign: 'नोट पर हस्ताक्षर करें', notesAdm: 'इस भर्ती के नोट्स', photos: 'घाव और साइट की फ़ोटो', msgDoc: 'डॉक्टर को संदेश', dictate: 'बोलकर लिखें', stop: 'बोलना रोकें', lOver: 'अभी करें · देरी', lDue: 'इस घंटे', lDone: 'पूरे', lLater: 'बाद में' }
+    };
+    var T = LG[S.lang] || LG.en;
+    var langs = [['en', 'EN'], ['mr', 'मराठी'], ['hi', 'हिंदी']].map(function (l) { var on = S.lang === l[0]; return { l: l[1], on: on ? 'true' : 'false', pick: function () { set({ lang: l[0] }); }, style: 'border: 0; min-height: 34px; padding: 0 10px; font-size: 12px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#0B1220' : '#C7D0DD') }; });
+
+    /* ===== five patients ===== */
+    var PTS = [
+      { bed: 'MICU-04', name: 'Ramesh Kale', age: 63, sex: 'Male', day: 2, uhid: '26-118204', ip: 'IP/26-27/0043', doc: 'Dr. Meera Kulkarni · Pulmonology', wt: 68,
+        dx: 'COPD acute exacerbation with type 2 respiratory failure · Type 2 diabetes', news: 7, alg: 'Penicillin (rash)', copd: true,
+        flags: [['Fall risk · high (Morse 55)', 'warn'], ['Pressure risk · moderate (Braden 14)', 'warn'], ['Droplet precautions', 'info'], ['Code status · Full', 'mute'], ['O₂ target SpO₂ 88–92%', 'mute']],
+        esc: { raised: '10:50 AM', target: '11:05 AM', doc: 'Dr. Kulkarni', plan: 'BiPAP trial, repeat ABG at 1 PM' },
+        ser: { news: [2, 3, 3, 5, 6, 7, 7], hr: [88, 92, 96, 104, 110, 112, 116], rr: [18, 20, 22, 24, 24, 26, 26], spo2: [94, 93, 92, 90, 87, 88, 90], temp: [37.2, 37.6, 37.9, 38.2, 38.4, 38.1, 37.8], sbp: [138, 134, 130, 124, 118, 112, 108] }, dia: 64,
+        scales: [['Fall risk · Morse', '55', 'High', 'crit', 'yesterday 9 AM', 'Due 2 PM', 'warn'], ['Pressure · Braden', '14', 'Moderate', 'warn', 'today 8 AM', 'Up to date', 'good'], ['Pain · 0–10', '6', 'Moderate', 'warn', '9:10 AM', 'Overdue 55 min', 'crit'], ['IV site · VIP', '1', 'Watch', 'warn', '6 AM', 'Due 2 PM', 'warn'], ['GCS', '15', 'Alert', 'good', '10:40 AM', 'Up to date', 'good']],
+        meds: [['Inj. Levofloxacin 750 mg', 'IV · once daily', 0, 0, [[8, 'given']]], ['Inj. Methylprednisolone 40 mg', 'IV · 12-hourly', 0, 0, [[8, 'given'], [20, 'sched']]], ['Neb. Levosalbutamol + Ipratropium', 'Inhaled · 6-hourly', 0, 0, [[6, 'given'], [12, 'due'], [18, 'sched']]], ['Inj. Insulin regular · 6 units', 'SC · before meals · CBG 248 at 10:30', 1, 0, [[8, 'given'], [10.5, 'over'], [13, 'sched'], [19.5, 'sched']]], ['Inj. Enoxaparin 40 mg', 'SC · once daily', 1, 0, [[11, 'due']]], ['Tab. Paracetamol 650 mg', 'Oral · when needed · last 9 AM', 0, 1, [[9, 'given']]]],
+        crit: { t: 'Potassium 2.9 mmol/L', at: '10:58 AM', doc: 'Dr. Kulkarni' },
+        labs: [['Arterial blood gas', 'Heparinised syringe', '#2E7D32', 3, 1, 'pH 7.31 · pCO₂ 58 · pO₂ 62', '#8A5300', 0], ['CBC with ESR', 'EDTA (purple top)', '#6A1B9A', 2, 0, 'Sent 9:15 AM · expected by 12 PM', '#475467', 0], ['Sputum culture', 'Sterile container', '#90A4AE', 0, 0, 'Collect before the next antibiotic dose', '#475467', 11], ['Repeat ABG', 'Heparinised syringe', '#2E7D32', 0, 0, 'At 1 PM after BiPAP trial', '#475467', 13]],
+        gen: [['O₂', 'Oxygen via 28% Venturi mask', 'Keep SpO₂ 88–92%', 1], ['Diet', 'Diabetic soft diet, 1,800 kcal', 'Oral fluids 1.5 L a day', 0], ['K⁺', 'Inj. Potassium chloride 20 mmol in 500 ml NS over 4 h', 'New 11:02 AM after critical potassium', 0], ['Therapy', 'Chest physiotherapy twice a day', 'Physiotherapy referral sent', 1]],
+        tasks: [[8, 'Turn to the left side', 1, 'turn'], [10, 'Turn to the right side', 1, 'turn'], [12, 'Turn and skin check', 0, 'turn'], [14, 'Turn and skin check', 0, 'turn'], [10.5, 'Chest physiotherapy', 0, 'task'], [9, 'SpO₂ check · Venturi', 1, 'dev'], [11, 'SpO₂ check · Venturi', 0, 'dev'], [13, 'SpO₂ check · Venturi', 0, 'dev'], [14, 'Fall risk reassessment', 0, 'ass'], [9.25, 'Pain reassessment', 0, 'ass'], [14, 'IV site check (VIP)', 0, 'ass'], [14.75, 'SBAR handover', 0, 'task']],
+        na: ['cauti', 'clabsi', 'rst', 'bt'], dn: ['id', 'vo', 'ini', 'pi', 'dvt', 'mar', 'ha', 'lasa', 'alg', 'rec', 'hh', 'pivc', 'iso', 'bmw', 'cons', 'priv', 'doc'],
+        notes: [{ time: '10:45 AM', type: 'Event', by: 'Sr. Anjali Pawar', text: 'D: RR 26, SpO₂ 87% on 28% Venturi, drowsy but rousable. NEWS2 7.\nA: Dr. Kulkarni informed 10:50, read-back done. Head end raised, nebulised.\nR: SpO₂ 90% at 11:00, more alert.' }, { time: '7:20 AM', type: 'Progress', by: 'Br. Nikhil Jadhav', text: 'Received from night shift. Slept poorly, productive cough. Taking oral fluids.' }] },
+      { bed: 'MICU-05', name: 'Sunita Sawant', age: 58, sex: 'Female', day: 3, uhid: '26-117930', ip: 'IP/26-27/0039', doc: 'Dr. Meera Kulkarni · Medicine', wt: 61,
+        dx: 'Community-acquired pneumonia with sepsis, improving', news: 5, alg: '', copd: false,
+        flags: [['Pressure risk · moderate (Braden 13)', 'warn'], ['Central line day 3', 'info'], ['Code status · Full', 'mute']],
+        esc: { raised: '10:20 AM', target: '11:20 AM', doc: 'Dr. Kulkarni', plan: 'Continue meropenem, lactate at 2 PM' },
+        ser: { news: [7, 7, 6, 6, 5, 5, 5], hr: [118, 114, 108, 104, 100, 98, 98], rr: [26, 24, 24, 22, 22, 22, 22], spo2: [91, 92, 93, 93, 94, 94, 94], temp: [38.9, 38.6, 38.2, 37.9, 37.6, 37.5, 37.4], sbp: [96, 100, 104, 108, 110, 112, 112] }, dia: 70,
+        scales: [['Pressure · Braden', '13', 'Moderate', 'warn', 'today 8 AM', 'Up to date', 'good'], ['Fall risk · Morse', '35', 'Moderate', 'warn', 'today 8 AM', 'Up to date', 'good'], ['Pain · 0–10', '2', 'Mild', 'good', '8 AM', 'Due 4 PM', 'good']],
+        meds: [['Inj. Meropenem 1 g', 'IV · 8-hourly', 0, 0, [[6, 'given'], [14, 'sched'], [22, 'sched']]], ['Inj. Noradrenaline infusion', 'IV · titrate to MAP 65 · stopped 6 AM', 1, 0, [[6, 'given']]], ['Inj. Pantoprazole 40 mg', 'IV · once daily', 0, 0, [[8, 'given']]], ['Inj. Paracetamol 1 g', 'IV · 6-hourly', 0, 0, [[6, 'given'], [12, 'due'], [18, 'sched']]]],
+        crit: null,
+        labs: [['Serum lactate', 'Fluoride (grey top)', '#78909C', 0, 0, 'Due 2 PM', '#475467', 14], ['Blood culture', 'Culture bottles', '#1565C0', 3, 0, 'Klebsiella, sensitive to meropenem', '#8A5300', 0], ['Procalcitonin', 'Plain (red top)', '#C62828', 2, 0, 'Sent 8 AM', '#475467', 0]],
+        gen: [['Line', 'Central line dressing and bundle check', 'Due this shift', 0], ['Position', 'Turn every 2 hours', 'Braden 13', 1], ['Diet', 'Soft diet as tolerated', 'Encourage protein', 1]],
+        tasks: [[8, 'Turn and skin check', 1, 'turn'], [10, 'Turn and skin check', 0, 'turn'], [12, 'Turn and skin check', 0, 'turn'], [11, 'Central line bundle check', 0, 'dev'], [14.75, 'SBAR handover', 0, 'task']],
+        na: ['cauti', 'rst', 'bt', 'iso'], dn: ['id', 'vo', 'ini', 'pi', 'dvt', 'mar', 'ha', 'lasa', 'alg', 'rec', 'hh', 'pivc', 'bmw', 'cons', 'priv', 'doc', 'clabsi', 'fall', 'edu', 'pain'],
+        notes: [{ time: '8:10 AM', type: 'Progress', by: 'Sr. Anjali Pawar', text: 'Off noradrenaline since 6 AM, MAP 78. Afebrile. Eating small amounts.' }] },
+      { bed: 'MICU-07', name: 'Anil Gaikwad', age: 47, sex: 'Male', day: 1, uhid: '26-118277', ip: 'IP/26-27/0047', doc: 'Dr. Suresh Nair · Surgery', wt: 74,
+        dx: 'Post-op day 1 after exploratory laparotomy', news: 3, alg: 'Sulfa drugs', copd: false,
+        flags: [['Nil by mouth', 'warn'], ['Abdominal drain', 'info'], ['Urinary catheter day 1', 'info']],
+        esc: null,
+        ser: { news: [4, 4, 3, 3, 3, 3, 3], hr: [104, 100, 96, 94, 92, 92, 92], rr: [20, 20, 18, 18, 18, 18, 18], spo2: [95, 96, 96, 96, 96, 96, 96], temp: [37.9, 37.8, 37.7, 37.6, 37.6, 37.6, 37.6], sbp: [118, 120, 122, 124, 124, 124, 124] }, dia: 78,
+        scales: [['Pain · 0–10', '4', 'Moderate', 'warn', '10 AM', 'Due now', 'warn'], ['Fall risk · Morse', '45', 'High', 'crit', 'today 7 AM', 'Up to date', 'good']],
+        meds: [['Inj. Ceftriaxone 1 g', 'IV · 12-hourly', 0, 0, [[8, 'given'], [20, 'sched']]], ['Inj. Metronidazole 500 mg', 'IV · 8-hourly', 0, 0, [[6, 'given'], [14, 'sched']]], ['Inj. Tramadol 50 mg', 'IV · when needed', 0, 1, [[10, 'given']]], ['Inj. Enoxaparin 40 mg', 'SC · once daily', 1, 0, [[11, 'due']]]],
+        crit: null,
+        labs: [['CBC', 'EDTA (purple top)', '#6A1B9A', 3, 0, 'Hb 11.2 · WBC 12,100', '#8A5300', 0], ['Serum electrolytes', 'Plain (red top)', '#C62828', 0, 0, 'Collect now', '#475467', 11]],
+        gen: [['Drain', 'Chart drain output every 4 hours', 'Last 60 ml serous', 1], ['Mobility', 'Sit out of bed this evening', 'With help', 0], ['Diet', 'Nil by mouth until bowel sounds return', 'Mouth care every 4 h', 1]],
+        tasks: [[8, 'Drain output', 1, 'dev'], [12, 'Drain output', 0, 'dev'], [11, 'Catheter need review', 0, 'dev'], [11, 'Pain reassessment', 0, 'ass'], [14.75, 'SBAR handover', 0, 'task']],
+        na: ['clabsi', 'rst', 'bt', 'iso', 'turn'], dn: ['id', 'vo', 'ini', 'pi', 'dvt', 'mar', 'ha', 'lasa', 'alg', 'rec', 'hh', 'pivc', 'bmw', 'cons', 'priv', 'doc', 'cauti'],
+        notes: [{ time: '7:30 AM', type: 'Progress', by: 'Br. Nikhil Jadhav', text: 'Post-op day 1. Pain 5/10 at night, tramadol given 10 PM. Drain 120 ml serous overnight.' }] },
+      { bed: 'MICU-08', name: 'Leela Gokhale', age: 72, sex: 'Female', day: 4, uhid: '26-117712', ip: 'IP/26-27/0031', doc: 'Dr. Meera Kulkarni · Medicine', wt: 58,
+        dx: 'Diabetic foot ulcer, right heel', news: 1, alg: 'Penicillin', copd: false,
+        flags: [['Fall risk · high (Morse 60)', 'warn'], ['Heel off-loading', 'info']],
+        esc: null,
+        ser: { news: [1, 1, 1, 1, 1, 1, 1], hr: [84, 82, 86, 84, 82, 84, 84], rr: [16, 16, 16, 16, 16, 16, 16], spo2: [97, 97, 97, 98, 97, 97, 97], temp: [37.1, 37.0, 37.2, 37.0, 36.9, 37.0, 37.0], sbp: [134, 130, 132, 130, 128, 132, 132] }, dia: 80,
+        scales: [['Fall risk · Morse', '60', 'High', 'crit', 'today 8 AM', 'Up to date', 'good'], ['Wound', '4', 'Needs review', 'warn', 'yesterday', 'Due today', 'warn']],
+        meds: [['Inj. Linezolid 600 mg', 'IV · 12-hourly', 0, 0, [[9, 'given'], [21, 'sched']]], ['Inj. Insulin regular · sliding scale', 'SC · before meals', 1, 0, [[8, 'given'], [13, 'sched']]]],
+        crit: null,
+        labs: [['Wound swab culture', 'Sterile swab', '#90A4AE', 3, 0, 'Staph aureus, MRSA', '#8A5300', 0]],
+        gen: [['Wound', 'Normal saline dressing daily', 'Due 11:30 AM', 0], ['Position', 'Off-load right heel', 'Pillow under calf', 1]],
+        tasks: [[11.5, 'Wound dressing', 0, 'task'], [12, 'Heel check', 0, 'turn'], [10, 'Heel check', 1, 'turn']],
+        na: ['cauti', 'clabsi', 'rst', 'bt', 'iso'], dn: ['id', 'vo', 'ini', 'pi', 'dvt', 'mar', 'ha', 'lasa', 'alg', 'rec', 'hh', 'pivc', 'bmw', 'cons', 'priv', 'doc', 'fall', 'turn', 'pain'],
+        notes: [] },
+      { bed: 'MICU-10', name: 'Vikas Thorat', age: 45, sex: 'Male', day: 3, uhid: '26-118011', ip: 'IP/26-27/0040', doc: 'Dr. Meera Kulkarni · Medicine', wt: 70,
+        dx: 'Recovered diabetic ketoacidosis · going home today', news: 0, alg: '', copd: false,
+        flags: [['Discharge today', 'good']],
+        esc: null,
+        ser: { news: [1, 0, 0, 0, 0, 0, 0], hr: [86, 80, 78, 76, 78, 78, 78], rr: [16, 14, 14, 14, 14, 14, 14], spo2: [98, 98, 98, 98, 98, 98, 98], temp: [36.9, 36.8, 36.8, 36.8, 36.8, 36.8, 36.8], sbp: [124, 122, 124, 124, 124, 124, 124] }, dia: 76,
+        scales: [['Fall risk · Morse', '15', 'Low', 'good', 'today 8 AM', 'Up to date', 'good']],
+        meds: [['Inj. Insulin glargine 18 units', 'SC · bedtime', 1, 0, [[22, 'sched']]], ['Inj. Insulin regular', 'SC · before meals', 1, 0, [[8, 'given'], [13, 'sched']]]],
+        crit: null, labs: [], gen: [['Teach', 'Insulin pen teaching with teach-back', 'Before discharge', 0]],
+        tasks: [[11, 'Insulin pen teaching', 0, 'task'], [12, 'Remove IV cannula', 0, 'dev']],
+        na: ['cauti', 'clabsi', 'rst', 'bt', 'iso', 'pi', 'turn'], dn: ['id', 'vo', 'ini', 'dvt', 'mar', 'ha', 'lasa', 'alg', 'rec', 'hh', 'pivc', 'bmw', 'cons', 'priv', 'doc', 'fall', 'pain'],
+        notes: [] }
+    ];
+    var pi = S.pi, P = PTS[pi], K = function (k) { return pi + ':' + k; };
+    var aSt = function (i, k) { return S.alerts[i + ':' + k] || 'none'; };
+
+    /* ===== alerts that clear themselves ===== */
+    var allAlerts = [], doneAlerts = [];
+    PTS.forEach(function (q, i) {
+      var e = aSt(i, 'esc'), c = aSt(i, 'crit');
+      if (q.esc && e !== 'none') { var o = e === 'open' ? { t: q.bed + ' · NEWS2 ' + q.news + ' · waiting for the doctor', s: 'Escalated ' + q.esc.raised + ' · review due ' + q.esc.target, tone: q.news >= 7 ? 'crit' : 'warn' } : e === 'ack' ? { t: q.bed + ' · doctor coming to the bedside', s: q.esc.doc + ' acknowledged', tone: 'warn' } : null;
+        if (o) { o.i = i; allAlerts.push(o); } else doneAlerts.push({ t: q.bed + ' · escalation closed, ' + q.esc.doc + ' reviewed' }); }
+      if (q.crit) { if (c === 'open') allAlerts.push({ i: i, t: q.bed + ' · critical ' + q.crit.t, s: 'Reported ' + q.crit.at + ' · read-back needed', tone: 'crit' }); else doneAlerts.push({ t: q.bed + ' · critical result read back' }); }
+    });
+    var alertList = allAlerts.map(function (a) { return { t: a.t, s: a.s, open: function () { set({ pi: a.i, bell: false, give: null, errDose: null }); },
+      style: 'display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: ' + tone[a.tone][1] + '; border-left: 4px solid ' + tone[a.tone][0] }; });
+
+    var es = P.esc ? aSt(pi, 'esc') : 'none', hi = P.news >= 7;
+    var ringBase = 'width: 64px; height: 64px; border-radius: 999px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; color: #FFFFFF; ';
+    var esc = es === 'none' ? { box: 'display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: ' + (P.news >= 5 ? '#FEF6E0' : '#F3FAF6') + '; border: 1px solid ' + (P.news >= 5 ? '#F5DFAE' : '#CDEBDB'),
+        ring: ringBase + 'background: ' + (P.news >= 5 ? '#B54708' : P.news >= 1 ? '#667085' : '#067647'),
+        color: P.news >= 5 ? '#8A5300' : '#067647', sub: '#475467', title: P.news >= 5 ? 'Medium risk' : 'Low risk', l1: P.news >= 1 ? 'Vitals every 4 hours' : 'Routine vitals every 12 hours', l2: '', demo: false }
+      : es === 'open' ? { box: 'display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: #FDF0EF; border: 1px solid #F4C7C2',
+        ring: ringBase + 'background: ' + (hi ? '#B42318' : '#B54708') + '; animation: pulsered 2s infinite',
+        color: '#B42318', sub: '#7A271A', title: 'Escalated · waiting for the doctor', l1: P.esc.doc + ' paged ' + P.esc.raised + ' · review due by ' + P.esc.target, l2: hi ? 'Vitals every 30 min until reviewed' : 'Vitals every hour until reviewed', demo: true, nextLabel: 'Simulate: doctor acknowledges' }
+      : es === 'ack' ? { box: 'display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: #FEF6E0; border: 1px solid #F5DFAE',
+        ring: ringBase + 'background: #B54708',
+        color: '#8A5300', sub: '#7A4A00', title: 'Doctor acknowledged · coming', l1: P.esc.doc + ' acknowledged at 11:07 AM', l2: 'Keep vitals at the escalated frequency', demo: true, nextLabel: 'Simulate: doctor reviews the patient' }
+      : { box: 'display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: #F3FAF6; border: 1px solid #CDEBDB',
+        ring: ringBase + 'background: ' + (hi ? '#B42318' : '#B54708'),
+        color: '#067647', sub: '#475467', title: 'Doctor reviewed · alert closed', l1: 'Reviewed 11:12 AM by ' + P.esc.doc, l2: 'Plan: ' + P.esc.plan, demo: false };
+    esc.next = function () { var na = Object.assign({}, S.alerts); na[K('esc')] = es === 'open' ? 'ack' : 'closed'; set({ alerts: na }); toast(es === 'open' ? 'Doctor acknowledged · updated in the bell and bed strip' : 'Escalation closed · removed from the bell, timeline and compliance'); };
+
+    /* ===== bed strip that really switches ===== */
+    var go = function (i) { set(self.sw(i)); };
+    var beds = PTS.map(function (q, i) {
+      var on = i === pi, e = q.esc ? aSt(i, 'esc') : 'none', c = q.crit && aSt(i, 'crit') === 'open';
+      var sub = 'NEWS2 ' + q.news + (e === 'open' ? ' · escalated' : e === 'ack' ? ' · doctor coming' : e === 'closed' ? ' · reviewed' : '') + (c ? ' · critical lab' : '');
+      var col = q.news >= 7 ? '#B42318' : q.news >= 5 ? '#B54708' : q.news >= 1 ? '#667085' : '#067647';
+      return { bed: q.bed, name: q.name.split(' ')[0], sub: sub, subColor: e === 'open' || c ? '#B42318' : '#475467', on: on ? 'true' : 'false', pick: function () { go(i); },
+        style: 'display: flex; align-items: center; gap: 10px; border: ' + (on ? '2px solid #0B6E69' : '1px solid #E2E7EF') + '; background: ' + (on ? '#E6F2F1' : '#FFFFFF') + '; border-radius: 12px; padding: 6px 12px; min-height: 44px; white-space: nowrap; color: #0B1220',
+        dot: 'width: 10px; height: 10px; border-radius: 999px; background: ' + col + '; flex: none' + ((e === 'open' || c) ? '; animation: pulsered 2s infinite' : '') };
+    });
+    var pv = { name: P.name, first: P.name.split(' ')[0], bed: P.bed, ini: P.name.split(' ').map(function (x) { return x[0]; }).join(''), meta: P.age + ' y · ' + P.sex + ' · Bed ' + P.bed + ' · Day ' + P.day, uhid: P.uhid, ip: P.ip, doc: P.doc, wt: P.wt, dx: P.dx, news: P.news,
+      flags: (P.alg ? [['Allergy: ' + P.alg, 'alg']] : [['No known allergy', 'good']]).concat(P.flags).map(function (f) { return { t: f[0], style: 'border-radius: 999px; padding: 4px 11px; font-size: 12px; ' + (f[1] === 'alg' ? 'font-weight: 700; background: #B42318; color: #FFFFFF' : 'font-weight: 600; background: ' + tone[f[1]][1] + '; color: ' + tone[f[1]][0]) }; }) };
+
+    /* ===== trends ===== */
+    var TL = ['12 PM', '4 PM', '8 PM', '12 AM', '4 AM', '8 AM', '11 AM'];
+    var M = { news: ['NEWS2', '', 0, 4, 0, 10, '#0B6E69', '0–4', 'low risk 0–4'], hr: ['Pulse', '/min', 51, 90, 60, 130, '#0B6E69', '51–90', 'normal 51–90'], rr: ['Resp. rate', '/min', 12, 20, 8, 32, '#0B6E69', '12–20', 'normal 12–20'],
+      spo2: P.copd ? ['SpO₂', '%', 88, 92, 82, 98, '#0B6E69', '88–92', 'COPD target 88–92%'] : ['SpO₂', '%', 94, 100, 86, 100, '#0B6E69', '94–100', 'target 94–100%'], temp: ['Temp', '°C', 36.1, 38.0, 35.5, 39.5, '#0B6E69', '36.1–38.0', 'normal 36.1–38.0'], sbp: ['Systolic BP', 'mmHg', 111, 219, 85, 150, '#0B6E69', '111–219', 'NEWS2 zero band 111–219'] };
+    var mk = S.metric, m = M[mk], d = P.ser[mk];
+    var X = function (i) { return 60 + i * (440 / 6); }, Y = function (v) { return 14 + (1 - (v - m[4]) / (m[5] - m[4])) * 162; }, cl = function (v) { return Math.max(14, Math.min(176, v)); };
+    var out = function (v) { return v < m[2] || v > m[3]; }, last = d[d.length - 1], dl = Math.round((last - d[0]) * 10) / 10;
+    var cur = { l: m[0], unit: m[1], now: String(last), nowColor: out(last) ? '#B42318' : '#0B1220', delta: (dl > 0 ? '▲ ' : dl < 0 ? '▼ ' : '') + Math.abs(dl), target: m[7], color: m[6], bandLabel: m[8],
+      bandY: cl(Y(m[3])), bandH: Math.max(0, cl(Y(m[2])) - cl(Y(m[3]))), pts: d.map(function (v, i) { return X(i) + ',' + Y(v); }).join(' '),
+      dots: d.map(function (v, i) { var o = out(v); return { x: X(i), y: Y(v), r: o ? 6 : 5, fill: o ? '#B42318' : '#FFFFFF', stroke: o ? '#FFFFFF' : m[6], tip: m[0] + ' ' + v + ' at ' + TL[i] }; }),
+      grid: [0.15, 0.5, 0.85].map(function (f) { var v = m[4] + (m[5] - m[4]) * f; return { y: Y(v), ty: Y(v) + 4, v: mk === 'temp' ? v.toFixed(1) : Math.round(v) }; }), lastX: X(6) + 4, lastY: Y(last) - 12 };
+    var metrics = Object.keys(M).map(function (k) { var on = mk === k; return { l: M[k][0], pick: function () { set({ metric: k }); }, style: 'border: 1px solid ' + (on ? M[k][6] : '#E2E7EF') + '; background: ' + (on ? M[k][6] : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054') + '; border-radius: 999px; padding: 0 12px; min-height: 32px; font-size: 12px; font-weight: 600' }; });
+    var tile = function (k, l, v) { var s = P.ser[k], a = s[s.length - 1], o = a < M[k][2] || a > M[k][3], dd = Math.round((a - s[0]) * 10) / 10;
+      return { l: l, v: v, sub: (dd > 0 ? '▲ ' : dd < 0 ? '▼ ' : '') + (dd ? Math.abs(dd) + ' in 24 h' : 'steady'), color: o ? '#B42318' : '#0B1220', style: 'display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid ' + (o ? '#F4C7C2' : '#E2E7EF') + '; background: ' + (o ? '#FDF0EF' : '#FFFFFF') }; };
+    var vitals = [tile('hr', 'Pulse', String(P.ser.hr[6])), tile('rr', 'Resp.', String(P.ser.rr[6])), tile('sbp', 'BP', P.ser.sbp[6] + '/' + P.dia), tile('spo2', 'SpO₂', P.ser.spo2[6] + '%'), tile('temp', 'Temp', String(P.ser.temp[6]))];
+    var scales = P.scales.map(function (s) { return { name: s[0], score: s[1], band: s[2] + ' risk', last: 'last ' + s[4], due: s[5],
+      ring: 'width: 44px; height: 44px; border-radius: 12px; flex: none; display: flex; align-items: center; justify-content: center; color: ' + tone[s[3] === 'crit' ? 'warn' : s[3]][0] + '; background: ' + tone[s[3] === 'crit' ? 'warn' : s[3]][1],
+      dueStyle: 'font-size: 12px; font-weight: 700; border-radius: 8px; padding: 4px 8px; white-space: nowrap; color: ' + tone[s[6]][0] + '; background: ' + tone[s[6]][1] }; });
+
+    /* ===== doses: base state plus what the nurse recorded ===== */
+    var doseKey = function (mi, h) { return pi + ':' + mi + ':' + h; };
+    var doseSt = function (mi, h, base) { var o = S.dose[doseKey(mi, h)]; if (!o) return { st: base }; if (o.st === 'error') return { st: h < NOW - 0.5 ? 'over' : 'due', err: o }; return { st: 'given', rec: o }; };
+    var hx = function (h) { return (h - 6) / 16 * 100; };
+    var mOver = 0, mDue = 0, mGiv = 0;
+    var meds = P.meds.map(function (r, mi) {
+      var rowAct = false;
+      var doses = r[4].map(function (dd) {
+        var ds = doseSt(mi, dd[0], dd[1]), st = ds.st, tl0 = tlab(dd[0]);
+        if (st === 'over') mOver++; if (st === 'due') mDue++; if (st === 'given') mGiv++;
+        var c = { given: ['#F5F7FA', '#475467', '#E2E7EF', '✓ ' + tl0 + (ds.rec && ds.rec.how === 'override' ? ' · override' : '')], due: ['#FEF6E0', '#8A5300', '#E9C46A', tl0 + ' · Give'], over: ['#B42318', '#FFFFFF', '#B42318', tl0 + ' · Overdue'], sched: ['#FFFFFF', '#475467', '#CDD5DF', tl0] }[st];
+        var act = st === 'due' || st === 'over'; if (act) rowAct = true;
+        return { l: c[3] + (ds.err ? ' · earlier entry in error' : ''), aria: r[0] + ' ' + tl0 + ' ' + st,
+          pick: function () { if (act) set({ give: { mi: mi, h: dd[0], t: tl0 }, scan: {} }); else if (st === 'given') set({ errDose: { mi: mi, h: dd[0], t: tl0 } }); },
+          style: 'position: absolute; top: 12px; left: ' + hx(dd[0]) + '%; transform: translateX(-50%); border: 1.5px solid ' + c[2] + '; background: ' + c[0] + '; color: ' + c[1] + '; border-radius: 999px; padding: 0 10px; min-height: 28px; font-size: 12px; font-weight: 700; white-space: nowrap; ' + (act ? (st === 'due' ? 'animation: pulse 2s infinite' : 'animation: pulsered 2s infinite') : st === 'given' ? 'cursor: pointer' : 'cursor: default') };
+      });
+      return { n: r[0], s: r[1], ha: !!r[2], prn: !!r[3], doses: doses, act: rowAct };
+    });
+    var hours = [6, 8, 10, 12, 14, 16, 18, 20, 22].map(function (h) { return { x: Math.max(2, Math.min(98, hx(h))), l: tlab(h) }; });
+
+    /* recorded in error, for a dose that shows as given */
+    var ed = S.errDose, edInfo = { t: '', s: '', can: false };
+    if (ed) { var em = P.meds[ed.mi], eo = S.dose[doseKey(ed.mi, ed.h)];
+      edInfo = { t: em[0] + ' · ' + ed.t + ' dose', s: eo ? 'Given 11:05 AM by Sr. Anjali Pawar · ' + (eo.how === 'override' ? 'scan override: ' + eo.why : 'wristband and medicine scanned') + (eo.wit ? ' · checked by ' + eo.wit : '') : 'Given earlier this shift by Br. Nikhil Jadhav · wristband and medicine scanned', can: true }; }
+    var errReasons = ['Dose was not actually given', 'Documented on the wrong patient', 'Wrong time recorded', 'Duplicate entry'].map(function (why) { return { l: why, pick: function () {
+      var nd = Object.assign({}, S.dose); nd[doseKey(ed.mi, ed.h)] = { st: 'error', why: why, by: 'Sr. Anjali Pawar', at: '11:06 AM' }; set({ dose: nd, errDose: null });
+      toast('Marked as recorded in error: ' + why.toLowerCase() + '. The original entry is kept.'); } }; });
+
+    /* ===== give flow: scan wristband, scan medicine, override needs a reason ===== */
+    var g = S.give, sc = S.scan, gv = { n: '', s: '', t: '', steps: [], ready: false, auto: [], ha: false };
+    if (g) {
+      var gm = P.meds[g.mi], late = g.h < NOW - 0.5;
+      var bandOk = sc.band === 'ok', medOk = sc.med === 'ok', ov = !!sc.ov && !!sc.ovWhy && (sc.ovNote || '').trim().length > 3;
+      var step = function (n, t, state, msg, scan, wrong, scanLabel, wrongLabel) {
+        var col = state === 'ok' ? ['#FFFFFF', '#F3FAF6', '#CDEBDB'] : state === 'bad' ? ['#FFFFFF', '#FFF8F7', '#F4C7C2'] : state === 'wait' ? ['#FFFFFF', '#FAFBFC', '#E2E7EF'] : ['#FFFFFF', '#FFFFFF', '#0B6E69'];
+        return { t: t, msg: msg, msgColor: state === 'bad' ? '#B42318' : state === 'ok' ? '#067647' : '#475467', msgWeight: state === 'bad' || state === 'ok' ? '700' : '400', mark: state === 'ok' ? '✓' : state === 'bad' ? '!' : String(n),
+          showScan: state === 'now' || state === 'bad', scan: scan, wrong: wrong, scanLabel: scanLabel, wrongLabel: wrongLabel,
+          box: 'display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: ' + col[1] + '; border: ' + (state === 'now' ? '2px' : '1px') + ' solid ' + col[2] + '; opacity: ' + (state === 'wait' ? '0.6' : '1'),
+          num: 'width: 30px; height: 30px; border-radius: 999px; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; ' + (state === 'ok' ? 'background: #067647; color: #FFFFFF' : state === 'bad' ? 'background: #B42318; color: #FFFFFF' : state === 'now' ? 'background: #0B6E69; color: #FFFFFF' : 'background: #EEF1F5; color: #475467') };
+      };
+      var setScan = function (o) { set({ scan: Object.assign({}, sc, o) }); };
+      var other = PTS[(pi + 1) % PTS.length];
+      gv = { n: gm[0], s: gm[1], t: g.t + (late ? ' · late' : ''),
+        steps: [
+          step(1, 'Scan the patient’s wristband', ov && !bandOk ? 'ok' : bandOk ? 'ok' : sc.band === 'bad' ? 'bad' : 'now',
+            ov && !bandOk ? 'Skipped · manual override' : bandOk ? P.name + ' · UHID ' + P.uhid + ' · matches this chart' : sc.band === 'bad' ? 'STOP. This band is ' + other.name + ' (' + other.bed + '), not ' + P.name + '. Check the patient before giving anything.' : 'Point the camera or scanner at the barcode on the wristband',
+            function () { setScan({ band: 'ok' }); }, function () { setScan({ band: 'bad' }); }, sc.band === 'bad' ? 'Scan again' : 'Scan wristband', 'Demo: wrong patient'),
+          step(2, 'Scan the medicine', ov && !medOk ? 'ok' : !bandOk ? 'wait' : medOk ? 'ok' : sc.med === 'bad' ? 'bad' : 'now',
+            ov && !medOk ? 'Skipped · manual override' : medOk ? gm[0] + ' · batch B2611 · expires Mar 2027 · matches the order' : sc.med === 'bad' ? 'STOP. Scanned Inj. Heparin 5,000 IU. It is not ordered for this patient at this time.' : bandOk ? 'Scan the barcode on the vial, ampoule or strip' : 'Waiting for the wristband scan',
+            function () { setScan({ med: 'ok' }); }, function () { setScan({ med: 'bad' }); }, sc.med === 'bad' ? 'Scan again' : 'Scan medicine', 'Demo: wrong medicine')
+        ] };
+      gv.ready = (bandOk && medOk) || ov;
+      gv.ha = !!gm[2];
+      gv.auto = [['Right patient', true], ['Right medicine and dose', true], ['Right route · ' + gm[1].split(' · ')[0], true], [late ? 'Late: ' + Math.round((NOW - g.h) * 60) + ' min after schedule' : 'Right time · within 30 min', !late], [P.alg ? 'Allergy checked · no clash with ' + P.alg.split(' ')[0].toLowerCase() : 'No known allergy', true], ['Not given in the last 6 hours', true]].map(function (a) {
+        return { t: (a[1] ? '✓ ' : '! ') + a[0], style: 'font-size: 12px; font-weight: 600; border-radius: 8px; padding: 6px 8px; ' + (a[1] ? 'background: #F3FAF6; color: #067647' : 'background: #FEF6E0; color: #8A5300') }; });
+      var witOk = !gv.ha || (!!sc.wit && /^\d{4}$/.test(sc.pin || ''));
+      gv.pin = sc.pin || ''; gv.setWit = function (e) { setScan({ wit: e.target.value }); }; gv.setPin = function (e) { setScan({ pin: e.target.value }); };
+      gv.witMsg = witOk ? '✓ Second check done' : 'Needed before you confirm'; gv.witColor = witOk ? '#067647' : '#B42318';
+      gv.ovOpen = !!sc.ov; gv.ovLabel = sc.ov ? 'Cancel override' : 'Cannot scan? Manual override';
+      gv.toggleOv = function () { setScan({ ov: !sc.ov, ovWhy: '', ovNote: '' }); };
+      gv.ovNote = sc.ovNote || ''; gv.setOvNote = function (e) { setScan({ ovNote: e.target.value }); };
+      gv.ovReasons = ['Wristband damaged or missing', 'Medicine has no barcode', 'Scanner not working', 'Emergency'].map(function (r) { return { l: r, pick: function () { setScan({ ovWhy: r }); }, style: chipS(sc.ovWhy === r) }; });
+      var blocked = (sc.band === 'bad' || sc.med === 'bad') && !ov;
+      var can = gv.ready && witOk && !blocked;
+      gv.foot = blocked ? 'Blocked by a scan mismatch. Rescan the right item.' : !gv.ready ? (sc.ov ? 'Choose a reason and write what you checked instead' : 'Scan the wristband, then the medicine') : !witOk ? 'High-alert: second nurse and PIN needed' : 'All checks passed';
+      gv.footColor = can ? '#067647' : blocked ? '#B42318' : '#475467';
+      gv.btn = 'border: 0; border-radius: 12px; min-height: 44px; padding: 0 20px; font-weight: 700; ' + (can ? 'background: #0B6E69; color: #FFFFFF' : 'background: #D0D5DD; color: #475467; cursor: not-allowed');
+      gv.confirm = function () { if (!can) return; var key = doseKey(g.mi, g.h), nd = Object.assign({}, S.dose), prev = S.dose[key];
+        nd[key] = { st: 'given', how: bandOk && medOk ? 'scan' : 'override', why: sc.ovWhy, wit: sc.wit, at: '11:05 AM' };
+        set({ dose: nd, give: null, scan: {}, toast: { msg: gm[0] + ' recorded as given' + (nd[key].how === 'override' ? ' (override, reason saved)' : ''), undo: { kind: 'dose', key: key, prev: prev || null }, until: Date.now() + 10000 } }); };
+      gv.notGiven = function () { set({ give: null, scan: {} }); toast('Not given: choose the reason on the full chart (refused, held by doctor, nil by mouth)'); };
+    }
+
+    /* ===== one shift timeline: medicines, tasks, assessments, samples, turns, devices ===== */
+    var HRS = [7, 8, 9, 10, 11, 12, 13, 14];
+    var TYP = { med: ['Medicine', '#0B6E69'], task: ['Task', '#475467'], ass: ['Assessment', '#6D3FC0'], lab: ['Sample', '#9C2A72'], turn: ['Turn and skin', '#B54708'], dev: ['Device check', '#1D4FB8'] };
+    var items = [];
+    P.meds.forEach(function (r, mi) { r[4].forEach(function (dd) { if (dd[0] >= 7 && dd[0] < 15) { var ds = doseSt(mi, dd[0], dd[1]); items.push({ h: dd[0], k: 'med', l: r[0].replace(/^(Inj\.|Tab\.|Neb\.)\s*/, ''), done: ds.st === 'given', act: function () { if (ds.st === 'given') set({ errDose: { mi: mi, h: dd[0], t: tlab(dd[0]) } }); else set({ give: { mi: mi, h: dd[0], t: tlab(dd[0]) }, scan: {} }); } }); } }); });
+    P.tasks.forEach(function (t, ti) { var key = K('t' + ti), dn0 = S.tlDone[key] !== undefined ? S.tlDone[key] : t[2];
+      items.push({ h: t[0], k: t[3], l: t[1], done: !!dn0, act: function () { var nt = Object.assign({}, S.tlDone); nt[key] = dn0 ? 0 : 1; set({ tlDone: nt }); if (!dn0) set({ toast: { msg: t[1] + ' marked done', undo: { kind: 'tl', key: key, prev: dn0 }, until: Date.now() + 10000 } }); } }); });
+    P.labs.forEach(function (l, li) { if (l[7]) { var stp = Math.min(3, l[3] + (S.lab[K(li)] || 0)); items.push({ h: l[7], k: 'lab', l: l[0], done: stp > 0, act: function () { if (stp === 0) { var nl = Object.assign({}, S.lab); nl[K(li)] = 1; set({ lab: nl, toast: { msg: l[0] + ' collected · label printed', undo: { kind: 'lab', key: K(li) }, until: Date.now() + 10000 } }); } } }); } });
+    if (P.esc && aSt(pi, 'esc') !== 'closed') items.push({ h: 11, k: 'ass', l: 'Vitals at escalated frequency', done: false, act: function () { set({ rec: true }); } });
+    var tlf = S.tlf, tOver = 0, tDue = 0, tDone = 0;
+    var cols = HRS.map(function (h) {
+      var its = items.filter(function (it) { return Math.floor(it.h) === h && (tlf === 'all' || it.k === tlf); }).sort(function (a, b) { return a.h - b.h; });
+      return { l: tlab(h), now: h === 11, hc: h === 11 ? '#0B6E69' : '#475467',
+        style: 'border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 4px; min-height: 120px; background: ' + (h === 11 ? '#F4FAF9' : h < 11 ? '#FAFBFC' : '#FFFFFF') + '; border: 1px solid ' + (h === 11 ? '#0B6E69' : '#EEF1F5'),
+        items: its.map(function (it) { var st = it.done ? 'done' : it.h < NOW - 0.25 ? 'over' : it.h < NOW + 1 ? 'due' : 'later'; if (st === 'over') tOver++; if (st === 'due') tDue++; if (st === 'done') tDone++;
+          return { l: it.l, s: TYP[it.k][0] + ' · ' + tlab(it.h) + ' · ' + (st === 'done' ? 'done' : st === 'over' ? 'overdue' : st === 'due' ? 'due' : 'later'), tip: TYP[it.k][0] + ': ' + it.l, act: it.act,
+            dot: 'width: 8px; height: 8px; border-radius: 999px; flex: none; margin-top: 4px; background: ' + (st === 'over' ? '#B42318' : st === 'due' ? '#B54708' : '#98A2B3'),
+            style: 'display: flex; gap: 6px; align-items: flex-start; border-radius: 8px; padding: 5px 6px; font-size: 11px; font-weight: 600; text-align: left; width: 100%; min-height: 34px; ' + (st === 'done' ? 'background: #F5F7FA; color: #667085; text-decoration: line-through; border: 1px solid #E2E7EF' : st === 'over' ? 'background: #FDF0EF; color: #B42318; border: 1px solid #F4C7C2' : st === 'due' ? 'background: #FFFBF0; color: #7A4A00; border: 1px solid #E9C46A' : 'background: #FFFFFF; color: #344054; border: 1px solid #E2E7EF') }; }) };
+    });
+    var tl = { over: tOver, due: tDue, done: tDone, cols: cols,
+      filters: [['all', 'All']].concat(Object.keys(TYP).map(function (k) { return [k, TYP[k][0]]; })).map(function (f) { return { l: f[1], pick: function () { set({ tlf: f[0] }); }, style: chipS(tlf === f[0]) }; }),
+      legend: [[T.lOver, '#B42318'], [T.lDue, '#B54708'], [T.lDone + ' · ' + T.lLater, '#98A2B3']].map(function (l) { return { l: l[0], dot: 'width: 10px; height: 10px; border-radius: 999px; display: inline-block; background: ' + l[1] }; }) };
+
+    /* ===== compliance: "auto" items follow the record ===== */
+    var critClosed = !P.crit || aSt(pi, 'crit') === 'closed', escOk = !P.esc || aSt(pi, 'esc') === 'closed';
+    var mineGiven = Object.keys(S.dose).filter(function (k) { return k.indexOf(pi + ':') === 0 && S.dose[k].st === 'given'; }).map(function (k) { return S.dose[k]; });
+    var AUTO = { rb: critClosed, escal: escOk, scan: !mineGiven.some(function (x) { return x.how === 'override'; }) };
+    var B = [
+      ['Identification and communication', 'NABH AAC · NE PNP · IPSG 1, 2', [['id', 'Two identifiers before every care step'], ['scan', 'Every dose scanned, wristband and medicine', 'auto'], ['rb', 'Critical results read back and documented', 'auto'], ['vo', 'Verbal orders read back and countersigned'], ['ho', 'SBAR handover at shift change', '2:45 PM']]],
+      ['Assessment and escalation', 'NABH AAC, COP · NE PNP', [['ini', 'Initial nursing assessment within the set time'], ['escal', 'NEWS2 escalation answered by a doctor', 'auto'], ['fall', 'Fall risk reassessed every 24 h', '2 PM'], ['pi', 'Pressure injury risk every 24 h'], ['dvt', 'VTE risk and prophylaxis'], ['pain', 'Pain reassessed after analgesia', 'Overdue']]],
+      ['Medication safety', 'NABH MOM · NE MOM · IPSG 3', [['mar', 'Doses within 30 min of schedule'], ['ha', 'Second-nurse check for high-alert medicines'], ['lasa', 'Look-alike, sound-alike medicines stored apart'], ['alg', 'Allergy on chart and wristband'], ['rec', 'Medicine reconciliation on admission']]],
+      ['Infection prevention', 'NABH IPC · NE IPC · IPSG 5 · BMW Rules 2016', [['hh', 'Hand hygiene at the 5 moments'], ['pivc', 'IV cannula bundle'], ['cauti', 'Urinary catheter bundle'], ['clabsi', 'Central line bundle'], ['iso', 'Isolation sign and PPE at the bedside'], ['bmw', 'Waste segregated: yellow, red, white, blue']]],
+      ['Harm prevention', 'NABH PSQ, COP · NE PNP', [['turn', 'Turned every 2 hours', '12 PM'], ['rst', 'Restraint monitoring'], ['bt', 'Blood transfusion checks'], ['edu', 'Teaching with teach-back', 'Today']]],
+      ['Rights and records', 'NABH PRE, IMS · NE ECG', [['cons', 'Consent recorded for procedures'], ['priv', 'Privacy and dignity kept'], ['doc', 'Entries timed and signed; errors kept, not deleted']]]
+    ];
+    var total = 0, dn = 0, over = 0, na = 0, cf = S.cf;
+    var bundles = B.map(function (b) {
+      var d0 = 0, tot = 0;
+      var its = b[2].map(function (it) {
+        var key = it[0], isNa = P.na.indexOf(key) >= 0, auto = it[2] === 'auto';
+        var on = !isNa && (auto ? AUTO[key] : (S.done[K(key)] !== undefined ? !!S.done[K(key)] : P.dn.indexOf(key) >= 0));
+        if (isNa) na++; else { total++; tot++; if (on) { d0++; dn++; } else if (it[2] === 'Overdue' || (auto && key !== 'scan')) over++; }
+        var tg = isNa ? 'N/A' : on ? (auto ? 'auto' : '') : auto ? (key === 'scan' ? 'Override used' : 'Open') : (it[2] || '');
+        return { t: it[1], tag: tg, mark: isNa ? '–' : on ? '✓' : '', show: cf === 'all' || (cf === 'open' && !on && !isNa) || (cf === 'na' && isNa),
+          toggle: function () { if (isNa || auto) return; var nd = Object.assign({}, S.done); nd[K(key)] = on ? 0 : 1; set({ done: nd }); },
+          box: 'width: 20px; height: 20px; border-radius: 6px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; ' + (isNa ? 'background: #EEF1F5; color: #667085' : on ? 'background: #067647; color: #FFFFFF' : 'background: #FFFFFF; border: 2px solid #98A2B3; color: transparent'),
+          textStyle: isNa ? 'color: #667085' : on ? 'color: #475467' : 'color: #0B1220; font-weight: 500',
+          tagStyle: tg ? 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; ' + (tg === 'N/A' ? 'background: #EEF1F5; color: #475467' : tg === 'auto' ? 'background: #E6F2F1; color: #0B6E69' : tg === 'Overdue' || tg === 'Open' || tg === 'Override used' ? 'background: #FDF0EF; color: #B42318' : 'background: #FEF6E0; color: #8A5300') : 'display: none' };
+      }).filter(function (x) { return x.show; });
+      var pc = tot ? Math.round(d0 / tot * 100) : 100;
+      var complete = tot > 0 && d0 === tot, open = !complete || cf !== 'all' || !!S.open[b[0]];
+      return { name: b[0], refs: b[1], items: its, done: d0, total: tot, pct: pc, pctColor: pc === 100 ? '#067647' : '#B54708', open: open, showFold: complete && cf === 'all',
+        foldLabel: open ? 'Hide' : '✓ All met · show ' + tot + ' items', fold: function () { var no = Object.assign({}, S.open); no[b[0]] = !open; set({ open: no }); } };
+    }).filter(function (b) { return b.items.length; });
+    var pct = total ? Math.round(dn / total * 100) : 100;
+    var ring = 'conic-gradient(' + (pct >= 90 ? '#067647' : pct >= 70 ? '#B54708' : '#B42318') + ' ' + pct * 3.6 + 'deg, #EEF1F5 0)';
+    var cfilters = [['all', 'All'], ['open', 'Still to do'], ['na', 'Not applicable']].map(function (f) { return { l: f[1], pick: function () { set({ cf: f[0] }); }, style: chipS(cf === f[0]) }; });
+
+    /* ===== orders ===== */
+    var crit = { open: !!P.crit && aSt(pi, 'crit') === 'open', closed: !!P.crit && aSt(pi, 'crit') === 'closed', t: P.crit ? P.crit.t : '', at: P.crit ? P.crit.at : '', doc: P.crit ? P.crit.doc : '',
+      readBack: function () { var na2 = Object.assign({}, S.alerts); na2[K('crit')] = 'closed'; set({ alerts: na2, toast: { msg: 'Read-back recorded · alert closed in the bell, bed strip and compliance', undo: { kind: 'alert', key: K('crit'), prev: 'open' }, until: Date.now() + 10000 } }); } };
+    var SN = ['Ordered', 'Collected', 'Sent', 'Resulted'];
+    var labs = P.labs.map(function (l, li) {
+      var s = Math.min(3, l[3] + (S.lab[K(li)] || 0));
+      return { n: l[0], tubeName: l[1], stat: !!l[4], note: l[5], noteColor: l[6], btn: s === 0 ? 'Collect' : s === 1 ? 'Send to lab' : s === 2 ? 'Track' : 'View result',
+        tube: 'width: 12px; height: 26px; border-radius: 3px 3px 7px 7px; flex: none; background: ' + l[2],
+        next: function () { if (s < 2) { var nl = Object.assign({}, S.lab); nl[K(li)] = (nl[K(li)] || 0) + 1; set({ lab: nl }); } },
+        btnStyle: 'border-radius: 10px; min-height: 36px; padding: 0 12px; font-weight: 600; font-size: 13px; ' + (s < 2 ? 'background: #0B6E69; border: 0; color: #FFFFFF' : 'background: #FFFFFF; border: 1px solid #CDD5DF; color: #0B1220'),
+        steps: SN.map(function (n, k) { var d2 = k < s || (k === s && s === 3), cu = k === s && s < 3; return { l: n, style: 'flex: 1; text-align: center; font-size: 11px; font-weight: 700; padding: 5px 0; margin-right: 2px; ' + (k === 0 ? 'border-radius: 8px 0 0 8px; ' : k === 3 ? 'border-radius: 0 8px 8px 0; ' : '') + (d2 ? 'background: #067647; color: #FFFFFF' : cu ? 'background: #E6F2F1; color: #0B6E69; box-shadow: inset 0 0 0 1.5px #0B6E69' : 'background: #EEF1F5; color: #667085') }; }) };
+    });
+    var toAck = 0;
+    var gen = P.gen.map(function (o, i) { var a = o[3] || S.ack[K(i)]; if (!a) toAck++;
+      return { c: o[0], t: o[1], s: o[2], btn: a ? 'Acknowledged' : 'Acknowledge', ack: function () { if (!a) { var na3 = Object.assign({}, S.ack); na3[K(i)] = 1; set({ ack: na3 }); } },
+        card: 'display: flex; gap: 12px; align-items: center; border: 1px solid ' + (a ? '#E2E7EF' : '#E9C46A') + '; background: ' + (a ? '#FFFFFF' : '#FFFBF0') + '; border-radius: 14px; padding: 10px 12px',
+        cat: 'width: 52px; height: 40px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: #E6F2F1; color: #0B6E69',
+        btnStyle: 'border-radius: 10px; min-height: 36px; padding: 0 12px; font-weight: 600; font-size: 12px; white-space: nowrap; border: 0; ' + (a ? 'background: #E7F4EE; color: #067647' : 'background: #0B6E69; color: #FFFFFF') }; });
+
+    /* ===== notes: undo for 10 s, then "recorded in error" keeps the original ===== */
+    var FM = { DAR: [['D', 'Data', 'What you saw and measured'], ['A', 'Action', 'What you did'], ['R', 'Response', 'How the patient responded']], SOAP: [['S', 'Subjective', 'What the patient says'], ['O', 'Objective', 'What you measured'], ['P', 'Plan', 'What happens next']], Free: [['N', 'Note', 'Write the note']] };
+    var keys = ['a', 'b', 'c'];
+    var formats = ['DAR', 'SOAP', 'Free'].map(function (f) { return { l: f === 'Free' ? 'Free text' : f, pick: function () { set({ fmt: f }); }, style: pill(S.fmt === f) }; });
+    var noteFields = FM[S.fmt].map(function (f, i) { var k = keys[i]; return { k: f[0], l: f[1], ph: f[2], v: S.note[k], set: function (e) { var nn = Object.assign({}, S.note); nn[k] = e.target.value; set({ note: nn }); } }; });
+    var chips = [['Comfortable, settled', 'a'], ['Doctor informed, read-back done', 'b'], ['Repositioned, skin intact', 'b'], ['Vitals improving', 'c']].map(function (c) { return { t: c[0], add: function () { var k = S.fmt === 'Free' ? 'a' : c[1], nn = Object.assign({}, S.note); nn[k] = (nn[k] ? nn[k] + '. ' : '') + c[0]; set({ note: nn }); } }; });
+    var mine = S.signed.filter(function (n) { return n.pi === pi; });
+    var notes = mine.concat(P.notes.map(function (n, i) { return Object.assign({ id: 'b' + pi + '-' + i, pi: pi }, n); })).map(function (n) {
+      var err = S.dose['note:' + n.id], asking = S.errNote === n.id;
+      return { time: n.time, type: n.type, by: n.by, text: n.text, hasPhoto: !!n.photo, photo: n.photo ? 'Photo attached · ' + n.photo : '', isErr: !!err, errLine: err ? 'Recorded in error · ' + err.why + ' · Sr. Anjali Pawar, 11:06 AM' : '', st: err ? 'In error' : 'Signed', stColor: err ? '#B42318' : '#475467',
+        canErr: !err && !asking, asking: asking, askErr: function () { set({ errNote: n.id }); },
+        reasons: ['Wrong patient', 'Wrong information', 'Duplicate'].map(function (why) { return { l: why, pick: function () { var nd = Object.assign({}, S.dose); nd['note:' + n.id] = { why: why }; set({ dose: nd, errNote: null, toast: { msg: 'Note marked as recorded in error. It stays in the record, struck through.', until: Date.now() + 5000 } }); } }; }),
+        box: 'border-left: 3px solid ' + (err || n.type === 'Event' ? '#B42318' : '#0B6E69') + '; padding: 4px 0 4px 12px; display: flex; flex-direction: column; gap: 4px; ' + (err ? 'background: #FFF8F7; border-radius: 0 10px 10px 0' : ''),
+        textStyle: 'margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-line; ' + (err ? 'text-decoration: line-through; color: #667085' : '') };
+    });
+    var sign = function () {
+      var parts = FM[S.fmt].map(function (f, i) { var v = (S.note[keys[i]] || '').trim(); return v ? (S.fmt === 'Free' ? v : f[0] + ': ' + v) : ''; }).filter(Boolean);
+      if (!parts.length) return;
+      var id = 's' + (S.seq + 1);
+      set({ seq: S.seq + 1, signed: [{ id: id, pi: pi, time: '11:05 AM', type: 'Progress', by: 'Sr. Anjali Pawar', text: parts.join('\n'), photo: S.noteAtt && SITES.length ? SITES[0][0] : '' }].concat(S.signed), note: { a: '', b: '', c: '' }, noteAtt: false,
+        toast: { msg: 'Note signed for ' + P.name.split(' ')[0], undo: { kind: 'note', id: id, text: S.note }, until: Date.now() + 10000 } });
+    };
+
+    var loading = Date.now() < S.loadUntil;
+
+    /* ===== messages to the doctor, with seen / acknowledged ===== */
+    var docName = P.esc ? P.esc.doc : P.doc.split(' · ')[0];
+    var md = S.msgDemo[pi] || '';
+    var sbarText = 'S: ' + P.name + ', ' + P.bed + ', NEWS2 ' + P.news + '. B: ' + P.dx + '. A: RR ' + P.ser.rr[6] + ', SpO₂ ' + P.ser.spo2[6] + '%, pulse ' + P.ser.hr[6] + ', BP ' + P.ser.sbp[6] + '/' + P.dia + ', temp ' + P.ser.temp[6] + '. R: Please review at the bedside.';
+    var thread = [];
+    if (P.esc) {
+      thread.push({ me: 1, text: sbarText, at: P.esc.raised, st: es === 'open' ? 'seen' : 'ack' });
+      if (es !== 'open') thread.push({ me: 0, text: 'Coming now. Plan: ' + P.esc.plan + '.', at: '11:07 AM' });
+    }
+    (S.msgs[pi] || []).forEach(function (m) { thread.push({ me: 1, text: m.text, at: m.at, st: md === 'ack' ? 'ack' : md === 'seen' ? 'seen' : 'sent' }); });
+    if (md === 'ack' && (S.msgs[pi] || []).length) thread.push({ me: 0, text: 'Noted. Will review.', at: '11:08 AM' });
+    var msgs = thread.map(function (m) {
+      var stl = { sent: '✓ Sent', seen: '✓✓ Seen', ack: '✓✓ Acknowledged' }[m.st];
+      return { text: m.text, meta: m.me ? 'You · ' + m.at + ' · ' + stl : docName + ' · ' + m.at,
+        row: 'display: flex; flex-direction: column; gap: 3px; align-items: ' + (m.me ? 'flex-end' : 'flex-start'),
+        bubble: 'max-width: 78%; padding: 10px 12px; border-radius: 14px; font-size: 13px; line-height: 1.45; color: #0B1220; ' + (m.me ? 'background: #E6F2F1; border-bottom-right-radius: 4px' : 'background: #F5F7FA; border-bottom-left-radius: 4px'),
+        metaStyle: 'font-size: 11px; font-weight: 600; color: ' + (m.st === 'ack' ? '#067647' : '#667085') };
+    });
+    var mineMsgs = thread.filter(function (m) { return m.me; }), lastSt = mineMsgs.length ? mineMsgs[mineMsgs.length - 1].st : '';
+    var msgStatus = !thread.length ? 'No messages yet' : lastSt === 'ack' ? 'Acknowledged by ' + docName : lastSt === 'seen' ? 'Seen · waiting for a reply' : 'Sent · not seen yet';
+    var msgStatusStyle = 'font-size: 12px; font-weight: 700; border-radius: 8px; padding: 4px 8px; ' + (lastSt === 'ack' ? 'background: #E7F4EE; color: #067647' : lastSt ? 'background: #FEF6E0; color: #8A5300' : 'background: #EEF1F5; color: #475467');
+    var msgToggle = function () { set({ msgOpen: !S.msgOpen }); };
+    var msgLabel = S.msgOpen ? 'Hide messages' : T.msgDoc + (thread.length ? ' · ' + (lastSt === 'ack' ? 'acknowledged' : lastSt === 'seen' ? 'seen' : 'sent') : '');
+    var msgBtnStyle = 'align-self: flex-start; margin-top: 6px; display: flex; align-items: center; gap: 6px; border: 1px solid #CDD5DF; background: #FFFFFF; color: #0B1220; border-radius: 10px; min-height: 36px; padding: 0 12px; font-size: 12px; font-weight: 700';
+    var setDraft = function (e) { set({ msgDraft: e.target.value }); };
+    var insertSbar = function () { set({ msgDraft: sbarText }); };
+    var sendMsg = function () {
+      var tx = (S.msgDraft || '').trim(); if (!tx) return;
+      var nm = Object.assign({}, S.msgs), nd = Object.assign({}, S.msgDemo); nm[pi] = (nm[pi] || []).concat([{ text: tx, at: '11:06 AM' }]); nd[pi] = '';
+      set({ msgs: nm, msgDemo: nd, msgDraft: '', toast: { msg: 'Sent to ' + docName + '. You will see when it is read.', until: Date.now() + 4000 } });
+    };
+    var showMsgDemo = lastSt === 'sent' || lastSt === 'seen';
+    var demoSeen = function () { var nd = Object.assign({}, S.msgDemo); nd[pi] = 'seen'; set({ msgDemo: nd }); };
+    var demoAck = function () {
+      var nd = Object.assign({}, S.msgDemo); nd[pi] = 'ack'; var o = { msgDemo: nd };
+      if (P.esc && es === 'open') { var na5 = Object.assign({}, S.alerts); na5[K('esc')] = 'ack'; o.alerts = na5; }
+      o.toast = { msg: docName + ' acknowledged · escalation and bell updated', until: Date.now() + 4000 }; set(o);
+    };
+
+    /* ===== device auto-fill, manual as fallback ===== */
+    var MON = ['BM-04', 'BM-05', 'BM-07', '', ''][pi];
+    var PUMP = ['Infusion pump IP-04 · potassium chloride 20 mmol in 500 ml NS · 125 ml/h · 3 h 10 min left', 'Syringe pump SP-05 · noradrenaline · stopped at 6 AM', '', '', ''][pi];
+    var devMode = !MON ? 'none' : (S.dev[pi] || 'auto');
+    var setDev = function (v) { var nd = Object.assign({}, S.dev); nd[pi] = v; set({ dev: nd }); };
+    var dev = {
+      msg: devMode === 'auto' ? 'Pulse, BP, resp. rate and SpO₂ filled from bedside monitor ' + MON + ' at 11:04 AM. Check them before saving.' : devMode === 'manual' ? 'Entering by hand. Monitor ' + MON + ' values are not used.' : devMode === 'fail' ? 'Monitor ' + MON + ' has sent nothing since 10:58 AM. Enter the values by hand and check the cable.' : 'No monitor linked to this bed. Enter the values by hand.',
+      style: 'display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-radius: 12px; padding: 8px 12px; font-size: 13px; font-weight: 600; ' + (devMode === 'fail' ? 'background: #FEF6E0; color: #7A4A00' : devMode === 'auto' ? 'background: #E6F2F1; color: #0B6E69' : 'background: #F5F7FA; color: #344054'),
+      canToggle: devMode === 'auto' || devMode === 'manual', btn: devMode === 'auto' ? 'Enter by hand instead' : 'Use monitor values',
+      toggle: function () { setDev(devMode === 'auto' ? 'manual' : 'auto'); },
+      canFail: devMode === 'auto', fail: function () { setDev('fail'); },
+      canRetry: devMode === 'fail', retry: function () { setDev('auto'); },
+      hasPump: !!PUMP, pump: PUMP ? 'From the pump: ' + PUMP : ''
+    };
+
+    /* ===== wound and site photos ===== */
+    var SITES = [
+      [['IV cannula · left forearm', 'VIP score 1 at 6 AM', ['Day 1', 'Today 6 AM']]],
+      [['Central line · right neck', 'Dressing dry and intact', ['Day 1', 'Day 3']]],
+      [['Laparotomy wound', 'Clean and dry, no ooze', ['Post-op', 'Today 7 AM']], ['Drain site', 'Serous output, skin intact', ['Today 7 AM']]],
+      [['Right heel ulcer', '4 × 3 cm · slough about 30% · measured yesterday', ['Admission', 'Day 2', 'Yesterday']]],
+      []
+    ][pi];
+    var sites = SITES.map(function (s0, si) {
+      var key = pi + ':' + si, added = S.photos[key] || [];
+      return { n: s0[0], s: s0[1], aria: 'Add a photo of ' + s0[0],
+        photos: s0[2].map(function (c) { return { fake: true, real: false, src: '', alt: '', cap: c, ph: 'width: 96px; height: 72px; border-radius: 10px; background: #EEF1F5; display: flex; align-items: center; justify-content: center; color: #98A2B3' }; })
+          .concat(added.map(function (a, k) { return { fake: false, real: true, src: a.src, alt: s0[0] + ', photo taken ' + a.at, cap: 'Today ' + a.at, ph: '' }; })),
+        add: function (e) {
+          var f = e && e.target && e.target.files && e.target.files[0]; if (!f) return;
+          if (!/^image\//.test(f.type)) { set({ toast: { msg: 'That file is not a photo. Choose a JPG or PNG.', until: Date.now() + 5000 } }); return; }
+          if (f.size > 8000000) { set({ toast: { msg: 'Photo is over 8 MB. Take it again at a lower size.', until: Date.now() + 5000 } }); return; }
+          var rd = new FileReader();
+          rd.onload = function () { var np = Object.assign({}, self.state.photos); np[key] = (np[key] || []).concat([{ src: rd.result, at: '11:06 AM' }]); self.setState({ photos: np, toast: { msg: 'Photo added to ' + s0[0], undo: { kind: 'photo', key: key }, until: Date.now() + 10000 } }); };
+          rd.onerror = function () { self.setState({ toast: { msg: 'Could not read the photo. Try again.', until: Date.now() + 5000 } }); };
+          rd.readAsDataURL(f); e.target.value = '';
+        } };
+    });
+    var attachLabel = !SITES.length ? '' : S.noteAtt ? '✓ Photo attached · ' + SITES[0][0] : '+ Attach latest photo · ' + SITES[0][0];
+    var attachStyle = 'border-radius: 999px; min-height: 34px; padding: 0 12px; font-size: 12px; font-weight: 600; border: 1px solid ' + (S.noteAtt ? '#0B6E69' : '#CDD5DF') + '; background: ' + (S.noteAtt ? '#E6F2F1' : '#FFFFFF') + '; color: ' + (S.noteAtt ? '#0B6E69' : '#344054');
+
+    /* ===== dictation (browser speech recognition) ===== */
+    var dictate = function () {
+      if (self.rec) { try { self.rec.stop(); } catch (er) {} return; }
+      var Rz = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+      if (!Rz) { set({ dictErr: 'Dictation is not available in this browser. Type the note, or use Chrome on the ward tablet.' }); return; }
+      try {
+        var r = new Rz(); r.lang = { en: 'en-IN', mr: 'mr-IN', hi: 'hi-IN' }[S.lang] || 'en-IN'; r.interimResults = false; r.continuous = true;
+        r.onresult = function (ev) { var tx = ''; for (var k = ev.resultIndex; k < ev.results.length; k++) { if (ev.results[k].isFinal) tx += ev.results[k][0].transcript; } if (tx) { var nn = Object.assign({}, self.state.note); nn.a = (nn.a ? nn.a + ' ' : '') + tx.trim(); self.setState({ note: nn }); } };
+        r.onerror = function (ev) { self.setState({ dictErr: ev.error === 'not-allowed' || ev.error === 'service-not-allowed' ? 'Microphone is blocked. Allow the microphone for this page, then try again.' : ev.error === 'no-speech' ? 'No speech heard. Tap Dictate and speak closer to the tablet.' : 'Dictation stopped (' + ev.error + '). Your text so far is kept.' }); };
+        r.onend = function () { self.rec = null; self.setState({ dict: null }); };
+        self.rec = r; r.start(); set({ dict: 'on', dictErr: '' });
+      } catch (er2) { set({ dictErr: 'Could not start dictation. Type the note instead.' }); }
+    };
+    var dictStyle = 'display: flex; align-items: center; gap: 6px; border-radius: 999px; min-height: 34px; padding: 0 12px; font-size: 12px; font-weight: 700; ' + (S.dict ? 'background: #0B6E69; color: #FFFFFF; border: 0' : 'background: #FFFFFF; color: #0B1220; border: 1px solid #CDD5DF');
+    var dictStatus = S.dict ? 'Listening in ' + { en: 'English', mr: 'Marathi', hi: 'Hindi' }[S.lang] + ' · words go into the first box' : '';
+
+    /* ===== Ctrl K patient finder ===== */
+    var q = (S.palQ || '').trim().toLowerCase();
+    var palHits = PTS.map(function (x, i) { return { x: x, i: i }; }).filter(function (o) { return !q || (o.x.bed + ' ' + o.x.name + ' ' + o.x.uhid).toLowerCase().indexOf(q) >= 0; });
+    var palList = palHits.map(function (o, k) { return { bed: o.x.bed, name: o.x.name, sub: 'NEWS2 ' + o.x.news + ' · ' + o.x.dx, pick: function () { go(o.i); },
+      style: 'display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; width: 100%; border: 0; border-radius: 12px; padding: 10px 12px; min-height: 52px; color: #0B1220; background: ' + (k === 0 ? '#E6F2F1' : 'transparent') }; });
+    var palKey = function (e) { if (e.key === 'Enter' && palHits.length) go(palHits[0].i); };
+
+    /* ===== fold medicines with nothing due ===== */
+    var foldCount = meds.filter(function (x) { return !x.act; }).length;
+    var foldMeds = { any: foldCount > 0, l: S.showDone ? 'Hide medicines with nothing due' : 'Show ' + foldCount + ' medicine' + (foldCount > 1 ? 's' : '') + ' with nothing due now', toggle: function () { set({ showDone: !S.showDone }); } };
+
+    /* ===== undo toast (10 seconds) ===== */
+    var t = S.toast, left = t ? t.until - Date.now() : 0, toastOn = !!t && left > 0;
+    var undo = function () { if (!t || !t.undo) return; var u = t.undo, done = function (o, msg) { o.toast = { msg: msg, until: Date.now() + 3000 }; set(o); };
+      if (u.kind === 'dose') { var nd = Object.assign({}, S.dose); if (u.prev) nd[u.key] = u.prev; else delete nd[u.key]; done({ dose: nd }, 'Undone · the dose is due again'); }
+      else if (u.kind === 'note') done({ signed: S.signed.filter(function (n) { return n.id !== u.id; }), note: u.text }, 'Undone · your note is back in the editor');
+      else if (u.kind === 'tl') { var nt = Object.assign({}, S.tlDone); nt[u.key] = u.prev; done({ tlDone: nt }, 'Undone'); }
+      else if (u.kind === 'lab') { var nl = Object.assign({}, S.lab); delete nl[u.key]; done({ lab: nl }, 'Undone'); }
+      else if (u.kind === 'alert') { var na4 = Object.assign({}, S.alerts); na4[u.key] = u.prev; done({ alerts: na4 }, 'Undone · alert reopened'); }
+      else if (u.kind === 'photo') { var np = Object.assign({}, S.photos); np[u.key] = (np[u.key] || []).slice(0, -1); done({ photos: np }, 'Undone · photo removed'); } };
+
+    return {
+      beds: beds, prevPt: function () { go(pi - 1); }, nextPt: function () { go(pi + 1); }, p: pv, esc: esc,
+      alertCount: allAlerts.length, alertLabel: allAlerts.length ? allAlerts.length + ' alert' + (allAlerts.length > 1 ? 's' : '') : 'No alerts',
+      bellStyle: 'display: flex; align-items: center; gap: 6px; border-radius: 10px; min-height: 36px; padding: 0 12px; font-weight: 700; font-size: 13px; ' + (allAlerts.length ? 'background: #B42318; color: #FFFFFF; border: 0; animation: pulsered 2s infinite' : 'background: transparent; color: #FFFFFF; border: 1px solid #2B3850'),
+      toggleBell: function () { set({ bell: !S.bell }); }, bellOpen: S.bell, alertList: alertList, alertDone: doneAlerts, noAlerts: !allAlerts.length,
+      recOpen: S.rec, openRec: function () { set({ rec: true }); }, closeRec: function () { set({ rec: false }); },
+      saveRec: function () { set({ rec: false }); toast('Vitals saved for ' + P.name.split(' ')[0]); },
+      recFields: [['Temp °C', String(P.ser.temp[6])], ['Pulse /min', String(P.ser.hr[6])], ['BP mmHg', P.ser.sbp[6] + '/' + P.dia], ['Resp /min', String(P.ser.rr[6])], ['SpO₂ %', String(P.ser.spo2[6])], ['O₂ device', P.copd ? 'Venturi 28%' : 'Room air'], ['AVPU', 'Alert']].map(function (f, k) { var mon = devMode === 'auto' && k >= 1 && k <= 4, gone = devMode === 'fail' && k >= 1 && k <= 4; return { l: f[0], v: gone ? '' : f[1], src: mon ? 'Monitor ' + MON + ' · 11:04' : 'By hand', srcStyle: 'font-size: 11px; font-weight: 600; color: ' + (mon ? '#0B6E69' : '#667085') }; }),
+      isTrends: S.view === 'trends', isAssess: S.view === 'assess', showTrends: function () { set({ view: 'trends' }); }, showAssess: function () { set({ view: 'assess' }); },
+      segTrends: pill(S.view === 'trends'), segAssess: pill(S.view === 'assess'),
+      metrics: metrics, cur: cur, times: TL.map(function (l, i) { return { l: l, x: X(i) }; }), vitals: vitals, scales: scales,
+      bundles: bundles, pct: pct, ring: ring, doneCount: dn, totalCount: total, naCount: na, overdueCount: over, cfilters: cfilters,
+      tl: tl,
+      meds: S.showDone ? meds : meds.filter(function (x) { return x.act; }), foldMeds: foldMeds, noActMeds: !S.showDone && !meds.some(function (x) { return x.act; }), hours: hours, nowX: hx(NOW), medOver: mOver, medDue: mDue, medGiven: mGiv,
+      errDose: !!ed, errInfo: edInfo, errReasons: errReasons, closeErr: function () { set({ errDose: null }); },
+      giving: !!g, gv: gv, cancelGive: function () { set({ give: null, scan: {} }); },
+      crit: crit, labs: labs, gen: gen, toAck: toAck,
+      formats: formats, noteFields: noteFields, chips: chips, notes: notes, notesCount: notes.length, sign: sign,
+      T: T, langs: langs, loading: loading, notLoading: !loading, noLabs: !P.labs.length && !P.crit, noNotes: !notes.length,
+      docName: docName, msgOpen: S.msgOpen, msgs: msgs, noMsgs: !msgs.length, msgStatus: msgStatus, msgStatusStyle: msgStatusStyle, msgToggle: msgToggle, msgLabel: msgLabel, msgBtnStyle: msgBtnStyle, msgDraft: S.msgDraft, setDraft: setDraft, insertSbar: insertSbar, sendMsg: sendMsg, showMsgDemo: showMsgDemo, demoSeen: demoSeen, demoAck: demoAck,
+      dev: dev, sites: sites, noSites: !sites.length,
+      dictate: dictate, dictOn: S.dict ? 'true' : 'false', dictLabel: S.dict ? T.stop : T.dictate, dictStyle: dictStyle, dictStatus: dictStatus, dictErr: S.dictErr, dictErrOn: !!S.dictErr, clearDictErr: function () { set({ dictErr: '' }); },
+      canAttach: !!sites.length, toggleAttach: function () { set({ noteAtt: !S.noteAtt }); }, attachLabel: attachLabel, attachStyle: attachStyle,
+      palOpen: S.pal, openPal: function () { set({ pal: true, palQ: '' }); }, palQ: S.palQ, setPalQ: function (e) { set({ palQ: e.target.value }); }, palKey: palKey, palList: palList, palEmpty: !palList.length,
+      toastOn: toastOn, toast: { msg: t ? t.msg : '', canUndo: !!(t && t.undo), secs: Math.max(0, Math.ceil(left / 1000)), pct: Math.max(0, Math.min(100, left / 100)) }, undo: undo
+    };
+  }
+}
+</script>
+</body>
+</html>

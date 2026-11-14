@@ -84,7 +84,8 @@ class TreatmentCourseControllerTest {
     @Test
     void ownerDoctorsFrontDeskAndBillingReadWhileNurseAndPharmacistAndCounsellorGet403() throws Exception {
         when(service.get(any(ClinicUser.class), eq(COURSE))).thenReturn(view());
-        when(service.list(any(ClinicUser.class), eq(PATIENT))).thenReturn(List.of(new SummaryView(COURSE, "TC-0412",
+        when(service.list(any(ClinicUser.class), eq(PATIENT), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(List.of(new SummaryView(COURSE, "TC-0412",
                 "DENTAL", "SITTING", "Dental treatment course", LocalDate.parse("2026-11-12"), "ACTIVE", 1, 0)));
 
         for (String role : new String[] {"OWNER", "DOCTOR", "VISITING_DOCTOR", "FRONT_DESK", "BILLING"}) {
@@ -194,5 +195,66 @@ class TreatmentCourseControllerTest {
                 .contentType(JSON).content("{\"revision\":3,\"visitId\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/visit-already-linked"));
+    }
+
+    // ---- 0.7.0 (SAH-75-3, SAH-75-10; ADR-026 D3, D4) ----
+
+    private static final String[] ACTIONS = {"mark-done", "missed", "rebook", "reschedule", "remove",
+            "admission-request"};
+    private static final String ACTION_BODY = "{\"revision\":3,\"plannedDate\":\"2026-12-01\"}";
+
+    @Test
+    void theKindFilterOfTheEmbeddedPanelReachesTheService() throws Exception {
+        when(service.list(any(ClinicUser.class), eq(PATIENT), eq("DENTAL"))).thenReturn(List.of());
+
+        mockMvc.perform(get(COURSES + "?patientId=" + PATIENT + "&kind=DENTAL").with(as("DOCTOR")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+
+        verify(service).list(any(ClinicUser.class), eq(PATIENT), eq("DENTAL"));
+    }
+
+    @Test
+    void theSixActionsAnswerTheCourseForDoctorsAndTheOwner() throws Exception {
+        when(service.markDone(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenReturn(view());
+        when(service.markMissed(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenReturn(view());
+        when(service.rebook(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenReturn(view());
+        when(service.reschedule(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenReturn(view());
+        when(service.remove(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenReturn(view());
+        when(service.requestAdmission(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenReturn(view());
+
+        for (String role : new String[] {"DOCTOR", "VISITING_DOCTOR", "OWNER"}) {
+            for (String action : ACTIONS) {
+                mockMvc.perform(post(COURSES + "/" + COURSE + "/sittings/" + SITTING + "/" + action).with(as(role))
+                        .contentType(JSON).content(ACTION_BODY.replace(",\"plannedDate\":\"2026-12-01\"",
+                                action.startsWith("re") && !action.equals("remove") ? ",\"plannedDate\":\"2026-12-01\""
+                                        : "")))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(COURSE.toString()));
+            }
+        }
+    }
+
+    @Test
+    void frontDeskBillingAndTheOtherRolesCannotUseAnyAction() throws Exception {
+        for (String role : new String[] {"FRONT_DESK", "BILLING", "NURSE", "PHARMACIST", "COUNSELLOR"}) {
+            for (String action : ACTIONS) {
+                mockMvc.perform(post(COURSES + "/" + COURSE + "/sittings/" + SITTING + "/" + action).with(as(role))
+                        .contentType(JSON).content("{\"revision\":3}")).andExpect(status().isForbidden());
+            }
+        }
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void anActionBodyIsClosedAndAStaleRevisionIsA409CourseChanged() throws Exception {
+        mockMvc.perform(post(COURSES + "/" + COURSE + "/sittings/" + SITTING + "/remove").with(as("DOCTOR"))
+                .contentType(JSON).content("{\"revision\":3,\"reason\":\"x\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/validation"));
+        when(service.markMissed(any(ClinicUser.class), eq(COURSE), eq(SITTING), any())).thenThrow(
+                EmrProblemException.of(409, "course-changed", "Course changed", "This sitting changed. Reload."));
+
+        mockMvc.perform(post(COURSES + "/" + COURSE + "/sittings/" + SITTING + "/missed").with(as("DOCTOR"))
+                .contentType(JSON).content("{\"revision\":1}")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/course-changed"))
+                .andExpect(jsonPath("$.detail").value("This sitting changed. Reload."));
     }
 }

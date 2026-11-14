@@ -616,9 +616,9 @@ class PatientDateOfBirthIT extends EmrSupport {
         within.put("dateOfBirth", today().minusYears(47).toString());
         JsonNode flagged = ok(HttpMethod.POST, PATIENTS, clinic.owner(), within.toString(), 201);
         assertThat(flagged.get("possibleDuplicateOfId").asText()).isEqualTo(firstId);
-        // 48 years: three apart, not flagged
+        // 50 years: three apart from the 47-year patient made just above and five from the 45-year one, not flagged
         ObjectNode far = base("Ramesh Kulkarni", "M", mobile);
-        far.put("dateOfBirth", today().minusYears(48).toString());
+        far.put("dateOfBirth", today().minusYears(50).toString());
         JsonNode notFlagged = ok(HttpMethod.POST, PATIENTS, clinic.owner(), far.toString(), 201);
         assertThat(notFlagged.get("possibleDuplicateOfId") == null || notFlagged.get("possibleDuplicateOfId").isNull()).isTrue();
         // a different name with the same years is not flagged either

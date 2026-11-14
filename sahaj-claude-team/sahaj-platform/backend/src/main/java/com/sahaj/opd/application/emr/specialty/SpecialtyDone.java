@@ -39,6 +39,7 @@ public final class SpecialtyDone {
             case "TOOTH_CHART" -> !value.path("teeth").isEmpty() || value.path("allHealthyConfirmed").asBoolean(false);
             case "DENTAL_DONE" -> dentalDone(ctx);
             case "CONSENT_CHECKLIST" -> consent(value);
+            case "DENTAL_MED_HISTORY" -> value.path("reviewedWithPatient").asBoolean(false);
             case "ANC_CHECK" -> anyNumber(value.path("today"));
             case "FORM_F" -> !SpecialtyValues.obstetricScanOrdered(ctx.sibling().apply("ANC_CHECK"))
                     || value.path("filledAndSigned").asBoolean(false);

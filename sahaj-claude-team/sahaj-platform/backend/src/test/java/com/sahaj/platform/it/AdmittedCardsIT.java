@@ -150,7 +150,7 @@ class AdmittedCardsIT extends RoundSupport {
         for (RequestPostProcessor auth : new RequestPostProcessor[] {w.clinic().owner(), w.doctor().auth(), w.nurse().auth()}) {
             JsonNode row = rowOf(list(auth), w.adm().id());
             assertThat(row.has("clinical")).isTrue();
-            assertThat(keys(row.get("clinical"))).containsExactlyInAnyOrder("escalation", "latestEws", "vitalsDue", "allergy");
+            assertThat(keys(row.get("clinical"))).containsExactlyInAnyOrder("escalation", "latestEws", "vitalsDue", "allergy", "roundDoneToday");
         }
     }
 

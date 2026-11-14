@@ -158,6 +158,13 @@ public class SurgeryBookingService {
                     && "ACTIVE".equals(c.status()) && recordId.equals(c.originRecordId())).findFirst();
         }
         if (course.isEmpty()) {
+            // ADR-026 D3, H11: an episode started at the first consult carries to the pre-op visit.
+            boolean owner = "OWNER".equals(member.role());
+            course = courses.forPatient(tenantId, patientId, 50).stream().filter(c -> "SURGERY".equals(c.kind())
+                    && "ACTIVE".equals(c.status())
+                    && (owner || member.membershipId().equals(c.doctorMembershipId()))).findFirst();
+        }
+        if (course.isEmpty()) {
             CourseKinds.Kind kind = CourseKinds.kind("SURGERY").orElseThrow();
             UUID created = courses.insertCourse(tenantId, new NewCourse(courses.nextCourseNo(tenantId), patientId,
                     kind.kind(), kind.unit(), kind.defaultName(), null, member.membershipId(), today, recordId,
@@ -215,7 +222,7 @@ public class SurgeryBookingService {
         if (earlier != null && earlier.path("sittingId").isTextual()) {
             UUID existingId = UUID.fromString(earlier.path("sittingId").asText());
             Optional<SittingRow> existing = courses.sittingForUpdate(tenantId, existingId);
-            if (existing.isPresent()) {
+            if (existing.isPresent() && !existing.get().removed()) {
                 SittingRow sitting = existing.get();
                 if (sitting.admissionId() == null && sitting.opdVisitId() == null) {
                     courses.updateSitting(tenantId, existingId, new SittingChange(encounterKind, date,

@@ -67,7 +67,7 @@ class EmrHistoryIT extends EmrPhase3Support {
         JsonNode newest = page.get("items").get(0);
         assertThat(newest.get("kind").asText()).isEqualTo("OPD");
         assertThat(newest.get("title").asText()).as("no diagnosis: the first complaint").isEqualTo("Cough");
-        assertThat(newest.get("place").asText()).isEqualTo("Dr Test Doctor · General Medicine");
+        assertThat(newest.get("place").asText()).as("contract: Dr. <name> · <department>; the test name already starts with Dr").isEqualTo("Dr. Dr Test Doctor · General Medicine");
         assertThat(newest.get("signed").asBoolean()).isFalse();
         assertThat(newest.get("date").asText()).isEqualTo(LocalDate.now(IST).toString());
         JsonNode old = page.get("items").get(1);

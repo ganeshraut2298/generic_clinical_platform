@@ -33,6 +33,7 @@ import com.sahaj.opd.application.VisitService;
 import com.sahaj.opd.application.VisitService.FinishMove;
 import com.sahaj.opd.application.VisitView;
 import com.sahaj.opd.application.course.TreatmentCourseRepository;
+import com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow;
 import com.sahaj.opd.application.emr.EmrProblemException;
 import com.sahaj.opd.application.emr.EmrRecordDocument;
 import com.sahaj.opd.application.emr.EmrRecordRepository;
@@ -267,6 +268,57 @@ class EmrSignServiceTest {
         order.verify(finish).markSigned(eq(TENANT), eq(RECORD), eq(USER), eq(MEMBERSHIP), eq(KEY), anyString(), anyString());
         order.verify(audit).record(eq("EMR_RECORD_SIGNED"), eq("EMR_RECORD"), eq(RECORD), any(), any());
         order.verify(events).publishEvent(any(EmrRecordSigned.class));
+    }
+
+    // ---- step 9: the linked course sitting (SAH-75-10, ADR-026 D4: one state, one charge) ----
+
+    private void signWithLinkedSitting(SittingRow sitting) {
+        contextIs(opdContext(documentWithFollowUp("D7"), view(List.of(), List.of())));
+        when(followUps.setForVisit(any(), any(), any(), any(), any())).thenReturn(new VisitFollowUpResult(
+                UUID.randomUUID(), LocalDate.of(2026, 11, 20), true, false, null));
+        when(appointments.bookFirstFree(any(), any(), any(), any(), any(), anyInt(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(records.syncBillLines(any(), any(), any())).thenReturn(new BillSummary(0, 0, List.of()));
+        when(visits.finishConsultation(TENANT, USER, VISIT)).thenReturn(new FinishMove("MOVED", "BILLING"));
+        when(courses.sittingByVisit(TENANT, VISIT)).thenReturn(Optional.of(sitting));
+        service.sign(DOCTOR, RECORD, KEY, input(FinishChoices.none()));
+    }
+
+    private static SittingRow linkedSitting(Instant doneAt, Instant removedAt) {
+        return new SittingRow(UUID.fromString("00000000-0000-0000-0000-0000000000a1"), UUID.randomUUID(), 3, "OPD",
+                "OPD_SITTING", null, List.of(), 100_000, null, VISIT, null, false, doneAt, null, null, removedAt,
+                doneAt == null ? null : "MARK_DONE", null);
+    }
+
+    @Test
+    void theSignMarksALinkedSittingDoneWhenItIsNotDoneYet() {
+        SittingRow sitting = linkedSitting(null, null);
+
+        signWithLinkedSitting(sitting);
+
+        verify(courses).markDone(eq(TENANT), eq(sitting.id()), eq(NOW), eq(USER));
+        verify(courses).bumpRevision(TENANT, sitting.courseId(), USER);
+    }
+
+    @Test
+    void aSittingMarkedDoneByHandFirstIsNotMarkedAgainSoItsChargeIsCountedOnce() {
+        SittingRow sitting = linkedSitting(Instant.parse("2026-11-12T05:00:00Z"), null);
+
+        signWithLinkedSitting(sitting);
+
+        verify(courses, never()).markDone(any(), any(), any(), any());
+        verify(courses, never()).bumpRevision(any(), any(), any());
+    }
+
+    @Test
+    void aRemovedLinkedSittingIsSkippedBecauseRemovedAndDoneExcludeEachOtherInTheTable() {
+        SittingRow sitting = linkedSitting(null, Instant.parse("2026-11-11T05:00:00Z"));
+
+        signWithLinkedSitting(sitting);
+
+        verify(courses, never()).markDone(any(), any(), any(), any());
+        verify(courses, never()).bumpRevision(any(), any(), any());
+        verify(finish).markSigned(eq(TENANT), eq(RECORD), eq(USER), eq(MEMBERSHIP), eq(KEY), anyString(), anyString());
     }
 
     @Test
@@ -1053,6 +1105,31 @@ class EmrSignServiceTest {
     }
 
     @Test
+    void aFinishCheckOfARoundOnADischargedAdmissionAnswers409EncounterClosedNotIpdsNotAdmitted() throws Exception {
+        // B-2: ipd's 409 not-admitted from the order check is mapped like the sign path (opd.yaml 0.6.3, DEC-051 D2)
+        contextIs(roundContext(ONE_ROW));
+        when(ipdOrders.check(eq(TENANT), eq(USER), eq("DOCTOR"), eq(ADMISSION), anyList())).thenThrow(
+                new com.sahaj.platform.api.ConflictException("not-admitted", "Patient is not admitted", "Not admitted."));
+
+        assertThatThrownBy(() -> service.check(DOCTOR, RECORD, FinishChoices.none()))
+                .isInstanceOfSatisfying(EmrProblemException.class, e -> {
+                    assertThat(e.status()).isEqualTo(409);
+                    assertThat(e.slug()).isEqualTo("encounter-closed");
+                });
+    }
+
+    @Test
+    void aFinishCheckLetsAnyOtherConflictFromTheOrderCheckThrough() throws Exception {
+        contextIs(roundContext(ONE_ROW));
+        when(ipdOrders.check(eq(TENANT), eq(USER), eq("DOCTOR"), eq(ADMISSION), anyList())).thenThrow(
+                new com.sahaj.platform.api.ConflictException("ipd-read-only", "Read-only", "Read-only."));
+
+        assertThatThrownBy(() -> service.check(DOCTOR, RECORD, FinishChoices.none()))
+                .isInstanceOfSatisfying(com.sahaj.platform.api.ConflictException.class,
+                        e -> assertThat(e.problemType()).isEqualTo("ipd-read-only"));
+    }
+
+    @Test
     void aRecordWithoutAProfileHasANullBlockAndOnlyThePrescriptionToPrint() {
         contextIs(opdContext(documentWithFollowUp("D3"), view(List.of(), List.of())));
         stubOpdSign();
@@ -1202,6 +1279,9 @@ class EmrSignServiceTest {
         assertThat(change.allergyText()).isEqualTo("No known allergy");
         assertThat(EmrSignService.isNoneToken("  NKDA. ")).isTrue();
         assertThat(EmrSignService.isNoneToken("No known drug allergies")).isTrue();
+        assertThat(EmrSignService.isNoneToken("none known")).isTrue();
+        assertThat(EmrSignService.isNoneToken("No Known Allergies.")).isTrue();
+        assertThat(EmrSignService.isNoneToken("Penicillin; none known otherwise")).isFalse();
         assertThat(EmrSignService.isNoneToken("Penicillin")).isFalse();
         assertThat(EmrSignService.isNoneToken(null)).isFalse();
     }

@@ -59,6 +59,14 @@ public interface PatientClinicalPort {
             this(id, uhid, name, age, sex, allergyText, null, null, null);
         }
 
+        /**
+         * SAH-75 (ADR-026 D12): RECORDED, NONE_RECORDED or NOT_RECORDED, from the stored allergy text with the shared
+         * none-word list ({@link AllergyStatus#of}). Derived, never stored.
+         */
+        public AllergyStatus allergyStatus() {
+            return AllergyStatus.of(allergyText);
+        }
+
         @Override
         public String toString() {
             return "PatientClinical[id=" + id + "]";

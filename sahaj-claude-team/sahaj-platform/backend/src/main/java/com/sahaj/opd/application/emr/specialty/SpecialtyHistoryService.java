@@ -62,11 +62,13 @@ public class SpecialtyHistoryService {
         ObjectNode view = mapper.createObjectNode();
         view.put("profile", profile);
         view.put("someHidden", false);
+        ArrayNode toothHistory = view.putArray("dentalToothHistory");
         switch (profile) {
             case "gm", "onco" -> vitals(view, tenantId, patientId, row, profile, document);
             case "og" -> ancVisits(view, tenantId, patientId, row, document);
             case "paeds" -> growth(view, tenantId, patientId, row, document);
             case "physio" -> physio(view, tenantId, patientId, row, document);
+            case "dental" -> dentalToothHistory(toothHistory, tenantId, patientId, row);
             default -> {
                 // no history block for another profile
             }
@@ -248,6 +250,7 @@ public class SpecialtyHistoryService {
             progress.putNull("romFirst");
             progress.putNull("romLast");
             progress.putArray("goalsAchieved");
+            progress.putArray("painBySession");
             progress.put("onlyFirstVisit", true);
             return;
         }
@@ -268,7 +271,46 @@ public class SpecialtyHistoryService {
             }
             break;
         }
+        ArrayNode bySession = progress.putArray("painBySession");
+        for (SpecialtyRecordSupport.SessionPain pain : support.painBySession(tenantId, patientId, row.id())) {
+            ObjectNode item = bySession.addObject();
+            item.put("sessionNo", pain.sessionNo());
+            item.put("score", pain.score());
+        }
         progress.put("onlyFirstVisit", false);
+    }
+
+
+    // ---- dental: earlier work per tooth (SAH-75-11 D6) ----
+
+    /**
+     * Plan rows marked done in the patient's SIGNED dental records, newest record first: {@code tooth} (FDI, as text),
+     * the day it was done and the procedure as written, with "sitting n of m" when the row has more than one sitting.
+     * Empty until SAH-51 signs records. Clinical text: never logged.
+     */
+    private void dentalToothHistory(ArrayNode out, UUID tenantId, UUID patientId, RecordRow row) {
+        for (Earlier e : support.earlier(tenantId, patientId, row.id(), "DENTAL_PLAN")) {
+            for (JsonNode plan : e.value().path("rows")) {
+                if (out.size() >= 200) {
+                    return;
+                }
+                if (!"DONE".equals(plan.path("status").asText()) || !plan.path("tooth").isInt()
+                        || !plan.path("procedureText").isTextual()) {
+                    continue;
+                }
+                String tooth = String.valueOf(plan.path("tooth").asInt());
+                if (!tooth.matches("^[1-8][1-8]$")) {
+                    continue;
+                }
+                int planned = plan.path("sittingsPlanned").asInt(1);
+                String text = plan.path("procedureText").asText()
+                        + (planned > 1 ? " · sitting " + plan.path("currentSitting").asInt(1) + " of " + planned : "");
+                ObjectNode item = out.addObject();
+                item.put("tooth", tooth);
+                item.put("date", plan.path("doneOn").isTextual() ? plan.path("doneOn").asText() : e.date().toString());
+                item.put("text", text.length() > 200 ? text.substring(0, 200) : text);
+            }
+        }
     }
 
     // ---- oncology cycles ----
@@ -277,6 +319,10 @@ public class SpecialtyHistoryService {
         ArrayNode out = view.putArray("oncologyCycles");
         if (patientId == null) {
             return;
+        }
+        Map<UUID, JsonNode> examByRecord = new java.util.HashMap<>();
+        for (Earlier e : support.earlier(tenantId, patientId, row.id(), "ONC_EXAM")) {
+            examByRecord.put(e.recordId(), e.value());
         }
         Map<UUID, JsonNode> toxByRecord = new java.util.HashMap<>();
         for (Earlier e : support.earlier(tenantId, patientId, row.id(), "ONC_TOX")) {
@@ -310,6 +356,21 @@ public class SpecialtyHistoryService {
                 item.putNull("bsaUsed");
             }
             item.putObject("labs");
+            ArrayNode lesions = item.putArray("lesions");
+            JsonNode exam = examByRecord.get(order.recordId);
+            if (exam != null) {
+                for (JsonNode lesion : exam.path("lesions")) {
+                    if (lesions.size() < 10 && lesion.path("name").isTextual()) {
+                        ObjectNode entry = lesions.addObject();
+                        entry.put("name", lesion.path("name").asText());
+                        if (lesion.path("todayCm").isNumber()) {
+                            entry.put("cm", lesion.path("todayCm").asDouble());
+                        } else {
+                            entry.putNull("cm");
+                        }
+                    }
+                }
+            }
             JsonNode tox = toxByRecord.get(order.recordId);
             if (tox == null) {
                 item.putNull("grades");

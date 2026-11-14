@@ -66,9 +66,9 @@ describe('EMR list rules (SAH-56)', () => {
 
   describe('count and active items', () => {
     it('counts active items, and disabled ones when some are switched off', () => {
-      expect(countText([item(), item({ id: 'i2' })])).toBe('2 active');
+      expect(countText([item(), item({ id: 'i2' })])).toBe('2');
       expect(countText([item(), item({ id: 'i2', active: false })])).toBe('1 active · 1 disabled');
-      expect(countText([])).toBe('0 active');
+      expect(countText([])).toBe('0');
     });
 
     it('leaves out disabled items', () => {

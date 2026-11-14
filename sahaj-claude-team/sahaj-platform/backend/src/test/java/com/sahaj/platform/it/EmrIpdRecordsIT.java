@@ -223,13 +223,14 @@ class EmrIpdRecordsIT extends ScopeSupport {
 
     @Test
     void anOwnerWithDoctorDetailsAndADoctorOpenAnyAdmissionAndNurseVisitingDoctorAndTheOtherRolesAre403Forbidden() throws Exception {
-        Clinic clinic = hospital();
+        Clinic clinic = hospital(false);
         Adm admitted = admitOne(clinic);
+        String erCase = caseOf(clinic, "Dev Patil", 3); // a real case: a made-up id is a 404 before the role rule
         for (String role : new String[] {"NURSE", "VISITING_DOCTOR", "FRONT_DESK", "BILLING", "PHARMACIST", "COUNSELLOR"}) {
             Pn person = newPn(clinic, role);
             JsonNode p = refusedOpen(person.auth(), "IPD_ROUND", admitted.id(), 403, "forbidden");
             assertThat(p.get("type").asText()).doesNotEndWith("outside-scope");
-            refusedOpen(person.auth(), "ER_ASSESSMENT", UUID.randomUUID(), 403, "forbidden");
+            refusedOpen(person.auth(), "ER_ASSESSMENT", erCase, 403, "forbidden");
         }
         refused(call(HttpMethod.POST, OPEN, anonymous(), openBody("IPD_ROUND", admitted.id())), 401, "unauthorized");
         assertThat(records(clinic)).isZero();

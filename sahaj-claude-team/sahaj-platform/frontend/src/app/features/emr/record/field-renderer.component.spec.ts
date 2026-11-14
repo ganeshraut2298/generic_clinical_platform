@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { field } from '../emr.fixtures';
-import { EmrFieldDefinition } from '../emr.model';
+import { EmrFieldDefinition, EmrFieldOption } from '../emr.model';
 import { FieldRendererComponent } from './field-renderer.component';
 
 describe('FieldRendererComponent (SAH-47-3)', () => {
@@ -232,6 +232,134 @@ describe('FieldRendererComponent (SAH-47-3)', () => {
     expect(el.querySelector('.err-text')!.textContent).toContain('Enter a number from 0 to 300.');
     expect(input().getAttribute('aria-invalid')).toBe('true');
   });
+  describe('chip rows (SAH-75-6)', () => {
+    const opts = [
+      { key: 'sharp', label: 'Sharp', isNone: false },
+      { key: 'night', label: 'Night pain', isNone: false, alert: true },
+      { key: 'none', label: 'None', isNone: true },
+    ];
+    const chips = (): HTMLButtonElement[] => Array.from(el.querySelectorAll<HTMLButtonElement>('[data-testid=chip-row] button, .picks button'));
+
+    it('draws a single-choice field as chips, with a tick on the chosen one, and a second press clears it', () => {
+      render(field({ key: 'since', label: 'Since', type: 'DROPDOWN', valueKind: 'CHOICE', optionsSource: 'FIELD', options: opts, presentation: 'CHIPS' }), 'sharp');
+      expect(el.querySelector('select')).toBeNull();
+      expect(chips().map((c) => c.textContent!.trim())).toEqual(['✓ Sharp', 'Night pain', 'None']);
+      chips()[0].click();
+      expect(emitted).toEqual([null]);
+      chips()[1].click();
+      expect(emitted[1]).toBe('night');
+    });
+
+    it('draws a many-choice field as chips: "None" clears the others, another chip clears "None"', () => {
+      render(field({ key: 'type', label: 'Type', type: 'MULTI_SELECT', valueKind: 'MULTI_CHOICE', optionsSource: 'FIELD', options: opts, presentation: 'CHIPS' }), ['sharp', 'night']);
+      chips()[2].click();
+      expect(emitted[0]).toEqual(['none']);
+      TestBed.resetTestingModule();
+      render(field({ key: 'type', label: 'Type', type: 'MULTI_SELECT', valueKind: 'MULTI_CHOICE', optionsSource: 'FIELD', options: opts, presentation: 'CHIPS' }), ['none']);
+      chips()[0].click();
+      expect(emitted[0]).toEqual(['sharp']);
+    });
+
+    it('shows a chosen alert chip in red', () => {
+      render(field({ key: 'type', label: 'Type', type: 'MULTI_SELECT', valueKind: 'MULTI_CHOICE', optionsSource: 'FIELD', options: opts, presentation: 'CHIPS' }), ['night']);
+      expect(chips()[1].classList.contains('alert')).toBe(true);
+      expect(chips()[0].classList.contains('alert')).toBe(false);
+    });
+
+    it('shows the image upload switched off with the Later note under the dental images', () => {
+      render(field({ key: 'images', label: 'Images', type: 'MULTI_SELECT', valueKind: 'MULTI_CHOICE', optionsSource: 'FIELD', options: opts, presentation: 'CHIPS' }), []);
+      const later = el.querySelector('[data-testid=images-later]')!;
+      expect(later.querySelector('button')!.disabled).toBe(true);
+      expect(later.querySelector('.pill')!.textContent).toBe('Later');
+    });
+
+    it('shows no image upload under other chip fields', () => {
+      render(field({ key: 'type', label: 'Type', type: 'MULTI_SELECT', valueKind: 'MULTI_CHOICE', optionsSource: 'FIELD', options: opts, presentation: 'CHIPS' }), []);
+      expect(el.querySelector('[data-testid=images-later]')).toBeNull();
+    });
+
+    it('keeps a field without the CHIPS presentation as it was (a select; plain many-choice buttons)', () => {
+      render(field({ key: 'a', label: 'A', type: 'DROPDOWN', valueKind: 'CHOICE', optionsSource: 'FIELD', options: opts }), null);
+      expect(el.querySelector('select')).not.toBeNull();
+    });
+  });
+
+  describe('menstrual history rows (ADR-026 D13)', () => {
+    const cycle = [
+      { key: 'regular', label: 'Regular', isNone: false },
+      { key: 'irregular', label: 'Irregular', isNone: false },
+    ];
+
+    it('draws Cycle as a single-choice chip row on a record from the new layout', () => {
+      render(field({ key: 'cycle', label: 'Cycle', type: 'DROPDOWN', valueKind: 'CHOICE', optionsSource: 'FIELD', options: cycle, presentation: 'CHIPS' }), 'irregular');
+      expect(Array.from(el.querySelectorAll('[data-testid=chip-row] button')).map((b) => b.textContent!.trim())).toEqual(['Regular', '✓ Irregular']);
+    });
+
+    it('still draws Cycle as text on a record opened before the change (snapshot of version 2)', () => {
+      render(field({ key: 'cycle', label: 'Cycle', type: 'PATTERN', valueKind: 'TEXT' }), 'Regular, 28 days');
+      expect(input().value).toBe('Regular, 28 days');
+      expect(el.querySelector('[data-testid=chip-row]')).toBeNull();
+    });
+
+    it('still draws Dysmenorrhoea as a Yes or No switch on a record opened before the change', () => {
+      render(field({ key: 'dysmenorrhoea', label: 'Dysmenorrhoea', type: 'TOGGLE', valueKind: 'BOOLEAN' }), true);
+      expect(el.querySelector('[role=switch]')!.getAttribute('aria-checked')).toBe('true');
+    });
+  });
+
+  describe('tiles (ADR-026 D13, contraception method)', () => {
+    const method: EmrFieldOption[] = [
+      { key: 'none', label: 'None', isNone: false, hint: 'Not using' },
+      { key: 'condoms', label: 'Condoms', isNone: false, hint: 'Barrier' },
+      { key: 'ocp', label: 'OCP', isNone: false, hint: 'Daily pill' },
+    ];
+    const tiles = (): HTMLButtonElement[] => Array.from(el.querySelectorAll<HTMLButtonElement>('[data-testid=tile-grid] button'));
+    const tileField = (options = method) => field({ key: 'method', label: 'Method', type: 'DROPDOWN', valueKind: 'CHOICE', optionsSource: 'FIELD', options, presentation: 'CHIPS' });
+
+    it('draws a chip field with an option hint as tiles: bold label, hint below, no chip row and no select', () => {
+      render(tileField(), 'condoms');
+      expect(el.querySelector('[data-testid=chip-row]')).toBeNull();
+      expect(el.querySelector('select')).toBeNull();
+      expect(tiles()).toHaveLength(3);
+      expect(tiles().map((t) => Array.from(t.querySelectorAll('span')).map((s) => s.textContent))).toEqual([
+        ['None', 'Not using'],
+        ['Condoms', 'Barrier'],
+        ['OCP', 'Daily pill'],
+      ]);
+      expect(tiles().map((t) => t.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    });
+
+    it('chooses a tile, moves the choice, and clears it on a second press (the chip rules)', () => {
+      render(tileField(), 'condoms');
+      tiles()[2].click();
+      expect(emitted).toEqual(['ocp']);
+      tiles()[1].click();
+      expect(emitted).toEqual(['ocp', null]);
+    });
+
+    it('is keyboard accessible: real buttons in a labelled group, disabled when the record is read only', () => {
+      render(tileField(), null, true);
+      expect(el.querySelector('[data-testid=tile-grid]')!.getAttribute('role')).toBe('group');
+      expect(el.querySelector('[data-testid=tile-grid]')!.getAttribute('aria-labelledby')).toBe('f-test-method-l');
+      expect(tiles().every((t) => t.type === 'button' && t.disabled)).toBe(true);
+    });
+
+    it('draws a tile without a hint with its label alone, as long as one option has a hint', () => {
+      render(tileField([{ key: 'a', label: 'A', isNone: false, hint: null }, ...method]), null);
+      expect(tiles()[0].querySelectorAll('span')).toHaveLength(1);
+    });
+
+    it('draws chips, not tiles, when no option has a hint', () => {
+      render(tileField(method.map((o) => ({ ...o, hint: null }))), null);
+      expect(el.querySelector('[data-testid=tile-grid]')).toBeNull();
+      expect(el.querySelector('[data-testid=chip-row]')).not.toBeNull();
+    });
+
+    it('draws a select, not tiles, when the field is not CHIPS', () => {
+      render(field({ key: 'm', label: 'M', type: 'DROPDOWN', valueKind: 'CHOICE', optionsSource: 'FIELD', options: method }), null);
+      expect(el.querySelector('[data-testid=tile-grid]')).toBeNull();
+    });
+  });
 });
 
 describe('FieldRendererComponent Search list', () => {
@@ -455,4 +583,5 @@ describe('FieldRendererComponent shared components (ADR-022 D2)', () => {
     render(field({ key: 'x', label: 'X', type: 'LIBRARY', valueKind: 'COMPONENT', component: null }));
     expect(el.textContent).toContain('Not available yet');
   });
+
 });

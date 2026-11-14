@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>My console · customisable nursing workspace</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EEF2F7}
+a{color:#0B6E69}a:hover{color:#084F4B}
+button{font-family:inherit;cursor:pointer}
+textarea{font-family:inherit}
+button:focus-visible,textarea:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #0B6E6955;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #EEF2F7; font-family: Inter, system-ui, sans-serif; color: #0B1220; font-size: 14px">
+
+  <header style="background: #0B1220; color: #FFFFFF; display: flex; align-items: center; gap: 12px; padding: 10px 24px; flex-wrap: wrap">
+    <span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 16px">My console</span>
+    <span style="font-size: 13px; color: #C7D0DD">Ramesh Kale · MICU-04 · 63 M · NEWS2 7 · Allergy: Penicillin</span>
+    <span style="flex: 1"></span>
+    <a href="PatientSwitch.dc.html" style="color: #FFFFFF; text-decoration: none; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; display: flex; align-items: center; font-weight: 600; font-size: 13px">Switch patient</a>
+    <a href="NurseRound.dc.html" style="color: #FFFFFF; text-decoration: none; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; display: flex; align-items: center; font-weight: 600; font-size: 13px">Start round</a>
+    <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; display: flex; align-items: center; font-weight: 600; font-size: 13px">Standard layout</a>
+  </header>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E2E7EF; padding: 10px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+    <span style="font-size: 13px; font-weight: 700">Layout</span>
+    <div role="group" aria-label="Layout preset" style="display: flex; background: #EEF1F5; border-radius: 12px; padding: 3px">
+      <sc-for list="{{presets}}" as="p" hint-placeholder-count="4">
+        <button type="button" onClick="{{p.pick}}" style="{{p.style}}">{{p.l}}</button>
+      </sc-for>
+    </div>
+    <span style="font-size: 12px; color: #475467">{{layoutNote}}</span>
+    <span style="flex: 1"></span>
+    <sc-if value="{{edit}}" hint-placeholder-val="{{ false }}">
+      <button type="button" onClick="{{openLib}}" style="background: #FFFFFF; border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 600; font-size: 13px">+ Add section</button>
+    </sc-if>
+    <button type="button" onClick="{{toggleEdit}}" style="{{editBtn}}">{{editLabel}}</button>
+  </div>
+
+  <sc-if value="{{edit}}" hint-placeholder-val="{{ false }}">
+    <div style="background: #E6F2F1; color: #084F4B; padding: 10px 24px; font-size: 13px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap">
+      <b>Customising.</b><span>Drag a section by its handle, or use the arrows on a tablet. Pick a width, hide what you don't use, add sections from the library. Saved for you only; the ward default stays as it is.</span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{libOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="margin: 16px 24px 0; background: #FFFFFF; border: 2px solid #0B6E69; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: center"><b style="font-size: 15px">Section library</b><button type="button" onClick="{{closeLib}}" style="border: 0; background: transparent; min-height: 40px; font-weight: 600; color: #475467">Close</button></div>
+      <sc-if value="{{libEmpty}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #475467">Every section is already on your console.</span></sc-if>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{library}}" as="l" hint-placeholder-count="4">
+          <div style="border: 1px solid #E2E7EF; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px">
+            <b style="font-size: 13px">{{l.t}}</b><small style="font-size: 12px; color: #475467">{{l.d}}</small>
+            <button type="button" onClick="{{l.add}}" style="align-self: flex-start; background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 9px; min-height: 34px; padding: 0 12px; font-weight: 600; font-size: 12px">Add</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <main style="max-width: 1440px; margin: 0 auto; padding: 16px 24px 40px; box-sizing: border-box; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; align-items: start">
+    <sc-for list="{{widgets}}" as="w" hint-placeholder-count="8">
+      <section aria-label="{{w.t}}" draggable="{{w.draggable}}" onDragStart="{{w.dragStart}}" onDragOver="{{w.dragOver}}" onDrop="{{w.drop}}" onDragEnd="{{w.dragEnd}}" style="{{w.style}}">
+
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+          <sc-if value="{{w.edit}}" hint-placeholder-val="{{ false }}">
+            <span title="Drag to move" aria-hidden="true" style="width: 28px; height: 32px; border-radius: 8px; background: #EEF1F5; display: flex; align-items: center; justify-content: center; cursor: grab; color: #475467">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg>
+            </span>
+          </sc-if>
+          <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 16px; flex: 1; min-width: 120px">{{w.t}}</h2>
+          <sc-if value="{{w.isMonitor}}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{togglePicker}}" style="{{pickerBtn}}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>Parameters · {{paramCount}}</button>
+          </sc-if>
+          <sc-if value="{{w.edit}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-label="Width" style="display: flex; background: #EEF1F5; border-radius: 9px; padding: 2px">
+              <sc-for list="{{w.sizes}}" as="z" hint-placeholder-count="6">
+                <button type="button" onClick="{{z.pick}}" aria-label="Width {{z.l}}" style="{{z.style}}">{{z.l}}</button>
+              </sc-for>
+            </div>
+            <button type="button" onClick="{{w.up}}" aria-label="Move earlier" style="width: 32px; height: 32px; border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 8px; font-weight: 700">↑</button>
+            <button type="button" onClick="{{w.down}}" aria-label="Move later" style="width: 32px; height: 32px; border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 8px; font-weight: 700">↓</button>
+            <button type="button" onClick="{{w.hide}}" aria-label="Hide section" style="height: 32px; border: 1px solid #F4C7C2; background: #FFFFFF; color: #B42318; border-radius: 8px; padding: 0 10px; font-weight: 600; font-size: 12px">Hide</button>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{w.isMonitor}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <sc-if value="{{pickerOpen}}" hint-placeholder-val="{{ false }}">
+              <div style="border: 1px solid #A7D3CF; background: #F4FAF9; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap"><b style="font-size: 13px; flex: 1">Choose what to monitor for this patient</b><span style="font-size: 12px; color: #475467">Alert limits come from the ward default; tap a limit to change it for this patient</span></div>
+                <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+                  <sc-for list="{{paramGroups}}" as="g" hint-placeholder-count="5">
+                    <div style="display: flex; flex-direction: column; gap: 4px">
+                      <small style="font-size: 11px; font-weight: 700; color: #475467; text-transform: uppercase; letter-spacing: 0.05em">{{g.name}}</small>
+                      <sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+                        <button type="button" onClick="{{it.toggle}}" style="{{it.style}}"><span style="{{it.box}}">{{it.mark}}</span><span style="flex: 1; text-align: left">{{it.l}}</span></button>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px">
+              <sc-for list="{{params}}" as="p" hint-placeholder-count="6">
+                <div style="{{p.style}}">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px"><small style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #475467">{{p.l}}</small><span style="{{p.flagStyle}}">{{p.flag}}</span></div>
+                  <div style="display: flex; align-items: baseline; gap: 4px"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 24px; color: {{p.color}}">{{p.v}}</b><small style="font-size: 11px; color: #475467">{{p.u}}</small></div>
+                  <svg viewBox="0 0 120 28" aria-hidden="true" style="width: 100%; height: 28px"><polyline points="{{p.pts}}" fill="none" stroke="{{p.line}}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="{{p.lx}}" cy="{{p.ly}}" r="3.5" fill="{{p.line}}"></circle></svg>
+                  <small style="font-size: 11px; color: #475467">{{p.range}} · {{p.at}}</small>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isTrend}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div role="group" aria-label="Measure" style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{trendChips}}" as="c" hint-placeholder-count="5">
+                <button type="button" onClick="{{c.pick}}" style="{{c.style}}">{{c.l}}</button>
+              </sc-for>
+            </div>
+            <svg viewBox="0 0 420 170" role="img" aria-label="{{tr.l}} over 24 hours" style="width: 100%; height: auto">
+              <rect x="34" y="{{tr.by}}" width="378" height="{{tr.bh}}" fill="#E7F4EE"></rect>
+              <line x1="34" x2="412" y1="146" y2="146" stroke="#CDD5DF"></line>
+              <sc-for list="{{tr.ticks}}" as="k" hint-placeholder-count="7"><text x="{{k.x}}" y="163" text-anchor="middle" font-size="10" fill="#667085">{{k.l}}</text></sc-for>
+              <polyline points="{{tr.pts}}" fill="none" stroke="{{tr.color}}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
+              <sc-for list="{{tr.dots}}" as="d" hint-placeholder-count="7"><circle cx="{{d.x}}" cy="{{d.y}}" r="{{d.r}}" fill="{{d.fill}}" stroke="{{d.stroke}}" stroke-width="2.5"><title>{{d.tip}}</title></circle></sc-for>
+            </svg>
+            <span style="font-size: 12px; color: #475467">Green band: {{tr.band}} · red dots are outside it</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isAssess}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{scales}}" as="s" hint-placeholder-count="5">
+              <div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #E2E7EF; border-radius: 12px">
+                <span style="{{s.badge}}">{{s.v}}</span>
+                <span style="flex: 1; font-size: 13px"><b>{{s.n}}</b><br><small style="color: #475467">{{s.b}}</small></span>
+                <span style="{{s.dueStyle}}">{{s.due}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isComp}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <div style="width: 58px; height: 58px; border-radius: 999px; background: conic-gradient(#B54708 266deg, #EEF1F5 0); display: flex; align-items: center; justify-content: center; flex: none"><div style="width: 44px; height: 44px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700">74%</div></div>
+              <span style="font-size: 13px; color: #475467">22 of 30 applicable standards met · mapped to NABH 6th ed., Nursing Excellence 2nd ed., JCI goals</span>
+            </div>
+            <sc-for list="{{compTodo}}" as="c" hint-placeholder-count="4">
+              <div style="display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 6px 0; border-top: 1px solid #EEF1F5"><span style="flex: 1">{{c.t}}</span><span style="font-size: 11px; font-weight: 700; color: #475467; background: #EEF1F5; border-radius: 6px; padding: 1px 6px">{{c.ch}}</span><span style="{{c.style}}">{{c.s}}</span></div>
+            </sc-for>
+            <a href="Main.dc.html" style="font-size: 13px; font-weight: 600">Open full compliance</a>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isMeds}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{medsDue}}" as="m" hint-placeholder-count="4">
+              <div style="{{m.style}}">
+                <span style="flex: 1; min-width: 0"><b style="font-size: 13px">{{m.n}}</b><br><small style="font-size: 12px; color: #475467">{{m.s}}</small></span>
+                <button type="button" onClick="{{m.give}}" style="{{m.btnStyle}}">{{m.btn}}</button>
+              </div>
+            </sc-for>
+            <a href="Main.dc.html" style="font-size: 13px; font-weight: 600">Full medicine chart</a>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isOrders}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{orders}}" as="o" hint-placeholder-count="4">
+              <div style="display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid #E2E7EF; border-radius: 12px">
+                <span style="{{o.tag}}">{{o.k}}</span>
+                <span style="flex: 1; min-width: 0; font-size: 13px"><b>{{o.t}}</b><br><small style="color: #475467">{{o.s}}</small></span>
+                <button type="button" onClick="{{o.act}}" style="{{o.btnStyle}}">{{o.btn}}</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isNote}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+              <div role="group" aria-label="Note type" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 2px">
+                <sc-for list="{{noteTypes}}" as="t" hint-placeholder-count="5">
+                  <button type="button" onClick="{{t.pick}}" style="{{t.style}}">{{t.l}}</button>
+                </sc-for>
+              </div>
+              <span style="font-size: 12px; color: #475467">Format: Data · Action · Response</span>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{phrases}}" as="p" hint-placeholder-count="5">
+                <button type="button" onClick="{{p.add}}" style="border: 1px dashed #B9C3D0; background: #FFFFFF; border-radius: 999px; min-height: 30px; padding: 0 10px; font-size: 12px; color: #344054">+ {{p.t}}</button>
+              </sc-for>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+              <sc-for list="{{dar}}" as="d" hint-placeholder-count="3">
+                <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #344054">{{d.l}}<textarea value="{{d.v}}" onChange="{{d.set}}" rows="3" placeholder="{{d.ph}}" style="border: 1px solid #CDD5DF; border-radius: 10px; padding: 8px 10px; font-size: 13px; color: #0B1220; resize: vertical"></textarea></label>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+              <span style="font-size: 12px; color: #475467; flex: 1; min-width: 200px">Signed notes are locked; corrections go in as addenda.</span>
+              <button type="button" style="background: #FFFFFF; border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 600; font-size: 13px">Dictate</button>
+              <button type="button" onClick="{{sign}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 10px; min-height: 40px; padding: 0 16px; font-weight: 700; font-size: 13px">Sign note</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+              <sc-for list="{{notes}}" as="n" hint-placeholder-count="2">
+                <div style="border-left: 3px solid {{n.c}}; padding-left: 10px; font-size: 13px; display: flex; flex-direction: column; gap: 2px">
+                  <span style="font-size: 12px; color: #475467"><b style="color: #0B1220">{{n.time}}</b> · {{n.type}} · {{n.by}} · Signed</span>
+                  <span style="white-space: pre-line; line-height: 1.45">{{n.text}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isIO}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; gap: 10px">
+              <div style="flex: 1; background: #EAF0FD; border-radius: 12px; padding: 10px 12px"><small style="font-size: 11px; font-weight: 700; color: #1D4FB8">IN SINCE 8 AM</small><br><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">820 ml</b></div>
+              <div style="flex: 1; background: #FEF6E0; border-radius: 12px; padding: 10px 12px"><small style="font-size: 11px; font-weight: 700; color: #8A5300">OUT SINCE 8 AM</small><br><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">560 ml</b></div>
+              <div style="flex: 1; background: #E7F4EE; border-radius: 12px; padding: 10px 12px"><small style="font-size: 11px; font-weight: 700; color: #067647">BALANCE</small><br><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">+260 ml</b></div>
+            </div>
+            <span style="font-size: 12px; color: #475467">IV 0.9% NaCl 375 · oral 300 · nebulisation 145 | urine 500 · sputum 60 · urine 0.6 ml/kg/h</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isLines}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+              <div style="display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid #E2E7EF; border-radius: 12px; font-size: 13px">
+                <span style="flex: 1"><b>{{l.n}}</b><br><small style="color: #475467">{{l.s}}</small></span>
+                <span style="{{l.style}}">{{l.d}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isTasks}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{tasks}}" as="t" hint-placeholder-count="4">
+              <button type="button" onClick="{{t.toggle}}" style="{{t.style}}"><span style="font-size: 12px; font-weight: 700; width: 64px; text-align: left; color: {{t.tc}}">{{t.time}}</span><span style="{{t.box}}">{{t.mark}}</span><span style="flex: 1; text-align: left">{{t.t}}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isDevices}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+              <span style="background: #E6F2F1; color: #0B6E69; border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700">{{dv.runCount}} running</span>
+              <span style="background: #EEF1F5; color: #344054; border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700">{{dv.totalToday}} device time today</span>
+              <sc-if value="{{dv.alertCount}}" hint-placeholder-val="{{ false }}"><span style="background: #FEF6E0; color: #8A5300; border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700">{{dv.alertCount}} check due</span></sc-if>
+              <span style="flex: 1"></span>
+              <span style="font-size: 12px; color: #475467">Clock {{dv.clock}}</span>
+              <button type="button" onClick="{{dv.openPick}}" style="{{dv.addBtn}}">+ Start a device</button>
+            </div>
+
+            <sc-if value="{{dv.picking}}" hint-placeholder-val="{{ false }}">
+              <div style="border: 1px solid #A7D3CF; background: #F4FAF9; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+                <div style="display: flex; align-items: center; gap: 10px"><b style="font-size: 13px; flex: 1">1 · Choose the device</b><button type="button" onClick="{{dv.closePick}}" style="border: 0; background: transparent; min-height: 36px; font-weight: 600; color: #475467">Cancel</button></div>
+                <div role="group" aria-label="Device type" style="display: flex; gap: 6px; flex-wrap: wrap">
+                  <sc-for list="{{dv.cats}}" as="c" hint-placeholder-count="5">
+                    <button type="button" onClick="{{c.pick}}" style="{{c.style}}">{{c.l}}</button>
+                  </sc-for>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px">
+                  <sc-for list="{{dv.catalog}}" as="d" hint-placeholder-count="4">
+                    <button type="button" onClick="{{d.pick}}" style="{{d.style}}">
+                      <span style="{{d.icon}}">{{d.ab}}</span>
+                      <span style="display: flex; flex-direction: column; text-align: left; gap: 1px; min-width: 0"><b style="font-size: 13px">{{d.n}}</b><small style="font-size: 11px; color: #475467">{{d.hint}}</small></span>
+                    </button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{dv.hasSetup}}" hint-placeholder-val="{{ false }}">
+                  <div style="border-top: 1px solid #CFE6E3; padding-top: 10px; display: flex; flex-direction: column; gap: 10px">
+                    <b style="font-size: 13px">2 · Set up {{dv.setup.n}}</b>
+                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+                      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #344054">Settings<input value="{{dv.setup.set}}" onChange="{{dv.onSet}}" aria-label="Settings" style="border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 13px; font-family: inherit; color: #0B1220"></label>
+                      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #344054">Device tag<input value="{{dv.setup.tag}}" aria-label="Device tag" style="border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 13px; font-family: inherit; color: #0B1220"></label>
+                      <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #344054">Started at<span style="border: 1px solid #CDD5DF; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 13px; display: flex; align-items: center; background: #FFFFFF; color: #0B1220">{{dv.clock}} · now</span></div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 6px">
+                      <span style="font-size: 12px; font-weight: 700; color: #344054">How long</span>
+                      <div role="group" aria-label="Planned duration" style="display: flex; gap: 6px; flex-wrap: wrap">
+                        <sc-for list="{{dv.durs}}" as="u" hint-placeholder-count="6">
+                          <button type="button" onClick="{{u.pick}}" style="{{u.style}}">{{u.l}}</button>
+                        </sc-for>
+                      </div>
+                      <span style="font-size: 12px; color: #475467">{{dv.setup.plan}}</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #FFFFFF; border-radius: 10px; padding: 8px 10px; font-size: 12px; color: #344054"><b>Nursing checks while running:</b> {{dv.setup.check}}</div>
+                    <div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{dv.start}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 10px; min-height: 44px; padding: 0 18px; font-weight: 700">Start now</button></div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px">
+              <sc-for list="{{dv.running}}" as="r" hint-placeholder-count="3">
+                <div style="{{r.card}}">
+                  <div style="display: flex; gap: 10px; align-items: center">
+                    <span style="{{r.icon}}">{{r.ab}}</span>
+                    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column"><b style="font-size: 14px">{{r.n}}</b><small style="font-size: 12px; color: #475467">{{r.set}}</small></div>
+                    <span style="{{r.pillStyle}}">{{r.pill}}</span>
+                  </div>
+                  <div style="display: flex; align-items: baseline; gap: 8px"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; letter-spacing: 0.01em">{{r.el}}</b><small style="font-size: 12px; color: #475467">since {{r.since}}</small></div>
+                  <sc-if value="{{r.planned}}" hint-placeholder-val="{{ false }}">
+                    <div style="display: flex; flex-direction: column; gap: 4px">
+                      <div style="height: 8px; background: #EEF1F5; border-radius: 999px; overflow: hidden"><div style="height: 8px; width: {{r.pct}}%; background: {{r.barColor}}; border-radius: 999px"></div></div>
+                      <span style="font-size: 12px; color: {{r.remColor}}; font-weight: 600">{{r.rem}}</span>
+                    </div>
+                  </sc-if>
+                  <span style="{{r.checkStyle}}">{{r.check}}</span>
+                  <sc-if value="{{r.stopping}}" hint-placeholder-val="{{ false }}">
+                    <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 8px">
+                      <span style="font-size: 12px; font-weight: 700; color: #344054">Why are you stopping it?</span>
+                      <div style="display: flex; gap: 6px; flex-wrap: wrap">
+                        <sc-for list="{{r.reasons}}" as="x" hint-placeholder-count="4">
+                          <button type="button" onClick="{{x.pick}}" style="border: 1px solid #CDD5DF; background: #FFFFFF; border-radius: 999px; min-height: 32px; padding: 0 10px; font-size: 12px; font-weight: 600; color: #344054">{{x.l}}</button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <div style="display: flex; gap: 6px">
+                    <button type="button" onClick="{{r.checkDone}}" style="flex: 1; background: #FFFFFF; border: 1px solid #CDD5DF; border-radius: 10px; min-height: 38px; font-weight: 600; font-size: 12px">Check done</button>
+                    <button type="button" onClick="{{r.askStop}}" style="flex: 1; background: #FFFFFF; border: 1px solid #F4C7C2; color: #B42318; border-radius: 10px; min-height: 38px; font-weight: 700; font-size: 12px">{{r.stopLabel}}</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="border: 1px solid #E2E7EF; border-radius: 14px; overflow: hidden">
+              <div style="display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); background: #F5F7FA; font-size: 11px; font-weight: 700; color: #475467; text-transform: uppercase; letter-spacing: 0.04em">
+                <span style="padding: 8px 12px">Today's use</span><span style="padding: 8px 12px">Sessions</span><span style="padding: 8px 12px">Total time</span><span style="padding: 8px 12px">To IPD bill</span>
+              </div>
+              <sc-for list="{{dv.usage}}" as="u" hint-placeholder-count="4">
+                <div style="display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); font-size: 13px; border-top: 1px solid #EEF1F5">
+                  <span style="padding: 8px 12px"><b>{{u.n}}</b><br><small style="color: #475467">{{u.d}}</small></span><span style="padding: 8px 12px">{{u.s}}</span><span style="padding: 8px 12px; font-weight: 700">{{u.t}}</span><span style="padding: 8px 12px; color: #475467">{{u.b}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{w.isHandover}}" hint-placeholder-val="{{ false }}">
+          <dl style="margin: 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 6px 10px; font-size: 13px; line-height: 1.45">
+            <dt style="font-weight: 700; color: #0B6E69">S</dt><dd style="margin: 0">63 M, MICU-04, day 2, COPD flare-up with type 2 respiratory failure. NEWS2 7, escalated 10:50 AM.</dd>
+            <dt style="font-weight: 700; color: #0B6E69">B</dt><dd style="margin: 0">Diabetic. Penicillin allergy (rash). Droplet precautions.</dd>
+            <dt style="font-weight: 700; color: #0B6E69">A</dt><dd style="margin: 0">Pulse 116, resp 26, BP 108/64, SpO₂ 90% on 28% Venturi. K⁺ 2.9 read back.</dd>
+            <dt style="font-weight: 700; color: #0B6E69">R</dt><dd style="margin: 0">Potassium drip after pharmacist check. Repeat ABG 1 PM. Turn at 12 PM. Pain reassessment overdue.</dd>
+          </dl>
+        </sc-if>
+      </section>
+    </sc-for>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.loadAt = Date.now();
+    this.state = {
+      edit: false, lib: false, picker: false, drag: null, preset: 'icu', trend: 'hr', noteType: 'Progress',
+      order: ['monitor', 'devices', 'trend', 'comp', 'meds', 'orders', 'note', 'tasks', 'assess'],
+      size: { monitor: 12, trend: 5, comp: 7, meds: 6, orders: 6, note: 8, tasks: 4, assess: 6, io: 6, lines: 6, handover: 6, devices: 12 },
+      dvPick: false, dvCat: 'Breathing', dvSetup: null, dvStop: null, dvChecked: {},
+      dvRun: [{ id: 1, k: 'o2v', set: 'FiO₂ 28% · 8 L/min', start: 650, plan: 0, chk: 600 }, { id: 2, k: 'mon', set: 'ECG, SpO₂, NIBP every 30 min', start: -1440 + 540, plan: 0, chk: 600 }, { id: 3, k: 'air', set: 'Alternating mode', start: -1440 + 600, plan: 0, chk: 480 }, { id: 4, k: 'neb', set: 'Levosalbutamol + ipratropium', start: 658, plan: 15, chk: 658 }],
+      dvLog: [{ k: 'niv', start: 130, stop: 400, why: 'Completed' }, { k: 'neb', start: 360, stop: 375, why: 'Completed' }, { k: 'o2n', start: -180, stop: 650, why: 'Changed to Venturi' }], dvSeq: 10,
+      sel: ['hr', 'bp', 'map', 'rr', 'spo2', 'temp', 'fio2', 'cbg', 'pain', 'uo'],
+      note: { d: '', a: '', r: '' }, signed: [], given: {}, ack: {}, taskDone: { t1: 1 }
+    };
+  }
+  componentDidMount() { var self = this; this.tick = setInterval(function () { self.forceUpdate(); }, 1000); }
+  componentWillUnmount() { clearInterval(this.tick); }
+  renderVals() {
+    var S = this.state, self = this, set = function (o) { self.setState(o); };
+    var pill = function (on) { return 'border: 0; border-radius: 9px; padding: 0 12px; min-height: 34px; font-weight: 600; font-size: 13px; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#0B6E69' : '#475467') + '; box-shadow: ' + (on ? '0 1px 3px #0B122022' : 'none'); };
+    var W = {
+      monitor: ['Vital signs monitor', 'Your chosen parameters with trend and alert limits'],
+      trend: ['Trend', 'One parameter over 24 hours'],
+      comp: ['Compliance', 'Ring score and items still to do'],
+      meds: ['Medicines due', 'Doses due and overdue, give from here'],
+      orders: ['Nursing orders', 'Lab samples and general orders to acknowledge'],
+      note: ['Nurse note', 'Write and sign notes, see recent ones'],
+      tasks: ['Tasks this shift', 'Timed nursing tasks with tick-off'],
+      assess: ['Risk assessments', 'Morse, Braden, pain, VIP and due times'],
+      io: ['Intake and output', 'Running balance since 8 AM'],
+      lines: ['Lines, drains and devices', 'Day counts and next checks'],
+      handover: ['Handover (SBAR)', 'Built from the record, ready for 3 PM'],
+      devices: ['Devices', 'Start and stop oxygen, pumps, NIV and more, with live timers']
+    };
+    var PRE = {
+      icu: ['ICU nurse', ['monitor', 'devices', 'trend', 'comp', 'meds', 'orders', 'note', 'tasks', 'assess'], ['hr', 'bp', 'map', 'rr', 'spo2', 'temp', 'fio2', 'cbg', 'pain', 'uo']],
+      ward: ['Ward nurse', ['monitor', 'meds', 'tasks', 'note', 'assess', 'comp'], ['hr', 'bp', 'rr', 'spo2', 'temp', 'pain']],
+      postop: ['Post-op', ['monitor', 'devices', 'lines', 'io', 'meds', 'note', 'trend'], ['hr', 'bp', 'rr', 'spo2', 'temp', 'pain', 'drain', 'uo']],
+      mine: ['My layout', null, null]
+    };
+    var presets = Object.keys(PRE).map(function (k) { return { l: PRE[k][0], style: pill(S.preset === k),
+      pick: function () { if (k === 'mine') { set({ preset: 'mine' }); return; } set({ preset: k, order: PRE[k][1].slice(), sel: PRE[k][2].slice() }); } }; });
+
+    /* parameters: [key, label, unit, value text, series, low, high, group, last time] */
+    var P = {
+      hr: ['Pulse', '/min', '116', [88, 92, 96, 104, 110, 112, 116], 51, 90, 'Core', '11:00'],
+      bp: ['Blood pressure', 'mmHg', '108/64', [138, 134, 130, 124, 118, 112, 108], 111, 219, 'Core', '11:00'],
+      map: ['MAP', 'mmHg', '79', [96, 92, 90, 86, 83, 80, 79], 65, 110, 'Haemodynamic', '11:00'],
+      rr: ['Resp. rate', '/min', '26', [18, 20, 22, 24, 24, 26, 26], 12, 20, 'Core', '11:00'],
+      spo2: ['SpO₂', '%', '90', [94, 93, 92, 90, 87, 88, 90], 88, 92, 'Core', '11:00'],
+      temp: ['Temperature', '°C', '37.8', [37.2, 37.6, 37.9, 38.2, 38.4, 38.1, 37.8], 36.1, 38.0, 'Core', '11:00'],
+      fio2: ['FiO₂', '%', '28', [24, 24, 28, 28, 35, 28, 28], 21, 40, 'Respiratory', '11:00'],
+      etco2: ['EtCO₂', 'mmHg', '48', [42, 43, 45, 47, 49, 48, 48], 35, 45, 'Respiratory', '11:00'],
+      cvp: ['CVP', 'cmH₂O', '9', [7, 8, 8, 9, 10, 9, 9], 2, 12, 'Haemodynamic', '10:00'],
+      gcs: ['GCS', '/15', '15', [15, 15, 14, 14, 15, 15, 15], 15, 15, 'Neuro', '10:40'],
+      rass: ['RASS', '', '0', [0, 0, -1, -1, 0, 0, 0], -1, 1, 'Neuro', '10:40'],
+      pupils: ['Pupils', 'mm', '3 = 3', [3, 3, 3, 3, 3, 3, 3], 2, 5, 'Neuro', '10:40'],
+      pain: ['Pain', '/10', '6', [3, 3, 4, 5, 6, 6, 6], 0, 3, 'Metabolic and comfort', '9:10'],
+      cbg: ['Blood sugar', 'mg/dL', '248', [182, 236, 201, 264, 228, 240, 248], 70, 180, 'Metabolic and comfort', '10:30'],
+      uo: ['Urine output', 'ml/kg/h', '0.6', [1.0, 0.9, 0.8, 0.7, 0.7, 0.6, 0.6], 0.5, 3, 'Fluids', '11:00'],
+      drain: ['Drain output', 'ml/4 h', '60', [120, 100, 90, 80, 70, 60, 60], 0, 100, 'Fluids', '10:00'],
+      wt: ['Weight', 'kg', '68.0', [68.8, 68.8, 68.6, 68.4, 68.2, 68.0, 68.0], 60, 80, 'Fluids', '6:00']
+    };
+    var spark = function (a, lo, hi) { var mn = Math.min.apply(null, a.concat([lo])), mx = Math.max.apply(null, a.concat([hi])), r = mx - mn || 1; return a.map(function (v, i) { return [4 + i * 112 / (a.length - 1), 25 - (v - mn) / r * 21]; }); };
+    var params = S.sel.filter(function (k) { return P[k]; }).map(function (k) {
+      var p = P[k], last = p[3][p[3].length - 1], out = k === 'bp' ? last < p[4] : (last < p[4] || last > p[5]), pts = spark(p[3], p[4], p[5]), lp = pts[pts.length - 1];
+      return { l: p[0], u: p[1], v: p[2], range: k === 'bp' ? 'Systolic over ' + (p[4] - 1) : 'Limits ' + p[4] + '–' + p[5], at: p[7],
+        pts: pts.map(function (x) { return x[0] + ',' + x[1]; }).join(' '), lx: lp[0], ly: lp[1],
+        color: out ? '#B42318' : '#0B1220', line: out ? '#B42318' : '#0B6E69', flag: out ? 'Out of range' : 'In range',
+        flagStyle: 'font-size: 10px; font-weight: 700; border-radius: 6px; padding: 1px 6px; ' + (out ? 'background: #B42318; color: #FFFFFF' : 'background: #E7F4EE; color: #067647'),
+        style: 'display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 14px; border: 1px solid ' + (out ? '#F4C7C2' : '#E2E7EF') + '; background: ' + (out ? '#FDF0EF' : '#FFFFFF') };
+    });
+    var GR = ['Core', 'Respiratory', 'Haemodynamic', 'Neuro', 'Metabolic and comfort', 'Fluids'];
+    var paramGroups = GR.map(function (g) { return { name: g, items: Object.keys(P).filter(function (k) { return P[k][6] === g; }).map(function (k) {
+      var on = S.sel.indexOf(k) >= 0;
+      return { l: P[k][0], mark: on ? '✓' : '',
+        toggle: function () { var s2 = S.sel.slice(); if (on) s2.splice(s2.indexOf(k), 1); else s2.push(k); set({ sel: s2, preset: 'mine' }); },
+        box: 'width: 18px; height: 18px; border-radius: 5px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; ' + (on ? 'background: #0B6E69; color: #FFFFFF' : 'background: #FFFFFF; border: 2px solid #98A2B3; color: transparent'),
+        style: 'display: flex; align-items: center; gap: 8px; border: 1px solid ' + (on ? '#0B6E69' : '#E2E7EF') + '; background: #FFFFFF; border-radius: 9px; min-height: 34px; padding: 0 8px; font-size: 12px; font-weight: 600; color: #0B1220' };
+    }) }; }).concat([]);
+    paramGroups = paramGroups.filter(function (g) { return g.items.length; });
+    paramGroups = [paramGroups[0], { name: 'Respiratory and haemodynamic', items: paramGroups[1].items.concat(paramGroups[2].items) }, paramGroups[3], paramGroups[4], paramGroups[5]];
+
+    /* trend */
+    var trendKeys = S.sel.filter(function (k) { return P[k] && typeof P[k][3][0] === 'number' && k !== 'pupils'; });
+    var tk = trendKeys.indexOf(S.trend) >= 0 ? S.trend : trendKeys[0] || 'hr', tp = P[tk];
+    var TL = ['12 PM', '4 PM', '8 PM', '12 AM', '4 AM', '8 AM', '11 AM'];
+    var mn = Math.min.apply(null, tp[3].concat([tp[4]])), mx = Math.max.apply(null, tp[3].concat([tp[5]])), rg = (mx - mn) || 1; mn -= rg * 0.1; mx += rg * 0.1;
+    var X = function (i) { return 50 + i * 57; }, Y = function (v) { return 10 + (1 - (v - mn) / (mx - mn)) * 136; };
+    var tout = function (v) { return tk === 'bp' ? v < tp[4] : (v < tp[4] || v > tp[5]); };
+    var tr = { l: tp[0], color: '#0B6E69', band: tk === 'bp' ? 'systolic ' + tp[4] + ' or more' : tp[4] + '–' + tp[5] + ' ' + tp[1],
+      by: Y(Math.min(tp[5], mx)), bh: Math.max(0, Y(Math.max(tp[4], mn)) - Y(Math.min(tp[5], mx))),
+      pts: tp[3].map(function (v, i) { return X(i) + ',' + Y(v); }).join(' '),
+      dots: tp[3].map(function (v, i) { var o = tout(v); return { x: X(i), y: Y(v), r: o ? 5.5 : 4.5, fill: o ? '#B42318' : '#FFFFFF', stroke: o ? '#FFFFFF' : '#0B6E69', tip: tp[0] + ' ' + v + ' at ' + TL[i] }; }),
+      ticks: TL.map(function (l, i) { return { x: X(i), l: l }; }) };
+    var trendChips = trendKeys.map(function (k) { var on = k === tk; return { l: P[k][0], pick: function () { set({ trend: k }); },
+      style: 'border-radius: 999px; min-height: 30px; padding: 0 10px; font-size: 12px; font-weight: 600; border: 1px solid ' + (on ? '#0B6E69' : '#E2E7EF') + '; background: ' + (on ? '#0B6E69' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054') }; });
+
+    /* widgets */
+    var SZ = [[4, '⅓'], [5, '40%'], [6, '½'], [7, '60%'], [8, '⅔'], [12, 'Full']];
+    var move = function (id, d) { var o = S.order.slice(), i = o.indexOf(id), j = i + d; if (j < 0 || j >= o.length) return; o.splice(i, 1); o.splice(j, 0, id); set({ order: o, preset: 'mine' }); };
+    var widgets = S.order.map(function (id) {
+      var span = S.size[id] || 6, dragging = S.drag === id;
+      return { t: W[id][0], edit: S.edit, draggable: S.edit ? 'true' : 'false',
+        isMonitor: id === 'monitor', isTrend: id === 'trend', isAssess: id === 'assess', isComp: id === 'comp', isMeds: id === 'meds', isOrders: id === 'orders', isNote: id === 'note', isIO: id === 'io', isLines: id === 'lines', isTasks: id === 'tasks', isHandover: id === 'handover', isDevices: id === 'devices',
+        sizes: SZ.map(function (z) { var on = span === z[0]; return { l: z[1], pick: function () { var ns = Object.assign({}, S.size); ns[id] = z[0]; set({ size: ns, preset: 'mine' }); },
+          style: 'border: 0; border-radius: 7px; min-height: 28px; padding: 0 8px; font-size: 11px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? '#0B6E69' : '#475467') }; }),
+        up: function () { move(id, -1); }, down: function () { move(id, 1); },
+        hide: function () { set({ order: S.order.filter(function (x) { return x !== id; }), preset: 'mine' }); },
+        dragStart: function (e) { if (!S.edit) return; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); } catch (x) {} set({ drag: id }); },
+        dragOver: function (e) { if (S.edit) e.preventDefault(); },
+        drop: function (e) { if (!S.edit) return; e.preventDefault(); var from = S.drag; if (!from || from === id) return; var o = S.order.filter(function (x) { return x !== from; }); o.splice(o.indexOf(id), 0, from); set({ order: o, drag: null, preset: 'mine' }); },
+        dragEnd: function () { set({ drag: null }); },
+        style: 'grid-column: span ' + span + '; min-width: 0; background: #FFFFFF; border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; ' + (S.edit ? 'border: 2px dashed ' + (dragging ? '#0B6E69' : '#9AD0CB') + '; opacity: ' + (dragging ? '0.5' : '1') + '; cursor: move' : 'border: 1px solid #E2E7EF; box-shadow: 0 1px 2px #0B12200A')
+      };
+    });
+    var library = Object.keys(W).filter(function (k) { return S.order.indexOf(k) < 0; }).map(function (k) { return { t: W[k][0], d: W[k][1], add: function () { set({ order: S.order.concat([k]), preset: 'mine' }); } }; });
+
+
+    /* ---- devices: start, stop, live timers ---- */
+    var NOWM = 665 + (Date.now() - (self.loadAt || Date.now())) / 60000;
+    var hm = function (m) { var d = m < 0 ? 'Yesterday ' : ''; m = ((Math.floor(m) % 1440) + 1440) % 1440; var h = Math.floor(m / 60), mm = m % 60; return d + ((h % 12) || 12) + ':' + (mm < 10 ? '0' : '') + mm + (h < 12 ? ' AM' : ' PM'); };
+    var dur = function (min, sec) { var t = Math.max(0, Math.floor(min * 60)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s2 = t % 60; return sec ? (h ? h + ' h ' : '') + (m < 10 && h ? '0' : '') + m + ' min ' + (s2 < 10 ? '0' : '') + s2 + ' s' : h && !m ? h + ' h' : (h ? h + ' h ' : '') + m + ' min'; };
+    var DC = {
+      o2v: ['Oxygen · Venturi mask', 'Breathing', 'O₂', 'FiO₂ 28% · 8 L/min', 'Check SpO₂ hourly; target 88–92%', 60, 'Oxygen, per hour'],
+      o2n: ['Oxygen · nasal prongs', 'Breathing', 'O₂', '2 L/min', 'Check SpO₂ and nostrils every 4 h', 240, 'Oxygen, per hour'],
+      hfnc: ['High-flow nasal cannula', 'Breathing', 'HF', '40 L/min · FiO₂ 40% · 37 °C', 'Check SpO₂ hourly, water chamber every 4 h', 60, 'HFNC, per hour'],
+      niv: ['NIV · BiPAP', 'Breathing', 'NIV', 'IPAP 14 · EPAP 6 · FiO₂ 35%', 'Skin under the mask every 2 h; ABG after 1 h', 120, 'NIV, per hour'],
+      vent: ['Ventilator', 'Breathing', 'VEN', 'VC · TV 420 ml · PEEP 6 · FiO₂ 40%', 'Cuff pressure every 8 h; VAP bundle every shift', 240, 'Ventilator, per day'],
+      neb: ['Nebuliser', 'Breathing', 'NEB', 'Levosalbutamol + ipratropium', 'Pulse and breathing before and after', 0, 'Per session'],
+      ip: ['Infusion pump', 'Infusion', 'IV', 'KCl 20 mmol in 500 ml NS · 125 ml/h', 'IV site and rate every hour', 60, 'Infusion pump, per day'],
+      sp: ['Syringe pump', 'Infusion', 'SP', 'Insulin 50 U in 50 ml · 2 ml/h', 'Blood sugar every hour while running', 60, 'Syringe pump, per day'],
+      fp: ['Feeding pump', 'Infusion', 'FD', 'Enteral feed · 60 ml/h', 'Tube position before start; head up 30°', 240, 'Feeding pump, per day'],
+      mon: ['Cardiac monitor', 'Monitoring', 'ECG', 'ECG, SpO₂, NIBP every 30 min', 'Alarm limits checked at each shift', 480, 'Monitor, per day'],
+      scd: ['Calf compression pump', 'Skin and mobility', 'DVT', 'Both legs · 40 mmHg', 'Remove and check skin every 8 h', 480, 'Per day'],
+      air: ['Air mattress', 'Skin and mobility', 'AIR', 'Alternating mode', 'Pressure and skin every shift', 480, 'Per day'],
+      warm: ['Warming blanket', 'Skin and mobility', 'WRM', '38 °C', 'Temperature every 30 min', 30, 'Per hour'],
+      suc: ['Suction', 'Other', 'SUC', 'Wall suction · −120 mmHg', 'Record secretions after each use', 0, 'Per session']
+    };
+    var CATS = ['Breathing', 'Infusion', 'Monitoring', 'Skin and mobility', 'Other'];
+    var icon = function (cat) { var c = { Breathing: ['#E6F2F1', '#0B6E69'], Infusion: ['#EAF0FD', '#1D4FB8'], Monitoring: ['#F2EBFB', '#5B2A9C'], 'Skin and mobility': ['#FEF6E0', '#8A5300'], Other: ['#EEF1F5', '#344054'] }[cat]; return 'width: 40px; height: 40px; border-radius: 11px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; background: ' + c[0] + '; color: ' + c[1]; };
+    var DURS = [[0, 'Until stopped'], [15, '15 min'], [30, '30 min'], [60, '1 hour'], [240, '4 hours'], [480, '8 hours']];
+    var su = S.dvSetup;
+    var catalog = Object.keys(DC).filter(function (k) { return DC[k][1] === S.dvCat; }).map(function (k) { var d = DC[k], on = su && su.k === k, busy = S.dvRun.some(function (r) { return r.k === k; });
+      return { n: d[0], ab: d[2], hint: busy ? 'Already running' : d[3], icon: icon(d[1]),
+        pick: function () { set({ dvSetup: { k: k, set: d[3], plan: k === 'neb' ? 15 : k === 'ip' ? 240 : 0, tag: 'MICU-' + d[2] + '-0' + (k.length + 2) } }); },
+        style: 'display: flex; gap: 10px; align-items: center; border: ' + (on ? '2px solid #0B6E69' : '1px solid #E2E7EF') + '; background: #FFFFFF; border-radius: 12px; padding: 8px 10px; min-height: 56px; color: #0B1220; opacity: ' + (busy ? '0.6' : '1') }; });
+    var running = S.dvRun.map(function (r) {
+      var d = DC[r.k], el = NOWM - r.start, p = r.plan, over = p && el > p, sinceChk = NOWM - (S.dvChecked[r.id] || r.chk), chkDue = d[5] && sinceChk >= d[5];
+      var stopping = S.dvStop === r.id;
+      return { n: d[0], ab: d[2], set: r.set, icon: icon(d[1]), since: hm(r.start), el: dur(el, el < 600),
+        planned: !!p, pct: p ? Math.min(100, el / p * 100) : 0, barColor: over ? '#B42318' : '#0B6E69',
+        rem: p ? (over ? 'Over the planned ' + dur(p) + ' by ' + dur(el - p) + ' · stop or extend' : dur(p - el) + ' left · ends ' + hm(r.start + p)) : '',
+        remColor: over ? '#B42318' : '#475467',
+        pill: over ? 'Over time' : chkDue ? 'Check due' : 'Running',
+        pillStyle: 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; ' + (over ? 'background: #B42318; color: #FFFFFF' : chkDue ? 'background: #FEF6E0; color: #8A5300' : 'background: #E7F4EE; color: #067647'),
+        check: chkDue ? 'Due: ' + d[4] : d[4], checkStyle: 'font-size: 12px; border-radius: 8px; padding: 6px 8px; ' + (chkDue ? 'background: #FEF6E0; color: #7A4A00; font-weight: 600' : 'background: #F5F7FA; color: #475467'),
+        card: 'display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; border: 1px solid ' + (over ? '#F4C7C2' : chkDue ? '#F5DFAE' : '#E2E7EF') + '; background: #FFFFFF',
+        stopping: stopping, stopLabel: stopping ? 'Keep running' : 'Stop',
+        askStop: function () { set({ dvStop: stopping ? null : r.id }); },
+        checkDone: function () { var nc = Object.assign({}, S.dvChecked); nc[r.id] = NOWM; set({ dvChecked: nc }); },
+        reasons: ['Completed', 'Doctor ordered stop', 'Changed device', 'Patient refused', 'Device fault'].map(function (why) { return { l: why, pick: function () {
+          set({ dvRun: S.dvRun.filter(function (x) { return x.id !== r.id; }), dvLog: S.dvLog.concat([{ k: r.k, start: r.start, stop: NOWM, why: why }]), dvStop: null }); } }; }) };
+    });
+    var dayStart = 0, use = {};
+    S.dvLog.concat(S.dvRun.map(function (r) { return { k: r.k, start: r.start, stop: NOWM, live: 1 }; })).forEach(function (x) {
+      var a = Math.max(x.start, dayStart), b = x.stop; if (b <= a) return; var u = use[x.k] = use[x.k] || { s: 0, t: 0, live: 0, why: [] }; u.s++; u.t += b - a; if (x.live) u.live = 1; else if (x.why) u.why.push(x.why); });
+    var totalT = 0;
+    var usage = Object.keys(use).map(function (k) { var u = use[k], d = DC[k]; totalT += u.t;
+      var unit = d[6].indexOf(',') > 0 ? d[6].split(',')[0] : d[0].split(' · ')[0];
+      var bill = /per hour/i.test(d[6]) ? Math.ceil(u.t / 60) + ' h · ' + unit : /per day/i.test(d[6]) ? '1 day · ' + unit : u.s + ' session' + (u.s > 1 ? 's' : '');
+      return { n: d[0], d: u.live ? 'Running now' : 'Stopped · ' + u.why.slice(-1)[0], s: String(u.s), t: dur(u.t), b: bill }; });
+    var dv = {
+      clock: hm(NOWM), runCount: running.length, totalToday: dur(totalT), alertCount: running.filter(function (r) { return r.pill !== 'Running'; }).length,
+      picking: S.dvPick, openPick: function () { set({ dvPick: !S.dvPick, dvSetup: null }); }, closePick: function () { set({ dvPick: false, dvSetup: null }); },
+      addBtn: 'border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 700; font-size: 13px; ' + (S.dvPick ? 'background: #FFFFFF; color: #0B1220; border: 1px solid #CDD5DF' : 'background: #0B6E69; color: #FFFFFF; border: 0'),
+      cats: CATS.map(function (c) { var on = S.dvCat === c; return { l: c, pick: function () { set({ dvCat: c, dvSetup: null }); }, style: 'border-radius: 999px; min-height: 34px; padding: 0 12px; font-size: 12px; font-weight: 600; border: 1px solid ' + (on ? '#0B6E69' : '#CDD5DF') + '; background: ' + (on ? '#0B6E69' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054') }; }),
+      catalog: catalog, hasSetup: !!su,
+      setup: su ? { n: DC[su.k][0].toLowerCase(), set: su.set, tag: su.tag, check: DC[su.k][4], plan: su.plan ? 'Planned ' + dur(su.plan) + ' · ends ' + hm(NOWM + su.plan) + ' · you get a reminder 5 minutes before' : 'Runs until you stop it · total time is counted for the record and the bill' } : { n: '', set: '', tag: '', check: '', plan: '' },
+      onSet: function (e) { set({ dvSetup: Object.assign({}, su, { set: e.target.value }) }); },
+      durs: DURS.map(function (u) { var on = su && su.plan === u[0]; return { l: u[1], pick: function () { set({ dvSetup: Object.assign({}, su, { plan: u[0] }) }); }, style: 'border-radius: 999px; min-height: 34px; padding: 0 12px; font-size: 12px; font-weight: 600; border: 1px solid ' + (on ? '#0B6E69' : '#CDD5DF') + '; background: ' + (on ? '#0B6E69' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054') }; }),
+      start: function () { if (!su) return; set({ dvRun: S.dvRun.concat([{ id: S.dvSeq + 1, k: su.k, set: su.set, start: NOWM, plan: su.plan, chk: NOWM }]), dvSeq: S.dvSeq + 1, dvPick: false, dvSetup: null }); },
+      running: running, usage: usage
+    };
+
+    /* contents */
+    var tone = { crit: ['#B42318', '#FDF0EF'], warn: ['#8A5300', '#FEF6E0'], good: ['#067647', '#E7F4EE'] };
+    var scales = [['Fall risk · Morse', '55', 'High risk · yesterday 9 AM', 'crit', 'Due 2 PM', 'warn'], ['Pressure · Braden', '14', 'Moderate · today 8 AM', 'warn', 'Up to date', 'good'], ['Pain · 0–10', '6', 'Moderate · 9:10 AM', 'warn', 'Overdue', 'crit'], ['IV site · VIP', '1', 'Watch · 6 AM', 'warn', 'Due 2 PM', 'warn'], ['VTE risk', 'High', 'Enoxaparin ordered', 'warn', 'Up to date', 'good']].map(function (s) {
+      return { n: s[0], v: s[1], b: s[2], due: s[4], badge: 'min-width: 40px; height: 36px; padding: 0 6px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: ' + tone[s[3]][0] + '; background: ' + tone[s[3]][1],
+        dueStyle: 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; color: ' + tone[s[5]][0] + '; background: ' + tone[s[5]][1] }; });
+    var compTodo = [['Pain reassessed after analgesia', 'COP', 'Overdue', 'crit'], ['IV fluids labelled with time and nurse', 'MOM', 'Due now', 'warn'], ['Fall bundle check', 'PSQ', '12 PM', 'warn'], ['SBAR handover', 'AAC', '2:45 PM', 'warn']].map(function (c) {
+      return { t: c[0], ch: c[1], s: c[2], style: 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; color: ' + tone[c[3]][0] + '; background: ' + tone[c[3]][1] }; });
+    var MD = [['m1', 'Inj. Insulin regular · 6 units', 'SC · 10:30 AM dose · high-alert, second nurse', 'over'], ['m2', 'Inj. Enoxaparin 40 mg', 'SC · 11 AM · high-alert', 'due'], ['m3', 'Neb. Levosalbutamol + Ipratropium', 'Inhaled · 12 PM', 'due'], ['m4', 'Inj. Methylprednisolone 40 mg', 'IV · 8 PM', 'later']];
+    var medsDue = MD.map(function (m) { var g = S.given[m[0]], st = g ? 'given' : m[3];
+      return { n: m[1], s: m[2], btn: st === 'given' ? '✓ Given 11:05' : st === 'later' ? 'Later' : 'Give',
+        give: function () { if (st === 'over' || st === 'due') { var ng = Object.assign({}, S.given); ng[m[0]] = 1; set({ given: ng }); } },
+        style: 'display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid ' + (st === 'over' ? '#F4C7C2' : st === 'due' ? '#F5DFAE' : '#E2E7EF') + '; background: ' + (st === 'over' ? '#FDF0EF' : st === 'due' ? '#FFFBF0' : '#FFFFFF'),
+        btnStyle: 'border-radius: 9px; min-height: 36px; padding: 0 12px; font-weight: 700; font-size: 12px; white-space: nowrap; ' + (st === 'given' ? 'background: #E7F4EE; color: #067647; border: 0' : st === 'later' ? 'background: #FFFFFF; color: #475467; border: 1px solid #CDD5DF' : st === 'over' ? 'background: #B42318; color: #FFFFFF; border: 0' : 'background: #0B6E69; color: #FFFFFF; border: 0') }; });
+    var OD = [['o1', 'Lab', 'Sputum culture and sensitivity', 'Sterile container · collect now', 'Collect'], ['o2', 'Lab', 'Repeat ABG at 1 PM', 'Heparinised syringe', 'Collect'], ['o3', 'Order', 'Inj. Potassium chloride 20 mmol over 4 h', 'New 11:02 AM after critical K⁺', 'Acknowledge'], ['o4', 'Order', 'Chest physiotherapy twice a day', 'Physiotherapy referral sent', 'Acknowledge']];
+    var orders = OD.map(function (o) { var a = S.ack[o[0]];
+      return { k: o[1], t: o[2], s: o[3], btn: a ? (o[4] === 'Collect' ? '✓ Collected' : '✓ Acknowledged') : o[4], act: function () { var na = Object.assign({}, S.ack); na[o[0]] = 1; set({ ack: na }); },
+        tag: 'font-size: 11px; font-weight: 700; border-radius: 8px; padding: 4px 8px; ' + (o[1] === 'Lab' ? 'background: #F2EBFB; color: #5B2A9C' : 'background: #E6F2F1; color: #0B6E69'),
+        btnStyle: 'border-radius: 9px; min-height: 36px; padding: 0 12px; font-weight: 700; font-size: 12px; white-space: nowrap; ' + (a ? 'background: #E7F4EE; color: #067647; border: 0' : 'background: #0B6E69; color: #FFFFFF; border: 0') }; });
+    var noteTypes = ['Progress', 'Event', 'Procedure', 'Education', 'Handover'].map(function (t) { return { l: t, pick: function () { set({ noteType: t }); }, style: 'border: 0; border-radius: 8px; padding: 0 10px; min-height: 30px; font-weight: 600; font-size: 12px; background: ' + (S.noteType === t ? '#FFFFFF' : 'transparent') + '; color: ' + (S.noteType === t ? '#0B6E69' : '#475467') }; });
+    var PH = [['Breathless, using accessory muscles', 'd'], ['SpO₂ 90% on 28% Venturi', 'd'], ['Doctor informed, read-back done', 'a'], ['Head end raised, nebulised', 'a'], ['Settled, more alert', 'r']];
+    var phrases = PH.map(function (p) { return { t: p[0], add: function () { var nn = Object.assign({}, S.note); nn[p[1]] = (nn[p[1]] ? nn[p[1]] + '. ' : '') + p[0]; set({ note: nn }); } }; });
+    var dar = [['d', 'Data', 'What you saw and measured'], ['a', 'Action', 'What you did'], ['r', 'Response', 'How the patient responded']].map(function (f) { return { l: f[1], ph: f[2], v: S.note[f[0]], set: function (e) { var nn = Object.assign({}, S.note); nn[f[0]] = e.target.value; set({ note: nn }); } }; });
+    var BASE = [{ time: '10:45 AM', type: 'Event', by: 'Sr. Anjali Pawar', c: '#B42318', text: 'D: RR 26, SpO₂ 87%, drowsy but rousable.\nA: Doctor informed, nebulised, head end raised.\nR: SpO₂ 90% at 11:00, more alert.' }];
+    var notes = S.signed.concat(BASE);
+    var sign = function () { var t = [['D', S.note.d], ['A', S.note.a], ['R', S.note.r]].filter(function (x) { return x[1] && x[1].trim(); }).map(function (x) { return x[0] + ': ' + x[1].trim(); }); if (!t.length) return;
+      set({ signed: [{ time: '11:05 AM', type: S.noteType, by: 'Sr. Anjali Pawar', c: '#0B6E69', text: t.join('\n') }].concat(S.signed), note: { d: '', a: '', r: '' } }); };
+    var lines = [['Peripheral IV cannula · left forearm', 'Inserted 23 Oct · VIP 1 · dressing dated', 'Day 2', 'warn'], ['Oxygen · 28% Venturi mask', 'Target SpO₂ 88–92%', 'Since 10:50', 'good'], ['Urinary catheter', 'Not in place', 'N/A', 'good']].map(function (l) {
+      return { n: l[0], s: l[1], d: l[2], style: 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; color: ' + tone[l[3]][0] + '; background: ' + tone[l[3]][1] }; });
+    var TK = [['t1', '10:00 AM', 'Turned to the left side'], ['t2', '10:30 AM', 'Chest physiotherapy'], ['t3', '12:00 PM', 'Turn and skin check'], ['t4', '12:00 PM', 'Nebulisation'], ['t5', '1:00 PM', 'Repeat ABG']];
+    var tasks = TK.map(function (t, i) { var on = !!S.taskDone[t[0]], late = !on && i === 1;
+      return { time: t[1], t: t[2], mark: on ? '✓' : '', tc: late ? '#B42318' : '#475467',
+        toggle: function () { var nt = Object.assign({}, S.taskDone); nt[t[0]] = on ? 0 : 1; set({ taskDone: nt }); },
+        box: 'width: 18px; height: 18px; border-radius: 5px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; ' + (on ? 'background: #067647; color: #FFFFFF' : 'background: #FFFFFF; border: 2px solid #98A2B3; color: transparent'),
+        style: 'display: flex; gap: 10px; align-items: center; border: 1px solid ' + (late ? '#F4C7C2' : '#E2E7EF') + '; background: ' + (late ? '#FDF0EF' : '#FFFFFF') + '; border-radius: 10px; min-height: 40px; padding: 0 10px; font-size: 13px; color: ' + (on ? '#475467' : '#0B1220') }; });
+
+    return {
+      presets: presets, layoutNote: S.preset === 'mine' ? 'Changed from the preset · saved for Sr. Anjali Pawar' : 'Preset for ' + PRE[S.preset][0].toLowerCase() + 's',
+      edit: S.edit, editLabel: S.edit ? 'Done customising' : 'Customise',
+      editBtn: 'border-radius: 10px; min-height: 40px; padding: 0 16px; font-weight: 700; font-size: 13px; ' + (S.edit ? 'background: #0B6E69; color: #FFFFFF; border: 0' : 'background: #FFFFFF; color: #0B1220; border: 1px solid #CDD5DF'),
+      toggleEdit: function () { set({ edit: !S.edit, lib: false }); },
+      libOpen: S.lib && S.edit, openLib: function () { set({ lib: true }); }, closeLib: function () { set({ lib: false }); }, library: library, libEmpty: !library.length,
+      widgets: widgets,
+      pickerOpen: S.picker, togglePicker: function () { set({ picker: !S.picker }); }, paramCount: params.length,
+      pickerBtn: 'display: flex; align-items: center; gap: 6px; border-radius: 9px; min-height: 34px; padding: 0 12px; font-weight: 600; font-size: 12px; ' + (S.picker ? 'background: #0B6E69; color: #FFFFFF; border: 0' : 'background: #FFFFFF; color: #0B1220; border: 1px solid #CDD5DF'),
+      params: params, paramGroups: paramGroups, trendChips: trendChips, tr: tr,
+      scales: scales, compTodo: compTodo, medsDue: medsDue, orders: orders,
+      dv: dv,
+      noteTypes: noteTypes, phrases: phrases, dar: dar, notes: notes, sign: sign, lines: lines, tasks: tasks
+    };
+  }
+}
+</script>
+</body>
+</html>

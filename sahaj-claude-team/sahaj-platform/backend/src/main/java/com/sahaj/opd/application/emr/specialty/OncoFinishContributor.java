@@ -92,7 +92,7 @@ class OncoFinishContributor implements SpecialtyFinishContributor {
                 continue;
             }
             for (SittingRow sitting : courses.sittingsOf(ctx.tenantId(), List.of(course.id()))) {
-                if (date.equals(sitting.plannedDate()) && sitting.doneAt() == null) {
+                if (date.equals(sitting.plannedDate()) && sitting.doneAt() == null && sitting.missedAt() == null) {
                     return Optional.of(sitting);
                 }
             }

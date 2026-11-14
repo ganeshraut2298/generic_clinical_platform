@@ -78,7 +78,9 @@ public final class SpecialtyValues {
             case "SURGERY_FITNESS" -> uniqueText(value, "tests", "key", errors);
             case "SURGERY_PLAN" -> surgeryPlan(value, old, ctx, errors);
             case "ONC_TOX" -> uniqueText(value, "symptoms", "key", errors);
-            case "ONC_EXAM" -> oncExam(value, old, errors);
+            case "ONC_EXAM" -> oncExam(value, old, ctx, errors, notes);
+            case "PAIN_SCORE" -> painScore(value, errors);
+            case "DENTAL_MED_HISTORY" -> dentalMedHistory(value, old, ctx, errors, notes);
             case "ONC_LABS" -> oncLabs(value, ctx, errors);
             default -> {
                 // no server rule beyond the shape
@@ -504,6 +506,17 @@ public final class SpecialtyValues {
         Map<String, JsonNode> before = byField(old, "givenToday", "vaccineKey");
         Set<String> seen = new HashSet<>();
         ArrayNode given = (ArrayNode) value.get("givenToday");
+        // SAH-75-9 (ADR-026 D8): "Mark all due as given" may press twice; a vaccine sent twice is stored once (set
+        // semantics by vaccineKey, the first entry is kept).
+        ArrayNode unique = NODES.arrayNode();
+        Set<String> sent = new HashSet<>();
+        for (JsonNode entry : given) {
+            if (sent.add(entry.path("vaccineKey").asText())) {
+                unique.add(entry);
+            }
+        }
+        given.removeAll();
+        given.addAll(unique);
         List<PaedsRules.VaccineState> states = ctx.dateOfBirth() == null ? List.of()
                 : PaedsRules.vaccineStates(ctx.ref().groups(), ctx.ref().vaccines(), Set.of(), ctx.dateOfBirth(),
                         ctx.today());
@@ -515,9 +528,7 @@ public final class SpecialtyValues {
                 errors.add(where + ".vaccineKey", "Choose a vaccine from the schedule.");
                 continue;
             }
-            if (!seen.add(key)) {
-                errors.add(where + ".vaccineKey", "This vaccine is listed twice.");
-            }
+            seen.add(key);
             if (ctx.earlierVaccines().contains(key)) {
                 errors.add(where + ".vaccineKey", "This vaccine was given earlier. It cannot be added here.");
                 continue;
@@ -652,7 +663,7 @@ public final class SpecialtyValues {
 
     // ---- ONC_EXAM, ONC_LABS (SAH-65-2, SAH-65-3) ----
 
-    private static void oncExam(ObjectNode value, JsonNode old, Errors errors) {
+    private static void oncExam(ObjectNode value, JsonNode old, SpecialtyCtx ctx, Errors errors, List<Note> notes) {
         Map<String, JsonNode> before = byField(old, "lesions", "id");
         uniqueIds(value, "lesions", errors);
         for (JsonNode raw : value.path("lesions")) {
@@ -663,6 +674,81 @@ public final class SpecialtyValues {
             } else {
                 lesion.putNull("lastCm");
             }
+        }
+        oncBodyMap(value, old, ctx, errors, notes);
+    }
+
+    /** The shared body map rules (pin numbers, stamps, the MLC rule), run for the optional ONC_EXAM body map. */
+    private static final com.sahaj.opd.application.emr.EmrComponentValues BODY_MAPS =
+            new com.sahaj.opd.application.emr.EmrComponentValues(new com.fasterxml.jackson.databind.ObjectMapper());
+
+    /**
+     * SAH-75-5 (ADR-026 D5): the body map of the oncology examination follows the same rules as every body map (ADR-022
+     * D8). Nothing marked is stored as null; pins removed from a map that had medico-legal pins still write the MLC audit.
+     */
+    private static void oncBodyMap(ObjectNode value, JsonNode old, SpecialtyCtx ctx, Errors errors, List<Note> notes) {
+        JsonNode sent = value.get("bodyMap");
+        JsonNode before = old == null || !old.path("bodyMap").isObject() ? null : old.path("bodyMap");
+        boolean sentMap = sent != null && sent.isObject();
+        if (!sentMap && before == null) {
+            value.putNull("bodyMap");
+            return;
+        }
+        JsonNode input = sentMap ? sent : NODES.objectNode().put("component", "BODY_MAP").put("schemaVersion", 1)
+                .set("pins", NODES.arrayNode());
+        try {
+            var result = BODY_MAPS.normalizeBodyMap(input, before,
+                    new com.sahaj.opd.application.emr.EmrComponentValues.Context(ctx.now(), ctx.membershipId(), null,
+                            null));
+            notes.addAll(result.notes());
+            if (sentMap && result.value().path("pins").size() > 0) {
+                value.set("bodyMap", result.value());
+            } else {
+                value.putNull("bodyMap");
+            }
+        } catch (com.sahaj.opd.application.emr.EmrValueRules.InvalidValue e) {
+            errors.add("bodyMap", e.getMessage());
+        }
+    }
+
+    /** SAH-75-5: the pain marker must name one of the drawn body regions (a point outside the figure has none). */
+    private static void painScore(ObjectNode value, Errors errors) {
+        JsonNode marker = value.path("siteMarker");
+        if (marker.isObject() && !com.sahaj.opd.application.emr.EmrComponentValues.REGIONS
+                .containsKey(marker.path("region").asText())) {
+            errors.add("siteMarker.region", "Mark a point on the body figure.");
+        }
+    }
+
+    /**
+     * SAH-75-6 (ADR-026 D6): "Medical history and alerts". NONE beside another chip of its group is refused; the review
+     * stamp is the server's: stamped when the card goes to reviewed, kept while it stays reviewed, cleared when it is
+     * taken back; the audit EMR_DENTAL_MEDHX_REVIEWED holds the new state only, never the chips.
+     */
+    private static void dentalMedHistory(ObjectNode value, JsonNode old, SpecialtyCtx ctx, Errors errors,
+                                         List<Note> notes) {
+        for (String group : List.of("conditions", "medicines", "allergies")) {
+            List<String> chosen = new ArrayList<>();
+            value.path(group).forEach(item -> chosen.add(item.asText()));
+            if (DentalRules.noneWithOthers(chosen)) {
+                errors.add(group, "None cannot be chosen with another option.");
+            }
+        }
+        boolean reviewed = value.path("reviewedWithPatient").asBoolean(false);
+        boolean wasReviewed = old != null && old.path("reviewedWithPatient").asBoolean(false);
+        if (reviewed) {
+            if (wasReviewed && old.path("review").isObject()) {
+                value.set("review", old.get("review"));
+            } else {
+                value.set("review", stamp(ctx));
+            }
+        } else {
+            value.putNull("review");
+        }
+        if (reviewed != wasReviewed) {
+            Map<String, Object> audit = new LinkedHashMap<>();
+            audit.put("reviewed", reviewed);
+            notes.add(new Note("EMR_DENTAL_MEDHX_REVIEWED", audit));
         }
     }
 

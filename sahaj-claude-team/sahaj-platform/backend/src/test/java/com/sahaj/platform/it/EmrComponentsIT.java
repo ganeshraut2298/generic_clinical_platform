@@ -31,6 +31,13 @@ class EmrComponentsIT extends EmrPhase3Support {
         return switchDepartment(startRecord(clinic, doctor), "derm");
     }
 
+    /** The lesion map section with the required Morphology filled too, so the section can be Done (a required field must be filled). */
+    private ObjectNode lesionDone(JsonNode map) {
+        ObjectNode section = oneField("lesion_map", "body_map", map);
+        ((ObjectNode) section.get("values")).put("morphology", "Plaque");
+        return section;
+    }
+
     private static JsonNode bodyMapOf(Rec rec) {
         return valueOf(rec.record(), "lesion_map", "body_map");
     }
@@ -342,9 +349,10 @@ class EmrComponentsIT extends EmrPhase3Support {
         refuseSave(rec, 400, "validation", rxSection(thirtyOne));
         ObjectNode[] thirty = new ObjectNode[30];
         System.arraycopy(thirtyOne, 0, thirty, 0, 30);
-        assertThat(valueOf(save(rec, rxSection(thirty)).record(), "rx", "drug").get("rows")).hasSize(30);
+        Rec saved30 = save(rec, rxSection(thirty));
+        assertThat(valueOf(saved30.record(), "rx", "drug").get("rows")).hasSize(30);
         // the edge values are accepted: 1 and 365 days
-        Rec edge = save(rec, rxSection(rxRow(null, "Syrup one", "1-1-1", 1, "MORNING_EMPTY_STOMACH"), rxRow(null, "Syrup two", "1-0-0", 365, "BEFORE_FOOD")));
+        Rec edge = save(saved30, rxSection(rxRow(null, "Syrup one", "1-1-1", 1, "MORNING_EMPTY_STOMACH"), rxRow(null, "Syrup two", "1-0-0", 365, "BEFORE_FOOD")));
         assertThat(valueOf(edge.record(), "rx", "drug").get("rows").get(1).get("days").asInt()).isEqualTo(365);
     }
 
@@ -385,7 +393,10 @@ class EmrComponentsIT extends EmrPhase3Support {
         assertThat(saved.record().get("completeBlockers").get(0).asText()).isEqualTo("ALLERGY_ALERT");
         assertThat(saved.record().get("readyToComplete").asBoolean()).isFalse();
         // even with every required section Done the footer is not "Ready to complete" while an alert is open
-        Rec ready = save(saved, complaintsSection(typedItem("Fever")),
+        // Vitals is a required General Medicine section since V2026_12_14_1010 (SAH-75), filled with the vitals log editor
+        ObjectNode vitalsLog = (ObjectNode) objectMapper.readTree("{\"component\":\"VITALS_LOG\",\"schemaVersion\":1,\"entries\":[{\"id\":\"5b1f1f0e-0a00-4c00-8000-00000000000b\","
+                + "\"bpSystolic\":120,\"bpDiastolic\":80,\"pulse\":72,\"spo2\":98}]}");
+        Rec ready = save(saved, oneField("vitals", "specialty", vitalsLog), complaintsSection(typedItem("Fever")),
                 oneField("diagnosis", "provisional_diagnosis", listValue("DIAGNOSIS", typedItem("Viral fever"))),
                 sectionValues("rxformat", "{\"header\":{\"text\":\"Header\"}}"));
         assertThat(texts(ready.record().get("stillNeeded"), null)).isEmpty();
@@ -411,7 +422,9 @@ class EmrComponentsIT extends EmrPhase3Support {
         String sulfa = medicineId(SULFA_MEDICINE);
         ObjectNode row = rxRow(sulfa, SULFA_MEDICINE, "1-0-1", 5, "AFTER_FOOD");
         row.putObject("allergyReview").put("allergyClass", "SULFA").put("confirmed", true);
-        Rec saved = save(rec, allergySection("SULFA"), rxSection(row));
+        // the class is added first: a review sent in the same save as the first allergy class is cleared (DEC-051 D1)
+        Rec withAllergy = save(rec, allergySection("SULFA"));
+        Rec saved = save(withAllergy, rxSection(row));
         assertThat(saved.record().get("allergyAlerts").get(0).get("reviewed").asBoolean()).isTrue();
         List<List<String>> audits = auditRows(rec.clinic(), "EMR_ALLERGY_ALERT_REVIEWED");
         assertThat(audits).hasSize(1);
@@ -450,7 +463,8 @@ class EmrComponentsIT extends EmrPhase3Support {
         String sulfa = medicineId(SULFA_MEDICINE);
         ObjectNode row = rxRow(sulfa, SULFA_MEDICINE, "1-0-1", 5, "AFTER_FOOD");
         row.putObject("allergyReview").put("allergyClass", "SULFA").put("confirmed", true);
-        Rec reviewed = save(rec, allergySection("SULFA"), rxSection(row));
+        Rec withAllergy = save(rec, allergySection("SULFA")); // a review in the same save as the first class would be cleared (DEC-051 D1)
+        Rec reviewed = save(withAllergy, rxSection(row));
         assertThat(reviewed.record().get("allergyAlerts").get(0).get("reviewed").asBoolean()).isTrue();
         // another class is added to the allergies: the review is cleared and the alert comes back
         Rec changed = save(reviewed, allergySection("SULFA", "PENICILLIN"));
@@ -508,7 +522,7 @@ class EmrComponentsIT extends EmrPhase3Support {
         ObjectNode forged = pin(1, "FALL", false);
         forged.put("recordedAt", "2001-01-01T00:00:00Z");
         forged.put("recordedByMembershipId", newId());
-        Rec saved = save(rec, oneField("lesion_map", "body_map", bodyMap(false, forged)));
+        Rec saved = save(rec, lesionDone(bodyMap(false, forged)));
         JsonNode stored = bodyMapOf(saved).get("pins").get(0);
         assertThat(stored.get("no").asInt()).isEqualTo(1);
         assertThat(stored.get("region").asText()).isEqualTo("chest");
@@ -672,13 +686,13 @@ class EmrComponentsIT extends EmrPhase3Support {
         for (int i = 0; i < 60; i++) {
             sixty[i] = pin(i + 1, "FALL", false);
         }
-        Rec full = save(rec, oneField("lesion_map", "body_map", bodyMap(false, sixty)));
+        Rec full = save(ok, oneField("lesion_map", "body_map", bodyMap(false, sixty)));
         assertThat(bodyMapOf(full).get("pins")).hasSize(60);
         ObjectNode[] sixtyOne = new ObjectNode[61];
         for (int i = 0; i < 61; i++) {
             sixtyOne[i] = pin(i + 1, "FALL", false);
         }
-        refuseSave(rec, 400, "validation", oneField("lesion_map", "body_map", bodyMap(false, sixtyOne)));
+        refuseSave(full, 400, "validation", oneField("lesion_map", "body_map", bodyMap(false, sixtyOne)));
     }
 
     @Test
@@ -688,10 +702,10 @@ class EmrComponentsIT extends EmrPhase3Support {
         assertThat(recordSection(rec.record(), "lesion_map").get("status").asText()).isEqualTo("REQUIRED");
         Rec empty = save(rec, oneField("lesion_map", "body_map", bodyMap(false)));
         assertThat(recordSection(empty.record(), "lesion_map").get("status").asText()).isEqualTo("REQUIRED");
-        Rec none = save(empty, oneField("lesion_map", "body_map", bodyMap(true)));
+        Rec none = save(empty, lesionDone(bodyMap(true)));
         assertThat(recordSection(none.record(), "lesion_map").get("status").asText()).isEqualTo("DONE");
         assertThat(bodyMapOf(none).get("noFindingsConfirmed").asBoolean()).isTrue();
-        Rec pinned = save(none, oneField("lesion_map", "body_map", bodyMap(false, pin(1, "FALL", false))));
+        Rec pinned = save(none, lesionDone(bodyMap(false, pin(1, "FALL", false))));
         assertThat(recordSection(pinned.record(), "lesion_map").get("status").asText()).isEqualTo("DONE");
         // the old phase 2 text object is refused as a body map value (it is only read from old records)
         refuseSave(pinned, 400, "validation", sectionValues("lesion_map", "{\"body_map\":{\"text\":\"old text\"}}"));

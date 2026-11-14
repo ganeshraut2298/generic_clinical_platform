@@ -1,4 +1,5 @@
 import { ComponentValue } from '../components/component-values.logic';
+import { ALLERGIES, CONDITIONS, MEDICINES } from '../specialty/dental/dental-medhistory.logic';
 import { EmrSpecialtyReference, EmrSpecialtyView } from '../specialty/specialty.model';
 
 /**
@@ -42,6 +43,19 @@ export function specialtyComponentLines(
       }
       const note = value.weightKg != null ? specialty?.paeds?.growthNotes?.[0]?.label : null;
       return [parts.join(' · ') + (note ? ` (${note})` : '')];
+    }
+    case 'DENTAL_MED_HISTORY': {
+      // "Medical history" heading (SAH-75-6): the chosen chips of each group, then the review.
+      const group = (title: string, keys: readonly string[], chips: readonly { key: string; label: string }[]): string[] => {
+        const labels = keys.map((k) => chips.find((c) => c.key === k)?.label ?? humanise(k));
+        return labels.length > 0 ? [`${title}: ${labels.join(', ')}`] : [];
+      };
+      return [
+        ...group('Conditions', value.conditions, CONDITIONS),
+        ...group('Medicines', value.medicines, MEDICINES),
+        ...group('Allergies', value.allergies, ALLERGIES),
+        ...(value.reviewedWithPatient ? ['Reviewed with patient'] : []),
+      ];
     }
     default:
       return [];

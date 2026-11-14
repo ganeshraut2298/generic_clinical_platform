@@ -138,11 +138,11 @@ export function activeItems(items: readonly EmrListItem[]): EmrListItem[] {
   return items.filter((i) => i.active);
 }
 
-/** "3 active", or "3 active · 1 disabled" when some are switched off. */
+/** "3" (the active items), or "3 active · 1 disabled" when some are switched off (EmrList.dc.html:259). */
 export function countText(items: readonly EmrListItem[]): string {
   const active = activeItems(items).length;
   const off = items.length - active;
-  return off > 0 ? `${active} active · ${off} disabled` : `${active} active`;
+  return off > 0 ? `${active} active · ${off} disabled` : String(active);
 }
 
 export function sameText(a: string, b: string): boolean {

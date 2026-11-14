@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { formatDisplayDate } from '../../../../shared/format/ist-date';
 import { newId } from '../specialty.logic';
 import { SpEditor } from '../shared/sp-editor';
 import {
@@ -206,7 +207,7 @@ function typeOf(n: number): 'inc' | 'can' | 'pre' | 'mol' {
                 </label>
                 <label class="field">
                   <span class="sp-lbl">Open mouth · {{ open() }}</span>
-                  <input type="range" min="0" max="140" [value]="open()" (input)="onOpen($event)" />
+                  <input type="range" min="6" max="160" [value]="open()" (input)="onOpen($event)" />
                 </label>
                 <div class="sp-row">
                   <button type="button" class="chip sq" aria-label="Zoom out" (click)="zoomBy(-0.1)">−</button>
@@ -219,43 +220,61 @@ function typeOf(n: number): 'inc' | 'can' | 'pre' | 'mol' {
             </div>
           } @else {
             <div class="detail">
-              <h4 class="sp-h">Surfaces of {{ sel() }} · tap to mark</h4>
-              <div class="cross" role="group" aria-label="Surfaces of the selected tooth">
-                @for (s of cross(); track s.key) {
-                  <button
-                    type="button"
-                    class="surf"
-                    [class]="'pos-' + s.pos"
-                    [class.on]="s.on"
-                    [disabled]="disabled() || !canSurface()"
-                    [attr.aria-pressed]="s.on"
-                    [attr.aria-label]="s.full"
-                    (click)="surface(s.key)"
-                  >
-                    {{ s.label }}
-                  </button>
+              <div class="dcol dsurf">
+                <h4 class="sp-h">Surfaces of {{ sel() }} · tap to mark</h4>
+                <div class="cross" role="group" aria-label="Surfaces of the selected tooth">
+                  @for (s of cross(); track s.key) {
+                    <button
+                      type="button"
+                      class="surf"
+                      [class]="'pos-' + s.pos"
+                      [class.on]="s.on"
+                      [disabled]="disabled() || !canSurface()"
+                      [attr.aria-pressed]="s.on"
+                      [attr.aria-label]="s.full"
+                      (click)="surface(s.key)"
+                    >
+                      {{ s.label }}
+                    </button>
+                  }
+                </div>
+                <p class="sp-sub" data-testid="surf-text">{{ surfText() }}</p>
+              </div>
+              <div class="dcol dside">
+                <h4 class="sp-h">Side view · crown and roots</h4>
+                <div class="side" [class.up]="selUpper()" aria-hidden="true">
+                  <svg viewBox="0 0 40 100" width="90" height="180">
+                    <path [attr.d]="rootPath()" class="root" [class.ghost]="selCondition() === 'Missing'" />
+                    <path [attr.d]="crownPath()" class="crown" [class.ghost]="selCondition() === 'Missing'" [attr.data-cond]="selConditionKey()" />
+                  </svg>
+                </div>
+                <p class="sp-sub">{{ note() }}</p>
+              </div>
+              <div class="dcol dmob">
+                <h4 class="sp-h">Mobility</h4>
+                <div class="sp-row" role="group" aria-label="Mobility">
+                  @for (m of mobility; track m) {
+                    <button type="button" class="chip sq" [class.on]="selTooth().mobility === m" [disabled]="disabled()" (click)="setMobility(m)">G{{ m }}</button>
+                  }
+                </div>
+                <h4 class="sp-h">History of {{ sel() }}</h4>
+                @if (ctx.historyError(); as err) {
+                  <p class="msg crit" role="alert">{{ err }}</p>
                 }
-              </div>
-              <p class="sp-sub" data-testid="surf-text">{{ surfText() }}</p>
-              <h4 class="sp-h">Side view · crown and roots</h4>
-              <div class="side" [class.up]="selUpper()" aria-hidden="true">
-                <svg viewBox="0 0 40 100" width="90" height="180">
-                  <path [attr.d]="rootPath()" class="root" [class.ghost]="selCondition() === 'Missing'" />
-                  <path [attr.d]="crownPath()" class="crown" [class.ghost]="selCondition() === 'Missing'" [attr.data-cond]="selConditionKey()" />
-                </svg>
-              </div>
-              <p class="sp-sub">{{ note() }}</p>
-              <h4 class="sp-h">Mobility</h4>
-              <div class="sp-row" role="group" aria-label="Mobility">
-                @for (m of mobility; track m) {
-                  <button type="button" class="chip sq" [class.on]="selTooth().mobility === m" [disabled]="disabled()" (click)="setMobility(m)">G{{ m }}</button>
+                @for (h of toothHistory(); track $index) {
+                  <div class="hist" data-testid="tooth-history">
+                    <span>{{ h.text }}</span>
+                    <span class="sp-sub">{{ when(h.date) }}</span>
+                  </div>
+                } @empty {
+                  @if (ctx.history() !== null) {
+                    <p class="sp-sub" data-testid="tooth-history-empty">No earlier work on this tooth.</p>
+                  }
                 }
-              </div>
-              <h4 class="sp-h">History of {{ sel() }}</h4>
-              <p class="sp-sub">No treatment recorded for this tooth</p>
-              <div class="sp-row">
-                <button type="button" class="btn" data-act="prev-tooth" (click)="step(-1)">‹ Previous tooth</button>
-                <button type="button" class="btn" data-act="next-tooth" (click)="step(1)">Next tooth ›</button>
+                <div class="sp-row">
+                  <button type="button" class="btn" data-act="prev-tooth" (click)="step(-1)">‹ Previous tooth</button>
+                  <button type="button" class="btn" data-act="next-tooth" (click)="step(1)">Next tooth ›</button>
+                </div>
               </div>
             </div>
           }
@@ -412,12 +431,23 @@ export class ToothChartComponent extends SpEditor<SpToothChart> {
   protected readonly suggestions = computed(() => suggestionsFor(this.selTooth().condition));
   protected readonly legend = computed(() => legendCounts(this.chart(), [...this.upper(), ...this.lower()]));
   protected readonly planKey = computed(() => this.ctx.sectionKeyOf('DENTAL_PLAN'));
+  /** Earlier work on the selected tooth, from the patient's signed visits (contract 0.7.0). */
+  protected readonly toothHistory = computed(() => (this.ctx.history()?.dentalToothHistory ?? []).filter((h) => h.tooth === String(this.sel())));
   protected readonly teeth3d = computed(() => jaw3d(this.chart(), this.upper(), this.lower(), this.open()));
   protected readonly sceneTransform = computed(() => `scale(${this.zoom()}) rotateX(${this.tilt()}deg) rotateY(${this.yaw()}deg)`);
   protected readonly enamel = computed(() => SHADES.find((s) => s.key === this.chart().shade)?.swatch ?? '#F0E3C6');
 
+  protected when(date: string): string {
+    return formatDisplayDate(date);
+  }
+
   constructor() {
     super();
+    effect(() => {
+      if (this.viewTab() === 'detail' && this.ctx.history() === null) {
+        this.ctx.loadHistory();
+      }
+    });
     this.destroyRef.onDestroy(() => this.stopSpin());
   }
 

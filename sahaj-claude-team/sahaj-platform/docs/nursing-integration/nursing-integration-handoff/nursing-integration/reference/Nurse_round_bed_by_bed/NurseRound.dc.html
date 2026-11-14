@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nurse round · bed by bed</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EEF2F7}
+a{color:#0B6E69}a:hover{color:#084F4B}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #0B6E6955;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #EEF2F7; font-family: Inter, system-ui, sans-serif; color: #0B1220; font-size: 14px">
+
+  <header style="background: #0B1220; color: #FFFFFF; display: flex; align-items: center; gap: 14px; padding: 10px 24px; flex-wrap: wrap">
+    <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; display: flex; align-items: center; gap: 8px; border: 1px solid #2B3850; border-radius: 10px; padding: 0 12px; min-height: 36px; font-weight: 600; font-size: 13px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>Back to workspace</a>
+    <div style="display: flex; flex-direction: column">
+      <b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 16px">11 AM nurse round · MICU</b>
+      <small style="font-size: 12px; color: #C7D0DD">Started 11:00 AM · Sr. Anjali Pawar · hourly rounding for high-risk patients, 2-hourly for others</small>
+    </div>
+    <span style="flex: 1"></span>
+    <span style="font-size: 13px; color: #E6EBF2">{{doneCount}} of 5 beds done</span>
+    <button type="button" style="background: transparent; color: #FFFFFF; border: 1px solid #2B3850; border-radius: 10px; min-height: 36px; padding: 0 12px; font-weight: 600; font-size: 13px">Pause round</button>
+  </header>
+
+  <nav aria-label="Beds in this round" style="background: #FFFFFF; border-bottom: 1px solid #E2E7EF; padding: 12px 24px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+    <sc-for list="{{beds}}" as="b" hint-placeholder-count="5">
+      <button type="button" onClick="{{b.pick}}" style="{{b.style}}">
+        <span style="{{b.bar}}"></span>
+        <span style="display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%"><b style="font-size: 13px">{{b.bed}}</b><span style="{{b.stStyle}}">{{b.st}}</span></span>
+        <span style="font-size: 12px; color: #475467; text-align: left">{{b.name}} · NEWS2 {{b.news}}</span>
+      </button>
+    </sc-for>
+  </nav>
+
+  <main style="max-width: 1440px; margin: 0 auto; padding: 20px 24px 40px; box-sizing: border-box; display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start">
+
+    <section aria-label="This bed" style="flex: 4 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+      <div style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 14px">
+          <span style="width: 52px; height: 52px; border-radius: 15px; background: #E6F2F1; color: #0B6E69; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; flex: none">{{p.ini}}</span>
+          <div style="flex: 1; min-width: 0">
+            <h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">{{p.name}}</h1>
+            <span style="font-size: 13px; color: #475467">{{p.meta}}</span>
+          </div>
+          <span style="{{p.newsStyle}}"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px">{{p.news}}</b><small style="font-size: 9px; font-weight: 700; letter-spacing: 0.06em">NEWS2</small></span>
+        </div>
+        <div style="font-size: 14px">{{p.dx}}</div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{p.flags}}" as="f" hint-placeholder-count="3">
+            <span style="{{f.style}}">{{f.t}}</span>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px">Check at this bed</h2>
+        <span style="font-size: 12px; color: #475467">Pulled from the medicine chart, orders and assessment due times</span>
+        <sc-for list="{{p.todo}}" as="t" hint-placeholder-count="3">
+          <div style="{{t.style}}">
+            <span style="{{t.dot}}"></span>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 1px"><b style="font-size: 13px">{{t.t}}</b><small style="font-size: 12px; color: #475467">{{t.s}}</small></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px">Patient not available?</h2>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{away}}" as="w" hint-placeholder-count="4">
+            <button type="button" onClick="{{w.pick}}" style="{{w.style}}">{{w.t}}</button>
+          </sc-for>
+        </div>
+        <span style="font-size: 12px; color: #475467">The bed is marked and you are reminded to come back within 30 minutes.</span>
+      </div>
+    </section>
+
+    <section aria-label="Round checklist" style="flex: 6 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 18px; flex: 1">Round checklist · {{p.bed}}</h2>
+        <span style="font-size: 13px; color: #475467">{{checked}} of {{checkTotal}} done</span>
+        <button type="button" onClick="{{allOk}}" style="background: #E7F4EE; color: #067647; border: 0; border-radius: 10px; min-height: 36px; padding: 0 12px; font-weight: 700; font-size: 13px">All normal</button>
+      </div>
+      <div style="height: 6px; background: #EEF1F5; border-radius: 999px; overflow: hidden"><div style="height: 6px; width: {{checkPct}}%; background: #0B6E69; border-radius: 999px"></div></div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+        <div style="border: 1px solid #E2E7EF; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+          <b style="font-size: 14px">Pain</b>
+          <div role="group" aria-label="Pain score 0 to 10" style="display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px">
+            <sc-for list="{{painScale}}" as="s" hint-placeholder-count="11">
+              <button type="button" onClick="{{s.pick}}" aria-label="Pain {{s.n}}" style="{{s.style}}">{{s.n}}</button>
+            </sc-for>
+          </div>
+          <span style="font-size: 12px; color: {{painColor}}">{{painNote}}</span>
+        </div>
+        <div style="border: 1px solid #E2E7EF; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+          <b style="font-size: 14px">Position</b>
+          <div role="group" aria-label="Position now" style="display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{positions}}" as="s" hint-placeholder-count="4">
+              <button type="button" onClick="{{s.pick}}" style="{{s.style}}">{{s.t}}</button>
+            </sc-for>
+          </div>
+          <span style="font-size: 12px; color: #475467">Last turned 10:00 AM to the left side · Braden 14, turn every 2 hours</span>
+        </div>
+      </div>
+
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <b style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #475467">{{g.name}}</b>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+            <sc-for list="{{g.items}}" as="it" hint-placeholder-count="4">
+              <div style="{{it.row}}">
+                <span style="flex: 1; font-size: 13px; font-weight: 500">{{it.t}}</span>
+                <button type="button" onClick="{{it.yes}}" aria-label="{{it.t}}: yes" style="{{it.yesStyle}}">Yes</button>
+                <button type="button" onClick="{{it.no}}" aria-label="{{it.t}}: needs action" style="{{it.noStyle}}">Act</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <b style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #475467">Quick vitals <span style="font-weight: 500; text-transform: none; letter-spacing: 0">· optional, due every 30 min for this patient</span></b>
+        <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+          <sc-for list="{{qv}}" as="v" hint-placeholder-count="6">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #475467">{{v.l}}<input value="{{v.v}}" placeholder="{{v.ph}}" aria-label="{{v.l}}" style="border: 1px solid #CDD5DF; border-radius: 10px; min-height: 42px; padding: 0 10px; font-size: 15px; font-weight: 600; color: #0B1220; font-family: inherit"></label>
+          </sc-for>
+        </div>
+      </div>
+
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #344054">One-line round note
+        <input placeholder="e.g. Settled, son at bedside, asked for water" style="border: 1px solid #CDD5DF; border-radius: 12px; min-height: 44px; padding: 0 12px; font-size: 14px; color: #0B1220; font-family: inherit">
+      </label>
+
+      <sc-if value="{{hasAct}}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FEF6E0; color: #7A4A00; border-radius: 12px; padding: 10px 14px; font-size: 13px">{{actNote}}</div>
+      </sc-if>
+
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-top: 1px solid #EEF1F5; padding-top: 14px">
+        <button type="button" onClick="{{prev}}" style="background: #FFFFFF; border: 1px solid #CDD5DF; border-radius: 12px; min-height: 48px; padding: 0 16px; font-weight: 600">Previous bed</button>
+        <span style="flex: 1"></span>
+        <button type="button" onClick="{{finish}}" style="background: #0B6E69; color: #FFFFFF; border: 0; border-radius: 12px; min-height: 48px; padding: 0 22px; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px">{{nextLabel}}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+      </div>
+    </section>
+
+    <section aria-label="Round summary" style="flex: 1 1 100%; background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 18px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 15px">Round summary</h2><span style="font-size: 12px; color: #475467">Saved to each patient's record and the ward rounding log</span></div>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{summary}}" as="s" hint-placeholder-count="5">
+          <div style="{{s.style}}"><b style="font-size: 13px">{{s.bed}}</b><span style="font-size: 12px; color: #475467">{{s.t}}</span></div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cur: 1, done: { 0: 'done' }, pain: {}, pos: {}, ans: {}, away: {} };
+  }
+  renderVals() {
+    var S = this.state, self = this, set = function (o) { self.setState(o); };
+    var P = [
+      { bed: 'MICU-04', name: 'Ramesh Kale', news: 7, meta: '63 y · Male · Day 2 · Dr. Meera Kulkarni', dx: 'COPD flare-up, type 2 respiratory failure, diabetes', flags: [['Allergy: Penicillin', 'crit'], ['Fall risk high', 'warn'], ['Droplet precautions', 'info']], todo: [['Escalated · doctor review due 11:05', 'NEWS2 7, vitals every 30 min', 'crit'], ['Insulin overdue', 'CBG 248 at 10:30 AM', 'crit'], ['Pain reassessment overdue', '6/10 at 9:10 AM after paracetamol', 'warn']] },
+      { bed: 'MICU-05', name: 'Sunita Sawant', news: 5, meta: '58 y · Female · Day 3 · Dr. Meera Kulkarni', dx: 'Community-acquired pneumonia, sepsis improving', flags: [['No known allergy', 'good'], ['Pressure risk moderate', 'warn'], ['Central line day 3', 'info']], todo: [['Turn due now', 'Last turned 9:00 AM to the right', 'warn'], ['Central line dressing check', 'Bundle check due this shift', 'warn'], ['Inj. Meropenem 1 g at 12 PM', 'Prepare after the round', 'info']] },
+      { bed: 'MICU-07', name: 'Anil Gaikwad', news: 3, meta: '47 y · Male · Day 1 after laparotomy · Dr. Suresh Nair', dx: 'Post-op day 1, exploratory laparotomy', flags: [['Allergy: Sulfa drugs', 'crit'], ['Drain in situ', 'info'], ['Nil by mouth', 'warn']], todo: [['Drain output since 8 AM', 'Last 60 ml serous', 'info'], ['Pain score after epidural top-up', 'Due now', 'warn'], ['Urinary catheter: still needed?', 'Ask at the doctor round', 'info']] },
+      { bed: 'MICU-08', name: 'Leela Gokhale', news: 1, meta: '72 y · Female · Day 4 · Dr. Meera Kulkarni', dx: 'Diabetic foot ulcer, right heel', flags: [['Allergy: Penicillin', 'crit'], ['Fall risk high', 'warn']], todo: [['Heel off-loading check', 'Pillow under calf', 'info'], ['Wound dressing at 11:30', 'Normal saline dressing', 'info']] },
+      { bed: 'MICU-10', name: 'Vikas Thorat', news: 0, meta: '45 y · Male · Day 3 · Dr. Meera Kulkarni', dx: 'Recovered DKA, going home today', flags: [['No known allergy', 'good'], ['Discharge today', 'info']], todo: [['Insulin pen teaching', 'Teach-back before discharge', 'info'], ['Remove IV cannula after last dose', 'Document site', 'info']] }
+    ];
+    var c = S.cur, p = P[c];
+    var tone = { crit: ['#B42318', '#FDF0EF'], warn: ['#8A5300', '#FEF6E0'], info: ['#1D4FB8', '#EAF0FD'], good: ['#067647', '#E7F4EE'] };
+    var newsTone = function (n) { return n >= 7 ? 'crit' : n >= 5 ? 'warn' : n >= 1 ? 'info' : 'good'; };
+
+    var GR = [
+      ['Comfort and needs', [['toil', 'Toilet or bedpan offered'], ['drink', 'Water and food within reach'], ['sleep', 'Rested, not distressed'], ['fam', 'Family updated if present']]],
+      ['Safety', [['bed', 'Bed lowest, brakes on'], ['bell', 'Call bell within reach'], ['rails', 'Side rails as per fall plan'], ['foot', 'Non-slip footwear or bed rest']]],
+      ['Lines, devices and skin', [['iv', 'IV site clean, no redness (VIP 0–1)'], ['o2', 'Oxygen device and flow as ordered'], ['drain', 'Drains and catheter patent, bag below bed'], ['skin', 'Heels and sacrum checked']]]
+    ];
+    var ansKey = function (k) { return c + '-' + k; };
+    var total = 2, chk = 0, acts = [];
+    if (S.pain[c] != null) chk++; if (S.pos[c]) chk++;
+    var groups = GR.map(function (g) {
+      return { name: g[0], items: g[1].map(function (it) {
+        total++; var a = S.ans[ansKey(it[0])]; if (a) chk++; if (a === 'no') acts.push(it[1]);
+        var mk = function (v) { return function () { var na = Object.assign({}, S.ans); na[ansKey(it[0])] = na[ansKey(it[0])] === v ? 0 : v; set({ ans: na }); }; };
+        var bs = function (on, col, bg) { return 'border-radius: 9px; min-height: 36px; min-width: 52px; padding: 0 10px; font-weight: 700; font-size: 12px; border: 1px solid ' + (on ? col : '#CDD5DF') + '; background: ' + (on ? bg : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054'); };
+        return { t: it[1], yes: mk('yes'), no: mk('no'), yesStyle: bs(a === 'yes', '#067647', '#067647'), noStyle: bs(a === 'no', '#B54708', '#B54708'),
+          row: 'display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 12px; border: 1px solid ' + (a === 'no' ? '#E9C46A' : '#E2E7EF') + '; background: ' + (a === 'yes' ? '#F3FAF6' : a === 'no' ? '#FFFBF0' : '#FFFFFF') };
+      }) };
+    });
+    var painScale = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+      var on = S.pain[c] === n, col = n >= 7 ? '#B42318' : n >= 4 ? '#B54708' : '#067647';
+      return { n: n, pick: function () { var np = Object.assign({}, S.pain); np[c] = n; set({ pain: np }); },
+        style: 'min-height: 40px; border-radius: 9px; font-weight: 700; font-size: 13px; border: 1px solid ' + (on ? col : '#E2E7EF') + '; background: ' + (on ? col : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : col) };
+    });
+    var pv = S.pain[c];
+    var positions = ['Left side', 'Right side', 'On back, head up', 'Sitting in chair'].map(function (t) {
+      var on = S.pos[c] === t;
+      return { t: t, pick: function () { var np = Object.assign({}, S.pos); np[c] = t; set({ pos: np }); },
+        style: 'border-radius: 10px; min-height: 40px; padding: 0 12px; font-weight: 600; font-size: 13px; border: 1px solid ' + (on ? '#0B6E69' : '#CDD5DF') + '; background: ' + (on ? '#0B6E69' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054') };
+    });
+    var away = ['Asleep, not woken', 'Off the ward (X-ray)', 'Refused', 'Doctor at bedside'].map(function (t) {
+      var on = S.away[c] === t;
+      return { t: t, pick: function () { var na = Object.assign({}, S.away); na[c] = on ? 0 : t; set({ away: na }); },
+        style: 'border-radius: 999px; min-height: 36px; padding: 0 12px; font-weight: 600; font-size: 12px; border: 1px solid ' + (on ? '#475467' : '#CDD5DF') + '; background: ' + (on ? '#475467' : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#344054') };
+    });
+
+    var status = function (i) { return i === c ? 'now' : S.done[i] || 'todo'; };
+    var STL = { now: ['In progress', '#0B6E69', '#E6F2F1'], done: ['Done', '#067647', '#E7F4EE'], skip: ['Come back', '#8A5300', '#FEF6E0'], flag: ['Done · action', '#B54708', '#FEF6E0'], todo: ['Not yet', '#475467', '#EEF1F5'] };
+    var beds = P.map(function (b, i) {
+      var st = status(i), L = STL[st], nt = tone[newsTone(b.news)];
+      return { bed: b.bed, name: b.name, news: b.news, st: L[0], pick: function () { set({ cur: i }); },
+        stStyle: 'font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; color: ' + L[1] + '; background: ' + L[2],
+        bar: 'height: 4px; width: 100%; border-radius: 999px; background: ' + nt[0],
+        style: 'display: flex; flex-direction: column; gap: 6px; align-items: flex-start; border: ' + (i === c ? '2px solid #0B6E69' : '1px solid #E2E7EF') + '; background: ' + (i === c ? '#F4FAF9' : '#FFFFFF') + '; border-radius: 12px; padding: 8px 12px 10px; min-height: 64px; color: #0B1220' };
+    });
+    var doneCount = P.filter(function (b, i) { return S.done[i] === 'done' || S.done[i] === 'flag'; }).length;
+    var nt = tone[newsTone(p.news)];
+    var finish = function () {
+      var nd = Object.assign({}, S.done); nd[c] = S.away[c] ? 'skip' : acts.length || (pv != null && pv >= 4) ? 'flag' : 'done';
+      var nx = -1; for (var k = 1; k <= P.length; k++) { var j = (c + k) % P.length; if (!nd[j] || nd[j] === 'skip') { nx = j; break; } }
+      set({ done: nd, cur: nx < 0 ? c : nx });
+    };
+    var actNote = acts.length ? 'Needs action: ' + acts.join('; ') + '. A task is added for you and shown in the workspace.' : '';
+    if (pv != null && pv >= 4) actNote = (actNote ? actNote + ' ' : '') + 'Pain ' + pv + '/10: give analgesia as ordered and reassess within 60 minutes.';
+    var SUM = { done: 'All normal', flag: 'Done · follow-up added', skip: 'Come back by ' + '11:40 AM', now: 'In progress', todo: 'Not yet' };
+    var summary = P.map(function (b, i) { var st = status(i), L = STL[st];
+      return { bed: b.bed + ' · ' + b.name.split(' ')[0], t: i === 0 && st === 'done' ? 'All normal · 11:04 AM' : SUM[st], style: 'display: flex; flex-direction: column; gap: 2px; border-radius: 12px; padding: 10px 12px; background: ' + L[2] }; });
+
+    return {
+      beds: beds, doneCount: doneCount,
+      p: { bed: p.bed, name: p.name, meta: p.meta, dx: p.dx, news: p.news, ini: p.name.split(' ').map(function (x) { return x[0]; }).join(''),
+        newsStyle: 'width: 58px; height: 52px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; color: ' + (p.news >= 7 ? '#FFFFFF' : nt[0]) + '; background: ' + (p.news >= 7 ? '#B42318' : nt[1]),
+        flags: p.flags.map(function (f) { return { t: f[0], style: 'border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; ' + (f[1] === 'crit' ? 'background: #B42318; color: #FFFFFF' : 'background: ' + tone[f[1]][1] + '; color: ' + tone[f[1]][0]) }; }),
+        todo: p.todo.map(function (t) { return { t: t[0], s: t[1], style: 'display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: ' + tone[t[2]][1],
+          dot: 'width: 9px; height: 9px; border-radius: 999px; margin-top: 5px; flex: none; background: ' + tone[t[2]][0] }; }) },
+      groups: groups, painScale: painScale, positions: positions, away: away,
+      painNote: pv == null ? 'Ask the patient to rate the pain now' : pv >= 7 ? 'Severe: inform the doctor and give analgesia as ordered' : pv >= 4 ? 'Moderate: analgesia as ordered, reassess within 60 minutes' : 'Mild or none: continue current plan',
+      painColor: pv == null ? '#475467' : pv >= 7 ? '#B42318' : pv >= 4 ? '#8A5300' : '#067647',
+      checked: chk, checkTotal: total, checkPct: Math.round(chk / total * 100),
+      allOk: function () { var na = Object.assign({}, S.ans); GR.forEach(function (g) { g[1].forEach(function (it) { na[ansKey(it[0])] = 'yes'; }); }); set({ ans: na }); },
+      qv: [['Pulse', '', '80'], ['Resp', '', '16'], ['SpO₂ %', '', '92'], ['BP', '', '120/80'], ['Temp °C', '', '37.0'], ['AVPU', '', 'Alert']].map(function (v) { return { l: v[0], v: v[1], ph: v[2] }; }),
+      hasAct: !!actNote, actNote: actNote,
+      prev: function () { set({ cur: (c + P.length - 1) % P.length }); },
+      finish: finish, nextLabel: S.away[c] ? 'Mark come back · next bed' : doneCount >= 4 ? 'Finish round' : 'Save and next bed',
+      summary: summary
+    };
+  }
+}
+</script>
+</body>
+</html>

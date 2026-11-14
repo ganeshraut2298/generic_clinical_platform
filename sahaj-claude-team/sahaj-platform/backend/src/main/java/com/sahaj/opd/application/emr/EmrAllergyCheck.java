@@ -26,6 +26,8 @@ public final class EmrAllergyCheck {
 
     public static final String ALLERGY_SECTION = "allergy";
     public static final String ALLERGY_FIELD = "drug_allergy";
+    /** The Dental card whose Penicillin chip joins the visit's classes (SAH-75-6). */
+    public static final String DENTAL_MEDHX_SECTION = "dental_medhx";
 
     private EmrAllergyCheck() {
     }
@@ -43,6 +45,7 @@ public final class EmrAllergyCheck {
     /** The allergy class keys picked in this record's Allergies section, in the order picked. */
     public static Set<String> visitClasses(EmrRecordDocument document, Set<String> knownClasses) {
         Set<String> classes = new LinkedHashSet<>();
+        addDentalClasses(document, knownClasses, classes);
         JsonNode list = document.values(ALLERGY_SECTION).get(ALLERGY_FIELD);
         if (list == null) {
             return classes;
@@ -57,6 +60,23 @@ public final class EmrAllergyCheck {
             }
         }
         return classes;
+    }
+
+    /**
+     * SAH-75-6 (ADR-026 D6): the Penicillin chip of the Dental "Medical history and alerts" card joins the visit's allergy
+     * classes; the other chips have no class (ADR-026 H15). Only a class the clinic's list knows is added.
+     */
+    private static void addDentalClasses(EmrRecordDocument document, Set<String> knownClasses, Set<String> classes) {
+        JsonNode medhx = document.values(DENTAL_MEDHX_SECTION).path("specialty");
+        if (!"DENTAL_MED_HISTORY".equals(medhx.path("component").asText())) {
+            return;
+        }
+        for (JsonNode chip : medhx.path("allergies")) {
+            String cls = com.sahaj.opd.domain.emr.specialty.DentalRules.MED_ALLERGY_CLASS.get(chip.asText());
+            if (cls != null && knownClasses.contains(cls)) {
+                classes.add(cls);
+            }
+        }
     }
 
     /** All alerts of the record: every shown section's prescription components against the visit's classes. */

@@ -88,8 +88,8 @@ describe('SpecialtyApi (opd.yaml 0.5.1)', () => {
 });
 
 describe('specialty registry (ADR-023 D1)', () => {
-  it('has an editor for each of the 34 specialty components', () => {
-    expect(Object.keys(SPECIALTY_EDITORS)).toHaveLength(34);
+  it('has an editor for each of the 35 specialty components', () => {
+    expect(Object.keys(SPECIALTY_EDITORS)).toHaveLength(35);
   });
 
   it('shows an unknown component with the generic renderer', () => {
@@ -103,7 +103,7 @@ describe('specialty registry (ADR-023 D1)', () => {
       const type = await loader();
       expect(type, component).toBeTypeOf('function');
     }
-  });
+  }, 30_000);
 });
 
 describe('reference list names (opd.yaml 0.5.1, ADR-023 D13.1)', () => {

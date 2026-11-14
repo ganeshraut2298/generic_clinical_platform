@@ -16,7 +16,7 @@ import { OncDecisionKey, OncDeviationReason } from '../specialty.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ['../specialty.shared.scss', './onco.scss'],
   template: `
-    <section class="sp card" aria-labelledby="onc-decision-h">
+    <section class="sp card" id="onc-decision" tabindex="-1" aria-labelledby="onc-decision-h">
       <h3 id="onc-decision-h" class="sp-h big">5 · Today’s decision</h3>
       <div class="sp-row">
         <b data-testid="suggested">{{ suggestedText() }}</b>

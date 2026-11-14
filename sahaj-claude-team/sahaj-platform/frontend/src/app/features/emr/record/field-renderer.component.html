@@ -117,7 +117,39 @@
       </div>
     }
     @case ('CHOICE') {
-      @if (field().options.length > 0) {
+      @if (tiles()) {
+        <div class="tiles" role="group" [attr.aria-labelledby]="inputId() + '-l'" data-testid="tile-grid">
+          @for (o of field().options; track o.key) {
+            <button
+              type="button"
+              class="tile"
+              [attr.aria-pressed]="text() === o.key"
+              [disabled]="disabled()"
+              (click)="pickSingle(o.key)"
+            >
+              <span class="tl">{{ o.label }}</span>
+              @if (o.hint) {
+                <span class="th">{{ o.hint }}</span>
+              }
+            </button>
+          }
+        </div>
+      } @else if (chips() && field().options.length > 0) {
+        <div class="picks" role="group" [attr.aria-labelledby]="inputId() + '-l'" data-testid="chip-row">
+          @for (o of field().options; track o.key) {
+            <button
+              type="button"
+              class="pick"
+              [class.alert]="o.alert && text() === o.key"
+              [attr.aria-pressed]="text() === o.key"
+              [disabled]="disabled()"
+              (click)="pickSingle(o.key)"
+            >
+              {{ chipLabel(o.label, text() === o.key) }}
+            </button>
+          }
+        </div>
+      } @else if (field().options.length > 0) {
         <select
           class="input"
           [id]="inputId()"
@@ -145,20 +177,44 @@
       }
     }
     @case ('MULTI_CHOICE') {
-      @if (field().options.length > 0) {
+      @if (tiles()) {
+        <div class="tiles" role="group" [attr.aria-labelledby]="inputId() + '-l'" data-testid="tile-grid">
+          @for (o of field().options; track o.key) {
+            <button
+              type="button"
+              class="tile"
+              [attr.aria-pressed]="multi().includes(o.key)"
+              [disabled]="disabled()"
+              (click)="togglePick(o.key)"
+            >
+              <span class="tl">{{ o.label }}</span>
+              @if (o.hint) {
+                <span class="th">{{ o.hint }}</span>
+              }
+            </button>
+          }
+        </div>
+      } @else if (field().options.length > 0) {
         <div class="picks" role="group" [attr.aria-labelledby]="inputId() + '-l'">
           @for (o of field().options; track o.key) {
             <button
               type="button"
               class="pick"
+              [class.alert]="chips() && o.alert && multi().includes(o.key)"
               [attr.aria-pressed]="multi().includes(o.key)"
               [disabled]="disabled()"
               (click)="togglePick(o.key)"
             >
-              {{ o.label }}
+              {{ chips() ? chipLabel(o.label, multi().includes(o.key)) : o.label }}
             </button>
           }
         </div>
+        @if (chips() && field().key === 'images') {
+          <div class="later" data-testid="images-later">
+            <button type="button" class="input" disabled [attr.aria-describedby]="inputId() + '-later'">Attach image</button>
+            <span class="pill p-wait" [id]="inputId() + '-later'">Later</span>
+          </div>
+        }
       } @else {
         <input
           class="input"

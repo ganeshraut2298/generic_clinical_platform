@@ -351,7 +351,8 @@ class SetupAndShellIT extends SweepSupport {
         assertThat(first.get("preferences").get("language").asText()).isEqualTo("mr");
         assertThat(first.get("preferences").get("theme").asText()).isEqualTo("dark");
         assertThat(first.get("preferences").get("sidebarCollapsed").asBoolean()).isTrue();
-        assertThat(first.get("menu").size()).isLessThanOrEqualTo(6);
+        // the simple menu has 6 items, plus Second checks for an owner with doctor details (SAH-66)
+        assertThat(first.get("menu").size()).isLessThanOrEqualTo(7);
         JsonNode second = ok(HttpMethod.PATCH, ME + "/preferences", clinic.owner(), "{\"theme\":\"light\"}", 200);
         assertThat(second.get("preferences").get("theme").asText()).isEqualTo("light");
         assertThat(second.get("preferences").get("language").asText()).isEqualTo("mr");

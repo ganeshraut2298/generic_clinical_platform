@@ -17,7 +17,7 @@
     >
       <app-icon [name]="collapsed() ? 'chevR' : 'chevD'" [size]="16" />
       <h3 [id]="'sec-h-' + section().key">
-        {{ section().name }}@if (section().required) {<span class="star" aria-hidden="true"> *</span>}
+        {{ heading() }}@if (section().required) {<span class="star" aria-hidden="true"> *</span>}
       </h3>
     </button>
     <span
@@ -30,6 +30,9 @@
     >
     @if (section().source === 'FORM') {
       <span class="pill p-teal" data-testid="custom-tag">Custom</span>
+    }
+    @if (subLine(); as line) {
+      <span class="faint t-xs sub" data-testid="card-subline">{{ line }}</span>
     }
     @if (fillers()) {
       <span class="faint t-xs who">Can be filled by: {{ fillers() }}</span>
@@ -75,7 +78,7 @@
             }
           </div>
         }
-        <app-specialty-host [section]="section()" />
+        <app-specialty-host [section]="section()" [area]="area()" />
       } @else {
         @if (section().key === 'vitals' && store.record()?.encounterType === 'IPD_ROUND') {
           <app-vitals-note />

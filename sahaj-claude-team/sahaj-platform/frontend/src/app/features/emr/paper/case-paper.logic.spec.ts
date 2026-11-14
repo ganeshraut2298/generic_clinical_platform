@@ -9,6 +9,7 @@ import {
   subtitle,
   visibleRows,
   vitalsLine,
+  sentToPrinter,
 } from './case-paper.logic';
 
 function listValue(kind: EmrListValue['kind'], items: Partial<EmrListItem>[]): EmrListValue {
@@ -195,5 +196,13 @@ describe('live case paper (SAH-55)', () => {
       expect(readyFooter('EN')).toBe('Ready to complete. Prescription prints in English with English drug names.');
       expect(readyFooter(null)).toBe('Ready to complete.');
     });
+  });
+});
+
+describe('the print message (SAH-75-8 G17-3)', () => {
+  it('says "Sent to printer · A4", and warns when fewer than 5 sections are filled', () => {
+    expect(sentToPrinter('A4', 8)).toBe('Sent to printer · A4');
+    expect(sentToPrinter('A5', 4)).toBe('Sent to printer · A5 · some sections are still empty');
+    expect(sentToPrinter('A4', 5)).toBe('Sent to printer · A4');
   });
 });

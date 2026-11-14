@@ -74,8 +74,17 @@
             @if (visitText(); as v) {
               · {{ v }}
             }
+            @if (courseLine(); as c) {
+              · <span data-testid="course-line">{{ c }}</span>
+            }
           </span>
         </div>
+        @if (profileChip(); as chip) {
+          <span class="pill vax" [class.p-crit]="chip.tone === 'crit'" [class.p-warn]="chip.tone === 'warn'" [class.p-good]="chip.tone === 'good'" [attr.data-testid]="chip.id">{{ chip.text }}</span>
+        }
+        @if (noAllergyChip(); as na) {
+          <span class="pill p-wait" data-testid="no-allergy-chip">{{ na }}</span>
+        }
         <span class="faint dr">
           {{ h.doctor.name }}
           @if (h.doctor.room) {
@@ -85,7 +94,7 @@
       </div>
 
       <div class="tags">
-        @if (h.allergyText; as a) {
+        @if (redAllergy(); as a) {
           <span class="pill p-crit">Allergy: {{ a }}</span>
         }
         @if (h.chronicText; as c) {

@@ -226,7 +226,8 @@ class EmrCourseAdmissionIT extends IpdBillingSupport {
         // the beds made for the refused tries are all still free (the admission would have taken one)
         assertThat(count(s.clinic(), "select count(*) from ipd.bed b where not exists (select 1 from ipd.admission a where a.bed_id = b.id)")).isEqualTo(3);
         // the real one works, then the same sitting a second time is refused and writes nothing more
-        admitOk(s.clinic(), admitBody(s, s.s2()));
+        JsonNode firstAdmission = admitOk(s.clinic(), admitBody(s, s.s2()));
+        discharge(s.clinic(), firstAdmission.get("id").asText()); // else the same patient answers already-admitted before the sitting is looked at
         long afterFirst = rows(s.clinic(), "admission");
         JsonNode again = problem(call(HttpMethod.POST, ADMISSIONS, s.clinic().owner(), js(admitBody(s, s.s2()))), 409);
         assertThat(again.get("type").asText()).isEqualTo(PROBLEM_BASE + "course-sitting-not-available");

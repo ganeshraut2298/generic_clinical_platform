@@ -52,6 +52,18 @@ class EmrDentalSendToBillingIT extends EmrSignSupport {
     }
 
     /**
+     * The Dental starter (layout v2, SAH-75) requires complaints, dental_medhx, diagnosis and tx_plan; it has no vitals log.
+     * Saves complaints, diagnosis, the medical history card (None on each chip group, reviewed with the patient) and the
+     * prescription and its format; the tooth chart and the treatment plan are saved by the caller.
+     */
+    private Rec fillDentalRequired(Rec rec) throws Exception {
+        return save(rec, sectionValues("complaints", COMPLAINTS_JSON), sectionValues("diagnosis", DIAGNOSIS_JSON),
+                spSection("dental_medhx", "DENTAL_MED_HISTORY", "{\"conditions\":[\"NONE\"],\"medicines\":[\"NONE\"],\"allergies\":[\"NONE\"],"
+                        + "\"reviewedWithPatient\":true}"),
+                sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
+    }
+
+    /**
      * Opens a Dental visit and fills it like the screen. Row A (Root canal, tooth 16, Rs 1,000) and row B (Scaling, tooth 21,
      * no amount) are marked Done today; row C (Composite filling, tooth 26, 2 sittings) stays Planned when {@code openRow}.
      * With {@code course} the course is built from the plan before the rows are marked Done ("Book next sitting" needs it).
@@ -67,7 +79,7 @@ class EmrDentalSendToBillingIT extends EmrSignSupport {
         String a = uuid();
         String b = uuid();
         String c = uuid();
-        rec = fillRequired(rec);
+        rec = fillDentalRequired(rec);
         rec = save(rec, spSection("dental_chart", "TOOTH_CHART", chart()));
         String openRowJson = openRow ? "," + planRow(c, 26, "COMPOSITE_FILLING", "Composite filling", 2, 60000L, "PLANNED") : "";
         rec = save(rec, spSection("tx_plan", "DENTAL_PLAN", plan(planRow(a, 16, "ROOT_CANAL", "Root canal", 1, ROOT_CANAL_PAISE, "PLANNED") + ","

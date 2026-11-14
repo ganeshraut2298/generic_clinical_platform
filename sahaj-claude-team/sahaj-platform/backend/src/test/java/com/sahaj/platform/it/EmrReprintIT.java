@@ -245,7 +245,7 @@ class EmrReprintIT extends EmrSignSupport {
             JsonNode og = full.get("specialty").get("og");
             assertThat(og.get("edd").asText()).isEqualTo(edd);
             assertThat(og.has("gestationalAge")).isTrue();
-            assertThat(og.get("formFRequired").asBoolean()).as("a growth scan was ordered and Form F is not signed").isTrue();
+            assertThat(og.get("formFRequired").asBoolean()).as("a growth scan was ordered, but the helper signs Form F, so nothing is still required").isFalse();
             assertThat(texts(full.get("layout").get("sections"), "key")).as("ANC is not a print-on section here").doesNotContain("anc", "pcpndt");
         }
         for (String role : new String[] {"FRONT_DESK", "PHARMACIST"}) {

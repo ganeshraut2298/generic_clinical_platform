@@ -77,8 +77,10 @@ describe('LoginPage', () => {
   });
 
   afterEach(() => {
-    http.verify();
+    // Restore the globals first: a stub left behind by a failed test breaks every later test in the same worker.
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    http.verify();
   });
 
   it('shows Log in heading and Log in toggle pressed by default', async () => {
@@ -497,40 +499,42 @@ describe('LoginPage', () => {
       expect(group().classList.contains('thumb-slide')).toBe(false);
     });
 
-    it('keeps one tab pressed and the group label', async () => {
+    it('keeps one tab selected and the group label', async () => {
       await open('/login', false);
       await choose(1);
-      const pressed = Array.from(root().querySelectorAll('mat-button-toggle button')).filter(
-        (button) => button.getAttribute('aria-pressed') === 'true',
-      );
-      expect(pressed.length).toBe(1);
-      expect(pressed[0].textContent!.trim()).toBe('New clinic');
+      // A single-choice Material toggle group is a radio group: the chosen tab has aria-checked, not aria-pressed.
+      const tabs = Array.from(root().querySelectorAll('mat-button-toggle button'));
+      expect(tabs.every((button) => button.getAttribute('role') === 'radio')).toBe(true);
+      const selected = tabs.filter((button) => button.getAttribute('aria-checked') === 'true');
+      expect(selected.length).toBe(1);
+      expect(selected[0].textContent!.trim()).toBe('New clinic');
       expect(group().getAttribute('aria-label')).toBe('Account');
     });
 
     it('lines up again, without a slide, when the group is resized', async () => {
-      const callbacks: (() => void)[] = [];
+      // The Material form field also watches its label with a ResizeObserver, so the stub needs the whole API.
+      const callbacks: ResizeObserverCallback[] = [];
       vi.stubGlobal(
         'ResizeObserver',
         class {
-          constructor(callback: () => void) {
+          constructor(callback: ResizeObserverCallback) {
             callbacks.push(callback);
           }
-          observe() {}
-          disconnect() {}
+          observe = vi.fn();
+          unobserve = vi.fn();
+          disconnect = vi.fn();
         },
       );
       await open('/login', false);
       await choose(1);
       widths = [70, 100];
       lefts = [0, 72];
-      callbacks.forEach((callback) => callback());
+      callbacks.forEach((callback) => callback([], {} as ResizeObserver));
       detectChanges();
       await whenStable();
       expect(thumb()!.style.transform).toBe('translateX(72px)');
       expect(thumb()!.style.width).toBe('100px');
       expect(group().classList.contains('thumb-slide')).toBe(false);
-      vi.unstubAllGlobals();
     });
 
     it('keeps the toggle own highlight when the tabs cannot be measured', async () => {

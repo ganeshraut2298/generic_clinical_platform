@@ -18,14 +18,24 @@ import java.util.UUID;
 public interface TreatmentCoursePort {
 
     /**
-     * One sitting as billing needs it. {@code status} is PLANNED, TODAY or DONE (computed by opd). {@code settledInIpd}
+     * One sitting as billing needs it. {@code status} is PLANNED, TODAY, DONE or MISSED (computed by opd; MISSED is not
+     * done and carries no charge, ADR-026 D4). A sitting removed from the plan is never returned. {@code displayNo} is
+     * the number shown (rank among the non-removed sittings), {@code sittingNo} the stable key. {@code settledInIpd}
      * is true for a day-care or IPD sitting linked to an admission: it is billed on the IPD bill (ADR-022 H1).
      * {@code ipNumber} is the linked admission's IP number, {@code doneAt} when the sitting finished (null if not DONE
      * or not known).
      */
     record SittingFacts(UUID sittingId, int sittingNo, String encounterKind, LocalDate plannedDate, long chargePaise,
                         String note, String status, UUID opdVisitId, UUID admissionId, String ipNumber,
-                        boolean settledInIpd, Instant doneAt) {
+                        boolean settledInIpd, Instant doneAt, int displayNo) {
+
+        /** Without a display number: it is the sitting number (the shape before 0.7.0). */
+        public SittingFacts(UUID sittingId, int sittingNo, String encounterKind, LocalDate plannedDate,
+                            long chargePaise, String note, String status, UUID opdVisitId, UUID admissionId,
+                            String ipNumber, boolean settledInIpd, Instant doneAt) {
+            this(sittingId, sittingNo, encounterKind, plannedDate, chargePaise, note, status, opdVisitId, admissionId,
+                    ipNumber, settledInIpd, doneAt, sittingNo);
+        }
 
         @Override
         public String toString() {
@@ -62,12 +72,16 @@ public interface TreatmentCoursePort {
     Optional<String> courseNo(UUID tenantId, UUID courseId);
 
     /**
-     * The sitting when it is a planned, unlinked DAY_CARE or IPD sitting of an ACTIVE course of {@code patientId}; the
+     * The sitting when it is a planned, unlinked DAY_CARE or IPD sitting of an ACTIVE course of {@code patientId} (never a
+     * removed, missed or done one, ADR-026 D4); the
      * sitting row is locked until the end of the caller's transaction. Absent otherwise (the caller answers 409
      * course-sitting-not-available and writes nothing).
      */
     Optional<AdmittableSitting> admittableSitting(UUID tenantId, UUID patientId, UUID sittingId);
 
-    /** Links the admission to the sitting (the sitting becomes TODAY); audits COURSE_SITTING_ADMISSION_LINKED. */
+    /**
+     * Links the admission to the sitting (the sitting becomes TODAY); audits COURSE_SITTING_ADMISSION_LINKED. A sitting that
+     * was removed, missed or is done is refused with a {@code ConflictException} course-sitting-not-available (409).
+     */
     void linkAdmission(UUID tenantId, UUID actorUserId, UUID sittingId, UUID admissionId);
 }

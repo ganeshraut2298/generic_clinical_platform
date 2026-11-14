@@ -113,7 +113,8 @@ public class CourseAccountService {
         SittingFacts next = course.sittings().stream().filter(s -> isPlannedAdmission(s))
                 .min(Comparator.comparingInt(SittingFacts::sittingNo)).orElse(null);
         NextPlannedAdmission planned = next == null ? null
-                : new NextPlannedAdmission(next.sittingId(), next.sittingNo(), next.chargePaise(), next.note());
+                : new NextPlannedAdmission(next.sittingId(), next.sittingNo(), next.displayNo(), next.chargePaise(),
+                        next.note());
         Suggestions suggestions = new Suggestions(
                 math.balancePaise() == 0 ? null : CourseAccountMath.suggestedPart(math.dueTodayPaise(),
                         math.balancePaise()),
@@ -177,11 +178,22 @@ public class CourseAccountService {
                 Instant at = line.at();
                 timed.add(new Timed(at, new LedgerLine("CREDIT_USED",
                         at == null ? null : at.atZone(BillingService.INDIA).toLocalDate(), null, null,
-                        unitWord(course.unit()) + " " + line.sittingNo(), line.amountPaise(), null)));
+                        unitWord(course.unit()) + " " + displayNoOf(course, line.sittingNo()), line.amountPaise(),
+                        null)));
             }
         }
         timed.sort(Comparator.comparing(Timed::at, Comparator.nullsLast(Comparator.naturalOrder())));
         return timed.stream().map(Timed::line).toList();
+    }
+
+    /** The number shown for a sitting (ADR-026 D4): its display number, the sitting number when it is not listed. */
+    private static int displayNoOf(CourseFacts course, int sittingNo) {
+        for (SittingFacts s : course.sittings()) {
+            if (s.sittingNo() == sittingNo) {
+                return s.displayNo();
+            }
+        }
+        return sittingNo;
     }
 
     private static String unitWord(String unit) {
@@ -266,13 +278,13 @@ public class CourseAccountService {
         String word = unitWord(course.unit());
         switch (input.type()) {
             case "VISIT_PAYMENT":
-                return sitting == null ? "Today's " + word.toLowerCase(Locale.ROOT) : word + " " + sitting.sittingNo();
+                return sitting == null ? "Today's " + word.toLowerCase(Locale.ROOT) : word + " " + sitting.displayNo();
             case "IPD_DEPOSIT":
                 if (sitting == null || !isPlannedAdmission(sitting)) {
                     throw new InvalidInputException("againstSittingId",
                             "Choose a planned day-care or IPD admission of this course.");
                 }
-                return "Admission deposit · " + word + " " + sitting.sittingNo();
+                return "Admission deposit · " + word + " " + sitting.displayNo();
             default:
                 if (sitting != null) {
                     throw new InvalidInputException("againstSittingId", "Leave this out for this kind of payment.");

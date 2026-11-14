@@ -52,7 +52,8 @@ class SpecialtyDoneAndProfilesTest {
     void theAnchorSectionsAreTheOnesInTheAdr() {
         assertThat(SpecialtyProfiles.anchors("gm")).containsEntry("vitals", "VITALS_LOG").containsEntry("exam",
                 "EXAM_GENERAL").hasSize(2);
-        assertThat(SpecialtyProfiles.anchors("dental")).hasSize(5).containsEntry("dental_done", "DENTAL_DONE");
+        assertThat(SpecialtyProfiles.anchors("dental")).hasSize(6).containsEntry("dental_done", "DENTAL_DONE")
+                .containsEntry("dental_medhx", "DENTAL_MED_HISTORY");
         assertThat(SpecialtyProfiles.anchors("og")).containsEntry("pcpndt", "FORM_F").hasSize(3);
         assertThat(SpecialtyProfiles.anchors("paeds")).containsEntry("wtdose", "WEIGHT_DOSE").hasSize(4);
         assertThat(SpecialtyProfiles.anchors("physio")).hasSize(10).containsEntry("hep", "HOME_EXERCISES")

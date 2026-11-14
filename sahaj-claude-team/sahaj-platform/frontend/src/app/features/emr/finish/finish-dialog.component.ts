@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -33,7 +34,7 @@ const DENTAL_CHOICES: readonly { key: EmrDentalNextInterval; label: string }[] =
 @Component({
   selector: 'app-finish-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatDialogModule, IconComponent],
+  imports: [MatButtonModule, MatDialogModule, NgTemplateOutlet, IconComponent],
   styleUrl: './finish-dialog.component.scss',
   templateUrl: './finish-dialog.component.html',
 })

@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Doctor screen — Dental</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#0B6E69}a:hover{color:#084F4C}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #0B6E6966;outline-offset:2px}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; font-size: 14px; min-height: 1240px; display: flex; flex-direction: column">
+
+  <div style="background: #0F1C2E; color: #FFFFFF; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 24px">
+    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+      <span style="font-weight: 700; font-size: 16px">Smart Clinic</span>
+      <span style="background: #0B6E69; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600">Dental · Chair 1</span>
+      <nav aria-label="Main" style="display: flex; gap: 4px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 8px 12px; border-radius: 8px; background: #1E3550; font-size: 13px; font-weight: 600">Queue (4 waiting)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Appointments</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Lab work</a>
+      </nav>
+    </div>
+    <span style="font-size: 13px; color: #B8C4D3">Dr. [DOCTOR NAME], BDS · MDS</span>
+  </div>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+    <div style="display: flex; gap: 14px; align-items: center">
+      <span style="width: 48px; height: 48px; border-radius: 999px; background: #D7EFEC; color: #0B6E69; display: flex; align-items: center; justify-content: center; font-weight: 700">SP</span>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 17px; font-weight: 700">[PATIENT NAME]</span>
+        <span style="font-size: 13px; color: #5B6B7F">34 y · Female · UHID [ID] · RCT on 36 in progress, sitting 2 of 3</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <span style="background: #FDECEA; color: #B42318; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600">Allergy: Penicillin</span>
+      <span style="background: #FDF0DC; color: #8A4B08; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600">Medical: on thyroid medicine</span>
+      <span style="background: #E3F5EC; color: #146C43; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600">Estimate signed</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 24px; align-items: flex-start; flex: 1">
+
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+      <div role="tablist" aria-label="Visit part" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{parts}}" as="p" hint-placeholder-count="2">
+          <button type="button" role="tab" aria-selected="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">
+            <span style="{{p.numStyle}}">{{p.num}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; flex: 1; text-align: left"><span style="font-size: 16px; font-weight: 700">{{p.label}}</span><span style="font-size: 12px; opacity: 0.85">{{p.sub}}</span></span>
+            <span style="{{p.badgeStyle}}">{{p.badge}}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="{{aStyle}}">
+      <div id="complaints">
+        <dc-import name="EmrList" kind="complaints" spec="dental" title="Chief complaints" required="{{ true }}" accent="#0B6E69" who="Dr. [DOCTOR NAME]" on-change="{{cp_complaints}}" hint-size="100%,230px"></dc-import>
+      </div>
+
+      <sc-for list="{{assess}}" as="a" hint-placeholder-count="5">
+        <section style="{{a.style}}">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 15px; font-weight: 700">{{a.title}}</h2><span style="font-size: 12px; color: #5B6B7F">{{a.sub}}</span></div>
+            <sc-if value="{{a.hasAction}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{a.action}}" style="{{a.actionStyle}}">{{a.actionLabel}}</button></sc-if>
+          </div>
+          <sc-for list="{{a.groups}}" as="g" hint-placeholder-count="3">
+            <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap">
+              <span style="width: 150px; flex: none; font-size: 13px; font-weight: 600; color: #3E4C5E; padding-top: 8px">{{g.label}}</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 240px">
+                <sc-for list="{{g.opts}}" as="o" hint-placeholder-count="4"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button></sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <sc-for list="{{a.alerts}}" as="w" hint-placeholder-count="1">
+            <div role="alert" style="{{w.style}}"><strong>{{w.title}}</strong> {{w.text}}</div>
+          </sc-for>
+        </section>
+      </sc-for>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #0F1C2E; color: #FFFFFF; border-radius: 12px; padding: 14px 18px">
+        <span style="font-size: 13px">{{aFooter}}</span>
+        <button type="button" onClick="{{goT}}" style="border: 0; background: #FFFFFF; color: #0F1C2E; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 700; cursor: pointer">Continue to Treatment →</button>
+      </div>
+      </div>
+
+      <div style="{{tStyle}}">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #3E4C5E">
+        <strong style="color: #0F1C2E">From assessment:</strong><span>{{aRecap}}</span>
+        <button type="button" onClick="{{goA}}" style="margin-left: auto; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-weight: 600; cursor: pointer">← Back to assessment</button>
+      </div>
+      <div id="diagnosis">
+        <dc-import name="EmrList" kind="diagnosis" spec="dental" title="Diagnosis" required="{{ true }}" accent="#0B6E69" who="Dr. [DOCTOR NAME]" on-change="{{cp_diagnosis}}" hint-size="100%,230px"></dc-import>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Dental chart <span style="color: #B42318">*</span></h2>
+            <span style="font-size: 12px; color: #5B6B7F">{{viewHint}}</span>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+            <div role="tablist" aria-label="Chart view" style="display: flex; background: #0F1C2E; border-radius: 10px; padding: 4px; gap: 4px">
+              <sc-for list="{{viewTabs}}" as="t" hint-placeholder-count="3">
+                <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{t.icon}}"/></svg>{{t.label}}
+                </button>
+              </sc-for>
+            </div>
+            <div role="tablist" aria-label="Dentition" style="display: flex; background: #EEF1F5; border-radius: 10px; padding: 4px; gap: 4px">
+              <sc-for list="{{dentTabs}}" as="t" hint-placeholder-count="2">
+                <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; background: #FAFBFC; border: 1px solid #EEF1F5; border-radius: 10px; padding: 8px 12px; {{styleBarDisp}}">
+          <div style="display: flex; gap: 6px; align-items: center"><span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Look</span>
+            <sc-for list="{{chartStyles}}" as="c" hint-placeholder-count="4"><button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button></sc-for>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center"><span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Tooth shade</span>
+            <sc-for list="{{shades}}" as="c" hint-placeholder-count="5"><button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" aria-label="Shade {{c.label}}" title="Shade {{c.label}}" style="{{c.style}}">{{c.label}}</button></sc-for>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center"><span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Gum tone</span>
+            <sc-for list="{{gums}}" as="c" hint-placeholder-count="3"><button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" aria-label="{{c.label}}" title="{{c.label}}" style="{{c.style}}"></button></sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{isChart}}" hint-placeholder-val="{{ true }}">
+        <div style="{{chartBox}}">
+          <div style="display: flex; justify-content: space-between; width: 100%; max-width: 760px; font-size: 11px; font-weight: 700; color: {{axisColor}}; text-transform: uppercase; letter-spacing: 0.06em"><span>Upper right</span><span>Upper left</span></div>
+          <sc-if value="{{isBtnStyle}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center">
+            <sc-for list="{{upper}}" as="t" hint-placeholder-count="16">
+              <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.sel}}" aria-label="Tooth {{t.n}}, {{t.cond}}" title="{{t.n}} · {{t.cond}}" style="{{t.style}}">
+                <span style="{{t.crown}}">{{t.surf}}</span>
+                <span style="font-size: 12px; font-weight: 700">{{t.n}}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="height: 2px; background: #C9D2DC; width: 100%; max-width: 760px; margin: 4px 0"></div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center">
+            <sc-for list="{{lower}}" as="t" hint-placeholder-count="16">
+              <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.sel}}" aria-label="Tooth {{t.n}}, {{t.cond}}" title="{{t.n}} · {{t.cond}}" style="{{t.style}}">
+                <span style="font-size: 12px; font-weight: 700">{{t.n}}</span>
+                <span style="{{t.crown}}">{{t.surf}}</span>
+              </button>
+            </sc-for>
+          </div>
+          </div>
+          </sc-if>
+          <sc-if value="{{isPicStyle}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; gap: 2px; justify-content: center; align-items: flex-end">
+            <sc-for list="{{upper}}" as="t" hint-placeholder-count="16">
+              <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.sel}}" aria-label="Tooth {{t.n}}, {{t.cond}}" title="{{t.n}} · {{t.cond}}" style="{{t.rStyle}}">
+                
+                <svg width="{{t.w}}" height="{{t.h}}" viewBox="0 0 40 100" preserveAspectRatio="none" aria-hidden="true">
+                  <g transform="{{t.flip}}">
+                    <path d="{{t.root}}" fill="{{t.rootFill}}" stroke="{{t.stroke}}" stroke-width="1" opacity="{{t.rootOp}}" stroke-dasharray="{{t.dash}}"/>
+                    <path d="{{t.screwBody}}" fill="#7B8794" display="{{t.implDisp}}"/>
+                    <path d="M15 16 H25 M15 24 H25 M15 32 H25 M15 40 H25 M15 48 H25" stroke="#C9D2DC" stroke-width="2" display="{{t.implDisp}}"/>
+                    <path d="{{t.canal}}" fill="none" stroke="{{t.canalCol}}" stroke-width="2.4" stroke-linecap="round" display="{{t.canalDisp}}"/>
+                    <path d="M0 6 H40 V58 Q31 49 20 53 Q9 49 0 58 Z" fill="{{t.gumFill}}" display="{{t.gumDisp}}"/>
+                    <path d="{{t.crownP}}" fill="{{t.crownFill}}" stroke="{{t.stroke}}" stroke-width="1.2" stroke-dasharray="{{t.dash}}"/>
+                    <path d="M13 63 Q11 74 14 86 Q17 75 18 63 Z" fill="#FFFFFF" opacity="{{t.shineOp}}"/>
+                    <ellipse cx="20" cy="80" rx="{{t.markR}}" ry="5" fill="{{t.markFill}}" display="{{t.markDisp}}"/>
+                    <path d="{{t.crownP}}" fill="none" stroke="#B79AF0" stroke-width="3.5" display="{{t.capDisp}}"/>
+                    <path d="M8 62 L32 94 M32 62 L8 94" stroke="#E5484D" stroke-width="3.5" stroke-linecap="round" display="{{t.xDisp}}"/>
+                  </g>
+                </svg>
+                <span style="{{t.numStyle}}">{{t.n}}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="height: 2px; background: {{midline}}; width: 100%; max-width: 760px; margin: 2px 0"></div>
+          <div style="display: flex; gap: 2px; justify-content: center; align-items: flex-start">
+            <sc-for list="{{lower}}" as="t" hint-placeholder-count="16">
+              <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.sel}}" aria-label="Tooth {{t.n}}, {{t.cond}}" title="{{t.n}} · {{t.cond}}" style="{{t.rStyle}}">
+                <span style="{{t.numStyle}}">{{t.n}}</span>
+                <svg width="{{t.w}}" height="{{t.h}}" viewBox="0 0 40 100" preserveAspectRatio="none" aria-hidden="true">
+                  <g transform="{{t.flip}}">
+                    <path d="{{t.root}}" fill="{{t.rootFill}}" stroke="{{t.stroke}}" stroke-width="1" opacity="{{t.rootOp}}" stroke-dasharray="{{t.dash}}"/>
+                    <path d="{{t.screwBody}}" fill="#7B8794" display="{{t.implDisp}}"/>
+                    <path d="M15 16 H25 M15 24 H25 M15 32 H25 M15 40 H25 M15 48 H25" stroke="#C9D2DC" stroke-width="2" display="{{t.implDisp}}"/>
+                    <path d="{{t.canal}}" fill="none" stroke="{{t.canalCol}}" stroke-width="2.4" stroke-linecap="round" display="{{t.canalDisp}}"/>
+                    <path d="M0 6 H40 V58 Q31 49 20 53 Q9 49 0 58 Z" fill="{{t.gumFill}}" display="{{t.gumDisp}}"/>
+                    <path d="{{t.crownP}}" fill="{{t.crownFill}}" stroke="{{t.stroke}}" stroke-width="1.2" stroke-dasharray="{{t.dash}}"/>
+                    <path d="M13 63 Q11 74 14 86 Q17 75 18 63 Z" fill="#FFFFFF" opacity="{{t.shineOp}}"/>
+                    <ellipse cx="20" cy="80" rx="{{t.markR}}" ry="5" fill="{{t.markFill}}" display="{{t.markDisp}}"/>
+                    <path d="{{t.crownP}}" fill="none" stroke="#B79AF0" stroke-width="3.5" display="{{t.capDisp}}"/>
+                    <path d="M8 62 L32 94 M32 62 L8 94" stroke="#E5484D" stroke-width="3.5" stroke-linecap="round" display="{{t.xDisp}}"/>
+                  </g>
+                </svg>
+                
+              </button>
+            </sc-for>
+          </div>
+          </sc-if>
+          <div style="display: flex; justify-content: space-between; width: 100%; max-width: 760px; font-size: 11px; font-weight: 700; color: {{axisColor}}; text-transform: uppercase; letter-spacing: 0.06em"><span>Lower right</span><span>Lower left</span></div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{is3d}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E; margin-right: 4px">View from</span>
+            <sc-for list="{{presets}}" as="p" hint-placeholder-count="6"><button type="button" aria-pressed="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">{{p.label}}</button></sc-for>
+          </div>
+          <div onPointerDown="{{dragStart}}" onPointerMove="{{dragMove}}" onPointerUp="{{dragEnd}}" onPointerLeave="{{dragEnd}}" style="position: relative; height: 440px; border-radius: 14px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #24384F 0%, #0F1C2E 70%); perspective: 1100px; cursor: grab; touch-action: none; user-select: none">
+            <div style="position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; {{sceneTransform}}">
+              <sc-for list="{{teeth3d}}" as="t" hint-placeholder-count="32">
+                <button type="button" onClick="{{t.pick}}" aria-label="Tooth {{t.n}}, {{t.cond}}" style="{{t.style}}">
+                  <sc-for list="{{t.faces}}" as="f" hint-placeholder-count="6"><span style="{{f.s}}">{{f.txt}}</span></sc-for>
+                </button>
+              </sc-for>
+            </div>
+            <div style="position: absolute; left: 14px; top: 12px; display: flex; flex-direction: column; gap: 2px; color: #DCE6F0; font-size: 12px; pointer-events: none">
+              <span style="font-weight: 700; font-size: 13px; color: #FFFFFF">Tooth {{sel.n}} · {{selCond}}</span>
+              <span>{{sel.name}}</span>
+            </div>
+            <div style="position: absolute; right: 14px; top: 12px; font-size: 11px; color: #B8C4D3; pointer-events: none">Drag to rotate · tap a tooth to select</div>
+            <div style="position: absolute; left: 14px; bottom: 12px; display: flex; gap: 6px">
+              <button type="button" onClick="{{zoomOut}}" aria-label="Zoom out" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #3A4E64; background: #1E3550; color: #FFFFFF; font-size: 18px; font-weight: 700; cursor: pointer">−</button>
+              <button type="button" onClick="{{zoomIn}}" aria-label="Zoom in" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #3A4E64; background: #1E3550; color: #FFFFFF; font-size: 18px; font-weight: 700; cursor: pointer">+</button>
+              <button type="button" aria-pressed="{{spin}}" onClick="{{toggleSpin}}" style="{{spinStyle}}">{{spinLabel}}</button>
+              <button type="button" aria-pressed="{{labels}}" onClick="{{toggleLabels}}" style="{{labelStyle}}">Numbers</button>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Turn left / right · {{yaw}}°
+              <input type="range" min="-180" max="180" value="{{yaw}}" onChange="{{onYaw}}" style="accent-color: #0B6E69">
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Tilt up / down · {{tilt}}°
+              <input type="range" min="-90" max="90" value="{{tilt}}" onChange="{{onTilt}}" style="accent-color: #0B6E69">
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Open mouth · {{open}}
+              <input type="range" min="6" max="160" value="{{open}}" onChange="{{onOpen}}" style="accent-color: #0B6E69">
+            </label>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{isDetail}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-wrap: wrap; gap: 16px">
+          <div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 10px; align-items: center; background: #FAFBFC; border: 1px solid #EEF1F5; border-radius: 12px; padding: 16px">
+            <span style="align-self: flex-start; font-size: 12px; font-weight: 700; color: #3E4C5E">Surfaces of {{sel.n}} · tap to mark</span>
+            <div style="display: grid; grid-template-columns: 64px 76px 64px; grid-template-rows: 56px 76px 56px; gap: 4px">
+              <span></span>
+              <button type="button" onClick="{{sd.top.pick}}" aria-pressed="{{sd.top.on}}" style="{{sd.top.style}}">{{sd.top.label}}</button>
+              <span></span>
+              <button type="button" onClick="{{sd.left.pick}}" aria-pressed="{{sd.left.on}}" style="{{sd.left.style}}">{{sd.left.label}}</button>
+              <button type="button" onClick="{{sd.mid.pick}}" aria-pressed="{{sd.mid.on}}" style="{{sd.mid.style}}">{{sd.mid.label}}</button>
+              <button type="button" onClick="{{sd.right.pick}}" aria-pressed="{{sd.right.on}}" style="{{sd.right.style}}">{{sd.right.label}}</button>
+              <span></span>
+              <button type="button" onClick="{{sd.bottom.pick}}" aria-pressed="{{sd.bottom.on}}" style="{{sd.bottom.style}}">{{sd.bottom.label}}</button>
+              <span></span>
+            </div>
+            <span style="font-size: 12px; color: #5B6B7F; text-align: center">{{surfText}}</span>
+          </div>
+          <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 10px; align-items: center; background: #0F1C2E; border-radius: 12px; padding: 16px; color: #FFFFFF">
+            <span style="align-self: flex-start; font-size: 12px; font-weight: 700; color: #DCE6F0">Side view · crown and roots</span>
+            <div style="{{profile.wrap}}">
+              <span style="{{profile.crown}}"></span>
+              <sc-if value="{{profile.cap}}" hint-placeholder-val="{{ false }}"><span style="{{profile.capStyle}}"></span></sc-if>
+              <sc-if value="{{profile.caries}}" hint-placeholder-val="{{ false }}"><span style="{{profile.cariesStyle}}"></span></sc-if>
+              <div style="display: flex; gap: 6px; justify-content: center">
+                <sc-for list="{{profile.roots}}" as="r" hint-placeholder-count="2"><span style="{{r.s}}"><span style="{{r.canal}}"></span></span></sc-for>
+              </div>
+            </div>
+            <span style="font-size: 12px; color: #B8C4D3; text-align: center">{{profile.note}}</span>
+          </div>
+          <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 10px">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Mobility</span>
+            <div style="display: flex; gap: 6px">
+              <sc-for list="{{mobility}}" as="m" hint-placeholder-count="4"><button type="button" aria-pressed="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button></sc-for>
+            </div>
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E; margin-top: 6px">History of {{sel.n}}</span>
+            <sc-for list="{{toothHistory}}" as="h" hint-placeholder-count="2">
+              <div style="display: flex; flex-direction: column; gap: 2px; border-left: 3px solid #0B6E69; padding: 4px 0 4px 10px">
+                <span style="font-size: 13px; font-weight: 600">{{h.what}}</span>
+                <span style="font-size: 12px; color: #5B6B7F">{{h.when}}</span>
+              </div>
+            </sc-for>
+            <div style="display: flex; gap: 6px; margin-top: 4px">
+              <button type="button" onClick="{{prevTooth}}" style="flex: 1; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; min-height: 40px; font-weight: 600; cursor: pointer">‹ Previous tooth</button>
+              <button type="button" onClick="{{nextTooth}}" style="flex: 1; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; min-height: 40px; font-weight: 600; cursor: pointer">Next tooth ›</button>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center">
+          <sc-for list="{{legend}}" as="l" hint-placeholder-count="7">
+            <span style="display: flex; gap: 6px; align-items: center; font-size: 12px; color: #3E4C5E; background: #FAFBFC; border: 1px solid #EEF1F5; border-radius: 999px; padding: 4px 10px"><span style="{{l.swatch}}"></span>{{l.label}} <strong>{{l.count}}</strong></span>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="background: #FFFFFF; border: 2px solid #0B6E69; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <span style="width: 48px; height: 48px; border-radius: 10px; background: #0F1C2E; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700">{{sel.n}}</span>
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700">Tooth {{sel.n}}</h2>
+            <span style="font-size: 12px; color: #5B6B7F">{{sel.name}}</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Condition</span>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+            <sc-for list="{{conds}}" as="c" hint-placeholder-count="8">
+              <button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}"><span style="{{c.swatch}}"></span>{{c.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Surfaces</span>
+          <div style="display: flex; gap: 6px">
+            <sc-for list="{{surfaces}}" as="s" hint-placeholder-count="5">
+              <button type="button" aria-pressed="{{s.on}}" onClick="{{s.pick}}" aria-label="{{s.full}}" title="{{s.full}}" style="{{s.style}}">{{s.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #EEF1F5; padding-top: 12px">
+          <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Suggested treatment</span>
+          <sc-if value="{{hasSuggest}}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{suggest}}" as="s" hint-placeholder-count="2">
+                <button type="button" onClick="{{s.add}}" style="display: flex; justify-content: space-between; align-items: center; border: 1px solid #0B6E69; background: #FFFFFF; color: #0B6E69; border-radius: 8px; padding: 10px 12px; min-height: 44px; font-weight: 600; cursor: pointer; text-align: left">+ {{s.label}}<span style="font-size: 12px; color: #3E4C5E; font-weight: 500">{{s.phase}}</span></button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{noSuggest}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: #5B6B7F">Healthy tooth: nothing to plan.</span></sc-if>
+        </div>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 700">Treatment plan &amp; estimate</h2>
+          <span style="font-size: 12px; color: #5B6B7F">Tap a status to move it forward</span>
+        </div>
+        <div style="overflow-x: auto">
+          <div style="min-width: 660px; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+            <div style="display: grid; grid-template-columns: 70px 2fr 1fr 1fr 1.2fr 40px; gap: 10px; padding: 8px 12px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">
+              <span>Tooth</span><span>Procedure</span><span>Phase</span><span>Estimate</span><span>Status</span><span></span>
+            </div>
+            <sc-for list="{{plan}}" as="p" hint-placeholder-count="5">
+              <div style="{{p.rowStyle}}">
+                <button type="button" onClick="{{p.goTooth}}" style="border: 0; background: transparent; padding: 0; font: inherit; font-weight: 700; color: #0B6E69; cursor: pointer; text-align: left; text-decoration: underline">{{p.tooth}}</button>
+                <span>{{p.proc}}</span><span style="color: #3E4C5E">{{p.phase}}</span><span>{{p.cost}}</span>
+                <button type="button" onClick="{{p.next}}" style="{{p.statusStyle}}">{{p.status}} ›</button>
+                <button type="button" onClick="{{p.remove}}" aria-label="Remove {{p.proc}} on {{p.tooth}}" style="border: 0; background: transparent; color: #5B6B7F; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </sc-for>
+            <div style="display: flex; justify-content: space-between; padding: 10px 12px; border-top: 1px solid #E3E8EE; background: #FAFBFC; font-size: 13px; font-weight: 700"><span>{{planSummary}}</span><span>{{planTotal}}</span></div>
+          </div>
+        </div>
+      </section>
+
+      <div id="course">
+        <dc-import name="TreatmentCourse" kind="dental" accent="#0B6E69" hint-size="100%,760px"></dc-import>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Today&#39;s prescription</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{rxOpts}}" as="r" hint-placeholder-count="3"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.toggle}}" style="{{r.style}}">{{r.label}}</button></sc-for>
+        </div>
+        <sc-if value="{{penWarn}}" hint-placeholder-val="{{ false }}">
+          <span role="alert" style="font-size: 12px; font-weight: 700; color: #B42318; background: #FDECEA; border-radius: 8px; padding: 8px 10px">Amoxicillin is a penicillin. This patient is allergic to penicillin.</span>
+        </sc-if>
+      </section>
+      <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="dental" title="Doctor’s advice" required="{{ false }}" accent="#0B6E69" who="Dr. [DOCTOR NAME]" hint-size="100%,230px"></dc-import></div>
+      </div>
+    </main>
+
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="dental" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#0B6E69" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+
+    </div>
+    </aside>
+  </div>
+
+  <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; box-shadow: 0 -4px 12px rgba(15,28,46,0.06)">
+    <span style="{{statusStyle}}">{{statusText}}</span>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap">
+      <button type="button" onClick="{{printEst}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Print estimate</button>
+      <button type="button" onClick="{{complete}}" style="{{completeStyle}}">Complete &amp; send to billing</button>
+    </div>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; bottom: 84px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3); display: flex; gap: 12px; align-items: center">
+      {{toast}}
+      <sc-if value="{{canUndo}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{undo}}" style="border: 0; background: transparent; color: #7FE0D6; font-weight: 700; cursor: pointer; min-height: 32px">Undo</button></sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{modal}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(15,28,46,0.55); display: flex; align-items: flex-start; justify-content: center; padding-top: 180px">
+      <div role="dialog" aria-label="Visit summary" style="width: 520px; max-width: calc(100% - 32px); background: #FFFFFF; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px rgba(15,28,46,0.35)">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Send to billing?</h2>
+        <div style="display: flex; flex-direction: column; gap: 8px; background: #FAFBFC; border-radius: 10px; padding: 12px 14px; font-size: 13px">
+          <sc-for list="{{doneToday}}" as="d" hint-placeholder-count="1"><span>• {{d.title}}</span></sc-for>
+          <span style="color: #5B6B7F">Next sitting: {{sitting}}</span>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap">
+          <button type="button" onClick="{{closeModal}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Back</button>
+          <button type="button" onClick="{{finish}}" style="border: 1px solid #0B6E69; background: #0B6E69; color: #FFFFFF; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: pointer">Confirm &amp; book next sitting</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":2600}}'>
+var COND = {
+  healthy: ['Healthy', '#FFFFFF', '1px solid #C9D2DC'],
+  caries: ['Caries', '#FDE7CF', '1px solid #B45309'],
+  filled: ['Filled', '#DCEBFB', '1px solid #1D5FA8'],
+  rct: ['RCT', '#D7EFEC', '1px solid #0B6E69'],
+  crown: ['Crown', '#EADFF8', '1px solid #6D3FC0'],
+  missing: ['Missing', '#FFFFFF', '1px dashed #5B6B7F'],
+  extract: ['To extract', '#FDECEA', '1px solid #B42318'],
+  implant: ['Implant', '#E6E9ED', '1px solid #3E4C5E']
+};
+var SUGGEST = {
+  caries: [['Composite filling', 'Phase 1'], ['Root canal treatment', 'Phase 1']],
+  rct: [['Root canal treatment', 'Phase 1'], ['PFM crown', 'Phase 2']],
+  filled: [['Replace filling', 'Phase 1']],
+  crown: [['Crown re-cementation', 'Phase 1']],
+  missing: [['Implant with crown', 'Phase 3'], ['Bridge', 'Phase 2']],
+  extract: [['Extraction', 'Phase 1']],
+  implant: [['Implant review', 'Phase 3']]
+};
+var NAMES = { 1: 'Central incisor', 2: 'Lateral incisor', 3: 'Canine', 4: 'First premolar', 5: 'Second premolar', 6: 'First molar', 7: 'Second molar', 8: 'Third molar' };
+var CNAMES = { 1: 'Central incisor', 2: 'Lateral incisor', 3: 'Canine', 4: 'First molar', 5: 'Second molar' };
+var QUAD = { 1: 'upper right', 2: 'upper left', 3: 'lower left', 4: 'lower right', 5: 'upper right', 6: 'upper left', 7: 'lower left', 8: 'lower right' };
+var STATUS = ['Planned', 'In progress', 'Done'];
+var SHADES = { A1: '#F6EFDF', B1: '#FAF6EC', A2: '#F0E3C6', A3: '#E7D3AA', C2: '#DCD2BC' };
+var GUMS = { pink: ['#E8919B', 'Pink'], light: ['#C58579', 'Light brown'], dark: ['#8E5650', 'Dark brown'] };
+var RATES = [['Composite filling', 1500], ['Replace filling', 1500], ['Root canal treatment', 4500], ['PFM crown', 5500], ['Implant with crown', 30000], ['Implant review', 0], ['Extraction', 1200], ['Bridge', 12000], ['Crown re-cementation', 500]];
+function rateOf(proc) { for (var i = 0; i < RATES.length; i++) if (proc.indexOf(RATES[i][0]) === 0) return RATES[i][1]; return 0; }
+function inr(n) { var s = Math.round(n).toString(), last = s.slice(-3), rest = s.slice(0, -3); if (rest) last = ',' + last; return '₹' + rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + last; }
+var CROWN = {
+  inc: 'M10 55 Q8 75 11 92 Q20 97 29 92 Q32 75 30 55 Z', can: 'M9 55 Q7 74 12 88 L20 97 L28 88 Q33 74 31 55 Z',
+  pre: 'M7 55 Q5 72 9 88 Q14 95 20 92 Q26 95 31 88 Q35 72 33 55 Z', mol: 'M3 55 Q1 72 5 88 Q10 95 15 91 Q20 96 25 91 Q30 95 35 88 Q39 72 37 55 Z'
+};
+var ROOT = {
+  inc: 'M12 57 Q14 20 20 6 Q26 20 28 57 Z', can: 'M12 57 Q15 12 20 1 Q25 12 28 57 Z', pre: 'M11 57 Q13 22 20 8 Q27 22 29 57 Z',
+  molU: 'M5 57 Q5 30 9 10 Q14 30 16 57 Z M24 57 Q26 30 31 10 Q35 30 35 57 Z M15 57 Q17 26 20 14 Q23 26 25 57 Z', molL: 'M5 57 Q6 30 10 12 Q15 30 17 57 Z M23 57 Q25 30 30 12 Q34 30 35 57 Z'
+};
+var CANAL = { inc: 'M20 57 L20 12', can: 'M20 57 L20 6', pre: 'M20 57 L20 14', molU: 'M11 57 L9 16 M29 57 L31 16 M20 57 L20 20', molL: 'M11 57 L10 18 M29 57 L30 18' };
+var ASSESS = [
+  { id: 'med', title: 'Medical history and alerts', sub: 'Ask before any injection, extraction or surgery', groups: [['med_cond', 'Conditions', 'multi', ['Diabetes', 'High BP', 'Heart disease', 'Thyroid', 'Asthma', 'Bleeding disorder', 'Epilepsy', 'Pregnant', 'None']], ['med_drug', 'Medicines', 'multi', ['Blood thinners', 'Aspirin', 'Bisphosphonates', 'Steroids', 'Thyroid medicine', 'None']], ['med_allergy', 'Allergies', 'multi', ['Penicillin', 'Local anaesthetic', 'Latex', 'Painkillers (NSAIDs)', 'None']]] },
+  { id: 'hab', title: 'Dental history and habits', sub: 'Shapes the treatment plan and advice', groups: [['last', 'Last dental visit', 'single', ['Under 6 months', '6–12 months', 'Over 1 year', 'Never']], ['brush', 'Brushing', 'single', ['Once a day', 'Twice a day', 'Irregular']], ['habits', 'Habits', 'multi', ['Tobacco chewing', 'Gutkha', 'Paan / betel', 'Smoking', 'Alcohol', 'Teeth grinding', 'Mouth breathing']]] },
+  { id: 'pain', title: 'Pain', sub: 'For the main complaint', groups: [['ptype', 'Type', 'multi', ['Sharp', 'Throbbing', 'On chewing', 'Cold sensitivity', 'Hot sensitivity', 'Night pain', 'Radiating']], ['pscore', 'Score (0–10)', 'single', ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']], ['pdur', 'Since', 'single', ['1 day', '2–3 days', '1 week', 'Over 2 weeks']]] },
+  { id: 'exo', title: 'Extra-oral examination', sub: '', groups: [['face', 'Face', 'single', ['Symmetrical', 'Swelling present']], ['tmj', 'Jaw joint (TMJ)', 'single', ['Normal', 'Clicking', 'Pain', 'Deviation']], ['ln', 'Lymph nodes', 'single', ['Not palpable', 'Palpable, tender', 'Palpable, non-tender']], ['mo', 'Mouth opening', 'single', ['Normal', 'Restricted']]] },
+  { id: 'ino', title: 'Intra-oral examination', sub: 'Tooth-by-tooth findings go on the chart in Treatment', groups: [['oh', 'Oral hygiene', 'single', ['Good', 'Fair', 'Poor']], ['ging', 'Gingiva', 'single', ['Healthy', 'Mild inflammation', 'Bleeding', 'Recession']], ['calc', 'Calculus / stains', 'single', ['None', '+', '++', '+++']], ['occ', 'Occlusion', 'single', ['Class I', 'Class II', 'Class III']], ['soft', 'Soft tissue', 'multi', ['Normal', 'Ulcer', 'White patch', 'Red patch', 'Tongue coating']]] },
+  { id: 'xr', title: 'Radiographs and photos', sub: 'Tap to order; attached images open in the viewer', groups: [['xray', 'Images', 'multi', ['IOPA 36 (attached)', 'OPG', 'Bitewing', 'CBCT', 'Intra-oral photos']]] }
+];
+var RX = ['Ibuprofen + Paracetamol · 1-0-1 · 3 d', 'Chlorhexidine mouthwash · 2 times · 7 d', 'Amoxicillin 500 mg · 1-1-1 · 5 d'];
+
+function cpN(a, mode) { return (Array.isArray(a) ? a : []).map(function (x) { if (!x) return ''; if (typeof x === 'string') return x; var t = x.name || ''; if (mode === 'dx' && x.code) t += ' (' + x.code + ')'; else if (mode === 'c' && x.a1) t += ' · ' + x.a1; return t; }).filter(Boolean); }
+function cpKeys(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }); }
+
+function casePaper(st, r, cp) {
+  var a = st.as || {}, T = st.teeth || {};
+  var chart = Object.keys(T).map(function (k) { return k + ' ' + T[k]; }).join(', ');
+  var today = (st.plan || []).filter(function (p) { return p.status === 1 || p.today; }).map(function (p) { return 'Tooth ' + p.tooth + ' · ' + p.proc; });
+  var rx = (r.rxOpts || []).filter(function (o) { return o.on; }).map(function (o) { var p = String(o.label).replace(/^✓\s*/, '').split(' · '); return { name: p[0], how: p[1] || '', days: p[2] || '', note: p[3] || '' }; });
+  return { dept: 'Dental · OPD', doctor: 'Dr. [DOCTOR NAME]', qual: 'BDS, MDS (Conservative Dentistry)', reg: '[DCI / SDC REG. NO.]', patient: '[PATIENT NAME]', meta: '34 y · Female', ids: 'UHID [ID]', visit: 'OPD · RCT 36, sitting 2 of 3', vitals: '',
+    sections: { complaints: cpN(cp.complaints, 'c'), allergies: cpKeys(a.med_allergy), history: cpKeys(a.med_cond).concat(cpKeys(a.habits).map(function (h) { return 'Habit: ' + h; })),
+      exam: ['Extra-oral: face ' + (a.face || '') + ', TMJ ' + (a.tmj || '') + ', nodes ' + (a.ln || ''), 'Intra-oral: oral hygiene ' + (a.oh || '') + ', gingiva ' + (a.ging || '') + ', occlusion ' + (a.occ || ''), chart ? 'Dental chart (FDI): ' + chart : ''].filter(Boolean),
+      diagnosis: cpN(cp.diagnosis, 'dx'), investigations: cpKeys(a.xray), procedures: today, advice: cpN(cp.advice), follow: ['Next sitting after ' + (st.sitting || '7 days')] }, rx: rx };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      dent: 'adult', sel: 36, toast: '', prev: null, modal: false, sitting: '7 days',
+      part: 'A', cC: 0, cD: 0, cNames: '', medReviewed: false, cstyle: 'real', shade: 'A2', gum: 'pink',
+      as: { med_cond: { Thyroid: true }, med_drug: { 'Thyroid medicine': true }, med_allergy: { Penicillin: true }, last: '6–12 months', brush: 'Once a day', habits: { 'Tobacco chewing': true }, ptype: { 'On chewing': true, 'Night pain': true }, pscore: '6', pdur: '1 week', face: 'Symmetrical', tmj: 'Normal', ln: 'Not palpable', mo: 'Normal', oh: 'Fair', ging: 'Mild inflammation', calc: '+', occ: 'Class I', soft: { Normal: true }, xray: { 'IOPA 36 (attached)': true } },
+      view: '3d', yaw: -22, tilt: -14, open: 34, zoom: 1, spin: false, labels: true, arch: 'both', preset: 'front', mob: { 36: 1 },
+      teeth: { 16: 'filled', 26: 'filled', 36: 'rct', 46: 'missing', 47: 'caries', 11: 'crown', 18: 'extract', 54: 'caries', 75: 'caries' },
+      surf: { 36: ['O', 'D'], 16: ['O'], 47: ['M', 'O'] },
+      plan: [
+        { tooth: 16, proc: 'Composite filling (O)', phase: 'Phase 1', status: 2, today: false },
+        { tooth: 47, proc: 'Composite filling (MO)', phase: 'Phase 1', status: 0 },
+        { tooth: 36, proc: 'Root canal treatment · sitting 2 of 3', phase: 'Phase 1', status: 1 },
+        { tooth: 36, proc: 'PFM crown', phase: 'Phase 2', status: 0 },
+        { tooth: 46, proc: 'Implant with crown', phase: 'Phase 3', status: 0 }
+      ],
+      rx: { 0: true, 1: true, 2: false },
+      intra: { 'Oral hygiene': 'Fair', 'Gingiva': 'Mild inflammation', 'Occlusion': 'Class I' }
+    };
+  }
+  componentWillUnmount() { if (this._spin) clearInterval(this._spin); if (this._t) clearTimeout(this._t); }
+  setSpin(on) {
+    var self = this;
+    if (this._spin) { clearInterval(this._spin); this._spin = null; }
+    if (on) this._spin = setInterval(function () { var y = self.state.yaw + 2; if (y > 180) y -= 360; self.setState({ yaw: y }); }, 60);
+    this.setState({ spin: on });
+  }
+  act(patch, msg, undoable) {
+    var self = this;
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3500);
+    var s = this.state;
+    this.setState(Object.assign({ toast: msg, prev: undoable ? { teeth: s.teeth, plan: s.plan, surf: s.surf } : null }, patch));
+  }
+  _rv() {
+    var self = this, st = this.state, A = '#0B6E69';
+    var pic = {
+      type: function (n) { var q = Math.floor(n / 10), p = n % 10; if (q > 4) return p <= 2 ? 'inc' : p === 3 ? 'can' : 'mol'; return p <= 2 ? 'inc' : p === 3 ? 'can' : p <= 5 ? 'pre' : 'mol'; },
+      upper: function (n) { var q = Math.floor(n / 10); return q === 1 || q === 2 || q === 5 || q === 6; },
+      w: function (n) { var t = pic.type(n), q = Math.floor(n / 10), sc = q > 4 ? 0.85 : 1; var base = { inc: (q === 3 || q === 4) ? 26 : 32, can: 33, pre: 35, mol: 46 }[t]; return Math.round(base * sc); },
+      btn: function (sel) { return 'display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 1px; border-radius: 10px; cursor: pointer; border: 2px solid ' + (sel ? (st.cstyle === 'xray' ? '#7FE0D6' : '#0F1C2E') : 'transparent') + '; background: ' + (sel ? (st.cstyle === 'xray' ? 'rgba(127,224,214,0.12)' : '#EEF1F5') : 'transparent'); },
+      num: function (sel) { return 'font-size: 11px; font-weight: 700; color: ' + (st.cstyle === 'xray' ? (sel ? '#7FE0D6' : '#B8C4D3') : (sel ? '#0F1C2E' : '#3E4C5E')); }
+    };
+    function tooth(n) {
+      var k = st.teeth[n] || 'healthy', c = COND[k], sel = st.sel === n, sf = (st.surf[n] || []).join('');
+      var o = { n: n, cond: c[0], sel: sel, surf: sf,
+        pick: function () { self.setState({ sel: n }); },
+        style: 'width: 44px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; border-radius: 10px; cursor: pointer; color: #0F1C2E; border: 2px solid ' + (sel ? '#0F1C2E' : 'transparent') + '; background: ' + (sel ? '#EEF1F5' : 'transparent'),
+        crown: 'width: 32px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #3E4C5E; background: ' + c[1] + '; border: ' + c[2],
+        rStyle: pic.btn(sel), numStyle: pic.num(sel) , w: pic.w(n), h: 96, flip: pic.upper(n) ? '' : 'translate(0,100) scale(1,-1)' };
+      var tp = pic.type(n), up_ = pic.upper(n), xr = st.cstyle === 'xray', ol = st.cstyle === 'outline';
+      var miss = k === 'missing', impl = k === 'implant';
+      var enamel = xr ? '#D9DEE3' : ol ? '#FFFFFF' : SHADES[st.shade];
+      var rootKey = tp === 'mol' ? (up_ ? 'molU' : 'molL') : tp;
+      var tint = { caries: '#7A4513', filled: xr ? '#FFFFFF' : '#5B8FD9', rct: st.cstyle === 'real' ? '#1FB5A6' : null, implant: st.cstyle === 'real' ? '#7B8794' : null, crown: null, extract: null };
+      Object.assign(o, {
+        crownP: CROWN[tp], root: impl ? '' : ROOT[rootKey], canal: CANAL[rootKey], screwBody: 'M15 10 H25 V58 H15 Z',
+        rootFill: xr ? '#8D99A6' : ol ? '#FFFFFF' : '#E3CFA2', rootOp: miss ? 0.35 : (st.cstyle === 'real' ? 0 : 1),
+        crownFill: miss ? 'none' : (k === 'crown' ? (xr ? '#F2F4F7' : '#EDE6FA') : enamel),
+        stroke: xr ? '#B8C4D3' : ol ? '#3E4C5E' : 'rgba(90,70,40,0.45)', dash: miss ? '4 3' : '',
+        gumFill: GUMS[st.gum][0], gumDisp: st.cstyle === 'real' ? 'inline' : 'none',
+        shineOp: miss || xr || ol ? 0 : 0.45,
+        canalCol: k === 'rct' ? (xr ? '#FFFFFF' : '#1FB5A6') : (xr ? '#5B6B7F' : '#C9A96E'), canalDisp: miss || impl || st.cstyle === 'real' ? (k === 'rct' && st.cstyle === 'real' ? 'none' : 'none') : 'inline',
+        markFill: tint[k] || 'transparent', markDisp: tint[k] ? 'inline' : 'none', markR: k === 'filled' ? 8 : 6,
+        capDisp: k === 'crown' ? 'inline' : 'none', xDisp: k === 'extract' ? 'inline' : 'none', implDisp: impl && st.cstyle !== 'real' ? 'inline' : 'none'
+      });
+      return o;
+    }
+    var adult = st.dent === 'adult';
+    var up = adult ? [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28] : [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
+    var lo = adult ? [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38] : [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
+    var dentTabs = [['adult', 'Adult (32)'], ['child', 'Child (20)']].map(function (t) {
+      var on = st.dent === t[0];
+      return { label: t[1], on: on, pick: function () { self.setState({ dent: t[0], sel: t[0] === 'adult' ? 36 : 75 }); },
+        style: 'border: 0; border-radius: 8px; padding: 8px 14px; min-height: 40px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#3E4C5E') + '; background: ' + (on ? '#FFFFFF' : 'transparent') + '; box-shadow: ' + (on ? '0 1px 2px rgba(15,28,46,0.15)' : 'none') };
+    });
+    var visible = up.concat(lo);
+    var legend = Object.keys(COND).filter(function (k) { return k !== 'healthy'; }).map(function (k) {
+      var cnt = visible.filter(function (n) { return st.teeth[n] === k; }).length;
+      return { label: COND[k][0], count: cnt || '', swatch: 'width: 12px; height: 12px; border-radius: 3px; background: ' + COND[k][1] + '; border: ' + COND[k][2] };
+    });
+    var cur = st.teeth[st.sel] || 'healthy';
+    var conds = Object.keys(COND).map(function (k) {
+      var on = cur === k, c = COND[k];
+      return { label: c[0], on: on,
+        pick: function () { var t = Object.assign({}, st.teeth); t[st.sel] = k; self.act({ teeth: t }, 'Tooth ' + st.sel + ' marked ' + c[0], true); },
+        style: 'display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 10px; min-height: 40px; cursor: pointer; text-align: left; color: #0F1C2E; border: ' + (on ? '2px solid ' + A : '1px solid #D5DCE4') + '; background: ' + (on ? A + '10' : '#FFFFFF'),
+        swatch: 'flex: none; width: 14px; height: 14px; border-radius: 4px; background: ' + c[1] + '; border: ' + c[2] };
+    });
+    var cs = st.surf[st.sel] || [];
+    var surfaces = [['M', 'Mesial'], ['O', 'Occlusal / incisal'], ['D', 'Distal'], ['B', 'Buccal / labial'], ['L', 'Lingual / palatal']].map(function (s) {
+      var on = cs.indexOf(s[0]) >= 0;
+      return { label: s[0], full: s[1], on: on,
+        pick: function () { var m = Object.assign({}, st.surf); var a = (m[st.sel] || []).slice(); if (on) a.splice(a.indexOf(s[0]), 1); else a.push(s[0]); m[st.sel] = a; self.setState({ surf: m }); },
+        style: 'width: 44px; height: 44px; border-radius: 8px; font-weight: 700; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+    });
+    var sug = (SUGGEST[cur] || []).map(function (s) {
+      var sf = cs.length ? ' (' + cs.join('') + ')' : '';
+      return { label: s[0] + sf, phase: s[1], add: function () { self.act({ plan: st.plan.concat([{ tooth: st.sel, proc: s[0] + sf, phase: s[1], status: 0 }]) }, s[0] + ' on ' + st.sel + ' added to plan', true); } };
+    });
+    var plan = st.plan.map(function (p, i) {
+      var SC = [['#EEF1F5', '#3E4C5E'], ['#D7EFEC', '#0B6E69'], ['#E3F5EC', '#146C43']][p.status];
+      var hl = p.tooth === st.sel;
+      return { tooth: p.tooth, proc: p.proc, phase: p.phase, cost: rateOf(p.proc) ? inr(rateOf(p.proc)) : '—', status: STATUS[p.status],
+        rowStyle: 'display: grid; grid-template-columns: 70px 2fr 1fr 1fr 1.2fr 40px; gap: 10px; padding: 8px 12px; border-top: 1px solid #EEF1F5; align-items: center; font-size: 13px; background: ' + (hl ? '#F2FAF9' : '#FFFFFF'),
+        statusStyle: 'border: 0; border-radius: 999px; padding: 6px 10px; min-height: 32px; font-size: 12px; font-weight: 700; cursor: pointer; justify-self: start; background: ' + SC[0] + '; color: ' + SC[1],
+        goTooth: function () { self.setState({ sel: p.tooth, dent: p.tooth > 50 ? 'child' : 'adult' }); },
+        next: function () { var a = st.plan.slice(); var ns = (p.status + 1) % 3; a[i] = Object.assign({}, p, { status: ns, today: ns === 2 ? true : p.today }); self.act({ plan: a }, p.proc + ' → ' + STATUS[ns], true); },
+        remove: function () { self.act({ plan: st.plan.filter(function (_, j) { return j !== i; }) }, 'Removed from plan', true); } };
+    });
+    var doneToday = [{ title: '36 · Root canal treatment — sitting 2 of 3', note: 'Cleaning and shaping, working length 21 mm. Calcium hydroxide dressing, temporary filling. IOPA attached.' }]
+      .concat(st.plan.filter(function (p) { return p.today && p.status === 2; }).map(function (p) { return { title: p.tooth + ' · ' + p.proc, note: 'Marked done today. Charge added to the bill.' }; }));
+    var sittings = ['3 days', '7 days', '14 days', '1 month'].map(function (s) {
+      var on = st.sitting === s;
+      return { label: s, on: on, pick: function () { self.setState({ sitting: s }); },
+        style: 'font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 12px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+    });
+    var rxOpts = RX.map(function (r, i) {
+      var on = !!st.rx[i];
+      return { label: (on ? '✓ ' : '+ ') + r, on: on, toggle: function () { var x = Object.assign({}, st.rx); x[i] = !on; self.setState({ rx: x }); },
+        style: 'font-size: 12px; font-weight: 600; text-align: left; border-radius: 8px; padding: 8px 10px; min-height: 36px; cursor: pointer; border: 1px ' + (on ? 'solid ' + (i === 2 ? '#B42318' : A) : 'dashed #9AA8B8') + '; color: ' + (on ? (i === 2 ? '#B42318' : '#084F4C') : '#3E4C5E') + '; background: ' + (on ? (i === 2 ? '#FDECEA' : A + '12') : '#FFFFFF') };
+    });
+    var INTRA = { 'Oral hygiene': ['Good', 'Fair', 'Poor'], 'Gingiva': ['Healthy', 'Mild inflammation', 'Bleeding'], 'Occlusion': ['Class I', 'Class II', 'Class III'] };
+    var intra = Object.keys(INTRA).map(function (k) {
+      return { label: k, opts: INTRA[k].map(function (o) {
+        var on = st.intra[k] === o;
+        return { label: o, on: on, pick: function () { var x = Object.assign({}, st.intra); x[k] = o; self.setState({ intra: x }); },
+          style: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 6px 10px; min-height: 34px; cursor: pointer; border: 1px solid ' + (on ? A : '#D5DCE4') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+      }) };
+    });
+    var q = Math.floor(st.sel / 10), p = st.sel % 10;
+    var pen = !!st.rx[2];
+
+    /* ---------- assessment ---------- */
+    var AS = st.as;
+    function setAs(key, val) { var x = Object.assign({}, AS); x[key] = val; self.setState({ as: x }); }
+    var ALERTS = [];
+    var mc = AS.med_cond || {}, md = AS.med_drug || {}, ma = AS.med_allergy || {}, hb = AS.habits || {};
+    if (ma['Penicillin']) ALERTS.push(['Penicillin allergy.', 'Avoid amoxicillin; use a non-penicillin antibiotic.']);
+    if (md['Blood thinners'] || md['Aspirin'] || mc['Bleeding disorder']) ALERTS.push(['Bleeding risk.', 'Check INR or stop advice with the physician before extraction or surgery.']);
+    if (mc['Diabetes']) ALERTS.push(['Diabetes.', 'Check sugar before surgery; healing is slower.']);
+    if (mc['High BP'] || mc['Heart disease']) ALERTS.push(['BP / heart.', 'Check BP; limit adrenaline in local anaesthetic.']);
+    if (mc['Pregnant']) ALERTS.push(['Pregnant.', 'Avoid X-rays unless essential; second trimester is safest for treatment.']);
+    if (md['Bisphosphonates']) ALERTS.push(['Bisphosphonates.', 'Risk of jaw bone problems after extraction or implant.']);
+    if (hb['Tobacco chewing'] || hb['Gutkha'] || hb['Paan / betel'] || hb['Smoking']) ALERTS.push(['Tobacco use.', 'Screen the mouth for pre-cancer patches and counsel to quit.']);
+    var assess = ASSESS.map(function (sec) {
+      var isMed = sec.id === 'med';
+      return {
+        title: sec.title, sub: sec.sub || '', hasAction: isMed,
+        actionLabel: st.medReviewed ? '✓ Reviewed with patient' : 'Mark as reviewed',
+        action: function () { self.setState({ medReviewed: !st.medReviewed }); },
+        actionStyle: 'border: 1px solid ' + (st.medReviewed ? '#146C43' : A) + '; background: ' + (st.medReviewed ? '#E3F5EC' : A) + '; color: ' + (st.medReviewed ? '#146C43' : '#FFFFFF') + '; border-radius: 8px; padding: 0 14px; min-height: 38px; font-size: 13px; font-weight: 700; cursor: pointer',
+        style: 'background: #FFFFFF; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; border: 1px solid ' + (isMed && !st.medReviewed ? '#F3C1BC' : '#E3E8EE'),
+        groups: sec.groups.map(function (g) {
+          var key = g[0], multi = g[2] === 'multi', val = AS[key];
+          return { label: g[1], opts: g[3].map(function (o) {
+            var on = multi ? !!(val && val[o]) : val === o;
+            var warn = on && multi && o !== 'None' && o !== 'Normal' && (key.indexOf('med') === 0 || key === 'habits' || key === 'soft');
+            return { label: (on && multi ? '✓ ' : '') + o, on: on,
+              pick: function () {
+                if (multi) { var x = Object.assign({}, val || {}); if (o === 'None' || o === 'Normal') x = on ? {} : (function () { var y = {}; y[o] = true; return y; })(); else { delete x['None']; delete x['Normal']; if (on) delete x[o]; else x[o] = true; } setAs(key, x); }
+                else setAs(key, on ? '' : o);
+              },
+              style: 'font-size: 13px; font-weight: 600; border-radius: ' + (multi ? '999px' : '8px') + '; padding: 7px 12px; min-height: 36px; cursor: pointer; border: 1px solid ' + (on ? (warn ? '#B42318' : A) : '#D5DCE4') + '; color: ' + (on ? (warn ? '#B42318' : (multi ? '#084F4C' : '#FFFFFF')) : '#3E4C5E') + '; background: ' + (on ? (warn ? '#FDECEA' : (multi ? A + '14' : A)) : '#FFFFFF') };
+          }) };
+        }),
+        alerts: (isMed ? ALERTS : []).map(function (w) { return { title: w[0], text: w[1], style: 'font-size: 13px; color: #8E1B12; background: #FDECEA; border: 1px solid #F3C1BC; border-radius: 8px; padding: 8px 12px' }; })
+      };
+    });
+    var aMissing = []; if (!st.cC) aMissing.push('chief complaint'); if (!st.medReviewed) aMissing.push('medical history review');
+    var aFooter = aMissing.length ? 'Still needed in assessment: ' + aMissing.join(', ') + '. You can still go ahead.' : 'Assessment done. Next: diagnosis, chart, plan and payments.';
+    var aRecap = (st.cNames || 'no complaints') + ' · pain ' + (AS.pscore || '–') + '/10' + (ALERTS.length ? ' · ' + ALERTS.length + ' medical alert(s): ' + ALERTS.map(function (w) { return w[0].replace('.', ''); }).join(', ') : '');
+
+    /* ---------- view switch ---------- */
+    var VIEWS = [['chart', 'Chart', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['3d', '3D model', 'M12 2l9 5v10l-9 5-9-5V7zM12 22V12M21 7l-9 5-9-5'], ['detail', 'Tooth detail', 'M11 4a7 7 0 1 0 0 14a7 7 0 0 0 0-14zM21 21l-5-5']];
+    var viewTabs = VIEWS.map(function (v) {
+      var on = st.view === v[0];
+      return { label: v[1], icon: v[2], on: on, pick: function () { if (v[0] !== '3d') self.setSpin(false); self.setState({ view: v[0] }); },
+        style: 'display: flex; gap: 6px; align-items: center; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 40px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#DCE6F0') + '; background: ' + (on ? '#FFFFFF' : 'transparent') };
+    });
+    var HINTS = { chart: 'Tap a tooth, pick its condition on the right, then add treatment to the plan.', '3d': 'Drag to turn the jaw. Tap a tooth to select it. Colours show each tooth’s condition.', detail: 'Mark surfaces, see roots and canals, and check this tooth’s history.' };
+
+    /* ---------- 3D arch ---------- */
+    function hx(c) { c = c.replace('#', ''); return [parseInt(c.substr(0, 2), 16), parseInt(c.substr(2, 2), 16), parseInt(c.substr(4, 2), 16)]; }
+    function rgb(a) { return 'rgb(' + a.map(function (v) { return Math.max(0, Math.min(255, Math.round(v))); }).join(',') + ')'; }
+    function mix(c1, c2, t) { var a = hx(c1), b = hx(c2); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+    function shade(a, f) { return rgb(a.map(function (v) { return v * f; })); }
+    var ENAMEL = SHADES[st.shade];
+    var TINT = { healthy: null, caries: '#B45309', filled: '#1D5FA8', rct: '#0B6E69', crown: '#7C5AC4', missing: null, extract: '#B42318', implant: '#6B7785' };
+    var ADULT_U = { 1: [19, 30, 10], 2: [16, 27, 10], 3: [18, 31, 13], 4: [17, 25, 15], 5: [17, 24, 15], 6: [25, 22, 22], 7: [23, 21, 21], 8: [21, 19, 19] };
+    var ADULT_L = { 1: [13, 25, 9], 2: [14, 25, 9], 3: [16, 29, 12], 4: [16, 24, 14], 5: [16, 23, 15], 6: [26, 21, 21], 7: [24, 20, 20], 8: [22, 18, 19] };
+    var CHILD = { 1: [15, 22, 8], 2: [13, 21, 8], 3: [15, 23, 10], 4: [18, 18, 16], 5: [21, 18, 18] };
+    function dims(n) { var qq = Math.floor(n / 10), pp = n % 10; if (qq > 4) return CHILD[pp]; return (qq <= 2 ? ADULT_U : ADULT_L)[pp]; }
+    function face(w, h, tf, bg, extra) { return { s: 'position: absolute; left: ' + (-w / 2) + 'px; top: ' + (-h / 2) + 'px; width: ' + w + 'px; height: ' + h + 'px; transform: ' + tf + '; background: ' + bg + '; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #3E4C5E; ' + (extra || ''), txt: '' }; }
+    function boxFaces(w, h, d, base, oy, opt) {
+      opt = opt || {};
+      var pre = oy ? 'translateY(' + oy + 'px) ' : '';
+      var bf = opt.ghost ? 'backface-visibility: visible; border: 1px dashed rgba(220,230,240,0.55);' : 'backface-visibility: hidden; border: 1px solid rgba(15,28,46,0.10);';
+      function bg(f) { return opt.ghost ? 'transparent' : shade(base, f); }
+      var fr = face(w, h, pre + 'translateZ(' + d / 2 + 'px)', bg(1), bf + (opt.radius ? 'border-radius: ' + opt.radius + ';' : '') + (opt.ring || ''));
+      if (opt.txt) fr.txt = opt.txt;
+      return [fr,
+        face(w, h, pre + 'rotateY(180deg) translateZ(' + d / 2 + 'px)', bg(0.74), bf + (opt.radius ? 'border-radius: ' + opt.radius + ';' : '')),
+        face(d, h, pre + 'rotateY(90deg) translateZ(' + w / 2 + 'px)', bg(0.84), bf),
+        face(d, h, pre + 'rotateY(-90deg) translateZ(' + w / 2 + 'px)', bg(0.84), bf),
+        face(w, d, pre + 'rotateX(90deg) translateZ(' + h / 2 + 'px)', bg(opt.topF || 0.95), bf + (opt.topMark || '')),
+        face(w, d, pre + 'rotateX(-90deg) translateZ(' + h / 2 + 'px)', bg(opt.botF || 0.9), bf + (opt.botMark || ''))];
+    }
+    var child = st.dent === 'child';
+    var A3 = child ? [96, 88] : [132, 124];
+    function arch3d(list, upper) {
+      var ws = list.map(function (n) { return dims(n)[0] + 1.5; });
+      var total = ws.reduce(function (s, w) { return s + w; }, 0), cum = 0, span = Math.PI * 0.94;
+      return list.map(function (n, i) {
+        var dm = dims(n), w = dm[0], h = dm[1], d = dm[2];
+        var t = -span / 2 + span * (cum + ws[i] / 2) / total; cum += ws[i];
+        var x = A3[0] * Math.sin(t), z = A3[1] * Math.cos(t) - A3[1] * 0.45;
+        var phi = Math.atan2(Math.sin(t) / A3[0], Math.cos(t) / A3[1]) * 180 / Math.PI;
+        var y = upper ? -(st.open / 2 + h / 2) : (st.open / 2 + h / 2);
+        var k = st.teeth[n] || 'healthy', sel = st.sel === n, ghost = k === 'missing';
+        var base = TINT[k] ? mix(ENAMEL, TINT[k], k === 'implant' ? 0.35 : 0.5) : hx(ENAMEL);
+        var ring = sel ? 'box-shadow: 0 0 0 2px #FFD166 inset;' : '';
+        var mark = (st.surf[n] || []).indexOf('O') >= 0 ? 'background-image: radial-gradient(circle at 50% 50%, rgba(90,50,10,0.55) 0 22%, transparent 24%);' : '';
+        var faces = boxFaces(w, h, d, base, 0, { ghost: ghost, radius: upper ? '4px 4px 10px 10px' : '10px 10px 4px 4px', ring: ring, txt: st.labels ? String(n) : '', topF: upper ? 0.8 : 1.06, botF: upper ? 1.06 : 0.8, botMark: upper ? mark : '', topMark: upper ? '' : mark });
+        var gh = 15, gy = upper ? -(h / 2 + gh / 2 - 1) : (h / 2 + gh / 2 - 1);
+        faces = faces.concat(boxFaces(w + 3, gh, d + 6, hx(GUMS[st.gum][0]), gy, { radius: upper ? '8px 8px 2px 2px' : '2px 2px 8px 8px' }));
+        if (k === 'implant') faces.push(face(6, 22, 'translateY(' + (upper ? -(h / 2 + 12) : (h / 2 + 12)) + 'px) translateZ(' + (d / 2 + 3.5) + 'px)', 'repeating-linear-gradient(0deg, #9AA5B1 0 3px, #5B6B7F 3px 5px)', 'border-radius: 2px;'));
+        var lift = sel ? ' translateZ(10px)' : '';
+        var hide = (st.arch === 'upper' && !upper) || (st.arch === 'lower' && upper);
+        return { n: n, cond: COND[k][0], faces: faces,
+          pick: function () { if (self._moved) return; self.setState({ sel: n }); },
+          style: 'position: absolute; left: 0; top: 0; width: 0; height: 0; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer; transform-style: preserve-3d; display: ' + (hide ? 'none' : 'block') + '; transform: translate3d(' + x.toFixed(1) + 'px, ' + y.toFixed(1) + 'px, ' + z.toFixed(1) + 'px) rotateY(' + phi.toFixed(1) + 'deg)' + lift };
+      });
+    }
+    var teeth3d = arch3d(up, true).concat(arch3d(lo, false));
+    var PRESETS = [['front', 'Front', -8, 0, 34, 'both'], ['left', 'Patient’s left', -6, -68, 34, 'both'], ['right', 'Patient’s right', -6, 68, 34, 'both'], ['upper', 'Upper jaw (biting surface)', 90, 0, 60, 'upper'], ['lower', 'Lower jaw (biting surface)', -90, 0, 60, 'lower'], ['wide', 'Open wide', -28, -18, 120, 'both']];
+    var presets = PRESETS.map(function (p) {
+      var on = st.preset === p[0];
+      return { label: p[1], on: on, pick: function () { self.setSpin(false); self.setState({ preset: p[0], tilt: p[2], yaw: p[3], open: p[4], arch: p[5] }); },
+        style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 7px 12px; min-height: 36px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+    });
+    function num(e) { return parseFloat(e && e.target ? e.target.value : 0) || 0; }
+
+    /* ---------- tooth detail ---------- */
+    var rightSide = q === 1 || q === 4 || q === 5 || q === 8;
+    var anterior = q > 4 ? p <= 3 : p <= 3;
+    function surfBtn(key, label) {
+      var on = cs.indexOf(key) >= 0, car = cur === 'caries';
+      return { label: label, on: on,
+        pick: function () { var m = Object.assign({}, st.surf); var a = (m[st.sel] || []).slice(); if (on) a.splice(a.indexOf(key), 1); else a.push(key); m[st.sel] = a; self.setState({ surf: m }); },
+        style: 'border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; border: 2px solid ' + (on ? (car ? '#B45309' : A) : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? (car ? '#B45309' : A) : '#FFFFFF') };
+    }
+    var sd = { top: surfBtn('B', 'B'), bottom: surfBtn('L', q === 1 || q === 2 || q === 5 || q === 6 ? 'P' : 'L'), mid: surfBtn('O', anterior ? 'I' : 'O'), left: surfBtn(rightSide ? 'D' : 'M', rightSide ? 'D' : 'M'), right: surfBtn(rightSide ? 'M' : 'D', rightSide ? 'M' : 'D') };
+    var surfText = cs.length ? 'Marked: ' + cs.join(', ') + '. B buccal · ' + (q === 1 || q === 2 ? 'P palatal' : 'L lingual') + ' · M toward midline · D away from midline' : 'No surface marked. B buccal · M toward midline · D away from midline';
+    var rootsN = q > 4 ? (p >= 4 ? 2 : 1) : (p >= 6 ? (q <= 2 ? 3 : 2) : (p === 4 && q <= 2 ? 2 : 1));
+    var upperT = q === 1 || q === 2 || q === 5 || q === 6;
+    var ghostP = cur === 'missing', implP = cur === 'implant';
+    var cw = (dims(st.sel)[0]) * 3.2;
+    var roots = [];
+    for (var r = 0; r < (implP ? 1 : rootsN); r++) {
+      roots.push({ s: 'position: relative; display: flex; justify-content: center; width: ' + (implP ? 22 : 16) + 'px; height: ' + (implP ? 70 : (rootsN > 1 ? 74 : 92)) + 'px; border-radius: ' + (implP ? '4px 4px 8px 8px' : '6px 6px 50% 50% / 6px 6px 22px 22px') + '; background: ' + (ghostP ? 'transparent' : implP ? 'repeating-linear-gradient(0deg, #9AA5B1 0 5px, #5B6B7F 5px 8px)' : '#E8DCC0') + '; border: ' + (ghostP ? '1px dashed #9AA8B8' : '0') + (rootsN === 3 && r === 1 ? '; margin-top: -8px' : ''),
+        canal: 'display: block; width: 3px; margin-top: 6px; height: 80%; border-radius: 2px; background: ' + (ghostP || implP ? 'transparent' : cur === 'rct' ? '#2BD4C4' : '#C9A96E') });
+    }
+    var NOTES = { rct: 'Root canal: canals cleaned and dressed. Teal lines show filled canals.', caries: 'Decay on the marked surfaces (dark spot). Check depth on IOPA.', filled: 'Existing filling on the marked surfaces.', crown: 'Crown covers the whole tooth (outlined).', missing: 'Tooth missing: dashed outline shows where it was.', extract: 'Planned for extraction.', implant: 'Implant fixture in bone with a crown on top.', healthy: 'Healthy tooth with ' + rootsN + ' root' + (rootsN > 1 ? 's' : '') + '.' };
+    var profile = {
+      wrap: 'display: flex; flex-direction: ' + (upperT ? 'column-reverse' : 'column') + '; align-items: center; position: relative; padding: 8px 0',
+      crown: 'display: block; width: ' + cw + 'px; height: 48px; border-radius: ' + (upperT ? '8px 8px 18px 18px' : '18px 18px 8px 8px') + '; background: ' + (ghostP ? 'transparent' : TINT[cur] ? rgb(mix(ENAMEL, TINT[cur], 0.45)) : ENAMEL) + '; border: ' + (ghostP ? '1px dashed #9AA8B8' : '0'),
+      cap: cur === 'crown', capStyle: 'position: absolute; ' + (upperT ? 'bottom' : 'top') + ': 4px; width: ' + (cw + 8) + 'px; height: 34px; border: 3px solid #B79AF0; border-radius: ' + (upperT ? '6px 6px 20px 20px' : '20px 20px 6px 6px') + '; box-sizing: border-box',
+      caries: cur === 'caries' || cs.indexOf('O') >= 0 && cur !== 'filled', cariesStyle: 'position: absolute; ' + (upperT ? 'bottom' : 'top') + ': 14px; width: 14px; height: 14px; border-radius: 999px; background: #6B3A10',
+      roots: roots, note: NOTES[cur]
+    };
+    var mobility = ['Grade 0', 'Grade 1', 'Grade 2', 'Grade 3'].map(function (m, i) {
+      var on = (st.mob[st.sel] || 0) === i;
+      return { label: m.replace('Grade ', 'G'), on: on, pick: function () { var x = Object.assign({}, st.mob); x[st.sel] = i; self.setState({ mob: x }); },
+        style: 'flex: 1; font-size: 13px; font-weight: 700; border-radius: 8px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? A : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF') };
+    });
+    var HIST = { 36: [['RCT sitting 2 of 3 · cleaning and shaping', 'Today'], ['RCT sitting 1 · access opening, pulp removed', '04 Nov 2026'], ['IOPA X-ray · deep caries reaching pulp', '28 Oct 2026']], 16: [['Composite filling (O)', '14 Oct 2026']], 46: [['Extracted (another clinic)', '2023']], 11: [['PFM crown after trauma', '2021']], 47: [['Caries found on M and O', '28 Oct 2026']] };
+    var toothHistory = (HIST[st.sel] || [['No treatment recorded for this tooth', 'First visit 28 Oct 2026']]).map(function (h) { return { what: h[0], when: h[1] }; });
+    var order = up.concat(lo), oi = order.indexOf(st.sel);
+    var counts = [0, 0, 0]; st.plan.forEach(function (x) { counts[x.status]++; });
+    return {
+      viewTabs: viewTabs, viewHint: HINTS[st.view], isChart: st.view === 'chart', is3d: st.view === '3d', isDetail: st.view === 'detail',
+      teeth3d: teeth3d, presets: presets, selCond: COND[cur][0],
+      sceneTransform: 'transform: scale(' + st.zoom + ') rotateX(' + st.tilt + 'deg) rotateY(' + st.yaw + 'deg)',
+      yaw: Math.round(st.yaw), tilt: Math.round(st.tilt), open: Math.round(st.open),
+      onYaw: function (e) { self.setSpin(false); self.setState({ yaw: num(e), preset: '' }); },
+      onTilt: function (e) { self.setState({ tilt: num(e), preset: '' }); },
+      onOpen: function (e) { self.setState({ open: num(e) }); },
+      zoomIn: function () { self.setState({ zoom: Math.min(1.8, Math.round((st.zoom + 0.15) * 100) / 100) }); },
+      zoomOut: function () { self.setState({ zoom: Math.max(0.6, Math.round((st.zoom - 0.15) * 100) / 100) }); },
+      spin: st.spin, toggleSpin: function () { self.setSpin(!st.spin); }, spinLabel: st.spin ? 'Stop turning' : 'Auto-turn',
+      spinStyle: 'height: 36px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid ' + (st.spin ? '#7FE0D6' : '#3A4E64') + '; color: ' + (st.spin ? '#0F1C2E' : '#FFFFFF') + '; background: ' + (st.spin ? '#7FE0D6' : '#1E3550'),
+      labels: st.labels, toggleLabels: function () { self.setState({ labels: !st.labels }); },
+      labelStyle: 'height: 36px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid ' + (st.labels ? '#7FE0D6' : '#3A4E64') + '; color: ' + (st.labels ? '#0F1C2E' : '#FFFFFF') + '; background: ' + (st.labels ? '#7FE0D6' : '#1E3550'),
+      dragStart: function (e) { if (self._spin) self.setSpin(false); self._d = { x: e.clientX, y: e.clientY, yaw: st.yaw, tilt: st.tilt }; self._moved = false; },
+      dragMove: function (e) {
+        var d = self._d; if (!d) return;
+        var dx = e.clientX - d.x, dy = e.clientY - d.y;
+        if (Math.abs(dx) + Math.abs(dy) > 4) self._moved = true;
+        var y = d.yaw + dx * 0.45; while (y > 180) y -= 360; while (y < -180) y += 360;
+        self.setState({ yaw: y, tilt: Math.max(-90, Math.min(90, d.tilt - dy * 0.45)), preset: '' });
+      },
+      dragEnd: function () { self._d = null; setTimeout(function () { self._moved = false; }, 0); },
+      sd: sd, surfText: surfText, profile: profile, mobility: mobility, toothHistory: toothHistory,
+      prevTooth: function () { self.setState({ sel: order[(oi - 1 + order.length) % order.length] }); },
+      nextTooth: function () { self.setState({ sel: order[(oi + 1) % order.length] }); },
+      dentTabs: dentTabs, upper: up.map(tooth), lower: lo.map(tooth), legend: legend, conds: conds, surfaces: surfaces,
+      suggest: sug, hasSuggest: sug.length > 0, noSuggest: sug.length === 0,
+      plan: plan, planSummary: st.plan.length + ' items · ' + counts[2] + ' done · ' + counts[1] + ' in progress · ' + counts[0] + ' planned',
+      planTotal: inr(st.plan.reduce(function (a, x) { return a + rateOf(x.proc); }, 0)) + ' (sample rate card)',
+      parts: (function () {
+        var aDone = (st.cC > 0 ? 1 : 0) + (st.medReviewed ? 1 : 0), tDone = (st.cD > 0 ? 1 : 0) + (st.plan.length > 0 ? 1 : 0);
+        return [['A', 'Assessment', 'Complaints, history, examination, X-rays', aDone], ['T', 'Treatment', 'Diagnosis, chart, plan, sittings and payments', tDone]].map(function (p, i) {
+          var on = st.part === p[0], full = p[3] === 2;
+          return { num: full ? '✓' : String(i + 1), label: p[1], sub: p[2], on: on, badge: p[3] + ' of 2 required',
+            pick: function () { self.setState({ part: p[0] }); },
+            style: 'display: flex; gap: 12px; align-items: center; border-radius: 12px; padding: 12px 16px; min-height: 64px; cursor: pointer; text-align: left; border: 2px solid ' + (on ? A : '#E3E8EE') + '; background: ' + (on ? A : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#0F1C2E'),
+            numStyle: 'flex: none; width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; background: ' + (full ? '#146C43' : on ? '#FFFFFF' : '#EEF1F5') + '; color: ' + (full ? '#FFFFFF' : '#0F1C2E'),
+            badgeStyle: 'flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 9px; background: ' + (full ? '#E3F5EC' : on ? 'rgba(255,255,255,0.2)' : '#FDECEA') + '; color: ' + (full ? '#146C43' : on ? '#FFFFFF' : '#B42318') };
+        });
+      })(),
+      aStyle: 'display: ' + (st.part === 'A' ? 'flex' : 'none') + '; flex-direction: column; gap: 16px',
+      tStyle: 'display: ' + (st.part === 'T' ? 'flex' : 'none') + '; flex-direction: column; gap: 16px',
+      goT: function () { self.setState({ part: 'T' }); }, goA: function () { self.setState({ part: 'A' }); },
+      onComplaints: function (items) { var a = Array.isArray(items) ? items : []; self.setState({ cC: a.length, cNames: a.map(function (x) { return x.name + ' (' + x.a1 + ')'; }).join(', ') }); },
+      onDiagnosis: function (items) { var a = Array.isArray(items) ? items : []; self.setState({ cD: a.length }); },
+      assess: assess, aFooter: aFooter, aRecap: aRecap,
+      chartStyles: [['real', 'Realistic'], ['xray', 'X-ray'], ['outline', 'Outline'], ['buttons', 'Buttons']].map(function (c) {
+        var on = st.cstyle === c[0];
+        return { label: c[1], on: on, pick: function () { self.setState({ cstyle: c[0] }); },
+          style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 11px; min-height: 32px; cursor: pointer; border: 1px solid ' + (on ? '#0F1C2E' : '#C9D2DC') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? '#0F1C2E' : '#FFFFFF') };
+      }),
+      shades: Object.keys(SHADES).map(function (k) {
+        var on = st.shade === k;
+        return { label: k, on: on, pick: function () { self.setState({ shade: k }); },
+          style: 'width: 34px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 700; color: #3E4C5E; background: ' + SHADES[k] + '; border: ' + (on ? '2px solid #0F1C2E' : '1px solid #C9D2DC') };
+      }),
+      gums: Object.keys(GUMS).map(function (k) {
+        var on = st.gum === k;
+        return { label: 'Gum ' + GUMS[k][1], on: on, pick: function () { self.setState({ gum: k }); },
+          style: 'width: 30px; height: 30px; border-radius: 999px; cursor: pointer; background: ' + GUMS[k][0] + '; border: ' + (on ? '3px solid #0F1C2E' : '1px solid #C9D2DC') };
+      }),
+      styleBarDisp: st.view === 'detail' ? 'display: none' : '',
+      isBtnStyle: st.cstyle === 'buttons', isPicStyle: st.cstyle !== 'buttons',
+      chartBox: 'display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 14px 8px; border-radius: 12px; background: ' + (st.cstyle === 'xray' ? '#0E1620' : st.cstyle === 'real' ? '#FFF8F6' : '#FFFFFF'),
+      axisColor: st.cstyle === 'xray' ? '#B8C4D3' : '#5B6B7F',
+      midline: st.cstyle === 'xray' ? '#3A4E64' : '#C9D2DC',
+      doneToday: doneToday, sittings: sittings, sitting: st.sitting,
+      sittingText: 'Books the chair in ' + st.sitting + ' for obturation of 36.',
+      rxOpts: rxOpts, penWarn: pen, intra: intra,
+      sel: { n: st.sel, name: (q > 4 ? (CNAMES[p] || '') + ' (milk tooth)' : (NAMES[p] || '')) + ', ' + (QUAD[q] || '') },
+      statusText: pen ? 'Remove Amoxicillin before completing (penicillin allergy).' : doneToday.length + ' procedure(s) done today will be billed.',
+      statusStyle: 'font-size: 13px; font-weight: 600; color: ' + (pen ? '#B42318' : '#146C43'),
+      completeStyle: 'border: 1px solid ' + (pen ? '#C9D2DC' : A) + '; background: ' + (pen ? '#EEF1F5' : A) + '; color: ' + (pen ? '#5B6B7F' : '#FFFFFF') + '; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: ' + (pen ? 'not-allowed' : 'pointer'),
+      complete: function () { if (pen) self.act({}, 'Fix the allergy warning first', false); else self.setState({ modal: true }); },
+      printEst: function () { self.act({}, 'Estimate sent to printer', false); },
+      closeModal: function () { self.setState({ modal: false }); },
+      finish: function () { self.act({ modal: false }, 'Sent to billing · next sitting booked in ' + st.sitting, false); },
+      undo: function () { if (st.prev) self.setState(Object.assign({ toast: '', prev: null }, st.prev)); },
+      toast: st.toast, canUndo: !!st.prev, modal: st.modal
+    };
+  }
+
+  renderVals() {
+    var self = this, st = this.state, r = this._rv(), MAP = {"complaints": "onComplaints", "diagnosis": "onDiagnosis", "advice": null}, TOOLS = false, cp = st.cp || {};
+    Object.keys(MAP).forEach(function (k) {
+      var orig = MAP[k] ? r[MAP[k]] : null;
+      r['cp_' + k] = function (items) { if (typeof orig === 'function') orig(items); var a = Array.isArray(items) ? items : []; self.setState(function (s0) { var x = Object.assign({}, s0.cp || {}); x[k] = a; return { cp: x }; }); };
+    });
+    var paper = casePaper(st, r, cp), S = paper.sections || {}, n = 0;
+    Object.keys(S).forEach(function (k) { if (S[k] && S[k].length) n++; }); if (paper.rx && paper.rx.length) n++;
+    var rt = st.rtab || 'history', A = '#0B6E69';
+    var tabs = [['history', 'Past visits', 'OPD + IPD'], ['paper', 'Case paper', n + ' of 10 filled · live']];
+    if (TOOLS) tabs.push(['tools', 'Quick tools', 'Helpers for this visit']);
+    r.rTabs = tabs.map(function (t) { var on = rt === t[0]; return { label: t[1], sub: t[2], on: on, pick: function () { self.setState({ rtab: t[0] }); },
+      style: 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 48px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none') }; });
+    function pane(k) { return 'display: ' + (rt === k ? 'flex' : 'none') + '; flex-direction: column; gap: 16px'; }
+    r.rpHistory = pane('history'); r.rpPaper = pane('paper'); r.rpTools = pane('tools');
+    r.paper = paper;
+    return r;
+  }
+}
+</script>
+</body>
+</html>

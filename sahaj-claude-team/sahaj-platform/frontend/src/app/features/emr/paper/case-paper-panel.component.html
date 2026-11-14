@@ -1,11 +1,10 @@
 <section class="cp" aria-labelledby="cp-title">
   <div class="tools">
     <div class="topline">
-      <h3 id="cp-title">Live case paper</h3>
-      <span class="live">● Live</span>
-      <span class="fill" data-testid="paper-fill">{{ filled() }} of 10 filled</span>
+      <span class="live" id="cp-title">● Live</span>
+      <span class="fill" data-testid="paper-fill">{{ filled() }} of 10 sections filled</span>
     </div>
-    <div class="bar" aria-hidden="true"><span [style.width.%]="percent()"></span></div>
+    <div class="bar" aria-hidden="true"><span [class.good]="barGood()" [style.width.%]="percent()"></span></div>
 
     <div class="controls">
       <div class="seg" role="group" aria-label="Paper size">

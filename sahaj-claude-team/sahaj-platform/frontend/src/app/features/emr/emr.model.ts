@@ -102,6 +102,10 @@ export interface EmrFieldOption {
   key: FieldKey;
   label: string;
   isNone: boolean;
+  /** 0.7.0 (SAH-75-6): shown red when chosen (a habit, an abnormal finding). False when absent. */
+  alert?: boolean;
+  /** 0.7.1 (ADR-026 D13): the second line of a tile ("Barrier", "Daily pill"). Null or absent when the option has none. */
+  hint?: string | null;
 }
 
 export interface EmrTableColumn {
@@ -131,6 +135,8 @@ export interface EmrFieldDefinition {
   min: number | null;
   max: number | null;
   component?: EmrFieldComponent | null;
+  /** 0.7.0 (SAH-75-6): CHIPS draws a choice as round chips (one, or many); DEFAULT when absent. */
+  presentation?: 'DEFAULT' | 'CHIPS';
 }
 
 /** One section of a layout with its settings and definition. */
@@ -311,6 +317,11 @@ export interface EmrRecordHeader {
   sex: 'F' | 'M' | 'O';
   uhid: string | null;
   allergyText: string | null;
+  /**
+   * 0.7.1 (ADR-026 D12). NONE_RECORDED: the record says "no known allergy" (grey chip on Paediatrics and Oncology only);
+   * allergyText is then null. Absent from an older server: treated as not recorded.
+   */
+  allergyStatus?: 'RECORDED' | 'NONE_RECORDED' | 'NOT_RECORDED';
   chronicText: string | null;
   /** 0.4.0 (SAH-57-3): true when a body map of this record has an MLC pin. */
   mlc?: boolean;

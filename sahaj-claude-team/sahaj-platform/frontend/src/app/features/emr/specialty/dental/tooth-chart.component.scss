@@ -354,9 +354,50 @@
 
 /* ---- tooth detail ---- */
 .detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.dcol {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.dsurf,
+.dside {
+  align-items: center;
+
+  .sp-h {
+    align-self: flex-start;
+  }
+}
+
+.dside {
+  border-color: transparent;
+  background: var(--ink);
+  color: var(--surface);
+
+  .sp-h,
+  .sp-sub {
+    color: var(--surface);
+  }
+}
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 4px 10px;
+  border-left: 3px solid var(--sec);
+  font-weight: 600;
+  font-size: 0.8125rem;
 }
 
 .cross {

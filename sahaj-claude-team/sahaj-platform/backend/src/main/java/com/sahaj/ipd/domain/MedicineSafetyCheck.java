@@ -116,15 +116,17 @@ public final class MedicineSafetyCheck {
 
     /**
      * The chip for an allergy text, first that applies: a known allergy class is named (RECORDED); the text says
-     * "none known" (NONE_KNOWN); the text is null, blank, says "not recorded" or is exactly "unknown", "not known"
-     * or "?" in any case (NOT_RECORDED); otherwise RECORDED.
+     * "none known" or is one of the none words of the shared list of patient.api (none, nil, nka, nkda, none known,
+     * no known allergy, no known allergies, no known drug allergy, no known drug allergies; whole text, any case,
+     * trailing full stops ignored) (NONE_KNOWN, H20: "No known allergy" written at sign is no allergy); the text is null, blank,
+     * says "not recorded" or is exactly "unknown", "not known" or "?" in any case (NOT_RECORDED); otherwise RECORDED.
      */
     public static AllergyStatus allergyStatus(String allergyText) {
         String lower = normalised(allergyText);
         if (classNamed(lower, PENICILLIN) || classNamed(lower, SULFA)) {
             return AllergyStatus.RECORDED;
         }
-        if (lower.contains("none known")) {
+        if (lower.contains("none known") || com.sahaj.patient.api.AllergyStatus.isNoneWord(lower)) {
             return AllergyStatus.NONE_KNOWN;
         }
         if (lower.isEmpty() || lower.contains("not recorded") || NOT_RECORDED_TEXTS.contains(lower)) {

@@ -104,14 +104,14 @@
                   @for (r of d.results; track $index) {
                     <div class="res">
                       <span>{{ r.test }}</span>
-                      <span [class.abn]="r.abnormal">{{ r.value }}@if (r.abnormal) { · Abnormal }</span>
+                      <span [class.abn]="r.abnormal">{{ r.value }}</span>
                     </div>
                   }
                 </div>
               }
               @if (d.medicines.length > 0) {
                 <div class="blk">
-                  <span class="dk">Medicines</span>
+                  <span class="dk" data-testid="medicines-heading">{{ medicinesHeading(d) }}</span>
                   @for (m of d.medicines; track $index) {
                     <span>• {{ medicineLine(m) }}</span>
                   }

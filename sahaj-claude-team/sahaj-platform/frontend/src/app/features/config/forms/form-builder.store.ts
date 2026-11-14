@@ -13,6 +13,7 @@ import {
 import { fieldCountLine, missingRequired, abnormalCount } from '../../emr/forms/form.logic';
 import {
   NO_DEPARTMENT_TEXT,
+  WHO_CHOICES,
   chipText,
   deleteBlockedMessage,
   definitionOf,
@@ -109,7 +110,8 @@ export class FormBuilderStore {
       ...s.useIn.places.map((p) => (p === 'EMERGENCY' ? 'Emergency' : 'IPD wards')),
     ];
     const part = s.emrPart === 'ASSESSMENT' ? 'Assessment' : 'Treatment';
-    return `${where.join(', ') || 'No department yet'} · ${part}`;
+    const who = WHO_CHOICES.filter((w) => s.whoCanFill.includes(w.key)).map((w) => w.label.toLowerCase());
+    return `${where.join(', ') || 'No department yet'} · ${part} · filled by ${who.join(', ')}`;
   });
   /** Preview line: required fields missing, values outside the normal range, or how many are filled. */
   readonly previewMissing = computed(() => {
@@ -339,6 +341,10 @@ export class FormBuilderStore {
   }
 
   save(): void {
+    if (!this.dirty() && !this.busy()) {
+      this.say('Nothing new to save');
+      return;
+    }
     this.saveDraft().subscribe((saved) => {
       if (saved) {
         this.say('Draft saved');

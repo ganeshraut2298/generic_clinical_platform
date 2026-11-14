@@ -23,6 +23,8 @@ import { FinishDialogComponent } from './finish-dialog.component';
 import { OFFLINE_SIGN, SIGN_ERROR, blockerMessage, dentalAllDone, firstBlockedSection } from './finish.logic';
 
 /** What the page needs to know when the flow stops or ends. */
+export const PICK_TREATMENTS = 'Pick the treatments given today first';
+
 export type FinishEvent =
   | { kind: 'blocked'; message: string; sectionKey: string | null }
   | { kind: 'signed'; outcome: EmrSignOutcome; choices: EmrFinishChoices; record: EmrRecordView; sessionNo: number | null; profile: EmrFinishProfileEffects | null }
@@ -170,7 +172,10 @@ export class EmrFinishFlow {
       return;
     }
     if (!this.store.ready()) {
-      this.events.next({ kind: 'blocked', message: this.store.footer(), sectionKey: this.store.firstMissing() });
+      // Physiotherapy with no treatment picked: the design's own words (DoctorPhysio.dc.html:313-317).
+      const items = this.store.footerItems();
+      const message = items.length === 1 && items[0].key === 'PHYSIO_TREATMENT_TODAY' ? PICK_TREATMENTS : this.store.footer();
+      this.events.next({ kind: 'blocked', message, sectionKey: this.store.firstMissing() });
       return;
     }
     this.starting.set(true);

@@ -45,21 +45,85 @@ const physio = [
 describe('General Medicine (SAH-60)', () => {
   const record = () => specialtyRecord('gm', gm);
 
-  it('records an entry per "Record general examination" and flags the readings with text', () => {
+  const BP_INPUT = 'input[aria-label^="BP in mmHg"]';
+  function fillAllSix(h: ReturnType<typeof mountEditor>, except: string[] = []): void {
+    const values: [string, string][] = [
+      ['PR in /min', '82'],
+      ['SpO₂ in %', '98'],
+      ['Temp in °F', '100.4'],
+      ['RR in /min', '18'],
+      ['Pain in 0–10', '2'],
+    ];
+    typeInto(h.el.querySelector<HTMLInputElement>(BP_INPUT)!, '146/92');
+    for (const [label, value] of values) {
+      if (!except.includes(label)) {
+        typeInto(h.el.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!, value);
+      }
+    }
+    h.fixture.detectChanges();
+  }
+
+  it('records an entry per "Record general examination" only when all six values are filled, and flags the readings with text', () => {
     const h = mountEditor(VitalsLogComponent, record(), 'vitals');
     expect(h.el.querySelector('[data-testid="vitals-sub"]')?.textContent).toBe('The doctor’s entry for this visit is still needed.');
-    expect((h.el.querySelector('button[data-act="record-vitals"]') as HTMLButtonElement).disabled).toBe(true);
-    typeInto(h.el.querySelector<HTMLInputElement>('input[aria-label="BP systolic in mmHg"]')!, '146');
-    typeInto(h.el.querySelector<HTMLInputElement>('input[aria-label="BP diastolic in mmHg"]')!, '92');
-    typeInto(h.el.querySelector<HTMLInputElement>('input[aria-label="Temp in °F"]')!, '100.4');
+    const record$ = () => h.el.querySelector('button[data-act="record-vitals"]') as HTMLButtonElement;
+    expect(record$().disabled).toBe(true);
+    expect(h.el.querySelector('[data-testid="ge-summary"]')?.textContent).toBe('Type the 6 values, then record them.');
+    expect(h.el.querySelectorAll('app-sp-stepper')).toHaveLength(5);
+    expect(h.el.querySelectorAll('app-sp-bp-stepper')).toHaveLength(1);
+    fillAllSix(h, ['Pain in 0–10']);
+    expect(record$().disabled).toBe(true);
+    expect(h.el.querySelector('[data-testid="ge-summary"]')?.textContent).toBe('1 value(s) still empty.');
+    typeInto(h.el.querySelector<HTMLInputElement>('input[aria-label="Pain in 0–10"]')!, '2');
     h.fixture.detectChanges();
+    expect(h.el.querySelector('[data-testid="ge-summary"]')?.textContent).toBe('Ready: BP 146/92 · PR 82 · SpO2 98 · Temp 100.4 · RR 18 · Pain 2');
     const notes = Array.from(h.el.querySelectorAll('[data-testid="stepper-note"]')).map((n) => n.textContent?.trim());
-    expect(notes).toEqual(['High', 'High', 'Fever']);
+    expect(notes).toEqual(['High', 'Fever']);
     click(h.el, 'button[data-act="record-vitals"]');
-    const entries = (h.store.specialtyValue('vitals') as { entries: { id: string; bpSystolic: number; temperature: { value: number; unit: string } }[] }).entries;
+    const entries = (h.store.specialtyValue('vitals') as { entries: { id: string; bpSystolic: number; bpDiastolic: number; temperature: { value: number; unit: string } }[] }).entries;
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ bpSystolic: 146, temperature: { value: 100.4, unit: 'F' } });
+    expect(entries[0]).toMatchObject({ bpSystolic: 146, bpDiastolic: 92, temperature: { value: 100.4, unit: 'F' } });
     expect(h.store.stateOf('vitals')?.done).toBe(true);
+  });
+
+  it('moves BP as one value: the upper number by 2 and the lower by 1, from 120/80', () => {
+    const h = mountEditor(VitalsLogComponent, record(), 'vitals');
+    const bp = () => h.el.querySelector<HTMLInputElement>(BP_INPUT)!.value;
+    click(h.el, 'app-sp-bp-stepper button[aria-label="Increase BP"]');
+    h.fixture.detectChanges();
+    expect(bp()).toBe('122/81');
+    click(h.el, 'app-sp-bp-stepper button[aria-label="Decrease BP"]');
+    h.fixture.detectChanges();
+    click(h.el, 'app-sp-bp-stepper button[aria-label="Decrease BP"]');
+    h.fixture.detectChanges();
+    expect(bp()).toBe('118/79');
+    typeInto(h.el.querySelector<HTMLInputElement>(BP_INPUT)!, 'abc');
+    h.fixture.detectChanges();
+    expect(bp()).toBe('118/79');
+  });
+
+  it('draws six small charts on the Trend view, each with the last value and a sentence', () => {
+    const h = mountEditor(VitalsLogComponent, record(), 'vitals');
+    byText(h.el, '.seg button', 'Trend').click();
+    h.fixture.detectChanges();
+    h.fixture.detectChanges();
+    h.http.expectOne(`${EMR_RECORDS}/r1/specialty-history`).flush({
+      profile: 'gm',
+      someHidden: false,
+      vitals: [
+        { recordedAt: '2026-11-11T05:12:00Z', recordedByName: 'Sr. Test', bp: '146/92', pulse: 82, spo2: 98, temperature: '98.4', respRate: 18, pain: 2, how: 'NURSE' },
+        { recordedAt: '2026-10-11T05:12:00Z', recordedByName: 'Sr. Test', bp: '152/94', pulse: 88, spo2: 97, temperature: '98.6', respRate: 20, pain: 3, how: 'NURSE' },
+      ],
+    });
+    h.fixture.detectChanges();
+    const cards = Array.from(h.el.querySelectorAll('[data-testid="ge-trends"] .tcard'));
+    expect(cards).toHaveLength(6);
+    expect(cards.map((c) => c.querySelector('.sp-lbl')?.textContent)).toEqual(['BP (systolic)', 'PR', 'SpO2', 'Temp', 'RR', 'Pain']);
+    expect(cards[0].querySelector('.tlast')?.textContent).toBe('146');
+    expect(cards[0].textContent).toContain('High at the last reading');
+    expect(cards[1].textContent).toContain('Within normal range');
+    expect(cards[0].querySelector('svg')?.getAttribute('aria-label')).toBe('BP (systolic) over 2 visits: 152, 146');
+    expect(h.el.querySelectorAll('[data-testid="ge-trends"] circle')).toHaveLength(6);
   });
 
   it('shows the server’s flags of the latest entry while nothing is unsaved', () => {
@@ -284,6 +348,36 @@ describe('Physiotherapy (SAH-63)', () => {
     expect(h.el.querySelectorAll('button.pn')).toHaveLength(11);
     expect(h.el.querySelector('[data-testid="pain-text"]')?.textContent).toBe('First visit 7. Last session: 5. Today: 4 — improving.');
     expect(h.el.querySelector('button.pn[data-band="crit"]')).not.toBeNull();
+  });
+
+  it('writes the earlier sessions, a small trend line and the comparison with today (P-3)', () => {
+    const h = mountEditor(PainScoreComponent, record(), 'pain');
+    h.http.expectOne(`${EMR_RECORDS}/r1/specialty-history`).flush({
+      profile: 'physio',
+      someHidden: false,
+      physioProgress: {
+        sessionsDone: 3, sessionsPlanned: 10, painFirst: 7, painLast: 5, romFirst: null, romLast: null, goalsAchieved: [], onlyFirstVisit: false,
+        painBySession: [{ sessionNo: 3, score: 5 }, { sessionNo: 1, score: 7 }, { sessionNo: 2, score: 6 }],
+      },
+    });
+    click(h.el, 'button.pn', 4);
+    h.fixture.detectChanges();
+    expect(h.el.querySelector('[data-testid="pain-text"]')?.textContent).toBe('Sessions 1–3: 7, 6, 5. Today: 4 — improving.');
+    expect(h.el.querySelector('[data-testid="pain-trend"] svg')?.getAttribute('aria-label')).toBe('Pain over the sessions: 7, 6, 5, 4');
+    click(h.el, 'button.pn', 6);
+    h.fixture.detectChanges();
+    expect(h.el.querySelector('[data-testid="pain-text"]')?.textContent).toContain('Today: 6 — worse than last session.');
+  });
+
+  it('shows Left as text and the strength chips of the visit in the range-of-motion card (P-4, P-9)', () => {
+    const h = mountEditor(RomTableComponent, record(), 'rom', {
+      rom: { component: 'ROM_TABLE', schemaVersion: 1, joint: 'knee', rows: [{ movement: 'flexion', rightDeg: 105, leftDeg: 120 }] },
+      mmt: { component: 'MMT_TABLE', schemaVersion: 1, rows: [{ group: 'quadriceps', right: 4, left: 5 }, { group: 'hamstrings', right: 4, left: null }] },
+    });
+    expect(h.el.querySelector('input[aria-label="Left Flexion in degrees"]')).toBeNull();
+    expect(Array.from(h.el.querySelectorAll('[data-testid="rom-left"]')).map((c) => c.textContent)).toEqual(['120°', '—', '—']);
+    const chips = Array.from(h.el.querySelectorAll('[data-testid="scale-chips"] .chipnote')).map((c) => c.textContent?.trim());
+    expect(chips).toEqual(['Quadriceps R 4/5 · L 5/5', 'Hamstrings R 4/5 · L –/5']);
   });
 
   it('shows the knee range of motion with the normal range and right against normal, and a typed joint without one', () => {

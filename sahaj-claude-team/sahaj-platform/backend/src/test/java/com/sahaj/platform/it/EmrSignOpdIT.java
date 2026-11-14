@@ -357,8 +357,10 @@ class EmrSignOpdIT extends EmrSignSupport {
         item.put("attr2", "BILL_TODAY");
         rec = save(rec, oneField("procedures", "procedure", listValue("SERVICES", item)));
         JsonNode bill = ok(HttpMethod.GET, BILLING + "/bills/" + rec.visitId(), clinic.owner(), null, 200);
-        ok(HttpMethod.POST, BILLING + "/bills/" + rec.visitId() + "/payments", clinic.owner(),
-                "{\"mode\":\"CASH\",\"amountPaise\":" + bill.get("subtotalPaise").asLong() + "}", 200);
+        moveVisitToBilling(clinic, rec.visitId()); // a payment is only taken while the visit is awaiting payment
+        org.springframework.mock.web.MockHttpServletResponse paidNow = call(HttpMethod.POST, BILLING + "/bills/" + rec.visitId() + "/payments", clinic.owner(),
+                "{\"mode\":\"CASH\",\"amountPaise\":" + bill.get("subtotalPaise").asLong() + "}").andReturn().getResponse();
+        assertThat(paidNow.getStatus()).as("the payment (bill " + bill + "): " + paidNow.getContentAsString()).isEqualTo(200);
         JsonNode line = check(rec).get("effects").get("billLines").get(0);
         assertThat(line.get("state").asText()).isEqualTo("ALREADY_BILLED");
         signOk(rec);
@@ -374,7 +376,7 @@ class EmrSignOpdIT extends EmrSignSupport {
         List<List<String>> complaint = globalRows("select id::text, name from opd.emr_complaint order by sort_order, lower(name), id limit 1");
         Rec rec = startRecord(clinic, doctor);
         rec = save(rec, complaintsSection(keyedItem(complaint.get(0).get(0), complaint.get(0).get(1))),
-                sectionValues("diagnosis", DIAGNOSIS_JSON), sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
+                spSection("vitals", "VITALS_LOG", VITALS_LOG_JSON.replace("ENTRY_ID", uuid())), sectionValues("diagnosis", DIAGNOSIS_JSON), sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
         assertThat(usageRows(clinic)).as("a draft counts nothing").isZero();
         signOk(rec);
         assertThat(usageRows(clinic)).as("one master item; the typed diagnosis and drug are not counted").isOne();
@@ -388,7 +390,7 @@ class EmrSignOpdIT extends EmrSignSupport {
         Staff doctor = addDoctor(clinic, "General physician");
         List<List<String>> complaint = globalRows("select id::text, name from opd.emr_complaint order by sort_order, lower(name), id limit 1");
         Rec rec = save(startRecord(clinic, doctor), complaintsSection(keyedItem(complaint.get(0).get(0), complaint.get(0).get(1))),
-                sectionValues("diagnosis", DIAGNOSIS_JSON), sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
+                spSection("vitals", "VITALS_LOG", VITALS_LOG_JSON.replace("ENTRY_ID", uuid())), sectionValues("diagnosis", DIAGNOSIS_JSON), sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
         String key = key();
         String body = signBody(rec.revision(), "{}");
         okKeyed(HttpMethod.POST, signPath(rec.id()), rec.token(), body, key, 200);
@@ -413,7 +415,7 @@ class EmrSignOpdIT extends EmrSignSupport {
         assertThat(stamp).containsExactly("true", doctor.userId().toString());
         List<List<String>> audits = auditRows(clinic, "PATIENT_CLINICAL_FACTS_UPDATED");
         assertThat(audits).hasSize(1);
-        assertThat(audits.get(0).get(2)).contains("ALLERGIES").doesNotContain("Dust allergy");
+        assertThat(audits.get(0).get(2)).contains("allergy").doesNotContain("Dust allergy");
     }
 
     @Test
@@ -500,7 +502,7 @@ class EmrSignOpdIT extends EmrSignSupport {
                 .isEqualTo("Asthma since childhood; dm; HTN");
         List<List<String>> audits = auditRows(clinic, "PATIENT_CLINICAL_FACTS_UPDATED");
         assertThat(audits).hasSize(1);
-        assertThat(audits.get(0).get(1) + audits.get(0).get(2)).as("field names only, never the values").contains("LONG_TERM_CONDITIONS")
+        assertThat(audits.get(0).get(1) + audits.get(0).get(2)).as("field names only, never the values").contains("chronic")
                 .doesNotContain("Asthma").doesNotContain("HTN");
     }
 

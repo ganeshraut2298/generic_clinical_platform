@@ -109,7 +109,7 @@ class VitalsTableIT extends VitalsSupport {
         save(w.clinic(), w.adm().id(), high7()); // the open escalation is now 7, High
         assertThat(openEscalation(w.clinic(), w.adm().id())).isEqualTo("7|HIGH|15|OPEN|1");
         SqlErr lower = ownerErr("ipd.ews_escalation",
-                "update ipd.ews_escalation set ews_score = 6, ews_risk = 'HIGH', target_minutes = 15");
+                "update ipd.ews_escalation set ews_score = 6, ews_risk = 'HIGH', target_minutes = 15 where admission_id = '" + w.adm().id() + "'");
         assertThat(lower.state()).isEqualTo("23514");
         assertThat(lower.message()).contains("score cannot go down");
     }

@@ -107,7 +107,7 @@ describe('EmrListComponent (SAH-56)', () => {
       expect(q('h3')!.textContent).toContain('Chief complaints');
       expect(q('.star')).not.toBeNull();
       expect(q('.sr-only')!.textContent).toContain('required');
-      expect(q('[data-testid=list-count]')!.textContent).toBe('0 active');
+      expect(q('[data-testid=list-count]')!.textContent).toBe('0');
       expect(qa('[role=tab]').map((t) => t.textContent!.trim())).toEqual(['Chips', 'Table']);
     });
 
@@ -268,13 +268,19 @@ describe('EmrListComponent (SAH-56)', () => {
   });
 
   describe('attributes (SAH-56-2)', () => {
-    it('changes the duration of a complaint to a value of the list', () => {
+    it('shows the duration as a pill with a down arrow and moves to the next value on each press', () => {
       render('COMPLAINTS', { items: [item()] });
-      const select = q<HTMLSelectElement>('.chip select')!;
-      expect(Array.from(select.options).map((o) => o.textContent!.trim())).toEqual(['1 day', '2 days', '3 days', '5 days', '1 week', '2 weeks', '1 month', 'Over 1 month']);
-      select.value = 'OVER_M1';
-      select.dispatchEvent(new Event('change'));
-      expect(emitted[0].items[0].attr1).toBe('OVER_M1');
+      const pill = q<HTMLButtonElement>('.chip [data-act=cycle-attr]')!;
+      expect(pill.textContent!.trim()).toBe('3 days ▾');
+      expect(pill.getAttribute('aria-label')).toBe('Duration of Fever: 3 days. Press to change.');
+      pill.click();
+      expect(emitted[0].items[0].attr1).toBe('D5');
+    });
+
+    it('goes back to the first value after the last one', () => {
+      render('COMPLAINTS', { items: [item({ attr1: 'OVER_M1' })] });
+      q<HTMLButtonElement>('.chip [data-act=cycle-attr]')!.click();
+      expect(emitted[0].items[0].attr1).toBe('D1');
     });
 
     it('starts Advice in the visit language and lets the doctor change the print language', () => {
@@ -312,12 +318,12 @@ describe('EmrListComponent (SAH-56)', () => {
       expect(rows[1].textContent).toContain('Dr Test');
     });
 
-    it('adds a Code column for a diagnosis', () => {
+    it('shows the diagnosis code in the name cell before the name, not as an extra column', () => {
       render('DIAGNOSIS', { items: [item({ text: 'Hypertension', code: 'I10' })] });
       q<HTMLButtonElement>('[data-act=view-table]')!.click();
       fixture.detectChanges();
-      expect(qa('th').map((h) => h.textContent!.trim())).toContain('Code');
-      expect(qa('td').some((c) => c.textContent!.trim() === 'I10')).toBe(true);
+      expect(qa('th').map((h) => h.textContent!.trim())).not.toContain('Code');
+      expect(q('td.s2')!.textContent!.replace(/\s+/g, ' ').trim()).toBe('I10Hypertension');
     });
 
     it('mutes a row when Active is switched off, counts it as disabled, and restores it when switched on', () => {
@@ -333,7 +339,7 @@ describe('EmrListComponent (SAH-56)', () => {
       qa('[data-act=toggle-active]')[0].click();
       fixture.detectChanges();
       expect(emitted[1].items[0].active).toBe(true);
-      expect(q('[data-testid=list-count]')!.textContent).toBe('2 active');
+      expect(q('[data-testid=list-count]')!.textContent).toBe('2');
     });
 
     it('removes a row with a message and an Undo that brings it back with its attributes', () => {
@@ -378,9 +384,7 @@ describe('EmrListComponent (SAH-56)', () => {
       fixture.detectChanges();
       expect(emitted).toHaveLength(0);
       expect(q('[data-testid=list-notice]')!.textContent).toBe('Already billed. Ask billing to adjust.');
-      const select = q<HTMLSelectElement>('.chip select')!;
-      select.value = '2';
-      select.dispatchEvent(new Event('change'));
+      q<HTMLButtonElement>('.chip [data-act=cycle-attr]')!.click();
       expect(emitted).toHaveLength(0);
     });
   });
@@ -391,7 +395,7 @@ describe('EmrListComponent (SAH-56)', () => {
       expect(q('[data-act=toggle-add]')).toBeNull();
       expect(q('[data-act=remove]')).toBeNull();
       expect(q('.quick')).toBeNull();
-      expect(q<HTMLSelectElement>('.chip select')!.disabled).toBe(true);
+      expect(q<HTMLButtonElement>('.chip [data-act=cycle-attr]')!.disabled).toBe(true);
     });
   });
 });

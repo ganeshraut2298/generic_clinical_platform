@@ -56,7 +56,11 @@ public class EmrCasePaperService {
             // ADR-023 D3: the specialty sections that print under Procedures and services, or have their own prints.
             Map.entry("immunization", "PROCEDURES"), Map.entry("modalities", "PROCEDURES"),
             Map.entry("tx_plan", "PROCEDURES"), Map.entry("wtdose", "NONE"), Map.entry("onc_regimen", "NONE"),
-            Map.entry("sx_preop", "NONE"));
+            Map.entry("sx_preop", "NONE"),
+            // SAH-75-6 (ADR-026 D6): the Dental assessment cards. The others (dental_pain, dental_extraoral,
+            // dental_intraoral) and local_exam go under Examination, the default.
+            Map.entry("dental_medhx", "MEDICAL_HISTORY"), Map.entry("dental_hx", "MEDICAL_HISTORY"),
+            Map.entry("dental_xray", "INVESTIGATIONS"));
 
     public record Heading(String heading, String en, String mr, String hi) {
     }

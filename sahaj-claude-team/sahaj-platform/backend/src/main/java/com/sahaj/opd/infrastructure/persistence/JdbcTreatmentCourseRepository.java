@@ -33,15 +33,15 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
             """;
     private static final String COURSE_COLUMNS = """
             id, course_no, patient_id, kind, unit, name, note, doctor_membership_id, started_on, status, revision,
-            request_hash, created_at, origin_record_id
+            request_hash, created_at, origin_record_id, estimate_signed
             """;
     private static final String INSERT_COURSE = """
             insert into opd.treatment_course (id, tenant_id, course_no, patient_id, kind, unit, name, note,
                                               doctor_membership_id, started_on, origin_record_id,
                                               origin_record_created_at, idempotency_key, request_hash, revision,
-                                              created_by)
+                                              created_by, estimate_signed)
             values (:id, :tenantId, :courseNo, :patientId, :kind, :unit, :name, :note, :doctor, :startedOn,
-                    :originId, :originCreatedAt, :idempotencyKey, :requestHash, 0, :actor)
+                    :originId, :originCreatedAt, :idempotencyKey, :requestHash, 0, :actor, :estimateSigned)
             """;
     private static final String FIND = "select " + COURSE_COLUMNS
             + " from opd.treatment_course where tenant_id = :tenantId and id = :id";
@@ -53,10 +53,12 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
             + " order by created_at desc, course_no desc limit :limit";
     private static final String SITTING_COLUMNS = """
             id, course_id, sitting_no, encounter_kind, add_option_key, planned_date, items, charge_paise, note,
-            opd_visit_id, ipd_admission_id, admission_requested, done_at, request_hash
+            opd_visit_id, ipd_admission_id, admission_requested, done_at, request_hash, missed_at, removed_at,
+            done_source, regimen_key
             """;
     private static final String SITTINGS_OF = "select " + SITTING_COLUMNS
             + " from opd.treatment_course_sitting where tenant_id = :tenantId and course_id in (:courseIds)"
+            + " and removed_at is null"
             + " order by course_id, sitting_no";
     private static final String SITTING = "select " + SITTING_COLUMNS
             + " from opd.treatment_course_sitting where tenant_id = :tenantId and id = :id";
@@ -74,17 +76,19 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
     private static final String INSERT_SITTING = """
             insert into opd.treatment_course_sitting (id, tenant_id, course_id, sitting_no, encounter_kind,
                                                       add_option_key, planned_date, items, charge_paise, note,
-                                                      admission_requested, idempotency_key, request_hash, created_by)
+                                                      admission_requested, idempotency_key, request_hash, created_by,
+                                                      regimen_key)
             values (:id, :tenantId, :courseId, :sittingNo, :kind, :optionKey, :plannedDate,
             """ + ITEMS_EXPR + """
-            , :charge, :note, :requested, :idempotencyKey, :requestHash, :actor)
+            , :charge, :note, :requested, :idempotencyKey, :requestHash, :actor, :regimen)
             """;
     private static final String UPDATE_SITTING = """
             update opd.treatment_course_sitting
             set encounter_kind = :kind, planned_date = :plannedDate,
                 items =
             """ + ITEMS_EXPR + """
-            , charge_paise = :charge, note = :note, admission_requested = :requested, updated_at = now(),
+            , charge_paise = :charge, note = :note, admission_requested = :requested,
+                regimen_key = coalesce(:regimen, regimen_key), updated_at = now(),
                 updated_by = :actor
             where tenant_id = :tenantId and id = :id
             """;
@@ -98,12 +102,47 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
             where tenant_id = :tenantId and id = :id
             """;
     private static final String MARK_DONE = """
-            update opd.treatment_course_sitting set done_at = :at, updated_at = now(), updated_by = :actor
-            where tenant_id = :tenantId and id = :id and done_at is null
+            update opd.treatment_course_sitting set done_at = :at, done_source = 'SIGN', updated_at = now(),
+                updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and removed_at is null and missed_at is null
+            """;
+    private static final String MARK_DONE_BY_HAND = """
+            update opd.treatment_course_sitting set done_at = :at, done_source = 'MARK_DONE',
+                done_by_membership_id = :by, updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and removed_at is null and missed_at is null
+            """;
+    private static final String MARK_MISSED = """
+            update opd.treatment_course_sitting set missed_at = :at, missed_by_membership_id = :by,
+                updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and removed_at is null
+            """;
+    private static final String REBOOK = """
+            update opd.treatment_course_sitting set missed_at = null, missed_by_membership_id = null,
+                planned_date = :date, updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and removed_at is null
+            """;
+    private static final String RESCHEDULE = """
+            update opd.treatment_course_sitting set planned_date = :date, updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and removed_at is null
+            """;
+    private static final String REMOVE = """
+            update opd.treatment_course_sitting set removed_at = :at, removed_by_membership_id = :by,
+                updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and missed_at is null and removed_at is null
+            """;
+    private static final String REQUEST_ADMISSION = """
+            update opd.treatment_course_sitting set encounter_kind = :kind, admission_requested = true,
+                updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and done_at is null and removed_at is null
+            """;
+    private static final String SET_REGIMEN = """
+            update opd.treatment_course_sitting set regimen_key = :regimen, updated_at = now(), updated_by = :actor
+            where tenant_id = :tenantId and id = :id and regimen_key is null
             """;
     private static final String OPEN_ADMISSION = "select " + SITTING_COLUMNS
             + " from opd.treatment_course_sitting s where tenant_id = :tenantId and admission_requested = true"
-            + " and ipd_admission_id is null and done_at is null and exists (select 1 from opd.treatment_course c"
+            + " and ipd_admission_id is null and done_at is null and removed_at is null and missed_at is null"
+            + " and exists (select 1 from opd.treatment_course c"
             + " where c.tenant_id = s.tenant_id and c.id = s.course_id and c.status = 'ACTIVE')"
             + " order by created_at desc limit 200";
     private static final String BUMP = """
@@ -139,6 +178,7 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
                 .param("originCreatedAt", c.originRecordCreatedAt() == null ? null
                         : Timestamp.from(c.originRecordCreatedAt()))
                 .param("idempotencyKey", c.idempotencyKey()).param("requestHash", c.requestHash())
+                .param("estimateSigned", c.estimateSigned())
                 .param("actor", actorUserId).update();
         return id;
     }
@@ -225,7 +265,8 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
                 .param("optionKey", s.addOptionKey()).param("plannedDate", s.plannedDate())
                 .param("items", itemsJson(s.items())).param("charge", s.chargePaise()).param("note", s.note())
                 .param("requested", !"OPD".equals(s.encounterKind())).param("idempotencyKey", s.idempotencyKey())
-                .param("requestHash", s.requestHash()).param("actor", actorUserId).update();
+                .param("requestHash", s.requestHash()).param("regimen", s.regimenKey()).param("actor", actorUserId)
+                .update();
         return id;
     }
 
@@ -234,7 +275,8 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
         jdbc.sql(UPDATE_SITTING).param("tenantId", tenantId).param("id", sittingId).param("kind", c.encounterKind())
                 .param("plannedDate", c.plannedDate()).param("items", itemsJson(c.items()))
                 .param("charge", c.chargePaise()).param("note", c.note())
-                .param("requested", !"OPD".equals(c.encounterKind())).param("actor", actorUserId).update();
+                .param("requested", !"OPD".equals(c.encounterKind())).param("regimen", c.regimenKey())
+                .param("actor", actorUserId).update();
     }
 
     @Override
@@ -254,6 +296,47 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
         jdbc.sql(BUMP).param("tenantId", tenantId).param("id", courseId).param("actor", actorUserId).update();
     }
 
+    @Override
+    public void markDoneByHand(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
+        jdbc.sql(MARK_DONE_BY_HAND).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
+                .param("by", membershipId).param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void markMissed(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
+        jdbc.sql(MARK_MISSED).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
+                .param("by", membershipId).param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void rebook(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId) {
+        jdbc.sql(REBOOK).param("tenantId", tenantId).param("id", sittingId).param("date", plannedDate)
+                .param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void reschedule(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId) {
+        jdbc.sql(RESCHEDULE).param("tenantId", tenantId).param("id", sittingId).param("date", plannedDate)
+                .param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void remove(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
+        jdbc.sql(REMOVE).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
+                .param("by", membershipId).param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void requestAdmission(UUID tenantId, UUID sittingId, String encounterKind, UUID actorUserId) {
+        jdbc.sql(REQUEST_ADMISSION).param("tenantId", tenantId).param("id", sittingId).param("kind", encounterKind)
+                .param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void setRegimenIfEmpty(UUID tenantId, UUID sittingId, String regimenKey, UUID actorUserId) {
+        jdbc.sql(SET_REGIMEN).param("tenantId", tenantId).param("id", sittingId).param("regimen", regimenKey)
+                .param("actor", actorUserId).update();
+    }
     private String itemsJson(List<String> items) {
         try {
             return mapper.writeValueAsString(items == null ? List.of() : items);
@@ -272,7 +355,8 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
                 rs.getObject("patient_id", UUID.class), rs.getString("kind"), rs.getString("unit"),
                 rs.getString("name"), rs.getString("note"), rs.getObject("doctor_membership_id", UUID.class),
                 rs.getObject("started_on", LocalDate.class), rs.getString("status"), rs.getLong("revision"),
-                rs.getString("request_hash"), instant(rs, "created_at"), rs.getObject("origin_record_id", UUID.class));
+                rs.getString("request_hash"), instant(rs, "created_at"), rs.getObject("origin_record_id", UUID.class),
+                rs.getBoolean("estimate_signed"));
     }
 
     private static SittingRow sitting(ResultSet rs, int row) throws SQLException {
@@ -288,6 +372,7 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
                 rs.getObject("planned_date", LocalDate.class), List.copyOf(items), rs.getLong("charge_paise"),
                 rs.getString("note"), rs.getObject("opd_visit_id", UUID.class),
                 rs.getObject("ipd_admission_id", UUID.class), rs.getBoolean("admission_requested"),
-                instant(rs, "done_at"), rs.getString("request_hash"));
+                instant(rs, "done_at"), rs.getString("request_hash"), instant(rs, "missed_at"),
+                instant(rs, "removed_at"), rs.getString("done_source"), rs.getString("regimen_key"));
     }
 }

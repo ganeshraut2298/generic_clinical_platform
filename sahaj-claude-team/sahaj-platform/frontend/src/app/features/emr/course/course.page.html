@@ -15,10 +15,13 @@
           <span class="id" data-testid="course-no">{{ c.courseNo }}</span>
         </div>
         <span class="faint">
-          Started {{ ledgerDate(c.startedOn) }} · {{ c.doctorName }}{{ c.note ? ' · ' + c.note : '' }}
+          Started {{ ledgerDate(c.startedOn) }} · {{ c.doctorName }}@if (c.estimateSigned) { · {{ estimateSignedText }}}
         </span>
         <span class="faint t-xs">{{ c.accountNote || accountNote }}</span>
       </div>
+      @if (embedded()) {
+        <a class="full" data-act="open-full" [routerLink]="['/app/courses', c.id]">Open full course</a>
+      }
       <div class="tabs" role="tablist" aria-label="Course view">
         @for (v of views; track v.key) {
           <button type="button" role="tab" [attr.aria-selected]="view() === v.key" [attr.data-view]="v.key" (click)="setView(v.key)">
@@ -58,8 +61,8 @@
     <ol class="steps" aria-label="{{ unitWord() }}s">
       @for (s of c.sittings; track s.id) {
         <li>
-          <button type="button" class="step" [class.done]="s.status === 'DONE'" [class.today]="s.status === 'TODAY'" [title]="s.items.join(', ')" (click)="setView('timeline')">
-            <span class="mark" aria-hidden="true">{{ s.status === 'DONE' ? '✓' : s.sittingNo }}</span>
+          <button type="button" class="step" [class.done]="s.status === 'DONE'" [class.today]="s.status === 'TODAY'" [class.missed]="s.status === 'MISSED'" [class.ipd]="s.encounterKind !== 'OPD'" [title]="s.items.join(', ')" (click)="setView('timeline')">
+            <span class="mark" aria-hidden="true">{{ s.status === 'DONE' ? '✓' : numberOf(s) }}</span>
             <span class="sl">{{ label(s) }}</span>
             <span class="sd">{{ dateOf(s) }}</span>
             <span class="se">{{ s.encounterKind === 'OPD' ? 'OPD' : 'IPD' }}</span>
@@ -79,12 +82,12 @@
       @case ('timeline') {
         <div class="cards" data-testid="timeline">
           @for (s of c.sittings; track s.id) {
-            <article class="card" [class.today]="s.status === 'TODAY'" [class.ipd]="s.encounterKind !== 'OPD'">
+            <article class="card" [class.today]="s.status === 'TODAY'" [class.missed]="s.status === 'MISSED'" [class.ipd]="s.encounterKind !== 'OPD'">
               <div class="ctop">
                 <div class="ctl">
-                  <strong>{{ unitWord() }} {{ s.sittingNo }} · {{ dateOf(s) }}</strong>
+                  <strong>{{ unitWord() }} {{ numberOf(s) }} · {{ dateOf(s) }}</strong>
                   <span class="enc">{{ encounterWord(s) }}</span>
-                  <span class="st" [class.done]="s.status === 'DONE'" [class.today]="s.status === 'TODAY'">{{ statusWord(s) }}</span>
+                  <span class="st" [class.done]="s.status === 'DONE'" [class.today]="s.status === 'TODAY'" [class.missed]="s.status === 'MISSED'">{{ statusWord(s) }}</span>
                 </div>
                 <span class="charge">{{ chargeWord(s) }}</span>
               </div>
@@ -108,18 +111,32 @@
                   </div>
                 </div>
               }
+              @if (dateChoice()?.sittingId === s.id) {
+                <div class="edit" data-testid="date-choice">
+                  <label>
+                    <span>{{ dateChoice()!.action === 'REBOOK' ? 'Rebook for' : 'New date' }}</span>
+                    <input class="input" type="date" [attr.min]="today()" [value]="dateChoice()!.date" (input)="setChoiceDate($event)" />
+                  </label>
+                  @if (dateError(); as problem) {
+                    <p class="err-text" role="alert" data-testid="date-error">{{ problem }}</p>
+                  }
+                  <div class="eb">
+                    <button mat-flat-button type="button" [disabled]="busy()" data-act="confirm-date" (click)="confirmDate(s)">{{ dateChoice()!.action === 'REBOOK' ? 'Rebook' : 'Save date' }}</button>
+                    <button mat-stroked-button type="button" (click)="cancelDate()">Cancel</button>
+                  </div>
+                </div>
+              }
               <div class="acts">
+                @for (a of actionsOf(s); track a) {
+                  <button type="button" class="act" [class.primary]="isPrimary(a)" [disabled]="busy()" [attr.data-action]="a" (click)="run(a, s)">
+                    {{ busy() ? 'Working' : actionText(a, s) }}
+                  </button>
+                }
                 @if (canLink(s)) {
                   <button type="button" class="act primary" [disabled]="busy()" data-act="link" (click)="link(s)">This is today’s {{ unitLower() }}</button>
                 }
                 @if (canEdit(s) && editing()?.sittingId !== s.id) {
                   <button type="button" class="act" data-act="edit" (click)="startEdit(s)">Change date, work or charge</button>
-                }
-                @if (canMoveToAdmission(s)) {
-                  <button type="button" class="act" [disabled]="busy()" data-act="move" (click)="moveToAdmission(s)">Move to day care / IPD</button>
-                }
-                @if (canAdmit(s)) {
-                  <button type="button" class="act primary" data-act="admit" (click)="admit(s)">Admit now</button>
                 }
               </div>
             </article>

@@ -92,7 +92,7 @@ class EmrFinishProfilesIT extends EmrSignSupport {
         JsonNode onco = profileOf(effects);
         assertThat(onco.get("profile").asText()).isEqualTo("onco");
         assertThat(onco.get("followUpFromNextCycle").isBoolean()).isTrue();
-        assertThat(prints(effects)).containsExactly("PRESCRIPTION", "CYCLE_RECORD");
+        assertThat(prints(effects)).as("the default next-cycle date exists, so the chemo calendar prints too").containsExactly("PRESCRIPTION", "CYCLE_RECORD", "CHEMO_CALENDAR");
     }
 
     @Test

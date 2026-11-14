@@ -16,6 +16,7 @@ import {
   visibleRows,
 } from './case-paper.logic';
 import { printPaper } from './print-paper';
+import { sentToPrinter } from './case-paper.logic';
 
 const SIZES: readonly PaperSize[] = ['A4', 'A5'];
 const TOAST_MS = 3000;
@@ -61,6 +62,8 @@ export class CasePaperPanelComponent {
   });
   protected readonly filled = computed(() => this.model()?.filledCount ?? 0);
   protected readonly percent = computed(() => Math.round((this.filled() / 10) * 100));
+  /** The bar is green from 7 sections filled, the department accent below (CasePaper.dc.html:132). */
+  protected readonly barGood = computed(() => this.filled() >= 7);
   protected readonly footer = computed(() => footerLines(this.context()?.clinicDefaults.capitals ?? false, false, this.context()?.signature.signed ?? false));
   protected readonly addenda = computed(() => this.context()?.addenda ?? []);
   protected readonly drName = drName;
@@ -147,9 +150,7 @@ export class CasePaperPanelComponent {
       return;
     }
     const ok = printPaper(this.doc, this.doc.defaultView ?? window, el, this.size());
-    if (!ok) {
-      this.say('We could not print. Try again.');
-    }
+    this.say(ok ? sentToPrinter(this.size(), this.filled()) : 'We could not print. Try again.');
   }
 
   private say(message: string): void {

@@ -56,6 +56,7 @@ class CourseAdmissionSourceAdapter implements CourseAdmissionSource {
             total = billing.forOne(tenantId, row.id(), now, catalog.depositRules(tenantId).alertPercent())
                     .bill(row, "").totalPaise();
         }
-        return new CourseAdmission(row.id(), row.ipNumber(), discharged ? "DISCHARGED" : "ADMITTED", total);
+        return new CourseAdmission(row.id(), row.ipNumber(), discharged ? "DISCHARGED" : "ADMITTED", total,
+                row.bedCode());
     }
 }

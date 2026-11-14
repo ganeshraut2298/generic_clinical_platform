@@ -246,7 +246,7 @@ class DentalFinishContributor implements SpecialtyFinishContributor {
             }
             int no = courses.nextSittingNo(ctx.tenantId(), courseId);
             UUID id = courses.insertSitting(ctx.tenantId(), new NewSitting(courseId, no, CourseKinds.ENCOUNTER_OPD,
-                    "opd_sitting", date, items, charge, null, key, sha(String.join("|", items) + date)),
+                    CourseKinds.option("DENTAL", "opd_sitting").orElseThrow().storedKey(), date, items, charge, null, key, sha(String.join("|", items) + date)),
                     ctx.actorUserId());
             courses.bumpRevision(ctx.tenantId(), courseId, ctx.actorUserId());
             sitting = courses.sitting(ctx.tenantId(), id).orElseThrow();

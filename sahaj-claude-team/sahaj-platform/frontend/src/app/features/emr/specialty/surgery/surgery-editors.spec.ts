@@ -50,6 +50,14 @@ describe('Fitness for surgery (SAH-64-2)', () => {
     expect(h.el.textContent).toContain('Tap a test to move it: pending → normal → abnormal.');
   });
 
+  it('draws the pre-op work-up as its own card with the red star, the fitness pill and nine tiles', () => {
+    const h = mountEditor(SurgeryFitnessComponent, view(), 'sx_fitness', { sx_fitness: blank });
+    const card = h.el.querySelector('[data-testid="preop-card"]')!;
+    expect(card.querySelector('h4')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Pre-op work-up *');
+    expect(card.querySelector('.pill')?.getAttribute('data-testid')).toBe('fit-text');
+    expect(card.querySelectorAll('.tests3 button.tile')).toHaveLength(9);
+  });
+
   it('moves HIV, HBsAg and HCV together as one row', () => {
     const h = mountEditor(SurgeryFitnessComponent, view(), 'sx_fitness', { sx_fitness: blank });
     byText(h.el, 'button.tile', 'HIV, HBsAg, HCV').click();

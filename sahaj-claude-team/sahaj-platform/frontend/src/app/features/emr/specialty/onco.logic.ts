@@ -208,7 +208,7 @@ export const CHECK_ACTION_LABEL: Record<string, string> = {
   RAISE_PREAUTH: 'Raise pre-auth',
 };
 
-export const STAGE_LABELS = ['Decided', 'Doses checked', 'Second check', 'Pharmacy', 'Chair'] as const;
+export const STAGE_LABELS = ['Decided', 'Doses checked', 'Second check', 'Pharmacy', 'Chair', 'Given'] as const;
 
 // ---- preview ----
 

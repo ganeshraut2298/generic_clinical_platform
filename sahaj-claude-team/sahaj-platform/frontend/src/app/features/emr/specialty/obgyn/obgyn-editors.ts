@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { printSheet } from '../print-sheet';
 import { formatDisplayDate } from '../../../../shared/format/ist-date';
 import { SpEditor, textOrNull, toggled } from '../shared/sp-editor';
 import { SpStepperComponent } from '../shared/sp-stepper.component';
@@ -41,6 +43,7 @@ const BLANK_ANC: SpAncCheck = {
   styleUrls: ['../specialty.shared.scss', './obgyn.scss'],
   template: `
     <div class="sp">
+      @if (main()) {
       @if (risks().length > 0) {
         <div class="sp-row" aria-label="Risks">
           @for (r of risks(); track r.label) {
@@ -131,6 +134,8 @@ const BLANK_ANC: SpAncCheck = {
         </div>
       }
 
+      }
+      @if (tools()) {
       <h4 class="sp-h">Due now · {{ dueLeft() }} left</h4>
       <div class="sp-row">
         @for (d of due; track d.key) {
@@ -158,6 +163,8 @@ const BLANK_ANC: SpAncCheck = {
         }
       </div>
 
+      }
+      @if (main()) {
       <div class="sp-row">
         <app-sp-stepper
           class="narrow"
@@ -192,11 +199,16 @@ const BLANK_ANC: SpAncCheck = {
           </tbody>
         </table>
       </div>
+      }
     </div>
   `,
 })
 export class AncCheckComponent extends SpEditor<SpAncCheck> {
   protected readonly component = 'ANC_CHECK' as const;
+  /** "main": the ANC column; "tools": the Quick tools cards (Due now, PCPNDT Form F, Supplements); "all": both (SAH-75-1, O2). */
+  readonly area = input<'all' | 'main' | 'tools'>('all');
+  protected readonly main = computed(() => this.area() !== 'tools');
+  protected readonly tools = computed(() => this.area() !== 'main');
   protected blank(): SpAncCheck {
     return BLANK_ANC;
   }
@@ -211,11 +223,20 @@ export class AncCheckComponent extends SpEditor<SpAncCheck> {
 
   constructor() {
     super();
+    this.registerFooterPrint(() => this.printAncCard());
     effect(() => {
       if (this.ctx.history() === null) {
         this.ctx.loadHistory();
       }
     });
+  }
+
+  private readonly doc = inject(DOCUMENT);
+  /** "Print ANC card": the pregnancy summary and the ANC visits on one page; nothing is stored or sent. */
+  protected printAncCard(): void {
+    const lines = this.visits().map((v) => `${v.date} · ${v.ga} · wt ${v.wt} · BP ${v.bp} · FH ${v.fh} · Hb ${v.hb}${v.note ? ` · ${v.note}` : ''}`);
+    const summary = [`Gestational age: ${this.gaText()}`, `EDD: ${this.eddText()}`, `Obstetric score: ${this.og()?.obstetricScore ?? 'Not recorded'}`];
+    printSheet(this.doc, this.ctx.sheet('ANC card', [{ heading: 'Pregnancy', lines: summary }, { heading: 'ANC visits', lines }]));
   }
 
   protected readonly gaWeeks = computed(() => this.og()?.gestationalAge?.weeks ?? null);
@@ -479,15 +500,30 @@ type AreaKey = 'perAbdomen' | 'perSpeculum' | 'perVaginum';
 @Component({
   selector: 'app-sp-gynae-exam',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styleUrl: '../specialty.shared.scss',
+  styleUrls: ['../specialty.shared.scss'],
+  styles: `
+    .exam3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    @media (max-width: 900px) {
+      .exam3 {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  `,
   template: `
     <div class="sp">
-      @for (f of areas; track f.key) {
-        <label class="field">
-          <span class="sp-lbl">{{ f.label }}</span>
-          <textarea class="input" maxlength="1000" [value]="text(f.key)" [disabled]="disabled()" (change)="setText(f.key, $event)"></textarea>
-        </label>
-      }
+      @if (main()) {
+      <div class="exam3">
+        @for (f of areas; track f.key) {
+          <label class="field">
+            <span class="sp-lbl">{{ f.label }}</span>
+            <textarea class="input" maxlength="1000" [placeholder]="f.hint" [value]="text(f.key)" [disabled]="disabled()" (change)="setText(f.key, $event)"></textarea>
+          </label>
+        }
+      </div>
       <div class="sp-row">
         <label class="field grow">
           <span class="sp-lbl">Female chaperone present</span>
@@ -508,24 +544,31 @@ type AreaKey = 'perAbdomen' | 'perSpeculum' | 'perVaginum';
       @if (needsChaperone()) {
         <p class="msg warn" role="status">Record the chaperone’s name, or tap Declined by patient.</p>
       }
+      }
+      @if (tools()) {
       <span class="sp-lbl">Quick orders</span>
       <div class="sp-row" role="group" aria-label="Quick orders">
         @for (q of quick; track q) {
           <button type="button" class="chip" [class.on]="ordered().has(q)" [disabled]="disabled()" (click)="toggleQuick(q)">{{ ordered().has(q) ? '✓ ' : '+ ' }}{{ q }}</button>
         }
       </div>
+      }
     </div>
   `,
 })
 export class GynaeExamComponent extends SpEditor<SpGynaeExam> {
   protected readonly component = 'GYNAE_EXAM' as const;
+  /** "main": the examination; "tools": the "Quick orders" card in Quick tools; "all": both. */
+  readonly area = input<'all' | 'main' | 'tools'>('all');
+  protected readonly main = computed(() => this.area() !== 'tools');
+  protected readonly tools = computed(() => this.area() !== 'main');
   protected blank(): SpGynaeExam {
     return { component: 'GYNAE_EXAM', schemaVersion: 1 };
   }
-  protected readonly areas: { key: AreaKey; label: string }[] = [
-    { key: 'perAbdomen', label: 'Per abdomen' },
-    { key: 'perSpeculum', label: 'Per speculum' },
-    { key: 'perVaginum', label: 'Per vaginum' },
+  protected readonly areas: { key: AreaKey; label: string; hint: string }[] = [
+    { key: 'perAbdomen', label: 'Per abdomen', hint: '' },
+    { key: 'perSpeculum', label: 'Per speculum', hint: 'Cervix, discharge' },
+    { key: 'perVaginum', label: 'Per vaginum', hint: 'Uterus size, adnexa' },
   ];
   protected readonly quick = GYN_QUICK_ORDERS;
   protected readonly ordered = signal<ReadonlySet<string>>(new Set());

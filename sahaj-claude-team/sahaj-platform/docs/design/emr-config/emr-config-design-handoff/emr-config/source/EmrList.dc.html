@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EMR list section</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font-family:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid #1D5FA866;outline-offset:2px}
+</style>
+</helmet>
+<div style="{{rootStyle}}">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+    <div style="display: flex; gap: 10px; align-items: center">
+      <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F1C2E">{{title}}<span style="{{starStyle}}"> *</span></h3>
+      <span style="{{countStyle}}">{{countText}}</span>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center">
+      <div role="tablist" aria-label="View" style="display: flex; background: #EEF1F5; border-radius: 8px; padding: 3px; gap: 3px">
+        <sc-for list="{{views}}" as="v" hint-placeholder-count="2">
+          <button type="button" role="tab" aria-selected="{{v.on}}" aria-label="{{v.label}} view" title="{{v.label}} view" onClick="{{v.pick}}" style="{{v.style}}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{v.icon}}"/></svg>{{v.label}}
+          </button>
+        </sc-for>
+      </div>
+      <button type="button" onClick="{{toggleAdd}}" aria-expanded="{{adding}}" style="{{addBtnStyle}}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="{{addIcon}}"/></svg>{{addBtnLabel}}
+      </button>
+    </div>
+  </div>
+
+  <sc-if value="{{adding}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 8px; border: 1px solid {{accent}}; background: #F7FAFE; border-radius: 10px; padding: 12px">
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">{{searchLabel}}
+        <input value="{{query}}" onChange="{{onQuery}}" placeholder="{{placeholder}}" style="font: inherit; font-size: 14px; font-weight: 400; color: #0F1C2E; border: 1px solid #C9D2DC; border-radius: 8px; padding: 10px 12px; background: #FFFFFF">
+      </label>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap">
+        <sc-for list="{{results}}" as="r" hint-placeholder-count="5">
+          <button type="button" onClick="{{r.add}}" style="{{r.style}}">+ {{r.name}}<span style="{{r.codeStyle}}">{{r.code}}</span><span style="font-size: 11px; color: #5B6B7F; margin-left: 6px">{{r.meta}}</span></button>
+        </sc-for>
+        <sc-if value="{{canCreate}}" hint-placeholder-val="{{ false }}">
+          <button type="button" onClick="{{createNew}}" style="border: 1px dashed {{accent}}; background: #FFFFFF; color: {{accent}}; border-radius: 999px; padding: 7px 12px; min-height: 36px; font-size: 13px; font-weight: 700; cursor: pointer">+ Add “{{query}}” as new {{noun}}</button>
+        </sc-if>
+      </div>
+      <span style="font-size: 11px; color: #5B6B7F">{{addHint}}</span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isChips}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; min-height: 36px">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="2">
+        <span style="{{c.style}}">
+          <span style="{{c.codeStyle}}">{{c.code}}</span>{{c.name}}
+          <button type="button" onClick="{{c.cycle}}" title="Change {{attrLabel}}" style="{{c.attrStyle}}">{{c.a1}} ▾</button>
+          <button type="button" onClick="{{c.remove}}" aria-label="Remove {{c.name}}" style="border: 0; background: transparent; color: inherit; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </span>
+      </sc-for>
+      <sc-if value="{{empty}}" hint-placeholder-val="{{ false }}"><span style="{{emptyStyle}}">{{emptyText}}</span></sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isGrid}}" hint-placeholder-val="{{ false }}">
+    <div style="overflow-x: auto">
+      <div style="min-width: 760px; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+        <div style="display: grid; grid-template-columns: 34px 2fr 1.1fr 1.1fr 1.3fr 1.6fr 80px 44px; gap: 8px; padding: 8px 12px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em; align-items: center">
+          <span>#</span><span>{{nameLabel}}</span><span>{{attrLabel}}</span><span>{{attr2Label}}</span><span>Added on</span><span>Added by</span><span>Active</span><span></span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+          <div style="{{r.style}}">
+            <span style="color: #5B6B7F">{{r.idx}}</span>
+            <span style="{{r.nameStyle}}"><span style="{{r.codeStyle}}">{{r.code}}</span>{{r.name}}<span style="{{r.newStyle}}">New to list</span></span>
+            <button type="button" onClick="{{r.cycle}}" style="{{r.cellBtn}}">{{r.a1}} ▾</button>
+            <button type="button" onClick="{{r.cycle2}}" style="{{r.cellBtn}}">{{r.a2}} ▾</button>
+            <span style="font-size: 12px; color: #3E4C5E">{{r.at}}</span>
+            <span style="font-size: 12px; color: #3E4C5E">{{r.by}}</span>
+            <button type="button" onClick="{{r.toggle}}" aria-pressed="{{r.on}}" aria-label="{{r.toggleLabel}}" style="{{r.track}}"><span style="{{r.knob}}"></span></button>
+            <button type="button" onClick="{{r.remove}}" aria-label="Delete {{r.name}}" style="border: 0; background: transparent; color: #B42318; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+          </div>
+        </sc-for>
+        <sc-if value="{{empty}}" hint-placeholder-val="{{ false }}"><div style="padding: 16px 12px; text-align: center; font-size: 13px; color: #5B6B7F; border-top: 1px solid #EEF1F5">{{emptyText}}</div></sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center">
+    <span style="font-size: 12px; color: #5B6B7F; display: flex; gap: 4px; align-items: center" title="Ranked by how often you used each one and how recently">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>Your most used:
+    </span>
+    <sc-for list="{{quick}}" as="q" hint-placeholder-count="6">
+      <button type="button" onClick="{{q.add}}" style="border: 1px dashed #9AA8B8; background: #FFFFFF; border-radius: 999px; padding: 6px 12px; min-height: 34px; font-size: 13px; color: #3E4C5E; cursor: pointer">+ {{q.name}}<span style="font-size: 11px; color: #5B6B7F; margin-left: 5px">{{q.count}}</span></button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="display: flex; gap: 10px; align-items: center; align-self: flex-start; background: #0F1C2E; color: #FFFFFF; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600">
+      {{toast}}
+      <sc-if value="{{canUndo}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{undo}}" style="border: 0; background: transparent; color: #8FC1FF; font-weight: 700; cursor: pointer; min-height: 28px">Undo</button></sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","options":["complaints","diagnosis","investigations","procedures","advice"],"default":"complaints"},"spec":{"editor":"enum","options":["gm","dental","og","paeds","physio","onco","surgery"],"default":"gm"},"title":{"editor":"text","default":"Chief complaints"},"required":{"editor":"boolean","default":true},"accent":{"editor":"color","default":"#1D5FA8"},"who":{"editor":null},"onChange":{"editor":null},"preset":{"editor":null},"presetKey":{"editor":null},"$preview":{"width":900,"height":420}}'>
+var KINDS = {
+  complaints: { noun: 'complaint', nameLabel: 'Complaint', attr: ['Duration', ['1 day', '2 days', '3 days', '5 days', '1 week', '2 weeks', '1 month', 'Over 1 month']], attr2: ['Severity', ['Mild', 'Moderate', 'Severe']], d1: 2, d2: 1, ph: 'Type a complaint, e.g. fever', empty: 'No complaint added yet. Tap a most-used one below or + Add.' },
+  diagnosis: { noun: 'diagnosis', nameLabel: 'Diagnosis', attr: ['Type', ['Provisional', 'Final', 'Differential', 'Comorbidity']], attr2: ['Status', ['Active', 'Chronic', 'Resolved']], d1: 0, d2: 0, ph: 'Type a diagnosis or ICD-10 code', empty: 'No diagnosis yet. It is needed to complete the visit.' },
+  investigations: { noun: 'test', nameLabel: 'Test', attr: ['Priority', ['Routine', 'Urgent', 'Before next visit']], attr2: ['Where', ['Clinic lab', 'Outside lab']], d1: 0, d2: 0, ph: 'Type a test, e.g. CBC', empty: 'No tests ordered.' },
+  advice: { noun: 'advice', nameLabel: 'Advice', attr: ['Language', ['English', 'Marathi', 'Hindi']], attr2: ['Send by', ['Print', 'WhatsApp', 'Print + WhatsApp']], d1: 1, d2: 2, ph: 'Type advice, e.g. drink plenty of water', empty: 'No advice yet. Tap a most-used one below.' },
+  procedures: { noun: 'service', nameLabel: 'Procedure / service', attr: ['Qty', ['1', '2', '3', '4']], attr2: ['Billing', ['Bill today', 'No charge', 'In package']], d1: 0, d2: 0, ph: 'Type a procedure or service', empty: 'Nothing added. Consultation fee is billed by the front desk.' }
+};
+var MASTER = {
+  complaints: {
+    gm: [['Fever', 142, 1], ['Cough', 118, 2], ['Cold', 96, 1], ['Sore throat', 64, 2], ['Headache', 74, 3], ['Body ache', 70, 5], ['Acidity', 52, 4], ['Abdominal pain', 33, 5], ['Loose motions', 38, 6], ['Joint pain', 35, 10], ['Weakness', 40, 12], ['Giddiness', 31, 9], ['Vomiting', 29, 8], ['Back pain', 27, 14], ['Burning urination', 22, 7], ['Breathlessness', 18, 20], ['Rash', 15, 25], ['Chest pain', 12, 30]],
+    dental: [['Tooth pain', 88, 1], ['Cleaning / check-up', 51, 2], ['Sensitivity', 46, 3], ['Bleeding gums', 30, 6], ['Braces review', 25, 5], ['Swelling', 22, 4], ['Broken tooth', 14, 10], ['Bad breath', 12, 15], ['Loose tooth', 9, 20]],
+    og: [['Tiredness', 64, 1], ['Pedal oedema', 22, 3], ['Nausea / vomiting', 48, 2], ['Back pain', 40, 4], ['Headache', 18, 6], ['Blurred vision', 4, 30], ['Bleeding / leaking', 6, 21], ['Reduced movements', 5, 18], ['Burning urination', 20, 5], ['White discharge', 34, 2], ['Irregular periods', 41, 1], ['Heavy periods', 26, 3], ['Lower abdominal pain', 30, 2]],
+    paeds: [['Vaccination', 160, 1], ['Fever', 120, 1], ['Cold', 98, 1], ['Cough', 90, 2], ['Loose motions', 44, 3], ['Vomiting', 36, 4], ['Not eating well', 28, 6], ['Rash', 18, 9], ['Ear pain', 14, 12], ['Growth check', 20, 7]],
+    onco: [['Fatigue', 88, 1], ['Nausea', 76, 1], ['Vomiting', 40, 2], ['Mouth sores', 34, 3], ['Tingling hands / feet', 28, 2], ['Fever', 22, 4], ['Loss of appetite', 46, 1], ['Hair loss', 30, 5], ['Pain', 38, 2], ['Breathlessness', 12, 9], ['Constipation', 26, 3], ['Loose motions', 18, 6], ['New lump', 8, 14], ['Weight loss', 20, 7]],
+    surgery: [['Pain abdomen', 92, 1], ['Swelling / lump', 54, 1], ['Pain after oily food', 20, 3], ['Swelling in groin', 30, 2], ['Wound discharge', 18, 4], ['Fever', 26, 3], ['Vomiting', 22, 4], ['Bleeding per rectum', 16, 5], ['Pain while passing stool', 20, 3], ['Yellow eyes / urine', 8, 10], ['Burning urination', 12, 6]],
+    physio: [['Knee pain', 72, 1], ['Back pain', 68, 1], ['Neck pain', 45, 2], ['Shoulder stiffness', 30, 4], ['Difficulty climbing stairs', 22, 3], ['Post-surgery rehab', 18, 5], ['Sports injury', 12, 8], ['Swelling', 10, 9], ['Morning stiffness', 15, 6]]
+  },
+  diagnosis: { onco: [['Ca breast', 64, 1, 'C50.9'], ['Ca cervix', 30, 3, 'C53.9'], ['Ca oral cavity', 41, 2, 'C06.9'], ['Ca lung', 18, 5, 'C34.90'], ['Ca colon', 12, 8, 'C18.9'], ['Ca ovary', 14, 6, 'C56.9'], ['Chemotherapy-induced nausea', 38, 1, 'R11.0'], ['Febrile neutropenia', 9, 12, 'D70.9'], ['Anaemia due to chemotherapy', 16, 4, 'D64.81'], ['Peripheral neuropathy (drug)', 11, 7, 'G62.0']],
+    surgery: [['Gallstones with chronic cholecystitis', 40, 1, 'K80.10'], ['Inguinal hernia', 52, 1, 'K40.90'], ['Acute appendicitis', 26, 3, 'K35.80'], ['Haemorrhoids', 34, 2, 'K64.9'], ['Anal fissure', 28, 2, 'K60.2'], ['Abscess', 30, 2, 'L02.91'], ['Lipoma', 22, 4, 'D17.9'], ['Umbilical hernia', 14, 6, 'K42.9'], ['Varicose veins', 10, 9, 'I83.90'], ['Diabetic foot ulcer', 12, 5, 'E11.621']],
+    dental: [['Dental caries', 96, 1, 'K02.9'], ['Irreversible pulpitis', 44, 1, 'K04.0'], ['Chronic apical periodontitis', 30, 3, 'K04.5'], ['Periapical abscess', 18, 4, 'K04.7'], ['Chronic gingivitis', 52, 2, 'K05.1'], ['Chronic periodontitis', 26, 5, 'K05.3'], ['Dentine hypersensitivity', 34, 2, 'K03.8'], ['Impacted tooth', 15, 6, 'K01.1'], ['Missing teeth', 20, 8, 'K08.1'], ['Fractured tooth', 9, 12, 'S02.5'], ['Malocclusion', 14, 7, 'K07.4']], gm: [['Viral fever', 98, 1, 'B34.9'], ['Upper respiratory infection', 84, 1, 'J06.9'], ['Hypertension', 61, 2, 'I10'], ['Type 2 diabetes', 55, 2, 'E11.9'], ['Acid peptic disease', 40, 4, 'K30'], ['Acute gastroenteritis', 33, 5, 'A09'], ['Urinary tract infection', 21, 7, 'N39.0'], ['Hypothyroidism', 19, 10, 'E03.9'], ['Tension headache', 17, 6, 'G44.2'], ['Migraine', 9, 20, 'G43.9'], ['Allergic rhinitis', 24, 8, 'J30.4'], ['Lumbar strain', 12, 14, 'S39.012']] },
+  advice: {
+    gm: [['Low salt diet', 80, 1], ['Walk 30 minutes daily', 74, 1], ['Check BP at home and note it', 40, 2], ['Avoid sugar and sweets', 52, 1], ['Take medicines at the same time daily', 35, 3], ['Drink plenty of water', 60, 1]],
+    dental: [['Do not eat for 1 hour after filling', 50, 1], ['Avoid chewing on the treated side until the crown', 30, 1], ['Brush twice daily with a soft brush', 62, 1], ['Warm salt-water rinse 3 times a day', 40, 2], ['Stop tobacco and gutkha', 22, 3], ['Come back at once if swelling or fever', 28, 2]],
+    og: [['Take iron and calcium 2 hours apart', 70, 1], ['Count baby movements every day', 54, 1], ['Come at once if bleeding, leaking or severe headache', 60, 1], ['Rest lying on the left side', 30, 3], ['Protein in every meal', 36, 2]],
+    paeds: [['Paracetamol only if fever above 100°F', 66, 1], ['Plenty of fluids; ORS if loose motions', 58, 1], ['Next vaccine date is on the card', 70, 1], ['Come at once if fast breathing or not feeding', 40, 2]],
+    physio: [['Do home exercises twice a day', 60, 1], ['Ice pack 15 minutes after exercise', 34, 2], ['Avoid squatting and sitting cross-legged', 40, 1], ['Use the railing on stairs', 22, 3], ['Reduce weight gradually', 18, 5]],
+    onco: [['Check temperature daily; come at once if above 100.4°F', 80, 1], ['Small frequent meals, high protein', 66, 1], ['Avoid crowds and people with fever or cough', 52, 1], ['Mouth rinse with soda-salt water 4 times a day', 44, 2], ['Drink 2–3 litres of water on chemo days', 58, 1], ['Tell us about tingling, bleeding or breathlessness', 30, 2], ['Wear a mask in public places', 36, 2]],
+    surgery: [['Nothing to eat or drink from midnight before surgery', 70, 1], ['Stop blood thinners 5 days before, as advised', 30, 2], ['Keep the wound dry for 48 hours', 62, 1], ['Walk from the day after surgery', 50, 1], ['No heavy lifting for 4–6 weeks', 44, 1], ['Come at once if fever, wound discharge or vomiting', 40, 1], ['Stitch removal on day 7–10', 36, 2]]
+  },
+  investigations: { gm: [['CBC', 120, 1, 'Blood'], ['Random blood sugar', 90, 1, 'Blood'], ['HbA1c', 48, 2, 'Blood'], ['Urine routine', 52, 2, 'Urine'], ['Lipid profile', 40, 3, 'Blood'], ['Dengue NS1', 36, 4, 'Blood'], ['TSH', 30, 5, 'Blood'], ['LFT', 22, 6, 'Blood'], ['KFT', 25, 6, 'Blood'], ['Widal', 18, 9, 'Blood'], ['X-ray chest PA', 16, 8, 'Imaging'], ['ECG', 28, 3, 'Cardiac']] },
+  procedures: { gm: [['ECG', 28, 3, '[₹ RATE]'], ['Nebulisation', 34, 2, '[₹ RATE]'], ['Injection (IM)', 52, 1, '[₹ RATE]'], ['Dressing', 30, 2, '[₹ RATE]'], ['Blood sugar test (RBS)', 60, 1, '[₹ RATE]'], ['Suturing', 8, 15, '[₹ RATE]'], ['Incision and drainage', 5, 22, '[₹ RATE]']] }
+};
+var SEEDS = {
+  'complaints:gm': [['Headache', '', 1, 1, '11 Nov · 10:40', 'Sr. [NURSE NAME] · triage'], ['Giddiness', '', 0, 0, '11 Nov · 10:58', 'Dr. [DOCTOR NAME]']],
+  'complaints:dental': [['Tooth pain', '', 4, 1, '11 Nov · 10:15', 'Front desk'], ['Sensitivity', '', 5, 0, '11 Nov · 10:16', 'Front desk']],
+  'complaints:og': [['Tiredness', '', 4, 0, '11 Nov · 09:52', 'Sr. [NURSE NAME]'], ['Pedal oedema', '', 2, 0, '11 Nov · 09:52', 'Sr. [NURSE NAME]']],
+  'complaints:paeds': [['Vaccination', '', 0, 0, '11 Nov · 09:30', 'Front desk'], ['Cold', '', 1, 0, '11 Nov · 09:31', 'Front desk']],
+  'complaints:physio': [['Knee pain', '', 6, 1, '28 Oct · 17:05', '[THERAPIST NAME]'], ['Difficulty climbing stairs', '', 6, 1, '28 Oct · 17:06', '[THERAPIST NAME]']],
+  'diagnosis:dental': [['Irreversible pulpitis', 'K04.0', 1, 0, '04 Nov · 10:22', 'Dr. [DOCTOR NAME]'], ['Dental caries', 'K02.9', 1, 0, '28 Oct · 10:40', 'Dr. [DOCTOR NAME]'], ['Missing teeth', 'K08.1', 1, 1, '28 Oct · 10:41', 'Dr. [DOCTOR NAME]']],
+  'complaints:onco': [['Fatigue', '', 4, 1, '11 Nov · 09:40', 'Sr. [NURSE NAME] · day care'], ['Nausea', '', 2, 0, '11 Nov · 09:41', 'Sr. [NURSE NAME] · day care']],
+  'complaints:surgery': [['Pain after oily food', '', 7, 1, '11 Nov · 10:05', 'Front desk'], ['Pain abdomen', '', 7, 1, '11 Nov · 10:05', 'Front desk']],
+  'diagnosis:onco': [['Ca breast', 'C50.9', 1, 0, '26 Jul · 16:00', 'Tumour board']],
+  'diagnosis:surgery': [['Gallstones with chronic cholecystitis', 'K80.10', 1, 0, '28 Oct · 11:20', 'Dr. [SURGEON NAME]']],
+  'advice:gm': [['Low salt diet', '', 1, 2, '11 Nov · 11:06', 'Dr. [DOCTOR NAME]']],
+  'advice:dental': [['Avoid chewing on the treated side until the crown', '', 1, 2, '11 Nov · 11:10', 'Dr. [DOCTOR NAME]']],
+  'advice:og': [['Take iron and calcium 2 hours apart', '', 1, 2, '11 Nov · 10:20', 'Dr. [DOCTOR NAME]']],
+  'advice:paeds': [['Next vaccine date is on the card', '', 1, 2, '11 Nov · 09:50', 'Dr. [DOCTOR NAME]']],
+  'advice:physio': [['Do home exercises twice a day', '', 1, 2, '11 Nov · 17:20', '[THERAPIST NAME]']],
+  'advice:onco': [['Check temperature daily; come at once if above 100.4°F', '', 1, 2, '11 Nov · 10:30', 'Dr. [ONCOLOGIST NAME]'], ['Drink 2–3 litres of water on chemo days', '', 1, 2, '11 Nov · 10:30', 'Dr. [ONCOLOGIST NAME]']],
+  'advice:surgery': [['Nothing to eat or drink from midnight before surgery', '', 1, 2, '11 Nov · 10:40', 'Dr. [SURGEON NAME]'], ['Stop blood thinners 5 days before, as advised', '', 1, 2, '11 Nov · 10:40', 'Dr. [SURGEON NAME]']],
+  'diagnosis:gm': [['Hypertension', 'I10', 1, 1, '11 Nov · 11:02', 'Dr. [DOCTOR NAME]']],
+  'investigations:gm': [['HbA1c', 'Blood', 0, 0, '11 Nov · 11:03', 'Dr. [DOCTOR NAME]']],
+  'procedures:gm': []
+};
+var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function nowStr() { var d = new Date(); function z(n) { return (n < 10 ? '0' : '') + n; } return z(d.getDate()) + ' ' + MON[d.getMonth()] + ' · ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+var uid = 1;
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var key = this.kindKey(), seeds = SEEDS[key] || [];
+    var m = this.master().map(function (x) { return { name: x[0], count: x[1], last: x[2], code: x[3] || '', custom: false }; });
+    this.state = {
+      view: 'chips', adding: false, query: '', toast: '', prev: null, master: m,
+      items: seeds.map(function (s) { return { id: uid++, name: s[0], code: s[1], a1: s[2], a2: s[3], at: s[4], by: s[5], on: true }; })
+    };
+  }
+  kind() { return KINDS[this.props.kind] ? this.props.kind : 'complaints'; }
+  kindKey() { return this.kind() + ':' + (this.props.spec || 'gm'); }
+  master() { var mk = MASTER[this.kind()] || {}; return mk[this.props.spec || 'gm'] || mk.gm || []; }
+  componentDidMount() { this.report(this.state.items); }
+  componentDidUpdate(prev) {
+    if (this.props.presetKey && prev.presetKey !== this.props.presetKey && this.props.preset) {
+      var K = KINDS[this.kind()], who = this.props.who || 'Dr. [DOCTOR NAME]', at = nowStr();
+      var items = this.props.preset.map(function (p) { return { id: uid++, name: p[0], code: p[1] || '', a1: p[2] == null ? K.d1 : p[2], a2: p[3] == null ? K.d2 : p[3], at: at, by: who + ' · template', on: true }; });
+      this.setState({ items: items, toast: '' });
+      this.report(items);
+    }
+  }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  report(items) {
+    var K = KINDS[this.kind()];
+    if (typeof this.props.onChange === 'function') this.props.onChange(items.filter(function (i) { return i.on; }).map(function (i) { return { name: i.name, code: i.code, a1: K.attr[1][i.a1], a2: K.attr2[1][i.a2] }; }));
+  }
+  commit(items, msg, undoable, extra) {
+    var self = this;
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(function () { self.setState({ toast: '', prev: null }); }, 4000);
+    this.setState(Object.assign({ items: items, toast: msg, prev: undoable ? this.state.items : null }, extra || {}));
+    this.report(items);
+  }
+  bump(name) {
+    return this.state.master.map(function (m) { return m.name === name ? Object.assign({}, m, { count: m.count + 1, last: 0 }) : m; });
+  }
+  renderVals() {
+    var self = this, st = this.state, K = KINDS[this.kind()];
+    var A = this.props.accent || '#1D5FA8', who = this.props.who || 'Dr. [DOCTOR NAME]';
+    var req = this.props.required !== false && this.props.required !== 'false';
+    var isDx = this.kind() === 'diagnosis';
+    var active = st.items.filter(function (i) { return i.on; });
+    function score(m) { return m.count + Math.max(0, 30 - m.last) * 3; }
+    function has(name) { return st.items.some(function (i) { return i.name.toLowerCase() === name.toLowerCase(); }); }
+    function addItem(m, custom) {
+      var item = { id: uid++, name: m.name, code: m.code || '', a1: K.d1, a2: K.d2, at: nowStr(), by: who, on: true, custom: !!custom };
+      var master = custom ? st.master.concat([{ name: m.name, count: 1, last: 0, code: '', custom: true }]) : self.bump(m.name);
+      self.commit(st.items.concat([item]), m.name + ' added', true, { master: master, query: '' });
+    }
+    var ranked = st.master.slice().sort(function (a, b) { return score(b) - score(a); });
+    var quick = ranked.filter(function (m) { return !has(m.name); }).slice(0, 7).map(function (m) {
+      return { name: m.name, count: '· ' + m.count, add: function () { addItem(m, false); } };
+    });
+    var q = (st.query || '').trim().toLowerCase();
+    var results = (q ? ranked.filter(function (m) { return m.name.toLowerCase().indexOf(q) >= 0 || (m.code || '').toLowerCase().indexOf(q) >= 0; }) : ranked).filter(function (m) { return !has(m.name); }).slice(0, 8).map(function (m) {
+      return { name: m.name, code: m.code, meta: 'used ' + m.count + '×', add: function () { addItem(m, false); },
+        codeStyle: 'font-size: 11px; font-weight: 700; color: #3E4C5E; background: #EEF1F5; border-radius: 4px; padding: 1px 5px; margin-left: 6px; display: ' + (m.code && isDx ? 'inline' : 'none'),
+        style: 'border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 999px; padding: 7px 12px; min-height: 36px; font-size: 13px; font-weight: 600; color: #0F1C2E; cursor: pointer' };
+    });
+    var exact = q && st.master.some(function (m) { return m.name.toLowerCase() === q; });
+    function cyc(i, key, list) { var it = st.items.slice(); var o = it[i]; var x = {}; x[key] = (o[key] + 1) % list.length; it[i] = Object.assign({}, o, x); self.setState({ items: it }); self.report(it); }
+    var chips = active.map(function (c) {
+      var i = st.items.indexOf(c);
+      return { name: c.name, code: c.code, a1: K.attr[1][c.a1],
+        codeStyle: 'font-size: 11px; font-weight: 700; color: ' + A + '; margin-right: 6px; display: ' + (c.code && isDx ? 'inline' : 'none'),
+        style: 'display: flex; align-items: center; gap: 2px; background: ' + A + '14; border: 1px solid ' + A + '; color: #0F1C2E; border-radius: 999px; padding: 2px 4px 2px 12px; font-size: 13px; font-weight: 600',
+        attrStyle: 'border: 0; background: #FFFFFF; color: ' + A + '; border-radius: 999px; padding: 4px 9px; margin-left: 6px; font-size: 12px; font-weight: 600; cursor: pointer',
+        cycle: function () { cyc(i, 'a1', K.attr[1]); },
+        remove: function () { self.commit(st.items.filter(function (x) { return x.id !== c.id; }), c.name + ' removed', true); } };
+    });
+    var rows = st.items.map(function (r, i) {
+      var t = r.on;
+      return { idx: i + 1, name: r.name, code: r.code, a1: K.attr[1][r.a1], a2: K.attr2[1][r.a2], at: r.at, by: r.by, on: t,
+        toggleLabel: (t ? 'Disable ' : 'Enable ') + r.name,
+        style: 'display: grid; grid-template-columns: 34px 2fr 1.1fr 1.1fr 1.3fr 1.6fr 80px 44px; gap: 8px; padding: 8px 12px; border-top: 1px solid #EEF1F5; align-items: center; font-size: 13px; background: ' + (t ? '#FFFFFF' : '#F7F8FA'),
+        nameStyle: 'font-weight: 600; color: ' + (t ? '#0F1C2E' : '#5B6B7F') + (t ? '' : '; text-decoration: line-through'),
+        codeStyle: 'font-size: 11px; font-weight: 700; color: ' + A + '; margin-right: 6px; display: ' + (r.code && isDx ? 'inline' : 'none'),
+        newStyle: 'margin-left: 6px; font-size: 10px; font-weight: 700; color: #8A4B08; background: #FDF0DC; border-radius: 4px; padding: 1px 5px; display: ' + (r.custom ? 'inline' : 'none'),
+        cellBtn: 'justify-self: start; border: 1px solid #D5DCE4; background: #FFFFFF; border-radius: 6px; padding: 5px 8px; font-size: 12px; font-weight: 600; color: #3E4C5E; cursor: pointer',
+        cycle: function () { cyc(i, 'a1', K.attr[1]); }, cycle2: function () { cyc(i, 'a2', K.attr2[1]); },
+        track: 'width: 40px; height: 24px; border-radius: 999px; border: 0; padding: 3px; cursor: pointer; display: flex; align-items: center; background: ' + (t ? '#146C43' : '#B7C2CE'),
+        knob: 'width: 18px; height: 18px; border-radius: 999px; background: #FFFFFF; margin-left: ' + (t ? '16px' : '0'),
+        toggle: function () { var it = st.items.slice(); it[i] = Object.assign({}, r, { on: !t }); self.commit(it, r.name + (t ? ' disabled. Kept in the record but not printed.' : ' enabled'), true); },
+        remove: function () { self.commit(st.items.filter(function (x) { return x.id !== r.id; }), r.name + ' deleted', true); } };
+    });
+    var VIEWS = [['chips', 'Chips', 'M4 7h6M4 12h10M4 17h8M16 7h4M18 12h2M16 17h4'], ['grid', 'Grid', 'M3 4h18v16H3zM3 10h18M3 15h18M9 4v16']];
+    var bad = req && active.length === 0;
+    return {
+      title: this.props.title || 'Chief complaints', accent: A, noun: K.noun, nameLabel: K.nameLabel, attrLabel: K.attr[0], attr2Label: K.attr2[0],
+      rootStyle: 'font-family: Inter, system-ui, sans-serif; background: #FFFFFF; border: 1px solid ' + (bad ? '#F3C1BC' : '#E3E8EE') + '; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; width: 100%',
+      starStyle: 'color: #B42318; display: ' + (req ? 'inline' : 'none'),
+      countText: active.length + (st.items.length !== active.length ? ' active · ' + (st.items.length - active.length) + ' disabled' : ''),
+      countStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 9px; background: ' + (bad ? '#FDECEA' : '#EEF1F5') + '; color: ' + (bad ? '#B42318' : '#3E4C5E'),
+      views: VIEWS.map(function (v) {
+        var on = st.view === v[0];
+        return { label: v[1], icon: v[2], on: on, pick: function () { self.setState({ view: v[0] }); },
+          style: 'display: flex; gap: 5px; align-items: center; border: 0; border-radius: 6px; padding: 6px 10px; min-height: 32px; font-size: 12px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#5B6B7F') + '; background: ' + (on ? '#FFFFFF' : 'transparent') + '; box-shadow: ' + (on ? '0 1px 2px rgba(15,28,46,0.15)' : 'none') };
+      }),
+      adding: st.adding, toggleAdd: function () { self.setState({ adding: !st.adding, query: '' }); },
+      addBtnLabel: st.adding ? 'Close' : 'Add', addIcon: st.adding ? 'M6 6l12 12M18 6L6 18' : 'M12 5v14M5 12h14',
+      addBtnStyle: 'display: flex; gap: 6px; align-items: center; border: 1px solid ' + A + '; background: ' + (st.adding ? '#FFFFFF' : A) + '; color: ' + (st.adding ? A : '#FFFFFF') + '; border-radius: 8px; padding: 0 14px; min-height: 38px; font-size: 13px; font-weight: 700; cursor: pointer',
+      searchLabel: 'Search your ' + K.noun + ' list', placeholder: K.ph, query: st.query,
+      onQuery: function (e) { self.setState({ query: e && e.target ? e.target.value : '' }); },
+      results: results, canCreate: !!q && !exact && !has(st.query.trim()),
+      createNew: function () { var name = st.query.trim(); name = name.charAt(0).toUpperCase() + name.slice(1); addItem({ name: name, code: '' }, true); },
+      addHint: q ? 'Not in the list? Add it as new. It is saved to your list for next time.' : 'Showing your most used first. Tap to add; keep tapping to add more.',
+      isChips: st.view === 'chips', isGrid: st.view === 'grid', chips: chips, rows: rows,
+      empty: (st.view === 'chips' ? active.length : st.items.length) === 0, emptyText: K.empty,
+      emptyStyle: 'font-size: 13px; color: ' + (bad ? '#B42318' : '#5B6B7F'),
+      quick: quick, toast: st.toast, canUndo: !!st.prev,
+      undo: function () { if (st.prev) { var it = st.prev; self.setState({ items: it, prev: null, toast: '' }); self.report(it); } }
+    };
+  }
+}
+</script>
+</body>
+</html>

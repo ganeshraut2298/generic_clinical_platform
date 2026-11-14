@@ -3,14 +3,15 @@ import { specialtyRecord } from '../specialty.fixtures';
 import { mountEditor, byText, click, typeInto, EMR_RECORDS } from '../specialty.testing';
 import { OncEcogComponent, OncExamComponent, OncLabsComponent, OncToxComponent } from './onco-assessment';
 import { OncDecisionComponent } from './onc-decision.component';
-import { SpOncEcog, SpOncExam, SpOncLabs, SpOncTox } from '../specialty.model';
+import { OncStepsComponent, orderedSteps } from './onc-steps.component';
+import { SpOncEcog, SpOncExam, SpOncLabs, SpOncTox, SpVitalsLog } from '../specialty.model';
 
 const anchors = [
   { key: 'vitals', component: 'VITALS_LOG' as const },
-  { key: 'onc_ecog', component: 'ONC_ECOG' as const },
   { key: 'onc_tox', component: 'ONC_TOX' as const },
   { key: 'onc_bsa', component: 'ONC_EXAM' as const },
   { key: 'onc_labs', component: 'ONC_LABS' as const },
+  { key: 'onc_ecog', component: 'ONC_ECOG' as const },
   { key: 'onc_regimen', component: 'CHEMO_PLAN' as const, part: 'TREATMENT' as const },
 ];
 const record = (onco: object = {}) => specialtyRecord('onco', anchors, { onco: { cycleNo: 4, cycle1WeightKg: 64, ...onco } as never });
@@ -159,7 +160,76 @@ describe('Examination (SAH-65-2)', () => {
   });
 });
 
+describe('Assessment steps bar (SAH-75-11 O-4)', () => {
+  it('lists the five steps in the drawn order with a number, and a tick on a step whose card is done', () => {
+    mountEditor(OncEcogComponent, record(), 'onc_ecog', { onc_ecog: { component: 'ONC_ECOG', schemaVersion: 1, grade: 1 } });
+    const steps = TestBed.createComponent(OncStepsComponent);
+    steps.detectChanges();
+    const el = steps.nativeElement as HTMLElement;
+    const names = Array.from(el.querySelectorAll('[data-testid="onc-steps"] .step')).map((b) => b.textContent?.replace(/\s+/g, ' ').trim());
+    expect(names).toEqual(['1 Side effects', '2 Examination', '3 Labs', '✓ ECOG (done)', '5 Decision']);
+    expect(el.querySelector('[data-testid="onc-steps"]')?.getAttribute('aria-label')).toBe('Assessment steps');
+  });
+});
+
+describe('Assessment steps order (ADR-026 D14)', () => {
+  it('follows the layout: Side effects, Examination, Labs, ECOG, then Decision', () => {
+    expect(orderedSteps(['vitals', 'onc_tox', 'onc_bsa', 'onc_labs', 'onc_ecog', 'onc_regimen']).map((s) => s.label)).toEqual(['Side effects', 'Examination', 'Labs', 'ECOG', 'Decision']);
+  });
+
+  it('follows an older layout that had ECOG before Labs, and leaves out a card the layout does not have', () => {
+    expect(orderedSteps(['onc_tox', 'onc_bsa', 'onc_ecog', 'onc_labs']).map((s) => s.label)).toEqual(['Side effects', 'Examination', 'ECOG', 'Labs', 'Decision']);
+    expect(orderedSteps(['onc_tox', 'onc_ecog']).map((s) => s.label)).toEqual(['Side effects', 'ECOG', 'Decision']);
+  });
+});
+
+describe('Examination card details (SAH-75-11 O-3, O-6)', () => {
+  it('shows the vitals of this visit as tiles in the first tab, read from the Vitals card', () => {
+    const vitals: SpVitalsLog = { component: 'VITALS_LOG', schemaVersion: 1, entries: [{ id: 'e1', bpSystolic: 128, bpDiastolic: 84, pulse: 104, temperature: { value: 37.2, unit: 'C' }, spo2: 97 }] };
+    const h = mountEditor(OncExamComponent, record(), 'onc_bsa', { onc_bsa: exam(), vitals });
+    const tiles = Array.from(h.el.querySelectorAll('[data-testid="exam-vitals"] .vtile')).map((t) => t.textContent?.replace(/\s+/g, ' ').trim());
+    expect(tiles).toEqual(['BP128/84Normal', 'PR104Fast · check for fever, anaemia, heart', 'Temp37.2 °CNormal', 'SpO₂97 %Normal']);
+    expect(h.el.querySelectorAll('[data-testid="exam-vitals"] .vtile.bad')).toHaveLength(1);
+  });
+
+  it('says a vital is not recorded yet when the Vitals card is empty', () => {
+    const h = mountEditor(OncExamComponent, record(), 'onc_bsa', { onc_bsa: exam() });
+    expect(h.el.querySelector('[data-testid="exam-vitals"]')?.textContent).toContain('Not recorded yet');
+  });
+
+  it('adds a lesion from a quick-add chip and draws its trend with the earlier cycles', () => {
+    const h = mountEditor(OncExamComponent, record(), 'onc_bsa', { onc_bsa: exam() });
+    byText(h.el, '.seg button', 'Tumour & response').click();
+    h.fixture.detectChanges();
+    h.http.expectOne(`${EMR_RECORDS}/r1/specialty-history`).flush({
+      profile: 'onco',
+      someHidden: false,
+      oncologyCycles: [
+        { cycleNo: 2, date: '2026-09-01', protocolKey: 'AC', levelPct: 100, weightKg: 60, bsaUsed: 1.6, labs: {}, grades: null, lesions: [{ name: 'Skin nodule', cm: 1.4 }] },
+        { cycleNo: 3, date: '2026-09-22', protocolKey: 'AC', levelPct: 100, weightKg: 60, bsaUsed: 1.6, labs: {}, grades: null, lesions: [{ name: 'Skin nodule', cm: 1.1 }] },
+      ],
+    });
+    click(h.el, 'button[data-act="quick-lesion"]', 1);
+    h.fixture.detectChanges();
+    expect(Array.from(h.el.querySelectorAll('thead th')).map((t) => t.textContent?.trim())).toEqual(['Lesion', 'Baseline', 'Last (C3)', 'Today', 'Trend', 'Change', 'Remove']);
+    expect((h.store.specialtyValue('onc_bsa') as SpOncExam).lesions).toMatchObject([{ name: 'Skin nodule', baselineCm: 1, todayCm: 1 }]);
+    expect(h.el.querySelector('.spk svg')?.getAttribute('aria-label')).toBe('Size of Skin nodule over the cycles: 1, 1.4, 1.1, 1');
+  });
+});
+
 describe('Pre-chemo labs and ECOG (SAH-65-3)', () => {
+  it('draws a trend with the earlier cycles and names the cycles in the column head (O-7)', () => {
+    const h = mountEditor(OncLabsComponent, record(), 'onc_labs', { onc_labs: labs({ hb: 11 }) });
+    h.http.expectOne(`${EMR_RECORDS}/r1/specialty-history`).flush({
+      profile: 'onco',
+      someHidden: false,
+      oncologyCycles: [1, 2, 3].map((n) => ({ cycleNo: n, date: '2026-09-01', protocolKey: 'AC', levelPct: 100, weightKg: 60, bsaUsed: 1.6, labs: { hb: 9 + n }, grades: null })),
+    });
+    h.fixture.detectChanges();
+    expect(Array.from(h.el.querySelectorAll('thead th')).map((t) => t.textContent?.trim())).toEqual(['Test', 'C1 · C2 · C3', 'Trend', 'Today', 'Needed', 'Check']);
+    expect(h.el.querySelector('.spk svg')?.getAttribute('aria-label')).toBe('Haemoglobin over the cycles: 10, 11, 12, 11');
+  });
+
   it('flags values against what is needed, with text, and a badge of how many are out of range', () => {
     const h = mountEditor(OncLabsComponent, record(), 'onc_labs', { onc_labs: labs({ hb: 11, anc: 1200, plt: 200, cr: 1.8, bili: 0.6, alt: 30, lvef: 60 }) });
     expect(h.el.querySelector('[data-testid="lab-anc"]')?.textContent).toBe('✗ Out of range');

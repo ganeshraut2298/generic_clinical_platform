@@ -134,6 +134,9 @@ export class AddDepartmentPage implements OnInit {
         this.starters.set(starters);
         this.copyable.set(departments.departments.filter((d) => d.status !== 'TEMPLATE'));
         this.loading.set(false);
+        if (starters.some((s) => s.starterKey === 'physio')) {
+          this.chooseStarter('physio');
+        }
       },
       error: () => {
         this.loading.set(false);

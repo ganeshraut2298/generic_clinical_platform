@@ -89,10 +89,11 @@ class EmrDepartmentsIT extends EmrSupport {
     @Test
     void everyClinicRoleReadsTheListAndTheDepartmentButOnlyTheOwnerCanEdit() throws Exception {
         Clinic clinic = newClinic();
+        java.util.Map<String, org.springframework.test.web.servlet.request.RequestPostProcessor> tokens = tokensOfEveryRole(clinic);
         for (String role : ALL_ROLES) {
-            JsonNode list = get(DEPARTMENTS, clinic.as(role));
+            JsonNode list = get(DEPARTMENTS, tokens.get(role));
             assertThat(list.get("canEdit").asBoolean()).as(role).isEqualTo("OWNER".equals(role));
-            JsonNode view = get(DEPARTMENTS + "/gm", clinic.as(role));
+            JsonNode view = get(DEPARTMENTS + "/gm", tokens.get(role));
             assertThat(view.get("canEdit").asBoolean()).as(role).isEqualTo("OWNER".equals(role));
             assertThat(view.get("sections").size()).isEqualTo(19);
         }

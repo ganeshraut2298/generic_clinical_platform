@@ -34,8 +34,9 @@ abstract class OpdJourneySupport extends AuthFlowTestSupport {
         /**
          * The role comes from the token authorities; the user id stays the owner's real user (a real
          * membership row), which is enough for FK-bearing audit columns. OwnerGuard still re-reads the
-         * DB, so a non-owner role can never reach an owner-only write through it. A flag that the service reads from
-         * the membership (such as {@code canEdit}) still sees the owner: tests of those use a real member's token.
+         * DB, so a non-owner role can never reach an owner-only write through it. A flag that the service
+         * reads from the membership (such as {@code canEdit}) still sees the owner: tests of those use a
+         * real member's token (see {@code EmrSupport.addStaff}).
          */
         RequestPostProcessor as(String role) {
             return asUser(tenantId, ownerUserId, role);
@@ -47,7 +48,7 @@ abstract class OpdJourneySupport extends AuthFlowTestSupport {
     }
 
     protected Clinic newClinic(boolean vitals) throws Exception {
-        return newClinic(vitals, ownerIsDoctor);
+        return newClinic(vitals, true);
     }
 
     /**

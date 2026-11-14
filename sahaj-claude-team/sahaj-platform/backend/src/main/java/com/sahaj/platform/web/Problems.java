@@ -81,6 +81,18 @@ public final class Problems {
                 "Something went wrong on our side. Please try again.");
     }
 
+    /**
+     * DEC-054: the database did not answer in time (a lock that stayed taken, a statement that ran too long, or no free
+     * connection). The request was rolled back, so nothing was saved by it; the client may try again after a moment.
+     */
+    public static ProblemDetail busy(long retryAfterSeconds) {
+        ProblemDetail problem = of(HttpStatus.SERVICE_UNAVAILABLE, "database-busy", "Sahaj is busy",
+                "This is taking longer than usual and was stopped. Nothing was saved by this attempt. "
+                        + "Wait a moment and try again.");
+        problem.setProperty("retryAfterSeconds", retryAfterSeconds);
+        return problem;
+    }
+
     /** A generic problem for any other status: the standard reason phrase and no detail from the cause. */
     public static ProblemDetail generic(HttpStatusCode status) {
         String reason = status instanceof HttpStatus http ? http.getReasonPhrase() : "Error";

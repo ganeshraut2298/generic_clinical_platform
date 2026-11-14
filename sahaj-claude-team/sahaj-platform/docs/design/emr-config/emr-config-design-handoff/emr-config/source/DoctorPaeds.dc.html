@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Doctor screen — Paediatrics</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#B4471F}a:hover{color:#8C3617}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #B4471F66;outline-offset:2px}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; font-size: 14px; min-height: 1240px; display: flex; flex-direction: column">
+
+  <div style="background: #0F1C2E; color: #FFFFFF; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 24px">
+    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+      <span style="font-weight: 700; font-size: 16px">Smart Clinic</span>
+      <span style="background: #B4471F; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600">Paediatrics</span>
+      <nav aria-label="Main" style="display: flex; gap: 4px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 8px 12px; border-radius: 8px; background: #1E3550; font-size: 13px; font-weight: 600">Queue (11 waiting)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Vaccination register</a>
+      </nav>
+    </div>
+    <span style="font-size: 13px; color: #B8C4D3">Dr. [DOCTOR NAME], MD (Paed)</span>
+  </div>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+    <div style="display: flex; gap: 14px; align-items: center">
+      <span style="width: 48px; height: 48px; border-radius: 999px; background: #FBE6DC; color: #B4471F; display: flex; align-items: center; justify-content: center; font-weight: 700">AR</span>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 17px; font-weight: 700">[CHILD NAME]</span>
+        <span style="font-size: 13px; color: #5B6B7F">18 months · Boy · UHID [ID] · Mother: [NAME] · Term, 2.9 kg at birth</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <span style="{{vaxChip}}">{{vaxChipText}}</span>
+      <span style="background: #EEF1F5; color: #3E4C5E; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600">No known allergy</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 24px; align-items: flex-start; flex: 1">
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+      <div id="complaints">
+        <dc-import name="EmrList" on-change="{{cp_complaints}}" kind="complaints" spec="paeds" title="Chief complaints" required="{{ true }}" accent="#B4471F" who="Dr. [DOCTOR NAME]" hint-size="100%,230px"></dc-import>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 16px">
+        <section style="flex: 1 1 340px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Growth today <span style="color: #B42318">*</span></h2><span style="font-size: 12px; color: #5B6B7F">WHO 0–5 y</span></div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+            <sc-for list="{{growth}}" as="g" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 6px; border: 1px solid #E3E8EE; border-radius: 10px; padding: 10px">
+                <span style="font-size: 11px; font-weight: 600; color: #5B6B7F">{{g.label}}</span>
+                <div style="display: flex; align-items: center; gap: 4px">
+                  <button type="button" onClick="{{g.dec}}" aria-label="Decrease {{g.label}}" style="width: 30px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; font-weight: 700; cursor: pointer">−</button>
+                  <span style="flex: 1; text-align: center; font-size: 17px; font-weight: 700">{{g.value}}</span>
+                  <button type="button" onClick="{{g.inc}}" aria-label="Increase {{g.label}}" style="width: 30px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; font-weight: 700; cursor: pointer">+</button>
+                </div>
+                <span style="{{g.noteStyle}}">{{g.note}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <svg role="img" aria-label="Weight-for-age chart with today's weight plotted" viewBox="0 0 400 200" style="width: 100%; height: auto">
+            <rect x="40" y="10" width="350" height="160" fill="#FAFBFC"/>
+            <path d="M40 150 C 120 90, 220 60, 390 40" fill="none" stroke="#C9D2DC" stroke-width="1.5"/>
+            <path d="M40 158 C 120 105, 220 80, 390 62" fill="none" stroke="#9AA8B8" stroke-width="1.5"/>
+            <path d="M40 165 C 120 120, 220 98, 390 82" fill="none" stroke="#C9D2DC" stroke-width="1.5"/>
+            <text x="356" y="36" font-size="10" fill="#5B6B7F">97th</text><text x="356" y="58" font-size="10" fill="#5B6B7F">50th</text><text x="356" y="96" font-size="10" fill="#5B6B7F">3rd</text>
+            <polyline points="40,160 80,132 120,118 160,108 200,100 240,95 280,{{wY}}" fill="none" stroke="#B4471F" stroke-width="2.5"/>
+            <circle cx="280" cy="{{wY}}" r="6" fill="#B4471F" stroke="#FFFFFF" stroke-width="2"/>
+            <text x="40" y="190" font-size="10" fill="#5B6B7F">Birth</text><text x="190" y="190" font-size="10" fill="#5B6B7F">12 m</text><text x="268" y="190" font-size="10" fill="#5B6B7F">18 m</text><text x="360" y="190" font-size="10" fill="#5B6B7F">24 m</text>
+          </svg>
+        </section>
+
+        <section style="flex: 1 1 280px; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px">
+          <h2 style="margin: 0 0 4px; font-size: 16px; font-weight: 700">Milestones · 18 months</h2>
+          <span style="font-size: 12px; color: #5B6B7F; margin-bottom: 4px">Tap to mark achieved or not yet</span>
+          <sc-for list="{{milestones}}" as="m" hint-placeholder-count="6">
+            <button type="button" aria-pressed="{{m.on}}" onClick="{{m.toggle}}" style="display: flex; gap: 10px; align-items: center; padding: 8px 4px; border: 0; border-bottom: 1px solid #EEF1F5; background: transparent; cursor: pointer; text-align: left; min-height: 44px">
+              <span style="{{m.dot}}">{{m.mark}}</span>
+              <span style="flex: 1; font-size: 13px; color: #0F1C2E">{{m.label}}</span>
+              <span style="font-size: 11px; color: #5B6B7F">{{m.domain}}</span>
+            </button>
+          </sc-for>
+          <span style="{{msNoteStyle}}">{{msNote}}</span>
+        </section>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+          <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Immunization · IAP schedule</h2><span style="font-size: 12px; color: #5B6B7F">Tap a due or overdue vaccine to mark it given today</span></div>
+          <div style="display: flex; gap: 12px; font-size: 12px; color: #3E4C5E">
+            <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 999px; background: #146C43"></span>Given</span>
+            <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 999px; background: #B4471F"></span>Due today</span>
+            <span style="display: flex; gap: 6px; align-items: center"><span style="width: 10px; height: 10px; border-radius: 999px; background: #B42318"></span>Overdue</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+          <sc-for list="{{vax}}" as="v" hint-placeholder-count="9">
+            <div style="{{v.rowStyle}}">
+              <span style="width: 100px; flex: none; font-size: 13px; font-weight: 700">{{v.age}}</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; flex: 1">
+                <sc-for list="{{v.items}}" as="i" hint-placeholder-count="3"><button type="button" onClick="{{i.pick}}" aria-pressed="{{i.on}}" style="{{i.style}}">{{i.label}}</button></sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
+          <button type="button" onClick="{{markAllDue}}" style="border: 1px solid #B4471F; background: #FFFFFF; color: #B4471F; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Mark all due as given</button>
+          <span style="font-size: 13px; color: #3E4C5E">{{vaxNote}}</span>
+        </div>
+      </section>
+      <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="paeds" title="Doctor’s advice" required="{{ false }}" accent="#B4471F" who="Dr. [DOCTOR NAME]" hint-size="100%,230px"></dc-import></div>
+    </main>
+
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="paeds" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#B4471F" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+      <section style="background: #FFFFFF; border: 2px solid #B4471F; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 700">Dose by weight</h2>
+          <span style="font-size: 12px; color: #5B6B7F">Uses today&#39;s weight: <strong>{{weight}} kg</strong>. Change weight on the left and this updates.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <sc-for list="{{meds}}" as="m" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}"><span style="font-weight: 700">{{m.name}}</span><span style="font-size: 12px; color: #3E4C5E">{{m.sub}}</span></button>
+          </sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 2px; background: #FAFBFC; border-radius: 8px; padding: 10px"><span style="font-size: 11px; color: #5B6B7F; font-weight: 600">Dose rule</span><span style="font-weight: 700">{{dose.rule}}</span></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; background: #FAFBFC; border-radius: 8px; padding: 10px"><span style="font-size: 11px; color: #5B6B7F; font-weight: 600">Per dose</span><span style="font-weight: 700">{{dose.mg}} mg</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; background: #FBE6DC; border-radius: 10px; padding: 12px">
+          <span style="font-size: 12px; font-weight: 600; color: #8C3617">Give</span>
+          <span style="font-size: 26px; font-weight: 700; color: #8C3617">{{dose.ml}} ml</span>
+          <span style="font-size: 12px; color: #8C3617">{{dose.freq}}</span>
+        </div>
+        <button type="button" onClick="{{addRx}}" style="border: 1px solid #B4471F; background: #B4471F; color: #FFFFFF; border-radius: 8px; min-height: 44px; font-weight: 600; cursor: pointer">Add to prescription</button>
+        <sc-if value="{{hasRx}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #EEF1F5; padding-top: 10px">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Prescription</span>
+            <sc-for list="{{rx}}" as="r" hint-placeholder-count="1">
+              <div style="display: flex; gap: 8px; align-items: center; font-size: 13px; background: #FAFBFC; border-radius: 8px; padding: 6px 4px 6px 10px">
+                <span style="flex: 1">{{r.text}}</span>
+                <button type="button" onClick="{{r.remove}}" aria-label="Remove" style="border: 0; background: transparent; width: 32px; height: 32px; cursor: pointer; color: #5B6B7F"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 700">Feeding</h2>
+        <span style="font-size: 13px; color: #3E4C5E; line-height: 1.5">Family food 3 meals + 2 snacks, breastfeeding at night. Picky eater.</span>
+      </section>
+    </div>
+    </aside>
+  </div>
+
+  <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; box-shadow: 0 -4px 12px rgba(15,28,46,0.06)">
+    <span style="font-size: 13px; color: #3E4C5E; font-weight: 600">{{footer}}</span>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap">
+      <button type="button" onClick="{{printCard}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Print vaccination card</button>
+      <button type="button" onClick="{{complete}}" style="border: 1px solid #B4471F; background: #B4471F; color: #FFFFFF; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: pointer">Complete visit</button>
+    </div>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; bottom: 84px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3)">{{toast}}</div>
+  </sc-if>
+
+  <sc-if value="{{modal}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(15,28,46,0.55); display: flex; align-items: flex-start; justify-content: center; padding-top: 200px">
+      <div role="dialog" aria-label="Visit summary" style="width: 520px; max-width: calc(100% - 32px); background: #FFFFFF; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px rgba(15,28,46,0.35)">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Complete this visit?</h2>
+        <div style="display: flex; flex-direction: column; gap: 6px; background: #FAFBFC; border-radius: 10px; padding: 12px 14px; font-size: 13px">
+          <sc-for list="{{summary}}" as="s" hint-placeholder-count="3"><span>• {{s}}</span></sc-for>
+        </div>
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13px"><input type="checkbox" checked style="width: 18px; height: 18px">Send next-vaccine reminder to parent on WhatsApp</label>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap">
+          <button type="button" onClick="{{closeModal}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Back</button>
+          <button type="button" onClick="{{finish}}" style="border: 1px solid #B4471F; background: #B4471F; color: #FFFFFF; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: pointer">Complete &amp; call next</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1700}}'>
+var MEDS = [
+  { name: 'Paracetamol syrup 120 mg / 5 ml', sub: 'Fever or pain', perKg: 15, conc: 24, freq: 'every 6 hours if needed, at most 4 doses a day', maxMg: 500 },
+  { name: 'Paracetamol syrup 250 mg / 5 ml', sub: 'Fever or pain, stronger syrup', perKg: 15, conc: 50, freq: 'every 6 hours if needed, at most 4 doses a day', maxMg: 500 },
+  { name: 'Ibuprofen syrup 100 mg / 5 ml', sub: 'Fever or pain, with food', perKg: 10, conc: 20, freq: 'every 8 hours with food, at most 3 doses a day', maxMg: 400 }
+];
+var SCHED = [
+  ['Birth', ['BCG', 'OPV 0', 'Hep B 1'], 'g'], ['6 weeks', ['DTwP 1', 'IPV 1', 'Hib 1', 'Hep B 2', 'Rota 1', 'PCV 1'], 'g'],
+  ['10 weeks', ['DTwP 2', 'IPV 2', 'Hib 2', 'Rota 2', 'PCV 2'], 'g'], ['14 weeks', ['DTwP 3', 'IPV 3', 'Hib 3', 'Rota 3', 'PCV 3'], 'g'],
+  ['6–9 months', ['Influenza 1', 'Influenza 2', 'Typhoid conj.'], 'g'], ['9 months', ['MMR 1'], 'g'], ['12 months', ['Hep A 1'], 'g'],
+  ['15 months', ['MMR 2', 'Varicella 1', 'PCV booster'], 'g'], ['16–18 months', ['DTwP booster 1', 'IPV booster 1', 'Hib booster 1'], 'd']
+];
+var OVERDUE = ['Varicella 1'];
+
+function cpN(a, mode) { return (Array.isArray(a) ? a : []).map(function (x) { if (!x) return ''; if (typeof x === 'string') return x; var t = x.name || ''; if (mode === 'dx' && x.code) t += ' (' + x.code + ')'; else if (mode === 'c' && x.a1) t += ' · ' + x.a1; return t; }).filter(Boolean); }
+function cpKeys(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }); }
+
+function casePaper(st, r, cp) {
+  return { dept: 'Paediatrics · OPD', doctor: 'Dr. [DOCTOR NAME]', qual: 'MBBS, MD (Paediatrics)', reg: '[MMC REG. NO.]', patient: '[CHILD NAME]', meta: '18 months · Boy', ids: 'UHID [ID] · Mother: [NAME]', visit: 'Well-baby + sick visit', vitals: 'Wt ' + st.wt + ' kg · Length ' + st.len + ' cm · HC ' + st.hc + ' cm',
+    sections: { complaints: cpN(cp.complaints, 'c'), allergies: ['No known allergy'], history: ['Term, 2.9 kg at birth'], exam: ['Weight ' + st.wt + ' kg · length ' + st.len + ' cm · head circumference ' + st.hc + ' cm', r.msNote ? 'Development: ' + r.msNote : ''].filter(Boolean),
+      diagnosis: cpN(cp.diagnosis, 'dx'), investigations: [], procedures: cpKeys(st.given).map(function (g) { return 'Vaccine given: ' + g; }), advice: cpN(cp.advice), follow: ['Next vaccines at 18 months'] },
+    rx: (st.rx || []).map(function (t) { var p = String(t).split(' · '); return { name: p[0], how: p[1] || '', days: '3 days', note: 'Dose by weight' }; }) };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { wt: 10.2, len: 81, hc: 46.5, med: 0, rx: [], given: {}, toast: '', modal: false,
+      ms: { 0: true, 1: true, 2: true, 3: true, 4: true, 5: false },
+      reasons: { 'Vaccination': true, 'Cold': true, 'Fever': false, 'Loose motions': false, 'Cough': false, 'Not eating well': false } };
+  }
+  say(msg, patch) {
+    var self = this;
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3000);
+    this.setState(Object.assign({ toast: msg }, patch || {}));
+  }
+  _rv() {
+    var self = this, st = this.state, A = '#B4471F';
+    function step(k, d, dp) { var x = {}; x[k] = Math.round((st[k] + d) * 10) / 10; self.setState(x); }
+    var wc = st.wt < 8.6 ? ['Below 3rd centile', '#B42318'] : st.wt < 9.8 ? ['~15th centile', '#146C43'] : st.wt < 11 ? ['~25–50th centile', '#146C43'] : st.wt < 13.7 ? ['~50–97th centile', '#146C43'] : ['Above 97th centile', '#B42318'];
+    var growth = [
+      { label: 'Weight', value: st.wt.toFixed(1) + ' kg', note: wc[0], noteStyle: 'font-size: 11px; font-weight: 600; color: ' + wc[1], dec: function () { step('wt', -0.1); }, inc: function () { step('wt', 0.1); } },
+      { label: 'Length', value: st.len + ' cm', note: '~40th centile', noteStyle: 'font-size: 11px; font-weight: 600; color: #146C43', dec: function () { step('len', -0.5); }, inc: function () { step('len', 0.5); } },
+      { label: 'Head circ.', value: st.hc.toFixed(1) + ' cm', note: '~50th centile', noteStyle: 'font-size: 11px; font-weight: 600; color: #146C43', dec: function () { step('hc', -0.5); }, inc: function () { step('hc', 0.5); } }
+    ];
+    var wY = Math.round(Math.max(30, Math.min(165, 90 - (st.wt - 10.2) * 18)));
+    var MS = [['Walks alone', 'Gross motor'], ['Climbs stairs with help', 'Gross motor'], ['Scribbles with crayon', 'Fine motor'], ['Feeds self with spoon', 'Social'], ['Points to show interest', 'Social'], ['Says 6 or more words', 'Language']];
+    var milestones = MS.map(function (m, i) {
+      var on = !!st.ms[i];
+      return { label: m[0], domain: m[1], on: on, mark: on ? '✓' : '?', toggle: function () { var x = Object.assign({}, st.ms); x[i] = !on; self.setState({ ms: x }); },
+        dot: 'flex: none; width: 24px; height: 24px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #FFFFFF; background: ' + (on ? '#146C43' : '#B45309') };
+    });
+    var notYet = MS.filter(function (_, i) { return !st.ms[i]; });
+    var vaxRows = SCHED.map(function (r) {
+      var items = r[1].map(function (n) {
+        var over = OVERDUE.indexOf(n) >= 0, k = st.given[n] ? 't' : over ? 'o' : r[2];
+        var C = { g: ['#E3F5EC', '#146C43', '✓ '], t: ['#146C43', '#FFFFFF', '✓ '], d: ['#FBE6DC', '#8C3617', ''], o: ['#FDECEA', '#B42318', '! '] }[k];
+        var clickable = k !== 'g';
+        return { label: C[2] + n + (k === 't' ? ' · today' : ''), on: k === 't',
+          pick: function () { if (!clickable) return; var gv = Object.assign({}, st.given); gv[n] = !st.given[n]; self.say(gv[n] ? n + ' recorded as given today' : n + ' unmarked', { given: gv }); },
+          style: 'font-size: 12px; font-weight: 600; border-radius: 6px; padding: 6px 10px; min-height: 32px; border: ' + (k === 'd' || k === 'o' ? '1px dashed ' + C[1] : '1px solid transparent') + '; cursor: ' + (clickable ? 'pointer' : 'default') + '; background: ' + C[0] + '; color: ' + C[1] };
+      });
+      var hot = r[1].some(function (n) { return !st.given[n] && (r[2] === 'd' || OVERDUE.indexOf(n) >= 0); });
+      return { age: r[0], items: items, rowStyle: 'display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid #EEF1F5; background: ' + (hot ? '#FFF8F4' : '#FFFFFF') };
+    });
+    var pending = SCHED.filter(function (r) { return r[2] === 'd'; })[0][1].concat(OVERDUE).filter(function (n) { return !st.given[n]; });
+    var givenToday = Object.keys(st.given).filter(function (k) { return st.given[k]; });
+    var M = MEDS[st.med];
+    var mg = Math.min(M.maxMg, Math.round(st.wt * M.perKg));
+    var ml = (Math.round(mg / M.conc * 10) / 10).toFixed(1);
+    var meds = MEDS.map(function (m, i) {
+      var on = st.med === i;
+      return { name: m.name, sub: m.sub, on: on, pick: function () { self.setState({ med: i }); },
+        style: 'display: flex; flex-direction: column; gap: 2px; text-align: left; border-radius: 8px; padding: 10px 12px; min-height: 52px; cursor: pointer; color: #0F1C2E; border: ' + (on ? '2px solid ' + A : '1px solid #D5DCE4') + '; background: ' + (on ? '#FBE6DC66' : '#FFFFFF') };
+    });
+    var reasons = Object.keys(st.reasons).map(function (k) {
+      var on = st.reasons[k];
+      return { label: (on ? '✓ ' : '+ ') + k, on: on, toggle: function () { var x = Object.assign({}, st.reasons); x[k] = !on; self.setState({ reasons: x }); },
+        style: 'font-size: 13px; font-weight: 600; border-radius: 999px; padding: 8px 14px; min-height: 38px; cursor: pointer; border: 1px ' + (on ? 'solid ' + A : 'dashed #9AA8B8') + '; color: ' + (on ? '#8C3617' : '#3E4C5E') + '; background: ' + (on ? '#FBE6DC' : '#FFFFFF') };
+    });
+    var rx = st.rx.map(function (t, i) { return { text: t, remove: function () { self.setState({ rx: st.rx.filter(function (_, j) { return j !== i; }) }); } }; });
+    return {
+      reasons: reasons, growth: growth, wY: wY, milestones: milestones,
+      msNote: notYet.length ? 'Not yet: ' + notYet.map(function (m) { return m[0].toLowerCase(); }).join(', ') + '. Recheck at next visit.' : 'All milestones for this age achieved.',
+      msNoteStyle: 'font-size: 12px; font-weight: 600; margin-top: 4px; color: ' + (notYet.length ? '#8A4B08' : '#146C43'),
+      vax: vaxRows,
+      vaxNote: pending.length ? pending.length + ' still to give: ' + pending.join(', ') : 'All due vaccines given. Next: Hep A 2 at 18–19 months.',
+      vaxChip: 'border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; background: ' + (pending.length ? '#FDECEA' : '#E3F5EC') + '; color: ' + (pending.length ? '#B42318' : '#146C43'),
+      vaxChipText: pending.length ? pending.length + ' vaccine(s) pending' : 'Vaccines up to date',
+      markAllDue: function () { var gv = Object.assign({}, st.given); ['DTwP booster 1', 'IPV booster 1', 'Hib booster 1', 'Varicella 1'].forEach(function (n) { gv[n] = true; }); self.say('4 vaccines recorded · batch numbers from stock', { given: gv }); },
+      weight: st.wt.toFixed(1), meds: meds,
+      dose: { rule: M.perKg + ' mg/kg', mg: mg, ml: ml, freq: M.freq },
+      addRx: function () { var t = M.name.split(' syrup')[0] + ' ' + ml + ' ml · ' + M.freq.split(',')[0]; self.say('Added to prescription', { rx: st.rx.concat([t]) }); },
+      rx: rx, hasRx: rx.length > 0,
+      footer: givenToday.length + ' vaccine(s) given today · ' + st.rx.length + ' medicine(s) prescribed',
+      printCard: function () { self.say('Vaccination card sent to printer'); },
+      complete: function () { self.setState({ modal: true }); },
+      closeModal: function () { self.setState({ modal: false }); },
+      finish: function () { self.say('Visit completed · reminder scheduled', { modal: false }); },
+      summary: ['Weight ' + st.wt.toFixed(1) + ' kg (' + wc[0] + ')', 'Vaccines given today: ' + (givenToday.join(', ') || 'none'), 'Prescription: ' + (st.rx.join('; ') || 'none')],
+      toast: st.toast, modal: st.modal
+    };
+  }
+
+  renderVals() {
+    var self = this, st = this.state, r = this._rv(), MAP = {"complaints": null, "advice": null}, TOOLS = true, cp = st.cp || {};
+    Object.keys(MAP).forEach(function (k) {
+      var orig = MAP[k] ? r[MAP[k]] : null;
+      r['cp_' + k] = function (items) { if (typeof orig === 'function') orig(items); var a = Array.isArray(items) ? items : []; self.setState(function (s0) { var x = Object.assign({}, s0.cp || {}); x[k] = a; return { cp: x }; }); };
+    });
+    var paper = casePaper(st, r, cp), S = paper.sections || {}, n = 0;
+    Object.keys(S).forEach(function (k) { if (S[k] && S[k].length) n++; }); if (paper.rx && paper.rx.length) n++;
+    var rt = st.rtab || 'history', A = '#B4471F';
+    var tabs = [['history', 'Past visits', 'OPD + IPD'], ['paper', 'Case paper', n + ' of 10 filled · live']];
+    if (TOOLS) tabs.push(['tools', 'Quick tools', 'Helpers for this visit']);
+    r.rTabs = tabs.map(function (t) { var on = rt === t[0]; return { label: t[1], sub: t[2], on: on, pick: function () { self.setState({ rtab: t[0] }); },
+      style: 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 48px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none') }; });
+    function pane(k) { return 'display: ' + (rt === k ? 'flex' : 'none') + '; flex-direction: column; gap: 16px'; }
+    r.rpHistory = pane('history'); r.rpPaper = pane('paper'); r.rpTools = pane('tools');
+    r.paper = paper;
+    return r;
+  }
+}
+</script>
+</body>
+</html>

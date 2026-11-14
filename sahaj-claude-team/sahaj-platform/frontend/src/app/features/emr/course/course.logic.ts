@@ -1,12 +1,16 @@
+import { formatDisplayDate } from '../../../shared/format/ist-date';
 import { formatInr } from '../../../shared/format/inr';
+import { ACCENT } from '../specialty/specialty-registry';
 import {
   CourseAccount,
   CourseEncounterKind,
   CoursePaymentType,
   CourseSitting,
+  CourseSittingAction,
   CourseSittingStatus,
   CourseUnit,
   PaymentMode,
+  TreatmentCourseKind,
 } from './course.model';
 
 /**
@@ -26,7 +30,7 @@ export const UNIT_WORD: Record<CourseUnit, string> = {
 
 export const UNIT_LETTER = (unit: CourseUnit): string => UNIT_WORD[unit].charAt(0);
 
-export const STATUS_WORD: Record<CourseSittingStatus, string> = { PLANNED: 'Planned', TODAY: 'Today', DONE: 'Done' };
+export const STATUS_WORD: Record<CourseSittingStatus, string> = { PLANNED: 'Planned', TODAY: 'Today', DONE: 'Done', MISSED: 'Missed' };
 
 export const ENCOUNTER_WORD: Record<CourseEncounterKind, string> = { OPD: 'OPD', DAY_CARE: 'Day care', IPD: 'IPD' };
 
@@ -53,8 +57,13 @@ export function rupees(paise: number): string {
   return formatInr(paise / 100);
 }
 
+/** The number shown for a sitting: the renumbered one (0.7.0), else the stable one. */
+export function numberOf(sitting: Pick<CourseSitting, 'sittingNo'> & { displayNo?: number }): number {
+  return sitting.displayNo ?? sitting.sittingNo;
+}
+
 export function sittingLabel(sitting: CourseSitting, unit: CourseUnit): string {
-  return `${UNIT_LETTER(unit)}${sitting.sittingNo}`;
+  return `${UNIT_LETTER(unit)}${numberOf(sitting)}`;
 }
 
 /** "OPD visit · OPD-10231", "IPD · Delivery admission · IP-2232" or "... · request" (not linked yet). */
@@ -216,3 +225,46 @@ export function parseRupees(text: string): number | null {
   }
   return Number(t) * 100;
 }
+
+/** The words of a drawn action button (TreatmentCourse.dc.html:249-285). */
+export function actionLabel(action: CourseSittingAction, unit: CourseUnit, sitting: CourseSitting): string {
+  switch (action) {
+    case 'MARK_DONE':
+      return `Mark ${UNIT_WORD[unit].toLowerCase()} done`;
+    case 'MISSED':
+      return 'Patient did not come';
+    case 'REBOOK':
+      return 'Rebook';
+    case 'RESCHEDULE':
+      return `Reschedule: ${sitting.plannedDate ? formatDisplayDate(sitting.plannedDate) : 'set a date'} ▾`;
+    case 'REMOVE':
+      return 'Remove';
+    case 'REQUEST_ADMISSION':
+      return sitting.encounterKind === 'OPD' ? 'Move to day care / IPD' : 'Request admission';
+    case 'ADMIT':
+      return 'Admit now';
+  }
+}
+
+/** The toast after "Mark <unit> done": the charge comes from the server's sitting, the browser adds nothing up. */
+export function doneToast(unit: CourseUnit, sitting: CourseSitting): string {
+  const head = `${UNIT_WORD[unit]} ${numberOf(sitting)} done`;
+  return sitting.settledInIpd ? `${head} · billed in IPD` : `${head} · ${rupees(sitting.chargePaise)} added to the account`;
+}
+
+/** Today or later, as a yyyy-mm-dd string against today's IST date (a date choice never goes into the past). */
+export function dateProblem(date: string, today: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return 'Choose a date.';
+  }
+  return date < today ? 'Choose today or a later date.' : null;
+}
+
+/** Accent of the course page and panel by kind (ADR-026 D1): DENTAL dental, ANC og, REHAB physio, SURGERY surgery, CHEMO onco. */
+export const KIND_ACCENT: Record<TreatmentCourseKind, string> = {
+  DENTAL: ACCENT.dental,
+  ANC: ACCENT.og,
+  REHAB: ACCENT.physio,
+  SURGERY: ACCENT.surgery,
+  CHEMO: ACCENT.onco,
+};

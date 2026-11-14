@@ -19,7 +19,8 @@ public final class SpecialtyProfiles {
 
     static {
         ANCHORS.put("gm", ordered("vitals", "VITALS_LOG", "exam", "EXAM_GENERAL"));
-        ANCHORS.put("dental", ordered("dental_chart", "TOOTH_CHART", "tx_plan", "DENTAL_PLAN", "dental_done",
+        ANCHORS.put("dental", ordered("dental_medhx", "DENTAL_MED_HISTORY", "dental_chart", "TOOTH_CHART",
+                "tx_plan", "DENTAL_PLAN", "dental_done",
                 "DENTAL_DONE", "dental_lab", "LAB_WORK", "consent", "CONSENT_CHECKLIST"));
         ANCHORS.put("og", ordered("anc", "ANC_CHECK", "pcpndt", "FORM_F", "gyn_exam", "GYNAE_EXAM"));
         ANCHORS.put("paeds", ordered("growth", "GROWTH", "immunization", "IMMUNIZATION", "milestones", "MILESTONES",
@@ -79,7 +80,7 @@ public final class SpecialtyProfiles {
     }
 
     private static final Map<String, List<String>> HIDDEN_BY_MODE = Map.of(
-            "og/ANC", List.of("gyn_exam", "infertility", "contraception"),
+            "og/ANC", List.of("gyn_exam", "infertility", "contraception", "menstrual"),
             "og/GYNAE", List.of("obstetric", "anc", "pcpndt", "usg"),
             "physio/FIRST_VISIT", List.of("modalities", "sessions"),
             "physio/SESSION", List.of("special_tests", "posture"));

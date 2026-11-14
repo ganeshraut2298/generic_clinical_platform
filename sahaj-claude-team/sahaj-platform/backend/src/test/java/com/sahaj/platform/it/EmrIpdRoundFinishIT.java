@@ -317,7 +317,7 @@ class EmrIpdRoundFinishIT extends EmrIpdSupport {
         assertThat(recordRow(r.clinic(), r.id()).get(0)).isEqualTo("DRAFT");
         assertThat(orders(r.clinic(), r.adm().id())).isZero();
         assertThat(notes(r.clinic())).isZero();
-        assertThat(check(r.doctor(), r.record(), "{}", 200).get("ready").asBoolean()).isFalse();
+        checkRefused(r.doctor(), r.record(), "{}", 409, "encounter-closed"); // DEC-051 D2: the finish check of a closed encounter is 409 as well (opd.yaml 0.6.3)
     }
 
     @Test

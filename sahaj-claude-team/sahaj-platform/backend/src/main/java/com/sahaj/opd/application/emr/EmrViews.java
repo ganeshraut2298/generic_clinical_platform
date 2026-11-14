@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sahaj.opd.application.emr.EmrModel.LayoutSection;
 import com.sahaj.opd.application.emr.finish.FinishModels;
 import com.sahaj.opd.application.emr.EmrModel.SectionSettings;
+import com.sahaj.patient.api.AllergyStatus;
 import com.sahaj.patient.api.PatientAge;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -123,7 +124,21 @@ public final class EmrViews {
                                String uhid, String allergyText, String chronicText, Integer lastVisitDaysAgo,
                                Integer visitOrdinal, String visitType, DoctorOnRecord doctor,
                                AdmissionOnRecord admission, EmergencyOnRecord emergency, boolean mlc,
-                               AgeDetail ageDetail) {
+                               AgeDetail ageDetail, AllergyStatus allergyStatus) {
+
+        /**
+         * The shape before 0.7.1: no allergy status. It is worked out from the text: RECORDED when there is one, else
+         * NOT_RECORDED (the service always gives the status itself).
+         */
+        public RecordHeader(UUID patientId, String patientName, String initials, Integer age, String sex,
+                            String uhid, String allergyText, String chronicText, Integer lastVisitDaysAgo,
+                            Integer visitOrdinal, String visitType, DoctorOnRecord doctor,
+                            AdmissionOnRecord admission, EmergencyOnRecord emergency, boolean mlc,
+                            AgeDetail ageDetail) {
+            this(patientId, patientName, initials, age, sex, uhid, allergyText, chronicText, lastVisitDaysAgo,
+                    visitOrdinal, visitType, doctor, admission, emergency, mlc, ageDetail,
+                    allergyText == null ? AllergyStatus.NOT_RECORDED : AllergyStatus.RECORDED);
+        }
 
         /** The shape before SAH-73: no age detail. */
         public RecordHeader(UUID patientId, String patientName, String initials, Integer age, String sex,

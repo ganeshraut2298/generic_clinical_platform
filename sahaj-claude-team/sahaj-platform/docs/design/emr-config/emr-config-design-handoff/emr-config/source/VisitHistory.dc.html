@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Past visits · OPD and IPD</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button,input{font-family:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid #1D5FA866;outline-offset:2px}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; width: 100%; font-size: 13px">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+    <h3 style="margin: 0; font-size: 15px; font-weight: 700">Patient history</h3>
+    <span style="font-size: 11px; color: #5B6B7F">{{countText}}</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 6px; background: #F7F9FB; border-radius: 10px; padding: 10px 12px">
+    <sc-for list="{{key}}" as="k" hint-placeholder-count="4">
+      <div style="display: flex; gap: 8px; font-size: 12px"><span style="width: 86px; flex: none; color: #5B6B7F; font-weight: 600">{{k.label}}</span><span style="{{k.style}}">{{k.value}}</span></div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; gap: 6px; align-items: center">
+    <div role="tablist" aria-label="Visit type" style="display: flex; background: #EEF1F5; border-radius: 8px; padding: 3px; gap: 3px">
+      <sc-for list="{{filters}}" as="f" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{f.on}}" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}}</button></sc-for>
+    </div>
+    <label style="flex: 1; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search history</span>
+      <input value="{{q}}" onChange="{{onQ}}" placeholder="Search: drug, test, diagnosis" style="flex: 1; min-width: 0; font: inherit; font-size: 12px; border: 1px solid #C9D2DC; border-radius: 8px; padding: 7px 9px">
+    </label>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 0; position: relative">
+    <sc-for list="{{visits}}" as="v" hint-placeholder-count="4">
+      <div style="display: flex; gap: 10px">
+        <div style="display: flex; flex-direction: column; align-items: center; flex: none; width: 14px">
+          <span style="{{v.dot}}"></span>
+          <span style="flex: 1; width: 2px; background: #E3E8EE; min-height: 12px"></span>
+        </div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px">
+          <button type="button" onClick="{{v.toggle}}" aria-expanded="{{v.open}}" style="display: flex; flex-direction: column; gap: 3px; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; color: #0F1C2E">
+            <span style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap">
+              <span style="{{v.typeStyle}}">{{v.type}}</span>
+              <span style="font-size: 12px; font-weight: 700">{{v.date}}</span>
+              <span style="font-size: 11px; color: #5B6B7F">{{v.chev}}</span>
+            </span>
+            <span style="font-size: 13px; font-weight: 600">{{v.title}}</span>
+            <span style="font-size: 11px; color: #5B6B7F">{{v.who}}</span>
+          </button>
+          <sc-if value="{{v.open}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 8px; border: 1px solid #E3E8EE; border-radius: 10px; padding: 10px; background: #FCFDFE">
+              <sc-for list="{{v.rows}}" as="r" hint-placeholder-count="3">
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">{{r.label}}</span><span style="font-size: 12px; color: #0F1C2E; line-height: 1.45">{{r.text}}</span></div>
+              </sc-for>
+              <sc-if value="{{v.hasTests}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 3px">
+                  <span style="font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Results</span>
+                  <sc-for list="{{v.tests}}" as="t" hint-placeholder-count="2"><div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px"><span>{{t.name}}</span><span style="{{t.style}}">{{t.value}}</span></div></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{v.hasRx}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 3px">
+                  <span style="font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">{{v.rxLabel}}</span>
+                  <sc-for list="{{v.rx}}" as="x" hint-placeholder-count="2"><span style="font-size: 12px">• {{x}}</span></sc-for>
+                </div>
+              </sc-if>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap">
+                <sc-for list="{{v.actions}}" as="a" hint-placeholder-count="2"><button type="button" onClick="{{a.run}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; padding: 5px 9px; min-height: 30px; font-size: 11px; font-weight: 600; color: #164A84; cursor: pointer">{{a.label}}</button></sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-for>
+    <sc-if value="{{empty}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #5B6B7F; padding: 8px 0">Nothing matches.</span></sc-if>
+  </div>
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="background: #0F1C2E; color: #FFFFFF; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 600">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"spec":{"editor":"enum","options":["gm","dental","og","paeds","physio","onco","surgery"],"default":"gm"},"onCopy":{"editor":null},"$preview":{"width":380,"height":900}}'>
+function V(d, type, title, who, rows, extra) { return Object.assign({ d: d, type: type, title: title, who: who, rows: rows, tests: [], rx: [] }, extra || {}); }
+var H = {
+  gm: { key: [['Allergies', 'Sulfa drugs', 1], ['Long-term', 'Type 2 diabetes (2019), hypertension (2021)', 0], ['Surgeries', 'None', 0], ['Regular meds', 'Telmisartan 40, Metformin 500 SR, Atorvastatin 10', 0]],
+    visits: [
+      V('28 Oct 2026', 'OPD', 'BP follow-up', 'Dr. [DOCTOR NAME] · General Medicine', [['Complaints', 'Headache on and off'], ['Findings', 'BP 154/96, pulse 84, weight 78.5 kg'], ['Diagnosis', 'I10 Hypertension, E11.9 Type 2 diabetes'], ['Advice', 'Low salt, walk 30 min, check BP at home']], { rx: ['Telmisartan 40 mg · 1-0-0 · 30 days', 'Metformin 500 mg SR · 1-0-1 · 30 days', 'Atorvastatin 10 mg · 0-0-1 · 30 days'] }),
+      V('14 Oct 2026', 'OPD', 'Raised BP and sugar', 'Dr. [DOCTOR NAME] · General Medicine', [['Complaints', 'Giddiness, tiredness'], ['Findings', 'BP 162/98, RBS 210']], { tests: [['HbA1c', '8.1 %', 1], ['Lipid profile LDL', '138 mg/dL', 1], ['Creatinine', '0.9 mg/dL', 0]], rx: ['Metformin 500 mg SR · 1-0-1', 'Atorvastatin 10 mg · 0-0-1'] }),
+      V('12–15 Jul 2025', 'IPD', 'Dengue fever · admitted 3 days', 'Dr. [DOCTOR NAME] · Ward 2, bed 14', [['Admission', 'Fever 5 days, platelets 38,000'], ['Course', 'IV fluids, platelet monitoring, no transfusion needed'], ['Discharge', 'Platelets 1.1 lakh, afebrile 48 h']], { tests: [['Dengue NS1', 'Positive', 1], ['Platelets on discharge', '1,10,000', 0]], rx: ['Paracetamol 650 mg · SOS', 'ORS · as needed'], rxLabel: 'Discharge medicines' }),
+      V('02 Sep 2024', 'OPD', 'Viral fever', 'Dr. [DOCTOR NAME]', [['Diagnosis', 'B34.9 Viral fever']], { rx: ['Paracetamol 650 mg · 1-1-1 · 3 days'] })
+    ] },
+  dental: { key: [['Allergies', 'Penicillin', 1], ['Medical', 'Hypothyroid, on thyroxine', 0], ['Habits', 'Tobacco chewing', 1], ['Past dental', 'Extraction 46 (2023, another clinic)', 0]],
+    visits: [
+      V('04 Nov 2026', 'OPD', 'RCT 36 · sitting 1', 'Dr. [DOCTOR NAME] · Chair 1', [['Done', 'Access opening, pulp removed, calcium hydroxide dressing'], ['Notes', 'Tender on percussion, LA given']], { rx: ['Ibuprofen 400 + Paracetamol 325 · 1-0-1 · 3 days'] }),
+      V('28 Oct 2026', 'OPD', 'First visit · examination and filling', 'Dr. [DOCTOR NAME]', [['Complaints', 'Pain lower left back tooth 1 week'], ['Findings', 'Deep caries 36, caries 47, 46 missing'], ['Done', 'Composite filling 16 (O), IOPA 36'], ['Plan', 'RCT 36 + crown, filling 47, implant 46']], { tests: [['IOPA 36', 'Deep caries into pulp', 1]] }),
+      V('2023', 'OPD', 'Extraction 46 · outside record', 'Uploaded by patient', [['Note', 'Extraction certificate scanned at front desk']])
+    ] },
+  og: { key: [['Allergies', 'None known', 0], ['Obstetric', 'G2 P1 L1 A0 · LSCS 2022', 1], ['Blood group', 'B positive', 0], ['Risk', 'Previous LSCS, anaemia', 1]],
+    visits: [
+      V('13 Oct 2026', 'OPD', 'ANC visit 4 · 23 weeks', 'Dr. [DOCTOR NAME]', [['Findings', 'BP 120/78, FH 23 cm, FHS 146'], ['Plan', 'Iron dose increased']], { tests: [['Hb', '10.4 g/dL', 1]], rx: ['Ferrous ascorbate 100 mg · 1-0-1', 'Calcium + D3 · 0-1-0'] }),
+      V('15 Sep 2026', 'OPD', 'ANC visit 3 · anomaly scan', 'Dr. [DOCTOR NAME]', [['Scan', 'No anomaly, placenta posterior upper']], { tests: [['Anomaly scan', 'Normal', 0]] }),
+      V('04 Aug 2026', 'OPD', 'ANC visit 2 · NT scan, Td 1', 'Dr. [DOCTOR NAME]', [['Scan', 'NT 1.4 mm, low risk']]),
+      V('03–06 Mar 2022', 'IPD', 'LSCS · baby boy 3.0 kg', 'Dr. [DOCTOR NAME] · Maternity ward', [['Indication', 'Failure to progress at 39 weeks'], ['Surgery', 'Lower segment caesarean, spinal anaesthesia'], ['Discharge', 'Day 3, wound healthy']], { rx: ['Cefuroxime 500 mg · 1-0-1 · 5 days', 'Paracetamol 650 mg · SOS'], rxLabel: 'Discharge medicines' })
+    ] },
+  paeds: { key: [['Allergies', 'None known', 0], ['Birth', 'Term, 2.9 kg, normal delivery', 0], ['Vaccines', 'Varicella 1 overdue', 1], ['Past illness', 'Bronchiolitis (admitted, 2025)', 0]],
+    visits: [
+      V('11 Aug 2026', 'OPD', '15-month vaccines', 'Dr. [DOCTOR NAME]', [['Given', 'MMR 2, PCV booster'], ['Growth', 'Weight 9.6 kg, length 78 cm']]),
+      V('09 May 2026', 'OPD', 'Fever and cold', 'Dr. [DOCTOR NAME]', [['Diagnosis', 'Viral URI']], { rx: ['Paracetamol syrup 120/5 · 5 ml SOS', 'Saline nasal drops'] }),
+      V('18–21 Jan 2025', 'IPD', 'Bronchiolitis · admitted 3 days', 'Dr. [DOCTOR NAME] · Paediatric ward', [['Admission', 'Fast breathing, SpO2 91%'], ['Course', 'Oxygen 2 days, nebulised saline'], ['Discharge', 'SpO2 98% on room air']])
+    ] },
+  physio: { key: [['Diagnosis', 'Right knee osteoarthritis (grade 2)', 0], ['Referred by', 'Dr. [ORTHO NAME]', 0], ['Medical', 'Hypertension', 0], ['Package', '10 sessions · 4th today', 0]],
+    visits: [
+      V('04 Nov 2026', 'OPD', 'Session 3', '[THERAPIST NAME]', [['Pain', '5/10 (was 6)'], ['Given', 'IFT, exercises, taping']]),
+      V('31 Oct 2026', 'OPD', 'Session 2', '[THERAPIST NAME]', [['Pain', '6/10'], ['Given', 'IFT, hot pack, exercises']]),
+      V('28 Oct 2026', 'OPD', 'Assessment · session 1', '[THERAPIST NAME]', [['Findings', 'Knee flexion 100°, quads 4/5, WOMAC 48'], ['Goals', 'Pain below 4, flexion 120°']]),
+      V('20 Oct 2026', 'OPD', 'Orthopaedic consult', 'Dr. [ORTHO NAME] · Orthopaedics', [['Diagnosis', 'Knee OA grade 2'], ['Plan', 'Physiotherapy 10 sessions, weight loss']], { tests: [['X-ray knee AP / lateral', 'Joint space narrowing medial', 1]] })
+    ] },
+  onco: { key: [['Diagnosis', 'Ca left breast · IDC grade 2 · Stage IIIA (T2 N2 M0)', 1], ['Receptors', 'ER+ PR+ HER2 negative', 0], ['Allergies', 'None known', 0], ['Scheme', 'MJPJAY · pre-approved for chemo', 0]],
+    visits: [
+      V('21 Oct 2026', 'IPD', 'Chemo cycle 3 (AC) · day care', 'Dr. [ONCOLOGIST NAME] · Day-care bed 4', [['Pre-check', 'ANC 1,600, platelets 1.9 lakh · fit'], ['Given', 'Doxorubicin 60 mg/m², Cyclophosphamide 600 mg/m²'], ['Note', 'Delayed 1 week: ANC 900 on 14 Oct']], { rx: ['Ondansetron 8 mg · 1-0-1 · 3 days', 'Dexamethasone 4 mg · 1-0-1 · 2 days', 'Pegfilgrastim day 2'], rxLabel: 'Take-home medicines' }),
+      V('14 Oct 2026', 'OPD', 'Pre-chemo review · cycle 3 held', 'Dr. [ONCOLOGIST NAME]', [['Toxicity', 'Nausea grade 1, fatigue grade 2'], ['Decision', 'Hold 1 week, add growth factor']], { tests: [['ANC', '900 /µL', 1], ['Platelets', '1,60,000', 0]] }),
+      V('23 Sep 2026', 'IPD', 'Chemo cycle 2 (AC) · day care', 'Dr. [ONCOLOGIST NAME]', [['Given', 'AC full dose'], ['Note', 'Tolerated well']]),
+      V('26 Jul 2026', 'OPD', 'Tumour board decision', 'Tumour board: surgery, medical and radiation oncology', [['Decision', 'Neoadjuvant chemo AC × 4 → paclitaxel × 4, then surgery, then radiotherapy']]),
+      V('20–22 Jul 2026', 'IPD', 'Core biopsy and staging', 'Dr. [ONCOLOGIST NAME] · Ward 3', [['Biopsy', 'Invasive ductal carcinoma, grade 2'], ['Staging', 'CT chest-abdomen: no distant spread; axillary nodes matted']], { tests: [['ER / PR', 'Positive (8/8, 6/8)', 0], ['HER2 (IHC)', '1+ negative', 0], ['CA 15-3', '62 U/mL', 1]] })
+    ] },
+  surgery: { key: [['Allergies', 'None known', 0], ['Past surgery', 'Open appendicectomy (2019)', 0], ['Medical', 'Mild asthma, uses inhaler as needed', 1], ['Blood thinners', 'None', 0]],
+    visits: [
+      V('28 Oct 2026', 'OPD', 'USG review · surgery advised', 'Dr. [SURGEON NAME] · General Surgery', [['Findings', 'Murphy sign positive, no jaundice'], ['Decision', 'Laparoscopic cholecystectomy; PAC and blood tests']], { tests: [['USG abdomen', 'Multiple gallstones, wall 4 mm, CBD 5 mm', 1], ['LFT', 'Normal', 0]] }),
+      V('21 Oct 2026', 'OPD', 'Pain upper abdomen after meals', 'Dr. [SURGEON NAME]', [['Complaints', 'Pain right upper abdomen 2 months, worse after oily food'], ['Plan', 'USG abdomen, LFT']], { rx: ['Drotaverine 80 mg · SOS', 'Pantoprazole 40 mg · 1-0-0 · 14 days'] }),
+      V('14 Oct 2026', 'OPD', 'Referred by physician', 'Dr. [DOCTOR NAME] · General Medicine', [['Reason', 'Recurrent pain after meals, suspected gallstones']]),
+      V('05–08 Jun 2019', 'IPD', 'Open appendicectomy', 'Dr. [SURGEON NAME] · Surgical ward', [['Surgery', 'Acute appendicitis, open appendicectomy under spinal'], ['Recovery', 'Uneventful, discharged day 3']], { rx: ['Cefixime 200 mg · 1-0-1 · 5 days'], rxLabel: 'Discharge medicines' })
+    ] }
+};
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { filter: 'all', q: '', open: 0, toast: '' }; }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  say(m) { var self = this; if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3000); this.setState({ toast: m }); }
+  renderVals() {
+    var self = this, st = this.state, D = H[this.props.spec] || H.gm;
+    var q = (st.q || '').toLowerCase().trim();
+    var list = D.visits.map(function (v, i) { return Object.assign({ i: i }, v); }).filter(function (v) {
+      if (st.filter !== 'all' && v.type !== st.filter) return false;
+      if (!q) return true;
+      var hay = [v.title, v.who].concat(v.rows.map(function (r) { return r[1]; }), v.rx, v.tests.map(function (t) { return t[0] + ' ' + t[1]; })).join(' ').toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+    var opd = D.visits.filter(function (v) { return v.type === 'OPD'; }).length, ipd = D.visits.length - opd;
+    return {
+      countText: opd + ' OPD · ' + ipd + ' IPD',
+      key: D.key.map(function (k) { return { label: k[0], value: k[1], style: 'font-weight: 600; color: ' + (k[2] ? '#B42318' : '#0F1C2E') }; }),
+      filters: [['all', 'All'], ['OPD', 'OPD'], ['IPD', 'IPD']].map(function (f) { var on = st.filter === f[0]; return { label: f[1], on: on, pick: function () { self.setState({ filter: f[0] }); }, style: 'border: 0; border-radius: 6px; padding: 5px 10px; min-height: 30px; font-size: 12px; font-weight: 600; cursor: pointer; color: ' + (on ? '#0F1C2E' : '#5B6B7F') + '; background: ' + (on ? '#FFFFFF' : 'transparent') }; }),
+      q: st.q, onQ: function (e) { self.setState({ q: e && e.target ? e.target.value : '' }); },
+      visits: list.map(function (v) {
+        var open = st.open === v.i, ipdV = v.type === 'IPD', acts = [];
+        if (v.rx.length) acts.push({ label: 'Copy medicines to today', run: function () { if (typeof self.props.onCopy === 'function') self.props.onCopy(v.rx); self.say(v.rx.length + ' medicine(s) copied to today’s prescription'); } });
+        if (v.tests.length) acts.push({ label: 'Repeat these tests', run: function () { self.say(v.tests.length + ' test(s) added to today’s orders'); } });
+        acts.push({ label: ipdV ? 'Open discharge summary' : 'Open full visit', run: function () { self.say((ipdV ? 'Discharge summary' : 'Visit record') + ' opened in a new tab'); } });
+        return { date: v.d, type: ipdV ? 'IPD' : 'OPD', title: v.title, who: v.who, open: open, chev: open ? 'Hide ▴' : 'Details ▾',
+          toggle: function () { self.setState({ open: open ? -1 : v.i }); },
+          typeStyle: 'font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 6px; background: ' + (ipdV ? '#EADFF8' : '#DCEBFB') + '; color: ' + (ipdV ? '#552F99' : '#164A84'),
+          dot: 'width: 12px; height: 12px; border-radius: 999px; margin-top: 3px; background: ' + (ipdV ? '#6D3FC0' : '#1D5FA8') + '; box-shadow: 0 0 0 3px ' + (ipdV ? '#EADFF8' : '#DCEBFB'),
+          rows: v.rows.map(function (r) { return { label: r[0], text: r[1] }; }),
+          hasTests: v.tests.length > 0, tests: v.tests.map(function (t) { return { name: t[0], value: t[1], style: 'font-weight: 700; color: ' + (t[2] ? '#B42318' : '#146C43') }; }),
+          hasRx: v.rx.length > 0, rx: v.rx, rxLabel: v.rxLabel || 'Medicines', actions: acts };
+      }),
+      empty: list.length === 0, toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

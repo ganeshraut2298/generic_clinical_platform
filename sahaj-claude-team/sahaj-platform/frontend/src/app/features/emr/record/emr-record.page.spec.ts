@@ -69,6 +69,8 @@ describe('EmrRecordPage', () => {
     http.match((req) => req.url.endsWith('/encounter-vitals')).forEach((req) => req.flush({ current: null, earlier: null, sources: { opd: 'NOT_CAPTURED', ipd: 'AVAILABLE', er: 'NOT_CAPTURED' } }));
     http.match((req) => req.url.includes('/allergy-classes')).forEach((req) => req.flush([]));
     http.match((req) => req.url.includes('/medicine-favourites')).forEach((req) => req.flush([]));
+    http.match((req) => req.url.includes('/specialty-reference/')).forEach((req) => req.flush({ profile: 'paeds', tagNote: 't' }));
+    http.match((req) => req.url.endsWith('/specialty-history')).forEach((req) => req.flush({ profile: 'paeds', someHidden: false }));
   }
 
   async function settle(): Promise<void> {
@@ -324,7 +326,9 @@ describe('EmrRecordPage', () => {
 
   describe('two parts (SAH-47-2)', () => {
     it('shows both tabs with subtitles and "n of m required"', async () => {
-      await boot();
+      const view = record();
+      view.specialty = { profile: 'gm', mode: null, tagNote: 't' };
+      await boot(view);
       const tabs = qa('.part');
       expect(tabs).toHaveLength(2);
       expect(tabs[0].textContent).toContain('Assessment');
@@ -371,7 +375,8 @@ describe('EmrRecordPage', () => {
     it('lists both parts in the left list with done over total', async () => {
       await boot();
       const heads = qa('.nav-h').map((h) => h.textContent!.replace(/\s+/g, ' ').trim());
-      expect(heads).toEqual(['1Assessment0/3', '2Treatment0/3']);
+      // The count is of the required sections only (G9): the starter fixture has one required section in each part.
+      expect(heads).toEqual(['1Assessment0/1', '2Treatment0/1']);
       const items = qa('.nav-i').map((i) => i.textContent!.replace(/\s+/g, ' ').trim());
       expect(items[1]).toBe('! Chief complaintsRequired');
     });
@@ -693,7 +698,7 @@ describe('EmrRecordPage', () => {
 
     it('counts the headings with content in the Case paper subtitle while the doctor types', async () => {
       await boot();
-      expect(qa('.rtabs button')[1].textContent!.replace(/s+/g, ' ')).toContain('0 of 10 filled · live');
+      expect(qa('.rtabs button')[1].textContent!.replace(/\s+/g, ' ')).toContain('0 of 10 filled · live');
     });
   });
 
@@ -724,6 +729,70 @@ describe('EmrRecordPage', () => {
       el = fixture.nativeElement as HTMLElement;
       expect(q('[role=alert]')!.textContent).toContain('This patient is in a ward you do not cover.');
       expect(q('[data-act=retry]')).not.toBeNull();
+    });
+  });
+
+  describe('the frame of a drawn department (SAH-75-1, SAH-75-2)', () => {
+    const withProfile = (profile: 'gm' | 'dental' | 'og' | 'paeds' | 'physio' | 'surgery' | 'onco', mode: 'ANC' | 'GYNAE' | null = null): EmrRecordView => {
+      const view = record();
+      view.specialty = { profile, mode, tagNote: 't' };
+      return view;
+    };
+
+    it('General Medicine keeps the "EMR sections" nav with "n of m required done", and the part tabs with their lines', async () => {
+      await boot(withProfile('gm'));
+      expect(q('nav[aria-label="EMR sections"]')).not.toBeNull();
+      expect(q('[data-testid=nav-required]')!.textContent).toContain('required done');
+      expect(qa('.part')[1].textContent).toContain('Diagnosis, medicines, tests and services');
+      expect(tab('Quick tools')).toBeTruthy();
+      expect(q('.layout')!.classList.contains('no-nav')).toBe(false);
+    });
+
+    it('General Medicine names the cards as drawn: "General examination" for Vitals', async () => {
+      await boot(withProfile('gm'));
+      expect(qa('app-section-card h3').map((h) => h.textContent!.trim().replace(' *', ''))[0]).toBe('General examination');
+    });
+
+    it('Dental has no left nav, its part lines, no Quick tools, and the print button "Print estimate"', async () => {
+      await boot(withProfile('dental'));
+      expect(q('nav[aria-label="EMR sections"]')).toBeNull();
+      expect(q('.layout')!.classList.contains('no-nav')).toBe(true);
+      expect(qa('.part')[0].textContent).toContain('Complaints, history, examination, X-rays');
+      expect(qa('[role=tab]').some((t) => t.textContent!.includes('Quick tools'))).toBe(false);
+      expect(q('[data-act=footer-print]')!.textContent!.trim()).toBe('Print estimate');
+    });
+
+    it('Paediatrics is one page with no part tabs, no nav, no badges, a Quick tools tab and "Print vaccination card"', async () => {
+      await boot(withProfile('paeds'));
+      expect(q('.parts')).toBeNull();
+      expect(q('nav[aria-label="EMR sections"]')).toBeNull();
+      expect(q('[data-testid=part-badge]')).toBeNull();
+      expect(tab('Quick tools')).toBeTruthy();
+      expect(q('[data-act=footer-print]')!.textContent!.trim()).toBe('Print vaccination card');
+    });
+
+    it('Oncology counts steps with "n of m done" badges', async () => {
+      await boot(withProfile('onco'));
+      expect(qa('[data-testid=part-badge]').every((b) => /of [0-9]+ done$/.test(b.textContent!.trim()))).toBe(true);
+    });
+
+    it('takes the department accent on the page; the generic screen keeps the app colour', async () => {
+      await boot(withProfile('dental'));
+      expect((fixture.nativeElement as HTMLElement).style.getPropertyValue('--pri')).toBe('#0B6E69');
+    });
+
+    it('gives a generic screen the nav, the part tabs and no accent', async () => {
+      await boot();
+      expect(q('nav[aria-label="EMR sections"]')).not.toBeNull();
+      expect(q('.parts')).not.toBeNull();
+      expect((fixture.nativeElement as HTMLElement).style.getPropertyValue('--pri')).toBe('');
+    });
+
+    it('shows the right-hand tabs with their second lines', async () => {
+      await boot(withProfile('gm'));
+      expect(tab('Past visits').textContent).toContain('OPD + IPD');
+      expect(tab('Case paper').textContent).toContain('of 10 filled · live');
+      expect(tab('Quick tools').textContent).toContain('Helpers for this visit');
     });
   });
 });

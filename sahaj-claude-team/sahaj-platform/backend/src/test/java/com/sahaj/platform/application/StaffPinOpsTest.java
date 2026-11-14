@@ -38,9 +38,10 @@ import org.mockito.ArgumentCaptor;
 /** SAH-31, ADR-010 D5 to D10: the check, the lock, the third-lock switch-off, set, reset and the audit rows. */
 class StaffPinOpsTest {
 
-    private static final UUID TENANT = UUID.randomUUID();
-    private static final UUID USER = UUID.randomUUID();
-    private static final UUID MEMBER = UUID.randomUUID();
+    // Fixed ids: a random UUID can contain the digits of PIN below, which the audit sanitiser then masks (flaky test).
+    private static final UUID TENANT = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a001");
+    private static final UUID USER = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a002");
+    private static final UUID MEMBER = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a003");
     private static final Instant NOW = Instant.parse("2026-11-06T06:00:00Z");
     private static final String JWT_SECRET = "a-jwt-secret-that-is-at-least-32-characters-long";
     private static final String PIN = "4821";
@@ -376,10 +377,10 @@ class StaffPinOpsTest {
 
     // ---- colleague check (SAH-32, ADR-011 D7; SAH-38, ADR-014 D3 to D6) ----
 
-    private static final UUID CALLER_USER = UUID.randomUUID();
-    private static final UUID CALLER_MEMBER = UUID.randomUUID();
-    private static final UUID COLLEAGUE_USER = UUID.randomUUID();
-    private static final UUID COLLEAGUE_MEMBER = UUID.randomUUID();
+    private static final UUID CALLER_USER = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a004");
+    private static final UUID CALLER_MEMBER = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a005");
+    private static final UUID COLLEAGUE_USER = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a006");
+    private static final UUID COLLEAGUE_MEMBER = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a007");
 
     private static TeamRow teamRow(UUID id, UUID userId, String name, MembershipRole role, MembershipStatus status) {
         return new TeamRow(id, userId, name, "9822077411", role, status, null, false, null, null, null, 0L);
@@ -443,7 +444,7 @@ class StaffPinOpsTest {
 
     @Test
     void anIneligibleColleagueIsNotEligibleForEveryReasonAndNoPinRowIsReadOrWritten() {
-        UUID unknown = UUID.randomUUID();
+        UUID unknown = UUID.fromString("a1b2c3d4-0000-4000-8000-00000000a008");
         when(teamRepository.findById(TENANT, unknown)).thenReturn(Optional.empty());
         colleagueSetUp();
 

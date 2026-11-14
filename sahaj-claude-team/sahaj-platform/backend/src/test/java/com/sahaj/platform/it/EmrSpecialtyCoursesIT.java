@@ -277,7 +277,7 @@ class EmrSpecialtyCoursesIT extends EmrSpecialtySupport {
         String otDate = LocalDate.now(IST).plusDays(5).toString();
         Rec ready = readyToBook(rec, "IPD_1_2_DAYS", otDate);
         JsonNode booked = book(ready, key(), 200);
-        assertThat(booked.get("message").asText()).isEqualTo("Laparoscopic cholecystectomy booked for " + otDate + ", OT 2 · 10:00. Ward bed requested.");
+        assertThat(booked.get("message").asText()).isEqualTo("Laparoscopic cholecystectomy booked for " + LocalDate.parse(otDate).format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH)) + ", OT 2 · 10:00. Ward bed requested.");
         assertThat(booked.get("admissionRequested").asBoolean()).isTrue();
         assertThat(booked.get("sittingId").isNull()).isFalse();
         JsonNode course = get(COURSES + "/" + booked.get("courseId").asText(), rec.token());

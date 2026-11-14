@@ -284,6 +284,13 @@ describe('FinishDialogComponent (SAH-51-1, SAH-67-1, SAH-67-2)', () => {
       expect(confirm().textContent!.trim()).toBe('Complete & call next');
     });
 
+    it('Obstetrics: the bullets come before the section rows of "Check before completing" (O8)', () => {
+      boot(withProfile('og'), check({ effects: { profile: ogBlock({ ancVisitNo: 5, gestationalAge: { weeks: 27, days: 1 }, bpSystolic: 124, bpDiastolic: 80, hbGdl: 9.8, nextAncWeeks: 30 }) } }));
+      const bullets = el.querySelector('[data-testid=finish-profile]')!;
+      const rows = el.querySelector('[data-testid=finish-summary]')!;
+      expect(bullets.compareDocumentPosition(rows) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('Paediatrics: weight with its note, vaccines given today and the next due vaccine', () => {
       boot(
         withProfile('paeds'),

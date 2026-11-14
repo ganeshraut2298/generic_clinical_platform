@@ -81,6 +81,15 @@ function fieldText(layout: readonly EmrLayoutSection[], values: Values, sectionK
   return texts.length > 0 ? texts.join(', ') : null;
 }
 
+/**
+ * "Contraception: <method>" as drawn. A layout with the method field (0.7.1, ADR-026 D13) gives its chosen tile only; an older
+ * snapshot without it gives the section's text fields, as before.
+ */
+function contraceptionText(layout: readonly EmrLayoutSection[], values: Values): string | null {
+  const hasMethod = layout.find((s) => s.key === 'contraception')?.fields.some((f) => f.key === 'method') === true;
+  return fieldText(layout, values, 'contraception', hasMethod ? 'method' : undefined);
+}
+
 /** Reads the facts the lines need from what is on screen (the record values and layout). */
 export function recordFacts(layout: readonly EmrLayoutSection[], values: Values): ProfileRecordFacts {
   const medicines: string[] = [];
@@ -107,7 +116,7 @@ export function recordFacts(layout: readonly EmrLayoutSection[], values: Values)
     gynae: {
       cycle: fieldText(layout, values, 'menstrual', 'cycle')?.toLowerCase() ?? null,
       flow: fieldText(layout, values, 'menstrual', 'flow')?.toLowerCase() ?? null,
-      contraception: fieldText(layout, values, 'contraception'),
+      contraception: contraceptionText(layout, values),
       orders: activeTexts(values, 'INVESTIGATIONS'),
     },
   };

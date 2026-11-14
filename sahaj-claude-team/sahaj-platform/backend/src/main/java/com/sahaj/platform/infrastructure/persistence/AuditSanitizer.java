@@ -57,6 +57,9 @@ final class AuditSanitizer {
     /** Values here are numbers that keep their last four digits for an auditor to recognise the row. */
     private static final Set<String> MASK_MARKERS = Set.of("mobile", "phone", "whatsapp", "abha");
 
+    /** The fixed drug allergy classes of {@code opd.emr_allergy_class} (ADR-022 D5): class keys, not clinical text. */
+    private static final Set<String> ALLERGY_CLASS_KEYS = Set.of("SULFA", "PENICILLIN");
+
     private static final Pattern NOT_ALPHANUMERIC = Pattern.compile("[^a-z0-9]");
     private static final Pattern TEN_DIGIT_RUN = Pattern.compile("\\d{10}");
     private static final Pattern UUID_TEXT = Pattern.compile(
@@ -101,7 +104,7 @@ final class AuditSanitizer {
             return null;
         }
         if (isPinStateLabel(normalizedKey, value) || isRecordedFlag(normalizedKey, value)
-                || isBodyMapPinNumber(normalizedKey, value)) {
+                || isBodyMapPinNumber(normalizedKey, value) || isAllergyClassKey(normalizedKey, value)) {
             return value;
         }
         if (containsAny(normalizedKey, fullRedactMarkers)) {
@@ -167,6 +170,28 @@ final class AuditSanitizer {
      */
     private static boolean isBodyMapPinNumber(String normalizedKey, Object value) {
         return "pinno".equals(normalizedKey) && value instanceof Integer number && number >= 1 && number <= 60;
+    }
+
+    /**
+     * B-1 (SAH-43 QA run): the audit row {@code EMR_ALLERGY_ALERT_REVIEWED} carries {@code allergyClass}, the drug allergy
+     * class a doctor reviewed (a key of the fixed set in {@code opd.emr_allergy_class}, for example SULFA). The key contains
+     * "allergy", so it would be redacted like allergy text. Only this exact normalised key, holding a class key or a
+     * non-empty list of class keys from {@link #ALLERGY_CLASS_KEYS}, is kept. Any other value under it (free text, a
+     * lower-cased or unknown name) and every other key containing "allergy" is still replaced. A new class is a clinical
+     * decision and a migration, and this set changes with it.
+     */
+    private static boolean isAllergyClassKey(String normalizedKey, Object value) {
+        if (!"allergyclass".equals(normalizedKey)) {
+            return false;
+        }
+        if (value instanceof String key) {
+            return ALLERGY_CLASS_KEYS.contains(key);
+        }
+        if (value instanceof List<?> keys) {
+            return !keys.isEmpty()
+                    && keys.stream().allMatch(k -> k instanceof String key && ALLERGY_CLASS_KEYS.contains(key));
+        }
+        return false;
     }
 
     /**

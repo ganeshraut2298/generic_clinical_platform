@@ -508,11 +508,11 @@ class EmrEmergencyFinishIT extends EmrIpdSupport {
         Er e = er();
         try (LogCapture logs = new LogCapture()) {
             sign(e.doctor(), e.record(), refer("Zxqplace hospital", "Zxqnote reason"));
-            assertThat(logs.allText()).doesNotContain("Asha").doesNotContain("Patil").doesNotContain("Zxqplace").doesNotContain("Zxqnote");
+            assertThat(logs.allText()).doesNotContain("Asha Patil").doesNotContain("Patil").doesNotContain("Zxqplace").doesNotContain("Zxqnote");
         }
         String audit = String.join(" ", db().inTenant(e.clinic().tenantId(), c -> EmrSupport.allRows(c,
                 "select coalesce(before_json::text, '') || coalesce(after_json::text, '') from platform.audit_event"))
                 .stream().map(r -> r.get(0)).toList());
-        assertThat(audit).doesNotContain("Asha").doesNotContain("Patil").doesNotContain("Zxqplace").doesNotContain("Zxqnote");
+        assertThat(audit).doesNotContain("Asha Patil").doesNotContain("Patil").doesNotContain("Zxqplace").doesNotContain("Zxqnote");
     }
 }

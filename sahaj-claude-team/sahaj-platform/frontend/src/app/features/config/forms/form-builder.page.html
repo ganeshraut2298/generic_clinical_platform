@@ -40,7 +40,7 @@
           }
         </div>
         @if (store.canEdit()) {
-          <button mat-stroked-button type="button" data-act="save-draft" [disabled]="store.busy() !== null || !store.dirty()" (click)="store.save()">
+          <button mat-stroked-button type="button" data-act="save-draft" [attr.aria-busy]="store.busy() !== null" (click)="store.save()">
             {{ store.busy() === 'save' ? 'Saving' : 'Save draft' }}
           </button>
           <button mat-flat-button type="button" data-act="publish" [disabled]="store.busy() !== null || store.retired()" (click)="store.publishOrSubmit()">

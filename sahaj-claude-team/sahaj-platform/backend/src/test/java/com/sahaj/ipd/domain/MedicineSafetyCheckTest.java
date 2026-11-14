@@ -50,6 +50,31 @@ class MedicineSafetyCheckTest {
     }
 
     @Test
+    void everyNoneWordOfTheSharedListGivesTheGreenChipSoNoKnownAllergyWrittenAtSignIsNoAllergy() {
+        for (String word : new String[] {"none", "nil", "nka", "nkda", "none known", "no known allergy",
+            "no known allergies", "no known drug allergy", "no known drug allergies", "No known allergy",
+            "  NKDA.  ", "No Known Drug Allergies."}) {
+            assertThat(MedicineSafetyCheck.allergyStatus(word)).as(word).isEqualTo(AllergyStatus.NONE_KNOWN);
+        }
+    }
+
+    @Test
+    void aNoneWordNeverHidesARealAllergyOrAnythingBeyondTheWholeText() {
+        assertThat(MedicineSafetyCheck.allergyStatus("Penicillin, no known allergy otherwise"))
+                .isEqualTo(AllergyStatus.RECORDED);
+        assertThat(MedicineSafetyCheck.allergyStatus("Dust; no known drug allergy")).isEqualTo(AllergyStatus.RECORDED);
+        assertThat(MedicineSafetyCheck.allergyStatus("none of the usual")).isEqualTo(AllergyStatus.RECORDED);
+    }
+
+    @Test
+    void noKnownAllergyRaisesNoAllergyFindingAndNoNotRecordedWarning() {
+        OrderCheck check = check("amox", "No known allergy");
+        assertThat(check.allergyStatus()).isEqualTo(AllergyStatus.NONE_KNOWN);
+        assertThat(check.hardStops()).isEmpty();
+        assertThat(check.warnings()).extracting(Finding::code).doesNotContain(FindingCode.ALLERGIES_NOT_RECORDED);
+    }
+
+    @Test
     void anEmptyBlankOrNotRecordedTextGivesAllergiesNotRecorded() {
         assertThat(MedicineSafetyCheck.allergyStatus(null)).isEqualTo(AllergyStatus.NOT_RECORDED);
         assertThat(MedicineSafetyCheck.allergyStatus("")).isEqualTo(AllergyStatus.NOT_RECORDED);

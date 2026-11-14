@@ -133,7 +133,7 @@ class EmrFinishCheckIT extends EmrSignSupport {
         Clinic clinic = newClinic();
         Staff doctor = addDoctor(clinic, "General physician");
         Rec rec = fillRequired(startRecord(clinic, doctor, patientWith(clinic, "Test Patient Two", "Sulfa drugs", null)));
-        rec = save(rec, rxSection(rxRow(medicineId(SULFA_MEDICINE), SULFA_MEDICINE, "1-0-1", 3, "AFTER_FOOD")));
+        rec = save(rec, allergySection("SULFA"), rxSection(rxRow(medicineId(SULFA_MEDICINE), SULFA_MEDICINE, "1-0-1", 3, "AFTER_FOOD")));
         JsonNode check = check(rec);
         assertThat(check.get("ready").asBoolean()).isFalse();
         assertThat(blocker(check, "ALLERGY_ALERT").get("message").asText())
@@ -155,7 +155,8 @@ class EmrFinishCheckIT extends EmrSignSupport {
         assertThat(effects.get("billLines")).hasSize(1);
         JsonNode line = effects.get("billLines").get(0);
         assertThat(line.get("qty").asInt()).isEqualTo(2);
-        assertThat(line.get("amountPaise").asLong()).isEqualTo(15000L);
+        assertThat(line.get("unitPaise").asLong()).as("the price of one").isEqualTo(15000L);
+        assertThat(line.get("amountPaise").asLong()).as("qty x unit price (DEC-051 D4)").isEqualTo(30000L);
         assertThat(line.get("state").asText()).as("the line was made when the service was ticked").isEqualTo("ON_BILL");
         assertThat(effects.get("billTotalPaise").asLong()).isEqualTo(30000L);
     }
@@ -173,14 +174,17 @@ class EmrFinishCheckIT extends EmrSignSupport {
 
     @Test
     void anotherDoctorAndAVisitingDoctorAreRefusedOnSomeoneElsesPatientAndTheOwnerWithDoctorDetailsIsNot() throws Exception {
-        Rec rec = readyRec();
+        Clinic bare = newClinic(true, false);
+        Rec rec = fillRequired(startRecord(bare, addDoctor(bare, "General physician")));
         Staff other = addDoctor(rec.clinic(), "Dentist");
         Staff visiting = addStaff(rec.clinic(), "VISITING_DOCTOR", "Dr Visiting Person", "Dentist", "BDS", "REG-" + shortId());
         problemOf(HttpMethod.POST, checkPath(rec.id()), other.token(rec.clinic()), "{}", 403, "not-own-patient");
         problemOf(HttpMethod.POST, checkPath(rec.id()), visiting.token(rec.clinic()), "{}", 403, "not-own-patient");
         problemOf(HttpMethod.POST, checkPath(rec.id()), rec.clinic().owner(), "{}", 403, "doctor-details-missing");
         ownerWithDoctorDetails(rec.clinic(), "General physician", "MBBS", "REG-" + shortId());
-        assertThat(post(checkPath(rec.id()), rec.clinic().owner(), "{}", 200).get("ready").asBoolean()).isTrue();
+        JsonNode ownerCheck = post(checkPath(rec.id()), rec.clinic().owner(), "{}", 200); // not 403: the owner with doctor details may ask
+        assertThat(texts(ownerCheck.get("blockers"), "key")).as("the record is open for editing by its doctor, so the owner is told so")
+                .doesNotContain("STILL_NEEDED").contains("HELD_BY_OTHER");
     }
 
     @Test

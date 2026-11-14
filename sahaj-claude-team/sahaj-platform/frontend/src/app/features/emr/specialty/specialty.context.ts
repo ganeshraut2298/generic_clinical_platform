@@ -103,6 +103,17 @@ export class SpecialtyContext {
     });
   }
 
+  /** The print of the card that owns the footer print button (set while that card is on screen). */
+  readonly footerPrintHandler = signal<(() => void) | null>(null);
+  registerFooterPrint(run: () => void): () => void {
+    this.footerPrintHandler.set(run);
+    return () => {
+      if (this.footerPrintHandler() === run) {
+        this.footerPrintHandler.set(null);
+      }
+    };
+  }
+
   readonly reference = signal<EmrSpecialtyReference | null>(null);
   readonly referenceError = signal<string | null>(null);
   readonly history = signal<EmrSpecialtyHistory | null>(null);

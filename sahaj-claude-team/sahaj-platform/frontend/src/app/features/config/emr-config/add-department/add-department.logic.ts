@@ -27,9 +27,17 @@ export function turnedOffLine(names: readonly string[]): string | null {
   return `Turned off by default: ${list}. You can switch them back on.`;
 }
 
+/** Names the design adds in brackets on the Template preview (AddDepartment.dc.html, Physiotherapy). */
+const PREVIEW_NAMES: Readonly<Record<string, string>> = {
+  pain: 'Pain assessment (VAS / NPRS)',
+  mmt: 'Manual muscle testing (Oxford 0–5)',
+  func_scales: 'Outcome scales (ODI, NDI, WOMAC)',
+  modalities: 'Treatment modalities (IFT, TENS, US)',
+};
+
 /** Names on the Template preview: the starter's Specialty sections, as the mockup lists them. */
 export function previewSections(detail: Pick<EmrStarterDetail, 'sections'>): string[] {
-  return detail.sections.filter((s) => s.kind === 'SPECIALTY').map((s) => s.name);
+  return detail.sections.filter((s) => s.kind === 'SPECIALTY').map((s) => PREVIEW_NAMES[s.key] ?? s.name);
 }
 
 export function sameChoice(a: SourceChoice | null, b: SourceChoice | null): boolean {

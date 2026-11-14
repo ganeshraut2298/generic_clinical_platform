@@ -224,7 +224,7 @@
                     <span class="badge-mlc">MLC</span>
                   }
                 </td>
-                <td>{{ findingLabel(p.finding).toLowerCase() }} · {{ severityLabel(p.severity).toLowerCase() }}</td>
+                <td>{{ findingLabel(p.finding) }} · {{ severityLabel(p.severity).toLowerCase() }}</td>
                 <td>{{ causeLabel(p.cause) }}{{ p.note ? ' — ' + p.note : '' }}</td>
                 <td>{{ registerSize(p.sizeCm) }}</td>
                 <td class="faint">{{ recorded(p) }}</td>

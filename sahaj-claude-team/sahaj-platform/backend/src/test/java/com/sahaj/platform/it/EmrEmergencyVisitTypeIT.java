@@ -35,7 +35,12 @@ class EmrEmergencyVisitTypeIT extends EmrSignSupport {
     }
 
     private Ctx ctx() throws Exception {
-        Clinic clinic = newClinic();
+        return ctx(true);
+    }
+
+    /** {@code ownerIsDoctor} false: the owner has no doctor details (the setup wizard gives the owner a doctor profile). */
+    private Ctx ctx(boolean ownerIsDoctor) throws Exception {
+        Clinic clinic = newClinic(true, ownerIsDoctor);
         Staff doctor = addDoctor(clinic, "General physician");
         return new Ctx(clinic, doctor, issueVisit(clinic, doctor.membershipId()).get("id").asText());
     }
@@ -60,7 +65,7 @@ class EmrEmergencyVisitTypeIT extends EmrSignSupport {
 
     @Test
     void onlyTheDoctorsAndTheOwnerWithDoctorDetailsReadTheLevels() throws Exception {
-        Ctx c = ctx();
+        Ctx c = ctx(false);
         for (String role : NOT_DOCTOR_ROLES) {
             problemOf(HttpMethod.GET, TRIAGE, addNonDoctor(c.clinic(), role).token(c.clinic()), null, 403, "forbidden");
         }
@@ -178,7 +183,9 @@ class EmrEmergencyVisitTypeIT extends EmrSignSupport {
         assertThat(asNew.get("feeChange").get("outcome").asText()).isEqualTo(followUpFee == 25000L ? "UNCHANGED" : "UPDATED");
         assertThat(row(clinic, "select fee_paise::text from opd.visit where id = ?::uuid", id)).containsExactly("25000");
         // a payment on the bill: the type changes, the fee does not
-        ok(HttpMethod.POST, BILLING + "/bills/" + id + "/payments", clinic.owner(), "{\"mode\":\"CASH\",\"amountPaise\":25000}", 200);
+        moveVisitToBilling(clinic, id); // a payment is only taken while the visit is awaiting payment
+        org.springframework.mock.web.MockHttpServletResponse paidNow = call(HttpMethod.POST, BILLING + "/bills/" + id + "/payments", clinic.owner(), "{\"mode\":\"CASH\",\"amountPaise\":25000}").andReturn().getResponse();
+        assertThat(paidNow.getStatus()).as("the payment: " + paidNow.getContentAsString()).isEqualTo(200);
         JsonNode paid = ok(HttpMethod.PATCH, url(id), doctor.token(clinic), type("FOLLOW_UP"), 200);
         assertThat(paid.get("visitType").asText()).isEqualTo("FOLLOW_UP");
         assertThat(paid.get("feePaise").asLong()).isEqualTo(25000L);

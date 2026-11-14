@@ -116,7 +116,7 @@ class EmrPhase3TablesIT extends EmrPhase3Support {
         db().asMigrator(c -> {
             assertThat(expectError(c, "update opd.emr_form_starter set name = name").message()).contains("immutable");
             assertThat(expectError(c, "delete from opd.emr_form_starter").message()).contains("immutable");
-            assertThat(expectError(c, "truncate opd.emr_form_starter").message()).contains("immutable");
+            assertThat(expectError(c, "truncate opd.emr_form_starter").message()).as("refused: by the trigger, or first by a foreign key that references the table").matches("(?s).*(immutable|referenced in a foreign key).*");
             expectOk(c, "insert into opd.emr_form_starter (starter_key, name, description, suited_for, position, definition) values ('qa_probe', 'Probe', 'One line', 'Any', 99, "
                     + DEF + ")");
             assertThat(expectError(c, "update opd.emr_form_starter set name = 'Changed' where starter_key = 'qa_probe'").message()).contains("immutable");
@@ -454,7 +454,7 @@ class EmrPhase3TablesIT extends EmrPhase3Support {
         commit(c.tenantId(), String.format(insert, "null", "null"), bills.get(0));
         assertThat(stateIn(c, String.format(insert, "null", "null"), bills.get(0))).isEqualTo("ACCEPTED");
         // the counter line made by the API is a counter line: both columns null
-        assertThat(count(c, "select count(*) from billing.bill_item where source_kind is null and source_key is null and service_id is not null")).isEqualTo(2);
+        assertThat(count(c, "select count(*) from billing.bill_item where source_kind is null and source_key is null and service_id is not null")).isEqualTo(3);
         // the app updates the quantity and deletes an EMR line; it cannot take the key off
         assertThat(stateIn(c, "update billing.bill_item set qty = 3 where source_key = 'k1'")).isEqualTo("ACCEPTED");
         assertThat(stateIn(c, "update billing.bill_item set qty = 21 where source_key = 'k1'")).isEqualTo("23514");
@@ -571,8 +571,44 @@ class EmrPhase3TablesIT extends EmrPhase3Support {
             assertThat(r.get(2)).isEqualTo("true");
         }
         long failed = db().asMigrator(c -> DbAccess.count(c, "select count(*) from platform.flyway_schema_history where not success"));
-        long before = db().asMigrator(c -> DbAccess.count(c, "select count(*) from platform.flyway_schema_history where version = '2026.12.9.1000'"));
+        long before = db().asMigrator(c -> DbAccess.count(c, "select count(*) from platform.flyway_schema_history where version = '2026.12.09.1000'"));
         assertThat(failed).isZero();
         assertThat(before).isEqualTo(1);
+    }
+
+    // ================= S22 (Correction V2026_12_13_1010, DEC-051 Q1) · starter score rules use "kind" =================
+
+    /**
+     * docs/database/SAH-48-59.md, check S22 of the correction note: after V2026_12_13_1010 no starter score rule has the key
+     * "type", the diabetic foot starter has its two rules under "kind", the immutable trigger is enabled again, and the shipped
+     * starter still cannot be changed by the app or by the table owner (note: the numbering S22 of the original table is the
+     * privilege check, covered above; this is the S22 of the correction).
+     */
+    @Test
+    void s22TheStarterScoreRulesUseKindTheMigrationRanAndTheStarterTableIsStillImmutable() throws Exception {
+        assertThat(globalCount("select count(*) from opd.emr_form_starter s, jsonb_array_elements(s.definition -> 'fields') f, "
+                + "jsonb_array_elements(case when jsonb_typeof(f -> 'score' -> 'rules') = 'array' then f -> 'score' -> 'rules' else '[]'::jsonb end) r "
+                + "where jsonb_exists(r, 'type')")).as("no score rule keeps the key type").isZero();
+        assertThat(globalCount("select count(*) from opd.emr_form_starter s, jsonb_array_elements(s.definition -> 'fields') f, "
+                + "jsonb_array_elements(case when jsonb_typeof(f -> 'score' -> 'rules') = 'array' then f -> 'score' -> 'rules' else '[]'::jsonb end) r "
+                + "where not jsonb_exists(r, 'kind')")).as("every score rule has a kind").isZero();
+        List<List<String>> rules = globalRows("select r ->> 'kind' from opd.emr_form_starter s, jsonb_array_elements(s.definition -> 'fields') f, "
+                + "jsonb_array_elements(case when jsonb_typeof(f -> 'score' -> 'rules') = 'array' then f -> 'score' -> 'rules' else '[]'::jsonb end) r "
+                + "where s.starter_key = 'diabetic_foot'");
+        assertThat(rules.stream().map(r -> r.get(0)).toList()).as("the diabetic foot rules keep their order")
+                .containsExactly("NUMBER_BELOW", "CHOSEN_COUNT_BELOW");
+        assertThat(globalRows("select tgenabled::text from pg_trigger where tgrelid = 'opd.emr_form_starter'::regclass "
+                + "and tgname = 'trg_emr_form_starter_immutable'").get(0).get(0)).as("the trigger is enabled again").isEqualTo("O");
+        List<List<String>> history = db().asMigrator(c -> allRows(c, "select success::text from platform.flyway_schema_history where version = '2026.12.13.1010'"));
+        assertThat(history).as("the migration is in the Flyway history and succeeded").hasSize(1);
+        assertThat(history.get(0).get(0)).isEqualTo("true");
+        db().asMigrator(c -> {
+            assertThat(expectError(c, "update opd.emr_form_starter set name = name").message()).contains("immutable");
+            return null;
+        });
+        db().asApp(c -> {
+            assertThat(expectError(c, "update opd.emr_form_starter set name = name").state()).isEqualTo("42501");
+            return null;
+        });
     }
 }

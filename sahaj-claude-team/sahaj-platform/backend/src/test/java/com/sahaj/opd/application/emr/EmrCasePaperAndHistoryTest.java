@@ -278,4 +278,83 @@ class EmrCasePaperAndHistoryTest {
         assertThat(EmrHistoryService.render(json("{\"component\":\"EMR_LIST\",\"items\":[{\"text\":\"A\",\"active\":false},"
                 + "{\"text\":\"B\",\"active\":true}]}"))).isEqualTo("B");
     }
+
+    // ---- SAH-75-6 and SAH-75-8 (ADR-026 D6, D10) ----
+
+    @Test
+    void theDentalAssessmentCardsGoUnderTheHeadingsOfTheDesign() {
+        assertThat(EmrCasePaperService.headingOf("dental_medhx")).isEqualTo("MEDICAL_HISTORY");
+        assertThat(EmrCasePaperService.headingOf("dental_hx")).isEqualTo("MEDICAL_HISTORY");
+        assertThat(EmrCasePaperService.headingOf("dental_xray")).isEqualTo("INVESTIGATIONS");
+        for (String key : List.of("dental_pain", "dental_extraoral", "dental_intraoral", "local_exam")) {
+            assertThat(EmrCasePaperService.headingOf(key)).as(key).isEqualTo("EXAMINATION");
+        }
+    }
+
+    @Test
+    void theMedicinesHeadingIsMedicinesDischargeMedicinesOrTakeHomeMedicines() {
+        assertThat(EmrHistoryService.headingOf("OPD", false)).isEqualTo("MEDICINES");
+        assertThat(EmrHistoryService.headingOf("OPD", true)).isEqualTo("TAKE_HOME_MEDICINES");
+        assertThat(EmrHistoryService.headingOf("IPD_ROUND", false)).isEqualTo("DISCHARGE_MEDICINES");
+        assertThat(EmrHistoryService.headingOf("IPD", false)).isEqualTo("DISCHARGE_MEDICINES");
+        assertThat(EmrHistoryService.headingOf("IPD_ROUND", true)).isEqualTo("DISCHARGE_MEDICINES");
+    }
+
+    private EmrHistoryService.PastVisitDetail detailOf(String starter, String kind, String type, boolean sentOrder,
+                                                       boolean withChemoOrders) {
+        UUID past = UUID.randomUUID();
+        when(records.authorize(DOCTOR, RECORD)).thenReturn(new Authorized(new TeamMember(MEMBER, "Dr", "DOCTOR", true, 0),
+                row(RECORD, "OPD_VISIT", "DRAFT", NOW, "{}"), PATIENT));
+        RecordRow signed = new RecordRow(past, type, UUID.randomUUID(), null, null, null, PATIENT, MEMBER, starter,
+                "Dept", starter, "STARTER_LAYOUT", null, 1, "X", "SIGNED", NOW, signedDoc(), "ASSESSMENT", null, false,
+                null, 1, NOW);
+        when(repository.findById(TENANT, past)).thenReturn(Optional.of(signed));
+        com.sahaj.opd.application.emr.specialty.ChemoOrderRepository chemo = mock(
+                com.sahaj.opd.application.emr.specialty.ChemoOrderRepository.class);
+        com.sahaj.opd.application.emr.specialty.ChemoOrderRow order = new com.sahaj.opd.application.emr.specialty.ChemoOrderRow();
+        order.status = sentOrder ? "SENT" : "DRAFT";
+        when(chemo.findByRecord(TENANT, past)).thenReturn(Optional.of(order));
+        EmrHistoryService service = withChemoOrders
+                ? new EmrHistoryService(records, repository, mock(PatientIpdHistorySource.class),
+                        mock(PatientClinicalPort.class), team, EmrTestData.MAPPER, null, chemo)
+                : history(mock(PatientIpdHistorySource.class), mock(PatientClinicalPort.class));
+        return service.detail(DOCTOR, RECORD, kind, past);
+    }
+
+    @Test
+    void anOncologyVisitWithASentChemotherapyOrderTitlesItsMedicinesTakeHome() {
+        assertThat(detailOf("onco", "OPD", "OPD_VISIT", true, true).medicinesHeading()).isEqualTo("TAKE_HOME_MEDICINES");
+    }
+
+    @Test
+    void aDraftOrNoOrderAnotherDepartmentOrNoOrderRepositoryKeepsTheHeadingMedicines() {
+        assertThat(detailOf("onco", "OPD", "OPD_VISIT", false, true).medicinesHeading()).isEqualTo("MEDICINES");
+        assertThat(detailOf("gm", "OPD", "OPD_VISIT", true, true).medicinesHeading()).isEqualTo("MEDICINES");
+        assertThat(detailOf("onco", "OPD", "OPD_VISIT", true, false).medicinesHeading()).isEqualTo("MEDICINES");
+    }
+
+    @Test
+    void anIpdRoundRowShowsDischargeMedicines() {
+        assertThat(detailOf("gm", "IPD_ROUND", "IPD_ROUND", false, true).medicinesHeading())
+                .isEqualTo("DISCHARGE_MEDICINES");
+    }
+
+    @Test
+    void anUnsignedPastVisitKeepsTheHeadingOfItsKind() {
+        UUID draft = UUID.randomUUID();
+        when(records.authorize(DOCTOR, RECORD)).thenReturn(new Authorized(new TeamMember(MEMBER, "Dr", "DOCTOR", true, 0),
+                row(RECORD, "OPD_VISIT", "DRAFT", NOW, "{}"), PATIENT));
+        when(repository.findById(TENANT, draft)).thenReturn(Optional.of(row(draft, "OPD_VISIT", "DRAFT", NOW, "{}")));
+
+        assertThat(history(mock(PatientIpdHistorySource.class), mock(PatientClinicalPort.class))
+                .detail(DOCTOR, RECORD, "OPD", draft).medicinesHeading()).isEqualTo("MEDICINES");
+    }
+
+    @Test
+    void theOldElevenArgumentDetailReadsMedicines() {
+        EmrHistoryService.PastVisitDetail old = new EmrHistoryService.PastVisitDetail("OPD", UUID.randomUUID(), true,
+                List.of(), List.of(), List.of(), List.of(), false, false, null, null);
+
+        assertThat(old.medicinesHeading()).isEqualTo("MEDICINES");
+    }
 }

@@ -13,8 +13,16 @@ import java.util.UUID;
  */
 public interface CourseAdmissionSource {
 
-    /** {@code status} is ADMITTED or DISCHARGED; {@code billTotalPaise} the running bill, or the final bill once discharged. */
-    record CourseAdmission(UUID admissionId, String ipNumber, String status, long billTotalPaise) {
+    /**
+     * {@code status} is ADMITTED or DISCHARGED; {@code billTotalPaise} the running bill, or the final bill once discharged;
+     * {@code bedLabel} the code of the bed the patient is in (or was in), null when unknown. Never logged.
+     */
+    record CourseAdmission(UUID admissionId, String ipNumber, String status, long billTotalPaise, String bedLabel) {
+
+        /** Without a bed label (0.7.0 adds it, SAH-75-11 O2-2: the oncology order sheet line "Day-care bed <n>"). */
+        public CourseAdmission(UUID admissionId, String ipNumber, String status, long billTotalPaise) {
+            this(admissionId, ipNumber, status, billTotalPaise, null);
+        }
     }
 
     /** The facts of these admissions, keyed by admission id. */

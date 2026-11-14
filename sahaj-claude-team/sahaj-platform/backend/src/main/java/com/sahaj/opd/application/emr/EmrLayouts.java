@@ -303,13 +303,85 @@ public class EmrLayouts {
         return withLiveForms(tenantId, department, libraryBase(tenantId, department), false);
     }
 
-    /** The library sections only (the department's latest version, else its starter, else blank), forms as stored. */
+    /**
+     * The library sections only, forms as stored (ADR-026 D2, the union rule): the latest version's sections plus the
+     * sections of the current starter layout that the version lacks (placed at their starter position, offered hidden and
+     * not required because doctors have a published version and see nothing new until the owner shows it); a department
+     * never published has the current starter layout, else the blank layout.
+     */
     private List<LayoutSection> libraryBase(UUID tenantId, Department department) {
         Optional<VersionRow> latest = latestVersion(tenantId, department);
         if (latest.isPresent()) {
-            return json.readLayout(latest.get().layout());
+            List<LayoutSection> version = json.readLayout(latest.get().layout());
+            return department.starterKey() == null ? version
+                    : withStarterSections(version, starterLayout(department.starterKey()));
         }
         return department.starterKey() != null ? starterLayout(department.starterKey()) : blankLayout();
+    }
+
+    /** The sections with the starter's sections they lack added as hidden, not required rows at their starter position. */
+    static List<LayoutSection> withStarterSections(List<LayoutSection> sections, List<LayoutSection> starter) {
+        List<LayoutSection> merged = insertMissing(sections, starter, LayoutSection::key, EmrLayouts::offered);
+        List<LayoutSection> numbered = new ArrayList<>();
+        int position = 1;
+        for (LayoutSection section : merged) {
+            numbered.add(section.position() == position ? section : section.withSettings(section.settings(), position));
+            position++;
+        }
+        return List.copyOf(numbered);
+    }
+
+    /** A starter section as a published department is offered it: the starter's settings, but hidden and optional. */
+    private static LayoutSection offered(LayoutSection starter) {
+        if (starter.hideLocked()) {
+            return starter;
+        }
+        SectionSettings s = starter.settings();
+        return starter.withSettings(new SectionSettings(s.key(), s.part(), false, false, s.print(), s.copy(),
+                s.collapsed(), s.whoCanFill()), starter.position());
+    }
+
+    /**
+     * {@code present} plus every {@code reference} section it lacks, each placed straight after the nearest earlier
+     * reference section that is present (else before the nearest later one, else at the end); the missing item is made
+     * by {@code make}. Order of the items already present is never changed.
+     */
+    static <T> List<T> insertMissing(List<T> present, List<LayoutSection> reference,
+                                     java.util.function.Function<T, String> keyOf,
+                                     java.util.function.Function<LayoutSection, T> make) {
+        List<T> result = new ArrayList<>(present);
+        Set<String> keys = new java.util.HashSet<>();
+        for (T item : present) {
+            keys.add(keyOf.apply(item));
+        }
+        for (int i = 0; i < reference.size(); i++) {
+            LayoutSection missing = reference.get(i);
+            if (keys.contains(missing.key())) {
+                continue;
+            }
+            int at = -1;
+            for (int j = i - 1; j >= 0 && at < 0; j--) {
+                at = indexOf(result, reference.get(j).key(), keyOf);
+                if (at >= 0) {
+                    at = at + 1;
+                }
+            }
+            for (int j = i + 1; j < reference.size() && at < 0; j++) {
+                at = indexOf(result, reference.get(j).key(), keyOf);
+            }
+            result.add(at < 0 ? result.size() : at, make.apply(missing));
+            keys.add(missing.key());
+        }
+        return result;
+    }
+
+    private static <T> int indexOf(List<T> items, String key, java.util.function.Function<T, String> keyOf) {
+        for (int i = 0; i < items.size(); i++) {
+            if (keyOf.apply(items.get(i)).equals(key)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private Optional<VersionRow> latestVersion(UUID tenantId, Department department) {
@@ -353,13 +425,21 @@ public class EmrLayouts {
         Optional<List<SectionSettings>> draft = draft(department);
         if (draft.isPresent()) {
             List<LayoutSection> base = base(tenantId, department);
-            return new Working("DRAFT", EmrLayoutRules.apply(reconcileForms(draft.get(), base), base));
+            // ADR-026 D2: a section of today's set that the draft lacks (a starter section added since) is added at
+            // its position with the settings the base gives it.
+            List<SectionSettings> reconciled = insertMissing(reconcileForms(draft.get(), base), base,
+                    SectionSettings::key, LayoutSection::settings);
+            return new Working("DRAFT", EmrLayoutRules.apply(reconciled, base));
         }
         Optional<Published> published = published(tenantId, department);
         if (published.isPresent()) {
             // The configurator lists a form as settings only; the definition is for doctors and records.
-            return new Working(published.get().layoutSource(), published.get().sections().stream()
-                    .map(s -> s.formSection() ? s.withForm(s.name(), null, null) : s).toList());
+            List<LayoutSection> sections = published.get().sections().stream()
+                    .map(s -> s.formSection() ? s.withForm(s.name(), null, null) : s).toList();
+            if ("PUBLISHED".equals(published.get().layoutSource()) && department.starterKey() != null) {
+                sections = withStarterSections(sections, starterLayout(department.starterKey()));
+            }
+            return new Working(published.get().layoutSource(), sections);
         }
         return new Working("STARTER", base(tenantId, department));
     }

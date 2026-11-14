@@ -213,7 +213,7 @@ describe('PastVisitsPanelComponent (SAH-50)', () => {
       const detailEl = q('[data-testid=visit-detail]')!;
       expect(detailEl.textContent).toContain('Complaints');
       expect(detailEl.textContent).toContain('Telmisartan 40 mg · 1-0-0 · 30 days · After food');
-      expect(detailEl.querySelector('.abn')!.textContent).toContain('8.1 % · Abnormal');
+      expect(detailEl.querySelector('.abn')!.textContent).toContain('8.1 %');
       expect(qa('.res')[1].textContent).not.toContain('Abnormal');
       expect(q('.chev')!.textContent).toBe('Hide ▴');
       qa('[data-act=toggle-visit]')[1].click();

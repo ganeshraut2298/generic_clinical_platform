@@ -531,6 +531,70 @@ class ChemoOrderServiceTest {
                 .satisfies(e -> assertThat(problem(e)).isEqualTo("chemo-order-changed"));
     }
 
+    // ---- SAH-75-7 (ADR-026 D7): a sent order sets the regimen of the cycle sitting linked to the visit ----
+
+    private static com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow linkedCycle(String regimen,
+                                                                                                    Instant removedAt) {
+        return new com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow(UUID.randomUUID(), UUID.randomUUID(),
+                2, "DAY_CARE", "CHEMO_CYCLE", null, List.of(), 0, null, VISIT, null, true, null, null, null, removedAt,
+                null, regimen);
+    }
+
+    private com.sahaj.opd.application.course.TreatmentCourseRepository.CourseRow courseOf(String kind) {
+        return new com.sahaj.opd.application.course.TreatmentCourseRepository.CourseRow(UUID.randomUUID(), 4, PATIENT, kind,
+                "CYCLE", "Course", null, DOCTOR_M, java.time.LocalDate.parse("2026-10-01"), "ACTIVE", 0, "h", NOW);
+    }
+
+    private void sendWithLinkedSitting(com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow sitting,
+                                       String courseKind) {
+        when(courses.sittingByVisit(TENANT, VISIT)).thenReturn(Optional.of(sitting));
+        when(courses.find(TENANT, sitting.courseId())).thenReturn(Optional.of(courseOf(courseKind)));
+        ObjectNode view = confirmedOrder();
+        service.send(DOCTOR, RECORD, new ActionInput(stored().revision, view.path("fingerprint").asText()));
+    }
+
+    @Test
+    void sendingTheOrderSetsTheRegimenOfTheLinkedCycleWhenItHasNone() {
+        var sitting = linkedCycle(null, null);
+
+        sendWithLinkedSitting(sitting, "CHEMO");
+
+        verify(courses).setRegimenIfEmpty(TENANT, sitting.id(), "AC", DOCTOR_USER);
+        verify(courses).bumpRevision(TENANT, sitting.courseId(), DOCTOR_USER);
+    }
+
+    @Test
+    void aCycleThatAlreadyHasARegimenIsLeftAlone() {
+        sendWithLinkedSitting(linkedCycle("TC", null), "CHEMO");
+
+        verify(courses, org.mockito.Mockito.never()).setRegimenIfEmpty(any(), any(), any(), any());
+    }
+
+    @Test
+    void aRemovedLinkedSittingIsLeftAlone() {
+        sendWithLinkedSitting(linkedCycle(null, NOW), "CHEMO");
+
+        verify(courses, org.mockito.Mockito.never()).setRegimenIfEmpty(any(), any(), any(), any());
+    }
+
+    @Test
+    void aSittingOfAnotherKindOfCourseIsLeftAlone() {
+        sendWithLinkedSitting(linkedCycle(null, null), "SURGERY");
+
+        verify(courses, org.mockito.Mockito.never()).setRegimenIfEmpty(any(), any(), any(), any());
+    }
+
+    @Test
+    void anOrderForAVisitWithNoLinkedSittingTouchesNoCourse() {
+        when(courses.sittingByVisit(TENANT, VISIT)).thenReturn(Optional.empty());
+        ObjectNode view = confirmedOrder();
+
+        service.send(DOCTOR, RECORD, new ActionInput(stored().revision, view.path("fingerprint").asText()));
+
+        verify(courses, org.mockito.Mockito.never()).setRegimenIfEmpty(any(), any(), any(), any());
+        verify(courses, org.mockito.Mockito.never()).bumpRevision(any(), any(), any());
+    }
+
     @Test
     void aChangeAfterTheSecondCheckClearsItAuditsItAndBlocksTheSendTaggedC8() {
         confirmedOrder();

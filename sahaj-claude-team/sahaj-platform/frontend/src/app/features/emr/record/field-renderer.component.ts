@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { BodyMapComponent } from '../components/body-map.component';
+import { chipText, drawsAsTiles, toggleMany, toggleSingle } from '../components/chips.logic';
 import { EmrListComponent } from '../components/emr-list.component';
 import { FollowUpComponent } from '../components/follow-up.component';
 import { IpdOrdersComponent } from '../components/ipd-orders.component';
@@ -107,9 +108,20 @@ export class FieldRendererComponent {
     this.emit(v === '' ? null : v);
   }
 
+  /** CHIPS presentation (SAH-75-6): round chips with a tick when chosen; "None" clears the others and any other chip clears it. */
+  protected readonly chips = computed(() => this.field().presentation === 'CHIPS');
+  /** ADR-026 D13: a chip field whose options carry a hint draws as tiles (three columns, two below 600 px). */
+  protected readonly tiles = computed(() => this.chips() && drawsAsTiles(this.field().options));
+  protected chipLabel = chipText;
+
   protected togglePick(optionKey: string): void {
     const list = this.multi();
-    this.emit(list.includes(optionKey) ? list.filter((k) => k !== optionKey) : [...list, optionKey]);
+    this.emit(this.chips() ? toggleMany(this.field().options, list, optionKey) : list.includes(optionKey) ? list.filter((k) => k !== optionKey) : [...list, optionKey]);
+  }
+
+  /** A single-choice chip: pressing the chosen chip again clears the field. */
+  protected pickSingle(optionKey: string): void {
+    this.emit(toggleSingle(this.text() === '' ? null : this.text(), optionKey));
   }
 
   protected onMultiText(event: Event): void {

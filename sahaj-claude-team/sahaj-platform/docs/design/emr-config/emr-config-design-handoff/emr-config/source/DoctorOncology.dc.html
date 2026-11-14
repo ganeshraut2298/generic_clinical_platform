@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Doctor screen — Medical Oncology</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+button,input,select{font-family:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #9D174D66;outline-offset:2px}
+a{color:#9D174D}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; font-size: 14px; min-height: 3600px; display: flex; flex-direction: column">
+
+  <div style="background: #0F1C2E; color: #FFFFFF; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 24px">
+    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+      <span style="font-weight: 700; font-size: 16px">Smart Clinic</span>
+      <span style="background: #9D174D; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600">Medical Oncology · Day care</span>
+      <nav aria-label="Main" style="display: flex; gap: 4px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 8px 12px; border-radius: 8px; background: #1E3550; font-size: 13px; font-weight: 600">Day-care list (7)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Patient alerts (3)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Tumour board</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">Chemo pharmacy</a>
+      </nav>
+    </div>
+    <span style="font-size: 13px; color: #B8C4D3">Dr. [ONCOLOGIST NAME], DM (Medical Oncology)</span>
+  </div>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 14px 24px 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between">
+      <div style="display: flex; gap: 14px; align-items: center">
+        <span style="width: 48px; height: 48px; border-radius: 999px; background: #FCE7F0; color: #9D174D; display: flex; align-items: center; justify-content: center; font-weight: 700">SK</span>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <span style="font-size: 17px; font-weight: 700">[PATIENT NAME]</span>
+          <span style="font-size: 13px; color: #5B6B7F">48 y · Female · UHID [ID] · ABHA linked · Marathi speaker · caregiver: husband</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <sc-for list="{{watch}}" as="w" hint-placeholder-count="3"><span style="{{w.style}}">{{w.text}}</span></sc-for>
+      </div>
+    </div>
+    <div aria-label="Cancer journey snapshot" style="display: grid; grid-template-columns: 1.1fr 1fr 1fr 1.7fr 1fr; gap: 1px; background: #E3E8EE; border: 1px solid #E3E8EE; border-radius: 12px; overflow: hidden">
+      <div style="background: #FFFFFF; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Diagnosis</span><span style="font-weight: 700">Ca left breast · IDC G2</span><span style="font-size: 12px; color: #9D174D; font-weight: 700">Stage IIIA · cT2 cN2 M0</span></div>
+      <div style="background: #FFFFFF; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Biology</span><span style="font-weight: 700">ER+ PR+ HER2−</span><span style="font-size: 12px; color: #5B6B7F">Ki-67 30% · BRCA pending</span></div>
+      <div style="background: #FFFFFF; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Intent · line</span><span style="font-weight: 700">Curative · neoadjuvant</span><span style="font-size: 12px; color: #5B6B7F">1st line · board 26 Jul</span></div>
+      <div style="background: #FFFFFF; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Plan · AC ×4 → Paclitaxel ×4</span><span style="font-size: 12px; font-weight: 700">{{cycleText}}</span></div>
+        <div style="display: flex; gap: 4px"><sc-for list="{{cycles}}" as="c" hint-placeholder-count="8"><span title="{{c.tip}}" style="{{c.style}}">{{c.label}}</span></sc-for></div>
+      </div>
+      <div style="background: #FFFFFF; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">Response (clinical)</span><span style="{{respStyle}}">{{respShort}}</span><span style="font-size: 12px; color: #5B6B7F">{{respSub}}</span></div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 24px; align-items: flex-start; flex: 1">
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+      <div role="tablist" aria-label="Visit part" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{parts}}" as="p" hint-placeholder-count="2">
+          <button type="button" role="tab" aria-selected="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">
+            <span style="{{p.numStyle}}">{{p.num}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; flex: 1; text-align: left"><span style="font-size: 16px; font-weight: 700">{{p.label}}</span><span style="font-size: 12px; opacity: 0.85">{{p.sub}}</span></span>
+            <span style="{{p.badgeStyle}}">{{p.badge}}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- ===================== PART 1 · ASSESSMENT ===================== -->
+      <div style="{{aStyle}}">
+        <nav aria-label="Assessment steps" style="position: sticky; top: 0; z-index: 3; background: #F4F6F8; padding: 4px 0; display: flex; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{aSteps}}" as="s" hint-placeholder-count="5"><a href="{{s.href}}" style="{{s.style}}"><span style="{{s.dotStyle}}">{{s.dot}}</span>{{s.label}}</a></sc-for>
+        </nav>
+
+        <section id="sx" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 3px">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 700">1 · Side effects since last cycle</h2>
+              <span style="font-size: 12px; color: #5B6B7F">Patient filled the symptom check on WhatsApp yesterday, 7:40 pm (Marathi). Confirm or change each grade. CTCAE 0 none · 1 mild · 2 moderate · 3 severe · 4 life-threatening.</span>
+            </div>
+            <button type="button" onClick="{{acceptPro}}" style="{{acceptStyle}}">{{acceptLabel}}</button>
+          </div>
+          <div role="table" aria-label="Side effects by cycle" style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+            <div role="row" style="display: grid; grid-template-columns: minmax(150px, 1.4fr) repeat(3, 44px) 92px minmax(200px, 1.6fr); gap: 8px; align-items: center; padding: 8px 12px; background: #F7F9FB; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.03em">
+              <span role="columnheader">Symptom</span><span role="columnheader" style="text-align: center">C1</span><span role="columnheader" style="text-align: center">C2</span><span role="columnheader" style="text-align: center">C3</span><span role="columnheader" style="text-align: center">Patient said</span><span role="columnheader">Today · your grade</span>
+            </div>
+            <sc-for list="{{tox}}" as="t" hint-placeholder-count="9">
+              <div role="row" style="{{t.rowStyle}}">
+                <span role="cell" style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 600">{{t.label}}</span><span style="{{t.hintStyle}}">{{t.hint}}</span></span>
+                <sc-for list="{{t.hist}}" as="h" hint-placeholder-count="3"><span role="cell" class="num" style="{{h.style}}">{{h.g}}</span></sc-for>
+                <span role="cell" style="display: flex; justify-content: center"><span class="num" style="{{t.proStyle}}">📱 {{t.pro}}</span></span>
+                <span role="cell" style="display: flex; gap: 4px"><sc-for list="{{t.grades}}" as="g" hint-placeholder-count="5"><button type="button" aria-pressed="{{g.on}}" aria-label="{{t.label}} grade {{g.n}}" onClick="{{g.pick}}" style="{{g.style}}">{{g.n}}</button></sc-for></span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <span style="font-size: 12px; font-weight: 700; color: #3E4C5E">Since last cycle:</span>
+            <sc-for list="{{events}}" as="e" hint-placeholder-count="6"><button type="button" aria-pressed="{{e.on}}" onClick="{{e.toggle}}" style="{{e.style}}">{{e.label}}</button></sc-for>
+          </div>
+          <sc-for list="{{toxAlerts}}" as="a" hint-placeholder-count="1"><div role="alert" style="{{a.style}}"><strong>{{a.title}}</strong> {{a.text}}</div></sc-for>
+          <dc-import name="EmrList" kind="complaints" spec="onco" title="Other complaints (optional)" required="{{ false }}" accent="#9D174D" who="Dr. [ONCOLOGIST NAME]" on-change="{{cp_complaints}}" hint-size="100%,230px"></dc-import>
+        </section>
+
+        <section id="exam" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+            <h2 style="margin: 0; font-size: 15px; font-weight: 700">2 · Examination</h2>
+            <span style="font-size: 12px; color: #5B6B7F">{{examSummary}}</span>
+          </div>
+          <div role="tablist" aria-label="Examination tools" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; background: #F4F6F8; border-radius: 10px; padding: 4px">
+            <sc-for list="{{exTabs}}" as="x" hint-placeholder-count="5"><button type="button" role="tab" aria-selected="{{x.on}}" onClick="{{x.pick}}" style="{{x.style}}"><span style="{{x.dotStyle}}"></span><span style="display: flex; flex-direction: column; align-items: flex-start; gap: 1px"><span>{{x.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{x.sub}}</span></span></button></sc-for>
+          </div>
+
+          <div style="{{exV}}">
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+              <sc-for list="{{vitals}}" as="v" hint-placeholder-count="7">
+                <div style="{{v.boxStyle}}">
+                  <span style="font-size: 12px; font-weight: 600; color: #5B6B7F">{{v.label}}</span>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px">
+                    <button type="button" onClick="{{v.dec}}" aria-label="Decrease {{v.label}}" style="width: 32px; height: 32px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; font-weight: 700; cursor: pointer">−</button>
+                    <span class="num" style="{{v.valStyle}}">{{v.value}}</span>
+                    <button type="button" onClick="{{v.inc}}" aria-label="Increase {{v.label}}" style="width: 32px; height: 32px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; font-weight: 700; cursor: pointer">+</button>
+                  </div>
+                  <span style="{{v.noteStyle}}">{{v.note}}</span>
+                </div>
+              </sc-for>
+              <div style="border-radius: 10px; padding: 10px 12px; background: #FCE7F0; display: flex; flex-direction: column; gap: 4px; justify-content: center">
+                <span style="font-size: 12px; font-weight: 600; color: #831843">Body surface area</span>
+                <span class="num" style="font-size: 22px; font-weight: 700; color: #9D174D">{{bsa}} m²</span>
+                <span style="{{wtNoteStyle}}">{{wtNote}}</span>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><span style="font-size: 13px; font-weight: 700">General signs</span><button type="button" onClick="{{noSigns}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 4px 12px; min-height: 32px; font-size: 12px; font-weight: 600; cursor: pointer">None present</button></div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{signs}}" as="g" hint-placeholder-count="7"><button type="button" aria-pressed="{{g.on}}" onClick="{{g.toggle}}" style="{{g.style}}">{{g.label}}</button></sc-for></div>
+            </div>
+          </div>
+
+          <div style="{{exT}}">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+              <span style="font-size: 13px; font-weight: 700">Measurable lesions · longest diameter (cm, calliper)</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{addLesions}}" as="l" hint-placeholder-count="3"><button type="button" onClick="{{l.add}}" style="border: 1px dashed #9AA8B8; background: #FFFFFF; border-radius: 999px; padding: 4px 10px; min-height: 32px; font-size: 12px; font-weight: 600; cursor: pointer">+ {{l.label}}</button></sc-for></div>
+            </div>
+            <div role="table" aria-label="Lesion tracker" style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+              <div role="row" style="display: grid; grid-template-columns: minmax(170px, 1.6fr) 70px 70px 150px 96px 80px 32px; gap: 8px; align-items: center; padding: 8px 12px; background: #F7F9FB; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.03em">
+                <span>Lesion</span><span>Baseline</span><span>Last (C3)</span><span>Today</span><span>Trend</span><span>Change</span><span></span>
+              </div>
+              <sc-for list="{{lesions}}" as="l" hint-placeholder-count="2">
+                <div role="row" style="display: grid; grid-template-columns: minmax(170px, 1.6fr) 70px 70px 150px 96px 80px 32px; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid #EEF1F5">
+                  <span style="font-weight: 600">{{l.name}}</span>
+                  <span class="num" style="color: #5B6B7F">{{l.base}}</span>
+                  <span class="num" style="color: #5B6B7F">{{l.prev}}</span>
+                  <span style="display: flex; align-items: center; gap: 6px">
+                    <button type="button" onClick="{{l.dec}}" aria-label="Smaller {{l.name}}" style="width: 30px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; font-weight: 700; cursor: pointer">−</button>
+                    <span class="num" style="min-width: 50px; text-align: center; font-weight: 700">{{l.today}}</span>
+                    <button type="button" onClick="{{l.inc}}" aria-label="Larger {{l.name}}" style="width: 30px; height: 30px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; font-weight: 700; cursor: pointer">+</button>
+                  </span>
+                  <svg width="90" height="26" viewBox="0 0 90 26" aria-hidden="true"><polyline points="{{l.pts}}" fill="none" stroke="#9D174D" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline></svg>
+                  <span class="num" style="{{l.chgStyle}}">{{l.chg}}</span>
+                  <button type="button" onClick="{{l.remove}}" aria-label="Remove {{l.name}}" style="width: 30px; height: 30px; border: 0; background: transparent; color: #5B6B7F; cursor: pointer; font-size: 16px">×</button>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{respBox}}">
+              <div style="display: flex; flex-direction: column; gap: 3px; flex: 1">
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.85">Sum of diameters · {{sumText}}</span>
+                <span style="font-size: 18px; font-weight: 700">{{respLong}}</span>
+                <span style="font-size: 12px; opacity: 0.85">RECIST-style rule: complete = all gone · partial = 30% or more smaller · progressive = 20% or more bigger than the smallest so far, or a new lesion. Confirm with imaging after cycle 4.</span>
+              </div>
+              <button type="button" aria-pressed="{{newLesion}}" onClick="{{toggleNew}}" style="{{newStyle}}">{{newLabel}}</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span style="font-size: 13px; font-weight: 700">Breast and skin</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{site}}" as="g" hint-placeholder-count="6"><button type="button" aria-pressed="{{g.on}}" onClick="{{g.toggle}}" style="{{g.style}}">{{g.label}}</button></sc-for></div>
+            </div>
+          </div>
+
+          <div style="{{exB}}">
+            <dc-import name="BodyMap" sex="female" title="Body map · mark lumps, nodes, skin lesions, port site" who="Dr. [ONCOLOGIST NAME]" on-change="{{onBody}}" hint-size="100%,780px"></dc-import>
+          </div>
+
+          <div style="{{exS}}">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><span style="font-size: 13px; font-weight: 700">Systemic examination</span><button type="button" onClick="{{allNormal}}" style="border: 1px solid #146C43; background: #E3F5EC; color: #146C43; border-radius: 8px; padding: 4px 14px; min-height: 34px; font-size: 13px; font-weight: 700; cursor: pointer">✓ All normal</button></div>
+            <sc-for list="{{systems}}" as="s" hint-placeholder-count="5">
+              <div style="{{s.rowStyle}}">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+                  <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 700">{{s.label}}</span><span style="font-size: 12px; color: #5B6B7F">{{s.why}}</span></span>
+                  <span style="display: flex; gap: 6px"><button type="button" aria-pressed="{{s.isN}}" onClick="{{s.setN}}" style="{{s.nStyle}}">Normal</button><button type="button" aria-pressed="{{s.isA}}" onClick="{{s.setA}}" style="{{s.aStyle}}">Abnormal</button></span>
+                </div>
+                <div style="{{s.findStyle}}"><sc-for list="{{s.finds}}" as="f" hint-placeholder-count="4"><button type="button" aria-pressed="{{f.on}}" onClick="{{f.toggle}}" style="{{f.style}}">{{f.label}}</button></sc-for></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="{{exP}}">
+            <span style="font-size: 13px; font-weight: 700">Chemo line / access device</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{devices}}" as="d" hint-placeholder-count="3"><button type="button" aria-pressed="{{d.on}}" onClick="{{d.pick}}" style="{{d.style}}">{{d.label}}</button></sc-for></div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px"><sc-for list="{{portChecks}}" as="c" hint-placeholder-count="6"><button type="button" aria-pressed="{{c.on}}" onClick="{{c.toggle}}" style="{{c.style}}">{{c.label}}</button></sc-for></div>
+            <span style="{{portNoteStyle}}">{{portNote}}</span>
+          </div>
+        </section>
+
+        <section id="labs" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 3px"><h2 style="margin: 0; font-size: 15px; font-weight: 700">3 · Pre-chemo labs</h2><span style="font-size: 12px; color: #5B6B7F">Drawn today 8:40 am · auto-filled from lab · within 72 hours</span></div>
+            <span style="{{labsBadgeStyle}}">{{labsBadge}}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+            <div style="display: grid; grid-template-columns: minmax(150px, 1.3fr) 150px 96px 150px 110px 74px; gap: 8px; align-items: center; padding: 8px 12px; background: #F7F9FB; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.03em"><span>Test</span><span>C1 · C2 · C3</span><span>Trend</span><span>Today</span><span>Needed</span><span></span></div>
+            <sc-for list="{{labs}}" as="l" hint-placeholder-count="7">
+              <div style="display: grid; grid-template-columns: minmax(150px, 1.3fr) 150px 96px 150px 110px 74px; gap: 8px; align-items: center; padding: 7px 12px; border-top: 1px solid #EEF1F5">
+                <span style="font-weight: 600">{{l.label}} <span style="font-size: 11px; color: #5B6B7F; font-weight: 500">{{l.unit}}</span></span>
+                <span class="num" style="font-size: 12px; color: #5B6B7F">{{l.hist}}</span>
+                <svg width="90" height="26" viewBox="0 0 90 26" aria-hidden="true"><line x1="0" x2="90" y1="{{l.limY}}" y2="{{l.limY}}" stroke="#F3C1BC" stroke-dasharray="3 3"></line><polyline points="{{l.pts}}" fill="none" stroke="{{l.stroke}}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline></svg>
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <button type="button" onClick="{{l.dec}}" aria-label="Lower {{l.label}}" style="width: 28px; height: 28px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; cursor: pointer">−</button>
+                  <span class="num" style="{{l.valStyle}}">{{l.value}}</span>
+                  <button type="button" onClick="{{l.inc}}" aria-label="Raise {{l.label}}" style="width: 28px; height: 28px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 6px; cursor: pointer">+</button>
+                </span>
+                <span style="font-size: 12px; color: #5B6B7F">{{l.limit}}</span>
+                <span style="{{l.okStyle}}">{{l.ok}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section id="fit" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 15px; font-weight: 700">4 · Performance status (ECOG)</h2><span style="{{ecogNoteStyle}}">{{ecogNote}}</span></div>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+            <sc-for list="{{ecog}}" as="e" hint-placeholder-count="5"><button type="button" aria-pressed="{{e.on}}" onClick="{{e.pick}}" style="{{e.style}}"><span style="font-size: 18px; font-weight: 700">{{e.n}}</span><span style="font-size: 11px; line-height: 1.35">{{e.text}}</span></button></sc-for>
+          </div>
+        </section>
+
+        <section id="decide" style="background: #0F1C2E; color: #FFFFFF; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <span style="font-size: 12px; font-weight: 700; color: #F9A8D4; text-transform: uppercase; letter-spacing: 0.05em">5 · Today’s decision</span>
+              <span style="font-size: 20px; font-weight: 700">Suggested: {{sugLabel}}</span>
+              <span style="font-size: 12px; color: #B8C4D3">Worked out from side effects, examination, labs, ECOG and response. You make the final call.</span>
+            </div>
+            <span style="{{decBadgeStyle}}">{{decBadge}}</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px">
+            <sc-for list="{{reasons}}" as="r" hint-placeholder-count="6"><span style="{{r.style}}"><span style="{{r.iconStyle}}">{{r.icon}}</span>{{r.text}}</span></sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+            <sc-for list="{{decisions}}" as="d" hint-placeholder-count="5"><button type="button" aria-pressed="{{d.on}}" onClick="{{d.pick}}" style="{{d.style}}"><span style="font-size: 14px; font-weight: 700">{{d.label}}</span><span style="font-size: 11px; opacity: 0.85">{{d.sub}}</span><span style="{{d.tagStyle}}">{{d.tag}}</span></button></sc-for>
+          </div>
+          <div style="{{devStyle}}">
+            <span style="font-size: 13px; font-weight: 700; color: #FCD34D">You chose differently from the suggestion. Pick a reason (saved with the note):</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{devReasons}}" as="r" hint-placeholder-count="5"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.pick}}" style="{{r.style}}">{{r.label}}</button></sc-for></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid #2A3C55; padding-top: 12px">
+            <span style="font-size: 13px; color: #D5DCE4">{{aRecap}}</span>
+            <button type="button" onClick="{{confirmDec}}" style="{{confirmStyle}}">{{confirmLabel}}</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===================== PART 2 · TREATMENT (order sheet) ===================== -->
+      <div style="{{tStyle}}">
+        <section style="background: linear-gradient(135deg, #831843, #9D174D 60%, #BE185D); color: #FFFFFF; border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85">Chemotherapy order sheet</span>
+              <span style="font-size: 20px; font-weight: 700">{{orderTitle}}</span>
+              <span style="font-size: 13px; opacity: 0.9">{{orderSub}}</span>
+            </div>
+            <button type="button" onClick="{{goA}}" style="border: 1px solid rgba(255,255,255,0.5); background: transparent; color: #FFFFFF; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-weight: 600; cursor: pointer">← Back to assessment</button>
+          </div>
+          <ol aria-label="Order progress" style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px">
+            <sc-for list="{{stages}}" as="s" hint-placeholder-count="6"><li style="{{s.style}}"><span style="{{s.dotStyle}}">{{s.dot}}</span><span>{{s.label}}</span></li></sc-for>
+          </ol>
+        </section>
+
+        <div style="{{noDecStyle}}">
+          <span style="font-weight: 700; color: #8A4B08">No decision yet.</span>
+          <span style="font-size: 13px; color: #8A4B08">Finish the assessment and confirm today’s decision. The order sheet fills itself from it.</span>
+          <a href="#decide" onClick="{{goA}}" style="margin-left: auto; font-weight: 700">Go to decision →</a>
+        </div>
+
+        <div id="diagnosis"><dc-import name="EmrList" kind="diagnosis" spec="onco" title="Diagnosis" required="{{ true }}" accent="#9D174D" who="Dr. [ONCOLOGIST NAME]" on-change="{{cp_diagnosis}}" hint-size="100%,230px"></dc-import></div>
+
+        <div style="{{holdStyle}}">
+          <section style="background: #FFFFFF; border: 2px solid #B45309; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #8A4B08">{{holdTitle}}</h2>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+              <sc-for list="{{holdFacts}}" as="f" hint-placeholder-count="3"><div style="background: #FDF6EC; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 11px; font-weight: 600; color: #8A4B08">{{f.k}}</span><span style="font-weight: 700">{{f.v}}</span></div></sc-for>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+              <button type="button" onClick="{{recordHold}}" style="{{holdBtnStyle}}">{{holdBtn}}</button>
+              <span style="font-size: 12px; color: #5B6B7F">Day-care chair released, pharmacy informed, patient gets the new date on WhatsApp.</span>
+            </div>
+          </section>
+        </div>
+
+        <div style="{{giveStyle}}">
+          <section id="protocol" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-left: 5px solid #9D174D; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 15px; font-weight: 700">A · Protocol</h2><span style="font-size: 12px; color: #5B6B7F">From the hospital’s approved protocol library · doses are per m²</span></div>
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+              <sc-for list="{{regimens}}" as="r" hint-placeholder-count="4"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.pick}}" style="{{r.style}}"><span style="display: flex; justify-content: space-between; gap: 6px; width: 100%"><span style="font-weight: 700">{{r.label}}</span><span style="{{r.tagStyle}}">{{r.tag}}</span></span><span style="font-size: 12px; opacity: 0.85">{{r.sub}}</span></button></sc-for>
+            </div>
+          </section>
+
+          <section id="doses" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-left: 5px solid #9D174D; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+              <h2 style="margin: 0; font-size: 15px; font-weight: 700">B · Doses</h2>
+              <span class="num" style="font-size: 12px; color: #3E4C5E">Height {{ht}} cm · weight {{wtText}} · BSA <strong>{{bsaUsed}} m²</strong></span>
+            </div>
+            <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap">
+              <span style="font-size: 13px; font-weight: 600">Dose level</span>
+              <div style="display: flex; gap: 6px"><sc-for list="{{levels}}" as="r" hint-placeholder-count="4"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.pick}}" style="{{r.style}}">{{r.label}}</button></sc-for></div>
+              <button type="button" aria-pressed="{{cap}}" onClick="{{toggleCap}}" style="{{capStyle}}">{{capLabel}}</button>
+            </div>
+            <div style="{{lvlReasonStyle}}">
+              <span style="font-size: 12px; font-weight: 700; color: #8A4B08">Reason for reduction (required):</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{lvlReasons}}" as="r" hint-placeholder-count="5"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.pick}}" style="{{r.style}}">{{r.label}}</button></sc-for></div>
+            </div>
+            <div role="table" aria-label="Dose calculation" style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+              <div role="row" style="display: grid; grid-template-columns: minmax(140px, 1.3fr) 80px 120px 90px 140px minmax(160px, 1.4fr); gap: 8px; padding: 8px 12px; background: #F7F9FB; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.03em"><span>Drug</span><span>mg/m²</span><span>Calculated</span><span>Rounded</span><span>Final dose</span><span>Lifetime dose</span></div>
+              <sc-for list="{{drugs}}" as="d" hint-placeholder-count="2">
+                <div role="row" style="display: grid; grid-template-columns: minmax(140px, 1.3fr) 80px 120px 90px 140px minmax(160px, 1.4fr); gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px solid #EEF1F5">
+                  <span style="display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 700">{{d.name}}</span><span style="{{d.flagStyle}}">{{d.flag}}</span></span>
+                  <span class="num">{{d.per}}</span>
+                  <span class="num" style="font-size: 12px; color: #5B6B7F">{{d.calc}}</span>
+                  <span class="num" style="font-size: 12px; color: #5B6B7F">{{d.rounded}}</span>
+                  <span class="num" style="font-size: 18px; font-weight: 700; color: #9D174D">{{d.dose}}</span>
+                  <span style="display: flex; flex-direction: column; gap: 4px"><span style="{{d.cumStyle}}">{{d.cum}}</span><span style="{{d.barWrap}}"><span style="{{d.bar}}"></span><span style="{{d.barNow}}"></span></span></span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size: 12px; color: #5B6B7F">Rounded to the nearest vial size (within 5% of calculated). Doses recalculate if weight changes by 10% or more.</span>
+          </section>
+
+          <section id="chair" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-left: 5px solid #9D174D; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 15px; font-weight: 700">C · Day-care sequence</h2><span class="num" style="font-size: 13px; font-weight: 700">Chair time ≈ {{chairTime}}</span></div>
+            <div style="display: flex; gap: 3px; border-radius: 10px; overflow: hidden">
+              <sc-for list="{{timeline}}" as="s" hint-placeholder-count="5"><div style="{{s.style}}"><span style="font-size: 12px; font-weight: 700">{{s.label}}</span><span class="num" style="font-size: 11px; opacity: 0.9">{{s.min}}</span></div></sc-for>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{premeds}}" as="p" hint-placeholder-count="3"><span style="font-size: 12px; background: #EEF1F5; border-radius: 999px; padding: 5px 10px">Pre-med · {{p}}</span></sc-for></div>
+            <span style="{{emetoStyle}}">{{emeto}}</span>
+          </section>
+
+          <section id="checks" style="background: #FFFFFF; border: 2px solid #9D174D; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 15px; font-weight: 700">D · Safety checks before sending</h2><span style="{{checkBadgeStyle}}">{{checkBadge}}</span></div>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+              <sc-for list="{{checks}}" as="c" hint-placeholder-count="9">
+                <div style="{{c.style}}">
+                  <span style="{{c.iconStyle}}">{{c.icon}}</span>
+                  <span style="display: flex; flex-direction: column; gap: 2px; flex: 1"><span style="font-weight: 700; font-size: 13px">{{c.label}}</span><span style="font-size: 12px; color: #5B6B7F">{{c.detail}}</span></span>
+                  <button type="button" onClick="{{c.act}}" style="{{c.actStyle}}">{{c.actLabel}}</button>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; background: #F7F9FB; border-radius: 10px; padding: 10px 12px">
+              <span style="font-size: 12px; font-weight: 700">Independent second check by (not the prescriber)</span>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{verifiers}}" as="v" hint-placeholder-count="3"><button type="button" aria-pressed="{{v.on}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button></sc-for></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+              <span style="{{sendNoteStyle}}">{{sendNote}}</span>
+              <button type="button" onClick="{{sendOrder}}" style="{{sendStyle}}">{{sendLabel}}</button>
+            </div>
+          </section>
+        </div>
+
+        <section id="home" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 15px; font-weight: 700">E · Take-home medicines</h2><span style="font-size: 12px; color: #5B6B7F">Generic names first · printed in {{langName}}</span></div>
+          <sc-for list="{{thm}}" as="m" hint-placeholder-count="6">
+            <button type="button" aria-pressed="{{m.on}}" onClick="{{m.toggle}}" style="{{m.style}}">
+              <span style="{{m.boxStyle}}">{{m.box}}</span>
+              <span style="display: flex; flex-direction: column; gap: 2px; flex: 1; text-align: left"><span style="font-weight: 700">{{m.name}}</span><span style="font-size: 12px; color: #5B6B7F">{{m.why}}</span></span>
+              <span class="num" style="font-size: 13px; font-weight: 700">{{m.dose}}</span>
+            </button>
+          </sc-for>
+        </section>
+
+        <section id="next" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 700">F · Next cycle and patient calendar</h2>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+            <sc-for list="{{nextFacts}}" as="f" hint-placeholder-count="4"><div style="{{f.style}}"><span style="font-size: 11px; font-weight: 600; color: #5B6B7F">{{f.k}}</span><span style="font-weight: 700">{{f.v}}</span><span style="font-size: 11px; color: #5B6B7F">{{f.s}}</span></div></sc-for>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #F0FAF4; border-radius: 10px; padding: 10px 12px">
+            <span style="font-size: 13px; font-weight: 700; color: #146C43">WhatsApp calendar</span>
+            <div style="display: flex; gap: 6px"><sc-for list="{{langs}}" as="l" hint-placeholder-count="3"><button type="button" aria-pressed="{{l.on}}" onClick="{{l.pick}}" style="{{l.style}}">{{l.label}}</button></sc-for></div>
+            <span style="font-size: 12px; color: #3E4C5E; flex: 1">Dates, fever warning (call if ≥ 38 °C), blood test reminders and the daily symptom check.</span>
+            <button type="button" onClick="{{sendWa}}" style="{{waStyle}}">{{waLabel}}</button>
+          </div>
+        </section>
+
+        <div id="course"><dc-import name="TreatmentCourse" kind="chemo" accent="#9D174D" hint-size="100%,860px"></dc-import></div>
+
+        <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 700">Referrals</h2>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{refs}}" as="r" hint-placeholder-count="6"><button type="button" aria-pressed="{{r.on}}" onClick="{{r.toggle}}" style="{{r.style}}">{{r.label}}</button></sc-for></div>
+        </section>
+
+        <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="onco" title="Doctor’s advice" required="{{ false }}" accent="#9D174D" who="Dr. [ONCOLOGIST NAME]" hint-size="100%,230px"></dc-import></div>
+
+        <section style="background: #FFFFFF; border: 1px dashed #9AA8B8; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><h2 style="margin: 0; font-size: 15px; font-weight: 700">Cycle note (written for you)</h2><button type="button" onClick="{{copyNote}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 4px 12px; min-height: 34px; font-size: 12px; font-weight: 600; cursor: pointer">Copy</button></div>
+          <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #3E4C5E">{{note}}</p>
+        </section>
+      </div>
+    </main>
+
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="onco" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#9D174D" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+    </div>
+    </aside>
+  </div>
+
+  <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; box-shadow: 0 -4px 12px rgba(15,28,46,0.06)">
+    <span style="{{footStyle}}">{{footText}}</span>
+    <div style="display: flex; gap: 10px">
+      <button type="button" onClick="{{saveDraft}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Save draft</button>
+      <button type="button" onClick="{{complete}}" style="{{completeStyle}}">Complete visit</button>
+    </div>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; bottom: 84px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3); max-width: 460px">{{toast}}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startPart":{"editor":"enum","options":["A","T"],"default":"A"},"$preview":{"width":1920,"height":3600}}'>
+var A = '#9D174D';
+var GC = ['#146C43', '#4D7C0F', '#B45309', '#B42318', '#7F1D1D'];
+var GBG = ['#E3F5EC', '#EEF7DC', '#FDF0DC', '#FDECEA', '#F8D7D4'];
+var TOX = [
+  ['nausea', 'Nausea', [1, 2, 1], 1], ['vomiting', 'Vomiting', [0, 1, 0], 0], ['mucositis', 'Mouth sores', [0, 1, 1], 1],
+  ['diarrhoea', 'Loose motions', [0, 0, 1], 0], ['neuropathy', 'Tingling / numbness', [0, 0, 0], 1], ['fatigue', 'Fatigue', [1, 1, 2], 2],
+  ['fn', 'Fever with low counts', [0, 0, 0], 0], ['pain', 'Pain', [1, 0, 1], 1], ['appetite', 'Loss of appetite', [1, 1, 1], 1]
+];
+var EVENTS = ['ER visit', 'Admitted', 'Fever ≥ 38 °C at home', 'Blood transfusion', 'Antibiotics', 'Missed oral medicines'];
+var SIGNS = ['Pallor', 'Icterus', 'Cyanosis', 'Clubbing', 'Lymph nodes (other)', 'Pedal oedema', 'Dehydration'];
+var SITE = ['Skin redness', 'Peau d’orange', 'Ulceration', 'Nipple retraction', 'Fixed to chest wall', 'Lump now mobile'];
+var SYS = [
+  ['cvs', 'Heart (CVS)', 'Anthracycline: watch for heart failure', ['New murmur', 'Raised JVP', 'Tachycardia', 'S3']],
+  ['rs', 'Lungs (RS)', 'Effusion, infection, drug lung', ['Reduced air entry', 'Crepitations', 'Dull note (effusion)', 'Wheeze']],
+  ['abd', 'Abdomen', 'Liver spread, ascites', ['Liver enlarged', 'Tenderness', 'Ascites', 'Mass']],
+  ['cns', 'Nervous system', 'Brain spread, neuropathy', ['Focal weakness', 'Reduced sensation', 'Reflexes reduced', 'Confusion']],
+  ['bone', 'Spine and bones', 'Bone spread', ['Spine tenderness', 'Rib tenderness', 'Restricted movement']]
+];
+var DEV = [['port', 'Chemo port (right chest)'], ['picc', 'PICC line'], ['peri', 'Peripheral cannula']];
+var PORT = ['Flushes freely', 'Blood return seen', 'No redness or swelling', 'No pain at site', 'Dressing clean', 'Flushed in last 4 weeks'];
+var LABS = [
+  ['hb', 'Haemoglobin', 'g/dL', 0.2, 8, null, 1, [11.8, 10.9, 10.2]],
+  ['anc', 'Neutrophils (ANC)', '/µL', 100, 1500, null, 0, [3200, 1900, 1600]],
+  ['plt', 'Platelets', '×10³/µL', 10, 100, null, 0, [260, 230, 190]],
+  ['cr', 'Creatinine', 'mg/dL', 0.1, null, 1.5, 1, [0.7, 0.8, 0.8]],
+  ['bili', 'Bilirubin', 'mg/dL', 0.1, null, 1.5, 1, [0.6, 0.7, 0.7]],
+  ['alt', 'ALT (SGPT)', 'U/L', 5, null, 100, 0, [28, 35, 40]],
+  ['ef', 'Heart pumping (LVEF)', '%', 1, 50, null, 0, [64, 63, 61]]
+];
+var ECOG = ['Fully active', 'Light work possible', 'Up and about over 50% of day; no work', 'In bed or chair over 50% of day', 'Fully bedbound'];
+var REG = {
+  AC: { label: 'AC', sub: 'Doxorubicin + cyclophosphamide · every 21 days', days: 21, emeto: 'High', consented: true, scheme: true,
+    drugs: [['Doxorubicin', 60, 15, 5, 'dox', 'Vesicant: give by port, check blood return'], ['Cyclophosphamide', 600, 30, 20, '', '']], premeds: [['Ondansetron 8 mg IV', 15], ['Dexamethasone 12 mg IV', 15], ['Aprepitant 125 mg oral', 0]] },
+  P3: { label: 'Paclitaxel 3-weekly', sub: 'Paclitaxel 175 mg/m² · every 21 days', days: 21, emeto: 'Low', consented: true, scheme: true,
+    drugs: [['Paclitaxel', 175, 180, 10, '', 'Watch first 15 min for reaction · in-line filter']], premeds: [['Dexamethasone 20 mg IV', 15], ['Pheniramine 45.5 mg IV', 15], ['Famotidine 20 mg IV', 0]] },
+  P1: { label: 'Paclitaxel weekly', sub: 'Paclitaxel 80 mg/m² · every 7 days', days: 7, emeto: 'Low', consented: true, scheme: true,
+    drugs: [['Paclitaxel', 80, 60, 10, '', 'In-line filter']], premeds: [['Dexamethasone 8 mg IV', 15], ['Pheniramine 45.5 mg IV', 15], ['Famotidine 20 mg IV', 0]] },
+  TC: { label: 'TC', sub: 'Docetaxel + cyclophosphamide · every 21 days', days: 21, emeto: 'Moderate', consented: false, scheme: false,
+    drugs: [['Docetaxel', 75, 60, 10, '', 'Watch for reaction · needs G-CSF'], ['Cyclophosphamide', 600, 30, 20, '', '']], premeds: [['Dexamethasone 8 mg oral (day before)', 0], ['Ondansetron 8 mg IV', 15]] }
+};
+var DECS = [
+  ['proceed', 'Give as planned', 'Full dose today'],
+  ['reduce', 'Give, reduce dose', 'Next level down'],
+  ['delay', 'Delay 1 week', 'Repeat counts, re-book'],
+  ['change', 'Change regimen', 'New protocol'],
+  ['stop', 'Stop chemo', 'Palliative / supportive care']
+];
+var DEV_R = ['Patient preference', 'Tumour board advice', 'Counts recovering, recheck tomorrow', 'Clinical judgement', 'Scheme / cost reasons'];
+var LVL_R = ['Low neutrophils last cycle', 'Fever with low counts', 'Grade 3 side effect', 'Neuropathy', 'Liver function', 'Frailty'];
+var VERIFIERS = ['Sr. nurse [NAME]', 'Pharmacist [NAME]', 'Dr. [RESIDENT NAME]'];
+var THM = [
+  ['ond', 'Ondansetron 8 mg', '1-0-1 × 3 days', 'Nausea'], ['dexa', 'Dexamethasone 4 mg', '1-0-1 × 2 days', 'Delayed nausea'],
+  ['panto', 'Pantoprazole 40 mg', '1-0-0 × 5 days', 'Stomach protection'], ['peg', 'Pegfilgrastim 6 mg SC', 'Once, day 2', 'Prevents low counts / fever'],
+  ['mw', 'Benzydamine mouthwash', '3 times a day × 7 days', 'Mouth sores'], ['lop', 'Loperamide 2 mg', 'After each loose motion (max 8)', 'Loose motions']
+];
+var REFS = ['Radiotherapy', 'Surgical oncology', 'Palliative care', 'Dietitian', 'Psycho-oncology counselling', 'Fertility counselling', 'Social worker (scheme papers)', 'Cardiology (echo)'];
+var LANGS = [['mr', 'Marathi'], ['hi', 'Hindi'], ['en', 'English']];
+var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function addDays(n) { var d = new Date(2026, 10, 11); d.setDate(d.getDate() + n); return d.getDate() + ' ' + MON[d.getMonth()]; }
+function spark(vals, lim) {
+  var all = vals.slice(); if (lim != null) all.push(lim);
+  var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all); if (hi === lo) hi = lo + 1;
+  function y(v) { return Math.round((22 - (v - lo) / (hi - lo) * 18) * 10) / 10; }
+  return { pts: vals.map(function (v, i) { return Math.round(4 + i * (82 / Math.max(1, vals.length - 1))) + ',' + y(v); }).join(' '), limY: lim != null ? y(lim) : -5 };
+}
+function chip(on, c, bg) { c = c || A; return 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 12px; min-height: 34px; cursor: pointer; border: 1px solid ' + (on ? c : '#D5DCE4') + '; color: ' + (on ? (bg ? c : '#FFFFFF') : '#3E4C5E') + '; background: ' + (on ? (bg || c) : '#FFFFFF'); }
+
+
+function cpN(a, mode) { return (Array.isArray(a) ? a : []).map(function (x) { if (!x) return ''; if (typeof x === 'string') return x; var t = x.name || ''; if (mode === 'dx' && x.code) t += ' (' + x.code + ')'; else if (mode === 'c' && x.a1) t += ' · ' + x.a1; return t; }).filter(Boolean); }
+function cpKeys(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }); }
+
+function casePaper(st, r, cp) {
+  var v = st.vit || {}, L = st.labs || {};
+  var tox = Object.keys(st.tox || {}).filter(function (k) { return st.tox[k] > 0; }).map(function (k) { return k + ' G' + st.tox[k]; });
+  var give = st.dec === 'proceed' || st.dec === 'reduce' || st.dec === 'change';
+  var rx = give ? (r.drugs || []).map(function (d) { return { name: d.name, how: d.dose + ' IV', days: 'Day 1', note: 'Day care · ' + (st.level || 100) + '% dose' }; }) : [];
+  return { dept: 'Medical Oncology · Day care', doctor: 'Dr. [ONCOLOGIST NAME]', qual: 'MBBS, MD, DM (Medical Oncology)', reg: '[MMC REG. NO.]', patient: '[PATIENT NAME]', meta: '48 y · Female', ids: 'UHID [ID] · ABHA linked', visit: 'AC cycle 4 · day 1', vitals: 'BP ' + v.sys + '/' + v.dia + ' · P ' + v.pulse + ' · T ' + Number(v.temp).toFixed(1) + ' °C · BSA ' + (r.bsaUsed || ''),
+    sections: { complaints: cpN(cp.complaints, 'c').concat(tox.length ? ['Side effects since last cycle: ' + tox.join(', ')] : []), allergies: [st.allergy ? 'No known drug allergy (confirmed today)' : 'No known drug allergy'], history: ['Ca left breast, IDC G2, stage IIIA · ER+ PR+ HER2−', 'Neoadjuvant AC × 3 given'],
+      exam: ['Weight ' + v.wt + ' kg · ECOG ' + st.ecog, r.respLong ? 'Response: ' + r.respLong : ''].filter(Boolean),
+      diagnosis: cpN(cp.diagnosis, 'dx'), investigations: ['Hb ' + L.hb + ' · ANC ' + L.anc + ' · Plt ' + L.plt + 'k · Cr ' + L.cr + ' · LVEF ' + L.ef + '%'],
+      procedures: st.dec ? [(give ? 'Chemotherapy · ' : 'No chemotherapy today · ') + (r.orderTitle || '')] : [],
+      advice: cpN(cp.advice), follow: (r.nextFacts || []).slice(0, 2).map(function (f) { return f.k + ': ' + f.v; }) },
+    rx: rx.concat((r.thm || []).filter(function (m) { return m.on; }).map(function (m) { return { name: m.name, how: m.dose, days: '', note: 'Take home' }; })) };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var today = {}; TOX.forEach(function (t) { today[t[0]] = null; });
+    this.state = {
+      part: props.startPart === 'T' ? 'T' : 'A', exTab: 'v', cC: 0, cD: 0, bodyN: 0,
+      tox: today, events: {},
+      vit: { sys: 118, dia: 76, pulse: 88, temp: 37.0, spo2: 98, wt: 61.5, ht: 158 },
+      signs: { 'Pallor': true }, signsSeen: false,
+      lesions: [{ id: 1, name: 'Primary · left breast, upper outer', base: 4.2, prev: 2.9, today: 2.6 }, { id: 2, name: 'Left axillary node', base: 2.4, prev: 1.6, today: 1.5 }], nextLes: 3, newLesion: false,
+      site: { 'Lump now mobile': true },
+      sys: {}, sysF: {},
+      dev: 'port', port: { 'Flushes freely': true, 'Blood return seen': true, 'No redness or swelling': true },
+      labs: { hb: 10.4, anc: 1700, plt: 185, cr: 0.8, bili: 0.7, alt: 42, ef: 60 },
+      ecog: 1, dec: props.startPart === 'T' ? 'proceed' : null, pick: null, devR: null,
+      reg: 'AC', level: 100, lvlR: null, cap: true, allergy: false, consentNew: false, preauth: false, verifier: null, sent: false, holdDone: false,
+      thm: { ond: true, dexa: true, panto: true, mw: true }, lang: 'mr', wa: false, refs: { 'Dietitian': true }, toast: ''
+    };
+  }
+  componentWillUnmount() { if (this._t) clearTimeout(this._t); }
+  say(m, p) { var self = this; if (this._t) clearTimeout(this._t); this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3500); this.setState(Object.assign({ toast: m }, p || {})); }
+  _rv() {
+    var self = this, st = this.state, v = st.vit;
+    function set(k, val) { var o = {}; o[k] = val; self.setState(o); }
+    function tog(k, key) { var x = Object.assign({}, st[k]); x[key] = !x[key]; set(k, x); }
+
+    /* ---------- side effects ---------- */
+    var graded = 0, worst = 0;
+    var tox = TOX.map(function (t) {
+      var g0 = st.tox[t[0]], pro = t[3], eff = g0 == null ? pro : g0;
+      if (g0 != null) graded++;
+      if (eff > worst) worst = eff;
+      var rise = eff > t[2][2];
+      var hint = eff >= 3 ? 'Severe · hold or reduce' : (t[0] === 'neuropathy' && eff >= 1) ? 'New · important before paclitaxel' : (t[0] === 'fn' && eff >= 1) ? 'Needs G-CSF and dose cut' : rise && g0 != null ? 'Worse than last cycle' : g0 == null ? 'Not confirmed yet' : '';
+      return {
+        label: t[1], pro: pro, hint: hint,
+        hintStyle: 'font-size: 11px; font-weight: 600; color: ' + (eff >= 3 || (t[0] === 'fn' && eff) ? '#B42318' : g0 == null ? '#8A4B08' : '#B45309'),
+        rowStyle: 'display: grid; grid-template-columns: minmax(150px, 1.4fr) repeat(3, 44px) 92px minmax(200px, 1.6fr); gap: 8px; align-items: center; padding: 7px 12px; border-top: 1px solid #EEF1F5; background: ' + (g0 == null ? '#FFFDF7' : '#FFFFFF'),
+        hist: t[2].map(function (g) { return { g: g, style: 'height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: ' + GBG[g] + '; color: ' + GC[g] }; }),
+        proStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; border: 1px ' + (g0 != null && g0 !== pro ? 'dashed #B45309' : 'solid #D5DCE4') + '; background: ' + GBG[pro] + '; color: ' + GC[pro],
+        grades: [0, 1, 2, 3, 4].map(function (g) { var on = g0 === g; return { n: g, on: on, pick: function () { var x = Object.assign({}, st.tox); x[t[0]] = g; set('tox', x); },
+          style: 'width: 34px; height: 32px; border-radius: 8px; font-weight: 700; cursor: pointer; border: 1px solid ' + (on ? GC[g] : g === pro && g0 == null ? GC[g] : '#D5DCE4') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? GC[g] : '#FFFFFF') }; })
+      };
+    });
+    var fn = (st.tox.fn == null ? 0 : st.tox.fn) >= 1 || st.events['Fever ≥ 38 °C at home'] || st.events['Admitted'];
+    var neuro = st.tox.neuropathy == null ? 1 : st.tox.neuropathy;
+    var toxAlerts = [];
+    if (worst >= 3) toxAlerts.push(['Grade 3 or more side effect.', 'Hold today or reduce the dose; record the reason.']);
+    if (fn) toxAlerts.push(['Fever or admission since last cycle.', 'Consider pegfilgrastim from this cycle and a 20% dose cut.']);
+    toxAlerts = toxAlerts.map(function (a) { return { title: a[0], text: a[1], style: 'font-size: 13px; color: #8E1B12; background: #FDECEA; border: 1px solid #F3C1BC; border-radius: 8px; padding: 8px 12px' }; });
+    var unconfirmed = TOX.length - graded;
+
+    /* ---------- examination ---------- */
+    var bsaRaw = Math.sqrt(v.ht * v.wt / 3600), bsaUsed = st.cap ? Math.min(2, bsaRaw) : bsaRaw, wt0 = 64, dwt = (v.wt - wt0) / wt0 * 100;
+    var fever = v.temp >= 38;
+    var VIT = [
+      ['sys', 'BP systolic', 2, 0, ' mmHg', v.sys >= 160 || v.sys < 90 ? 'Check again' : ''],
+      ['dia', 'BP diastolic', 2, 0, ' mmHg', v.dia >= 100 ? 'High' : ''],
+      ['pulse', 'Pulse', 2, 0, ' /min', v.pulse > 100 ? 'Fast · check for fever, anaemia, heart' : ''],
+      ['temp', 'Temperature', 0.1, 1, ' °C', fever ? 'Fever · rule out infection before chemo' : ''],
+      ['spo2', 'SpO₂', 1, 0, ' %', v.spo2 < 94 ? 'Low · examine lungs' : ''],
+      ['wt', 'Weight', 0.5, 1, ' kg', ''],
+      ['ht', 'Height', 1, 0, ' cm', '']
+    ];
+    var vitals = VIT.map(function (x) {
+      var bad = !!x[5];
+      function step(d) { var o = Object.assign({}, v); o[x[0]] = Math.round((v[x[0]] + d) * 10) / 10; set('vit', o); }
+      return { label: x[1], value: (x[3] ? v[x[0]].toFixed(1) : String(v[x[0]])) + x[4], note: x[5] || 'OK', dec: function () { step(-x[2]); }, inc: function () { step(x[2]); },
+        boxStyle: 'border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; border: 1px solid ' + (bad ? '#F3C1BC' : '#E3E8EE') + '; background: ' + (bad ? '#FFF7F6' : '#FFFFFF'),
+        valStyle: 'font-size: 16px; font-weight: 700; color: ' + (bad ? '#B42318' : '#0F1C2E'),
+        noteStyle: 'font-size: 11px; font-weight: 600; color: ' + (bad ? '#B42318' : '#146C43') };
+    });
+    var signs = SIGNS.map(function (s) { var on = !!st.signs[s]; return { label: (on ? '● ' : '') + s, on: on, toggle: function () { var x = Object.assign({}, st.signs); x[s] = !on; self.setState({ signs: x, signsSeen: true }); }, style: chip(on, '#B45309', '#FDF0DC') }; });
+    var signsOn = SIGNS.filter(function (s) { return st.signs[s]; });
+
+    var les = st.lesions;
+    var sumB = 0, sumP = 0, sumT = 0;
+    les.forEach(function (l) { sumB += l.base; sumP += l.prev; sumT += l.today; });
+    var pct = sumB ? (sumT - sumB) / sumB * 100 : 0, nadir = Math.min(sumB, sumP), fromNadir = nadir ? (sumT - nadir) / nadir * 100 : 0;
+    var resp = st.newLesion || (fromNadir >= 20 && sumT - nadir >= 0.5) ? 'PD' : les.length && sumT === 0 ? 'CR' : pct <= -30 ? 'PR' : 'SD';
+    var RESP = { CR: ['Complete response', '#146C43', '#E3F5EC'], PR: ['Partial response', '#146C43', '#E3F5EC'], SD: ['Stable disease', '#8A4B08', '#FDF0DC'], PD: ['Progressive disease', '#B42318', '#FDECEA'] };
+    var lesions = les.map(function (l) {
+      var c = l.base ? (l.today - l.base) / l.base * 100 : 0, sp = spark([l.base, l.prev, l.today]);
+      function step(d) { self.setState({ lesions: st.lesions.map(function (x) { return x.id === l.id ? Object.assign({}, x, { today: Math.max(0, Math.round((x.today + d) * 10) / 10) }) : x; }) }); }
+      return { name: l.name, base: l.base.toFixed(1), prev: l.prev.toFixed(1), today: l.today.toFixed(1) + ' cm', pts: sp.pts, chg: (c > 0 ? '+' : '') + c.toFixed(0) + '%',
+        chgStyle: 'font-weight: 700; color: ' + (c <= -30 ? '#146C43' : c >= 20 ? '#B42318' : '#3E4C5E'),
+        dec: function () { step(-0.1); }, inc: function () { step(0.1); },
+        remove: function () { self.say(l.name + ' removed from tracker', { lesions: st.lesions.filter(function (x) { return x.id !== l.id; }) }); } };
+    });
+    var addLesions = ['Supraclavicular node', 'Skin nodule', 'Opposite breast'].map(function (n) { return { label: n, add: function () { self.setState({ lesions: st.lesions.concat([{ id: st.nextLes, name: n, base: 1.0, prev: 1.0, today: 1.0 }]), nextLes: st.nextLes + 1 }); } }; });
+    var site = SITE.map(function (s) { var on = !!st.site[s]; return { label: (on ? '● ' : '') + s, on: on, toggle: function () { tog('site', s); }, style: chip(on, s === 'Lump now mobile' ? '#146C43' : '#B45309', s === 'Lump now mobile' ? '#E3F5EC' : '#FDF0DC') }; });
+
+    var sysDone = 0, sysAbn = [];
+    var systems = SYS.map(function (s) {
+      var val = st.sys[s[0]], isA = val === 'a', isN = val === 'n'; if (val) sysDone++;
+      var fs = st.sysF[s[0]] || {};
+      if (isA) sysAbn.push(s[1] + (Object.keys(fs).filter(function (k) { return fs[k]; }).length ? ': ' + Object.keys(fs).filter(function (k) { return fs[k]; }).join(', ') : ''));
+      function setV(x) { var o = Object.assign({}, st.sys); o[s[0]] = x; set('sys', o); }
+      return { label: s[1], why: s[2], isN: isN, isA: isA, setN: function () { setV('n'); }, setA: function () { setV('a'); },
+        rowStyle: 'border: 1px solid ' + (isA ? '#F3C1BC' : '#E3E8EE') + '; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: ' + (isA ? '#FFF7F6' : '#FFFFFF'),
+        nStyle: chip(isN, '#146C43'), aStyle: chip(isA, '#B42318'),
+        findStyle: 'display: ' + (isA ? 'flex' : 'none') + '; gap: 6px; flex-wrap: wrap',
+        finds: s[3].map(function (f) { var on = !!fs[f]; return { label: f, on: on, toggle: function () { var o = Object.assign({}, st.sysF); var y = Object.assign({}, fs); y[f] = !on; o[s[0]] = y; set('sysF', o); }, style: chip(on, '#B42318', '#FDECEA') }; }) };
+    });
+    var cvsAbn = st.sys.cvs === 'a';
+    var devices = DEV.map(function (d) { var on = st.dev === d[0]; return { label: d[1], on: on, pick: function () { set('dev', d[0]); }, style: chip(on) }; });
+    var portOk = PORT.filter(function (p) { return st.port[p]; }).length;
+    var portChecks = PORT.map(function (p) { var on = !!st.port[p]; return { label: (on ? '✓ ' : '○ ') + p, on: on, toggle: function () { tog('port', p); }, style: 'text-align: left; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 10px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? '#146C43' : '#D5DCE4') + '; background: ' + (on ? '#E3F5EC' : '#FFFFFF') + '; color: ' + (on ? '#146C43' : '#3E4C5E') }; });
+    var portReady = st.dev !== 'port' || (st.port['Flushes freely'] && st.port['Blood return seen']);
+    var exDone = { v: true, t: true, b: st.bodyN > 0, s: sysDone === SYS.length, p: portReady };
+    var exTabs = [['v', 'Vitals & general', vitals.filter(function (x) { return x.note !== 'OK'; }).length ? 'Needs a look' : 'BSA ' + bsaRaw.toFixed(2)], ['t', 'Tumour & response', RESP[resp][0]], ['b', 'Body map', st.bodyN ? st.bodyN + ' marked' : 'Optional'], ['s', 'Systems', sysDone + ' of ' + SYS.length + ' checked'], ['p', 'Port / line', portReady ? 'Ready' : 'Check blood return']].map(function (x) {
+      var on = st.exTab === x[0], ok = exDone[x[0]];
+      return { label: x[1], sub: x[2], on: on, pick: function () { set('exTab', x[0]); },
+        style: 'display: flex; gap: 8px; align-items: center; border-radius: 8px; padding: 8px 10px; min-height: 48px; cursor: pointer; font-size: 13px; font-weight: 700; text-align: left; border: 0; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none'),
+        dotStyle: 'flex: none; width: 10px; height: 10px; border-radius: 999px; background: ' + (ok ? '#146C43' : '#D5DCE4') };
+    });
+    function exS(k) { return 'display: ' + (st.exTab === k ? 'flex' : 'none') + '; flex-direction: column; gap: 12px'; }
+
+    /* ---------- labs ---------- */
+    var labFails = [];
+    var labs = LABS.map(function (l) {
+      var val = st.labs[l[0]], ok = (l[4] == null || val >= l[4]) && (l[5] == null || val <= l[5]);
+      if (!ok) labFails.push(l[1]);
+      var sp = spark(l[7].concat([val]), l[4] != null ? l[4] : l[5]);
+      function step(d) { var x = Object.assign({}, st.labs); x[l[0]] = Math.max(0, Math.round((val + d) * 10) / 10); set('labs', x); }
+      function f(n) { return l[6] ? n.toFixed(1) : String(Math.round(n)); }
+      return { label: l[1], unit: l[2], hist: l[7].map(f).join(' · '), pts: sp.pts, limY: sp.limY, stroke: ok ? '#3E4C5E' : '#B42318', value: f(val),
+        limit: l[4] != null ? '≥ ' + l[4] : '≤ ' + l[5], ok: ok ? 'OK' : l[4] != null ? 'Low' : 'High',
+        dec: function () { step(-l[3]); }, inc: function () { step(l[3]); },
+        valStyle: 'min-width: 58px; text-align: center; font-weight: 700; color: ' + (ok ? '#0F1C2E' : '#B42318'),
+        okStyle: 'text-align: center; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 6px; background: ' + (ok ? '#E3F5EC' : '#FDECEA') + '; color: ' + (ok ? '#146C43' : '#B42318') };
+    });
+    var countFail = labFails.filter(function (n) { return n !== 'Heart pumping (LVEF)'; });
+    var efLow = st.labs.ef < 50;
+
+    /* ---------- engine ---------- */
+    var reasons = [], sug;
+    function R(ok, text) { reasons.push({ ok: ok, text: text }); }
+    R(st.ecog <= 2, 'ECOG ' + st.ecog + (st.ecog <= 2 ? ' · fit for chemo' : ' · usually not fit for chemo'));
+    R(!countFail.length && !fever, countFail.length ? 'Out of range: ' + countFail.join(', ') : fever ? 'Fever today ' + v.temp.toFixed(1) + ' °C' : 'Counts, kidney and liver within limits');
+    R(worst < 3 && !fn, worst >= 3 ? 'Grade ' + worst + ' side effect' : fn ? 'Fever / admission since last cycle' : 'Worst side effect grade ' + worst + (unconfirmed ? ' (' + unconfirmed + ' not confirmed)' : ''));
+    R(resp !== 'PD', RESP[resp][0] + ' · ' + (pct > 0 ? '+' : '') + pct.toFixed(0) + '% from baseline');
+    R(!efLow && !cvsAbn, efLow ? 'LVEF ' + st.labs.ef + '%: stop anthracycline' : cvsAbn ? 'Abnormal heart exam: get echo' : 'Heart: LVEF ' + st.labs.ef + '%, exam normal');
+    R(st.dev !== 'port' || portReady, st.dev === 'port' && !portReady ? 'Port: no blood return yet' : 'Line ready for vesicant');
+    if (st.ecog >= 3) sug = 'stop'; else if (countFail.length || fever) sug = 'delay'; else if (resp === 'PD' || efLow) sug = 'change'; else if (worst >= 3 || fn) sug = 'reduce'; else sug = 'proceed';
+    var chosen = st.pick || sug, deviates = chosen !== sug;
+    var decLabel = {}; DECS.forEach(function (d) { decLabel[d[0]] = d[1]; });
+    var decisions = DECS.map(function (d) {
+      var on = chosen === d[0], isS = sug === d[0], warn = d[0] === 'delay' || d[0] === 'stop';
+      var c = warn ? '#B45309' : d[0] === 'change' ? '#6D28D9' : A;
+      return { label: d[1], sub: d[2], on: on, tag: isS ? 'Suggested' : '', pick: function () { self.setState({ pick: d[0], dec: null, devR: null, sent: false, holdDone: false }); },
+        style: 'display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; border-radius: 10px; padding: 10px 12px; min-height: 84px; cursor: pointer; color: #FFFFFF; border: 2px solid ' + (on ? '#FFFFFF' : '#2A3C55') + '; background: ' + (on ? c : '#16263C'),
+        tagStyle: 'display: ' + (isS ? 'inline-block' : 'none') + '; margin-top: auto; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 8px; background: #F9A8D4; color: #500724' };
+    });
+    var canConfirm = !deviates || !!st.devR;
+    var proTotal = TOX.length;
+
+    /* ---------- treatment ---------- */
+    var give = st.dec === 'proceed' || st.dec === 'reduce' || st.dec === 'change';
+    var hold = st.dec === 'delay' || st.dec === 'stop';
+    var Rg = REG[st.reg];
+    var drugs = Rg.drugs.map(function (d) {
+      var calc = d[1] * bsaUsed * st.level / 100, rounded = Math.round(calc / d[3]) * d[3];
+      var prior = 180, thisC = d[1] * st.level / 100, cum = d[4] === 'dox' ? prior + thisC : null;
+      return { name: d[0], per: d[1], calc: calc.toFixed(1) + ' mg', rounded: '→ ' + rounded + ' mg', dose: rounded + ' mg', flag: d[5] || '',
+        flagStyle: 'font-size: 11px; font-weight: 600; color: ' + (d[4] === 'dox' ? '#B42318' : '#5B6B7F'),
+        cum: cum != null ? Math.round(cum) + ' of 450 mg/m² lifetime' : 'No lifetime limit',
+        cumStyle: 'font-size: 12px; font-weight: 600; color: ' + (cum != null && cum > 400 ? '#B42318' : '#3E4C5E'),
+        barWrap: 'display: ' + (cum != null ? 'flex' : 'none') + '; height: 8px; background: #EEF1F5; border-radius: 999px; overflow: hidden',
+        bar: 'width: ' + (prior / 450 * 100) + '%; background: #9AA8B8',
+        barNow: 'width: ' + (thisC / 450 * 100) + '%; background: ' + A };
+    });
+    var cumOk = Rg.drugs.every(function (d) { return d[4] !== 'dox' || 180 + d[1] * st.level / 100 <= 450; });
+    var consentOk = Rg.consented || st.consentNew, schemeOk = Rg.scheme || st.preauth;
+    var lvlOk = st.level === 100 || !!st.lvlR;
+    var labsFit = !countFail.length && !fever;
+    var CH = [
+      [!!st.dec && give, 'Decision recorded', st.dec ? decLabel[st.dec] + (st.devR ? ' · ' + st.devR : '') : 'Confirm in assessment', st.dec ? '' : 'Go', function () { set('part', 'A'); }],
+      [labsFit, 'Fit to treat today', labsFit ? 'Counts, organ tests OK · no fever' : 'Check labs / temperature', '', null],
+      [true, 'Labs within 72 hours', 'Today 8:40 am', '', null],
+      [true, 'BSA from today’s weight', bsaUsed.toFixed(2) + ' m²' + (st.cap && bsaRaw > 2 ? ' (capped at 2.0)' : ''), '', null],
+      [cumOk, 'Cumulative dose within limit', cumOk ? 'Doxorubicin under 450 mg/m²' : 'Over lifetime limit', '', null],
+      [lvlOk, 'Dose-reduction reason', st.level === 100 ? 'Full dose · not needed' : st.lvlR || 'Pick a reason above', '', null],
+      [st.allergy, 'Allergies reviewed', st.allergy ? 'No known drug allergy · confirmed' : 'Confirm with patient', st.allergy ? 'Undo' : 'Confirm', function () { set('allergy', !st.allergy); }],
+      [consentOk, 'Consent for this regimen', Rg.consented ? 'Signed 26 Jul (AC → paclitaxel)' : st.consentNew ? 'New consent signed today' : 'New regimen: take fresh consent', Rg.consented ? '' : st.consentNew ? 'Undo' : 'Mark signed', function () { set('consentNew', !st.consentNew); }],
+      [schemeOk, 'Scheme / TPA approval', Rg.scheme ? 'MJPJAY package approved' : st.preauth ? 'Fresh pre-auth raised' : 'Not in approved package', Rg.scheme ? '' : st.preauth ? 'Undo' : 'Raise pre-auth', function () { set('preauth', !st.preauth); }]
+    ];
+    var passN = CH.filter(function (c) { return c[0]; }).length;
+    var allPass = passN === CH.length;
+    var checks = CH.map(function (c) {
+      return { label: c[1], detail: c[2], icon: c[0] ? '✓' : '!', act: c[4] || function () {}, actLabel: c[3],
+        style: 'display: flex; gap: 10px; align-items: center; border-radius: 10px; padding: 8px 10px; border: 1px solid ' + (c[0] ? '#CDEBD9' : '#F3C1BC') + '; background: ' + (c[0] ? '#F6FCF8' : '#FFF7F6'),
+        iconStyle: 'flex: none; width: 26px; height: 26px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #FFFFFF; background: ' + (c[0] ? '#146C43' : '#B42318'),
+        actStyle: 'display: ' + (c[3] ? 'inline-block' : 'none') + '; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 4px 10px; min-height: 32px; font-size: 12px; font-weight: 600; cursor: pointer' };
+    });
+    var canSend = allPass && !!st.verifier && !st.sent;
+    var stageN = st.sent ? 4 : st.verifier && allPass ? 3 : allPass ? 2 : st.dec ? 1 : 0;
+    var stages = ['Decided', 'Doses checked', 'Second check', 'Pharmacy', 'Chair', 'Given'].map(function (s, i) {
+      var done = i < stageN, now = i === stageN;
+      return { label: s, dot: done ? '✓' : String(i + 1),
+        style: 'display: flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 6px 8px; background: ' + (now ? '#FFFFFF' : done ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)') + '; color: ' + (now ? A : '#FFFFFF') + '; opacity: ' + (done || now ? 1 : 0.7),
+        dotStyle: 'flex: none; width: 20px; height: 20px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; background: ' + (done ? '#146C43' : now ? A : 'rgba(255,255,255,0.25)') + '; color: #FFFFFF' };
+    });
+    var segs = [{ label: 'Pre-meds', min: Rg.premeds.reduce(function (a, p) { return a + p[1]; }, 0) + 15, c: '#64748B' }]
+      .concat(Rg.drugs.map(function (d) { return { label: d[0], min: d[2], c: d[4] === 'dox' ? '#B42318' : A }; }))
+      .concat([{ label: 'Flush + observe', min: 30, c: '#146C43' }]);
+    var tot = segs.reduce(function (a, s) { return a + s.min; }, 0);
+    var timeline = segs.map(function (s) { return { label: s.label, min: s.min + ' min', style: 'flex: ' + s.min + ' 1 0; min-width: 84px; color: #FFFFFF; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; background: ' + s.c }; });
+    var gcsf = fn || st.reg === 'TC';
+    var thm = THM.map(function (m) {
+      var on = m[0] in st.thm ? !!st.thm[m[0]] : (m[0] === 'peg' && gcsf);
+      return { name: m[1], dose: m[2], why: m[3] + (m[0] === 'peg' && gcsf && !(m[0] in st.thm) ? ' · suggested: fever / regimen' : ''), on: on, box: on ? '✓' : '',
+        toggle: function () { var x = Object.assign({}, st.thm); x[m[0]] = !on; set('thm', x); },
+        style: 'display: flex; gap: 12px; align-items: center; width: 100%; border-radius: 10px; padding: 8px 12px; min-height: 48px; cursor: pointer; font-size: 13px; color: #0F1C2E; border: 1px solid ' + (on ? '#E9B6CC' : '#E3E8EE') + '; background: ' + (on ? '#FDF2F7' : '#FFFFFF'),
+        boxStyle: 'flex: none; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #FFFFFF; border: 1px solid ' + (on ? A : '#9AA8B8') + '; background: ' + (on ? A : '#FFFFFF') };
+    });
+    var nextIn = st.dec === 'delay' ? 7 : Rg.days, nextC = st.reg === 'AC' ? 'Cycle 5 · switch to paclitaxel' : 'Next cycle';
+    var nextFacts = [
+      [st.dec === 'delay' ? 'Re-booked chemo' : 'Next chemo', addDays(nextIn), nextC, true],
+      ['Blood test', addDays(nextIn - 1), 'CBC, kidney, liver · day before', true],
+      ['Echo', st.labs.ef < 55 ? 'Before next cycle' : 'Before paclitaxel', 'LVEF last ' + st.labs.ef + '%', st.labs.ef < 55],
+      ['Imaging', 'After cycle 4', 'Mammogram + USG breast · response check', false]
+    ].map(function (f) { return { k: f[0], v: f[1], s: f[2], style: 'border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; background: ' + (f[3] && f[0] === 'Echo' ? '#FDF0DC' : '#F7F9FB') }; });
+    var langName = LANGS.filter(function (l) { return l[0] === st.lang; })[0][1];
+
+    /* ---------- parts & progress ---------- */
+    var aDone = (graded === TOX.length ? 1 : 0) + (sysDone === SYS.length ? 1 : 0) + (st.dec ? 1 : 0);
+    var tDone = (st.cD ? 1 : 0) + (st.sent || st.holdDone ? 1 : 0);
+    function partBtn(p, i, done, of) { var on = st.part === p[0], full = done === of; return { num: full ? '✓' : String(i + 1), label: p[1], sub: p[2], on: on, badge: done + ' of ' + of + ' done', pick: function () { set('part', p[0]); },
+      style: 'display: flex; gap: 12px; align-items: center; border-radius: 12px; padding: 12px 16px; min-height: 64px; cursor: pointer; text-align: left; border: 2px solid ' + (on ? A : '#E3E8EE') + '; background: ' + (on ? A : '#FFFFFF') + '; color: ' + (on ? '#FFFFFF' : '#0F1C2E'),
+      numStyle: 'flex: none; width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; background: ' + (full ? '#146C43' : on ? '#FFFFFF' : '#EEF1F5') + '; color: ' + (full ? '#FFFFFF' : '#0F1C2E'),
+      badgeStyle: 'flex: none; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 9px; background: ' + (full ? '#E3F5EC' : on ? 'rgba(255,255,255,0.2)' : '#FDECEA') + '; color: ' + (full ? '#146C43' : on ? '#FFFFFF' : '#B42318') }; }
+    var aSteps = [['#sx', 'Side effects', graded === TOX.length], ['#exam', 'Examination', sysDone === SYS.length], ['#labs', 'Labs', !labFails.length], ['#fit', 'ECOG', st.ecog <= 2], ['#decide', 'Decision', !!st.dec]].map(function (s, i) {
+      return { href: s[0], label: s[1], dot: s[2] ? '✓' : String(i + 1),
+        style: 'display: flex; gap: 6px; align-items: center; text-decoration: none; font-size: 13px; font-weight: 600; color: #0F1C2E; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 999px; padding: 5px 12px 5px 5px; min-height: 34px',
+        dotStyle: 'width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #FFFFFF; background: ' + (s[2] ? '#146C43' : '#9AA8B8') };
+    });
+    var cycles = ['AC1', 'AC2', 'AC3', 'AC4', 'P1', 'P2', 'P3', 'P4'].map(function (c, i) {
+      var done = i < 3, now = i === 3, delayed = now && st.dec === 'delay';
+      return { label: c, tip: done ? 'Given' : now ? (delayed ? 'Delayed 1 week' : 'Today') : 'Planned',
+        style: 'flex: 1; text-align: center; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 5px 0; ' + (done ? 'background: #146C43; color: #FFFFFF' : now ? 'background: ' + (delayed ? '#B45309' : A) + '; color: #FFFFFF; box-shadow: 0 0 0 2px #FCE7F0' : 'background: #EEF1F5; color: #5B6B7F') };
+    });
+    var footMissing = [graded === TOX.length ? '' : unconfirmed + ' side effect grade(s)', sysDone === SYS.length ? '' : 'systemic exam', st.dec ? '' : 'today’s decision', st.cD ? '' : 'diagnosis', st.sent || st.holdDone ? '' : (hold ? 'record the hold' : 'send chemo order')].filter(Boolean);
+    var ready = !footMissing.length;
+    var note = 'Cycle 4 day 1 of AC (neoadjuvant, Ca left breast IIIA, ER+ PR+ HER2−). ' +
+      'Interval: worst toxicity grade ' + worst + (fn ? ', fever/admission reported' : '') + (neuro ? ', neuropathy G' + neuro : '') + '. ' +
+      'Exam: T ' + v.temp.toFixed(1) + ' °C, P ' + v.pulse + ', BP ' + v.sys + '/' + v.dia + ', wt ' + v.wt.toFixed(1) + ' kg, BSA ' + bsaUsed.toFixed(2) + '. ' + (signsOn.length ? signsOn.join(', ') + '. ' : '') +
+      'Lesion sum ' + sumB.toFixed(1) + ' → ' + sumT.toFixed(1) + ' cm (' + (pct > 0 ? '+' : '') + pct.toFixed(0) + '%): ' + RESP[resp][0].toLowerCase() + '. ' + (sysAbn.length ? 'Abnormal: ' + sysAbn.join('; ') + '. ' : sysDone === SYS.length ? 'Systemic exam normal. ' : '') +
+      'Labs: Hb ' + st.labs.hb.toFixed(1) + ', ANC ' + st.labs.anc + ', plt ' + st.labs.plt + 'k, LVEF ' + st.labs.ef + '%. ECOG ' + st.ecog + '. ' +
+      'Plan: ' + (st.dec ? decLabel[st.dec] + (st.devR ? ' (' + st.devR + ')' : '') : 'pending') + (give ? ' · ' + Rg.label + ' at ' + st.level + '%: ' + drugs.map(function (d) { return d.name + ' ' + d.dose; }).join(', ') : '') + '. Next: ' + addDays(nextIn) + '.';
+
+    return {
+      watch: [
+        ['Doxorubicin 180 / 450 mg/m²', '#FDF0DC', '#8A4B08'], ['MJPJAY · ₹ 38,000 left', '#E3F5EC', '#146C43'], ['No known drug allergy', '#EEF1F5', '#3E4C5E']
+      ].map(function (w) { return { text: w[0], style: 'font-size: 12px; font-weight: 700; border-radius: 8px; padding: 6px 10px; background: ' + w[1] + '; color: ' + w[2] }; }),
+      cycleText: st.dec === 'delay' ? 'Cycle 4 delayed' : 'Cycle 4 of 8 · day 1',
+      cycles: cycles,
+      respShort: resp + ' · ' + (pct > 0 ? '+' : '') + pct.toFixed(0) + '%', respSub: RESP[resp][0] + ' since baseline',
+      respStyle: 'font-weight: 700; font-size: 15px; color: ' + RESP[resp][1],
+
+      parts: [partBtn(['A', 'Assessment', 'Side effects · examination · labs · decision'], 0, aDone, 3), partBtn(['T', 'Treatment', 'Order sheet · safety checks · take-home · next cycle'], 1, tDone, 2)],
+      aStyle: 'display: ' + (st.part === 'A' ? 'flex' : 'none') + '; flex-direction: column; gap: 16px',
+      tStyle: 'display: ' + (st.part === 'T' ? 'flex' : 'none') + '; flex-direction: column; gap: 16px',
+      goA: function () { set('part', 'A'); },
+      aSteps: aSteps,
+
+      tox: tox, events: EVENTS.map(function (e) { var on = !!st.events[e]; return { label: (on ? '● ' : '') + e, on: on, toggle: function () { tog('events', e); }, style: chip(on, '#B42318', '#FDECEA') }; }),
+      toxAlerts: toxAlerts,
+      acceptLabel: unconfirmed ? 'Accept patient grades (' + unconfirmed + ')' : '✓ All grades confirmed',
+      acceptStyle: 'border: 1px solid ' + (unconfirmed ? A : '#146C43') + '; background: ' + (unconfirmed ? A : '#E3F5EC') + '; color: ' + (unconfirmed ? '#FFFFFF' : '#146C43') + '; border-radius: 8px; padding: 0 14px; min-height: 40px; font-weight: 700; cursor: pointer',
+      acceptPro: function () { var x = Object.assign({}, st.tox); TOX.forEach(function (t) { if (x[t[0]] == null) x[t[0]] = t[3]; }); self.say('Patient grades accepted for ' + unconfirmed + ' symptom(s). Change any you disagree with.', { tox: x }); },
+      onComplaints: function (items) { set('cC', Array.isArray(items) ? items.length : 0); },
+
+      examSummary: 'BSA ' + bsaUsed.toFixed(2) + ' m² · ' + RESP[resp][0] + ' · systems ' + sysDone + '/' + SYS.length + (sysAbn.length ? ' · ' + sysAbn.length + ' abnormal' : ''),
+      exTabs: exTabs, exV: exS('v'), exT: exS('t'), exB: exS('b'), exS: exS('s'), exP: exS('p'),
+      vitals: vitals, bsa: bsaRaw.toFixed(2),
+      wtNote: 'Cycle 1: ' + wt0 + ' kg · ' + (dwt >= 0 ? '+' : '') + dwt.toFixed(1) + '%' + (Math.abs(dwt) >= 10 ? ' · recalculate doses' : ''),
+      wtNoteStyle: 'font-size: 11px; font-weight: 600; color: ' + (Math.abs(dwt) >= 10 ? '#B42318' : '#831843'),
+      signs: signs, noSigns: function () { self.setState({ signs: {}, signsSeen: true }); },
+      lesions: lesions, addLesions: addLesions, site: site,
+      sumText: sumB.toFixed(1) + ' → ' + sumT.toFixed(1) + ' cm (smallest so far ' + nadir.toFixed(1) + ')',
+      respLong: RESP[resp][0] + ' · ' + (pct > 0 ? '+' : '') + pct.toFixed(0) + '% from baseline',
+      respBox: 'display: flex; gap: 14px; align-items: center; flex-wrap: wrap; border-radius: 10px; padding: 12px 14px; background: ' + RESP[resp][2] + '; color: ' + RESP[resp][1],
+      newLesion: st.newLesion, toggleNew: function () { set('newLesion', !st.newLesion); },
+      newLabel: st.newLesion ? '● New lesion seen' : '+ New lesion seen?',
+      newStyle: chip(st.newLesion, '#B42318'),
+      onBody: function (pins) { set('bodyN', Array.isArray(pins) ? pins.length : 0); },
+      systems: systems,
+      allNormal: function () { var o = {}; SYS.forEach(function (s) { o[s[0]] = 'n'; }); self.setState({ sys: o, sysF: {} }); },
+      devices: devices, portChecks: portChecks,
+      portNote: st.dev === 'port' ? (portReady ? 'Port ready · ' + portOk + ' of ' + PORT.length + ' checks done' : 'No blood return: do not give doxorubicin until the line is confirmed (dye study / nurse check).') : 'Peripheral / PICC: vesicant only with a fresh, checked line.',
+      portNoteStyle: 'font-size: 12px; font-weight: 600; color: ' + (portReady ? '#146C43' : '#B42318'),
+
+      labs: labs,
+      labsBadge: labFails.length ? labFails.length + ' out of range' : 'All within limits',
+      labsBadgeStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 12px; background: ' + (labFails.length ? '#FDECEA' : '#E3F5EC') + '; color: ' + (labFails.length ? '#B42318' : '#146C43'),
+
+      ecog: ECOG.map(function (t, i) { var on = st.ecog === i; return { n: i, text: t, on: on, pick: function () { set('ecog', i); }, style: 'display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; border-radius: 10px; padding: 10px; min-height: 76px; cursor: pointer; color: ' + (on ? '#FFFFFF' : '#0F1C2E') + '; border: 1px solid ' + (on ? (i >= 3 ? '#B42318' : A) : '#D5DCE4') + '; background: ' + (on ? (i >= 3 ? '#B42318' : A) : '#FFFFFF') }; }),
+      ecogNote: st.ecog <= 2 ? 'Fit for chemo' : 'Usually not fit; discuss palliative care',
+      ecogNoteStyle: 'font-size: 12px; font-weight: 700; color: ' + (st.ecog <= 2 ? '#146C43' : '#B42318'),
+
+      sugLabel: decLabel[sug],
+      reasons: reasons.map(function (r) { return { text: r.text, icon: r.ok ? '✓' : '!', style: 'display: flex; gap: 8px; align-items: center; font-size: 13px; color: ' + (r.ok ? '#D5DCE4' : '#FFFFFF') + '; font-weight: ' + (r.ok ? 500 : 700), iconStyle: 'flex: none; width: 20px; height: 20px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #FFFFFF; background: ' + (r.ok ? '#146C43' : '#B42318') }; }),
+      decisions: decisions,
+      devStyle: 'display: ' + (deviates ? 'flex' : 'none') + '; flex-direction: column; gap: 8px; background: #16263C; border-radius: 10px; padding: 10px 12px',
+      devReasons: DEV_R.map(function (r) { var on = st.devR === r; return { label: r, on: on, pick: function () { self.setState({ devR: r, dec: null }); }, style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 12px; min-height: 34px; cursor: pointer; border: 1px solid ' + (on ? '#FCD34D' : '#2A3C55') + '; background: ' + (on ? '#FCD34D' : 'transparent') + '; color: ' + (on ? '#0F1C2E' : '#FFFFFF') }; }),
+      decBadge: st.dec ? '✓ Confirmed: ' + decLabel[st.dec] : 'Not confirmed',
+      decBadgeStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 12px; background: ' + (st.dec ? '#146C43' : '#2A3C55') + '; color: #FFFFFF',
+      aRecap: 'ECOG ' + st.ecog + ' · worst grade ' + worst + ' · ' + resp + ' ' + (pct > 0 ? '+' : '') + pct.toFixed(0) + '% · ANC ' + st.labs.anc + ' · BSA ' + bsaUsed.toFixed(2) + (unconfirmed ? ' · ' + unconfirmed + ' grade(s) unconfirmed' : ''),
+      confirmLabel: st.dec ? 'Open order sheet →' : 'Confirm “' + decLabel[chosen] + '” →',
+      confirmStyle: 'border: 0; background: ' + (canConfirm ? '#F9A8D4' : '#2A3C55') + '; color: ' + (canConfirm ? '#500724' : '#9AA8B8') + '; border-radius: 8px; padding: 0 20px; min-height: 46px; font-weight: 700; font-size: 14px; cursor: ' + (canConfirm ? 'pointer' : 'not-allowed'),
+      confirmDec: function () {
+        if (st.dec) { set('part', 'T'); return; }
+        if (!canConfirm) { self.say('Pick a reason for choosing differently from the suggestion.'); return; }
+        var p = { dec: chosen, part: 'T', sent: false, holdDone: false };
+        if (chosen === 'reduce') { p.level = 80; p.lvlR = worst >= 3 ? 'Grade 3 side effect' : fn ? 'Fever with low counts' : null; }
+        if (chosen === 'proceed') { p.level = 100; p.lvlR = null; }
+        if (chosen === 'change') { p.reg = efLow ? 'P3' : 'TC'; }
+        self.say('Decision recorded: ' + decLabel[chosen] + '. Order sheet ready.', p);
+      },
+
+      orderTitle: give ? 'Cycle 4 · Day 1 · ' + Rg.label + (st.level < 100 ? ' at ' + st.level + '%' : '') : hold ? 'No chemotherapy today' : 'Cycle 4 · Day 1',
+      orderSub: (st.dec ? 'Decision: ' + decLabel[st.dec] : 'Waiting for decision') + ' · Day-care bed 4 · Intent: curative (neoadjuvant)',
+      stages: stages,
+      noDecStyle: 'display: ' + (st.dec ? 'none' : 'flex') + '; gap: 10px; align-items: center; flex-wrap: wrap; background: #FDF0DC; border: 1px solid #F5D6A8; border-radius: 12px; padding: 12px 16px',
+      onDiagnosis: function (items) { set('cD', Array.isArray(items) ? items.length : 0); },
+      holdStyle: 'display: ' + (hold ? 'flex' : 'none') + '; flex-direction: column; gap: 16px',
+      giveStyle: 'display: ' + (hold ? 'none' : 'flex') + '; flex-direction: column; gap: 16px',
+      holdTitle: st.dec === 'stop' ? 'Stop chemotherapy · move to supportive / palliative care' : 'Delay chemotherapy by 1 week',
+      holdFacts: (st.dec === 'stop' ? [['Reason', reasons.filter(function (r) { return !r.ok; }).map(function (r) { return r.text; })[0] || st.devR || 'Clinical judgement'], ['Refer', 'Palliative care · counselling'], ['Discuss', 'Family meeting · tumour board']] :
+        [['Reason', reasons.filter(function (r) { return !r.ok; }).map(function (r) { return r.text; })[0] || st.devR || 'Clinical judgement'], ['Repeat CBC', addDays(6)], ['New chemo date', addDays(7)]]).map(function (f) { return { k: f[0], v: f[1] }; }),
+      holdBtn: st.holdDone ? '✓ Recorded' : st.dec === 'stop' ? 'Record and refer to palliative care' : 'Record hold and re-book',
+      holdBtnStyle: 'border: 0; background: ' + (st.holdDone ? '#E3F5EC' : '#B45309') + '; color: ' + (st.holdDone ? '#146C43' : '#FFFFFF') + '; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 700; cursor: pointer',
+      recordHold: function () { if (st.holdDone) return; var r = Object.assign({}, st.refs); if (st.dec === 'stop') r['Palliative care'] = true; self.say(st.dec === 'stop' ? 'Chemo stopped and palliative care referral sent.' : 'Chemo re-booked to ' + addDays(7) + '. Patient informed on WhatsApp.', { holdDone: true, refs: r }); },
+
+      regimens: Object.keys(REG).map(function (k) {
+        var on = st.reg === k, R0 = REG[k], tag = !R0.consented ? 'New consent' : k === 'P3' && st.dec === 'change' ? 'Suggested' : 'In plan';
+        return { label: R0.label, sub: R0.sub, on: on, tag: tag, pick: function () { self.setState({ reg: k, sent: false, verifier: null }); },
+          style: 'display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; border-radius: 10px; padding: 10px 12px; min-height: 72px; cursor: pointer; color: ' + (on ? '#FFFFFF' : '#0F1C2E') + '; border: 1px solid ' + (on ? A : '#D5DCE4') + '; background: ' + (on ? A : '#FFFFFF'),
+          tagStyle: 'flex: none; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 8px; background: ' + (on ? 'rgba(255,255,255,0.22)' : R0.consented ? '#EEF1F5' : '#FDF0DC') + '; color: ' + (on ? '#FFFFFF' : R0.consented ? '#3E4C5E' : '#8A4B08') };
+      }),
+      ht: v.ht, wtText: v.wt.toFixed(1) + ' kg', bsaUsed: bsaUsed.toFixed(2),
+      levels: [100, 90, 80, 75].map(function (l) { var on = st.level === l; return { label: l + '%', on: on, pick: function () { self.setState({ level: l, sent: false, verifier: null, lvlR: l === 100 ? null : st.lvlR }); }, style: chip(on, l < 100 ? '#B45309' : A) }; }),
+      cap: st.cap, toggleCap: function () { set('cap', !st.cap); },
+      capLabel: (st.cap ? '✓ ' : '') + 'Cap BSA at 2.0 m²', capStyle: chip(st.cap, '#3E4C5E', '#EEF1F5'),
+      lvlReasonStyle: 'display: ' + (st.level < 100 ? 'flex' : 'none') + '; gap: 8px; align-items: center; flex-wrap: wrap; background: #FDF6EC; border-radius: 8px; padding: 8px 10px',
+      lvlReasons: LVL_R.map(function (r) { var on = st.lvlR === r; return { label: r, on: on, pick: function () { set('lvlR', r); }, style: chip(on, '#B45309') }; }),
+      drugs: drugs,
+      chairTime: Math.floor(tot / 60) + ' h ' + (tot % 60) + ' min', timeline: timeline,
+      premeds: Rg.premeds.map(function (p) { return p[0]; }),
+      emeto: 'Nausea risk: ' + Rg.emeto + (Rg.emeto === 'High' ? ' · 3-drug anti-nausea cover included' : ''),
+      emetoStyle: 'font-size: 12px; font-weight: 600; color: ' + (Rg.emeto === 'High' ? '#8A4B08' : '#3E4C5E'),
+      checks: checks,
+      checkBadge: passN + ' of ' + CH.length + ' passed' + (st.verifier ? ' · second check done' : ''),
+      checkBadgeStyle: 'font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 12px; background: ' + (allPass ? '#E3F5EC' : '#FDECEA') + '; color: ' + (allPass ? '#146C43' : '#B42318'),
+      verifiers: VERIFIERS.map(function (n) { var on = st.verifier === n; return { label: (on ? '✓ ' : '') + n, on: on, pick: function () { if (!allPass && !on) { self.say('Clear the red checks before the second check.'); return; } set('verifier', on ? null : n); }, style: chip(on, '#146C43') }; }),
+      sendNote: st.sent ? 'Sent ' + drugs.map(function (d) { return d.name + ' ' + d.dose; }).join(', ') + ' · pharmacy preparing' : !allPass ? (CH.length - passN) + ' check(s) still red' : !st.verifier ? 'Waiting for the second check' : 'All checks passed. Ready to send.',
+      sendNoteStyle: 'font-size: 13px; font-weight: 600; color: ' + (st.sent || canSend ? '#146C43' : '#B42318'),
+      sendLabel: st.sent ? '✓ Sent to pharmacy' : 'Sign and send to pharmacy',
+      sendStyle: 'border: 1px solid ' + (canSend ? A : '#C9D2DC') + '; background: ' + (canSend ? A : st.sent ? '#E3F5EC' : '#EEF1F5') + '; color: ' + (canSend ? '#FFFFFF' : st.sent ? '#146C43' : '#5B6B7F') + '; border-radius: 8px; padding: 0 20px; min-height: 46px; font-weight: 700; cursor: ' + (canSend ? 'pointer' : 'not-allowed'),
+      sendOrder: function () { if (st.sent) return; if (!allPass) { self.say('Clear the red safety checks first.'); return; } if (!st.verifier) { self.say('An independent second person must check the doses.'); return; } self.say('Order signed and sent. Pharmacy preparing; day-care bed 4.', { sent: true }); },
+
+      thm: thm, langName: langName, nextFacts: nextFacts,
+      langs: LANGS.map(function (l) { var on = st.lang === l[0]; return { label: l[1], on: on, pick: function () { self.setState({ lang: l[0], wa: false }); }, style: chip(on, '#146C43') }; }),
+      waLabel: st.wa ? '✓ Sent' : 'Send to patient', sendWa: function () { self.say('Chemo calendar sent on WhatsApp in ' + langName + '.', { wa: true }); },
+      waStyle: 'border: 0; background: ' + (st.wa ? '#E3F5EC' : '#146C43') + '; color: ' + (st.wa ? '#146C43' : '#FFFFFF') + '; border-radius: 8px; padding: 0 14px; min-height: 38px; font-weight: 700; cursor: pointer',
+      refs: REFS.map(function (r) { var on = !!st.refs[r]; return { label: (on ? '✓ ' : '+ ') + r, on: on, toggle: function () { tog('refs', r); }, style: 'font-size: 13px; font-weight: 600; border-radius: 999px; padding: 7px 12px; min-height: 36px; cursor: pointer; border: 1px ' + (on ? 'solid ' + A : 'dashed #9AA8B8') + '; color: ' + (on ? '#831843' : '#3E4C5E') + '; background: ' + (on ? '#FCE7F0' : '#FFFFFF') }; }),
+      note: note, copyNote: function () { self.say('Cycle note copied to the visit record'); },
+
+      footText: ready ? 'Ready to complete. Cycle record, take-home medicines and calendar will print.' : 'Still needed: ' + footMissing.join(', ') + '.',
+      footStyle: 'font-size: 13px; font-weight: 600; color: ' + (ready ? '#146C43' : '#B42318'),
+      completeStyle: 'border: 1px solid ' + (ready ? A : '#C9D2DC') + '; background: ' + (ready ? A : '#EEF1F5') + '; color: ' + (ready ? '#FFFFFF' : '#5B6B7F') + '; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: ' + (ready ? 'pointer' : 'not-allowed'),
+      complete: function () { self.say(ready ? 'Visit completed · cycle note saved, prescriptions printed in ' + langName : 'Finish: ' + footMissing.join(', ')); },
+      saveDraft: function () { self.say('Draft saved'); },
+      toast: st.toast,
+      proTotal: proTotal
+    };
+  }
+
+  renderVals() {
+    var self = this, st = this.state, r = this._rv(), MAP = {"complaints": "onComplaints", "diagnosis": "onDiagnosis", "advice": null}, TOOLS = false, cp = st.cp || {};
+    Object.keys(MAP).forEach(function (k) {
+      var orig = MAP[k] ? r[MAP[k]] : null;
+      r['cp_' + k] = function (items) { if (typeof orig === 'function') orig(items); var a = Array.isArray(items) ? items : []; self.setState(function (s0) { var x = Object.assign({}, s0.cp || {}); x[k] = a; return { cp: x }; }); };
+    });
+    var paper = casePaper(st, r, cp), S = paper.sections || {}, n = 0;
+    Object.keys(S).forEach(function (k) { if (S[k] && S[k].length) n++; }); if (paper.rx && paper.rx.length) n++;
+    var rt = st.rtab || 'history', A = '#9D174D';
+    var tabs = [['history', 'Past visits', 'OPD + IPD'], ['paper', 'Case paper', n + ' of 10 filled · live']];
+    if (TOOLS) tabs.push(['tools', 'Quick tools', 'Helpers for this visit']);
+    r.rTabs = tabs.map(function (t) { var on = rt === t[0]; return { label: t[1], sub: t[2], on: on, pick: function () { self.setState({ rtab: t[0] }); },
+      style: 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 48px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none') }; });
+    function pane(k) { return 'display: ' + (rt === k ? 'flex' : 'none') + '; flex-direction: column; gap: 16px'; }
+    r.rpHistory = pane('history'); r.rpPaper = pane('paper'); r.rpTools = pane('tools');
+    r.paper = paper;
+    return r;
+  }
+}
+</script>
+</body>
+</html>

@@ -15,7 +15,9 @@
       "Bash(git branch*)",
       "Bash(git switch -c feature/*)",
       "Bash(git switch -c fix/*)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+       "Bash(node frontend/e2e/live/opd-journey.mjs:*)",
+      "Bash(curl -s http://localhost:8080/:*)"
     ],
     "ask": [
       "Bash(git commit*)",

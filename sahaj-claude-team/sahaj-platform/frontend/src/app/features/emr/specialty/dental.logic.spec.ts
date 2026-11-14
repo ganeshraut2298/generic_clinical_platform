@@ -3,6 +3,7 @@ import {
   ADULT_UPPER,
   CHILD_LOWER,
   CHILD_UPPER,
+  courseSummary,
   defaultSittings,
   emptyChart,
   estimateTotalPaise,
@@ -142,5 +143,13 @@ describe('3D jaw (CSS 3D transforms only)', () => {
     expect(toothColour('#F0E3C6', 'CARIES')).not.toEqual([0xf0, 0xe3, 0xc6]);
     expect(toothSize(36).w).toBeGreaterThan(toothSize(11).w);
     expect(toothSize(75).w).toBeLessThan(toothSize(36).w);
+  });
+
+  it('writes the running treatment for the header from a multi-sitting row in progress', () => {
+    const row = { tooth: 36, procedureText: 'RCT', status: 'IN_PROGRESS' as const, sittingsPlanned: 3, currentSitting: 2 };
+    expect(courseSummary([row])).toBe('RCT on 36 in progress, sitting 2 of 3');
+    expect(courseSummary([{ ...row, sittingsPlanned: 1 }])).toBeNull();
+    expect(courseSummary([{ ...row, status: 'PLANNED' as const }])).toBeNull();
+    expect(courseSummary([])).toBeNull();
   });
 });

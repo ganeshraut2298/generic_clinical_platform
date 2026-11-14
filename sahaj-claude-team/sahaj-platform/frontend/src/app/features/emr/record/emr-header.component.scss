@@ -123,6 +123,14 @@
   margin-left: auto;
 }
 
+.vax {
+  margin-left: auto;
+
+  & + .dr {
+    margin-left: 0;
+  }
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;

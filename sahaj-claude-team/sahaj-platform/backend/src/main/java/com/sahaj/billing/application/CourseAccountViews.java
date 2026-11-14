@@ -20,7 +20,8 @@ public final class CourseAccountViews {
                              String receiptNo) {
     }
 
-    public record NextPlannedAdmission(UUID sittingId, int sittingNo, long chargePaise, String note) {
+    /** {@code displayNo} (0.4.0, ADR-026 D4) is the number shown; {@code sittingNo} stays the stable key. */
+    public record NextPlannedAdmission(UUID sittingId, int sittingNo, int displayNo, long chargePaise, String note) {
     }
 
     /** Both are null when there is nothing to suggest (balance 0; no planned admission). */

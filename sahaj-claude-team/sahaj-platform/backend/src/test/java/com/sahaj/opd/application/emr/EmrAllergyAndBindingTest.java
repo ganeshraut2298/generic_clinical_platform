@@ -192,4 +192,60 @@ class EmrAllergyAndBindingTest {
         org.mockito.Mockito.verify(repo, org.mockito.Mockito.never()).search(any(), any(), eq("x".repeat(101)),
                 org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
     }
+
+    // ---- SAH-75-6 (ADR-026 D6): the Dental card's Penicillin chip joins the visit's classes ----
+
+    private static JsonNode readTree(String json) {
+        try {
+            return EmrTestData.MAPPER.readTree(json);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static EmrRecordDocument withDentalCard(String allergies) {
+        EmrRecordDocument doc = EmrRecordDocument.empty(EmrTestData.MAPPER);
+        doc.put("dental_medhx", (com.fasterxml.jackson.databind.node.ObjectNode) readTree(
+                "{\"specialty\":{\"component\":\"DENTAL_MED_HISTORY\",\"schemaVersion\":1,\"conditions\":[],"
+                        + "\"medicines\":[],\"allergies\":" + allergies + ",\"reviewedWithPatient\":false}}"),
+                false, java.time.Instant.EPOCH, UUID.randomUUID());
+        return doc;
+    }
+
+    @Test
+    void thePenicillinChipOfTheDentalCardIsAVisitClassAndTheOtherChipsHaveNone() {
+        Set<String> known = Set.of("SULFA", "PENICILLIN");
+
+        assertThat(EmrAllergyCheck.visitClasses(withDentalCard("[\"PENICILLIN\",\"LATEX\",\"NSAIDS\"]"), known))
+                .containsExactly("PENICILLIN");
+        assertThat(EmrAllergyCheck.visitClasses(withDentalCard("[\"LATEX\",\"NSAIDS\",\"LOCAL_ANAESTHETIC\"]"), known))
+                .isEmpty();
+        assertThat(EmrAllergyCheck.visitClasses(withDentalCard("[\"NONE\"]"), known)).isEmpty();
+    }
+
+    @Test
+    void aClassTheClinicListDoesNotKnowIsNotAddedAndTheChipJoinsTheAllergiesSectionsClasses() {
+        EmrRecordDocument doc = document(ALLERGY_SULFA, rx("null"));
+        doc.put("dental_medhx", (com.fasterxml.jackson.databind.node.ObjectNode) readTree(
+                "{\"specialty\":{\"component\":\"DENTAL_MED_HISTORY\",\"allergies\":[\"PENICILLIN\"]}}"), false,
+                java.time.Instant.EPOCH, UUID.randomUUID());
+
+        assertThat(EmrAllergyCheck.visitClasses(doc, Set.of("SULFA"))).containsExactly("SULFA");
+        assertThat(EmrAllergyCheck.visitClasses(doc, Set.of("SULFA", "PENICILLIN"))).containsExactlyInAnyOrder("SULFA",
+                "PENICILLIN");
+    }
+
+    @Test
+    void aPenicillinDrugIsAnAlertWhenOnlyTheDentalCardHoldsTheAllergy() {
+        EmrRecordDocument doc = withDentalCard("[\"PENICILLIN\"]");
+        doc.put("rx", (com.fasterxml.jackson.databind.node.ObjectNode) readTree(rx("null")), false,
+                java.time.Instant.EPOCH, UUID.randomUUID());
+        Set<String> classes = EmrAllergyCheck.visitClasses(doc, Set.of("SULFA", "PENICILLIN"));
+
+        List<Alert> alerts = EmrAllergyCheck.alerts(layout(), doc, classes, id -> "PENICILLIN");
+
+        assertThat(alerts).hasSize(1);
+        assertThat(alerts.get(0).allergyClass()).isEqualTo("PENICILLIN");
+        assertThat(EmrAllergyCheck.blocked(alerts)).isTrue();
+    }
 }

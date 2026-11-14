@@ -284,6 +284,20 @@ describe('FormBuilderPage (SAH-59)', () => {
   });
 
   describe('Save draft and the approval steps', () => {
+    it('reads the meta line with the roles that fill the form', () => {
+      boot(formView({ definition: footDefinition({ settings: settings({ whoCanFill: ['DOCTOR', 'NURSE'] }) }) }));
+      expect(page['store'].metaLine()).toBe('General Medicine · Assessment · filled by doctor, nurse');
+    });
+
+    it('answers "Nothing new to save" when nothing changed, without calling the server', () => {
+      boot();
+      const button = q<HTMLButtonElement>('[data-act=save-draft]')!;
+      expect(button.disabled).toBe(false);
+      button.click();
+      fixture.detectChanges();
+      expect(toast()).toBe('Nothing new to save');
+    });
+
     it('saves the draft with the revision, then says "Draft saved"', () => {
       boot();
       const name = q<HTMLInputElement>('[data-testid=form-name]')!;

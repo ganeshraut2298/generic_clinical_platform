@@ -166,4 +166,79 @@ public final class DentalRules {
         }
         return RuleTag.sha256(text.toString());
     }
+
+    // ---- SAH-75-6 (ADR-026 D6): "Medical history and alerts" (values from the EMR mockup, not clinically reviewed) ----
+
+    /** The three chip groups of the card, in the drawn order; NONE last. */
+    public static final List<String> MED_CONDITIONS = List.of("DIABETES", "HIGH_BP", "HEART_DISEASE", "THYROID",
+            "ASTHMA", "BLEEDING_DISORDER", "EPILEPSY", "PREGNANT", "NONE");
+    public static final List<String> MED_MEDICINES = List.of("BLOOD_THINNERS", "ASPIRIN", "BISPHOSPHONATES", "STEROIDS",
+            "THYROID_MEDICINE", "NONE");
+    public static final List<String> MED_ALLERGIES = List.of("PENICILLIN", "LOCAL_ANAESTHETIC", "LATEX", "NSAIDS",
+            "NONE");
+
+    /** The words of each chip as drawn (also the allergy text written to the patient record at signing, OQ-75-16). */
+    public static final Map<String, String> MED_LABELS = Map.ofEntries(
+            Map.entry("DIABETES", "Diabetes"), Map.entry("HIGH_BP", "High BP"),
+            Map.entry("HEART_DISEASE", "Heart disease"), Map.entry("THYROID", "Thyroid"),
+            Map.entry("ASTHMA", "Asthma"), Map.entry("BLEEDING_DISORDER", "Bleeding disorder"),
+            Map.entry("EPILEPSY", "Epilepsy"), Map.entry("PREGNANT", "Pregnant"),
+            Map.entry("BLOOD_THINNERS", "Blood thinners"), Map.entry("ASPIRIN", "Aspirin"),
+            Map.entry("BISPHOSPHONATES", "Bisphosphonates"), Map.entry("STEROIDS", "Steroids"),
+            Map.entry("THYROID_MEDICINE", "Thyroid medicine"), Map.entry("PENICILLIN", "Penicillin"),
+            Map.entry("LOCAL_ANAESTHETIC", "Local anaesthetic"), Map.entry("LATEX", "Latex"),
+            Map.entry("NSAIDS", "Painkillers (NSAIDs)"), Map.entry("NONE", "None"));
+
+    /** The drug class of an allergy chip; only Penicillin has one (ADR-026 H15). */
+    public static final Map<String, String> MED_ALLERGY_CLASS = Map.of("PENICILLIN", "PENICILLIN");
+
+    /** The habits of "Dental history and habits" that raise the tobacco banner (option keys of dental_hx.habits). */
+    public static final Set<String> TOBACCO_HABITS = Set.of("tobacco_chewing", "gutkha", "paan_betel", "smoking");
+
+    /** One banner inside the card: the drawn title and sentence. */
+    public record MedicalAlert(String key, String title, String text) {
+    }
+
+    /**
+     * The banners of "Medical history and alerts", in the drawn order and words, each only when its condition holds. They
+     * warn; they never block. {@code habits} are the option keys chosen in dental_hx.habits of the same record.
+     */
+    public static List<MedicalAlert> medicalAlerts(Set<String> conditions, Set<String> medicines, Set<String> allergies,
+                                                   Set<String> habits) {
+        List<MedicalAlert> alerts = new ArrayList<>();
+        if (allergies.contains("PENICILLIN")) {
+            alerts.add(new MedicalAlert("PENICILLIN_ALLERGY", "Penicillin allergy.",
+                    "Avoid amoxicillin; use a non-penicillin antibiotic."));
+        }
+        if (medicines.contains("BLOOD_THINNERS") || medicines.contains("ASPIRIN")
+                || conditions.contains("BLEEDING_DISORDER")) {
+            alerts.add(new MedicalAlert("BLEEDING_RISK", "Bleeding risk.",
+                    "Check INR or stop advice with the physician before extraction or surgery."));
+        }
+        if (conditions.contains("DIABETES")) {
+            alerts.add(new MedicalAlert("DIABETES", "Diabetes.", "Check sugar before surgery; healing is slower."));
+        }
+        if (conditions.contains("HIGH_BP") || conditions.contains("HEART_DISEASE")) {
+            alerts.add(new MedicalAlert("BP_HEART", "BP / heart.",
+                    "Check BP; limit adrenaline in local anaesthetic."));
+        }
+        if (conditions.contains("PREGNANT")) {
+            alerts.add(new MedicalAlert("PREGNANT", "Pregnant.",
+                    "Avoid X-rays unless essential; second trimester is safest for treatment."));
+        }
+        if (medicines.contains("BISPHOSPHONATES")) {
+            alerts.add(new MedicalAlert("BISPHOSPHONATES", "Bisphosphonates.",
+                    "Risk of jaw bone problems after extraction or implant."));
+        }
+        if (habits.stream().anyMatch(TOBACCO_HABITS::contains)) {
+            alerts.add(new MedicalAlert("TOBACCO_USE", "Tobacco use.",
+                    "Screen the mouth for pre-cancer patches and counsel to quit."));
+        }
+        return List.copyOf(alerts);
+    }
+
+    /** True when NONE is chosen together with another chip of the same group (400 validation). */
+    public static boolean noneWithOthers(List<String> chosen) {
+        return chosen.contains("NONE") && chosen.size() > 1;
+    }
 }

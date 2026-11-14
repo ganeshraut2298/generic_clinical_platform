@@ -99,11 +99,29 @@ describe('Immunization (SAH-62-2)', () => {
     expect(h.store.specialtyValue('immunization')).toMatchObject({ givenToday: [] });
   });
 
-  it('"Mark all due as given" marks the vaccines due today only, not the overdue one (H9)', () => {
+  it('"Mark all due as given" records the vaccines due today and the overdue one, once, with the toast (SAH-75-9)', () => {
     const h = mountEditor(ImmunizationComponent, view(), 'immunization', { immunization: empty });
     byText(h.el, 'button', 'Mark all due as given').click();
+    h.fixture.detectChanges();
     const given = (h.store.specialtyValue('immunization') as SpImmunization).givenToday.map((g) => g.vaccineKey);
-    expect(given).toEqual(['dtwp_booster_1', 'ipv_booster_1']);
+    expect(given.length).toBe(3);
+    expect(given).toContain('dtwp_booster_1');
+    expect(given).toContain('ipv_booster_1');
+    expect(h.el.querySelector('[data-testid="vax-toast"]')?.textContent).toBe('3 vaccines recorded');
+    byText(h.el, 'button', 'Mark all due as given').click();
+    h.fixture.detectChanges();
+    expect((h.store.specialtyValue('immunization') as SpImmunization).givenToday.length).toBe(3);
+    expect(h.el.querySelector('[data-testid="vax-toast"]')?.textContent).toBe('0 vaccines recorded');
+  });
+
+  it('names the vaccine in the tap toasts: recorded as given today, then unmarked', () => {
+    const h = mountEditor(ImmunizationComponent, view(), 'immunization', { immunization: empty });
+    byText(h.el, 'button.vac', 'DTwP booster 1').click();
+    h.fixture.detectChanges();
+    expect(h.el.querySelector('[data-testid="vax-toast"]')?.textContent).toBe('DTwP booster 1 recorded as given today');
+    byText(h.el, 'button.vac', 'DTwP booster 1').click();
+    h.fixture.detectChanges();
+    expect(h.el.querySelector('[data-testid="vax-toast"]')?.textContent).toBe('DTwP booster 1 unmarked');
   });
 
   it('says how many are still to give', () => {
@@ -250,6 +268,7 @@ describe('Dose by weight (SAH-62-3)', () => {
     expect(h.el.querySelector('[data-testid="dose-weight"]')?.textContent).toContain('10.2 kg');
     expect(h.el.querySelector('[data-testid="dose-mg"]')?.textContent).toBe('153 mg');
     expect(h.el.querySelector('[data-testid="dose-ml"]')?.textContent).toBe('6.4 ml');
+    expect(h.el.querySelector('[data-testid="dose-give"]')?.textContent?.replace(/\s+/g, ' ').trim()).toContain('Give6.4 ml');
     byText(h.el, 'button', 'Add to prescription').click();
     const search = h.http.expectOne((r) => r.url === '/api/v1/opd/emr/medicines');
     expect(search.request.params.get('q')).toBe('Paracetamol syrup 120 mg / 5 ml');

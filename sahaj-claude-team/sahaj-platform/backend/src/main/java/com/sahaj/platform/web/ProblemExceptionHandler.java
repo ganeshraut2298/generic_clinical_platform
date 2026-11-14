@@ -379,11 +379,22 @@ public class ProblemExceptionHandler extends ResponseEntityExceptionHandler {
         return "-";
     }
 
+    /** DEC-054: seconds a client is told to wait after a database timeout. */
+    static final long BUSY_RETRY_AFTER_SECONDS = 5;
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> handleUnexpected(Exception ex) {
         Throwable root = ex;
         while (root.getCause() != null && root.getCause() != root) {
             root = root.getCause();
+        }
+        if (DatabaseBusy.isBusy(ex)) {
+            // a bounded wait that ended (lock timeout, statement timeout, no free connection): 503, never the 500 below
+            log.warn("Database busy kind={} type={} rootCause={} sqlState={} at={}", DatabaseBusy.kind(ex),
+                    ex.getClass().getName(), root.getClass().getName(), sqlState(root), firstSahajFrame(ex));
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HttpHeaders.RETRY_AFTER, String.valueOf(BUSY_RETRY_AFTER_SECONDS));
+            return respond(Problems.busy(BUSY_RETRY_AFTER_SECONDS), headers);
         }
         log.error("Unhandled error type={} rootCause={} sqlState={} dbError={} at={}", ex.getClass().getName(),
                 root.getClass().getName(), sqlState(root), primaryDbMessage(root), firstSahajFrame(ex));

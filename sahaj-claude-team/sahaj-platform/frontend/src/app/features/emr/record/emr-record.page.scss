@@ -5,11 +5,43 @@
   min-width: 0;
 }
 
+/* 50/50 from 1280 px: the EMR entry is the left half, past visits and the case paper the right half (SAH-75-1). */
 .layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+
+  &.no-nav {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.nav-foot {
+  margin-top: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+
+  .bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .fill {
+    display: block;
+    height: 100%;
+    background: var(--pri);
+
+    &.full {
+      background: var(--good);
+    }
+  }
 }
 
 .nav {
@@ -206,8 +238,21 @@
 
 .cards {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 12px;
+
+  > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* Paediatrics: "Growth today" and "Milestones" share a row from 1280 px (SAH-75-11 P4). */
+  @media (min-width: 1280px) {
+    > .half {
+      flex: 1 1 calc(50% - 6px);
+    }
+  }
 }
 
 .side {
@@ -303,14 +348,25 @@
   }
 }
 
-@media (max-width: 1180px) {
-  .layout {
-    grid-template-columns: 220px minmax(0, 1fr);
+/* Below 1280 px the right panel sits under the left one; its tabs stay at the top of the panel. */
+@media (max-width: 1279.98px) {
+  .layout,
+  .layout.no-nav {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .side {
-    grid-column: 1 / -1;
+  .nav {
     position: static;
     max-height: none;
+  }
+  .side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .rtabs {
+    position: sticky;
+    top: 0;
+    z-index: 3;
   }
 }
 
@@ -325,4 +381,10 @@
   .parts {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Complete looks and acts as not pressable while something is still needed (the design's grey button). */
+.fbtns button[data-act='complete'][aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

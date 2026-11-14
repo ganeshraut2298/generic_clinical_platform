@@ -13,6 +13,7 @@ import com.sahaj.opd.domain.emr.specialty.AncRules.Today;
 import com.sahaj.opd.domain.emr.specialty.ChemoRules;
 import com.sahaj.opd.domain.emr.specialty.DentalRules;
 import com.sahaj.opd.domain.emr.specialty.Flag;
+import com.sahaj.opd.domain.emr.specialty.JourneyRules;
 import com.sahaj.opd.domain.emr.specialty.OncologyRules;
 import com.sahaj.opd.domain.emr.specialty.PaedsRules;
 import com.sahaj.opd.domain.emr.specialty.PhysioRules;
@@ -174,7 +175,38 @@ public final class SpecialtyViewBuilder {
         }
         // ADR-024 D7: under 13 by the effective years (from the date of birth when recorded, else the stored age)
         node.put("childTabDefault", DentalRules.childTabDefault(ctx.ageYears()));
+        node.set("medicalAlerts", medicalAlerts(ctx));
         return node;
+    }
+
+    /**
+     * SAH-75-6 (ADR-026 D6): the banners of "Medical history and alerts", worked out from the stored card and from the
+     * habits of "Dental history and habits" in the same record. They warn; they never block. Never logged.
+     */
+    private static ArrayNode medicalAlerts(SpecialtyCtx ctx) {
+        JsonNode medhx = orEmpty(ctx.sibling().apply("DENTAL_MED_HISTORY"));
+        JsonNode habits = orEmpty(ctx.hooks().section().apply("dental_hx")).path("habits");
+        ArrayNode alerts = NODES.arrayNode();
+        for (DentalRules.MedicalAlert alert : DentalRules.medicalAlerts(texts(medhx.path("conditions")),
+                texts(medhx.path("medicines")), texts(medhx.path("allergies")), texts(habits))) {
+            ObjectNode node = alerts.addObject();
+            node.put("key", alert.key());
+            node.put("title", alert.title());
+            node.put("text", alert.text());
+        }
+        return alerts;
+    }
+
+    private static java.util.Set<String> texts(JsonNode array) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        if (array.isArray()) {
+            for (JsonNode item : array) {
+                if (item.isTextual()) {
+                    out.add(item.asText());
+                }
+            }
+        }
+        return out;
     }
 
     // ---- obstetrics ----
@@ -598,7 +630,90 @@ public final class SpecialtyViewBuilder {
             cycle.put("echo", next.echo());
         }
         node.put("orderStatus", chemo.orderStatus());
+        SpecialtyCtx.OncoExtra extra = ctx.hooks().onco().get();
+        if (extra == null) {
+            extra = SpecialtyCtx.OncoExtra.none();
+        }
+        node.set("journey", journeyStrip(extra, decision));
+        ObjectNode watch = node.putObject("watch");
+        put(watch, "doxorubicinGivenMgM2", extra.doxorubicinGivenMgM2());
+        watch.put("doxorubicinLimitMgM2", JourneyRules.DOXORUBICIN_LIMIT_MGM2);
+        put(node, "dayCareBed", extra.dayCareBed());
         return node;
+    }
+
+    /**
+     * SAH-75-7 (ADR-026 D7): the "Cancer journey snapshot", always whole: the journey record (null reads "Not recorded"),
+     * the diagnosis text, and the chemotherapy plan (null reads "No chemotherapy plan") with one chip per cycle. DELAYED
+     * is today's cycle while the decision recorded on this record is DELAY_1_WEEK. Never logged.
+     */
+    private static ObjectNode journeyStrip(SpecialtyCtx.OncoExtra extra, JsonNode decision) {
+        ObjectNode strip = NODES.objectNode();
+        SpecialtyCtx.JourneyRecord j = extra.journey();
+        if (j == null) {
+            strip.putNull("record");
+        } else {
+            ObjectNode record = strip.putObject("record");
+            record.put("version", j.version());
+            put(record, "stageGroup", j.stageGroup());
+            put(record, "tnmText", j.tnmText());
+            put(record, "markersText", j.markersText());
+            put(record, "ki67Pct", j.ki67Pct());
+            put(record, "geneticsText", j.geneticsText());
+            put(record, "intent", j.intent());
+            put(record, "setting", j.setting());
+            put(record, "lineNo", j.lineNo());
+            put(record, "boardDate", j.boardDate());
+            record.put("recordedAt", j.recordedAt() == null ? null : j.recordedAt().toString());
+            record.put("recordedByName", j.recordedByName());
+        }
+        put(strip, "diagnosisText", extra.diagnosisText());
+        SpecialtyCtx.PlanInfo plan = extra.plan();
+        if (plan == null) {
+            strip.putNull("plan");
+            return strip;
+        }
+        boolean delayed = decision != null && "DELAY_1_WEEK".equals(decision.path("choice").asText());
+        List<String> regimens = new java.util.ArrayList<>();
+        for (SpecialtyCtx.Cycle cycle : plan.cycles()) {
+            regimens.add(cycle.regimenKey());
+        }
+        List<String> labels = JourneyRules.cycleLabels(regimens);
+        ObjectNode node = strip.putObject("plan");
+        node.put("courseId", plan.courseId().toString());
+        String title = JourneyRules.planTitle(regimens);
+        node.put("title", title == null ? plan.courseName() : title);
+        Integer cycleNo = null;
+        ArrayNode cycles = NODES.arrayNode();
+        boolean todayUsed = false;
+        for (int i = 0; i < plan.cycles().size(); i++) {
+            SpecialtyCtx.Cycle cycle = plan.cycles().get(i);
+            String state = cycle.state();
+            if ("TODAY".equals(state)) {
+                if (delayed && !todayUsed) {
+                    state = "DELAYED";
+                }
+                if (cycleNo == null) {
+                    cycleNo = i + 1;
+                }
+                todayUsed = true;
+            }
+            ObjectNode chip = cycles.addObject();
+            chip.put("sittingId", cycle.sittingId().toString());
+            chip.put("label", labels.get(i));
+            chip.put("state", state);
+        }
+        if (cycleNo == null) {
+            for (int i = 0; i < plan.cycles().size() && cycleNo == null; i++) {
+                if ("PLANNED".equals(plan.cycles().get(i).state())) {
+                    cycleNo = i + 1;
+                }
+            }
+        }
+        put(node, "cycleNo", cycleNo);
+        node.put("cycleCount", plan.cycles().size());
+        node.set("cycles", cycles);
+        return strip;
     }
 
     static String lower(String text) {

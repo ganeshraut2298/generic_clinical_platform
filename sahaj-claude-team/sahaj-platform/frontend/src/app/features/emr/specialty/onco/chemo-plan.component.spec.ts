@@ -128,9 +128,11 @@ describe('Chemotherapy order sheet (SAH-66, SAH-70)', () => {
     expect(h.el.querySelector('[data-testid="bsa-line"]')?.textContent).toContain('BSA 1.66 m²');
     expect(h.el.querySelector('[data-testid="check-badge"]')?.textContent?.trim()).toBe('10 of 10 passed');
     const stages = Array.from(h.el.querySelectorAll('.stages li')).map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+    expect(stages).toHaveLength(6);
     expect(stages[0]).toContain('Decided');
     expect(stages[4]).toContain('Chair');
     expect(stages[4]).toContain('Later');
+    expect(stages[5]).toContain('Given');
   });
 
   it('flags a final dose more than 5% from calculated and sends only the edited dose', () => {
@@ -300,7 +302,8 @@ describe('Chemotherapy order sheet (SAH-66, SAH-70)', () => {
       h.fixture.detectChanges();
       const lines = Array.from(h.el.querySelectorAll('ul.plain li')).map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
       expect(lines).toHaveLength(6);
-      expect(lines[5]).toBe('Loperamide 2 mgAfter each loose motion (max 8) · Loose motions');
+      expect(lines[5]).toBe('Loperamide 2 mgLoose motionsAfter each loose motion (max 8)');
+      expect(h.el.querySelector('[data-testid="take-sub"]')?.textContent).toBe('Generic names first · printed in English');
       expect((byText(h.el, 'li', 'Loperamide').querySelector('input') as HTMLInputElement).checked).toBe(false);
       expect((byText(h.el, 'li', 'Pegfilgrastim').querySelector('input') as HTMLInputElement).checked).toBe(false);
       expect(h.el.textContent).not.toContain('suggested: fever / regimen');
@@ -354,7 +357,7 @@ describe('Chemotherapy order sheet (SAH-66, SAH-70)', () => {
       flushTakeHomeLookups(h.http);
       h.fixture.detectChanges();
       expect(h.store.specialtyValue('onc_regimen')).toMatchObject({ takeHome: ['ONDANSETRON_8'] });
-      expect(byText(h.el, 'li', 'Ondansetron').textContent).toContain('1-0-1 × 3 days · Nausea');
+      expect(byText(h.el, 'li', 'Ondansetron').textContent).toContain('Nausea');
       (byText(h.el, 'li', 'Loperamide').querySelector('input') as HTMLInputElement).click();
       flushTakeHomeLookups(h.http);
       expect(h.store.prescriptionRows().find((r) => r.name === 'Loperamide 2 mg')).toMatchObject({ frequency: null, frequencyText: 'After each loose motion (max 8)', days: 5, note: 'Loose motions', source: 'SPECIALTY_LIST' });
@@ -380,6 +383,13 @@ describe('Chemotherapy order sheet (SAH-66, SAH-70)', () => {
       expect(h.store.specialtyValue('onc_regimen')).toMatchObject({ referrals: ['PALLIATIVE_CARE'] });
       const wa = byText(h.el, 'button', 'Send chemo calendar on WhatsApp') as HTMLButtonElement;
       expect(wa.disabled).toBe(true);
+      const calendar = h.el.querySelector('[data-testid="wa-calendar"]')!;
+      expect(Array.from(calendar.querySelectorAll('button.chip')).map((b) => [b.textContent?.trim(), (b as HTMLButtonElement).disabled])).toEqual([
+        ['English', true],
+        ['मराठी', true],
+        ['हिंदी', true],
+      ]);
+      expect(calendar.textContent).toContain('Dates, fever warning (call if ≥ 38 °C), blood test reminders and the daily symptom check.');
       click(h.el, 'button[data-act="write-note"]');
       expect((h.store.specialtyValue('onc_regimen') as { cycleNote: string }).cycleNote).toContain('Order: AC at 100%: Doxorubicin 100 mg, Cyclophosphamide 1000 mg.');
     });

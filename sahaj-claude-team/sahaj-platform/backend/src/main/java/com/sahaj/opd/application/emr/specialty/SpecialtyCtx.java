@@ -89,14 +89,53 @@ public record SpecialtyCtx(String profile, Instant now, LocalDate today, LocalDa
         }
     }
 
+    /** The patient's Cancer journey version as the strip reads it (SAH-75-7). Clinical data: the version only in a log. */
+    public record JourneyRecord(int version, String stageGroup, String tnmText, String markersText, Integer ki67Pct,
+                                String geneticsText, String intent, String setting, Integer lineNo, LocalDate boardDate,
+                                Instant recordedAt, String recordedByName) {
+
+        @Override
+        public String toString() {
+            return "JourneyRecord[version=" + version + "]";
+        }
+    }
+
+    /** One cycle chip: the sitting, its regimen and its state GIVEN, TODAY, PLANNED or MISSED (DELAYED is the view's). */
+    public record Cycle(UUID sittingId, String regimenKey, String state) {
+    }
+
+    /** The patient's newest ACTIVE CHEMO course as the strip needs it: its name and its cycle sittings in order. */
+    public record PlanInfo(UUID courseId, String courseName, List<Cycle> cycles) {
+    }
+
+    /**
+     * What the oncology strip, the watch chips and the order sheet read beyond the chemotherapy orders (SAH-75-7, SAH-75-11;
+     * ADR-026 D7): the patient's journey, the diagnosis text, the chemotherapy plan, the doxorubicin given before this
+     * record's own order (null when no order was sent) and the bed of today's day-care cycle (null when none).
+     */
+    public record OncoExtra(JourneyRecord journey, String diagnosisText, PlanInfo plan, Double doxorubicinGivenMgM2,
+                            String dayCareBed) {
+
+        public static OncoExtra none() {
+            return new OncoExtra(null, null, null, null, null);
+        }
+    }
+
     /** Lazy reads. {@code section} is the generic values object of a section (for example menstrual). */
     public record Hooks(Function<String, JsonNode> section, Function<String, List<Earlier>> earlier,
                         Supplier<List<JsonNode>> prescriptionRows, BooleanSupplier hasActiveDiagnosis,
-                        Supplier<RehabInfo> rehab, Supplier<ChemoInfo> chemo) {
+                        Supplier<RehabInfo> rehab, Supplier<ChemoInfo> chemo, Supplier<OncoExtra> onco) {
+
+        /** The 0.6.0 shape: no oncology strip facts. */
+        public Hooks(Function<String, JsonNode> section, Function<String, List<Earlier>> earlier,
+                     Supplier<List<JsonNode>> prescriptionRows, BooleanSupplier hasActiveDiagnosis,
+                     Supplier<RehabInfo> rehab, Supplier<ChemoInfo> chemo) {
+            this(section, earlier, prescriptionRows, hasActiveDiagnosis, rehab, chemo, OncoExtra::none);
+        }
 
         public static Hooks none() {
             return new Hooks(key -> null, component -> List.of(), List::of, () -> false, () -> null,
-                    ChemoInfo::none);
+                    ChemoInfo::none, OncoExtra::none);
         }
     }
 }

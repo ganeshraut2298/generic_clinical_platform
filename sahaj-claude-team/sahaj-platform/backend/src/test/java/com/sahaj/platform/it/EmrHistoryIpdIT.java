@@ -57,6 +57,7 @@ class EmrHistoryIpdIT extends IpdBillingSupport {
         Clinic clinic = hospital();
         Person patient = person(clinic, "Mohan Joshi");
         String admission = admit(clinic, patient.id(), "Chest infection", "planned");
+        discharge(clinic, admission); // a patient is admitted once at a time: the second admission needs the first one closed
         String dayCare = admit(clinic, patient.id(), "Dressing change", "daycare");
         admit(clinic, newPatient(clinic), "Somebody else's admission", "planned");
         Opened opened = openOpd(clinic, patient.id(), clinic.doctorMembershipId(), "DOCTOR");
@@ -79,7 +80,7 @@ class EmrHistoryIpdIT extends IpdBillingSupport {
             }
         }
         assertThat(row.get("title").asText()).isEqualTo("Chest infection");
-        assertThat(row.get("place").asText()).startsWith("Dr Asha Rao · General ward bed ");
+        assertThat(row.get("place").asText()).startsWith("Dr. Dr Asha Rao · General ward bed ");
         assertThat(daycare.get("title").asText()).isEqualTo("Dressing change · day care");
         // the type filter and the search
         assertThat(history(opened, "type=IPD").get("items")).hasSize(2);

@@ -233,6 +233,21 @@ abstract class EmrSupport extends SweepSupport {
         return ok(HttpMethod.POST, path, auth, body, expected);
     }
 
+    /** Moves the visit along its queue to Billing: a payment is only taken while the visit is awaiting payment. */
+    protected void moveVisitToBilling(Clinic clinic, String visitId) throws Exception {
+        String stage = null;
+        for (JsonNode v : get(VISITS + "/today", clinic.owner())) {
+            if (visitId.equals(v.get("id").asText())) {
+                stage = v.get("stage").asText();
+            }
+        }
+        while (!"BILLING".equals(stage)) {
+            String next = "VITALS".equals(stage) ? "WITH_DOCTOR" : "BILLING";
+            ok(HttpMethod.PATCH, VISITS + "/" + visitId + "/stage", clinic.owner(), "{\"stage\":\"" + next + "\"}", 200);
+            stage = next;
+        }
+    }
+
     /** A request that must be answered with a problem body of this status and type slug. */
     protected JsonNode problemOf(HttpMethod method, String path, RequestPostProcessor auth, String body, int status,
                                  String slug) throws Exception {

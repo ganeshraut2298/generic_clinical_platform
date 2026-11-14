@@ -206,3 +206,24 @@
     font-size: 1.125rem;
   }
 }
+
+/* "Give": the volume in large text on a coloured block (mockup #DoctorPaeds, SAH-75-11 P3). */
+.give {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.give-l,
+.give-f {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.give-v {
+  font-size: 1.625rem;
+}

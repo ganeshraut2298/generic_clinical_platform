@@ -128,6 +128,13 @@ public class SpecialtyReferenceService {
         return item(list, key, label, null, null, null);
     }
 
+    /** The chips of one "Medical history and alerts" group; PENICILLIN carries its drug class in group (ADR-026 H15). */
+    private void medList(ArrayNode list, List<String> keys) {
+        for (String key : keys) {
+            item(list, key, DentalRules.MED_LABELS.get(key), null, DentalRules.MED_ALLERGY_CLASS.get(key), null);
+        }
+    }
+
     private static void putText(ObjectNode node, String name, String value) {
         if (value == null) {
             node.putNull(name);
@@ -250,6 +257,10 @@ public class SpecialtyReferenceService {
         item(labItems, "BRIDGE", "Bridge");
         item(labItems, "DENTURE", "Denture");
         item(labItems, "ALIGNER", "Aligner");
+        // 0.7.0 (SAH-75-6): the three chip groups of "Medical history and alerts", drawn order, NONE last
+        medList(lists.putArray("dentalMedConditions"), DentalRules.MED_CONDITIONS);
+        medList(lists.putArray("dentalMedMedicines"), DentalRules.MED_MEDICINES);
+        medList(lists.putArray("dentalMedAllergies"), DentalRules.MED_ALLERGIES);
         t.put("dentalRootCanalSittings", DentalRules.ROOT_CANAL_SITTINGS);
         t.put("dentalMaxSittings", DentalRules.MAX_SITTINGS);
         t.put("dentalEstimateStepPaise", DentalRules.ESTIMATE_STEP_PAISE);

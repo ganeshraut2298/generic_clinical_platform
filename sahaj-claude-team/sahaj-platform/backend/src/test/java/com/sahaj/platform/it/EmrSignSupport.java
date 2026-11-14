@@ -33,6 +33,9 @@ abstract class EmrSignSupport extends EmrSpecialtySupport {
             + "{\"id\":\"5b1f1f0e-0a00-4c00-8000-000000000003\",\"medicineId\":null,\"name\":\"Paracetamol 500 mg\",\"form\":null,"
             + "\"frequency\":\"1-0-1\",\"days\":3,\"when\":\"AFTER_FOOD\",\"source\":\"TYPED\"}]}}";
     static final String RXFORMAT_JSON = "{\"header\":{\"text\":\"Header with registration number\"}}";
+    // General Medicine Vitals is the vitals log editor (SAH-60) and V2026_12_14_1010 makes it a required section (SAH-75).
+    static final String VITALS_LOG_JSON = "{\"entries\":[{\"id\":\"ENTRY_ID\",\"bpSystolic\":120,\"bpDiastolic\":80,\"pulse\":72,\"spo2\":98,"
+            + "\"temperature\":{\"value\":98.6,\"unit\":\"F\"},\"respRate\":16}]}";
 
     protected static LocalDate today() {
         return LocalDate.now(IST);
@@ -42,8 +45,8 @@ abstract class EmrSignSupport extends EmrSpecialtySupport {
 
     /** Saves the four required sections of General Medicine; returns the record after the save. */
     protected Rec fillRequired(Rec rec) throws Exception {
-        return save(rec, sectionValues("complaints", COMPLAINTS_JSON), sectionValues("diagnosis", DIAGNOSIS_JSON),
-                sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
+        return save(rec, spSection("vitals", "VITALS_LOG", VITALS_LOG_JSON.replace("ENTRY_ID", uuid())), sectionValues("complaints", COMPLAINTS_JSON),
+                sectionValues("diagnosis", DIAGNOSIS_JSON), sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
     }
 
     /** A new clinic, a General physician, a visit and an open record whose required sections are all filled. */
@@ -128,9 +131,12 @@ abstract class EmrSignSupport extends EmrSpecialtySupport {
 
     /** The follow-up of the visit, or null. */
     protected JsonNode followUpOf(Clinic clinic, String visitId) throws Exception {
-        for (JsonNode f : get(FOLLOW_UPS, clinic.owner()).get("items")) {
-            if (visitId.equals(f.path("sourceVisitId").asText())) {
-                return f;
+        // the list needs a status (400 without one): a follow-up is in exactly one of the four
+        for (String status : new String[] {"DUE", "MISSED", "UPCOMING", "RETURNED"}) {
+            for (JsonNode f : get(FOLLOW_UPS + "?status=" + status, clinic.owner()).get("items")) {
+                if (visitId.equals(f.path("sourceVisitId").asText())) {
+                    return f;
+                }
             }
         }
         return null;

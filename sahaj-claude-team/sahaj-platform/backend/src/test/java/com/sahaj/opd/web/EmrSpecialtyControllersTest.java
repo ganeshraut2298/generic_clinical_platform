@@ -22,6 +22,7 @@ import com.sahaj.opd.application.emr.specialty.ChemoInputs.ConfirmInput;
 import com.sahaj.opd.application.emr.specialty.ChemoInputs.HoldInput;
 import com.sahaj.opd.application.emr.specialty.ChemoInputs.OrderInput;
 import com.sahaj.opd.application.emr.specialty.ChemoInputs.PinInput;
+import com.sahaj.opd.application.emr.specialty.CancerJourneyService;
 import com.sahaj.opd.application.emr.specialty.ChemoOrderService;
 import com.sahaj.opd.application.emr.specialty.ChemoSecondCheckService;
 import com.sahaj.opd.application.emr.specialty.SpecialtyHistoryService;
@@ -82,6 +83,8 @@ class EmrSpecialtyControllersTest {
     private SurgeryBookingService booking;
     @MockBean
     private VisitTemplateService templates;
+    @MockBean
+    private CancerJourneyService journey;
 
     private static RequestPostProcessor as(String role) {
         return TestTenantSecurity.asUser(TENANT, USER, role);
@@ -301,5 +304,51 @@ class EmrSpecialtyControllersTest {
                 .content("{\"name\":\"x\",\"items\":{},\"colour\":\"red\"}")).andExpect(status().isBadRequest());
         mockMvc.perform(post(EMR + "/visit-templates").with(as("NURSE")).contentType(JSON)
                 .content("{\"name\":\"x\",\"items\":{}}")).andExpect(status().isForbidden());
+    }
+
+    // ---- SAH-75-7 (ADR-026 D7): PUT /emr/records/{recordId}/cancer-journey ----
+
+    @Test
+    void theCancerJourneyIsSavedByDoctorsAndTheOwnerWithTheBodyAsSentAndNobodyElse() throws Exception {
+        when(journey.save(any(ClinicUser.class), eq(RECORD), any())).thenReturn(
+                new CancerJourneyService.JourneyView(2, "IIB", "cT2 cN2 M0", null, 28, null, "CURATIVE", null, 1, null,
+                        java.time.Instant.parse("2026-11-14T06:30:00Z"), "Dr Rao"));
+        String body = "{\"expectedVersion\":1,\"stageGroup\":\"IIB\",\"geneticsText\":null,\"ki67Pct\":28}";
+
+        for (String role : new String[] {"DOCTOR", "VISITING_DOCTOR", "OWNER"}) {
+            mockMvc.perform(put(EMR + "/records/" + RECORD + "/cancer-journey").with(as(role)).contentType(JSON)
+                    .content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2))
+                    .andExpect(jsonPath("$.recordedByName").value("Dr Rao"))
+                    .andExpect(jsonPath("$.stageGroup").value("IIB"));
+        }
+        for (String role : new String[] {"FRONT_DESK", "BILLING", "NURSE", "PHARMACIST", "COUNSELLOR"}) {
+            mockMvc.perform(put(EMR + "/records/" + RECORD + "/cancer-journey").with(as(role)).contentType(JSON)
+                    .content(body)).andExpect(status().isForbidden());
+        }
+        org.mockito.ArgumentCaptor<com.fasterxml.jackson.databind.JsonNode> sent = org.mockito.ArgumentCaptor.forClass(
+                com.fasterxml.jackson.databind.JsonNode.class);
+        verify(journey, org.mockito.Mockito.times(3)).save(any(ClinicUser.class), eq(RECORD), sent.capture());
+        // a field sent as null reaches the service as null (it clears), a field left out is absent (it keeps)
+        assertThat(sent.getValue().has("geneticsText")).isTrue();
+        assertThat(sent.getValue().get("geneticsText").isNull()).isTrue();
+        assertThat(sent.getValue().has("tnmText")).isFalse();
+    }
+
+    @Test
+    void aStaleJourneyIs409JourneyChangedAndASignedRecord409() throws Exception {
+        when(journey.save(any(ClinicUser.class), eq(RECORD), any())).thenThrow(EmrProblemException.of(409,
+                "journey-changed", "Journey changed", "The journey was changed. Reload."));
+
+        mockMvc.perform(put(EMR + "/records/" + RECORD + "/cancer-journey").with(as("DOCTOR")).contentType(JSON)
+                .content("{\"expectedVersion\":0}")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/journey-changed"))
+                .andExpect(jsonPath("$.detail").value("The journey was changed. Reload."));
+    }
+
+    @Test
+    void aSignedOutVisitorGets401OnTheJourney() throws Exception {
+        mockMvc.perform(put(EMR + "/records/" + RECORD + "/cancer-journey").contentType(JSON)
+                .content("{\"expectedVersion\":0}")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(journey);
     }
 }

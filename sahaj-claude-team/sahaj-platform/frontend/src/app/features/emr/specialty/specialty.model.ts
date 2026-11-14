@@ -8,7 +8,7 @@
  * not clinically reviewed" (called "tagged"). The server recomputes and its answer wins.
  */
 
-import type { EmrRxFrequency } from '../emr-phase3.model';
+import type { EmrBodyMapValue, EmrRxFrequency } from '../emr-phase3.model';
 
 export const TAG_NOTE = 'value from the EMR mockup, accepted by the human in DEC-039, not clinically reviewed';
 
@@ -60,7 +60,8 @@ export type EmrSpecialtyComponent =
   | 'ONC_LABS'
   | 'ONC_ECOG'
   | 'CHEMO_PLAN'
-  | 'OUTCOME_SCALES';
+  | 'OUTCOME_SCALES'
+  | 'DENTAL_MED_HISTORY';
 
 export type EmrScreenMode = 'ANC' | 'GYNAE' | 'FIRST_VISIT' | 'SESSION';
 
@@ -168,6 +169,17 @@ export interface SpDentalPlan extends SpBase<'DENTAL_PLAN'> {
 }
 
 export type LabItemKind = 'CROWN' | 'BRIDGE' | 'DENTURE' | 'ALIGNER';
+export type DentalMedCondition = 'DIABETES' | 'HIGH_BP' | 'HEART_DISEASE' | 'THYROID' | 'ASTHMA' | 'BLEEDING_DISORDER' | 'EPILEPSY' | 'PREGNANT' | 'NONE';
+export type DentalMedMedicine = 'BLOOD_THINNERS' | 'ASPIRIN' | 'BISPHOSPHONATES' | 'STEROIDS' | 'THYROID_MEDICINE' | 'NONE';
+export type DentalMedAllergy = 'PENICILLIN' | 'LOCAL_ANAESTHETIC' | 'LATEX' | 'NSAIDS' | 'NONE';
+/** 0.7.0 (SAH-75-6): "Medical history and alerts"; reviewedWithPatient makes the section Done; review is the server's stamp. */
+export interface SpDentalMedHistory extends SpBase<'DENTAL_MED_HISTORY'> {
+  conditions: DentalMedCondition[];
+  medicines: DentalMedMedicine[];
+  allergies: DentalMedAllergy[];
+  reviewedWithPatient: boolean;
+  review?: SpStamp | null;
+}
 export interface SpLabItem {
   id: string;
   planRowId: string | null;
@@ -244,9 +256,18 @@ export interface SpMilestones extends SpBase<'MILESTONES'> {
   notYet: string[];
 }
 
+/** 0.7.0 (SAH-75-5, OQ-75-3): the "Pain site" marker on the front view of the body figure. */
+export interface PainSiteMarker {
+  side: 'FRONT';
+  x: number;
+  y: number;
+  region: string;
+}
 export interface SpPainScore extends SpBase<'PAIN_SCORE'> {
   score: number | null;
+  /** The one-line note under the figure, up to 120 characters. */
   site?: string | null;
+  siteMarker?: PainSiteMarker | null;
 }
 export type Gait = 'NORMAL' | 'ANTALGIC' | 'WITH_STICK' | 'WITH_WALKER';
 export interface SpPostureGait extends SpBase<'POSTURE_GAIT'> {
@@ -371,6 +392,8 @@ export interface SpOncExam extends SpBase<'ONC_EXAM'> {
   breastSkin: BreastSkin[];
   systems: Partial<Record<OncSystemKey, SpSystemFinding | null>>;
   line: { device: LineDevice | null; checks: LineCheck[] };
+  /** 0.7.0 (SAH-75-5): the exam card's "Body map" tab; optional, the server applies the pin and MLC rules. */
+  bodyMap?: EmrBodyMapValue | null;
 }
 export interface SpOncLabs extends SpBase<'ONC_LABS'> {
   drawnAt: string | null;
@@ -437,7 +460,8 @@ export type EmrSpecialtyValue =
   | SpOncLabs
   | SpOncEcog
   | SpChemoPlan
-  | SpOutcomeScales;
+  | SpOutcomeScales
+  | SpDentalMedHistory;
 
 export type OncDecisionKey = 'GIVE_AS_PLANNED' | 'GIVE_REDUCED' | 'DELAY_1_WEEK' | 'CHANGE_REGIMEN' | 'STOP';
 export type OncDeviationReason = 'PATIENT_PREFERENCE' | 'TUMOUR_BOARD_ADVICE' | 'COUNTS_RECOVERING' | 'CLINICAL_JUDGEMENT' | 'SCHEME_COST';
@@ -472,6 +496,8 @@ export interface EmrSpecialtyView {
     estimateState: EstimateState;
     doneTodayRowIds: string[];
     childTabDefault: boolean;
+    /** 0.7.0: the banners of "Medical history and alerts", in the drawn order, only when their condition holds. */
+    medicalAlerts?: DentalMedicalAlert[];
   } | null;
   og?: {
     gestationalAge: { weeks: number; days: number } | null;
@@ -522,6 +548,13 @@ export interface EmrSpecialtyView {
   onco?: EmrOncoView | null;
 }
 
+export type DentalAlertKey = 'PENICILLIN_ALLERGY' | 'BLEEDING_RISK' | 'DIABETES' | 'BP_HEART' | 'PREGNANT' | 'BISPHOSPHONATES' | 'TOBACCO_USE';
+export interface DentalMedicalAlert {
+  key: DentalAlertKey;
+  title: string;
+  text: string;
+}
+
 export type OncResponse = 'COMPLETE_RESPONSE' | 'PARTIAL_RESPONSE' | 'STABLE_DISEASE' | 'PROGRESSIVE_DISEASE';
 export type OncAlert = 'GRADE_3_PLUS' | 'LAB_OUT_OF_RANGE' | 'FEVER' | 'WEIGHT_CHANGE_10' | 'CUMULATIVE_OVER_400' | 'PORT_NO_BLOOD_RETURN';
 export interface EmrOncoView {
@@ -558,6 +591,59 @@ export interface EmrOncoView {
   cycleNo: number | null;
   nextCycle: { defaultDate: string; label: 'NEXT_CHEMO' | 'REBOOKED_CHEMO'; bloodTestDate: string; echo: string } | null;
   orderStatus: 'NONE' | 'DRAFT' | 'SENT' | 'HELD';
+  /** 0.7.0 (SAH-75-7): the Cancer journey snapshot, whole on every read and save (never half filled). */
+  journey?: OncJourneyStrip;
+  /** 0.7.0: the watch chips; the scheme balance chip has no source and is never sent (OQ-75-8). */
+  watch?: { doxorubicinGivenMgM2: number | null; doxorubicinLimitMgM2: number };
+  /** 0.7.0 (SAH-75-11 O2-2): the bed of the day-care admission of today's cycle; null shows nothing. */
+  dayCareBed?: string | null;
+}
+
+export type CancerStageGroup = '0' | 'I' | 'IA' | 'IB' | 'IC' | 'II' | 'IIA' | 'IIB' | 'IIC' | 'III' | 'IIIA' | 'IIIB' | 'IIIC' | 'IV' | 'IVA' | 'IVB' | 'IVC';
+export type CancerIntent = 'CURATIVE' | 'PALLIATIVE';
+export type CancerSetting = 'NEOADJUVANT' | 'ADJUVANT' | 'DEFINITIVE' | 'ADVANCED';
+
+/** One version of the patient's Cancer journey (opd.yaml 0.7.0). Clinical data: never logged. */
+export interface CancerJourney {
+  version: number;
+  stageGroup: CancerStageGroup | null;
+  tnmText: string | null;
+  markersText: string | null;
+  ki67Pct: number | null;
+  geneticsText: string | null;
+  intent: CancerIntent | null;
+  setting: CancerSetting | null;
+  lineNo: number | null;
+  boardDate: string | null;
+  recordedAt: string;
+  recordedByName: string;
+}
+
+/** The body of the save: every field optional; null clears it in the new version, absent keeps the old value. */
+export interface CancerJourneyInput {
+  expectedVersion: number;
+  stageGroup?: CancerStageGroup | null;
+  tnmText?: string | null;
+  markersText?: string | null;
+  ki67Pct?: number | null;
+  geneticsText?: string | null;
+  intent?: CancerIntent | null;
+  setting?: CancerSetting | null;
+  lineNo?: number | null;
+  boardDate?: string | null;
+}
+
+export type JourneyCycleState = 'GIVEN' | 'TODAY' | 'PLANNED' | 'DELAYED' | 'MISSED';
+export interface OncJourneyStrip {
+  record: CancerJourney | null;
+  diagnosisText: string | null;
+  plan: {
+    courseId: string;
+    title: string;
+    cycleNo: number | null;
+    cycleCount: number;
+    cycles: { sittingId: string; label: string; state: JourneyCycleState }[];
+  } | null;
 }
 
 // ---- reference (GET /emr/specialty-reference/{profile}) ----
@@ -645,6 +731,8 @@ export interface EmrSpecialtyHistory {
   profile: EmrSpecialtyProfile;
   someHidden: boolean;
   vitals?: EmrHistoryVitals[];
+  /** 0.7.0 (SAH-75-11 D6): earlier work per tooth from the patient's signed dental records, newest first. */
+  dentalToothHistory?: { tooth: string; date: string; text: string }[];
   trend?: {
     bp: { date: string; systolic: number; diastolic: number }[];
     sugar: { date: string; mgdl: number }[];
@@ -669,6 +757,8 @@ export interface EmrSpecialtyHistory {
     bsaUsed: number | null;
     labs: Record<string, number | null>;
     grades: Record<string, number | null> | null;
+    /** 0.7.0 (SAH-75-11 O-6): the lesion sizes recorded at that cycle, for the lesion trend line. */
+    lesions?: { name: string; cm: number | null }[];
   }[];
   physioProgress?: {
     sessionsDone: number;
@@ -679,6 +769,8 @@ export interface EmrSpecialtyHistory {
     romLast: Record<string, unknown> | null;
     goalsAchieved: string[];
     onlyFirstVisit: boolean;
+    /** 0.7.0 (SAH-75-11 P-3): the pain score of each earlier signed session of the course, by session number. */
+    painBySession?: { sessionNo: number; score: number }[];
   } | null;
 }
 

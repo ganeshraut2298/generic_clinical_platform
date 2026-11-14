@@ -74,12 +74,25 @@ public class SpecialtyRecordSupport {
     private final AuditLog auditLog;
     private final ObjectMapper mapper;
     private final ObjectProvider<ChemoOrderHook> chemoHook;
+    /** SAH-75-7: the journey, plan and watch facts of the oncology strip; null in a plain unit test. */
+    private final OncoStripSource oncoStrip;
 
     public SpecialtyRecordSupport(SpecialtyReferenceRepository reference, ServiceRepository services,
                                   TeamMemberPort teamMembers, PatientClinicalPort patients,
                                   TreatmentCourseRepository courses, ChemoOrderRepository chemoOrders,
                                   EmrRecordRepository records, AuditLog auditLog, ObjectMapper mapper,
                                   ObjectProvider<ChemoOrderHook> chemoHook) {
+        this(reference, services, teamMembers, patients, courses, chemoOrders, records, auditLog, mapper, chemoHook,
+                null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SpecialtyRecordSupport(SpecialtyReferenceRepository reference, ServiceRepository services,
+                                  TeamMemberPort teamMembers, PatientClinicalPort patients,
+                                  TreatmentCourseRepository courses, ChemoOrderRepository chemoOrders,
+                                  EmrRecordRepository records, AuditLog auditLog, ObjectMapper mapper,
+                                  ObjectProvider<ChemoOrderHook> chemoHook, OncoStripSource oncoStrip) {
+        this.oncoStrip = oncoStrip;
         this.reference = reference;
         this.services = services;
         this.teamMembers = teamMembers;
@@ -499,7 +512,9 @@ public class SpecialtyRecordSupport {
         EarlierLoader earlier = new EarlierLoader(tenantId, row.patientId(), row.id(), signedAt);
         Hooks hooks = new Hooks(key -> document.has(key) ? document.values(key) : null, earlier::of,
                 () -> prescriptionRows(document), () -> hasActiveDiagnosis(document),
-                lazy(() -> rehab(tenantId, row)), lazy(() -> chemo(tenantId, row, document)));
+                lazy(() -> rehab(tenantId, row)), lazy(() -> chemo(tenantId, row, document)),
+                lazy(() -> oncoStrip == null || !"onco".equals(profile) ? SpecialtyCtx.OncoExtra.none()
+                        : oncoStrip.load(tenantId, row, document)));
         Set<String> vaccines = new HashSet<>();
         UUID ancCourse = null;
         if ("paeds".equals(profile)) {
@@ -592,12 +607,53 @@ public class SpecialtyRecordSupport {
         }
         List<SittingRow> sittings = courses.sittingsOf(tenantId, List.of(course.get().id()));
         Integer number = null;
+        int rank = 0;
         for (SittingRow sitting : sittings) {
+            rank++;
             if (row.opdVisitId() != null && row.opdVisitId().equals(sitting.opdVisitId())) {
-                number = sitting.sittingNo();
+                number = rank;
             }
         }
         return new RehabInfo(course.get().name(), number, sittings.size());
+    }
+
+    /** The pain score of an earlier SIGNED session, by the session number shown (ADR-026 D4 displayNo). */
+    public record SessionPain(int sessionNo, int score) {
+    }
+
+    /**
+     * SAH-75-11 (P-3): the PAIN_SCORE of the earlier SIGNED sessions of the patient's active REHAB course, in session order,
+     * at most 60. A record whose visit is not a sitting of that course is left out. Empty until SAH-51 signs records.
+     */
+    public List<SessionPain> painBySession(UUID tenantId, UUID patientId, UUID currentRecordId) {
+        Optional<CourseRow> course = patientId == null ? Optional.empty() : activeCourse(tenantId, patientId, "REHAB");
+        if (course.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Integer> sessionOfVisit = new HashMap<>();
+        int rank = 0;
+        for (SittingRow sitting : courses.sittingsOf(tenantId, List.of(course.get().id()))) {
+            rank++;
+            if (sitting.opdVisitId() != null) {
+                sessionOfVisit.put(sitting.opdVisitId(), rank);
+            }
+        }
+        java.util.TreeMap<Integer, Integer> bySession = new java.util.TreeMap<>();
+        for (Earlier earlier : new EarlierLoader(tenantId, patientId, currentRecordId, null).of("PAIN_SCORE")) {
+            JsonNode score = earlier.value().path("score");
+            RecordRow past = score.isInt() ? records.findById(tenantId, earlier.recordId()).orElse(null) : null;
+            Integer session = past == null || past.opdVisitId() == null ? null : sessionOfVisit.get(past.opdVisitId());
+            if (session != null) {
+                bySession.putIfAbsent(session, score.asInt());
+            }
+        }
+        List<SessionPain> result = new ArrayList<>();
+        bySession.forEach((session, value) -> {
+            if (result.size() < 60) {
+                result.add(new SessionPain(session, value));
+            }
+        });
+        return List.copyOf(result);
     }
 
     private ChemoInfo chemo(UUID tenantId, RecordRow row, EmrRecordDocument document) {

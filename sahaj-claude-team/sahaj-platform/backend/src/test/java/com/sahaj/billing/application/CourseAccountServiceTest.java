@@ -444,4 +444,102 @@ class CourseAccountServiceTest {
                 });
         verify(payments, never()).insert(any(), any(), any());
     }
+
+    // ---- 0.4.0 (SAH-75-10, ADR-026 D4): renumbered sittings, missed sittings, one charge ----
+
+    /** A sitting as the port reports it after a removal: {@code displayNo} differs from the stable {@code no}. */
+    private static SittingFacts shown(UUID id, int no, int displayNo, String kind, long charge, String status,
+                                      UUID admission, String ip, Instant doneAt) {
+        return new SittingFacts(id, no, kind, null, charge, null, status, null, admission, ip, admission != null, doneAt,
+                displayNo);
+    }
+
+    @Test
+    void theNextAdmissionBlockCarriesTheDisplayNumberWhileTheStableNumberStaysTheKey() {
+        // sitting 2 was removed, so the planned admission that is stored as 3 is shown as 2
+        course(shown(S1, 1, 1, "OPD", 100_000, "PLANNED", null, null, null),
+                shown(S3, 3, 2, "DAY_CARE", 300_000, "PLANNED", null, null, null));
+        money(List.of(), List.of());
+
+        CourseAccount account = service.account(OWNER, COURSE);
+
+        assertThat(account.nextPlannedAdmission().sittingNo()).isEqualTo(3);
+        assertThat(account.nextPlannedAdmission().displayNo()).isEqualTo(2);
+        assertThat(account.sittingCount()).isEqualTo(2);
+    }
+
+    @Test
+    void theAdvanceUsedLineNamesTheSittingByItsDisplayNumber() {
+        course(shown(S1, 1, 1, "OPD", 100_000, "DONE", null, null, T1),
+                shown(S3, 4, 2, "OPD", 100_000, "DONE", null, null, T2));
+        money(List.of(payment(1, "ADVANCE", "UPI", 150_000, null, "Course advance", T1, "h")), List.of());
+
+        CourseAccount account = service.account(OWNER, COURSE);
+
+        assertThat(account.ledger()).filteredOn(l -> "CREDIT_USED".equals(l.kind())).extracting(l -> l.against())
+                .containsExactly("Sitting 1", "Sitting 2");
+    }
+
+    @Test
+    void aMissedSittingStaysInTheEstimateAndIsNeitherDoneNorADueTodayCharge() {
+        course(shown(S1, 1, 1, "OPD", 100_000, "DONE", null, null, T1),
+                shown(S2, 2, 2, "OPD", 50_000, "MISSED", null, null, null),
+                shown(S3, 3, 3, "OPD", 50_000, "TODAY", null, null, null));
+        money(List.of(), List.of());
+
+        CourseAccount account = service.account(OWNER, COURSE);
+
+        assertThat(account.estimatePaise()).isEqualTo(200_000);
+        assertThat(account.doneCount()).isEqualTo(1);
+        assertThat(account.todayChargePaise()).isEqualTo(50_000);
+        assertThat(account.dueTodayPaise()).isEqualTo(150_000);
+    }
+
+    @Test
+    void theTodayChargeIsTheSumOfEveryTodaySittingNotSettledInIpd() {
+        course(shown(S1, 1, 1, "OPD", 100_000, "TODAY", null, null, null),
+                shown(S2, 2, 2, "OPD", 50_000, "TODAY", null, null, null),
+                shown(S3, 3, 3, "DAY_CARE", 300_000, "TODAY", ADMISSION, "IP/26-27/0003", null));
+        money(List.of(), List.of());
+
+        assertThat(service.account(OWNER, COURSE).todayChargePaise()).isEqualTo(150_000);
+    }
+
+    @Test
+    void aSittingDoneByHandAndThenSignedIsOneDoneSittingAndItsChargeIsCountedOnce() {
+        // both paths end in the same DONE state on the same sitting, so the port reports it once
+        course(shown(S1, 1, 1, "OPD", 100_000, "DONE", null, null, T1));
+        money(List.of(payment(1, "ADVANCE", "UPI", 100_000, null, "Course advance", T1, "h")), List.of());
+
+        CourseAccount account = service.account(OWNER, COURSE);
+
+        assertThat(account.doneCount()).isEqualTo(1);
+        assertThat(account.creditPaise()).isZero();
+        assertThat(account.dueFromEarlierPaise()).isZero();
+        assertThat(account.balancePaise()).isZero();
+    }
+
+    @Test
+    void aPaymentIsLabelledWithTheDisplayNumberOfTheSittingItIsFor() {
+        course(shown(S1, 1, 1, "OPD", 100_000, "PLANNED", null, null, null),
+                shown(S3, 3, 2, "IPD", 300_000, "PLANNED", null, null, null));
+        money(List.of(), List.of());
+        when(payments.nextReceiptNo(TENANT)).thenReturn(1L);
+
+        service.collect(FRONT, COURSE, KEY, new CoursePaymentInput("IPD_DEPOSIT", 120_000L, "UPI", false, S3));
+        service.collect(FRONT, COURSE, "pay-key-0002", new CoursePaymentInput("VISIT_PAYMENT", 10_000L, "UPI", false, S3));
+
+        ArgumentCaptor<NewPayment> inserted = ArgumentCaptor.forClass(NewPayment.class);
+        verify(payments, org.mockito.Mockito.times(2)).insert(eq(TENANT), inserted.capture(), eq(USER));
+        assertThat(inserted.getAllValues().get(0).againstLabel()).isEqualTo("Admission deposit · Sitting 2");
+        assertThat(inserted.getAllValues().get(1).againstLabel()).isEqualTo("Sitting 2");
+        assertThat(inserted.getAllValues().get(0).againstSittingId()).isEqualTo(S3);
+    }
+
+    @Test
+    void theOldTwelveArgumentFactsReadTheSittingNumberAsTheDisplayNumber() {
+        SittingFacts old = new SittingFacts(S1, 4, "OPD", null, 0, null, "PLANNED", null, null, null, false, null);
+
+        assertThat(old.displayNo()).isEqualTo(4);
+    }
 }

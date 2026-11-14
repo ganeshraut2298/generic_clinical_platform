@@ -55,11 +55,10 @@ describe('CasePaperPanelComponent (SAH-55)', () => {
   });
 
   describe('header (SAH-55-1)', () => {
-    it('shows "Live case paper", the live mark and "n of 10 filled"', () => {
+    it('shows the live mark and "n of 10 sections filled" (no extra heading)', () => {
       boot();
-      expect(q('h3')!.textContent).toBe('Live case paper');
       expect(q('.live')!.textContent).toBe('● Live');
-      expect(q('[data-testid=paper-fill]')!.textContent).toBe('0 of 10 filled');
+      expect(q('[data-testid=paper-fill]')!.textContent).toBe('0 of 10 sections filled');
     });
 
     it('shows the clinic, the doctor with the registration number, and the patient line', () => {
@@ -116,7 +115,7 @@ describe('CasePaperPanelComponent (SAH-55)', () => {
       store.setValue('complaints', 'complaint', complaint('Headache'));
       fixture.detectChanges();
       expect(rowOf('Chief complaints').textContent).toContain('Headache · 2 days');
-      expect(q('[data-testid=paper-fill]')!.textContent).toBe('1 of 10 filled');
+      expect(q('[data-testid=paper-fill]')!.textContent).toBe('1 of 10 sections filled');
       expect(store.paperSubtitle()).toBe('1 of 10 filled · live');
       http.expectNone((r) => r.method === 'PUT');
     });
@@ -129,7 +128,7 @@ describe('CasePaperPanelComponent (SAH-55)', () => {
       fixture.detectChanges();
       expect(qa('.prow')).toHaveLength(1);
       expect(q('[data-act=hide-empty]')!.textContent!.trim()).toBe('✓ Hiding empty');
-      expect(q('[data-testid=paper-fill]')!.textContent).toBe('1 of 10 filled');
+      expect(q('[data-testid=paper-fill]')!.textContent).toBe('1 of 10 sections filled');
       q<HTMLButtonElement>('[data-act=hide-empty]')!.click();
       fixture.detectChanges();
       expect(qa('.prow')).toHaveLength(10);

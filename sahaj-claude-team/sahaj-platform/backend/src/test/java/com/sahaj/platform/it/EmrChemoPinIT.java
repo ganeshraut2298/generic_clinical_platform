@@ -131,6 +131,7 @@ class EmrChemoPinIT extends EmrSpecialtySupport {
         MockHttpServletResponse fifth = secondCheck(s, wrong);
         assertThat(fifth.getStatus()).isEqualTo(403);
         assertThat(objectMapper.readTree(fifth.getContentAsString()).get("type").asText()).as("the fifth wrong try locks the PIN or is wrong").isIn(PROBLEM_BASE + "wrong-pin", PROBLEM_BASE + "pin-locked");
+        endTheLockOfTheChecker(s.checker());
         freshPinAllowance(s.clinic(), caller);
         for (String pin : new String[] {s.pin(), wrong}) {
             MockHttpServletResponse capped = secondCheck(s, pin);
@@ -225,5 +226,30 @@ class EmrChemoPinIT extends EmrSpecialtySupport {
         problemOf(HttpMethod.POST, orderUrl(s.rec()) + "/second-check", s.rec().token(), pinBody(s.named(), foreignNurse, foreignPin), 409, "chemo-order-changed");
         assertThat(orderRow(s.clinic(), orderId(s.named())).get(3)).isEqualTo("false");
         assertThat(failedCount(s)).isEqualTo("0");
+    }
+
+    /**
+     * The fifth wrong try also locks the checker's PIN, and a locked PIN is answered before the pair cap is looked at
+     * (StaffPinOps.checkColleague), so the pair-cap answer is only reachable once the lock is over. The application cannot
+     * write a lock that is already over: as the table owner, with the update guard off in the same (committed) transaction,
+     * the lock is set to a minute ago (the same way PinTestSupport.forcePinRow does for the staff PIN tests).
+     */
+    private void endTheLockOfTheChecker(Staff checker) throws SQLException {
+        try (java.sql.Connection c = db().migrator()) {
+            c.setAutoCommit(false);
+            try {
+                DbAccess.execute(c, "set local lock_timeout = '30s'");
+                DbAccess.execute(c, "alter table platform.staff_pin no force row level security");
+                DbAccess.execute(c, "alter table platform.staff_pin disable trigger trg_staff_pin_guard_update");
+                DbAccess.execute(c, "update platform.staff_pin set locked_until = clock_timestamp() - interval '1 minute' "
+                        + "where membership_id = ?::uuid", checker.membershipId().toString());
+                DbAccess.execute(c, "alter table platform.staff_pin enable trigger trg_staff_pin_guard_update");
+                DbAccess.execute(c, "alter table platform.staff_pin force row level security");
+                c.commit();
+            } catch (SQLException | RuntimeException | AssertionError e) {
+                c.rollback();
+                throw e;
+            }
+        }
     }
 }

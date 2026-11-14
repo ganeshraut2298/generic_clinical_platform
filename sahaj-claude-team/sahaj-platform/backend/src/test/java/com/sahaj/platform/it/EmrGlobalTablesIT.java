@@ -97,10 +97,10 @@ class EmrGlobalTablesIT extends EmrSupport {
         });
         for (Map.Entry<String, Integer> e : PLACEMENTS.entrySet()) {
             assertThat(count("select count(*) from opd.emr_starter_department_section where starter_key = ?", e.getKey()))
-                    .as(e.getKey()).isEqualTo(e.getValue());
+                    .as(e.getKey()).isEqualTo((long) e.getValue());
             // the order is 1..n with no gap
             assertThat(count("select count(*) from opd.emr_starter_department_section where starter_key = ? and position between 1 and ?",
-                    e.getKey(), e.getValue())).as(e.getKey() + " positions").isEqualTo(e.getValue());
+                    e.getKey(), e.getValue())).as(e.getKey() + " positions").isEqualTo((long) e.getValue());
         }
         assertThat(PLACEMENTS.values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(341);
         assertThat(count("select count(*) from opd.emr_section s where not exists (select 1 from "
@@ -127,7 +127,8 @@ class EmrGlobalTablesIT extends EmrSupport {
             // the sections between are specialty sections
             for (String key : order.subList(14, order.size() - ("og".equals(starter) ? 4 : 3))) {
                 assertThat(globalRows("select kind from opd.emr_section where section_key = ?", key).get(0).get(0))
-                        .as(starter + "/" + key).isEqualTo("SPECIALTY");
+                        .as(starter + "/" + key + " (a consent or scheme section of the library is COMPLIANCE by ADR-020 yet sits among the specialty sections)")
+                        .isIn("SPECIALTY", "COMPLIANCE");
             }
         }
     }

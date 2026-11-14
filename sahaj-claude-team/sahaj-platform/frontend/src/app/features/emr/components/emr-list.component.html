@@ -13,7 +13,7 @@
           data-act="view-chips"
           (click)="setView('chips')"
         >
-          Chips
+          <app-icon name="chips" [size]="16" />Chips
         </button>
         <button
           type="button"
@@ -22,7 +22,7 @@
           data-act="view-table"
           (click)="setView('table')"
         >
-          Table
+          <app-icon name="grid" [size]="16" />Table
         </button>
       </div>
       @if (!disabled()) {
@@ -106,16 +106,17 @@
           @if (price(item); as p) {
             <span class="faint t-xs">{{ p }}</span>
           }
-          <select
+          <button
+            type="button"
             class="attr"
+            data-act="cycle-attr"
             [disabled]="disabled()"
-            [attr.aria-label]="spec().attr1.label + ' of ' + item.text"
-            (change)="onAttr(item, 1, $event)"
+            [attr.title]="'Change ' + spec().attr1.label.toLowerCase()"
+            [attr.aria-label]="spec().attr1.label + ' of ' + item.text + ': ' + attrOf(item, 1) + '. Press to change.'"
+            (click)="cycleAttr(item, 1)"
           >
-            @for (c of specOf(1).choices; track c.key) {
-              <option [value]="c.key" [selected]="item.attr1 === c.key">{{ c.label }}</option>
-            }
-          </select>
+            {{ attrOf(item, 1) }} ▾
+          </button>
           @if (noTextNote(item); as note) {
             <span class="faint t-xs">{{ note }}</span>
           }
@@ -136,9 +137,6 @@
             <th scope="col" class="s2">{{ spec().nameLabel }}</th>
             <th scope="col">{{ spec().attr1.label }}</th>
             <th scope="col">{{ spec().attr2.label }}</th>
-            @if (kind() === 'DIAGNOSIS') {
-              <th scope="col">Code</th>
-            }
             <th scope="col">Added on</th>
             <th scope="col">Added by</th>
             <th scope="col">Active</th>
@@ -150,6 +148,9 @@
             <tr [class.off]="!item.active">
               <td class="s1 num">{{ i + 1 }}</td>
               <td class="s2">
+                @if (code(item); as c) {
+                  <span class="code">{{ c }}</span>
+                }
                 <span class="nm">{{ item.text }}</span>
                 @if (item.newToList) {
                   <span class="pill p-wait">New to list</span>
@@ -187,9 +188,6 @@
                   }
                 </select>
               </td>
-              @if (kind() === 'DIAGNOSIS') {
-                <td>{{ code(item) ?? '' }}</td>
-              }
               <td class="faint">{{ addedOn(item) }}</td>
               <td class="faint">{{ item.addedByName ?? '—' }}</td>
               <td>
@@ -225,7 +223,7 @@
   @if (!disabled()) {
     <div class="quick" role="group" aria-label="Your most used">
       <span class="qlabel" title="Ranked by how often you used each one and how recently">
-        <app-icon name="star" [size]="13" /> Your most used:
+        <app-icon name="bolt" [size]="13" /> Your most used:
       </span>
       @for (q of visibleQuick(); track q.itemKey) {
         <button type="button" class="qchip" [attr.aria-label]="'Add ' + q.text" data-act="add-quick" (click)="pick(q)">

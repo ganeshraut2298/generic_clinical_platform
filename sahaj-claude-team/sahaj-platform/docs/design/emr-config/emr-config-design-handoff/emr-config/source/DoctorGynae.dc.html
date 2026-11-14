@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Doctor screen — Obstetrics &amp; Gynaecology</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#A3366B}a:hover{color:#7E2853}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #A3366B66;outline-offset:2px}
+</style>
+</helmet>
+<div style="position: relative; font-family: Inter, system-ui, sans-serif; color: #0F1C2E; background: #F4F6F8; font-size: 14px; min-height: 1240px; display: flex; flex-direction: column">
+
+  <div style="background: #0F1C2E; color: #FFFFFF; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 24px">
+    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+      <span style="font-weight: 700; font-size: 16px">Smart Clinic</span>
+      <span style="background: #A3366B; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600">Obstetrics &amp; Gynaecology</span>
+      <nav aria-label="Main" style="display: flex; gap: 4px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="color: #FFFFFF; text-decoration: none; padding: 8px 12px; border-radius: 8px; background: #1E3550; font-size: 13px; font-weight: 600">Queue (8 waiting)</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">ANC register</a>
+        <a href="#" style="color: #B8C4D3; text-decoration: none; padding: 8px 12px; font-size: 13px">USG &amp; Form F</a>
+      </nav>
+    </div>
+    <span style="font-size: 13px; color: #B8C4D3">Dr. [DOCTOR NAME], MS (OBGY)</span>
+  </div>
+
+  <div style="background: #FFFFFF; border-bottom: 1px solid #E3E8EE; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+    <div style="display: flex; gap: 14px; align-items: center">
+      <span style="width: 48px; height: 48px; border-radius: 999px; background: #F8E3ED; color: #A3366B; display: flex; align-items: center; justify-content: center; font-weight: 700">AD</span>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 17px; font-weight: 700">[PATIENT NAME]</span>
+        <span style="font-size: 13px; color: #5B6B7F">29 y · UHID [ID] · Husband: [NAME] · Blood group B +ve</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <sc-for list="{{risks}}" as="r" hint-placeholder-count="2"><span style="{{r.style}}">{{r.label}}</span></sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 10px; align-items: center; padding: 14px 24px 0; flex-wrap: wrap">
+    <span style="font-size: 13px; font-weight: 600; color: #3E4C5E">This visit is</span>
+    <div role="tablist" aria-label="Visit type" style="display: flex; background: #E7EBF0; border-radius: 10px; padding: 4px; gap: 4px">
+      <sc-for list="{{modes}}" as="m" hint-placeholder-count="2"><button type="button" role="tab" aria-selected="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button></sc-for>
+    </div>
+    <span style="font-size: 12px; color: #5B6B7F">The screen shows only the sections for the visit type you pick.</span>
+  </div>
+
+  <div style="padding: 14px 24px 0">
+    <dc-import name="EmrList" kind="complaints" spec="og" title="Chief complaints" required="{{ true }}" accent="#A3366B" who="Dr. [DOCTOR NAME]" on-change="{{cp_complaints}}" hint-size="100%,230px"></dc-import>
+  </div>
+
+  <sc-if value="{{isAnc}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 24px 20px; align-items: flex-start; flex: 1">
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 4px; background: #A3366B; color: #FFFFFF; border-radius: 10px; padding: 14px">
+            <span style="font-size: 12px; font-weight: 600; color: #F8E3ED">Gestational age</span>
+            <span style="font-size: 26px; font-weight: 700">27w 1d</span>
+            <span style="font-size: 12px; color: #F8E3ED">2nd trimester, last week</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; border: 1px solid #E3E8EE; border-radius: 10px; padding: 14px">
+            <span style="font-size: 12px; font-weight: 600; color: #5B6B7F">EDD</span>
+            <span style="font-size: 20px; font-weight: 700">09 Feb 2027</span>
+            <span style="font-size: 12px; color: #5B6B7F">From LMP 05 May 2026</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; border: 1px solid #E3E8EE; border-radius: 10px; padding: 14px">
+            <span style="font-size: 12px; font-weight: 600; color: #5B6B7F">Obstetric score</span>
+            <span style="font-size: 20px; font-weight: 700">G2 P1 L1 A0</span>
+            <span style="font-size: 12px; color: #5B6B7F">LSCS 2022, boy 3.0 kg</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; border: 1px solid #E3E8EE; border-radius: 10px; padding: 14px">
+            <span style="font-size: 12px; font-weight: 600; color: #5B6B7F">Days to EDD</span>
+            <span style="font-size: 20px; font-weight: 700">90 days</span>
+            <span style="font-size: 12px; color: #5B6B7F">Plan: repeat LSCS vs VBAC</span>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #5B6B7F"><span>Week 0</span><span>12 w</span><span>28 w</span><span>40 w</span></div>
+          <div style="height: 14px; background: #EEF1F5; border-radius: 999px"><div style="width: 67.8%; height: 14px; background: #A3366B; border-radius: 999px"></div></div>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+            <sc-for list="{{scans}}" as="s" hint-placeholder-count="5">
+              <button type="button" onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="{{s.style}}">
+                <span style="font-size: 12px; font-weight: 700; color: #0F1C2E">{{s.name}}</span>
+                <span style="font-size: 11px; color: #5B6B7F">{{s.when}}</span>
+                <span style="{{s.statusStyle}}">{{s.status}}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="font-size: 13px; color: #3E4C5E; background: #FAFBFC; border-radius: 8px; padding: 10px 12px">{{scanDetail}}</div>
+        </div>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Today&#39;s ANC check <span style="color: #B42318">*</span></h2><span style="font-size: 12px; color: #5B6B7F">Use − / + ; warnings update as you go</span></div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+          <sc-for list="{{anc}}" as="a" hint-placeholder-count="6">
+            <div style="{{a.style}}">
+              <span style="font-size: 12px; font-weight: 600; color: #3E4C5E">{{a.label}}</span>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <button type="button" onClick="{{a.dec}}" aria-label="Decrease {{a.label}}" style="width: 36px; height: 36px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer">−</button>
+                <span style="flex: 1; text-align: center; font-size: 22px; font-weight: 700; color: {{a.color}}">{{a.value}}</span>
+                <button type="button" onClick="{{a.inc}}" aria-label="Increase {{a.label}}" style="width: 36px; height: 36px; border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer">+</button>
+              </div>
+              <span style="font-size: 11px; color: {{a.color}}; font-weight: 600">{{a.note}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <sc-for list="{{alerts}}" as="al" hint-placeholder-count="1">
+          <div role="alert" style="{{al.style}}">
+            <span style="flex: 1"><strong>{{al.title}}</strong> {{al.text}}</span>
+            <button type="button" onClick="{{al.act}}" style="{{al.btn}}">{{al.btnLabel}}</button>
+          </div>
+        </sc-for>
+
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">ANC visits</h2>
+        <div style="overflow-x: auto">
+          <div style="min-width: 680px; border: 1px solid #E3E8EE; border-radius: 10px; overflow: hidden">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 2fr; gap: 8px; padding: 8px 12px; background: #FAFBFC; font-size: 11px; font-weight: 700; color: #5B6B7F; text-transform: uppercase; letter-spacing: 0.04em">
+              <span>Date</span><span>GA</span><span>Weight</span><span>BP</span><span>FH</span><span>Hb</span><span>Notes</span>
+            </div>
+            <sc-for list="{{visits}}" as="v" hint-placeholder-count="5">
+              <div style="{{v.style}}"><span>{{v.d}}</span><span>{{v.ga}}</span><span>{{v.wt}}</span><span>{{v.bp}}</span><span>{{v.fh}}</span><span>{{v.hb}}</span><span style="color: #3E4C5E">{{v.note}}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <div id="course">
+        <dc-import name="TreatmentCourse" kind="anc" accent="#A3366B" hint-size="100%,820px"></dc-import>
+      </div>
+      <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="og" title="Doctor’s advice" required="{{ false }}" accent="#A3366B" who="Dr. [DOCTOR NAME]" hint-size="100%,230px"></dc-import></div>
+    </main>
+
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="og" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#A3366B" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+      <section style="background: #FDF0DC; border: 1px solid #E8C48F; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 700; color: #6B3A06">Due now · {{dueLeft}} left</h2>
+        <sc-for list="{{due}}" as="d" hint-placeholder-count="3">
+          <label style="display: flex; gap: 10px; align-items: center; font-size: 13px; color: #4A2A05; min-height: 36px; cursor: pointer">
+            <input type="checkbox" checked="{{d.on}}" onChange="{{d.toggle}}" style="width: 20px; height: 20px; accent-color: #A3366B">
+            <span style="flex: 1">{{d.label}}</span><span style="font-size: 11px; font-weight: 700">{{d.tag}}</span>
+          </label>
+        </sc-for>
+        <button type="button" onClick="{{orderAll}}" style="border: 1px solid #8A4B08; background: #FFFFFF; color: #6B3A06; border-radius: 8px; min-height: 40px; font-weight: 600; cursor: pointer">Order all</button>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><h2 style="margin: 0; font-size: 14px; font-weight: 700">PCPNDT Form F</h2><span style="background: #FDECEA; color: #B42318; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700">Legal</span></div>
+        <span style="font-size: 13px; color: #3E4C5E; line-height: 1.5">{{formFText}}</span>
+      </section>
+
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 700">Supplements</h2>
+        <sc-for list="{{supps}}" as="s" hint-placeholder-count="3">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #EEF1F5">
+            <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 600">{{s.name}}</span><span style="font-size: 12px; color: #3E4C5E">{{s.dose}}</span></span>
+            <button type="button" aria-pressed="{{s.on}}" onClick="{{s.toggle}}" style="{{s.style}}">{{s.btn}}</button>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+    </aside>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{isGyn}}" hint-placeholder-val="{{ false }}">
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 24px 20px; align-items: flex-start; flex: 1">
+    <main style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Menstrual history <span style="color: #B42318">*</span></h2>
+        <sc-for list="{{mens}}" as="m" hint-placeholder-count="4">
+          <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+            <span style="width: 140px; font-size: 13px; font-weight: 600; color: #3E4C5E">{{m.label}}</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{m.opts}}" as="o" hint-placeholder-count="3"><button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button></sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Examination</h2>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Per abdomen<input value="Soft, non-tender, no mass" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px"></label>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Per speculum<input placeholder="Cervix, discharge" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px"></label>
+          <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #3E4C5E">Per vaginum<input placeholder="Uterus size, adnexa" style="font: inherit; font-size: 13px; font-weight: 400; border: 1px solid #C9D2DC; border-radius: 8px; padding: 9px 10px"></label>
+        </div>
+        <label style="display: flex; gap: 10px; align-items: center; font-size: 13px"><input type="checkbox" checked style="width: 18px; height: 18px">Female chaperone present: [NAME]</label>
+      </section>
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Contraception</h2>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <sc-for list="{{contra}}" as="c" hint-placeholder-count="6"><button type="button" aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}"><span style="font-weight: 700">{{c.label}}</span><span style="font-size: 12px; color: #3E4C5E">{{c.sub}}</span></button></sc-for>
+        </div>
+      </section>
+      <div id="advice"><dc-import name="EmrList" on-change="{{cp_advice}}" kind="advice" spec="og" title="Doctor’s advice" required="{{ false }}" accent="#A3366B" who="Dr. [DOCTOR NAME]" hint-size="100%,230px"></dc-import></div>
+    </main>
+    <aside aria-label="Patient history and case paper" style="flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; align-self: flex-start">
+      <div role="tablist" aria-label="Patient record" style="display: flex; gap: 4px; background: #E3E8EE; border-radius: 10px; padding: 4px">
+        <sc-for list="{{rTabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-size: 11px; font-weight: 500; opacity: 0.8">{{t.sub}}</span></button></sc-for>
+      </div>
+      <div style="{{rpHistory}}"><dc-import name="VisitHistory" spec="og" hint-size="100%,900px"></dc-import></div>
+      <div style="{{rpPaper}}"><dc-import name="CasePaper" paper="{{paper}}" accent="#A3366B" hint-size="100%,1220px"></dc-import></div>
+      <div style="{{rpTools}}">
+      <section style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 700">Quick orders</h2>
+        <sc-for list="{{gynOrders}}" as="g" hint-placeholder-count="4"><button type="button" aria-pressed="{{g.on}}" onClick="{{g.toggle}}" style="{{g.style}}">{{g.label}}</button></sc-for>
+      </section>
+    </div>
+    </aside>
+  </div>
+  </sc-if>
+
+  <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #E3E8EE; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; box-shadow: 0 -4px 12px rgba(15,28,46,0.06)">
+    <span style="font-size: 13px; color: #3E4C5E; font-weight: 600">{{footer}}</span>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap">
+      <button type="button" onClick="{{printCard}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">{{printLabel}}</button>
+      <button type="button" onClick="{{complete}}" style="border: 1px solid #A3366B; background: #A3366B; color: #FFFFFF; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: pointer">Complete visit</button>
+    </div>
+  </div>
+
+  <sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position: absolute; right: 24px; bottom: 84px; background: #0F1C2E; color: #FFFFFF; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(15,28,46,0.3)">{{toast}}</div>
+  </sc-if>
+
+  <sc-if value="{{modal}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(15,28,46,0.55); display: flex; align-items: flex-start; justify-content: center; padding-top: 200px">
+      <div role="dialog" aria-label="Visit summary" style="width: 520px; max-width: calc(100% - 32px); background: #FFFFFF; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px rgba(15,28,46,0.35)">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Complete this visit?</h2>
+        <div style="display: flex; flex-direction: column; gap: 6px; background: #FAFBFC; border-radius: 10px; padding: 12px 14px; font-size: 13px">
+          <sc-for list="{{summary}}" as="s" hint-placeholder-count="3"><span>• {{s}}</span></sc-for>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap">
+          <button type="button" onClick="{{closeModal}}" style="border: 1px solid #C9D2DC; background: #FFFFFF; border-radius: 8px; padding: 0 16px; min-height: 44px; font-weight: 600; cursor: pointer">Back</button>
+          <button type="button" onClick="{{finish}}" style="border: 1px solid #A3366B; background: #A3366B; color: #FFFFFF; border-radius: 8px; padding: 0 18px; min-height: 44px; font-weight: 600; cursor: pointer">Complete &amp; call next</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":2300}}'>
+var FIELDS = [
+  ['wt', 'Weight', 0.5, 'kg', 1], ['sys', 'BP systolic', 2, 'mmHg', 0], ['dia', 'BP diastolic', 2, 'mmHg', 0],
+  ['fh', 'Fundal height', 1, 'cm', 0], ['fhs', 'Fetal heart', 2, 'bpm', 0], ['hb', 'Haemoglobin', 0.1, 'g/dL', 1]
+];
+var SCANS = [
+  ['Dating scan', '6–9 w', 'Done', 'Done at 8w 2d: single live intrauterine pregnancy, CRL matches LMP.'],
+  ['NT scan', '11–13+6 w', 'Done', 'Done at 13w 2d: NT 1.4 mm, double marker low risk.'],
+  ['Anomaly scan', '18–22 w', 'Done', 'Done at 19w 1d: no anomaly seen, placenta upper segment posterior.'],
+  ['Growth scan', '28–32 w', 'Due', 'Due from next week. Ordering it opens Form F automatically. Check scar thickness (previous LSCS).'],
+  ['Doppler / NST', '36 w +', 'Later', 'Planned from 36 weeks, or earlier if growth restriction is suspected.']
+];
+
+function cpN(a, mode) { return (Array.isArray(a) ? a : []).map(function (x) { if (!x) return ''; if (typeof x === 'string') return x; var t = x.name || ''; if (mode === 'dx' && x.code) t += ' (' + x.code + ')'; else if (mode === 'c' && x.a1) t += ' · ' + x.a1; return t; }).filter(Boolean); }
+function cpKeys(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }); }
+
+function casePaper(st, r, cp) {
+  var v = st.v || {}, anc = st.mode !== 'gyn';
+  var dx = cpN(cp.diagnosis, 'dx'); if (!dx.length && anc) { dx = ['Intrauterine pregnancy, 27 weeks']; if (v.hb < 10) dx.push('Anaemia in pregnancy'); if (st.pih || v.sys >= 140 || v.dia >= 90) dx.push('Gestational hypertension (watch)'); }
+  var DUE = [['OGTT (75 g)'], ['Td 2nd dose'], ['Growth scan + Form F']];
+  return { dept: 'Obstetrics & Gynaecology · OPD', doctor: 'Dr. [DOCTOR NAME]', qual: 'MBBS, MS (OBGY)', reg: '[MMC REG. NO.]', patient: '[PATIENT NAME]', meta: '29 y · Female · B +ve', ids: 'UHID [ID]', visit: anc ? 'ANC visit 5' : 'Gynaecology OPD', vitals: 'BP ' + v.sys + '/' + v.dia + ' · Wt ' + v.wt + ' kg',
+    sections: { complaints: cpN(cp.complaints, 'c').length ? cpN(cp.complaints, 'c') : cpKeys(st.sym), allergies: ['No known drug allergy'], history: ['G2 P1 L1 · previous normal delivery'],
+      exam: anc ? ['Fundal height ' + v.fh + ' cm · FHS ' + v.fhs + '/min', 'Hb ' + (v.hb != null ? Number(v.hb).toFixed(1) : '') + ' g/dL'] : Object.keys(st.mens || {}).map(function (k) { return k + ': ' + st.mens[k]; }),
+      diagnosis: dx, investigations: DUE.filter(function (_, i) { return st.due && st.due[i]; }).map(function (d) { return d[0]; }), procedures: [],
+      advice: cpN(cp.advice), follow: [anc ? 'Next ANC at 30 weeks' : 'After next cycle'] },
+    rx: (r.supps || []).filter(function (s) { return s.on; }).map(function (s) { var p = String(s.dose).split(' · '); return { name: s.name, how: p[0], days: 'Till next visit', note: p[1] || '' }; }) };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      mode: 'anc', scan: 3, toast: '', modal: false,
+      v: { wt: 61.5, sys: 124, dia: 80, fh: 27, fhs: 144, hb: 9.8 },
+      sym: { 'Tiredness': true, 'Pedal oedema': true, 'Headache': false, 'Blurred vision': false, 'Bleeding / leaking': false, 'Reduced movements': false },
+      due: { 0: false, 1: false, 2: false }, pih: false,
+      supp: { 0: true, 1: true, 2: true },
+      mens: { 'Cycle': 'Regular', 'Cycle length': '28–30 d', 'Flow': 'Normal', 'Pain': 'Mild' },
+      contra: 'None', gyn: {}
+    };
+  }
+  say(msg, patch) {
+    var self = this;
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(function () { self.setState({ toast: '' }); }, 3000);
+    this.setState(Object.assign({ toast: msg }, patch || {}));
+  }
+  _rv() {
+    var self = this, st = this.state, A = '#A3366B', v = st.v;
+    var highBP = v.sys >= 140 || v.dia >= 90;
+    var anaemia = v.hb < 11 ? (v.hb < 7 ? 'Severe' : v.hb < 10 ? 'Moderate' : 'Mild') : '';
+    var fhOff = Math.abs(v.fh - 27) > 2;
+    var fhsBad = v.fhs < 110 || v.fhs > 160;
+    function bad(k) { return (k === 'sys' || k === 'dia') ? highBP : k === 'hb' ? !!anaemia : k === 'fh' ? fhOff : k === 'fhs' ? fhsBad : false; }
+    function note(k) {
+      if (k === 'wt') return '+' + (v.wt - 60).toFixed(1) + ' kg since last visit';
+      if (k === 'sys' || k === 'dia') return highBP ? 'High: 140/90 or above' : 'Normal';
+      if (k === 'fh') return fhOff ? 'Does not match 27 weeks' : 'Matches gestational age';
+      if (k === 'fhs') return fhsBad ? 'Outside 110–160' : 'Normal (110–160)';
+      if (k === 'hb') return anaemia ? anaemia + ' anaemia' : 'Normal';
+      return '';
+    }
+    var anc = FIELDS.map(function (f) {
+      var b = bad(f[0]);
+      function set(d) { var x = Object.assign({}, v); x[f[0]] = Math.round((v[f[0]] + d) * 10) / 10; self.setState({ v: x }); }
+      return { label: f[1], value: v[f[0]].toFixed(f[4]) + ' ' + f[3], note: note(f[0]), color: b ? '#B42318' : '#0F1C2E',
+        dec: function () { set(-f[2]); }, inc: function () { set(f[2]); },
+        style: 'display: flex; flex-direction: column; gap: 8px; border-radius: 10px; padding: 12px; border: 1px solid ' + (b ? '#F3C1BC' : '#E3E8EE') + '; background: ' + (b ? '#FDF3F2' : '#FFFFFF') };
+    });
+    var alerts = [];
+    var dangerSym = st.sym['Headache'] || st.sym['Blurred vision'];
+    if (highBP) alerts.push({ title: 'Possible pre-eclampsia.', text: 'Repeat BP after 15 minutes rest and check urine protein.' + (dangerSym ? ' Headache / blurred vision reported.' : ''), btnLabel: st.pih ? '✓ Workup ordered' : 'Order PIH workup', act: function () { self.say('PIH workup ordered: urine protein, LFT, platelets, uric acid', { pih: true }); } });
+    if (anaemia) alerts.push({ title: anaemia + ' anaemia (Hb ' + v.hb.toFixed(1) + ').', text: anaemia === 'Moderate' ? 'Consider IV iron at this stage of pregnancy.' : anaemia === 'Severe' ? 'Needs urgent evaluation.' : 'Continue oral iron.', btnLabel: 'Add to plan', act: function () { self.say('Anaemia plan added to notes'); } });
+    if (st.sym['Bleeding / leaking'] || st.sym['Reduced movements']) alerts.push({ title: 'Warning sign reported.', text: 'Do NST and examine before the patient leaves.', btnLabel: 'Order NST', act: function () { self.say('NST ordered'); } });
+    alerts = alerts.map(function (a) { return Object.assign(a, { style: 'display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #FDECEA; border: 1px solid #B42318; color: #8E1B12; border-radius: 10px; padding: 10px 12px; font-size: 13px', btn: 'border: 1px solid #B42318; background: #FFFFFF; color: #B42318; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-weight: 600; cursor: pointer' }); });
+    var symptoms = Object.keys(st.sym).map(function (k) {
+      var on = st.sym[k], danger = ['Headache', 'Blurred vision', 'Bleeding / leaking', 'Reduced movements'].indexOf(k) >= 0;
+      return { label: (on ? '✓ ' : '+ ') + k, on: on, toggle: function () { var s = Object.assign({}, st.sym); s[k] = !on; self.setState({ sym: s }); },
+        style: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 7px 12px; min-height: 34px; cursor: pointer; border: 1px ' + (on ? 'solid ' + (danger ? '#B42318' : A) : 'dashed #9AA8B8') + '; color: ' + (on ? (danger ? '#B42318' : '#7E2853') : '#3E4C5E') + '; background: ' + (on ? (danger ? '#FDECEA' : '#F8E3ED') : '#FFFFFF') };
+    });
+    var SS = { Done: 'font-size: 11px; font-weight: 700; color: #146C43', Due: 'font-size: 11px; font-weight: 700; color: #8A4B08', Later: 'font-size: 11px; font-weight: 700; color: #5B6B7F' };
+    var scans = SCANS.map(function (s, i) {
+      var on = st.scan === i;
+      return { name: s[0], when: s[1], status: s[2], statusStyle: SS[s[2]], on: on, pick: function () { self.setState({ scan: i }); },
+        style: 'display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer; border-radius: 8px; padding: 8px 10px; border: ' + (on ? '2px solid ' + A : '1px solid ' + (s[2] === 'Due' ? '#E8C48F' : '#E3E8EE')) + '; background: ' + (s[2] === 'Due' ? '#FDF0DC' : '#FAFBFC') };
+    });
+    var DUE = [['OGTT (75 g)', '24–28 w'], ['Td 2nd dose', 'give today'], ['Growth scan + Form F', '28–32 w']];
+    var due = DUE.map(function (d, i) {
+      var on = !!st.due[i];
+      return { label: d[0], tag: on ? 'Ordered' : d[1], on: on, toggle: function () { var x = Object.assign({}, st.due); x[i] = !on; self.say(on ? d[0] + ' un-ordered' : d[0] + ' ordered', { due: x }); } };
+    });
+    var dueLeft = DUE.filter(function (_, i) { return !st.due[i]; }).length;
+    var SUP = [['Ferrous ascorbate 100 mg', '1-0-1 · after food'], ['Calcium 500 mg + Vit D3', '0-1-0 · 2 h apart from iron'], ['Folic acid 5 mg', '1-0-0']];
+    var supps = SUP.map(function (s, i) {
+      var on = !!st.supp[i];
+      return { name: s[0], dose: s[1], on: on, btn: on ? 'Continue' : 'Stopped', toggle: function () { var x = Object.assign({}, st.supp); x[i] = !on; self.setState({ supp: x }); },
+        style: 'flex: none; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 12px; min-height: 34px; cursor: pointer; border: 1px solid ' + (on ? '#146C43' : '#C9D2DC') + '; color: ' + (on ? '#146C43' : '#5B6B7F') + '; background: ' + (on ? '#E3F5EC' : '#FFFFFF') };
+    });
+    var visits = [['14 Jun', '8w 2d', '56.0', '110/70', '—', '11.2', 'Booking visit, dating USG'], ['04 Aug', '13w 2d', '57.2', '112/72', '—', '10.9', 'NT scan normal, Td1 given'], ['15 Sep', '19w 1d', '58.8', '118/76', '19', '10.6', 'Anomaly scan normal'], ['13 Oct', '23w 1d', '60.0', '120/78', '23', '10.4', 'Iron increased'], ['11 Nov', '27w 1d', v.wt.toFixed(1), v.sys + '/' + v.dia, String(v.fh), v.hb.toFixed(1), 'Today']].map(function (r, i, arr) {
+      var today = i === arr.length - 1;
+      return { d: r[0], ga: r[1], wt: r[2], bp: r[3], fh: r[4], hb: r[5], note: r[6],
+        style: 'display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 2fr; gap: 8px; padding: 10px 12px; border-top: 1px solid #EEF1F5; font-size: 13px; font-weight: ' + (today ? '700' : '400') + '; background: ' + (today ? '#F8E3ED' : '#FFFFFF') };
+    });
+    var risks = [{ t: 'High risk: previous LSCS', c: 'r' }];
+    if (anaemia) risks.push({ t: anaemia + ' anaemia · Hb ' + v.hb.toFixed(1), c: 'o' });
+    if (highBP) risks.push({ t: 'BP high today', c: 'r' });
+    risks = risks.map(function (r) { return { label: r.t, style: 'border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; background: ' + (r.c === 'r' ? '#FDECEA' : '#FDF0DC') + '; color: ' + (r.c === 'r' ? '#B42318' : '#8A4B08') }; });
+    var modes = [['anc', 'Antenatal (ANC)'], ['gyn', 'Gynae (not pregnant)']].map(function (m) {
+      var on = st.mode === m[0];
+      return { label: m[1], on: on, pick: function () { self.setState({ mode: m[0] }); },
+        style: 'border: 0; border-radius: 8px; padding: 8px 14px; min-height: 40px; font-size: 13px; font-weight: 600; cursor: pointer; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : 'transparent') };
+    });
+    function opt(on) { return 'font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 12px; min-height: 40px; cursor: pointer; border: 1px solid ' + (on ? A : '#D5DCE4') + '; color: ' + (on ? '#FFFFFF' : '#3E4C5E') + '; background: ' + (on ? A : '#FFFFFF'); }
+    var MENS = { 'Cycle': ['Regular', 'Irregular'], 'Cycle length': ['< 21 d', '21–27 d', '28–30 d', '31–35 d', '> 35 d'], 'Flow': ['Scanty', 'Normal', 'Heavy', 'With clots'], 'Pain': ['None', 'Mild', 'Severe'] };
+    var mens = Object.keys(MENS).map(function (k) { return { label: k, opts: MENS[k].map(function (o) { var on = st.mens[k] === o; return { label: o, on: on, style: opt(on), pick: function () { var x = Object.assign({}, st.mens); x[k] = o; self.setState({ mens: x }); } }; }) }; });
+    var contra = [['None', 'Not using'], ['Condoms', 'Barrier'], ['OCP', 'Daily pill'], ['Cu-T', 'IUCD, 5–10 years'], ['Injectable', 'Every 3 months'], ['Sterilisation', 'Permanent']].map(function (c) {
+      var on = st.contra === c[0];
+      return { label: c[0], sub: c[1], on: on, pick: function () { self.setState({ contra: c[0] }); },
+        style: 'display: flex; flex-direction: column; gap: 2px; text-align: left; border-radius: 10px; padding: 10px 12px; min-height: 56px; cursor: pointer; color: #0F1C2E; border: ' + (on ? '2px solid ' + A : '1px solid #D5DCE4') + '; background: ' + (on ? '#F8E3ED' : '#FFFFFF') };
+    });
+    var gynOrders = ['Pap smear', 'Pelvic USG', 'Thyroid profile', 'CBC', 'Hormone panel (FSH, LH, AMH)'].map(function (g) {
+      var on = !!st.gyn[g];
+      return { label: (on ? '✓ ' : '+ ') + g, on: on, toggle: function () { var x = Object.assign({}, st.gyn); x[g] = !on; self.setState({ gyn: x }); },
+        style: 'text-align: left; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 10px 12px; min-height: 44px; cursor: pointer; border: 1px ' + (on ? 'solid ' + A : 'dashed #9AA8B8') + '; color: ' + (on ? '#7E2853' : '#3E4C5E') + '; background: ' + (on ? '#F8E3ED' : '#FFFFFF') };
+    });
+    var isAnc = st.mode === 'anc';
+    var summary = isAnc
+      ? ['ANC visit 5 at 27w 1d · BP ' + v.sys + '/' + v.dia + ' · Hb ' + v.hb.toFixed(1), 'Ordered: ' + (DUE.filter(function (_, i) { return st.due[i]; }).map(function (d) { return d[0]; }).join(', ') || 'nothing'), 'Next ANC at 30 weeks']
+      : ['Gynae visit · cycle ' + st.mens['Cycle'].toLowerCase() + ', flow ' + st.mens['Flow'].toLowerCase(), 'Contraception: ' + st.contra, 'Orders: ' + (Object.keys(st.gyn).filter(function (k) { return st.gyn[k]; }).join(', ') || 'none')];
+    return {
+      isAnc: isAnc, isGyn: !isAnc, modes: modes, risks: risks,
+      scans: scans, scanDetail: SCANS[st.scan][3],
+      anc: anc, alerts: alerts, symptoms: symptoms, visits: visits,
+      due: due, dueLeft: dueLeft,
+      onComplaints: function (items) { var m = {}; (Array.isArray(items) ? items : []).forEach(function (x) { m[x.name] = true; }); self.setState({ sym: m }); },
+      orderAll: function () { self.say('OGTT, Td dose and growth scan ordered · Form F opened', { due: { 0: true, 1: true, 2: true } }); },
+      formFText: st.due[2] ? 'Form F started for the growth scan. Fill and sign before the scan is done.' : 'Opens automatically when an obstetric USG is ordered. 3 of 3 forms complete for this pregnancy.',
+      supps: supps, mens: mens, contra: contra, gynOrders: gynOrders,
+      footer: isAnc ? (alerts.length ? alerts.length + ' warning(s) on this visit, reviewed before completing.' : 'Next ANC visit suggested at 30 weeks (in 3 weeks).') : 'Gynae visit: menstrual history required.',
+      printLabel: isAnc ? 'Print ANC card' : 'Print Rx',
+      printCard: function () { self.say(isAnc ? 'ANC card sent to printer' : 'Prescription sent to printer'); },
+      complete: function () { self.setState({ modal: true }); },
+      closeModal: function () { self.setState({ modal: false }); },
+      finish: function () { self.say('Visit completed · calling next patient', { modal: false }); },
+      summary: summary, toast: st.toast, modal: st.modal
+    };
+  }
+
+  renderVals() {
+    var self = this, st = this.state, r = this._rv(), MAP = {"complaints": "onComplaints", "advice": null}, TOOLS = true, cp = st.cp || {};
+    Object.keys(MAP).forEach(function (k) {
+      var orig = MAP[k] ? r[MAP[k]] : null;
+      r['cp_' + k] = function (items) { if (typeof orig === 'function') orig(items); var a = Array.isArray(items) ? items : []; self.setState(function (s0) { var x = Object.assign({}, s0.cp || {}); x[k] = a; return { cp: x }; }); };
+    });
+    var paper = casePaper(st, r, cp), S = paper.sections || {}, n = 0;
+    Object.keys(S).forEach(function (k) { if (S[k] && S[k].length) n++; }); if (paper.rx && paper.rx.length) n++;
+    var rt = st.rtab || 'history', A = '#A3366B';
+    var tabs = [['history', 'Past visits', 'OPD + IPD'], ['paper', 'Case paper', n + ' of 10 filled · live']];
+    if (TOOLS) tabs.push(['tools', 'Quick tools', 'Helpers for this visit']);
+    r.rTabs = tabs.map(function (t) { var on = rt === t[0]; return { label: t[1], sub: t[2], on: on, pick: function () { self.setState({ rtab: t[0] }); },
+      style: 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 12px; min-height: 48px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 700; background: ' + (on ? '#FFFFFF' : 'transparent') + '; color: ' + (on ? A : '#3E4C5E') + '; box-shadow: ' + (on ? '0 1px 3px rgba(15,28,46,0.15)' : 'none') }; });
+    function pane(k) { return 'display: ' + (rt === k ? 'flex' : 'none') + '; flex-direction: column; gap: 16px'; }
+    r.rpHistory = pane('history'); r.rpPaper = pane('paper'); r.rpTools = pane('tools');
+    r.paper = paper;
+    return r;
+  }
+}
+</script>
+</body>
+</html>
