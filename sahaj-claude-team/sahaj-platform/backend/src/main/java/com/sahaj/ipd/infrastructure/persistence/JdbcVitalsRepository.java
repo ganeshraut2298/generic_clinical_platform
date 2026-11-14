@@ -32,6 +32,20 @@ public class JdbcVitalsRepository implements VitalsRepository {
             order by v.recorded_at desc, v.id desc
             limit 1
             """;
+    private static final String FIND_ON_DAY = "select " + COLUMNS + """
+            from ipd.vitals v
+            where v.tenant_id = :tenantId and v.admission_id = :admissionId
+              and cast((v.recorded_at at time zone 'Asia/Kolkata') as date) = :day
+            order by v.recorded_at desc, v.id desc
+            limit 1
+            """;
+    private static final String FIND_BEFORE_DAY = "select " + COLUMNS + """
+            from ipd.vitals v
+            where v.tenant_id = :tenantId and v.admission_id = :admissionId
+              and cast((v.recorded_at at time zone 'Asia/Kolkata') as date) < :day
+            order by v.recorded_at desc, v.id desc
+            limit 1
+            """;
     // SAH-36 (ADR-013 R4): one probe of ix_vitals_tenant_admission_recorded per admitted admission, newest first.
     private static final String FIND_LATEST_OF_ADMITTED = """
             select v.admission_id, v.ews_score, v.ews_risk, v.recorded_at
@@ -99,6 +113,18 @@ public class JdbcVitalsRepository implements VitalsRepository {
     public Optional<VitalsRow> findLatest(UUID tenantId, UUID admissionId) {
         return jdbc.sql(FIND_LATEST).param("tenantId", tenantId).param("admissionId", admissionId)
                 .query(JdbcVitalsRepository::vitals).optional();
+    }
+
+    @Override
+    public Optional<VitalsRow> findLatestOnDay(UUID tenantId, UUID admissionId, java.time.LocalDate day) {
+        return jdbc.sql(FIND_ON_DAY).param("tenantId", tenantId).param("admissionId", admissionId)
+                .param("day", java.sql.Date.valueOf(day)).query(JdbcVitalsRepository::vitals).optional();
+    }
+
+    @Override
+    public Optional<VitalsRow> findLatestBeforeDay(UUID tenantId, UUID admissionId, java.time.LocalDate day) {
+        return jdbc.sql(FIND_BEFORE_DAY).param("tenantId", tenantId).param("admissionId", admissionId)
+                .param("day", java.sql.Date.valueOf(day)).query(JdbcVitalsRepository::vitals).optional();
     }
 
     @Override

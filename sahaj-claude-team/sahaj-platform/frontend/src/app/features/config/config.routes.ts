@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { CONFIG_SECTIONS } from './config-sections';
+import { emrLeaveGuard } from '../emr/emr.guards';
 import { ipCardLeaveGuard } from './ipd/ipcard/ipcard-leave.guard';
 
 /**
@@ -38,7 +39,25 @@ export const CONFIG_ROUTES: Routes = [
       {
         path: 'specialty',
         title: 'Specialty template · Sahaj',
+        canDeactivate: [ipCardLeaveGuard],
         loadComponent: () => import('./specialty/specialty.page').then((m) => m.SpecialtyPage),
+      },
+      {
+        path: 'specialty/add-department',
+        title: 'Add a department · Sahaj',
+        loadComponent: () =>
+          import('./emr-config/add-department/add-department.page').then((m) => m.AddDepartmentPage),
+      },
+      {
+        path: 'forms',
+        title: 'Form builder · Sahaj',
+        loadComponent: () => import('./forms/forms-list.page').then((m) => m.FormsListPage),
+      },
+      {
+        path: 'forms/:formKey',
+        title: 'Form builder · Sahaj',
+        canDeactivate: [emrLeaveGuard],
+        loadComponent: () => import('./forms/form-builder.page').then((m) => m.FormBuilderPage),
       },
       {
         path: 'paper',

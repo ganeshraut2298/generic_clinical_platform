@@ -3,8 +3,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { ApiError } from '../../../core/http/problem-detail';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { patientAgeText } from '../../../shared/format/patient-age';
 import { PatientApi } from '../patient.api';
-import { Patient } from '../patient.model';
+import { Patient, PatientMergeResult } from '../patient.model';
 
 export interface MergeConfirmDialogData {
   /** The older record; it survives the merge. */
@@ -24,9 +25,10 @@ export interface MergeConfirmDialogData {
 })
 export class MergeConfirmDialogComponent {
   private readonly api = inject(PatientApi);
-  private readonly dialogRef = inject<MatDialogRef<MergeConfirmDialogComponent, Patient | null>>(MatDialogRef);
+  private readonly dialogRef = inject<MatDialogRef<MergeConfirmDialogComponent, PatientMergeResult | null>>(MatDialogRef);
   protected readonly data = inject<MergeConfirmDialogData>(MAT_DIALOG_DATA);
 
+  protected readonly ageOf = (patient: Patient): string => patientAgeText(patient, 'row');
   protected readonly merging = signal(false);
   protected readonly error = signal<string | null>(null);
 

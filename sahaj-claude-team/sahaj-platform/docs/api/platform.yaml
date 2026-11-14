@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Sahaj platform API
-  version: 0.1.0
-  description: Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
+  version: 0.1.1
+  description: 0.1.1 (12 Nov 2026, ADR-023 D13.5, SAH-66) adds the menu key secondchecks to GET /me (additive; nothing else changes). Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
 servers:
   - url: /api/v1/platform
 security:
@@ -814,6 +814,14 @@ components:
             a badge from the owning module's summary endpoint (emergency from GET /api/v1/ipd/emergency/summary;
             ADR-005), so this response stays cacheable for the session. menuCounts of GET /modules count the same
             keys.
+            0.1.1 (ADR-023 D6, H7 and D13.5, SAH-66): secondchecks ("Second checks", route /app/emr/second-checks, the
+            chemotherapy orders waiting for the signed-in user's second check) for NURSE, PHARMACIST, DOCTOR and
+            VISITING_DOCTOR, and for OWNER only when the owner's membership has doctor details; in both menu modes; no
+            module condition. Placed right after queue when the role has it, else at the end of the list before staff
+            (applied after ipd and emergency: PHARMACIST gets today, ipd, secondchecks). Examples, advanced menu, IPD
+            off, HRA off: DOCTOR today, queue, secondchecks, appointments, patients, followups; NURSE today, queue,
+            secondchecks, patients. Its badge, if the shell shows one, is total of GET /api/v1/opd/emr/chemo-checks.
+            The opd endpoints check the role themselves; the menu is never the only protection.
         permissions: { type: array, items: { type: string } }
         preferences: { $ref: '#/components/schemas/Preferences' }
     TeamMember:

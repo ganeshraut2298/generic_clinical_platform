@@ -1,0 +1,72 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.fl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.head {
+  h2 {
+    margin: 4px 0;
+  }
+  p {
+    margin: 0;
+  }
+}
+
+.crumb {
+  color: var(--ink-3);
+  font-size: 0.8rem;
+
+  a {
+    color: var(--pri-text);
+  }
+}
+
+h3 {
+  margin: 8px 0 0;
+  font-size: 1rem;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form,
+.starter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-hi);
+}
+
+.fmain,
+.smain {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.fname {
+  font-weight: 700;
+  color: var(--pri-text);
+}
+
+.empty {
+  color: var(--ink-3);
+}

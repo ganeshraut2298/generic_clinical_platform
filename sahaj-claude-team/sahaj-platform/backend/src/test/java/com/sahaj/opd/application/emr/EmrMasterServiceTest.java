@@ -53,7 +53,7 @@ class EmrMasterServiceTest {
     void searchEscapesWildcardsAndPagesTwentyAtATime() {
         UUID id = UUID.randomUUID();
         when(repository.search(EmrMaster.COMPLAINTS, "50\\%%", "paeds", 20, 40))
-                .thenReturn(new MasterPageRow(List.of(new MasterItemRow(id, "Fever", "paeds")), 61));
+                .thenReturn(new MasterPageRow(List.of(new MasterItemRow(id, "Fever", "paeds", null, null)), 61));
 
         MasterPage page = service.search("complaints", " 50% ", "paeds", 2);
 
@@ -112,13 +112,13 @@ class EmrMasterServiceTest {
     @Test
     void theRankingIsAlwaysTheCallersOwnMembership() {
         Instant used = Instant.parse("2026-11-10T06:05:00Z");
-        when(repository.ranked(TENANT, DOCTOR, EmrMaster.DIAGNOSES, "gp", 10)).thenReturn(List.of(
+        when(repository.ranked(TENANT, DOCTOR, EmrMaster.DIAGNOSES, "gm", 10)).thenReturn(List.of(
                 new QuickOptionRow("J06.9", "Acute upper respiratory infection, unspecified", "J06.9", null, null, 5,
-                        used),
+                        used, null, null),
                 new QuickOptionRow("A09", "Infectious gastroenteritis and colitis, unspecified", "A09", null, null, 0,
-                        null)));
+                        null, null, null)));
 
-        QuickOptionList list = service.quickOptions(user, "diagnoses", null, "gp");
+        QuickOptionList list = service.quickOptions(user, "diagnoses", null, "gm");
 
         assertThat(list.master()).isEqualTo("diagnoses");
         assertThat(list.items()).extracting(EmrViews.QuickOption::itemKey).containsExactly("J06.9", "A09");

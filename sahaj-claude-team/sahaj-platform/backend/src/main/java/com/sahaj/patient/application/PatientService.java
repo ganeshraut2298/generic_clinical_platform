@@ -1,10 +1,14 @@
 package com.sahaj.patient.application;
 
+import com.sahaj.patient.api.PatientAge;
 import com.sahaj.patient.application.PatientRepository.PatientPage;
 import com.sahaj.patient.application.PatientRepository.PatientRow;
 import com.sahaj.platform.api.AuditLog;
 import com.sahaj.platform.api.InvalidInputException;
 import com.sahaj.platform.api.NotFoundException;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,32 +53,56 @@ public class PatientService {
     private final ConsentRepository consentRepository;
     private final RecordAccessRepository recordAccessRepository;
     private final AuditLog auditLog;
+    private final Clock clock;
 
+    @Autowired
     public PatientService(PatientRepository patientRepository, ConsentRepository consentRepository,
-                           RecordAccessRepository recordAccessRepository, AuditLog auditLog) {
+                           RecordAccessRepository recordAccessRepository, AuditLog auditLog, Clock clock) {
         this.patientRepository = patientRepository;
         this.consentRepository = consentRepository;
         this.recordAccessRepository = recordAccessRepository;
         this.auditLog = auditLog;
+        this.clock = clock;
     }
 
-    /** AC3, AC4: search and filter chips. An unknown or not-yet-supported filter never errors. */
+    /** The system clock (the day is worked out in India by {@link PatientAge#today}). */
+    public PatientService(PatientRepository patientRepository, ConsentRepository consentRepository,
+                           RecordAccessRepository recordAccessRepository, AuditLog auditLog) {
+        this(patientRepository, consentRepository, recordAccessRepository, auditLog, Clock.systemUTC());
+    }
+
+    /**
+     * AC3, AC4: search and filter chips. An unknown or not-yet-supported filter never errors. SAH-73-3: each row
+     * carries the age worked out as of today in India (never the date of birth); "Children" is under 13.
+     */
     @Transactional(readOnly = true)
-    public PatientPage search(UUID tenantId, String q, String filter, int page) {
+    public PatientSummaryPage search(UUID tenantId, String q, String filter, int page) {
         String safeFilter = filter == null || !KNOWN_FILTERS.contains(filter) ? "all" : filter;
         int safePage = Math.max(page, 0);
         if (FILTERS_NEEDING_VISIT_DATA.contains(safeFilter)) {
-            return new PatientPage(List.of(), 0);
+            return new PatientSummaryPage(List.of(), 0);
         }
         String cleanedQuery = cleanQuery(q);
-        return patientRepository.search(tenantId, cleanedQuery, safeFilter, PAGE_SIZE, safePage * PAGE_SIZE);
+        LocalDate today = today();
+        PatientPage found = patientRepository.search(tenantId, cleanedQuery, safeFilter, PAGE_SIZE,
+                safePage * PAGE_SIZE, today);
+        return new PatientSummaryPage(found.items().stream().map(row -> toSummary(row, today)).toList(),
+                found.total());
     }
 
-    /** AC1, AC2, AC5, AC9: register a patient; same mobile joins the existing family. Never blocks on a duplicate. */
+    /**
+     * AC1, AC2, AC5, AC9: register a patient; same mobile joins the existing family. Never blocks on a duplicate.
+     * SAH-73-1: the date of birth is optional and the age is required only without it; the stored age is the
+     * completed years from the date as of today (ADR-024 D4, D5).
+     */
     @Transactional
     public PatientView create(UUID tenantId, UUID actorUserId, PatientInput input) {
         String name = cleanName(input.name());
-        int age = validAge(input.age());
+        LocalDate today = today();
+        DateOfBirthInput sentDate = input.dateOfBirth() == null ? DateOfBirthInput.ABSENT : input.dateOfBirth();
+        LocalDate dateOfBirth = sentDate.state() == DateOfBirthInput.State.NULL
+                || sentDate.state() == DateOfBirthInput.State.ABSENT ? null : validDateOfBirth(sentDate, today);
+        int age = ageFor(dateOfBirth, input.age(), today);
         String sex = validSex(input.sex());
         String mobile = validMobile(input.mobile());
         String language = validLanguage(input.language());
@@ -84,21 +113,22 @@ public class PatientService {
         List<ConsentInput> consents = ConsentInput.validateAll(input.consents());
 
         UUID id = UUID.randomUUID();
-        patientRepository.insert(id, name, age, sex, mobile, area, language, allergy, chronic, abhaLinked,
-                actorUserId);
+        patientRepository.insert(id, name, age, dateOfBirth, sex, mobile, area, language, allergy, chronic,
+                abhaLinked, actorUserId);
         for (ConsentInput consent : consents) {
             consentRepository.insert(id, consent.kind(), consent.given(), actorUserId);
         }
         PatientRow created = find0(tenantId, id);
-        auditLog.record("PATIENT_REGISTERED", ENTITY_TYPE, id, null, snapshot(created));
+        auditLog.record("PATIENT_REGISTERED", ENTITY_TYPE, id, null, snapshot(created, registeredFields(created)));
 
-        UUID duplicateOfId = findPossibleDuplicate(tenantId, id, mobile, age, name);
-        return toView(created, duplicateOfId);
+        UUID duplicateOfId = findPossibleDuplicate(tenantId, id, mobile, PatientAge.of(dateOfBirth, age, today).years(),
+                name, today);
+        return toView(created, duplicateOfId, today);
     }
 
     @Transactional(readOnly = true)
     public PatientView find(UUID tenantId, UUID id) {
-        return toView(find0(tenantId, id), null);
+        return toView(find0(tenantId, id), null, today());
     }
 
     /**
@@ -110,23 +140,44 @@ public class PatientService {
     public PatientView open(UUID tenantId, UUID actorUserId, UUID id) {
         PatientRow row = find0(tenantId, id);
         recordAccessRepository.insert(id, actorUserId);
-        return toView(row, null);
+        return toView(row, null, today());
     }
 
     /** AC6: the family sharing this mobile number, excluding merged-away records and the patient itself. */
     @Transactional(readOnly = true)
     public List<PatientSummaryView> family(UUID tenantId, UUID id) {
         PatientRow patient = find0(tenantId, id);
+        LocalDate today = today();
         return patientRepository.findFamily(tenantId, patient.mobile(), id).stream()
-                .map(PatientService::toSummary).toList();
+                .map(row -> toSummary(row, today)).toList();
     }
 
-    /** A partial update: any field left null keeps its saved value. Mobile cannot be changed here. */
+    /**
+     * A partial update: any field left null keeps its saved value. Mobile cannot be changed here. SAH-73-2: the date
+     * of birth has three states (absent = unchanged, a date = set or correct, explicit null = clear); the stored age
+     * is refreshed from the date on every write (ADR-024 D4) and a set, change or clear writes one
+     * PATIENT_DATE_OF_BIRTH_CHANGED event that holds no date.
+     */
     @Transactional
     public PatientView update(UUID tenantId, UUID actorUserId, UUID id, PatientUpdateInput input) {
         PatientRow before = find0(tenantId, id);
+        LocalDate today = today();
         String name = input.name() == null ? before.name() : cleanName(input.name());
-        int age = input.age() == null ? before.age() : validAge(input.age());
+        DateOfBirthInput sentDate = input.dateOfBirth() == null ? DateOfBirthInput.ABSENT : input.dateOfBirth();
+        LocalDate dateOfBirth = switch (sentDate.state()) {
+            case ABSENT -> before.dateOfBirth();
+            case NULL -> null;
+            default -> validDateOfBirth(sentDate, today);
+        };
+        int age;
+        if (dateOfBirth != null) {
+            age = ageFor(dateOfBirth, input.age(), today);
+        } else if (before.dateOfBirth() != null) {
+            // Clearing (BR73-9): the age sent, else the completed years worked out from the old date today.
+            age = input.age() == null ? PatientAge.completedYears(before.dateOfBirth(), today) : validAge(input.age());
+        } else {
+            age = input.age() == null ? before.age() : validAge(input.age());
+        }
         String sex = input.sex() == null ? before.sex() : validSex(input.sex());
         String area = input.area() == null ? before.area() : cleanOptional(input.area(), 160, "area");
         String language = input.language() == null ? before.language() : validLanguage(input.language());
@@ -135,14 +186,21 @@ public class PatientService {
         boolean abhaLinked = input.abhaLinked() == null ? before.abhaLinked() : input.abhaLinked();
 
         PatientRow after = new PatientRow(id, before.uhid(), name, age, sex, before.mobile(), area, language,
-                allergy, chronic, abhaLinked, before.mergedIntoId(), before.createdAt(), before.version());
-        if (after.equals(before)) {
-            return toView(before, null);
+                allergy, chronic, abhaLinked, before.mergedIntoId(), before.createdAt(), before.version(),
+                dateOfBirth);
+        List<String> changed = changedFields(before, after);
+        String dateChange = dateChange(before.dateOfBirth(), dateOfBirth);
+        if (changed.isEmpty() && dateChange == null) {
+            return toView(before, null, today);
         }
-        patientRepository.update(id, name, age, sex, area, language, allergy, chronic, abhaLinked, actorUserId);
+        patientRepository.update(id, name, age, dateOfBirth, sex, area, language, allergy, chronic, abhaLinked,
+                actorUserId);
         PatientRow saved = find0(tenantId, id);
-        auditLog.record("PATIENT_UPDATED", ENTITY_TYPE, id, snapshot(before), snapshot(saved));
-        return toView(saved, null);
+        if (!changed.isEmpty()) {
+            auditLog.record("PATIENT_UPDATED", ENTITY_TYPE, id, snapshot(before, null), snapshot(saved, changed));
+        }
+        recordDateOfBirthChange(id, before.dateOfBirth(), dateChange);
+        return toView(saved, null, today);
     }
 
     /**
@@ -153,6 +211,17 @@ public class PatientService {
      */
     @Transactional
     public PatientView merge(UUID tenantId, UUID actorUserId, UUID keepId, UUID mergeId) {
+        return mergeWithNotice(tenantId, actorUserId, keepId, mergeId).patient();
+    }
+
+    /**
+     * SAH-73-2 (BR73-11, SO-73-8): the merge of {@link #merge}, and the date of birth rule. The kept record's date
+     * stays; when it has none and the merged-away record has one, the date is copied; when both have different dates
+     * the kept date stays and the answer says so. When the kept record ends with a date its stored age is refreshed
+     * from that date, not taken from the merged record (ADR-024 D4, D5).
+     */
+    @Transactional
+    public MergeOutcome mergeWithNotice(UUID tenantId, UUID actorUserId, UUID keepId, UUID mergeId) {
         if (keepId.equals(mergeId)) {
             throw new InvalidInputException("mergeId", "Choose two different patients to merge");
         }
@@ -165,20 +234,29 @@ public class PatientService {
             throw new InvalidInputException("mergeId", "That patient record was already merged");
         }
 
-        Map<String, Object> keepBefore = snapshot(keep);
+        LocalDate today = today();
+        LocalDate dateOfBirth = keep.dateOfBirth() != null ? keep.dateOfBirth() : merge.dateOfBirth();
+        boolean differed = keep.dateOfBirth() != null && merge.dateOfBirth() != null
+                && !keep.dateOfBirth().equals(merge.dateOfBirth());
+        int age = dateOfBirth != null ? PatientAge.completedYears(dateOfBirth, today) : merge.age();
+
+        Map<String, Object> keepBefore = snapshot(keep, null);
         String allergy = combineClinicalText(keep.allergy(), merge.allergy());
         String chronic = combineClinicalText(keep.chronic(), merge.chronic());
-        patientRepository.update(keepId, merge.name(), merge.age(), merge.sex(), merge.area(), merge.language(),
+        patientRepository.update(keepId, merge.name(), age, dateOfBirth, merge.sex(), merge.area(), merge.language(),
                 allergy, chronic, merge.abhaLinked(), actorUserId);
         PatientRow keepAfter = find0(tenantId, keepId);
-        auditLog.record("PATIENT_MERGED", ENTITY_TYPE, keepId, keepBefore, snapshot(keepAfter));
+        auditLog.record("PATIENT_MERGED", ENTITY_TYPE, keepId, keepBefore,
+                snapshot(keepAfter, changedFields(keep, keepAfter)));
+        recordDateOfBirthChange(keepId, keep.dateOfBirth(), dateChange(keep.dateOfBirth(), keepAfter.dateOfBirth()));
 
-        Map<String, Object> mergeBefore = snapshot(merge);
+        Map<String, Object> mergeBefore = snapshot(merge, null);
         patientRepository.setMergedInto(mergeId, keepId, actorUserId);
         PatientRow mergeAfter = find0(tenantId, mergeId);
-        auditLog.record("PATIENT_MERGED", ENTITY_TYPE, mergeId, mergeBefore, snapshot(mergeAfter));
+        auditLog.record("PATIENT_MERGED", ENTITY_TYPE, mergeId, mergeBefore,
+                snapshot(mergeAfter, List.of("mergedIntoId")));
 
-        return toView(keepAfter, null);
+        return new MergeOutcome(toView(keepAfter, null, today), differed);
     }
 
     /**
@@ -221,9 +299,12 @@ public class PatientService {
     }
 
     /** AC5: same mobile, age within two years, a similar name - flagged, never blocking the write. */
-    private UUID findPossibleDuplicate(UUID tenantId, UUID newId, String mobile, int age, String name) {
+    private UUID findPossibleDuplicate(UUID tenantId, UUID newId, String mobile, int age, String name,
+                                       LocalDate today) {
+        // SAH-73-3 (BR73-10): the effective years of both sides, never the dates of birth.
         return patientRepository.findFamily(tenantId, mobile, newId).stream()
-                .filter(candidate -> Math.abs(candidate.age() - age) <= DUPLICATE_AGE_WINDOW)
+                .filter(candidate -> Math.abs(PatientAge.of(candidate.dateOfBirth(), candidate.age(), today).years()
+                        - age) <= DUPLICATE_AGE_WINDOW)
                 .filter(candidate -> namesAreSimilar(candidate.name(), name))
                 .map(PatientRow::id)
                 .findFirst()
@@ -304,30 +385,150 @@ public class PatientService {
         return trimmed;
     }
 
-    private static PatientView toView(PatientRow row, UUID possibleDuplicateOfId) {
-        return new PatientView(row.id(), row.uhid(), row.name(), row.age(), row.sex(), row.mobile(), row.area(),
-                row.language(), row.allergy(), row.chronic(), row.abhaLinked(), row.createdAt(),
-                possibleDuplicateOfId);
+    private static PatientView toView(PatientRow row, UUID possibleDuplicateOfId, LocalDate today) {
+        PatientAge ageDetail = PatientAge.of(row.dateOfBirth(), row.age(), today);
+        return new PatientView(row.id(), row.uhid(), row.name(), ageDetail.years(), row.sex(), row.mobile(),
+                row.area(), row.language(), row.allergy(), row.chronic(), row.abhaLinked(), row.createdAt(),
+                possibleDuplicateOfId, row.dateOfBirth(), ageDetail);
     }
 
-    private static PatientSummaryView toSummary(PatientRow row) {
-        return new PatientSummaryView(row.id(), row.uhid(), row.name(), row.age(), row.sex(), row.mobile(),
-                row.chronic(), null);
+    /** A list or family row: the worked-out age, never the date of birth (BR73-12). */
+    private static PatientSummaryView toSummary(PatientRow row, LocalDate today) {
+        PatientAge ageDetail = PatientAge.of(row.dateOfBirth(), row.age(), today);
+        return new PatientSummaryView(row.id(), row.uhid(), row.name(), ageDetail.years(), row.sex(), row.mobile(),
+                row.chronic(), null, ageDetail);
     }
 
-    private static Map<String, Object> snapshot(PatientRow row) {
+    /**
+     * ADR-024 D6: an audit snapshot holds no name, no mobile number, no date of birth and no age of a dated patient.
+     * It carries the field names that changed ({@code changedFields}, after a change only) and the non-identifying values.
+     */
+    private static Map<String, Object> snapshot(PatientRow row, List<String> changedFields) {
         Map<String, Object> values = new LinkedHashMap<>();
-        values.put("name", row.name());
-        values.put("age", row.age());
+        if (changedFields != null) {
+            values.put("changedFields", changedFields);
+        }
         values.put("sex", row.sex());
-        values.put("mobile", row.mobile());
-        values.put("area", row.area());
         values.put("language", row.language());
+        if (row.dateOfBirth() == null) {
+            values.put("age", row.age());
+        }
+        values.put("dateOfBirthRecorded", row.dateOfBirth() != null);
         // Security review S2: the audit trail says only whether the texts exist, never what they say.
         values.put("allergyRecorded", row.allergy() != null && !row.allergy().isBlank());
         values.put("chronicRecorded", row.chronic() != null && !row.chronic().isBlank());
         values.put("abhaLinked", row.abhaLinked());
         values.put("mergedIntoId", row.mergedIntoId());
         return values;
+    }
+
+    /** The field names a registration filled in (names only). */
+    private static List<String> registeredFields(PatientRow row) {
+        List<String> fields = new ArrayList<>(List.of("name", "sex", "mobile", "language"));
+        fields.add(row.dateOfBirth() == null ? "age" : "dateOfBirth");
+        if (row.area() != null) {
+            fields.add("area");
+        }
+        if (row.allergy() != null) {
+            fields.add("allergy");
+        }
+        if (row.chronic() != null) {
+            fields.add("chronic");
+        }
+        if (row.abhaLinked()) {
+            fields.add("abhaLinked");
+        }
+        return fields;
+    }
+
+    /**
+     * The names of the fields that differ, for the audit trail. The date of birth is left out (it has its own event) and
+     * so is the stored age whenever a date is or was involved (then it is only a snapshot of the date).
+     */
+    private static List<String> changedFields(PatientRow before, PatientRow after) {
+        List<String> changed = new ArrayList<>();
+        addIfDifferent(changed, "name", before.name(), after.name());
+        if (before.dateOfBirth() == null && after.dateOfBirth() == null) {
+            addIfDifferent(changed, "age", before.age(), after.age());
+        }
+        addIfDifferent(changed, "sex", before.sex(), after.sex());
+        addIfDifferent(changed, "area", before.area(), after.area());
+        addIfDifferent(changed, "language", before.language(), after.language());
+        addIfDifferent(changed, "allergy", before.allergy(), after.allergy());
+        addIfDifferent(changed, "chronic", before.chronic(), after.chronic());
+        addIfDifferent(changed, "abhaLinked", before.abhaLinked(), after.abhaLinked());
+        return changed;
+    }
+
+    private static void addIfDifferent(List<String> changed, String field, Object before, Object after) {
+        if (!java.util.Objects.equals(before, after)) {
+            changed.add(field);
+        }
+    }
+
+    /** SET, CHANGED or CLEARED; null when the date did not change. */
+    private static String dateChange(LocalDate before, LocalDate after) {
+        if (java.util.Objects.equals(before, after)) {
+            return null;
+        }
+        if (before == null) {
+            return "SET";
+        }
+        return after == null ? "CLEARED" : "CHANGED";
+    }
+
+    /**
+     * ADR-024 D6: one event per set, change or clear. The values hold the field name and whether a date is recorded,
+     * and the kind of change; never the date and never an age derived from it.
+     */
+    private void recordDateOfBirthChange(UUID patientId, LocalDate before, String change) {
+        if (change == null) {
+            return;
+        }
+        Map<String, Object> beforeValues = new LinkedHashMap<>();
+        beforeValues.put("field", "dateOfBirth");
+        beforeValues.put("dateOfBirthRecorded", before != null);
+        Map<String, Object> afterValues = new LinkedHashMap<>();
+        afterValues.put("field", "dateOfBirth");
+        afterValues.put("dateOfBirthRecorded", !"CLEARED".equals(change));
+        afterValues.put("change", change);
+        auditLog.record("PATIENT_DATE_OF_BIRTH_CHANGED", ENTITY_TYPE, patientId, beforeValues, afterValues);
+    }
+
+    private LocalDate today() {
+        return PatientAge.today(clock);
+    }
+
+    /**
+     * SO-73-7: a date that could not be read, a date later than today (India; today is accepted) and a date with more
+     * than 120 completed years are refused on {@code dateOfBirth}. The message never repeats the value sent.
+     */
+    private static LocalDate validDateOfBirth(DateOfBirthInput input, LocalDate today) {
+        LocalDate date = input.date();
+        if (input.state() != DateOfBirthInput.State.DATE || date == null) {
+            throw new InvalidInputException("dateOfBirth", "Enter a valid date of birth.");
+        }
+        if (PatientAge.isFuture(date, today)) {
+            throw new InvalidInputException("dateOfBirth", "Date of birth cannot be in the future.");
+        }
+        if (PatientAge.exceedsMaxYears(date, today)) {
+            throw new InvalidInputException("dateOfBirth", "Date of birth must be within the last 120 years.");
+        }
+        return date;
+    }
+
+    /**
+     * The stored age (ADR-024 D4, D5): with a date, the completed years as of today, and an age sent with it must be
+     * the same number; without a date, the age sent (0 to 120).
+     */
+    private static int ageFor(LocalDate dateOfBirth, Integer sentAge, LocalDate today) {
+        if (dateOfBirth == null) {
+            return validAge(sentAge);
+        }
+        int years = PatientAge.completedYears(dateOfBirth, today);
+        if (sentAge != null && sentAge != years) {
+            throw new InvalidInputException("age", "Age does not match the date of birth.");
+        }
+        return years;
     }
 }

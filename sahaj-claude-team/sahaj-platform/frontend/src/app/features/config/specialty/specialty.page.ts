@@ -1,9 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin } from 'rxjs';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../config-format';
+import { Observable } from 'rxjs';
+import { EmrConfigComponent } from '../emr-config/emr-config.component';
+import { LeaveAware } from '../ipd/ipcard/ipcard-leave.guard';
 import { ClinicApi } from '../platform/clinic.api';
 import { Specialty } from '../platform/clinic.model';
 
@@ -14,14 +17,15 @@ import { Specialty } from '../platform/clinic.model';
 @Component({
   selector: 'app-specialty',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent],
+  imports: [IconComponent, EmrConfigComponent],
   styleUrl: './specialty.page.scss',
   templateUrl: './specialty.page.html',
 })
-export class SpecialtyPage implements OnInit {
+export class SpecialtyPage implements OnInit, LeaveAware {
   private readonly api = inject(ClinicApi);
   private readonly store = inject(ShellStore);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly emrConfig = viewChild(EmrConfigComponent);
 
   protected readonly specialties = signal<Specialty[]>([]);
   protected readonly inUse = signal<string | null>(null);
@@ -42,6 +46,11 @@ export class SpecialtyPage implements OnInit {
         this.loadError.set(problemMessage(error, 'We could not load the templates. Try again.'));
       },
     });
+  }
+
+  /** The EMR configuration below asks before the owner leaves with unsaved changes (SAH-45-4). */
+  confirmLeave(): Observable<boolean> | boolean {
+    return this.emrConfig()?.confirmLeave() ?? true;
   }
 
   protected apply(specialty: Specialty): void {

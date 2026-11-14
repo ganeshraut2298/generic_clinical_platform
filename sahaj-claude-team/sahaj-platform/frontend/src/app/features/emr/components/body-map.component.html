@@ -1,0 +1,259 @@
+<section class="bm" [attr.aria-labelledby]="inputId() + '-t'">
+  <header class="head">
+    <div class="ht">
+      <h3 [id]="inputId() + '-t'">{{ title() }}</h3>
+      <span class="faint t-xs">{{ hint }}</span>
+    </div>
+    <div class="hc">
+      <div class="seg" role="tablist" aria-label="Body">
+        @for (s of sexes; track s.key) {
+          <button type="button" role="tab" [attr.aria-selected]="bodySex() === s.key" [attr.data-sex]="s.key" (click)="setSex(s.key)">
+            {{ s.label }}
+          </button>
+        }
+      </div>
+      <div class="skin" role="group" aria-label="Skin">
+        <span class="faint t-xs">Skin</span>
+        @for (t of tones; track t.key) {
+          <button
+            type="button"
+            class="tone"
+            [class]="'tone t-' + t.key"
+            [attr.aria-pressed]="tone() === t.key"
+            [attr.aria-label]="t.label + ' skin tone'"
+            [title]="t.label"
+            (click)="setTone(t.key)"
+          ></button>
+        }
+      </div>
+    </div>
+  </header>
+
+  <div class="cols">
+    <div class="draw">
+      <div class="drawbar">
+        <button type="button" class="vb" [attr.aria-pressed]="view() === 'FRONT'" data-act="front" (click)="setView('FRONT')">Front</button>
+        <button type="button" class="vb" [attr.aria-pressed]="view() === 'BACK'" data-act="back" (click)="setView('BACK')">Back</button>
+        <button type="button" class="vb" data-act="turn" (click)="turn()">Turn</button>
+        <span class="spacer"></span>
+        <button type="button" class="vb sq" aria-label="Zoom in" data-act="zoom-in" (click)="zoomIn()">+</button>
+        <button type="button" class="vb sq" aria-label="Zoom out" data-act="zoom-out" (click)="zoomOut()">−</button>
+        <button type="button" class="vb" aria-label="Fit whole body" title="Fit whole body" data-act="fit" (click)="fit()">Fit</button>
+      </div>
+
+      <div class="stage" [class]="'stage tone-' + tone()" [class.turning]="turning()">
+        <svg
+          class="figure"
+          role="group"
+          [attr.viewBox]="viewBox()"
+          [attr.aria-label]="ariaLabel()"
+          [class.pan]="zoom() > 1"
+          (pointerdown)="onSvgDown($event)"
+          (pointermove)="onSvgMove($event)"
+          (pointerup)="onSvgUp($event)"
+          (pointerleave)="onSvgLeave()"
+        >
+          @for (r of regions(); track r.id) {
+            <path class="skin-fill" [attr.d]="r.d" />
+          }
+          <path class="detail" [attr.d]="details()" />
+          @for (r of regions(); track r.id) {
+            <path
+              class="hit"
+              [class.on]="selectedRegionId() === r.id"
+              [attr.d]="r.d"
+              [attr.tabindex]="disabled() ? null : 0"
+              [attr.role]="disabled() ? null : 'button'"
+              [attr.aria-label]="disabled() ? null : r.name + '. Press Enter to drop a pin.'"
+              (keydown.enter)="dropAtRegion(r.id)"
+              (keydown.space)="dropAtRegion(r.id); $event.preventDefault()"
+            />
+          }
+          @for (p of viewPins(); track p.no) {
+            <g
+              class="pin"
+              [class]="'pin f-' + p.finding"
+              [class.sel]="selected() === p.no"
+              tabindex="0"
+              role="button"
+              [attr.aria-label]="'Pin ' + p.no + ', ' + whereText(p) + ', ' + findingLabel(p.finding)"
+              (pointerdown)="onPinDown($event, p)"
+              (keydown.enter)="select(p.no)"
+              (keydown)="nudge($event, p)"
+            >
+              <circle class="halo" [attr.cx]="pinX(p)" [attr.cy]="pinY(p)" [attr.r]="pinRadius(p) * (selected() === p.no ? 2 : 1.4)" />
+              <circle class="dot" [attr.cx]="pinX(p)" [attr.cy]="pinY(p)" [attr.r]="pinRadius(p)" />
+              <text [attr.x]="pinX(p)" [attr.y]="pinY(p) + pinRadius(p) * 0.42" [attr.font-size]="pinRadius(p) * 1.15" text-anchor="middle">{{ p.no }}</text>
+            </g>
+          }
+        </svg>
+        <span class="tag">{{ view() === 'FRONT' ? 'FRONT' : 'BACK' }}</span>
+        <span class="lr l" aria-hidden="true">R</span>
+        <span class="lr r" aria-hidden="true">L</span>
+      </div>
+
+      @if (!disabled()) {
+        <label class="part">
+          <span>Or pick a body part</span>
+          <select class="input" data-testid="pick-part" (change)="pickPart($event)">
+            <option value="">Choose…</option>
+            @for (o of partOptions(); track o.view + o.id) {
+              <option [value]="o.view + ':' + o.id">{{ o.name }}{{ o.view === 'BACK' ? ' (back)' : '' }}</option>
+            }
+          </select>
+        </label>
+      }
+    </div>
+
+    <div class="side">
+      @if (selectedPin(); as pin) {
+        <div class="form" [class]="'form f-' + pin.finding" data-testid="pin-form">
+          <div class="fhead">
+            <span class="num">{{ pin.no }}</span>
+            <div class="ftitle">
+              <strong>{{ whereText(pin) }}</strong>
+              <span class="faint t-xs">Recorded {{ recorded(pin) }}</span>
+            </div>
+            @if (!disabled()) {
+              <button type="button" class="del" data-act="delete-pin" (click)="deletePin(pin.no)">Delete pin</button>
+            }
+          </div>
+
+          <div class="group">
+            <span class="gl" [id]="inputId() + '-find'">Finding</span>
+            <div class="chips" role="group" [attr.aria-labelledby]="inputId() + '-find'">
+              @for (f of findings; track f.key) {
+                <button
+                  type="button"
+                  class="opt"
+                  [class]="'opt f-' + f.key"
+                  [attr.aria-pressed]="pin.finding === f.key"
+                  [disabled]="disabled()"
+                  (click)="pickFinding(f.key)"
+                >
+                  {{ f.label }}
+                </button>
+              }
+            </div>
+          </div>
+          <div class="group">
+            <span class="gl" [id]="inputId() + '-cause'">What happened</span>
+            <div class="chips" role="group" [attr.aria-labelledby]="inputId() + '-cause'">
+              @for (c of causes; track c.key) {
+                <button type="button" class="opt" [attr.aria-pressed]="pin.cause === c.key" [disabled]="disabled()" (click)="pickCause(c.key)">
+                  {{ c.label }}
+                </button>
+              }
+            </div>
+          </div>
+          <div class="group">
+            <span class="gl" [id]="inputId() + '-sev'">Severity</span>
+            <div class="chips" role="group" [attr.aria-labelledby]="inputId() + '-sev'">
+              @for (s of severities; track s.key) {
+                <button type="button" class="opt" [attr.aria-pressed]="pin.severity === s.key" [disabled]="disabled()" (click)="pickSeverity(s.key)">
+                  {{ s.label }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="size">
+              <span class="gl">Size</span>
+              <button type="button" class="step" aria-label="Smaller" [disabled]="disabled() || pin.sizeCm <= 0" (click)="size(-1)">−</button>
+              <span class="num-val" data-testid="pin-size">{{ sizeLabel() }}</span>
+              <button type="button" class="step" aria-label="Larger" [disabled]="disabled() || pin.sizeCm >= 50" (click)="size(1)">+</button>
+            </div>
+            <label class="mlc" [class.on]="pin.mlc">
+              <input type="checkbox" [checked]="pin.mlc" [disabled]="disabled()" data-act="mlc" (change)="toggleMlc($event)" />
+              Medico-legal case (MLC)
+            </label>
+          </div>
+
+          <label class="note">
+            <span class="gl">What happened / notes</span>
+            <input
+              class="input"
+              type="text"
+              autocomplete="off"
+              [value]="pin.note"
+              [disabled]="disabled()"
+              [attr.maxlength]="noteMax"
+              placeholder="e.g. fell from bike yesterday evening, abrasion with gravel"
+              (input)="onNote($event)"
+            />
+          </label>
+          @if (pin.mlc) {
+            <p class="mlcnote" role="note" data-testid="mlc-note">{{ mlcNote }}</p>
+          }
+        </div>
+      } @else {
+        <p class="idle" data-testid="idle-hint">
+          Tap anywhere on the body to drop pin {{ nextNo() }}. Use Turn to see the back, + to zoom in on small areas.
+        </p>
+      }
+
+      <div class="reghead">
+        <strong>Findings register ({{ pins().length }})</strong>
+        <span class="faint t-xs" data-testid="register-side">{{ sideText() }}</span>
+      </div>
+      <div class="tablewrap" tabindex="0" role="region" aria-label="Findings register">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Where</th>
+              <th scope="col">Finding</th>
+              <th scope="col">What happened</th>
+              <th scope="col">Size</th>
+              <th scope="col">Recorded</th>
+              <th scope="col"><span class="sr-only">Delete</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of pins(); track p.no) {
+              <tr [class.sel]="selected() === p.no">
+                <td>
+                  <button type="button" class="pno" [class]="'pno f-' + p.finding" [attr.aria-label]="'Show pin ' + p.no" (click)="select(p.no)">
+                    {{ p.no }}
+                  </button>
+                </td>
+                <td>
+                  {{ whereText(p) }}
+                  @if (p.mlc) {
+                    <span class="badge-mlc">MLC</span>
+                  }
+                </td>
+                <td>{{ findingLabel(p.finding).toLowerCase() }} · {{ severityLabel(p.severity).toLowerCase() }}</td>
+                <td>{{ causeLabel(p.cause) }}{{ p.note ? ' — ' + p.note : '' }}</td>
+                <td>{{ registerSize(p.sizeCm) }}</td>
+                <td class="faint">{{ recorded(p) }}</td>
+                <td>
+                  @if (!disabled()) {
+                    <button type="button" class="rm" [attr.aria-label]="'Delete finding ' + p.no" (click)="deletePin(p.no)">
+                      <app-icon name="x" [size]="14" />
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="emptytext" data-testid="register-empty">No local findings yet.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (allowNoFindings() && pins().length === 0 && !disabled()) {
+        <button type="button" class="nofind" [attr.aria-pressed]="confirmed()" data-act="no-findings" (click)="toggleNoFindings()">
+          {{ confirmed() ? '✓ No local findings confirmed' : 'No local findings' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (toast(); as message) {
+    <div class="toast" role="status" data-testid="bm-toast">{{ message }}</div>
+  }
+</section>

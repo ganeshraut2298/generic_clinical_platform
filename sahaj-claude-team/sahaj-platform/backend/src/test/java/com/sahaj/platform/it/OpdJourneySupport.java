@@ -34,7 +34,8 @@ abstract class OpdJourneySupport extends AuthFlowTestSupport {
         /**
          * The role comes from the token authorities; the user id stays the owner's real user (a real
          * membership row), which is enough for FK-bearing audit columns. OwnerGuard still re-reads the
-         * DB, so a non-owner role can never reach an owner-only write through it.
+         * DB, so a non-owner role can never reach an owner-only write through it. A flag that the service reads from
+         * the membership (such as {@code canEdit}) still sees the owner: tests of those use a real member's token.
          */
         RequestPostProcessor as(String role) {
             return asUser(tenantId, ownerUserId, role);
@@ -46,9 +47,17 @@ abstract class OpdJourneySupport extends AuthFlowTestSupport {
     }
 
     protected Clinic newClinic(boolean vitals) throws Exception {
+        return newClinic(vitals, ownerIsDoctor);
+    }
+
+    /**
+     * {@code ownerIsDoctor} false: the wizard's doctor list is empty, so the owner gets no doctor profile (the wizard gives
+     * the first doctor of step 3 to the owner). Only for tests of "an owner without doctor details".
+     */
+    protected Clinic newClinic(boolean vitals, boolean ownerIsDoctor) throws Exception {
         Session session = signUp(uniqueMobile());
         RequestPostProcessor auth = asUser(session.tenantId(), session.userId(), "OWNER");
-        completeWizard(auth, vitals);
+        completeWizard(auth, vitals, ownerIsDoctor);
         MvcResult addDoctor = mvc.perform(post("/api/v1/platform/team").with(auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -84,15 +93,17 @@ abstract class OpdJourneySupport extends AuthFlowTestSupport {
         return UUID.fromString(json(result).get("id").asText());
     }
 
-    private void completeWizard(RequestPostProcessor auth, boolean vitals) throws Exception {
+    private void completeWizard(RequestPostProcessor auth, boolean vitals, boolean ownerIsDoctor) throws Exception {
         step(1, auth, """
                 {"name":"Sahaj test clinic","address":"12 MG Road","city":"Pune","pin":"411001",
                  "phone":"9876543210","registrationNo":"REG-001"}
                 """);
         step(2, auth, "{\"code\":\"gp\"}");
-        step(3, auth, """
+        step(3, auth, ownerIsDoctor ? """
                 {"doctors":[{"name":"Dr Owner","specialty":"General physician","feeRupees":200,"mobile":""}],
                  "staff":[]}
+                """ : """
+                {"doctors":[],"staff":[]}
                 """);
         step(4, auth, "{\"feeTiming\":\"before\",\"queue\":true,\"vitals\":" + vitals
                 + ",\"followUpDays\":7,\"followUpFee\":\"free\"}");

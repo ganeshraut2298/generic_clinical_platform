@@ -92,6 +92,13 @@ public class VitalsService {
     private final IpdGate gate;
     private final MarAssembler mar;
     private final ScopeGuard guard;
+    /** SAH-67-1: set by Spring; null in a plain unit test (then the sheet has no latest round). */
+    private RoundNoteRepository roundNotes;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRoundNotes(RoundNoteRepository roundNotes) {
+        this.roundNotes = roundNotes;
+    }
 
     VitalsService(AdmissionRepository admissions, VitalsRepository vitals, EscalationRepository escalations,
                   ClinicalEventRepository events, PatientLookupPort patients, PatientAccessPort patientAccess,
@@ -339,9 +346,12 @@ public class VitalsService {
         for (NoteRow note : vitals.findRecentNotes(tenantId, row.id(), RECENT_NOTES)) {
             notes.add(new NursingNote(note.id(), note.note(), note.recordedAt(), names.of(note.recordedBy())));
         }
+        VitalsViews.LatestRound round = roundNotes == null ? null : roundNotes.findLatest(tenantId, row.id())
+                .map(r -> new VitalsViews.LatestRound(r.roundDate(), r.signedAt(), team.find(tenantId, r.signedByMembershipId())
+                        .map(m -> m.name()).orElse("Doctor"), r.investigationsAdvised())).orElse(null);
         return new Sheet(row.id(), patient.name(), row.bedCode(), row.status(), state, canRecord, reason, asOf,
                 latestView, VitalsDue.isDue(admitted, latest == null ? null : latest.recordedAt(), asOf),
-                List.copyOf(notes), mar.doseCount(tenantId, row.id(), admitted, asOf));
+                List.copyOf(notes), mar.doseCount(tenantId, row.id(), admitted, asOf), round);
     }
 
     /** The admission's patient; a missing one is a 404 and never a placeholder name (code review N6). */

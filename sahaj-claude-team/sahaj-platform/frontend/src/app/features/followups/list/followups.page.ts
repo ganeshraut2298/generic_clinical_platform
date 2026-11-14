@@ -9,6 +9,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiError } from '../../../core/http/problem-detail';
+import { formatClockLabel, formatDisplayDate } from '../../../shared/format/ist-date';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { PageHeadComponent } from '../../../shared/ui/page-head.component';
@@ -45,6 +46,11 @@ export class FollowUpsPage implements OnInit {
   protected readonly pillClass = followUpPillClass;
   protected readonly severity = followUpSeverity;
   protected readonly doctorShortName = doctorShortName;
+
+  /** "5 Nov 2026, 5:00 PM" of the appointment the doctor's sign booked (SAH-51-6). */
+  protected appointmentText(date: string, time: string | null | undefined): string {
+    return time ? `${formatDisplayDate(date)}, ${formatClockLabel(time)}` : formatDisplayDate(date);
+  }
 
   protected readonly status = signal<FollowUpStatus>('DUE');
   protected readonly counts = signal<FollowUpCounts>(EMPTY_COUNTS);

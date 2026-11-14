@@ -1,10 +1,14 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
+import { ReducedMotion } from '../../../core/motion/reduced-motion';
+import { KineticBackgroundComponent } from '../../../shared/ui/kinetic-background/kinetic-background.component';
+import { provideReducedMotion } from '../../../testing/motion-testing';
 import { ALREADY_HAS_CLINIC_MESSAGE, LOCK_MESSAGE, NOT_REGISTERED_MESSAGE } from './login-copy';
 import { LoginPage } from './login.page';
 
@@ -16,9 +20,10 @@ describe('LoginPage', () => {
   let router: Router;
   let navigate: ReturnType<typeof vi.spyOn>;
 
-  async function open(url = '/login') {
+  async function open(url = '/login', reduced?: boolean) {
     TestBed.configureTestingModule({
       providers: [
+        ...(reduced === undefined ? [] : [provideReducedMotion(reduced)]),
         provideRouter(
           [
             { path: 'login', component: LoginPage },
@@ -66,7 +71,15 @@ describe('LoginPage', () => {
     await whenStable();
   }
 
-  afterEach(() => http.verify());
+  beforeEach(() => {
+    // jsdom has no canvas: the background then removes itself, which is the "no 2D canvas" path.
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+  });
 
   it('shows Log in heading and Log in toggle pressed by default', async () => {
     await open('/login');
@@ -264,6 +277,267 @@ describe('LoginPage', () => {
       expect(req.request.body).toEqual({ selectionToken: 'sel-1', tenantId: 't1' });
       req.flush({ next: 'APP', accessToken: 'token-1' });
       expect(navigate).toHaveBeenCalledWith(['/app']);
+    });
+  });
+
+  describe('error timing (SAH-74-5, mockup sendotp and verify)', () => {
+    const redText = 'Enter a 10-digit mobile number';
+
+    it('shows no error on an empty field that was never touched', async () => {
+      await open('/login');
+      expect(root().textContent).not.toContain(redText);
+      expect(root().querySelector('.mat-form-field-invalid')).toBeNull();
+    });
+
+    it('shows no error when the user moves into and out of the empty field', async () => {
+      await open('/login');
+      mobileInput().dispatchEvent(new Event('focus'));
+      mobileInput().dispatchEvent(new Event('blur'));
+      detectChanges();
+      await whenStable();
+      expect(root().textContent).not.toContain(redText);
+      expect(root().querySelector('.mat-form-field-invalid')).toBeNull();
+    });
+
+    it('shows no error while typing a short number, before Send OTP is pressed', async () => {
+      await open('/login');
+      await type(mobileInput(), '98');
+      mobileInput().dispatchEvent(new Event('blur'));
+      detectChanges();
+      await whenStable();
+      expect(root().textContent).not.toContain(redText);
+    });
+
+    it('shows the error after Send OTP is pressed on an empty field, and stays on the mobile step', async () => {
+      await open('/login');
+      await submitForm();
+      expect(root().textContent).toContain(redText);
+      expect(mobileInput()).not.toBeNull();
+      http.expectNone(`${AUTH_BASE}/otp/request`);
+    });
+
+    it('clears the error when the step starts again (other tab)', async () => {
+      await open('/login');
+      await submitForm();
+      expect(root().textContent).toContain(redText);
+      root().querySelectorAll<HTMLElement>('mat-button-toggle button')[1].click();
+      detectChanges();
+      await whenStable();
+      expect(root().textContent).not.toContain(redText);
+    });
+
+    it('shows no code error on a blurred empty code field, only after Verify', async () => {
+      await open('/login');
+      await sendValidOtp();
+      codeInput().dispatchEvent(new Event('focus'));
+      codeInput().dispatchEvent(new Event('blur'));
+      detectChanges();
+      await whenStable();
+      expect(root().querySelector('mat-error')).toBeNull();
+      expect(root().querySelector('.mat-form-field-invalid')).toBeNull();
+      await submitForm();
+      expect(root().querySelector('mat-error')?.textContent).toContain('Enter the 6-digit code');
+    });
+  });
+
+  describe('background and attributes (SAH-74-3)', () => {
+    it('mounts the background once, before and outside the content wrapper', async () => {
+      await open('/login');
+      const layers = root().querySelectorAll('app-kinetic-background');
+      expect(layers.length).toBe(1);
+      const wrap = root().querySelector('.pubwrap')!;
+      expect(wrap.contains(layers[0])).toBe(false);
+      expect(layers[0].compareDocumentPosition(wrap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('uses the shared component with its default inputs', async () => {
+      await open('/login');
+      const debug = harness.fixture.debugElement.query(
+        (d) => d.componentInstance instanceof KineticBackgroundComponent,
+      );
+      const layer = debug.componentInstance as KineticBackgroundComponent;
+      expect(layer.interactionRadius()).toBe(90);
+      expect(layer.gridSpacing()).toBe(28);
+      expect(layer.friction()).toBe(0.75);
+      expect(layer.enabled()).toBe(true);
+    });
+
+    it('marks the header data-dot-exclude and the header, left panel and card data-surface', async () => {
+      await open('/login');
+      const excluded = root().querySelectorAll('[data-dot-exclude]');
+      expect(excluded.length).toBe(1);
+      expect(excluded[0].tagName).toBe('HEADER');
+      for (const selector of ['header', '.auth-side', '.auth-card']) {
+        expect(root().querySelector(selector)!.hasAttribute('data-surface')).toBe(true);
+      }
+    });
+
+    it('stays usable when the 2D canvas cannot be created', async () => {
+      await open('/login');
+      await sendValidOtp();
+      expect(root().textContent).toContain('98220 00001');
+    });
+
+    it('puts the cursor in the mobile field when the page opens, as the mockup does', async () => {
+      await open('/login');
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(mobileInput().ownerDocument.activeElement).toBe(mobileInput());
+    });
+  });
+
+  describe('entrance (SAH-74-1, reduced motion SAH-74-4)', () => {
+    const wrapper = () => root().querySelector('.pubwrap')!;
+
+    it('plays the entrance when reduced motion is not asked for', async () => {
+      await open('/login', false);
+      expect(wrapper().classList.contains('entrance')).toBe(true);
+    });
+
+    it('has no entrance when reduced motion is asked for, and the text is in place', async () => {
+      await open('/login', true);
+      expect(wrapper().classList.contains('entrance')).toBe(false);
+      expect(root().textContent).toContain('Welcome back');
+      expect(mobileInput()).not.toBeNull();
+    });
+
+    it('follows the setting without a reload, and does not replay when it goes back', async () => {
+      await open('/login', false);
+      const reduced = TestBed.inject(ReducedMotion).reduced as WritableSignal<boolean>;
+      reduced.set(true);
+      detectChanges();
+      await whenStable();
+      expect(wrapper().classList.contains('entrance')).toBe(false);
+      reduced.set(false);
+      detectChanges();
+      await whenStable();
+      expect(wrapper().classList.contains('entrance')).toBe(false);
+    });
+  });
+
+  describe('tab highlight (SAH-74-2)', () => {
+    // jsdom has no layout, so the two tabs get fixed boxes: "Log in" 0 to 60, "New clinic" 62 to 152.
+    let widths: number[];
+    let lefts: number[];
+    const indexOf = (el: HTMLElement) =>
+      Array.from(el.parentElement!.querySelectorAll('mat-button-toggle')).indexOf(el);
+
+    beforeEach(() => {
+      widths = [60, 90];
+      lefts = [0, 62];
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.tagName === 'MAT-BUTTON-TOGGLE' ? widths[indexOf(this)] : 0;
+      });
+      vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.tagName === 'MAT-BUTTON-TOGGLE' ? lefts[indexOf(this)] : 0;
+      });
+    });
+
+    const thumb = () => root().querySelector<HTMLElement>('.seg-thumb');
+    const group = () => root().querySelector<HTMLElement>('.seg')!;
+    const tab = (index: number) => root().querySelectorAll<HTMLElement>('mat-button-toggle button')[index];
+
+    async function choose(index: number) {
+      tab(index).click();
+      detectChanges();
+      await whenStable();
+    }
+
+    it('starts behind the selected tab, hidden from assistive technology, without sliding', async () => {
+      await open('/login', false);
+      expect(thumb()).not.toBeNull();
+      expect(thumb()!.getAttribute('aria-hidden')).toBe('true');
+      expect(thumb()!.style.width).toBe('60px');
+      expect(thumb()!.style.transform).toBe('translateX(0px)');
+      expect(group().classList.contains('thumb-slide')).toBe(false);
+      expect(group().classList.contains('thumb-ready')).toBe(true);
+    });
+
+    it('starts behind New clinic for ?mode=signup', async () => {
+      await open('/login?mode=signup', false);
+      expect(thumb()!.style.transform).toBe('translateX(62px)');
+      expect(thumb()!.style.width).toBe('90px');
+    });
+
+    it('slides to the chosen tab while the heading changes at once', async () => {
+      await open('/login', false);
+      tab(1).click();
+      detectChanges();
+      expect(root().querySelector('h2')!.textContent).toContain('Create your clinic account');
+      await whenStable();
+      expect(thumb()!.style.transform).toBe('translateX(62px)');
+      expect(thumb()!.style.width).toBe('90px');
+      expect(group().classList.contains('thumb-slide')).toBe(true);
+    });
+
+    it('ends on the last tab when changed twice quickly', async () => {
+      await open('/login', false);
+      tab(1).click();
+      tab(0).click();
+      detectChanges();
+      await whenStable();
+      expect(thumb()!.style.transform).toBe('translateX(0px)');
+      expect(thumb()!.style.width).toBe('60px');
+      expect(root().querySelector('h2')!.textContent).toContain('Log in to your clinic');
+    });
+
+    it('changes tab with no slide when reduced motion is asked for', async () => {
+      await open('/login', true);
+      await choose(1);
+      expect(thumb()!.style.transform).toBe('translateX(62px)');
+      expect(group().classList.contains('thumb-slide')).toBe(false);
+    });
+
+    it('stops sliding when reduced motion is switched on while the page is open', async () => {
+      await open('/login', false);
+      await choose(1);
+      expect(group().classList.contains('thumb-slide')).toBe(true);
+      (TestBed.inject(ReducedMotion).reduced as WritableSignal<boolean>).set(true);
+      detectChanges();
+      await whenStable();
+      expect(group().classList.contains('thumb-slide')).toBe(false);
+    });
+
+    it('keeps one tab pressed and the group label', async () => {
+      await open('/login', false);
+      await choose(1);
+      const pressed = Array.from(root().querySelectorAll('mat-button-toggle button')).filter(
+        (button) => button.getAttribute('aria-pressed') === 'true',
+      );
+      expect(pressed.length).toBe(1);
+      expect(pressed[0].textContent!.trim()).toBe('New clinic');
+      expect(group().getAttribute('aria-label')).toBe('Account');
+    });
+
+    it('lines up again, without a slide, when the group is resized', async () => {
+      const callbacks: (() => void)[] = [];
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            callbacks.push(callback);
+          }
+          observe() {}
+          disconnect() {}
+        },
+      );
+      await open('/login', false);
+      await choose(1);
+      widths = [70, 100];
+      lefts = [0, 72];
+      callbacks.forEach((callback) => callback());
+      detectChanges();
+      await whenStable();
+      expect(thumb()!.style.transform).toBe('translateX(72px)');
+      expect(thumb()!.style.width).toBe('100px');
+      expect(group().classList.contains('thumb-slide')).toBe(false);
+      vi.unstubAllGlobals();
+    });
+
+    it('keeps the toggle own highlight when the tabs cannot be measured', async () => {
+      widths = [0, 0];
+      await open('/login', false);
+      expect(thumb()).toBeNull();
+      expect(group().classList.contains('thumb-ready')).toBe(false);
     });
   });
 });

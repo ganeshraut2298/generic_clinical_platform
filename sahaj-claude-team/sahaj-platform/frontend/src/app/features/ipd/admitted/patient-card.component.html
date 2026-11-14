@@ -148,4 +148,17 @@
     [preview]="preview()"
     (act)="press($event)"
   />
+  @if (canOpenEmr() && !preview()) {
+    <div class="pcemr">
+      <button
+        type="button"
+        class="pcemrb"
+        data-act="open-emr"
+        [attr.aria-label]="'Open EMR for ' + view().name"
+        (click)="openEmrRecord.emit()"
+      >
+        <app-icon name="emr" [size]="14" /> Open EMR
+      </button>
+    </div>
+  }
 </article>

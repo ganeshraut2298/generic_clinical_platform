@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../../core/config/api-config';
 import { ConsentInput, PatientConsentState, RecordAccess } from '../privacy/privacy.model';
-import { Patient, PatientCreate, PatientFilter, PatientPage, PatientSummary, PatientUpdate } from './patient.model';
+import { Patient, PatientCreate, PatientFilter, PatientMergeResult, PatientPage, PatientSummary, PatientUpdate } from './patient.model';
 
 /** The only place that calls `/patient/patients` (SAH-8). */
 @Injectable({ providedIn: 'root' })
@@ -41,8 +41,8 @@ export class PatientApi {
     return this.http.get<PatientSummary[]>(`${this.baseUrl}/patients/${id}/family`);
   }
 
-  merge(keepId: string, mergeId: string): Observable<Patient> {
-    return this.http.post<Patient>(`${this.baseUrl}/patients/merge`, { keepId, mergeId });
+  merge(keepId: string, mergeId: string): Observable<PatientMergeResult> {
+    return this.http.post<PatientMergeResult>(`${this.baseUrl}/patients/merge`, { keepId, mergeId });
   }
 
   getConsents(id: string): Observable<PatientConsentState> {

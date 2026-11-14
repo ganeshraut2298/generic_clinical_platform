@@ -8,7 +8,8 @@ export type TriageScale = 3 | 5;
 export type TriageLevel = 1 | 2 | 3 | 4 | 5;
 export type EmergencyTone = 'crit' | 'warn' | 'good';
 export type EmergencySex = 'M' | 'F' | 'O';
-export type EmergencyCaseStatus = 'WAITING' | 'SEEN' | 'ADMITTED' | 'RELEASED' | 'REFERRED';
+/** SENT_TO_OPD (ipd.yaml 0.3.0, SAH-67-2) is closed like the others; a client treats an unknown status as closed. */
+export type EmergencyCaseStatus = 'WAITING' | 'SEEN' | 'ADMITTED' | 'RELEASED' | 'REFERRED' | 'SENT_TO_OPD';
 export type EmergencyState = 'trial' | 'on' | 'readonly';
 
 export interface EmergencyLevel {

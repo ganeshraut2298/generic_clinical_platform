@@ -49,7 +49,7 @@
         ariaCurrentWhenActive="page"
         [attr.aria-label]="
           badgeOf(item) > 0
-            ? (item.labelKey | t) + ', ' + badgeOf(item) + ' ' + ('nav.emergencyCount' | t)
+            ? (item.labelKey | t) + ', ' + badgeOf(item) + ' ' + (badgeUnitKey(item) | t)
             : (item.labelKey | t)
         "
         [attr.title]="collapsed() ? (item.labelKey | t) : null"

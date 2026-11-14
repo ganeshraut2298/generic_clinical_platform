@@ -14,7 +14,26 @@ import org.springframework.stereotype.Repository;
 public class JdbcBillItemRepository implements BillItemRepository {
 
     private static final String SELECT = """
-            select id, service_id, name, amount_paise, qty from billing.bill_item
+            select id, service_id, name, amount_paise, qty, source_kind from billing.bill_item
+            """;
+    private static final String FIND_EMR = """
+            select id, source_key, service_id, qty, amount_paise from billing.bill_item
+            where tenant_id = :tenantId and bill_id = :billId and source_kind = 'EMR' order by created_at
+            """;
+    private static final String INSERT_EMR = """
+            insert into billing.bill_item (id, bill_id, service_id, name, amount_paise, qty, source_kind, source_key,
+                                           created_by)
+            values (:id, :billId, :serviceId, :name, :amountPaise, :qty, 'EMR', :sourceKey, :actor)
+            on conflict do nothing
+            """;
+    private static final String INSERT_PLAN = """
+            insert into billing.bill_item (id, bill_id, service_id, name, label, amount_paise, qty, source_kind,
+                                           source_key, created_by)
+            values (:id, :billId, null, :label, :label, :amountPaise, 1, 'EMR_PLAN', :sourceKey, :actor)
+            on conflict do nothing
+            """;
+    private static final String UPDATE_QTY = """
+            update billing.bill_item set qty = :qty where tenant_id = :tenantId and id = :id
             """;
     private static final String FIND_BY_BILL = SELECT
             + " where tenant_id = :tenantId and bill_id = :billId order by created_at";
@@ -68,6 +87,34 @@ public class JdbcBillItemRepository implements BillItemRepository {
     }
 
     @Override
+    public List<EmrLine> findEmrLines(UUID tenantId, UUID billId) {
+        return jdbc.sql(FIND_EMR).param("tenantId", tenantId).param("billId", billId)
+                .query((rs, row) -> new EmrLine(rs.getObject("id", UUID.class), rs.getString("source_key"),
+                        rs.getObject("service_id", UUID.class), rs.getInt("qty"), rs.getLong("amount_paise"))).list();
+    }
+
+    @Override
+    public void insertEmr(UUID id, UUID billId, UUID serviceId, String name, long amountPaise, int qty,
+                          String sourceKey, UUID actorUserId) {
+        jdbc.sql(INSERT_EMR).param("id", id).param("billId", billId).param("serviceId", serviceId)
+                .param("name", name).param("amountPaise", amountPaise).param("qty", qty)
+                .param("sourceKey", sourceKey).param("actor", actorUserId).update();
+    }
+
+    @Override
+    public boolean insertPlan(UUID id, UUID billId, String label, long amountPaise, String sourceKey,
+                              UUID actorUserId) {
+        return jdbc.sql(INSERT_PLAN).param("id", id).param("billId", billId).param("label", label)
+                .param("amountPaise", amountPaise).param("sourceKey", sourceKey).param("actor", actorUserId)
+                .update() == 1;
+    }
+
+    @Override
+    public void updateQty(UUID tenantId, UUID id, int qty) {
+        jdbc.sql(UPDATE_QTY).param("tenantId", tenantId).param("id", id).param("qty", qty).update();
+    }
+
+    @Override
     public Optional<BillItemRow> findById(UUID tenantId, UUID billId, UUID itemId) {
         return jdbc.sql(FIND_BY_ID).param("tenantId", tenantId).param("billId", billId).param("id", itemId)
                 .query(JdbcBillItemRepository::map).optional();
@@ -80,6 +127,6 @@ public class JdbcBillItemRepository implements BillItemRepository {
 
     private static BillItemRow map(ResultSet rs, int rowNum) throws SQLException {
         return new BillItemRow(rs.getObject("id", UUID.class), rs.getObject("service_id", UUID.class),
-                rs.getString("name"), rs.getLong("amount_paise"), rs.getInt("qty"));
+                rs.getString("name"), rs.getLong("amount_paise"), rs.getInt("qty"), rs.getString("source_kind"));
     }
 }

@@ -68,9 +68,26 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
             """;
     private static final String SELECT = """
             select id, patient_id, doctor_membership_id, source_visit_id, source_admission_id, due_date, reason,
-                   returned_visit_id
-            from opd.follow_up
+                   returned_visit_id,
+                   (select a.appt_date from opd.appointment a
+                     where a.tenant_id = f.tenant_id and a.id = f.appointment_id) as appointment_date,
+                   (select a.appt_time from opd.appointment a
+                     where a.tenant_id = f.tenant_id and a.id = f.appointment_id) as appointment_time
+            from opd.follow_up f
             where tenant_id = :tenantId and""";
+    private static final String BY_SOURCE_VISIT = """
+            select id, due_date, returned_visit_id, appointment_id from opd.follow_up
+            where tenant_id = :tenantId and source_visit_id = :visitId
+            """;
+    private static final String UPDATE_DUE = """
+            update opd.follow_up set due_date = :dueDate, updated_by = :actor, updated_at = now(), version = version + 1
+            where tenant_id = :tenantId and id = :id
+            """;
+    private static final String SET_APPOINTMENT = """
+            update opd.follow_up set appointment_id = :appointmentId, interval_key = :intervalKey, updated_by = :actor,
+                updated_at = now(), version = version + 1
+            where tenant_id = :tenantId and id = :id
+            """;
     private static final String ORDER_BY_DUE = " order by due_date, created_at limit " + MAX_ROWS;
     private static final String ORDER_BY_RETURN = " order by returned_at desc, created_at limit " + MAX_ROWS;
 
@@ -187,6 +204,27 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
                 rs.getObject("doctor_membership_id", UUID.class), rs.getObject("source_visit_id", UUID.class),
                 rs.getObject("source_admission_id", UUID.class),
                 rs.getObject("due_date", LocalDate.class), rs.getString("reason"),
-                rs.getObject("returned_visit_id", UUID.class));
+                rs.getObject("returned_visit_id", UUID.class), rs.getObject("appointment_date", LocalDate.class),
+                rs.getObject("appointment_time", java.time.LocalTime.class));
+    }
+
+    @Override
+    public Optional<VisitFollowUp> findBySourceVisit(UUID tenantId, UUID sourceVisitId) {
+        return jdbc.sql(BY_SOURCE_VISIT).param("tenantId", tenantId).param("visitId", sourceVisitId)
+                .query((rs, row) -> new VisitFollowUp(rs.getObject("id", UUID.class),
+                        rs.getObject("due_date", LocalDate.class), rs.getObject("returned_visit_id", UUID.class),
+                        rs.getObject("appointment_id", UUID.class))).optional();
+    }
+
+    @Override
+    public void updateDueDate(UUID tenantId, UUID id, LocalDate dueDate, UUID actorUserId) {
+        jdbc.sql(UPDATE_DUE).param("tenantId", tenantId).param("id", id).param("dueDate", dueDate)
+                .param("actor", actorUserId).update();
+    }
+
+    @Override
+    public void setAppointment(UUID tenantId, UUID id, UUID appointmentId, String intervalKey, UUID actorUserId) {
+        jdbc.sql(SET_APPOINTMENT).param("tenantId", tenantId).param("id", id).param("appointmentId", appointmentId)
+                .param("intervalKey", intervalKey).param("actor", actorUserId).update();
     }
 }

@@ -45,7 +45,7 @@ public class EmrMasterService {
         MasterPageRow found = repository.search(master, SearchPrefix.lowerPattern(text), specialty,
                 EmrQueryRules.PAGE_SIZE, page * EmrQueryRules.PAGE_SIZE);
         List<MasterItem> items = found.items().stream()
-                .map(row -> new MasterItem(row.id(), row.name(), row.specialtyHint())).toList();
+                .map(row -> new MasterItem(row.id(), row.name(), row.specialtyHint(), row.nameMr(), row.nameHi())).toList();
         return new MasterPage(items, found.total(), page, EmrQueryRules.PAGE_SIZE);
     }
 
@@ -61,7 +61,7 @@ public class EmrMasterService {
                 limit);
         List<QuickOption> items = rows.stream()
                 .map(row -> new QuickOption(row.itemKey(), row.name(), row.icd10Code(), row.form(), row.favourite(),
-                        row.useCount(), row.lastUsedAt()))
+                        row.useCount(), row.lastUsedAt(), row.nameMr(), row.nameHi()))
                 .toList();
         return new QuickOptionList(master.key(), items);
     }

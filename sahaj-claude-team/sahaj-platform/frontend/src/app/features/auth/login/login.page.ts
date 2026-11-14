@@ -3,11 +3,15 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
+  effect,
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import {
   AbstractControl,
@@ -18,13 +22,16 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, RouterLink } from '@angular/router';
 import { ApiError } from '../../../core/http/problem-detail';
+import { ReducedMotion } from '../../../core/motion/reduced-motion';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { KineticBackgroundComponent } from '../../../shared/ui/kinetic-background/kinetic-background.component';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthMode, AuthResult, ClinicChoice, MOBILE_PATTERN, PRIVACY_VERSION, TERMS_VERSION } from '../../../core/auth/auth.model';
 import {
@@ -40,6 +47,24 @@ import {
 export type LoginStep = 'mobile' | 'otp' | 'chooseClinic' | 'notRegistered';
 
 const DEFAULT_RESEND_SECONDS = 30;
+
+/** Where the sliding highlight sits behind the selected tab, in px from the left of the group. */
+export interface TabThumb {
+  x: number;
+  width: number;
+}
+
+/**
+ * A field shows its red error only after the button was pressed with a bad value (mockup
+ * `sendotp` and `verify`), never because the user only focused and left it (SAH-74-5).
+ */
+export class AfterAttemptMatcher implements ErrorStateMatcher {
+  constructor(private readonly attempted: () => boolean) {}
+
+  isErrorState(control: AbstractControl | null): boolean {
+    return !!control && control.invalid && this.attempted();
+  }
+}
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, '');
@@ -68,6 +93,7 @@ function codeValidator(control: AbstractControl<string>): ValidationErrors | nul
     MatInputModule,
     RouterLink,
     IconComponent,
+    KineticBackgroundComponent,
   ],
   styleUrl: './login.page.scss',
   templateUrl: './login.page.html',
@@ -78,6 +104,9 @@ export class LoginPage implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly reducedMotion = inject(ReducedMotion);
+  private readonly seg = viewChild<unknown, ElementRef<HTMLElement>>('seg', { read: ElementRef });
 
   /** From the query string: /login?mode=signup. Anything else is Log in. */
   readonly mode = input<string>();
@@ -89,6 +118,22 @@ export class LoginPage implements OnInit {
   protected readonly lockMessage = signal<string | null>(null);
   protected readonly formError = signal<string | null>(null);
   protected readonly clinics = signal<ClinicChoice[]>([]);
+
+  /** True after Send OTP / Verify was pressed; clears when the step restarts. */
+  private readonly mobileAttempted = signal(false);
+  private readonly codeAttempted = signal(false);
+  protected readonly mobileMatcher = new AfterAttemptMatcher(() => this.mobileAttempted());
+  protected readonly codeMatcher = new AfterAttemptMatcher(() => this.codeAttempted());
+
+  /**
+   * Soft entrance of the left panel and the card (SAH-74-1). On when the visitor has not asked for
+   * reduced motion; switches off for good if they do, and does not replay if they switch back.
+   */
+  protected readonly entrance = signal(!this.reducedMotion.reduced());
+  /** Position of the sliding highlight; null until measured (the toggle's own highlight shows). */
+  protected readonly thumb = signal<TabThumb | null>(null);
+  /** True only while a tab change should slide the highlight. */
+  protected readonly thumbSlide = signal(false);
 
   protected readonly consentLine = CONSENT_LINE;
   protected readonly sideTicks = SIDE_TICKS;
@@ -124,10 +169,23 @@ export class LoginPage implements OnInit {
 
   constructor() {
     this.destroyRef.onDestroy(() => this.stopCountdown());
+    effect(() => {
+      if (this.reducedMotion.reduced()) {
+        this.entrance.set(false);
+        this.thumbSlide.set(false);
+      }
+    });
+    effect(() => {
+      this.authMode();
+      afterNextRender(() => this.placeThumb(true), { injector: this.injector });
+    });
+    afterNextRender(() => this.watchThumbSize());
   }
 
   ngOnInit(): void {
     this.authMode.set(this.mode() === 'signup' ? 'SIGNUP' : 'LOGIN');
+    // As the mockup does when the page opens: the cursor is in the mobile field.
+    this.focus('#login-mobile');
   }
 
   protected setAuthMode(mode: AuthMode): void {
@@ -137,7 +195,7 @@ export class LoginPage implements OnInit {
 
   protected mobileFieldError(): string | null {
     const errors = this.mobileControl.errors;
-    if (!errors || !this.mobileControl.touched) {
+    if (!errors || !this.mobileAttempted()) {
       return null;
     }
     if (typeof errors['server'] === 'string') {
@@ -148,7 +206,7 @@ export class LoginPage implements OnInit {
 
   protected codeFieldError(): string | null {
     const errors = this.codeControl.errors;
-    if (!errors || !this.codeControl.touched) {
+    if (!errors || !this.codeAttempted()) {
       return null;
     }
     if (typeof errors['server'] === 'string') {
@@ -162,6 +220,7 @@ export class LoginPage implements OnInit {
       return;
     }
     this.mobileControl.markAsTouched();
+    this.mobileAttempted.set(true);
     if (this.mobileControl.invalid) {
       this.focus('#login-mobile');
       return;
@@ -201,6 +260,7 @@ export class LoginPage implements OnInit {
       return;
     }
     this.codeControl.markAsTouched();
+    this.codeAttempted.set(true);
     if (this.codeControl.invalid) {
       this.focus('#login-code');
       return;
@@ -323,6 +383,8 @@ export class LoginPage implements OnInit {
 
   private resetToMobileStep(): void {
     this.stopCountdown();
+    this.mobileAttempted.set(false);
+    this.codeAttempted.set(false);
     this.step.set('mobile');
     this.resendSeconds.set(0);
     this.lockMessage.set(null);
@@ -350,6 +412,36 @@ export class LoginPage implements OnInit {
       clearInterval(this.timer);
       this.timer = undefined;
     }
+  }
+
+  /** Measures the selected tab and moves the highlight behind it. Layout is only read, never changed. */
+  private placeThumb(animated: boolean): void {
+    const group = this.seg()?.nativeElement;
+    if (!group) {
+      return;
+    }
+    const toggles = group.querySelectorAll<HTMLElement>('mat-button-toggle');
+    const target = toggles[this.authMode() === 'SIGNUP' ? 1 : 0];
+    if (!target || target.offsetWidth === 0) {
+      return;
+    }
+    const next: TabThumb = { x: target.offsetLeft, width: target.offsetWidth };
+    const previous = this.thumb();
+    this.thumbSlide.set(animated && previous !== null && !this.reducedMotion.reduced());
+    if (!previous || previous.x !== next.x || previous.width !== next.width) {
+      this.thumb.set(next);
+    }
+  }
+
+  /** Keeps the highlight lined up when the window or the text size changes. */
+  private watchThumbSize(): void {
+    const group = this.seg()?.nativeElement;
+    if (!group || typeof ResizeObserver !== 'function') {
+      return;
+    }
+    const observer = new ResizeObserver(() => this.placeThumb(false));
+    observer.observe(group);
+    this.destroyRef.onDestroy(() => observer.disconnect());
   }
 
   private focus(selector: string): void {

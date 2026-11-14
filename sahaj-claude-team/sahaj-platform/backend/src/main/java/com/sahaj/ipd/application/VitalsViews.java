@@ -58,10 +58,31 @@ public final class VitalsViews {
         }
     }
 
+    /**
+     * SAH-67-1 (ADR-025 D8): the latest daily progress note a doctor signed in the EMR; "Investigations advised" is clinical
+     * text for the screen only.
+     */
+    public record LatestRound(java.time.LocalDate roundDate, Instant signedAt, String doctorName,
+                              String investigationsAdvised) {
+
+        @Override
+        public String toString() {
+            return "LatestRound[roundDate=" + roundDate + "]";
+        }
+    }
+
     /** The Nursing sheet. {@code readOnlyReason} is ROLE, IPD_READONLY, NOT_ADMITTED or null. */
     public record Sheet(UUID admissionId, String patientName, String bedCode, String status, String state,
                         boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest,
-                        boolean vitalsDue, List<NursingNote> recentNotes, int doseCount) {
+                        boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, LatestRound latestRound) {
+
+        /** The sheet before the round line (no latest round). */
+        public Sheet(UUID admissionId, String patientName, String bedCode, String status, String state,
+                     boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest, boolean vitalsDue,
+                     List<NursingNote> recentNotes, int doseCount) {
+            this(admissionId, patientName, bedCode, status, state, canRecord, readOnlyReason, asOf, latest, vitalsDue,
+                    recentNotes, doseCount, null);
+        }
 
         @Override
         public String toString() {
@@ -86,12 +107,21 @@ public final class VitalsViews {
     public record VitalsSaved(UUID admissionId, String patientName, String bedCode, String status, String state,
                               boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest,
                               boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, Saved saved,
-                              EscalationResult escalation) {
+                              EscalationResult escalation, LatestRound latestRound) {
+
+        /** The answer before the round line (no latest round). */
+        public VitalsSaved(UUID admissionId, String patientName, String bedCode, String status, String state,
+                           boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest,
+                           boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, Saved saved,
+                           EscalationResult escalation) {
+            this(admissionId, patientName, bedCode, status, state, canRecord, readOnlyReason, asOf, latest, vitalsDue,
+                    recentNotes, doseCount, saved, escalation, null);
+        }
 
         static VitalsSaved of(Sheet sheet, Saved saved, EscalationResult escalation) {
             return new VitalsSaved(sheet.admissionId(), sheet.patientName(), sheet.bedCode(), sheet.status(),
                     sheet.state(), sheet.canRecord(), sheet.readOnlyReason(), sheet.asOf(), sheet.latest(),
-                    sheet.vitalsDue(), sheet.recentNotes(), sheet.doseCount(), saved, escalation);
+                    sheet.vitalsDue(), sheet.recentNotes(), sheet.doseCount(), saved, escalation, sheet.latestRound());
         }
 
         @Override

@@ -12,6 +12,7 @@ import { formatInr } from '../../../shared/format/inr';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { PageHeadComponent } from '../../../shared/ui/page-head.component';
+import { visitTypeLabel } from '../../queue/queue.model';
 import { Service } from '../../config/opd/opd.model';
 import { OpdApi } from '../../config/opd/opd.api';
 import { BillingApi } from '../billing.api';
@@ -58,6 +59,7 @@ export class BillingCounterPage implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly formatInr = formatInr;
+  protected readonly visitTypeLabel = visitTypeLabel;
   protected readonly paymentModes = PAYMENT_MODES;
   protected readonly discountReasons = DISCOUNT_REASONS;
   protected readonly refundReasons = REFUND_REASONS;

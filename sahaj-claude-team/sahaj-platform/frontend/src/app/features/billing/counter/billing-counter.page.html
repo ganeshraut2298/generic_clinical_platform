@@ -117,7 +117,7 @@
               T-{{ b.tokenNo }} · {{ b.patientName }}
               <span class="faint bill-age">{{ b.age }} {{ b.sex }}</span>
             </h2>
-            <div class="muted t-sm">{{ b.doctorName }} · {{ b.visitType === 'FOLLOW_UP' ? 'Follow-up' : 'New' }} visit</div>
+            <div class="muted t-sm">{{ b.doctorName }} · {{ visitTypeLabel(b.visitType) }} visit</div>
           </div>
           @if (b.balancePaise === 0) {
             <span class="pill p-good"><app-icon name="check" [size]="12" /> Settled</span>

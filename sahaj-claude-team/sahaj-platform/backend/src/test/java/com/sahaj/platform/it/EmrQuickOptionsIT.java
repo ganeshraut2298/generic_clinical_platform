@@ -67,7 +67,7 @@ class EmrQuickOptionsIT extends EmrSupport {
 
     @Test
     void anOwnerWithoutDoctorDetailsIsRefusedWithDoctorDetailsMissingUntilTheyAddThem() throws Exception {
-        Clinic clinic = newClinic();
+        Clinic clinic = bareOwnerClinic();
         for (EmrMaster master : MASTERS_ALL) {
             JsonNode problem = problemOf(HttpMethod.GET, QUICK + master.key(), clinic.owner(), null, 403,
                     "doctor-details-missing");
@@ -264,7 +264,7 @@ class EmrQuickOptionsIT extends EmrSupport {
     void usedMedicinesThenTheClinicsFavouritesThenTheRestAndOnlyMedicinesCarryFormAndFavourite() throws Exception {
         Clinic clinic = newClinic();
         Staff doctor = addDoctor(clinic, "General practice");
-        List<String> base = itemKeys(EmrMaster.MEDICINES, 52);
+        List<String> base = itemKeys(EmrMaster.MEDICINES, 53);
         String used = base.get(10);
         String favourite = base.get(30);
         ok(HttpMethod.PUT, "/api/v1/opd/medicine-favourites/" + favourite, clinic.owner(), null, 204);

@@ -92,7 +92,18 @@ class MeServiceTest {
     void aNurseNeverSeesBillingOrRevenue() {
         MeView view = service.getMe(TENANT_ID, USER_ID, "NURSE");
 
-        assertThat(view.menu()).containsExactly("today", "queue", "patients");
+        assertThat(view.menu()).containsExactly("today", "queue", "secondchecks", "patients");
+    }
+
+    @Test
+    void anOwnerGetsSecondChecksOnlyWithDoctorDetails() {
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").menu()).doesNotContain("secondchecks");
+
+        when(teamRepository.findByUser(TENANT_ID, USER_ID)).thenReturn(Optional.of(new TeamRepository.TeamRow(
+                MEMBERSHIP_ID, USER_ID, "Asha", "9123456789", MembershipRole.OWNER, MembershipStatus.ACTIVE, null,
+                true, "General Medicine", null, null, 0L)));
+
+        assertThat(service.getMe(TENANT_ID, USER_ID, "OWNER").menu()).startsWith("today", "queue", "secondchecks");
     }
 
     @Test

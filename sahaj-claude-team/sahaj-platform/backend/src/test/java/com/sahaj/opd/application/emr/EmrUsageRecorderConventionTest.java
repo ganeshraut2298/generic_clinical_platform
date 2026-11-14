@@ -20,10 +20,12 @@ import org.junit.jupiter.api.Test;
 class EmrUsageRecorderConventionTest {
 
     /** The recorder itself, and the sign service of SAH-51 once it exists. */
-    private static final String[] ALLOWED_CALLERS = {"com.sahaj.opd.application.emr.EmrUsageRecorder"};
+    private static final String[] ALLOWED_CALLERS = {"com.sahaj.opd.application.emr.EmrUsageRecorder",
+            "com.sahaj.opd.application.emr.finish.EmrSignService"};
 
     private static ArchRule onlyTheSignServiceMayCallTheRecorder() {
         return noClasses().that().doNotHaveFullyQualifiedName(ALLOWED_CALLERS[0])
+                .and().doNotHaveFullyQualifiedName(ALLOWED_CALLERS[1])
                 .should().dependOnClassesThat().haveFullyQualifiedName(ALLOWED_CALLERS[0])
                 .because("only the sign step may write the ranking counts (ADR-019 D10)");
     }

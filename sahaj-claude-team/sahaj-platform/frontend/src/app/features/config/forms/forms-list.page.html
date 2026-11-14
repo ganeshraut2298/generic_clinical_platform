@@ -1,0 +1,78 @@
+<section class="fl surf panel" aria-labelledby="fl-title">
+  <header class="head">
+    <div>
+      <nav class="crumb" aria-label="Path">
+        <a routerLink="/app/config/specialty">Settings / EMR configuration</a> / Form builder
+      </nav>
+      <h2 id="fl-title">Form builder — custom clinical forms</h2>
+      <p class="muted">
+        Build your own chart: fields, scores, show-if rules and print layout. It appears in the EMR as a custom section.
+      </p>
+    </div>
+  </header>
+
+  @if (!canEdit() && !loading() && !error()) {
+    <div class="notice teal slim" role="note" data-testid="forms-readonly">
+      <app-icon name="lock" [size]="14" />
+      <span>Only the owner can change forms. You can read and preview them.</span>
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="loading" aria-busy="true">Loading forms</p>
+  } @else if (error(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button mat-stroked-button type="button" data-act="retry" (click)="load()">Try again</button>
+    </div>
+  } @else {
+    <h3>Your forms</h3>
+    <ul class="forms" data-testid="forms">
+      @for (f of forms(); track f.formKey) {
+        <li class="form">
+          <div class="fmain">
+            <a class="fname" [routerLink]="['/app/config/forms', f.formKey]">{{ f.name }}</a>
+            <span class="faint t-xs">{{ where(f) }} · {{ f.emrPart === 'ASSESSMENT' ? 'Assessment' : 'Treatment' }}</span>
+            <span class="faint t-xs">{{ counts(f) }}</span>
+          </div>
+          <span class="pill" [class.p-good]="f.state === 'LIVE'" [class.p-wait]="f.state !== 'LIVE'">{{ chip(f) }}</span>
+          <a mat-stroked-button [routerLink]="['/app/config/forms', f.formKey]">{{ canEdit() ? 'Open' : 'View' }}</a>
+        </li>
+      } @empty {
+        <li class="empty">No form yet. Start from one of the forms below.</li>
+      }
+    </ul>
+
+    <h3>Start from a form clinics in India already use</h3>
+    <p class="muted t-sm">Everything stays editable. The starter itself never changes. Review each one before you use it.</p>
+    @if (createError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+    <ul class="starters" data-testid="starters">
+      @for (s of starters(); track s.starterKey) {
+        <li class="starter">
+          <div class="smain">
+            <strong>{{ s.name }}</strong>
+            <span class="faint t-xs">{{ s.description }}</span>
+            <span class="faint t-xs">{{ s.suitedFor }}</span>
+          </div>
+          @if (canEdit()) {
+            <button
+              mat-stroked-button
+              type="button"
+              [attr.data-starter]="s.starterKey"
+              [disabled]="creating() !== null"
+              (click)="use(s)"
+            >
+              {{ creating() === s.starterKey ? 'Starting' : 'Use this starter' }}
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

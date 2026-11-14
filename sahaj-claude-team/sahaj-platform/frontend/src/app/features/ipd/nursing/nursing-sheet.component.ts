@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { formatTimeOfInstant } from '../../../shared/format/ist-date';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -103,6 +104,7 @@ export class NursingSheetComponent {
   protected readonly roleNotice = ROLE_NOTICE;
   protected readonly sameValuesNotice = SAME_VALUES_NOTICE;
   protected readonly noteAgo = noteAgoText;
+  protected readonly roundTime = formatTimeOfInstant;
 
   protected readonly sheet = signal<NursingSheet | null>(null);
   protected readonly loadError = signal<string | null>(null);

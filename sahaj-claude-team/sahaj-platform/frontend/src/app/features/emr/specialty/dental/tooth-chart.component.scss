@@ -1,0 +1,458 @@
+.cols {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+
+  @media (min-width: 1100px) {
+    grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr);
+  }
+}
+
+.left,
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.right {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+}
+
+.swatch .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+
+/* ---- condition colours: product palette from the tokens ---- */
+.sw {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+
+  &[data-cond='CARIES'] {
+    background: var(--warn-soft);
+    border-color: var(--warn);
+  }
+  &[data-cond='FILLED'] {
+    background: var(--pri-soft);
+    border-color: var(--pri);
+  }
+  &[data-cond='RCT'] {
+    background: var(--sec-soft);
+    border-color: var(--sec);
+  }
+  &[data-cond='CROWN'] {
+    background: var(--node-d);
+    border-color: var(--pri-text);
+  }
+  &[data-cond='MISSING'] {
+    border-style: dashed;
+    border-color: var(--ink-3);
+  }
+  &[data-cond='TO_EXTRACT'] {
+    background: var(--crit-soft);
+    border-color: var(--crit);
+  }
+  &[data-cond='IMPLANT'] {
+    background: var(--line);
+    border-color: var(--ink-2);
+  }
+}
+
+.grid2 {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cond {
+  flex-direction: row;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.sbtn {
+  width: 44px;
+  justify-content: center;
+  padding: 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+
+  .cnt {
+    margin-left: 4px;
+    font-weight: 700;
+  }
+}
+
+/* ---- 2D chart ---- */
+.jaws {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  overflow-x: auto;
+
+  &.look-xray {
+    background: var(--ink);
+    color: var(--surface);
+  }
+}
+
+.quad {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+
+.arch {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  min-width: max-content;
+}
+
+.midline {
+  height: 1px;
+  background: var(--line);
+}
+
+.tooth {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 44px;
+  min-height: 44px;
+  padding: 4px 1px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &.sel {
+    border-color: var(--ink);
+    background: var(--surface-2);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 1px;
+  }
+
+  .num {
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
+  svg.flip {
+    transform: scaleY(-1);
+  }
+
+  .root {
+    fill: color-mix(in srgb, var(--warn) 22%, var(--surface));
+    stroke: color-mix(in srgb, var(--ink) 35%, transparent);
+    stroke-width: 1;
+
+    &.ghost {
+      fill: none;
+      stroke-dasharray: 3 2;
+    }
+  }
+
+  .crown {
+    stroke: color-mix(in srgb, var(--ink) 45%, transparent);
+    stroke-width: 1.2;
+
+    &[data-cond='MISSING'] {
+      stroke-dasharray: 4 3;
+    }
+    &[data-cond='CROWN'] {
+      stroke: var(--pri-text);
+      stroke-width: 2.5;
+    }
+    &[data-cond='RCT'] {
+      stroke: var(--sec);
+      stroke-width: 2.5;
+    }
+    &[data-cond='IMPLANT'] {
+      stroke: var(--ink-2);
+      stroke-width: 2.5;
+    }
+    &[data-cond='CARIES'] {
+      stroke: var(--warn);
+    }
+  }
+
+  .x {
+    stroke: var(--crit);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+
+  .mark.caries {
+    fill: var(--warn);
+  }
+
+  .mark.filled {
+    fill: var(--pri);
+  }
+
+  .blk {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    font-size: 0.5625rem;
+    font-weight: 700;
+    color: var(--ink-2);
+
+    &[data-cond='CARIES'] {
+      background: var(--warn-soft);
+      border-color: var(--warn);
+    }
+    &[data-cond='FILLED'] {
+      background: var(--pri-soft);
+      border-color: var(--pri);
+    }
+    &[data-cond='RCT'] {
+      background: var(--sec-soft);
+      border-color: var(--sec);
+    }
+    &[data-cond='CROWN'] {
+      background: var(--node-d);
+    }
+    &[data-cond='MISSING'] {
+      border-style: dashed;
+    }
+    &[data-cond='TO_EXTRACT'] {
+      background: var(--crit-soft);
+      border-color: var(--crit);
+    }
+    &[data-cond='IMPLANT'] {
+      background: var(--line);
+    }
+  }
+}
+
+.look-xray .tooth .num {
+  color: var(--surface);
+}
+
+/* ---- 3D jaw: CSS 3D transforms only ---- */
+.three {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stage {
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1100px;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--ink);
+  touch-action: none;
+  cursor: grab;
+}
+
+.scene {
+  position: relative;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+}
+
+.t3 {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform-style: preserve-3d;
+  cursor: pointer;
+
+  &:focus-visible .face:first-child {
+    outline: 2px solid var(--pri);
+  }
+
+  &.sel .face:first-child {
+    box-shadow: inset 0 0 0 2px #ffd166;
+  }
+}
+
+.face {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid rgba(15, 31, 58, 0.12);
+  backface-visibility: hidden;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-2);
+
+  &.ghost {
+    border: 1px dashed rgba(255, 255, 255, 0.55);
+    backface-visibility: visible;
+  }
+}
+
+.ctrls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+
+  input[type='range'] {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* ---- tooth detail ---- */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cross {
+  display: grid;
+  grid-template-columns: 44px 56px 44px;
+  grid-template-rows: 44px 56px 44px;
+  gap: 4px;
+  align-self: flex-start;
+
+  .surf {
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+
+    &.on {
+      background: var(--pri);
+      border-color: var(--pri);
+      color: var(--pri-ink);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pri);
+    }
+  }
+
+  .pos-top {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .pos-left {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .pos-mid {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .pos-right {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .pos-bottom {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
+.side {
+  display: flex;
+  justify-content: center;
+
+  .root {
+    fill: color-mix(in srgb, var(--warn) 22%, var(--surface));
+    stroke: var(--line);
+
+    &.ghost {
+      fill: none;
+      stroke-dasharray: 3 2;
+    }
+  }
+
+  .crown {
+    fill: var(--surface);
+    stroke: var(--ink-3);
+
+    &.ghost {
+      fill: none;
+      stroke-dasharray: 4 3;
+    }
+    &[data-cond='CARIES'] {
+      fill: var(--warn-soft);
+    }
+    &[data-cond='FILLED'] {
+      fill: var(--pri-soft);
+    }
+    &[data-cond='RCT'] {
+      fill: var(--sec-soft);
+    }
+    &[data-cond='CROWN'] {
+      fill: var(--node-d);
+    }
+    &[data-cond='TO_EXTRACT'] {
+      fill: var(--crit-soft);
+    }
+  }
+
+  &:not(.up) svg {
+    transform: scaleY(-1);
+  }
+}

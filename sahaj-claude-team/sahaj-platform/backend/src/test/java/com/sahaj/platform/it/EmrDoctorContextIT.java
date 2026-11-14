@@ -3,12 +3,8 @@ package com.sahaj.platform.it;
 import static com.sahaj.platform.support.TestTenantSecurity.authentication;
 import static com.sahaj.platform.support.TestTenantSecurity.runAs;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sahaj.opd.application.emr.EmrProblemException;
-import com.sahaj.opd.application.emr.EmrTemplateResolver;
-import com.sahaj.opd.application.emr.EmrViews.TemplateSnapshot;
 import com.sahaj.platform.api.TeamMemberPort;
 import com.sahaj.platform.api.TeamMemberPort.DoctorDetails;
 import java.util.List;
@@ -20,24 +16,25 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.core.Authentication;
 
 /**
- * SAH-43-3 (the doctor's own details through {@code platform.api}) and SAH-44-4 (which template the EMR chooses, and
- * the section list a visit is opened with) on the real database. The visit that stores the snapshot arrives with
- * SAH-46, so the snapshot rule is tested on the resolver service the visit story will call. Names, degrees and
- * registration numbers are made up. Test plan: docs/test-plans/SAH-43-44.md.
+ * SAH-43-3 (the doctor's own details through {@code platform.api}) and SAH-46-3 (which department the EMR chooses for a
+ * doctor: specialty alias, then the doctor's published departments, then the clinic default) on the real database. The
+ * record that stores the layout is tested in {@link EmrRecordsIT}. Names, degrees and registration numbers are made up.
+ * Test plan: docs/test-plans/SAH-53.md.
  */
 @OnTestDatabase
 class EmrDoctorContextIT extends EmrSupport {
 
     @Autowired
-    private EmrTemplateResolver resolver;
-
-    @Autowired
     private TeamMemberPort teamMembers;
+
+    private JsonNode department(Clinic clinic, Staff who) throws Exception {
+        return get(ME, who.token(clinic)).get("department");
+    }
 
     // ---------------- /emr/me ----------------
 
     @Test
-    void aDoctorGetsTheirOwnDetailsExactlyAsSavedAndTheTemplateTheirSpecialtyChooses() throws Exception {
+    void aDoctorGetsTheirOwnDetailsExactlyAsSavedAndTheDepartmentTheirSpecialtyChooses() throws Exception {
         Clinic clinic = newClinic();
         Staff doctor = addStaff(clinic, "DOCTOR", "Dr Zxqv Namefield", "General Physician", "MBBS, MD", "MH-ZXQ-4411");
         JsonNode me = get(ME, doctor.token(clinic));
@@ -48,11 +45,15 @@ class EmrDoctorContextIT extends EmrSupport {
         assertThat(me.get("degree").asText()).isEqualTo("MBBS, MD");
         assertThat(me.get("registrationNo").asText()).isEqualTo("MH-ZXQ-4411");
         assertThat(me.get("missing").size()).isZero();
-        JsonNode template = me.get("template");
-        assertThat(template.get("templateKey").asText()).isEqualTo("gp");
-        assertThat(template.get("templateVersion").asInt()).isEqualTo(1);
-        assertThat(template.get("templateName").asText()).isEqualTo("General practice");
-        assertThat(template.get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
+        assertThat(me.has("template")).as("the SAH-44 template block is gone").isFalse();
+        JsonNode department = me.get("department");
+        assertThat(department.get("departmentKey").asText()).isEqualTo("gm");
+        assertThat(department.get("departmentName").asText()).isEqualTo("General Medicine");
+        assertThat(department.get("starterKey").asText()).isEqualTo("gm");
+        assertThat(department.get("layoutSource").asText()).isEqualTo("STARTER");
+        assertThat(department.get("versionNo").isNull()).isTrue();
+        assertThat(department.get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
+        assertThat(me.get("departments").size()).isZero();
     }
 
     @Test
@@ -64,7 +65,7 @@ class EmrDoctorContextIT extends EmrSupport {
         JsonNode first = get(ME, noDegree.token(clinic));
         assertThat(texts(first.get("missing"), null)).containsExactly("DEGREE");
         assertThat(first.get("degree").isNull()).isTrue();
-        assertThat(first.get("template").get("templateKey").asText()).isEqualTo("dental");
+        assertThat(first.get("department").get("departmentKey").asText()).isEqualTo("dental");
         JsonNode second = get(ME, noRegistration.token(clinic));
         assertThat(texts(second.get("missing"), null)).containsExactly("REGISTRATION_NO");
         assertThat(second.get("registrationNo").isNull()).isTrue();
@@ -77,68 +78,159 @@ class EmrDoctorContextIT extends EmrSupport {
     }
 
     @Test
-    void theSpecialtyNamesOfTheAliasListChooseTheirTemplateIgnoringLetterCaseAndExtraSpaces() throws Exception {
+    void theSpecialtyNamesOfTheAliasListChooseTheirDepartmentIgnoringLetterCaseAndExtraSpaces() throws Exception {
         Clinic clinic = newClinic();
-        Staff doctor = addDoctor(clinic, "General practice");
+        Staff doctor = addDoctor(clinic, "General physician");
         String[][] cases = {
-                {"General Physician", "gp"}, {"general practice", "gp"}, {"  GENERAL    physician  ", "gp"},
-                {"Dental Surgeon", "dental"}, {"dental", "dental"}, {"DENTAL   SURGEON", "dental"},
-                {"Paediatrician", "paeds"}, {"Paediatrics", "paeds"}, {" paediatrician ", "paeds"},
-                {"Homeopath", "homeo"}, {"Homeopathy", "homeo"}, {"HOMEOPATH", "homeo"}};
+                {"General Physician", "gm"}, {"physician", "gm"}, {"  GENERAL    physician  ", "gm"}, {"GM", "gm"},
+                {"Dental Surgeon", "dental"}, {"dentist", "dental"}, {"DENTAL   SURGEON", "dental"}, {"dental", "dental"},
+                {"Paediatrician", "paeds"}, {"pediatrician", "paeds"}, {" paediatrics ", "paeds"},
+                {"Gynaecologist", "og"}, {"Obstetrician", "og"}, {"Obstetrics & Gynaecology", "og"}, {"og", "og"},
+                {"Physiotherapist", "physio"}, {"Orthopaedic Surgeon", "ortho"}, {"Ophthalmologist", "eye"},
+                {"ENT surgeon", "ent"}, {"Dermatologist", "derm"}, {"Diabetologist", "diab"}, {"Cardiologist", "cardio"},
+                {"Ayurveda", "ayush"}, {"AYUSH (Ayurveda)", "ayush"}, {"Oncologist", "onco"}, {"General Surgeon", "surgery"},
+                {"Psychiatrist", "psych"}, {"Counsellor", "psych"}};
         for (String[] c : cases) {
             setDoctorSpecialty(clinic, doctor, c[0]);
             JsonNode me = get(ME, doctor.token(clinic));
-            assertThat(me.get("template").get("templateKey").asText()).as("specialty '" + c[0] + "'").isEqualTo(c[1]);
-            assertThat(me.get("template").get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
+            assertThat(me.get("department").get("departmentKey").asText()).as("specialty '" + c[0] + "'").isEqualTo(c[1]);
+            assertThat(me.get("department").get("starterKey").asText()).isEqualTo(c[1]);
+            assertThat(me.get("department").get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
             assertThat(me.get("specialty").asText()).as("returned as saved").isEqualTo(c[0].strip());
         }
     }
 
     @Test
-    void aSpecialtyNotInTheListFallsBackToTheClinicsSpecialtyThenToGeneralPractice() throws Exception {
+    void aSpecialtyNotInTheListFallsBackToTheClinicDefaultAndSaysSo() throws Exception {
         Clinic clinic = newClinic();
-        Staff doctor = addDoctor(clinic, "Cardiologist");
-        setClinicSpecialty(clinic, "paeds");
-        JsonNode viaClinic = get(ME, doctor.token(clinic)).get("template");
-        assertThat(viaClinic.get("templateKey").asText()).isEqualTo("paeds");
-        assertThat(viaClinic.get("choiceSource").asText()).isEqualTo("CLINIC_SPECIALTY");
-
-        for (String odd : new String[] {"Ayurveda", "General physician MD", "dent", "gp", "General  Practice Clinic"}) {
-            setDoctorSpecialty(clinic, doctor, odd);
-            assertThat(get(ME, doctor.token(clinic)).get("template").get("choiceSource").asText()).as(odd)
-                    .isEqualTo("CLINIC_SPECIALTY");
+        Staff doctor = addDoctor(clinic, "Cardiology consultant");
+        // the clinic default: gp -> General Medicine, dental -> Dental, paeds -> Paediatrics, homeo or none -> General Medicine
+        String[][] clinicSpecialties = {{"gp", "gm"}, {"dental", "dental"}, {"paeds", "paeds"}, {"homeo", "gm"}};
+        for (String[] cs : clinicSpecialties) {
+            setClinicSpecialty(clinic, cs[0]);
+            for (String odd : new String[] {"Cardiology consultant", "Zxq specialty", "dent", "gp", "General  Practice Clinic",
+                    "Homeopath", "homeopathy"}) {
+                setDoctorSpecialty(clinic, doctor, odd);
+                JsonNode department = department(clinic, doctor);
+                assertThat(department.get("departmentKey").asText()).as("clinic " + cs[0] + ", specialty '" + odd + "'").isEqualTo(cs[1]);
+                assertThat(department.get("choiceSource").asText()).isEqualTo("CLINIC_DEFAULT");
+            }
         }
-
-        // no specialty on the doctor either: the clinic decides
-        commit(clinic.tenantId(), "update platform.doctor_profile set specialty = null where membership_id = ?",
-                doctor.membershipId());
-        assertThat(get(ME, doctor.token(clinic)).get("template").get("templateKey").asText()).isEqualTo("paeds");
-        assertThat(get(ME, doctor.token(clinic)).get("specialty").isNull()).isTrue();
-
-        // neither the doctor nor the clinic has one: General practice, and the answer says it came from the default
+        // no specialty on the doctor either: still the clinic default
+        setClinicSpecialty(clinic, "paeds");
+        commit(clinic.tenantId(), "update platform.doctor_profile set specialty = null where membership_id = ?", doctor.membershipId());
+        JsonNode viaClinic = get(ME, doctor.token(clinic));
+        assertThat(viaClinic.get("specialty").isNull()).isTrue();
+        assertThat(viaClinic.get("department").get("departmentKey").asText()).isEqualTo("paeds");
+        // neither the doctor nor the clinic has one: General Medicine, from the default
         setClinicSpecialty(clinic, null);
-        JsonNode byDefault = get(ME, doctor.token(clinic)).get("template");
-        assertThat(byDefault.get("templateKey").asText()).isEqualTo("gp");
-        assertThat(byDefault.get("choiceSource").asText()).isEqualTo("DEFAULT");
-        assertThat(byDefault.get("templateName").asText()).isEqualTo("General practice");
+        JsonNode byDefault = department(clinic, doctor);
+        assertThat(byDefault.get("departmentKey").asText()).isEqualTo("gm");
+        assertThat(byDefault.get("departmentName").asText()).isEqualTo("General Medicine");
+        assertThat(byDefault.get("choiceSource").asText()).isEqualTo("CLINIC_DEFAULT");
     }
 
     @Test
-    void theDoctorsSpecialtyBeatsTheClinicsAndTheSwitchIsNotSavedAsADefault() throws Exception {
+    void thereIsNoHomeopathyDepartmentAndAHomeopathDoctorGetsTheClinicDefault() throws Exception {
+        Clinic clinic = newClinic();
+        setClinicSpecialty(clinic, "homeo");
+        Staff doctor = addDoctor(clinic, "Homeopath");
+        JsonNode department = department(clinic, doctor);
+        assertThat(department.get("departmentKey").asText()).isEqualTo("gm");
+        assertThat(department.get("choiceSource").asText()).isEqualTo("CLINIC_DEFAULT");
+        problemOf(HttpMethod.GET, DEPARTMENTS + "/homeo", clinic.owner(), null, 404, "department-not-found");
+        problemOf(HttpMethod.GET, STARTERS + "/homeo", clinic.owner(), null, 404, "starter-not-found");
+    }
+
+    @Test
+    void theDoctorsSpecialtyBeatsTheClinicsDefault() throws Exception {
         Clinic clinic = newClinic();
         setClinicSpecialty(clinic, "dental");
         Staff doctor = addDoctor(clinic, "Paediatrician");
-        assertThat(get(ME, doctor.token(clinic)).get("template").get("templateKey").asText()).isEqualTo("paeds");
-        // asking the resolver for a snapshot of another template (the switch of SAH-46) leaves the choice alone
-        Authentication auth = authentication(clinic.tenantId(), clinic.ownerUserId(), "OWNER");
-        TemplateSnapshot switched = runAs(auth, () -> tx().execute(s -> resolver.snapshot(clinic.tenantId(), "homeo", "SWITCHED")));
-        assertThat(switched.templateKey()).isEqualTo("homeo");
-        assertThat(get(ME, doctor.token(clinic)).get("template").get("templateKey").asText()).isEqualTo("paeds");
+        JsonNode department = department(clinic, doctor);
+        assertThat(department.get("departmentKey").asText()).isEqualTo("paeds");
+        assertThat(department.get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
+    }
+
+    // ---------------- the doctor's published departments (SAH-54-3) ----------------
+
+    private JsonNode createAndPublish(Clinic clinic, String name, String sourceJson, UUID doctor) throws Exception {
+        JsonNode created = post(DEPARTMENTS, clinic.owner(), createBody(name, sourceJson, List.of(doctor), List.of("Room 7"), true), 201);
+        String key = created.get("departmentKey").asText();
+        publishAsIs(clinic, key);
+        return department(clinic, key);
     }
 
     @Test
-    void anOwnerWithDoctorDetailsGetsThemAnOwnerWithoutIsToldToAddThem() throws Exception {
+    void whenTheSpecialtyIsNotInTheListTheDoctorsPublishedDepartmentIsUsedAndAnUnpublishedOneIsNot() throws Exception {
         Clinic clinic = newClinic();
+        Staff doctor = addDoctor(clinic, "Zxq specialty");
+        JsonNode created = post(DEPARTMENTS, clinic.owner(), createBody("Skin and hair clinic", BLANK_SOURCE, List.of(doctor.membershipId()),
+                List.of("Room 7"), true), 201);
+        assertThat(created.get("status").asText()).isEqualTo("DRAFT");
+        // a draft department is not offered to doctors
+        JsonNode before = get(ME, doctor.token(clinic));
+        assertThat(before.get("department").get("choiceSource").asText()).isEqualTo("CLINIC_DEFAULT");
+        assertThat(before.get("departments").size()).isZero();
+        publishAsIs(clinic, created.get("departmentKey").asText());
+        JsonNode after = get(ME, doctor.token(clinic));
+        assertThat(after.get("department").get("departmentKey").asText()).isEqualTo(created.get("departmentKey").asText());
+        assertThat(after.get("department").get("departmentName").asText()).isEqualTo("Skin and hair clinic");
+        assertThat(after.get("department").get("starterKey").isNull()).as("a blank department has no starter").isTrue();
+        assertThat(after.get("department").get("layoutSource").asText()).isEqualTo("PUBLISHED");
+        assertThat(after.get("department").get("versionNo").asInt()).isEqualTo(1);
+        assertThat(after.get("department").get("choiceSource").asText()).isEqualTo("DOCTOR_DEPARTMENT");
+        assertThat(after.get("departments")).hasSize(1);
+        assertThat(after.get("departments").get(0).get("name").asText()).isEqualTo("Skin and hair clinic");
+        // another doctor of the same clinic is not assigned and still gets the default
+        Staff other = addDoctor(clinic, "Zxq specialty");
+        assertThat(department(clinic, other).get("choiceSource").asText()).isEqualTo("CLINIC_DEFAULT");
+    }
+
+    @Test
+    void withSeveralDepartmentsTheOneOfTheClinicsSpecialtyIsUsedElseTheFirstByNameAndTheSpecialtyAliasBeatsBoth() throws Exception {
+        Clinic clinic = newClinic();
+        Staff doctor = addDoctor(clinic, "Zxq specialty");
+        JsonNode dental = createAndPublish(clinic, "Annexe dental", starterSource("dental"), doctor.membershipId());
+        JsonNode medicine = createAndPublish(clinic, "Annexe medicine", starterSource("gm"), doctor.membershipId());
+        // clinic default (gp -> gm): the department started from General Medicine wins although "Annexe dental" sorts first
+        JsonNode chosen = department(clinic, doctor);
+        assertThat(chosen.get("departmentKey").asText()).isEqualTo(medicine.get("departmentKey").asText());
+        assertThat(chosen.get("choiceSource").asText()).isEqualTo("DOCTOR_DEPARTMENT");
+        assertThat(get(ME, doctor.token(clinic)).get("departments")).hasSize(2);
+        setClinicSpecialty(clinic, "dental");
+        assertThat(department(clinic, doctor).get("departmentKey").asText()).isEqualTo(dental.get("departmentKey").asText());
+        // no assigned department matches the clinic: the first by name
+        Staff second = addDoctor(clinic, "Zxq specialty");
+        JsonNode zeta = createAndPublish(clinic, "Zeta clinic", BLANK_SOURCE, second.membershipId());
+        JsonNode alpha = createAndPublish(clinic, "Alpha clinic", BLANK_SOURCE, second.membershipId());
+        assertThat(department(clinic, second).get("departmentKey").asText()).as("Alpha before Zeta")
+                .isEqualTo(alpha.get("departmentKey").asText()).isNotEqualTo(zeta.get("departmentKey").asText());
+        // a specialty that is in the alias list beats the assigned departments
+        setDoctorSpecialty(clinic, second, "Paediatrician");
+        JsonNode bySpecialty = department(clinic, second);
+        assertThat(bySpecialty.get("departmentKey").asText()).isEqualTo("paeds");
+        assertThat(bySpecialty.get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
+    }
+
+    @Test
+    void thePublishedVersionOfTheDoctorsDepartmentIsWhatTheContextReports() throws Exception {
+        Clinic clinic = newClinic();
+        Staff doctor = addDoctor(clinic, "General physician");
+        assertThat(department(clinic, doctor).get("layoutSource").asText()).isEqualTo("STARTER");
+        publishAsIs(clinic, "gm");
+        JsonNode v1 = department(clinic, doctor);
+        assertThat(v1.get("layoutSource").asText()).isEqualTo("PUBLISHED");
+        assertThat(v1.get("versionNo").asInt()).isEqualTo(1);
+        publishOneChange(clinic, "gm", "chronic", false);
+        assertThat(department(clinic, doctor).get("versionNo").asInt()).isEqualTo(2);
+    }
+
+    // ---------------- who may read ----------------
+
+    @Test
+    void anOwnerWithDoctorDetailsGetsThemAnOwnerWithoutIsToldToAddThem() throws Exception {
+        Clinic clinic = bareOwnerClinic();
         JsonNode problem = problemOf(HttpMethod.GET, ME, clinic.owner(), null, 403, "doctor-details-missing");
         assertThat(problem.get("detail").asText()).isEqualTo("Add your doctor details in Team and access to write consultations.");
         ownerWithDoctorDetails(clinic, "Dental surgeon", "BDS, MDS", "MH-OWN-77");
@@ -146,7 +238,7 @@ class EmrDoctorContextIT extends EmrSupport {
         assertThat(me.get("role").asText()).isEqualTo("OWNER");
         assertThat(me.get("degree").asText()).isEqualTo("BDS, MDS");
         assertThat(me.get("registrationNo").asText()).isEqualTo("MH-OWN-77");
-        assertThat(me.get("template").get("templateKey").asText()).isEqualTo("dental");
+        assertThat(me.get("department").get("departmentKey").asText()).isEqualTo("dental");
     }
 
     @Test
@@ -176,7 +268,7 @@ class EmrDoctorContextIT extends EmrSupport {
     }
 
     @Test
-    void aVisitingDoctorOfTwoClinicsGetsEachClinicsOwnSavedDetails() throws Exception {
+    void aVisitingDoctorOfTwoClinicsGetsEachClinicsOwnSavedDetailsAndDepartment() throws Exception {
         Clinic a = newClinic();
         Clinic b = newClinic();
         UUID user = newClinic().ownerUserId();
@@ -191,10 +283,10 @@ class EmrDoctorContextIT extends EmrSupport {
         JsonNode inClinicA = get(ME, new Staff(inA, user, "VISITING_DOCTOR").token(a));
         JsonNode inClinicB = get(ME, new Staff(inB, user, "VISITING_DOCTOR").token(b));
         assertThat(inClinicA.get("registrationNo").asText()).isEqualTo("REG-A-1");
-        assertThat(inClinicA.get("template").get("templateKey").asText()).isEqualTo("dental");
+        assertThat(inClinicA.get("department").get("departmentKey").asText()).isEqualTo("dental");
         assertThat(inClinicB.get("registrationNo").asText()).isEqualTo("REG-B-2");
         assertThat(inClinicB.get("degree").asText()).isEqualTo("MD Paeds");
-        assertThat(inClinicB.get("template").get("templateKey").asText()).isEqualTo("paeds");
+        assertThat(inClinicB.get("department").get("departmentKey").asText()).isEqualTo("paeds");
     }
 
     // ---------------- the platform.api port ----------------
@@ -249,66 +341,7 @@ class EmrDoctorContextIT extends EmrSupport {
         JsonNode me = get(ME, new Staff(membershipId, user, "DOCTOR").token(clinic));
         assertThat(me.get("specialty").isNull()).isTrue();
         assertThat(texts(me.get("missing"), null)).containsExactly("DEGREE", "REGISTRATION_NO");
-        assertThat(me.get("template").get("templateKey").asText()).isEqualTo("gp");
-    }
-
-    // ---------------- the snapshot rule (SAH-44-4) ----------------
-
-    private TemplateSnapshot snapshot(Clinic clinic, String key, String source) {
-        Authentication auth = authentication(clinic.tenantId(), clinic.ownerUserId(), "OWNER");
-        return runAs(auth, () -> tx().execute(s -> resolver.snapshot(clinic.tenantId(), key, source)));
-    }
-
-    @Test
-    void aSnapshotHoldsTheShownSectionsInTemplateOrderWithTheEffectiveRequiredFlag() throws Exception {
-        Clinic clinic = newClinic();
-        TemplateSnapshot snap = snapshot(clinic, "gp", "DOCTOR_SPECIALTY");
-        assertThat(snap.schemaVersion()).isEqualTo(1);
-        assertThat(snap.templateKey()).isEqualTo("gp");
-        assertThat(snap.templateVersion()).isEqualTo(1);
-        assertThat(snap.choiceSource()).isEqualTo("DOCTOR_SPECIALTY");
-        assertThat(snap.takenAt()).isNotNull();
-        assertThat(snap.sections()).hasSize(11);
-        assertThat(snap.sections().stream().map(s -> s.key()).toList()).containsExactly("chief_complaints",
-                "history_allergies", "vitals", "general_exam", "systemic_exam", "local_exam", "diagnosis", "prescription",
-                "investigations", "services", "advice_followup");
-        assertThat(snap.sections().stream().filter(s -> s.required()).count()).isEqualTo(6);
-        assertThat(snap.sections().get(0).label()).isEqualTo("Chief complaints");
-        assertThat(snap.sections().get(0).part()).isEqualTo("ASSESSMENT");
-        assertThat(snap.sections().get(0).editorType()).isEqualTo("COMPLAINTS");
-        assertThat(snap.sections().get(0).options().source()).isEqualTo("MASTER");
-        assertThat(snap.sections().get(0).options().master()).isEqualTo("complaints");
-    }
-
-    @Test
-    void anOwnersChangeAppliesToSnapshotsTakenAfterItAndNotToOnesTakenBefore() throws Exception {
-        Clinic a = newClinic();
-        Clinic b = newClinic();
-        TemplateSnapshot before = snapshot(a, "gp", "DEFAULT");
-        put(overrideUrl("gp", "local_exam"), a.owner(), overrideBody(false, false, 0), 200);
-        put(overrideUrl("gp", "systemic_exam"), a.owner(), overrideBody(true, true, 1), 200);
-        TemplateSnapshot after = snapshot(a, "gp", "DEFAULT");
-        assertThat(before.sections()).hasSize(11);
-        assertThat(before.sections().stream().anyMatch(s -> s.key().equals("local_exam"))).isTrue();
-        assertThat(before.sections().stream().filter(s -> s.key().equals("systemic_exam")).findFirst().get().required()).isFalse();
-        assertThat(after.sections()).hasSize(10);
-        assertThat(after.sections().stream().anyMatch(s -> s.key().equals("local_exam"))).isFalse();
-        assertThat(after.sections().stream().filter(s -> s.key().equals("systemic_exam")).findFirst().get().required()).isTrue();
-        // another clinic is not affected
-        assertThat(snapshot(b, "gp", "DEFAULT").sections()).hasSize(11);
-    }
-
-    @Test
-    void aSnapshotOfATemplateThatIsNotOneOfTheFourOrWithAnUnknownSourceIsABadRequest() throws Exception {
-        Clinic clinic = newClinic();
-        for (String key : new String[] {"ayur", "physio", "derma", "gynae", "ent", "oncology", "surgery", "GP", "", "gp "}) {
-            assertThatThrownBy(() -> snapshot(clinic, key, "SWITCHED")).as("key '" + key + "'")
-                    .isInstanceOf(EmrProblemException.class);
-        }
-        assertThatThrownBy(() -> snapshot(clinic, "gp", "WHIM")).isInstanceOf(EmrProblemException.class);
-        assertThatThrownBy(() -> snapshot(clinic, "gp", null)).isInstanceOf(EmrProblemException.class);
-        assertThat(snapshot(clinic, "homeo", "SWITCHED").sections()).hasSize(7);
-        assertThat(snapshot(clinic, "paeds", "CLINIC_SPECIALTY").sections()).hasSize(9);
-        assertThat(snapshot(clinic, "dental", "DOCTOR_SPECIALTY").sections()).hasSize(11);
+        assertThat(me.get("department").get("departmentKey").asText()).isEqualTo("gm");
+        assertThat(me.get("department").get("choiceSource").asText()).isEqualTo("CLINIC_DEFAULT");
     }
 }

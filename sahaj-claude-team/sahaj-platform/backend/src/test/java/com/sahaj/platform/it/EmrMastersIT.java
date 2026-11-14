@@ -81,8 +81,9 @@ class EmrMastersIT extends EmrSupport {
     @Test
     void notSignedInAnswers401OnEveryEmrReadPath() throws Exception {
         for (String path : new String[] {MASTERS + "complaints", MASTERS + "investigations", MASTERS + "advice",
-                QUICK + "complaints", QUICK + "diagnoses", ME, TEMPLATES, TEMPLATES + "/gp", SETTINGS,
-                DIAGNOSES + "?q=fev"}) {
+                QUICK + "complaints", QUICK + "diagnoses", ME, LIBRARY, LIBRARY + "/vitals", STARTERS, STARTERS + "/gm",
+                DEPARTMENTS, DEPARTMENTS + "/gm", DEPARTMENTS + "/gm/layout", DEPARTMENTS + "/gm/reset-target",
+                DEPARTMENTS + "/gm/versions/1", DOCTOR_OPTIONS, RECORDS + "/" + UUID.randomUUID(), DIAGNOSES + "?q=fev"}) {
             JsonNode problem = problemOf(HttpMethod.GET, path, anonymous(), null, 401, "unauthorized");
             assertThat(problem.get("status").asInt()).isEqualTo(401);
         }
@@ -191,7 +192,7 @@ class EmrMastersIT extends EmrSupport {
         boolean anyHintSeen = false;
         for (String[] master : MASTER_TABLES) {
             List<Item> items = allItems(master[1]);
-            for (String specialty : TEMPLATE_KEYS) {
+            for (String specialty : STARTER_KEYS) {
                 List<String> expected = expectedOrder(items, specialty);
                 long tagged = items.stream().filter(i -> specialty.equals(i.hint())).count();
                 anyHintSeen |= tagged > 0;
@@ -215,9 +216,10 @@ class EmrMastersIT extends EmrSupport {
     }
 
     @Test
-    void aSpecialtyOutsideTheFourTemplateCodesIsAValidationProblem() throws Exception {
+    void aSpecialtyOutsideTheFifteenStarterKeysIsAValidationProblem() throws Exception {
         Clinic clinic = clinicOf(this);
-        for (String specialty : new String[] {"ayur", "GP", "gp,dental", "physio", "%20"}) {
+        // gp and homeo were the SAH-44 template codes: they are not starter keys and answer 400 like any other unknown key
+        for (String specialty : new String[] {"ayur", "gp", "homeo", "GM", "Dental", "gm,dental", "physio2", "%20"}) {
             JsonNode problem = problemOf(HttpMethod.GET, MASTERS + "complaints?specialty=" + specialty, clinic.owner(),
                     null, 400, "validation");
             assertThat(fieldOf(problem, "specialty")).isNotNull();
@@ -278,11 +280,12 @@ class EmrMastersIT extends EmrSupport {
     void everyWriteToAMasterOrTemplatePathIsRefusedWith403ForEveryRoleAndNothingChanges() throws Exception {
         Clinic clinic = clinicOf(this);
         long complaints = globalCount("select count(*) from opd.emr_complaint");
-        long sections = globalCount("select count(*) from opd.emr_template_section");
+        long sections = globalCount("select count(*) from opd.emr_section");
+        long starters = globalCount("select count(*) from opd.emr_starter_department");
         String body = "{\"name\":\"Hacked item\",\"label\":\"x\"}";
         String[] paths = {MASTERS + "complaints", MASTERS + "investigations", MASTERS + "advice",
                 MASTERS + "complaints/" + UUID.randomUUID(), QUICK + "complaints", QUICK + "diagnoses",
-                TEMPLATES, TEMPLATES + "/gp"};
+                LIBRARY, LIBRARY + "/vitals", STARTERS, STARTERS + "/gm"};
         for (String role : new String[] {"OWNER", "DOCTOR", "NURSE", "FRONT_DESK", "BILLING", "PHARMACIST", "COUNSELLOR",
                 "VISITING_DOCTOR"}) {
             for (String path : paths) {
@@ -293,7 +296,8 @@ class EmrMastersIT extends EmrSupport {
             }
         }
         assertThat(globalCount("select count(*) from opd.emr_complaint")).isEqualTo(complaints);
-        assertThat(globalCount("select count(*) from opd.emr_template_section")).isEqualTo(sections);
+        assertThat(globalCount("select count(*) from opd.emr_section")).isEqualTo(sections);
+        assertThat(globalCount("select count(*) from opd.emr_starter_department")).isEqualTo(starters);
         assertThat(globalCount("select count(*) from opd.emr_complaint where name = 'Hacked item'")).isZero();
     }
 
@@ -301,7 +305,8 @@ class EmrMastersIT extends EmrSupport {
     void aWriteWithoutASessionIs401NotAWorkingWrite() throws Exception {
         for (HttpMethod method : new HttpMethod[] {HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE}) {
             problemOf(method, MASTERS + "complaints", anonymous(), "{\"name\":\"x\"}", 401, "unauthorized");
-            problemOf(method, TEMPLATES + "/gp", anonymous(), "{\"name\":\"x\"}", 401, "unauthorized");
+            problemOf(method, LIBRARY + "/vitals", anonymous(), "{\"name\":\"x\"}", 401, "unauthorized");
+            problemOf(method, STARTERS + "/gm", anonymous(), "{\"name\":\"x\"}", 401, "unauthorized");
         }
     }
 
@@ -365,16 +370,20 @@ class EmrMastersIT extends EmrSupport {
         assertThat(walked).isEqualTo(all.stream().map(Diagnosis::code).toList());
 
         boolean anyTagged = false;
-        for (String specialty : TEMPLATE_KEYS) {
-            List<String> expected = new ArrayList<>(all.stream().filter(d -> specialty.equals(d.specialty()))
+        // ADR-020 D13: the SAH-7 diagnosis tags are eight platform codes; a starter key orders by the code written here
+        java.util.Map<String, String> tagOf = java.util.Map.of("gm", "gp", "og", "gynae", "derm", "derma", "ayush", "ayur",
+                "dental", "dental", "paeds", "paeds", "physio", "physio");
+        for (String key : STARTER_KEYS) {
+            String specialty = tagOf.get(key);
+            List<String> expected = new ArrayList<>(all.stream().filter(d -> specialty != null && specialty.equals(d.specialty()))
                     .map(Diagnosis::code).toList());
             anyTagged |= !expected.isEmpty();
-            expected.addAll(all.stream().filter(d -> !specialty.equals(d.specialty())).map(Diagnosis::code).toList());
+            expected.addAll(all.stream().filter(d -> specialty == null || !specialty.equals(d.specialty())).map(Diagnosis::code).toList());
             List<String> got = new ArrayList<>();
             for (int page = 0; page < 4; page++) {
-                got.addAll(codes(get(DIAGNOSES + "?specialty=" + specialty + "&page=" + page, clinic.owner())));
+                got.addAll(codes(get(DIAGNOSES + "?specialty=" + key + "&page=" + page, clinic.owner())));
             }
-            assertThat(got).as("diagnoses with specialty " + specialty).isEqualTo(expected);
+            assertThat(got).as("diagnoses with starter " + key).isEqualTo(expected);
             assertThat(got).as("nothing hidden").hasSize(53);
         }
         assertThat(anyTagged).isTrue();
@@ -399,7 +408,7 @@ class EmrMastersIT extends EmrSupport {
         Clinic a = newClinic();
         Clinic b = newClinic();
         JsonNode before = get(MEDICINES, a.owner());
-        assertThat(before.get("total").asLong()).isEqualTo(52);
+        assertThat(before.get("total").asLong()).as("52 of SAH-7, Co-trimoxazole 960 mg of SAH-48 and 10 of SAH-49-71 (V2026_12_11_1020)").isEqualTo(63);
         assertThat(before.get("items").size()).isLessThanOrEqualTo(20);
         assertThat(before.get("items").get(0).get("favourite").asBoolean()).isFalse();
         List<String> orderB = texts(get(MEDICINES, b.owner()).get("items"), "id");
@@ -420,6 +429,44 @@ class EmrMastersIT extends EmrSupport {
                 .isEqualTo(texts(get(MASTERS + "complaints", b.owner()).get("items"), "id"));
         // a non-owner cannot mark a favourite (SAH-7, unchanged)
         problemOf(HttpMethod.PUT, "/api/v1/opd/medicine-favourites/" + chosen, a.as("DOCTOR"), null, 403, "forbidden");
+    }
+
+    // ---------------- the retired SAH-44 paths ----------------
+
+    @Test
+    void theRetiredTemplateAndSettingsPathsNoLongerExistAndAnswer404ForEveryRole() throws Exception {
+        Clinic clinic = clinicOf(this);
+        String[] paths = {EMR + "/templates", EMR + "/templates/gp", EMR + "/templates/dental", EMR + "/templates/paeds",
+                EMR + "/templates/homeo", EMR + "/templates/gp/sections/vitals/override", EMR + "/templates/gp/reset",
+                EMR + "/settings"};
+        for (String role : new String[] {"OWNER", "DOCTOR", "NURSE"}) {
+            for (String path : paths) {
+                assertThat(call(HttpMethod.GET, path, clinic.as(role), null).andReturn().getResponse().getStatus())
+                        .as("GET " + path + " as " + role).isEqualTo(404);
+            }
+        }
+        for (String path : paths) {
+            for (HttpMethod method : new HttpMethod[] {HttpMethod.PUT, HttpMethod.POST}) {
+                assertThat(call(method, path, clinic.owner(), "{}").andReturn().getResponse().getStatus())
+                        .as(method + " " + path).isEqualTo(404);
+            }
+        }
+    }
+
+    @Test
+    void theAdviceMasterCarriesNullMarathiAndHindiNamesInTheSeedAndTheOtherMastersNeverDo() throws Exception {
+        for (JsonNode item : search("advice", "page=2", "OWNER").get("items")) {
+            assertThat(item.has("nameMr")).as("advice carries nameMr").isTrue();
+            assertThat(item.has("nameHi")).as("advice carries nameHi").isTrue();
+            assertThat(item.get("nameMr").isNull()).isTrue();
+            assertThat(item.get("nameHi").isNull()).isTrue();
+        }
+        for (String master : new String[] {"complaints", "investigations"}) {
+            for (JsonNode item : search(master, null, "OWNER").get("items")) {
+                assertThat(item.path("nameMr").isNull() || item.path("nameMr").isMissingNode()).as(master).isTrue();
+                assertThat(item.path("nameHi").isNull() || item.path("nameHi").isMissingNode()).as(master).isTrue();
+            }
+        }
     }
 
     // ---------------- seed hygiene (SAH-43-1, last criteria) ----------------

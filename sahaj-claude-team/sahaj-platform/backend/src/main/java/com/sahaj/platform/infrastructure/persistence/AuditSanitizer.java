@@ -100,7 +100,8 @@ final class AuditSanitizer {
         if (value == null) {
             return null;
         }
-        if (isPinStateLabel(normalizedKey, value) || isRecordedFlag(normalizedKey, value)) {
+        if (isPinStateLabel(normalizedKey, value) || isRecordedFlag(normalizedKey, value)
+                || isBodyMapPinNumber(normalizedKey, value)) {
             return value;
         }
         if (containsAny(normalizedKey, fullRedactMarkers)) {
@@ -156,6 +157,16 @@ final class AuditSanitizer {
     private static boolean isPinStateLabel(String normalizedKey, Object value) {
         return "pinstate".equals(normalizedKey) && value instanceof String label
                 && ("SET".equals(label) || "LOCKED".equals(label) || "NOT_SET".equals(label));
+    }
+
+    /**
+     * DEC-051 M6 (ADR-022 L-1): the MLC audit row {@code EMR_MLC_FLAG_CHANGED} carries {@code pinNo}, the number of a
+     * pin on the body map (1 to 60). The key contains "pin", so it would be redacted like a PIN; only this exact key
+     * with a whole number from 1 to 60 is kept. A string under the key, a number outside that range (a 4 to 6 digit
+     * staff PIN is never in it) and every other key containing "pin" are still replaced.
+     */
+    private static boolean isBodyMapPinNumber(String normalizedKey, Object value) {
+        return "pinno".equals(normalizedKey) && value instanceof Integer number && number >= 1 && number <= 60;
     }
 
     /**

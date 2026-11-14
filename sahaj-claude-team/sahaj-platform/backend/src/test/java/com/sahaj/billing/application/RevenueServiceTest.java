@@ -56,6 +56,7 @@ class RevenueServiceTest {
     private PatientLookupPort patientLookupPort;
     private ActorDirectoryPort actorDirectoryPort;
     private OwnerGuard ownerGuard;
+    private CoursePaymentRepository coursePayments;
     private RevenueService service;
 
     private final List<VisitForRevenue> visits = new ArrayList<>();
@@ -73,8 +74,12 @@ class RevenueServiceTest {
         patientLookupPort = mock(PatientLookupPort.class);
         actorDirectoryPort = mock(ActorDirectoryPort.class);
         ownerGuard = mock(OwnerGuard.class);
+        coursePayments = mock(CoursePaymentRepository.class);
+        doReturn(new PaymentTotals(0, 0)).when(coursePayments).totalsBetween(any(), any(), any());
+        doReturn(List.of()).when(coursePayments).findBetween(any(), any(), any());
         service = new RevenueService(billRepository, billItemRepository, paymentRepository, visitBillingPort,
-                patientLookupPort, actorDirectoryPort, ownerGuard, Clock.fixed(NOW, ZoneOffset.UTC));
+                patientLookupPort, actorDirectoryPort, ownerGuard, Clock.fixed(NOW, ZoneOffset.UTC),
+                coursePayments);
 
         doReturn(visits).when(visitBillingPort).between(eq(TENANT), any(), any());
         doReturn(List.of()).when(visitBillingPort).findAll(eq(TENANT), any());
@@ -395,7 +400,7 @@ class RevenueServiceTest {
     void justAfterUtcMidnightIsAlreadyTheNextIndianDay() {
         Clock lateUtc = Clock.fixed(Instant.parse("2026-11-03T18:45:00Z"), ZoneOffset.UTC);
         RevenueService late = new RevenueService(billRepository, billItemRepository, paymentRepository,
-                visitBillingPort, patientLookupPort, actorDirectoryPort, ownerGuard, lateUtc);
+                visitBillingPort, patientLookupPort, actorDirectoryPort, ownerGuard, lateUtc, coursePayments);
 
         RevenueView report = late.report(TENANT, USER, "TODAY");
 
@@ -409,6 +414,41 @@ class RevenueServiceTest {
         when(paymentRepository.sumByModeSince(TENANT, "CASH", TODAY_START)).thenReturn(12345L);
 
         assertThat(service.report(TENANT, USER, "MONTH").cashInDrawerPaise()).isEqualTo(12345);
+    }
+
+    @Test
+    void coursePaymentsCountInCollectedModesDaysAndTheCashInTheDrawer() {
+        // SAH-58, DEC-042 H3: course payments are money collected; they have no visit, so no doctor line.
+        VisitForRevenue visit = visit("DONE", DOCTOR_A, "Dr Rao", 50000, EARLIER_TODAY);
+        bill(visit, 0, null, 50000);
+        pay(visit, "CASH", 50000, EARLIER_TODAY, null);
+        doReturn(List.of(new CoursePaymentRepository.Point("UPI", 200000, EARLIER_TODAY),
+                new CoursePaymentRepository.Point("CASH", 30000, EARLIER_TODAY.plusSeconds(60))))
+                .when(coursePayments).findBetween(eq(TENANT), any(), any());
+        when(coursePayments.sumByModeSince(TENANT, "CASH", TODAY_START)).thenReturn(30000L);
+        when(paymentRepository.sumByModeSince(TENANT, "CASH", TODAY_START)).thenReturn(50000L);
+
+        RevenueView report = service.report(TENANT, USER, "TODAY");
+
+        assertThat(report.collectedPaise()).isEqualTo(280000);
+        assertThat(report.days()).singleElement().satisfies(d -> assertThat(d.collectedPaise()).isEqualTo(280000));
+        assertThat(report.modes()).extracting(RevenueView.Mode::amountPaise).containsExactly(80000L, 200000L, 0L);
+        assertThat(report.cashInDrawerPaise()).isEqualTo(80000);
+        assertThat(report.doctors()).singleElement().satisfies(d -> assertThat(d.collectedPaise()).isEqualTo(50000));
+        assertThat(report.refundPaise()).isZero();
+    }
+
+    @Test
+    void thePreviousPeriodComparisonIncludesCoursePaymentsToo() {
+        when(paymentRepository.totalsBetween(eq(TENANT), any(), any())).thenReturn(new PaymentTotals(100000, 2));
+        doReturn(new PaymentTotals(100000, 1)).when(coursePayments).totalsBetween(eq(TENANT), any(), any());
+        doReturn(List.of(new CoursePaymentRepository.Point("UPI", 300000, EARLIER_TODAY)))
+                .when(coursePayments).findBetween(eq(TENANT), any(), any());
+
+        RevenueView report = service.report(TENANT, USER, "TODAY");
+
+        // collected 300000 against a previous 200000 (100000 at the counter + 100000 on a course): +50 percent
+        assertThat(report.collectedChangePercent()).isEqualTo(50);
     }
 
     @Test

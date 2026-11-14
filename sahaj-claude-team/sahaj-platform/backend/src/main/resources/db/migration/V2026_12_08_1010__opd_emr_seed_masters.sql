@@ -2,7 +2,9 @@
 -- STARTER LIST, NOT CLINICALLY REVIEWED (OQ-43-8). A clinician must review names, wording and specialty hints before real use.
 -- Reference data only: no brand names, no real patient data. Plain words that a clinic would use. The ids come from
 -- md5('opd.<table>:' || lower(name)), so every environment gets the same id for the same item.
--- specialty_hint only orders the list (hint first when a specialty is asked for); it never hides anything. null = general.
+-- specialty_hint only orders the list (hint first when a department is asked for); it never hides anything. null = general.
+-- ADR-020 D13 (rework of 12 Nov 2026): the hint is a starter department key. The old hints map gp -> gm (none was used: the
+-- general items are null), dental -> dental, paeds -> paeds and homeo -> null: the three homeopathy complaints are now general.
 -- sort_order is the master's own order (ten apart, so a later migration can insert between two rows).
 -- Sources: investigations 1 to 13 are the 13 tests of the mockup Investigation master (docs/design/mockup/sahaj-mockup.html, AXM investigation),
 -- investigation 14 is the mockup's organisation-added example; advice 1 to 14 are the advice lines of the mockup case paper presets;
@@ -68,9 +70,9 @@ from (values
   ('Excessive crying', 'paeds', 540),
   ('Slow weight gain', 'paeds', 550),
   ('Skin rash in a child', 'paeds', 560),
-  ('Recurrent colds', 'homeo', 570),
-  ('Hair fall', 'homeo', 580),
-  ('Allergy that keeps coming back', 'homeo', 590)
+  ('Recurrent colds', null, 570),
+  ('Hair fall', null, 580),
+  ('Allergy that keeps coming back', null, 590)
 ) as v (name, hint, sort_order);
 
 -- Investigations (46)

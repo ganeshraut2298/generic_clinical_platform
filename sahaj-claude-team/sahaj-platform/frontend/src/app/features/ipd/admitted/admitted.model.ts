@@ -247,8 +247,8 @@ export function cardLabel(row: Pick<AdmittedPatientRow, 'patientName' | 'bedCode
 
 // ---- Flags (ADR-013 D4) ----
 
-export type FlagKind = 'escalation' | 'emergency-access' | 'allergy' | 'ews' | 'vitals' | 'home' | 'deposit';
-export type FlagTone = 'crit' | 'warn' | 'blue' | 'grey';
+export type FlagKind = 'escalation' | 'emergency-access' | 'allergy' | 'ews' | 'vitals' | 'home' | 'deposit' | 'round';
+export type FlagTone = 'crit' | 'warn' | 'blue' | 'grey' | 'good';
 
 export interface CardFlag {
   kind: FlagKind;
@@ -360,6 +360,17 @@ export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities):
       tone: 'crit',
       icon: 'deposit',
       title: 'Deposit low',
+      safety: false,
+    });
+  }
+  if (c?.roundDoneToday) {
+    // SAH-67-1: the doctor signed today's progress note. Good, with a tick and the text; folds into "+N".
+    flags.push({
+      kind: 'round',
+      text: 'Round done',
+      tone: 'good',
+      icon: 'check',
+      title: 'Round done today',
       safety: false,
     });
   }

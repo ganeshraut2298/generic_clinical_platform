@@ -13,6 +13,11 @@ export interface ProblemDetail {
   /** Only on the dev-only bootstrap-pin-invalid problem (docs/api/admin.yaml, SAH-42). */
   triesLeft?: number;
   fieldErrors?: FieldError[];
+  /** opd.yaml 0.6.0: `emr-record-held` carries the holder's staff name (screen only, never logged). */
+  holderName?: string;
+  /** opd.yaml 0.6.0: `emr-not-ready` carries the blockers; `ipd-order-not-placed` carries the rows. */
+  blockers?: unknown[];
+  rows?: unknown[];
 }
 
 /** Error thrown by every HttpClient call that fails. Carries the problem detail. */

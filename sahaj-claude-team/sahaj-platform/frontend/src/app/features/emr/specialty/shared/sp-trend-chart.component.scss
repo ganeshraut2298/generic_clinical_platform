@@ -1,0 +1,48 @@
+:host {
+  display: block;
+}
+
+.fig {
+  margin: 0;
+}
+
+svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.plot {
+  fill: var(--surface-2);
+}
+
+.target {
+  stroke: var(--crit);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.line {
+  fill: none;
+  stroke: var(--pri);
+  stroke-width: 2.5;
+}
+
+.dot {
+  fill: var(--pri);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+text {
+  font-size: 9px;
+  fill: var(--ink-3);
+}
+
+.xl {
+  text-anchor: middle;
+}
+
+.tl {
+  fill: var(--crit);
+}

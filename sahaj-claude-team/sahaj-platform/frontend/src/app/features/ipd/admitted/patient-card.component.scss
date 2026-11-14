@@ -292,3 +292,26 @@
 .tone-good {
   color: var(--good);
 }
+
+// "Open EMR" (SAH-46-1): its own row under the quick actions, 44 px tall.
+.pcemr {
+  display: flex;
+}
+
+.pcemrb {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--glass-hi);
+  color: var(--pri-text);
+  font-weight: 600;
+
+  &:hover {
+    border-color: var(--pri);
+  }
+}

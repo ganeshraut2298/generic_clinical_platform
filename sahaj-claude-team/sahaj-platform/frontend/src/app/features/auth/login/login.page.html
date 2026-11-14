@@ -1,5 +1,6 @@
-<div class="pubwrap tight">
-  <header class="lnav glass">
+<app-kinetic-background />
+<div class="pubwrap tight" [class.entrance]="entrance()">
+  <header class="lnav glass" data-surface data-dot-exclude>
     <div class="brand">
       <div class="logo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
@@ -24,7 +25,7 @@
   </header>
 
   <div class="auth">
-    <section class="auth-side">
+    <section class="auth-side surface-glass" data-surface>
       <span class="pill p-teal">Free for your first year</span>
       <h1 class="display-sm">{{ sideCopy().heading }}</h1>
       <p class="lede">{{ sideCopy().lede }}</p>
@@ -35,13 +36,24 @@
       </ul>
     </section>
 
-    <section class="auth-card glass">
+    <section class="auth-card glass" data-surface>
       <mat-button-toggle-group
+        #seg
         class="seg"
+        [class.thumb-ready]="thumb() !== null"
+        [class.thumb-slide]="thumbSlide()"
         aria-label="Account"
         [value]="authMode()"
         (change)="setAuthMode($event.value)"
       >
+        @if (thumb(); as t) {
+          <span
+            class="seg-thumb"
+            aria-hidden="true"
+            [style.width.px]="t.width"
+            [style.transform]="'translateX(' + t.x + 'px)'"
+          ></span>
+        }
         <mat-button-toggle value="LOGIN">Log in</mat-button-toggle>
         <mat-button-toggle value="SIGNUP">New clinic</mat-button-toggle>
       </mat-button-toggle-group>
@@ -64,6 +76,7 @@
               [formControl]="mobileControl"
               inputmode="numeric"
               maxlength="10"
+              [errorStateMatcher]="mobileMatcher"
               autocomplete="tel-national"
               placeholder="98XXX XXXXX"
             />
@@ -90,6 +103,7 @@
               [formControl]="codeControl"
               inputmode="numeric"
               maxlength="6"
+              [errorStateMatcher]="codeMatcher"
               autocomplete="one-time-code"
               placeholder="······"
             />

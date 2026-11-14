@@ -21,6 +21,20 @@
     <span>{{ message }}</span>
   </div>
 } @else {
+  @if (emergencyVisits().length > 0) {
+    <section class="emg surf" aria-label="Emergency" data-testid="emergency-group">
+      <div class="col-h">
+        <span class="pill p-crit">Emergency</span>
+        <span class="faint t-xs">Most urgent first, then longest waiting</span>
+        <span class="n num">{{ emergencyVisits().length }}</span>
+      </div>
+      <div class="emg-body">
+        @for (visit of emergencyVisits(); track visit.id) {
+          <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: visit }" />
+        }
+      </div>
+    </section>
+  }
   <div class="board-wrap">
     <div class="board">
       @for (col of columns(); track col.stage) {
@@ -35,12 +49,28 @@
           <div class="colbody" [class.is-empty]="!col.visits.length">
             @if (col.visits.length) {
               @for (visit of col.visits; track visit.id) {
-                <article class="qcard">
+                <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: visit }" />
+              }
+            } @else {
+              <app-empty>No patients</app-empty>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  </div>
+}
+
+<ng-template #card let-visit>
+                <article class="qcard" [class.emergency]="visit.visitType === 'EMERGENCY'">
                   <div class="qtop">
                     <span class="tk">T-{{ visit.tokenNo }}</span>
-                    <span class="pill" [class.p-teal]="visit.visitType === 'NEW'" [class.p-sec]="visit.visitType === 'FOLLOW_UP'">
+                    <span class="pill" [class.p-teal]="visit.visitType === 'NEW'" [class.p-sec]="visit.visitType !== 'NEW' && visit.visitType !== 'EMERGENCY'" [class.p-crit]="visit.visitType === 'EMERGENCY'">
                       {{ visitTypeLabel(visit.visitType) }}
                     </span>
+                    @if (visit.visitType === 'EMERGENCY' && visit.triageLevelName) {
+                      <span class="pill" [class]="'pill ' + triagePill(visit.triageTone)" data-testid="triage-level">{{ visit.triageLevelName }}</span>
+                    }
                     @if (visit.stage !== 'DONE') {
                       <span class="w"><app-icon name="clock" [size]="13" />{{ minutesOf(visit) }} min</span>
                     }
@@ -52,6 +82,21 @@
                   }
                   @if (placeholderStages.includes(visit.stage)) {
                     <div class="qnote faint">Opens in a later update</div>
+                  }
+                  <div class="qemr">
+                    <app-open-emr-button
+                      encounterType="OPD_VISIT"
+                      [encounterId]="visit.id"
+                      [doctorMembershipId]="visit.doctorMembershipId"
+                      [patientLabel]="visit.patientName"
+                    />
+                  </div>
+                  @if (canReprint(visit)) {
+                    <div class="qemr">
+                      <button mat-stroked-button class="btn-sm" type="button" data-act="reprint" [disabled]="reprint.opening() === visit.id" [attr.aria-label]="'Reprint prescription for ' + visit.patientName" (click)="reprintRx(visit)">
+                        <app-icon name="print" [size]="14" /> Reprint
+                      </button>
+                    </div>
                   }
                   @if (visit.stage !== 'DONE') {
                     <div class="qact">
@@ -75,13 +120,4 @@
                     </div>
                   }
                 </article>
-              }
-            } @else {
-              <app-empty>No patients</app-empty>
-            }
-          </div>
-        </section>
-      }
-    </div>
-  </div>
-}
+</ng-template>

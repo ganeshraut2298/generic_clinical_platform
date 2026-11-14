@@ -53,6 +53,10 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
     private static final UrlPathHelper PATH_HELPER = UrlPathHelper.defaultInstance;
     private static final String PUBLIC_PREFIX = "/api/v1/platform/public/";
     private static final String API_PREFIX = "/api/v1/";
+    /** ADR-022 D11: the form builder saves a definition of up to 256 KB; these two paths only. */
+    static final long FORM_SAVE_MAX_BODY_BYTES = 256 * 1024;
+    private static final java.util.regex.Pattern FORM_SAVE_PATH = java.util.regex.Pattern.compile(
+            "^/api/v1/opd/emr/forms(/f_[a-z2-7]{10}/draft)?$");
 
     private final ProblemJsonWriter problemWriter;
     private final long signedInMaxBytes;
@@ -80,7 +84,13 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
         if (PATH_HELPER.getLookupPathForRequest(request).startsWith(PUBLIC_PREFIX)) {
             return MAX_BODY_BYTES;
         }
-        return isSignedIn() ? signedInMaxBytes : MAX_BODY_BYTES;
+        if (!isSignedIn()) {
+            return MAX_BODY_BYTES;
+        }
+        if (FORM_SAVE_PATH.matcher(PATH_HELPER.getLookupPathForRequest(request)).matches()) {
+            return Math.max(signedInMaxBytes, FORM_SAVE_MAX_BODY_BYTES);
+        }
+        return signedInMaxBytes;
     }
 
     private static boolean isSignedIn() {

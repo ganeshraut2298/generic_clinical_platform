@@ -1,0 +1,33 @@
+// Browser print of the case paper and of a clinic form (SAH-55-2, SAH-59-5). While printing, the
+// paper is copied into .print-root (see features/emr/paper/print-paper.ts); every other child of
+// the page is hidden, so the print holds the paper only, at the page size set for the print.
+.print-root {
+  display: none;
+}
+
+@media print {
+  body.printing-paper {
+    background: #fff;
+
+    > :not(.print-root):not(style):not(script) {
+      display: none !important;
+    }
+
+    .print-root {
+      display: block;
+    }
+
+    .print-root .print-sheet {
+      width: 100% !important;
+      min-height: 0 !important;
+      margin: 0;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: #fff;
+      color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+}

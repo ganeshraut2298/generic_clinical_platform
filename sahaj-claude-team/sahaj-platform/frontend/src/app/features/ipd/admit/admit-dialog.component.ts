@@ -52,6 +52,13 @@ import {
  */
 export interface AdmitDialogData {
   bedId?: string;
+  /** SAH-58-2. "Admit now" from a treatment course: the course's patient is picked and the sitting is linked. */
+  patientId?: string;
+  treatmentCourseSittingId?: string;
+  /** SAH-67-3. The doctor's admission request this admission completes; pre-fills the type and reason. */
+  admissionRequestId?: string;
+  admissionType?: AdmissionType;
+  reason?: string;
   emergencyCaseId?: string;
   options?: AdmissionOptions;
   onCaseClosed?: () => void;
@@ -109,6 +116,8 @@ export class AdmitDialogComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly data = inject<AdmitDialogData | null>(MAT_DIALOG_DATA, { optional: true });
   protected readonly emergencyCaseId = this.data?.emergencyCaseId ?? null;
+  private readonly courseSittingId = this.data?.treatmentCourseSittingId ?? null;
+  private readonly requestId = this.data?.admissionRequestId ?? null;
 
   protected readonly types = ADMISSION_TYPES;
   protected readonly payers = PAYERS;
@@ -231,6 +240,18 @@ export class AdmitDialogComponent {
 
     if (this.data?.bedId) {
       this.form.controls.bed.setValue(this.data.bedId);
+    }
+    if (this.data?.admissionType) {
+      this.form.controls.type.setValue(this.data.admissionType);
+    }
+    if (this.data?.reason) {
+      this.form.controls.reason.setValue(this.data.reason.slice(0, MAX_REASON));
+    }
+    if (this.data?.patientId) {
+      this.patientApi
+        .get(this.data.patientId)
+        .pipe(takeUntilDestroyed())
+        .subscribe({ next: (p) => this.pick(p), error: () => undefined });
     }
     if (this.data?.options) {
       this.options.set(this.data.options);
@@ -401,6 +422,8 @@ export class AdmitDialogComponent {
         depositMode: rupees > 0 ? v.mode : null,
         consentSigned: v.consent,
         ...(this.emergencyCaseId ? { emergencyCaseId: this.emergencyCaseId } : {}),
+        ...(this.courseSittingId ? { treatmentCourseSittingId: this.courseSittingId } : {}),
+        ...(this.requestId ? { admissionRequestId: this.requestId } : {}),
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

@@ -21,7 +21,7 @@ Total new: about 195 tests (4 disabled with a bug javadoc each).
 
 ## Final state (after java-developer's fixes)
 
-`mvn -f backend/pom.xml verify` on `sahaj_test`: 333 tests, 0 failures, 0 errors, 1 skipped. Bugs 1, 2 and 3 below are fixed and their tests are enabled and pass. The only skipped test is `PatientsIT.everyClinicRoleMayReadPatientsAsTheContractSays` (bug 4, open human decision: should BILLING, PHARMACIST and COUNSELLOR read patients?).
+`mvn -f backend/pom.xml verify` on `sahaj_test`: 333 tests, 0 failures, 0 errors, 1 skipped. Bugs 1, 2 and 3 below are fixed and their tests are enabled and pass. The only skipped test was `PatientsIT.everyClinicRoleMayReadPatientsAsTheContractSays` (bug 4). **Update 13 Nov 2026: bug 4 is closed by DEC-049 answer 2** (BILLING and PHARMACIST may read, COUNSELLOR may not, patient.yaml 0.2.1); the skipped test is replaced by three enabled tests in `PatientsIT` (see docs/test-plans/SAH-53.md, section DEC-049 items 2 and 3).
 
 Test changes made after the fixes:
 - `LifecycleEdgeCasesIT.applyingATemplateWhenTheOwnerAlreadyAddedASameNamedServiceDoesNotFail`: the wizard now seeds starter services, so the test picks a dental template service the second clinic does not have yet, adds it by hand in upper case at Rs 77, applies the dental template, and checks there is still exactly one such service and it keeps Rs 77.
@@ -79,7 +79,7 @@ None of these is a 500 or a data-leak. The real-database classic failure shapes 
 - Root cause: `PatientRoles.READ` (backend/src/main/java/com/sahaj/patient/web/PatientRoles.java line 8).
 - Fix: needs a human decision on the intended rule, then either widen `READ` or correct the contract. COUNSELLOR and BILLING staff look patients up in the mockup.
 - Owner: java-developer (and solution-architect if the contract changes).
-- Test: `PatientsIT.everyClinicRoleMayReadPatientsAsTheContractSays` (disabled).
+- **Closed 13 Nov 2026 (DEC-049 answer 2):** BILLING and PHARMACIST read, COUNSELLOR 403; tests `PatientsIT.billingAndPharmacistReadTheListDetailAndFamilyWithAgeAndNoDateOfBirth`, `counsellorGets403OnTheListTheDetailAndTheFamily`, `billingAndPharmacistStillCannotWritePatientsAndCannotReadAnotherClinicsPatient` (the disabled test is removed).
 
 ### Observations, not bugs (no test disabled)
 - A bill with a zero balance (for example a free follow-up) cannot take a payment (amount must be at most the balance and at least 1 paisa), so the billing counter has no "close" action for it. The visit can still be moved to DONE with the stage PATCH (tested in `BillingIT.aFreeFollowUpWithNothingToPayCanStillBeClosedByMovingItToDone`). Check with the human whether the counter needs a "Mark done" action.

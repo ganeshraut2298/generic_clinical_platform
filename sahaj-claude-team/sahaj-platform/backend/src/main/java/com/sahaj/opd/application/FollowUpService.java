@@ -44,7 +44,10 @@ public class FollowUpService {
     static final String RETURNED = "RETURNED";
     private static final Set<String> STATUSES = Set.of(DUE, MISSED, UPCOMING, RETURNED);
     private static final ZoneId INDIA = VisitService.INDIA;
-    /** Same roles as PatientRoles.READ: only these may see a patient mobile; others get null (SAH-14 security review M1). */
+    /**
+     * Only these may see a patient mobile; others get null (SAH-14 security review M1). Not widened when DEC-049 added
+     * BILLING and PHARMACIST to PatientRoles.READ: this follow-up list keeps its own fixed roles.
+     */
     private static final Set<String> MOBILE_ROLES = Set.of("OWNER", "FRONT_DESK", "NURSE", "DOCTOR", "VISITING_DOCTOR");
     /**
      * SAH-27 security review M1: who may read the clinical tail of a discharge follow-up reason. Other roles get
@@ -97,7 +100,8 @@ public class FollowUpService {
                     doctor == null ? "" : doctor.name(), row.dueDate(),
                     row.sourceAdmissionId() != null && !showReason ? MASKED_DISCHARGE_REASON : row.reason(),
                     computed, daysLate,
-                    row.sourceVisitId(), row.sourceAdmissionId(), row.returnedVisitId());
+                    row.sourceVisitId(), row.sourceAdmissionId(), row.returnedVisitId(), row.appointmentDate(),
+                    row.appointmentTime());
         }).toList();
         return new FollowUpView(new FollowUpView.Counts(counts.due(), counts.missed(), counts.upcoming(),
                 counts.returned()), items);
@@ -148,6 +152,74 @@ public class FollowUpService {
             after.put("dueDate", dueDate.toString());
             auditLog.record("FOLLOW_UP_CREATED", ENTITY_TYPE, id, null, after);
         }
+    }
+
+    /** What the doctor's sign did for the visit's follow-up (ADR-025 D6). */
+    public record VisitFollowUpResult(UUID id, LocalDate dueDate, boolean created, boolean returned,
+                                      UUID appointmentId) {
+    }
+
+    /**
+     * The due date of an interval chosen in the EMR: the Asia/Kolkata visit day plus 3, 7, 14 or 15 days, or 1 or 3 calendar
+     * months (end of month clamped). Null for an unknown interval.
+     */
+    public static LocalDate dueDateFor(LocalDate visitDay, String interval) {
+        if (interval == null) {
+            return null;
+        }
+        return switch (interval) {
+            case "D3" -> visitDay.plusDays(3);
+            case "D7" -> visitDay.plusDays(7);
+            case "D14" -> visitDay.plusDays(14);
+            case "D15" -> visitDay.plusDays(15);
+            case "M1" -> visitDay.plusMonths(1);
+            case "M3" -> visitDay.plusMonths(3);
+            default -> null;
+        };
+    }
+
+    /**
+     * SAH-51-6 (ADR-025 D6): the follow-up the doctor chose in the EMR, made or moved in the sign transaction: one per source
+     * visit. A missing one is inserted; an open one made by an earlier card move takes the new due date (FOLLOW_UP_DUE_CHANGED,
+     * dates only); a RETURNED one is left alone. Created whether or not the clinic's follow-up step is on.
+     */
+    @Transactional
+    public VisitFollowUpResult setForVisit(UUID tenantId, UUID actorUserId, VisitRow visit, LocalDate dueDate,
+                                           String reason) {
+        Optional<FollowUpRepository.VisitFollowUp> existing = repository.findBySourceVisit(tenantId, visit.id());
+        if (existing.isPresent()) {
+            FollowUpRepository.VisitFollowUp row = existing.get();
+            if (row.returnedVisitId() != null) {
+                return new VisitFollowUpResult(row.id(), row.dueDate(), false, true, row.appointmentId());
+            }
+            if (!row.dueDate().equals(dueDate)) {
+                repository.updateDueDate(tenantId, row.id(), dueDate, actorUserId);
+                Map<String, Object> before = new LinkedHashMap<>();
+                before.put("dueDate", row.dueDate().toString());
+                Map<String, Object> after = new LinkedHashMap<>();
+                after.put("dueDate", dueDate.toString());
+                auditLog.record("FOLLOW_UP_DUE_CHANGED", ENTITY_TYPE, row.id(), before, after);
+            }
+            return new VisitFollowUpResult(row.id(), dueDate, false, false, row.appointmentId());
+        }
+        UUID id = UUID.randomUUID();
+        repository.insertIfAbsent(id, visit.patientId(), visit.doctorMembershipId(), visit.id(), dueDate,
+                reason == null ? DEFAULT_REASON : reason, actorUserId);
+        UUID stored = repository.findBySourceVisit(tenantId, visit.id()).map(FollowUpRepository.VisitFollowUp::id)
+                .orElse(id);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("patientId", visit.patientId());
+        after.put("doctorMembershipId", visit.doctorMembershipId());
+        after.put("sourceVisitId", visit.id());
+        after.put("dueDate", dueDate.toString());
+        auditLog.record("FOLLOW_UP_CREATED", ENTITY_TYPE, stored, null, after);
+        return new VisitFollowUpResult(stored, dueDate, true, false, null);
+    }
+
+    /** Stores the appointment booked for the follow-up (ADR-025 D6). */
+    @Transactional
+    public void attachAppointment(UUID tenantId, UUID actorUserId, UUID followUpId, UUID appointmentId, String interval) {
+        repository.setAppointment(tenantId, followUpId, appointmentId, interval, actorUserId);
     }
 
     /**

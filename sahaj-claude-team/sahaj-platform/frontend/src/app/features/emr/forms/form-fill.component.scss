@@ -1,0 +1,166 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+.cell {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .cell {
+    grid-column: span 6 !important;
+  }
+}
+
+.fr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &.bad .input {
+    border-color: var(--crit);
+  }
+}
+
+.lbl {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.meta {
+  color: var(--ink-3);
+  font-size: 0.76rem;
+}
+
+.star {
+  color: var(--crit);
+}
+
+.sect {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  border-bottom: 1px solid var(--line);
+
+  h4 {
+    margin: 0;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
+.note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pick {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  &.multi {
+    border-radius: var(--r-pill);
+  }
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri);
+    color: var(--pri-ink);
+  }
+  &.multi[aria-pressed='true'] {
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.vit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.calc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: var(--pri-soft);
+  color: var(--pri-text);
+
+  .big {
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+
+  &.band {
+    background: var(--muted-soft);
+    color: var(--ink-2);
+  }
+  &.band.good {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+  &.band.warn {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &.band.crit {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+}
+
+.later {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .input {
+    text-align: left;
+    color: var(--ink-3);
+  }
+}
+
+textarea.input {
+  resize: vertical;
+}

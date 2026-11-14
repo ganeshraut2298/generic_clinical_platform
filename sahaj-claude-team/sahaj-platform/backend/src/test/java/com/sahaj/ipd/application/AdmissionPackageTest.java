@@ -75,7 +75,8 @@ class AdmissionPackageTest {
                 mock(ActorDirectoryPort.class), new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)), catalog,
                 charges, billing, discharges, mock(EmergencyService.class), vitals,
                 new AdmittedCards(mock(PatientClinicalPort.class), patients, vitals, safety),
-                new CardSetups(mock(CardSetupRepository.class)), ScopeStubs.unscoped(), ScopeStubs.repository());
+                new CardSetups(mock(CardSetupRepository.class)), ScopeStubs.unscoped(), ScopeStubs.repository(),
+                mock(com.sahaj.opd.api.EmrAdmissionRequestPort.class));
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement("on", false, 25));
         when(settings.findDepositRules(TENANT)).thenReturn(Optional.empty());
         when(settings.findCategories(TENANT)).thenReturn(List.of());

@@ -17,6 +17,7 @@ describe('PatientCardComponent', () => {
   let fixture: ComponentFixture<PatientCardComponent>;
   let acted: CardAction[];
   let named: number;
+  let opened: number;
 
   function render(row: AdmittedPatientRow, card: AdmittedCardAbilities = ABILITIES_NURSE): HTMLElement {
     fixture = TestBed.createComponent(PatientCardComponent);
@@ -27,6 +28,8 @@ describe('PatientCardComponent', () => {
     named = 0;
     fixture.componentInstance.act.subscribe((a) => acted.push(a));
     fixture.componentInstance.openName.subscribe(() => named++);
+    opened = 0;
+    fixture.componentInstance.openEmrRecord.subscribe(() => opened++);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -207,5 +210,32 @@ describe('PatientCardComponent', () => {
   it('is built from the inputs only and makes no request', () => {
     // No HttpClient is provided in this TestBed: creating the card would throw if it asked for one.
     expect(() => render(ROW)).not.toThrow();
+  });
+
+  describe('Open EMR (SAH-46-1)', () => {
+    it('is not drawn unless the user may open the EMR', () => {
+      const view = render(ROW);
+      expect(view.querySelector('[data-act=open-emr]')).toBeNull();
+    });
+
+    it('is drawn with the patient in its name, and asks the parent to open the record', () => {
+      const view = render(ROW);
+      fixture.componentRef.setInput('canOpenEmr', true);
+      fixture.detectChanges();
+      const button = view.querySelector('[data-act=open-emr]') as HTMLButtonElement;
+      expect(button.textContent).toContain('Open EMR');
+      expect(button.getAttribute('aria-label')).toBe('Open EMR for Asha Patil');
+      button.click();
+      expect(opened).toBe(1);
+      expect(acted).toEqual([]);
+    });
+
+    it('stays out of the inert preview', () => {
+      const view = render(ROW);
+      fixture.componentRef.setInput('canOpenEmr', true);
+      fixture.componentRef.setInput('preview', true);
+      fixture.detectChanges();
+      expect(view.querySelector('[data-act=open-emr]')).toBeNull();
+    });
   });
 });

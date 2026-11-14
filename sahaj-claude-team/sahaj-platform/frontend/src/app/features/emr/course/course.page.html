@@ -1,0 +1,261 @@
+@if (loading()) {
+  <p class="loading" aria-busy="true">Opening the course</p>
+} @else if (error(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button mat-stroked-button type="button" data-act="retry" (click)="load()">Try again</button>
+  </div>
+} @else if (course(); as c) {
+  <section class="tc surf panel" aria-labelledby="tc-title">
+    <header class="head">
+      <div class="hl">
+        <div class="tline">
+          <h2 id="tc-title">{{ c.name }}</h2>
+          <span class="id" data-testid="course-no">{{ c.courseNo }}</span>
+        </div>
+        <span class="faint">
+          Started {{ ledgerDate(c.startedOn) }} · {{ c.doctorName }}{{ c.note ? ' · ' + c.note : '' }}
+        </span>
+        <span class="faint t-xs">{{ c.accountNote || accountNote }}</span>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Course view">
+        @for (v of views; track v.key) {
+          <button type="button" role="tab" [attr.aria-selected]="view() === v.key" [attr.data-view]="v.key" (click)="setView(v.key)">
+            {{ v.label }}
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (others().length > 1) {
+      <nav class="others" aria-label="This patient's courses" data-testid="other-courses">
+        <span class="faint t-xs">Courses of this patient:</span>
+        @for (o of others(); track o.id) {
+          <button type="button" class="oc" [attr.aria-current]="o.id === c.id" (click)="openCourse(o.id)">{{ o.courseNo }} · {{ o.name }}</button>
+        }
+      </nav>
+    }
+
+    @if (accountError(); as message) {
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button mat-stroked-button type="button" data-act="retry-account" (click)="loadAccount()">Try again</button>
+      </div>
+    }
+
+    <div class="stats" data-testid="stats">
+      @for (s of stats(); track s.label) {
+        <div class="stat" [class.good]="s.tone === 'good'" [class.crit]="s.tone === 'crit'">
+          <span class="sl">{{ s.label }}</span>
+          <span class="sv">{{ s.value }}</span>
+          <span class="sn">{{ s.note }}</span>
+        </div>
+      }
+    </div>
+
+    <ol class="steps" aria-label="{{ unitWord() }}s">
+      @for (s of c.sittings; track s.id) {
+        <li>
+          <button type="button" class="step" [class.done]="s.status === 'DONE'" [class.today]="s.status === 'TODAY'" [title]="s.items.join(', ')" (click)="setView('timeline')">
+            <span class="mark" aria-hidden="true">{{ s.status === 'DONE' ? '✓' : s.sittingNo }}</span>
+            <span class="sl">{{ label(s) }}</span>
+            <span class="sd">{{ dateOf(s) }}</span>
+            <span class="se">{{ s.encounterKind === 'OPD' ? 'OPD' : 'IPD' }}</span>
+          </button>
+        </li>
+      }
+    </ol>
+
+    @if (planError(); as message) {
+      <div class="notice err" role="alert" data-testid="plan-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+
+    @switch (view()) {
+      @case ('timeline') {
+        <div class="cards" data-testid="timeline">
+          @for (s of c.sittings; track s.id) {
+            <article class="card" [class.today]="s.status === 'TODAY'" [class.ipd]="s.encounterKind !== 'OPD'">
+              <div class="ctop">
+                <div class="ctl">
+                  <strong>{{ unitWord() }} {{ s.sittingNo }} · {{ dateOf(s) }}</strong>
+                  <span class="enc">{{ encounterWord(s) }}</span>
+                  <span class="st" [class.done]="s.status === 'DONE'" [class.today]="s.status === 'TODAY'">{{ statusWord(s) }}</span>
+                </div>
+                <span class="charge">{{ chargeWord(s) }}</span>
+              </div>
+              <ul class="items">
+                @for (i of s.items; track $index) {
+                  <li>• {{ i }}</li>
+                }
+              </ul>
+              @if (s.note) {
+                <span class="faint">{{ s.note }}</span>
+              }
+              @if (editing()?.sittingId === s.id) {
+                <div class="edit" data-testid="edit-form">
+                  <label><span>Date</span><input class="input" type="date" [value]="editing()!.date" (input)="setEdit('date', $event)" /></label>
+                  <label><span>Work (one line each)</span><textarea class="input" rows="3" [value]="editing()!.items" (input)="setEdit('items', $event)"></textarea></label>
+                  <label><span>Charge (₹)</span><input class="input" type="text" inputmode="numeric" [value]="editing()!.charge" (input)="setEdit('charge', $event)" /></label>
+                  <label><span>Note</span><input class="input" type="text" [attr.maxlength]="300" [value]="editing()!.note" (input)="setEdit('note', $event)" /></label>
+                  <div class="eb">
+                    <button mat-flat-button type="button" [disabled]="busy()" data-act="save-edit" (click)="saveEdit(s)">Save</button>
+                    <button mat-stroked-button type="button" (click)="cancelEdit()">Cancel</button>
+                  </div>
+                </div>
+              }
+              <div class="acts">
+                @if (canLink(s)) {
+                  <button type="button" class="act primary" [disabled]="busy()" data-act="link" (click)="link(s)">This is today’s {{ unitLower() }}</button>
+                }
+                @if (canEdit(s) && editing()?.sittingId !== s.id) {
+                  <button type="button" class="act" data-act="edit" (click)="startEdit(s)">Change date, work or charge</button>
+                }
+                @if (canMoveToAdmission(s)) {
+                  <button type="button" class="act" [disabled]="busy()" data-act="move" (click)="moveToAdmission(s)">Move to day care / IPD</button>
+                }
+                @if (canAdmit(s)) {
+                  <button type="button" class="act primary" data-act="admit" (click)="admit(s)">Admit now</button>
+                }
+              </div>
+            </article>
+          } @empty {
+            <p class="empty">No {{ unitLower() }} planned yet.</p>
+          }
+
+          @if (c.canPlan && c.addOptions.length > 0) {
+            <div class="add">
+              <span class="faint">Add to this course:</span>
+              @for (o of c.addOptions; track o.key) {
+                <button type="button" class="act" [disabled]="busy()" [attr.data-add]="o.key" (click)="add(o.key, o.label)">+ {{ o.label }}</button>
+              }
+            </div>
+          }
+        </div>
+      }
+      @case ('table') {
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Course table" data-testid="course-table">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Date</th>
+                <th scope="col">Encounter</th>
+                <th scope="col">Work</th>
+                <th scope="col">Charge</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of c.sittings; track s.id) {
+                <tr [class.today]="s.status === 'TODAY'">
+                  <td>{{ label(s) }}</td>
+                  <td>{{ dateOf(s) }}</td>
+                  <td>{{ encounterWord(s) }}</td>
+                  <td>{{ s.items.join(', ') }}</td>
+                  <td>{{ chargeWord(s) }}</td>
+                  <td>{{ statusWord(s) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      @default {
+        <div class="pay" data-testid="payments">
+          @if (account(); as a) {
+            @if (canCollect()) {
+              <section class="panel2" aria-labelledby="pay-title">
+                <h3 id="pay-title">Collect payment</h3>
+                <div class="types" role="group" aria-label="Payment type">
+                  @for (o of options(); track o.key) {
+                    <button type="button" class="type" [attr.aria-pressed]="choice() === o.key" [attr.data-type]="o.key" (click)="pickChoice(o.key)">
+                      <b>{{ o.label }}</b>
+                      <span class="faint t-xs">{{ o.sub }}</span>
+                    </button>
+                  }
+                </div>
+                <label class="chk">
+                  <input type="checkbox" [checked]="useCredit()" data-act="use-credit" (change)="toggleCredit()" />
+                  Use advance balance first ({{ creditText() }})
+                </label>
+                <div class="amount">
+                  <button type="button" class="stepbtn" aria-label="Less" data-act="less" (click)="stepBy(-1)">−</button>
+                  <span class="av" data-testid="amount">{{ money(amountPaise()) }}</span>
+                  <button type="button" class="stepbtn" aria-label="More" data-act="more" (click)="stepBy(1)">+</button>
+                </div>
+                <span class="faint t-xs" [class.crit]="problem() && amountPaise() > 0">{{ problem() && amountPaise() > 0 ? problem() : hint() }}</span>
+                <div class="modes" role="group" aria-label="Mode">
+                  @for (m of modes; track m.key) {
+                    <button type="button" class="mode" [attr.aria-pressed]="mode() === m.key" (click)="setMode(m.key)">{{ m.label }}</button>
+                  }
+                </div>
+                <button mat-flat-button type="button" class="collect" [disabled]="paying() || !!problem()" data-act="collect" (click)="collect()">
+                  {{ paying() ? 'Recording' : collectText() }}
+                </button>
+                @if (payError(); as message) {
+                  <p class="err-text" role="alert" data-testid="pay-error">{{ message }}</p>
+                }
+              </section>
+            }
+
+            <section class="panel2 ledger" aria-labelledby="ledger-title">
+              <h3 id="ledger-title">Receipts and adjustments</h3>
+              <div class="tablewrap" tabindex="0" role="region" aria-label="Receipts and adjustments">
+                <table class="grid">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col">Type</th>
+                      <th scope="col">Mode</th>
+                      <th scope="col">Against</th>
+                      <th scope="col">Amount</th>
+                      <th scope="col">Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (l of a.ledger; track $index) {
+                      <tr [class.adj]="l.kind !== 'PAYMENT'">
+                        <td>{{ ledgerDate(l.date) }}</td>
+                        <td>{{ l.kind === 'PAYMENT' ? typeWord(l.type) : l.kind === 'CREDIT_USED' ? 'Advance used' : 'Carried to IPD' }}</td>
+                        <td>{{ l.mode ?? '—' }}</td>
+                        <td>{{ l.against }}</td>
+                        <td>{{ l.kind === 'PAYMENT' ? money(l.amountPaise) : '−' + money(abs(l.amountPaise)) }}</td>
+                        <td>
+                          @if (l.receiptNo && canReceipt()) {
+                            <button type="button" class="linkbtn" [attr.aria-label]="'Open receipt ' + l.receiptNo" data-act="receipt" (click)="openReceipt(l.receiptNo)">{{ l.receiptNo }}</button>
+                          } @else {
+                            {{ l.receiptNo ?? '' }}
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="6" class="empty" data-testid="ledger-empty">No payment yet.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <span class="faint t-xs" data-testid="pay-note">{{ note() }}</span>
+            </section>
+          } @else if (!accountError()) {
+            <p class="faint" aria-busy="true">Loading the account</p>
+          }
+        </div>
+      }
+    }
+
+    <div class="band">
+      <span class="chip">OPD</span> each sitting opens its own OPD visit
+      <span class="chip ipd">IPD</span> admissions and day care link to the same course
+      <span class="faint">· {{ c.accountNote || accountNote }}</span>
+    </div>
+
+    @if (toast(); as message) {
+      <div class="toast" role="status" data-testid="course-toast">{{ message }}</div>
+    }
+  </section>
+}

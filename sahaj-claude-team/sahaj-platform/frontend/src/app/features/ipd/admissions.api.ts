@@ -16,6 +16,7 @@ import {
   PayMode,
   TransferRules,
 } from './ipd.model';
+import { AdmissionRequestList } from './requests/admission-requests.model';
 import {
   DischargeInput,
   DischargeSettings,
@@ -63,6 +64,11 @@ export class AdmissionsApi {
 
   admit(body: AdmissionInput): Observable<AdmissionDetail> {
     return this.http.post<AdmissionDetail>(`${this.baseUrl}/admissions`, body);
+  }
+
+  /** SAH-67-3 (ipd.yaml 0.3.0). The doctors' admission requests and the course sittings waiting for a bed; the admit roles only. */
+  admissionRequests(): Observable<AdmissionRequestList> {
+    return this.http.get<AdmissionRequestList>(`${this.baseUrl}/admission-requests`);
   }
 
   get(id: string): Observable<AdmissionDetail> {

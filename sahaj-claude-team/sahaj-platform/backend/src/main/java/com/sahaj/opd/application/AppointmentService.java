@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
@@ -46,6 +47,8 @@ public class AppointmentService {
     private static final String BOOKED = "BOOKED";
     private static final String ARRIVED = "ARRIVED";
     private static final Set<String> DOCTOR_ROLES = Set.of("DOCTOR", "VISITING_DOCTOR");
+    /** The free slots bookFirstFree reads and tries in turn (each costs one select inside the sign transaction). */
+    private static final int BOOK_CANDIDATES = 10;
 
     private final AppointmentRepository appointmentRepository;
     private final BookingRulesRepository bookingRulesRepository;
@@ -56,11 +59,24 @@ public class AppointmentService {
     private final DoctorBlockedDates blockedDates;
     private final AuditLog auditLog;
     private final Clock clock;
+    /** SAH-51 (ADR-025 D6): the doctor's slot pattern for the EMR's follow-up booking; null in a plain unit test. */
+    private final DoctorSlotSettingsRepository slotSettings;
 
     public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
                                VisitRepository visitRepository, VisitService visitService,
                                PatientLookupPort patientLookup, TeamMemberPort teamMemberPort,
                                DoctorBlockedDates blockedDates, AuditLog auditLog, Clock clock) {
+        this(appointmentRepository, bookingRulesRepository, visitRepository, visitService, patientLookup, teamMemberPort,
+                blockedDates, auditLog, clock, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
+                               VisitRepository visitRepository, VisitService visitService,
+                               PatientLookupPort patientLookup, TeamMemberPort teamMemberPort,
+                               DoctorBlockedDates blockedDates, AuditLog auditLog, Clock clock,
+                               DoctorSlotSettingsRepository slotSettings) {
+        this.slotSettings = slotSettings;
         this.appointmentRepository = appointmentRepository;
         this.bookingRulesRepository = bookingRulesRepository;
         this.visitRepository = visitRepository;
@@ -171,6 +187,125 @@ public class AppointmentService {
             throw new InvalidInputException("apptTime",
                     "Booking closes " + rules.closeBeforeHours() + " hour(s) before the slot");
         }
+    }
+
+    /** One free slot of a doctor (ADR-025 D6): the date and the start time. */
+    public record FreeSlot(LocalDate date, LocalTime time) {
+    }
+
+    /** The appointment booked by {@link #bookFirstFree}. */
+    public record BookedSlot(UUID appointmentId, LocalDate date, LocalTime time) {
+    }
+
+    /**
+     * The doctor's next free slots from {@code from} for {@code days} days, oldest first, at most {@code limit} (SAH-11 slot
+     * settings; leave, walk-in slots, taken slots and times already past today are left out). Reads only.
+     */
+    @Transactional(readOnly = true)
+    public List<FreeSlot> freeSlots(UUID tenantId, UUID doctorMembershipId, LocalDate from, int days, int limit) {
+        List<FreeSlot> out = new ArrayList<>();
+        if (slotSettings == null || from == null) {
+            return out;
+        }
+        DoctorSlotSettingsRepository.SlotSettingsRow settings = slotSettings.find(tenantId, doctorMembershipId)
+                .orElse(DoctorSlotSettingsService.DEFAULTS);
+        List<SlotComputation.Session> sessions = settings.sessions().stream()
+                .map(s -> new SlotComputation.Session(s.sessionIndex(), s.startTime(), s.endTime())).toList();
+        LocalDate lastDay = from.plusDays(Math.max(days, 1) - 1L);
+        Set<LocalDate> blocked = blockedDates.blocked(tenantId, doctorMembershipId, from, lastDay);
+        LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
+        for (LocalDate day = from; !day.isAfter(lastDay) && out.size() < limit; day = day.plusDays(1)) {
+            if (blocked.contains(day)) {
+                continue;
+            }
+            for (SlotComputation.Slot slot : SlotComputation.slotsFor(day, settings.slotMinutes(),
+                    new java.util.HashSet<>(settings.workingDays()), settings.walkInEveryNth(), sessions)) {
+                if (slot.walkInReserved() || !LocalDateTime.of(day, slot.startTime()).isAfter(now)) {
+                    continue;
+                }
+                if (appointmentRepository.findActiveConflict(tenantId, doctorMembershipId, day, slot.startTime())
+                        .isEmpty()) {
+                    out.add(new FreeSlot(day, slot.startTime()));
+                    if (out.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * True when {@code time} on {@code date} is a slot the doctor can take bookings in: on the grid of the doctor's slot
+     * settings, on a working day, not on leave, not reserved for walk-ins and not already past. A slot someone else has booked
+     * still counts (use {@link #freeSlots} for the open ones). Reads only.
+     */
+    @Transactional(readOnly = true)
+    public boolean isOpenSlot(UUID tenantId, UUID doctorMembershipId, LocalDate date, LocalTime time) {
+        if (slotSettings == null || date == null || time == null) {
+            return false;
+        }
+        if (blockedDates.blocked(tenantId, doctorMembershipId, date, date).contains(date)) {
+            return false;
+        }
+        DoctorSlotSettingsRepository.SlotSettingsRow settings = slotSettings.find(tenantId, doctorMembershipId)
+                .orElse(DoctorSlotSettingsService.DEFAULTS);
+        List<SlotComputation.Session> sessions = settings.sessions().stream()
+                .map(s -> new SlotComputation.Session(s.sessionIndex(), s.startTime(), s.endTime())).toList();
+        LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
+        for (SlotComputation.Slot slot : SlotComputation.slotsFor(date, settings.slotMinutes(),
+                new java.util.HashSet<>(settings.workingDays()), settings.walkInEveryNth(), sessions)) {
+            if (slot.startTime().equals(time)) {
+                return !slot.walkInReserved() && LocalDateTime.of(date, time).isAfter(now);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * SAH-51-6 (ADR-025 D6): books the first free slot of the doctor from {@code from} for up to {@code maxDays} days for the
+     * follow-up the doctor's sign chose (visit type FOLLOW_UP, source EMR), in the sign transaction. Empty when there is none
+     * (the follow-up then keeps the date only, ADR-025 H6). The slot is locked and checked again before it is written.
+     */
+    @Transactional
+    public Optional<BookedSlot> bookFirstFree(UUID tenantId, UUID actorUserId, UUID patientId, UUID doctorMembershipId,
+                                              LocalDate from, int maxDays, String visitType, String source) {
+        // a few candidates are enough: each is a select and the sign holds its row locks meanwhile (code review 9)
+        for (FreeSlot slot : freeSlots(tenantId, doctorMembershipId, from, maxDays, BOOK_CANDIDATES)) {
+            appointmentRepository.lockSlot(tenantId, doctorMembershipId, slot.date(), slot.time());
+            if (appointmentRepository.findActiveConflict(tenantId, doctorMembershipId, slot.date(), slot.time())
+                    .isPresent()) {
+                continue;
+            }
+            UUID id = UUID.randomUUID();
+            appointmentRepository.insert(id, patientId, doctorMembershipId, slot.date(), slot.time(), visitType, source,
+                    null, actorUserId);
+            AppointmentRow created = findRow(tenantId, id);
+            auditLog.record("APPOINTMENT_BOOKED", ENTITY_TYPE, id, null, snapshot(created));
+            return Optional.of(new BookedSlot(id, slot.date(), slot.time()));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * SAH-63-3 (ADR-025 D7): books the slot the doctor chose in the finish dialog (physiotherapy session n+1). Empty when the
+     * slot was taken or the doctor is not taking bookings that day meanwhile (the sitting then keeps the date only).
+     */
+    @Transactional
+    public Optional<BookedSlot> bookAt(UUID tenantId, UUID actorUserId, UUID patientId, UUID doctorMembershipId,
+                                       LocalDate date, LocalTime time, String visitType, String source) {
+        if (blockedDates.blocked(tenantId, doctorMembershipId, date, date).contains(date)) {
+            return Optional.empty();
+        }
+        appointmentRepository.lockSlot(tenantId, doctorMembershipId, date, time);
+        if (appointmentRepository.findActiveConflict(tenantId, doctorMembershipId, date, time).isPresent()) {
+            return Optional.empty();
+        }
+        UUID id = UUID.randomUUID();
+        appointmentRepository.insert(id, patientId, doctorMembershipId, date, time, visitType, source, null, actorUserId);
+        AppointmentRow created = findRow(tenantId, id);
+        auditLog.record("APPOINTMENT_BOOKED", ENTITY_TYPE, id, null, snapshot(created));
+        return Optional.of(new BookedSlot(id, date, time));
     }
 
     /** AC3, AC4, AC7: cancel or mark no-show; only a still-booked appointment can change this way. */

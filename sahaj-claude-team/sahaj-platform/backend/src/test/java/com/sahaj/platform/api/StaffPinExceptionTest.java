@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.sahaj.platform.api.PinCheck.NotSetReason;
 import com.sahaj.platform.api.PinCheck.Outcome;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** SAH-31, ADR-010 D9 and D11: PinCheck.requireOk() and the exact problem types, statuses and texts. */
@@ -239,8 +240,9 @@ class StaffPinExceptionTest {
     }
 
     @Test
-    void thePairLimitIs429WithTheFixedTextAndNoRetryTimeForBothSubjects() {
-        for (StaffPinException.Subject subject : StaffPinException.Subject.values()) {
+    void thePairLimitIs429WithTheFixedTextAndNoRetryTimeForTheNurseSubjects() {
+        for (StaffPinException.Subject subject : List.of(StaffPinException.Subject.SELF,
+                StaffPinException.Subject.COLLEAGUE)) {
             StaffPinException ex = StaffPinException.of(new PinCheck(Outcome.PAIR_LIMIT, 0, null, 99), subject);
 
             assertThat(ex.kind()).isEqualTo(StaffPinException.Kind.COLLEAGUE_PIN_LIMIT);
@@ -250,6 +252,61 @@ class StaffPinExceptionTest {
             assertThat(ex.getMessage()).isEqualTo("Too many wrong PIN tries for this nurse. Choose another nurse.");
             assertThat(ex.retryAfterSeconds()).as("a guesser is not told when the window reopens").isZero();
         }
+    }
+
+    // ---- SAH-66 (ADR-023 D6, H7): the neutral texts for the independent checker of a chemotherapy order ----
+
+    private static StaffPinException checker(PinCheck check) {
+        return StaffPinException.of(check, StaffPinException.Subject.CHECKER);
+    }
+
+    @Test
+    void theCheckerPairLimitIsTheSameProblemWithNeutralText() {
+        StaffPinException ex = checker(new PinCheck(Outcome.PAIR_LIMIT, 0, null, 99));
+
+        assertThat(ex.kind()).isEqualTo(StaffPinException.Kind.COLLEAGUE_PIN_LIMIT);
+        assertThat(ex.slug()).isEqualTo("colleague-pin-limit");
+        assertThat(ex.status()).isEqualTo(429);
+        assertThat(ex.getMessage()).isEqualTo("Too many wrong PIN tries for this person. Choose another checker.");
+        assertThat(ex.retryAfterSeconds()).isZero();
+        assertThat(ex.subject()).isEqualTo(StaffPinException.Subject.CHECKER);
+    }
+
+    @Test
+    void theCheckerTextsNeverNameANurseAndKeepSlugsAndStatuses() {
+        StaffPinException wrong = checker(new PinCheck(Outcome.WRONG, 2, null, 0));
+        assertThat(wrong.slug()).isEqualTo("wrong-pin");
+        assertThat(wrong.status()).isEqualTo(403);
+        assertThat(wrong.getMessage()).isEqualTo("That PIN is not right.");
+
+        StaffPinException notSet = checker(new PinCheck(Outcome.NOT_SET, 0, null, 0));
+        assertThat(notSet.slug()).isEqualTo("pin-not-set");
+        assertThat(notSet.status()).isEqualTo(409);
+        assertThat(notSet.getMessage()).isEqualTo("The checker has not set a PIN yet. Choose another checker.");
+
+        StaffPinException locked = checker(new PinCheck(Outcome.LOCKED, 0, Instant.parse("2026-11-12T05:35:00Z"), 600));
+        assertThat(locked.slug()).isEqualTo("pin-locked");
+        assertThat(locked.status()).isEqualTo(403);
+        assertThat(locked.getMessage()).isEqualTo(
+                "The checker's PIN is locked after 5 wrong tries. Choose another checker, or try again at 11:05 AM.");
+        assertThat(locked.retryAfterSeconds()).isEqualTo(600);
+        assertThat(checker(new PinCheck(Outcome.LOCKED, 0, null, 0)).getMessage()).endsWith("or try again later.");
+
+        for (Outcome outcome : List.of(Outcome.WRONG, Outcome.NOT_SET, Outcome.LOCKED, Outcome.PAIR_LIMIT,
+                Outcome.RATE_LIMITED, Outcome.UNAVAILABLE, Outcome.CHECK_FAILED)) {
+            assertThat(checker(new PinCheck(outcome, 1, Instant.parse("2026-11-12T05:35:00Z"), 5)).getMessage())
+                    .as(outcome.name()).doesNotContainIgnoringCase("nurse");
+        }
+        assertThat(checker(new PinCheck(Outcome.RATE_LIMITED, 0, null, 60)).slug()).isEqualTo("rate-limit");
+        assertThat(checker(new PinCheck(Outcome.UNAVAILABLE, 0, null, 0)).slug()).isEqualTo("pin-unavailable");
+        assertThat(checker(new PinCheck(Outcome.CHECK_FAILED, 0, null, 0)).getMessage())
+                .isEqualTo("We could not check the PIN. Try again.");
+    }
+
+    @Test
+    void theCheckerSubjectCannotMakeAProblemOfARightPin() {
+        assertThatThrownBy(() -> checker(new PinCheck(Outcome.OK, 5, null, 0)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

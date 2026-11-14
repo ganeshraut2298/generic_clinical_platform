@@ -173,12 +173,24 @@ public final class AdmissionViews {
     public record AdmittedClinicalFlags(CardEscalationFlag escalation, VitalsViews.EwsSummary latestEws,
                                         boolean vitalsDue, CardAllergy allergy,
                                         @JsonInclude(JsonInclude.Include.NON_NULL) String diagnosis,
-                                        @JsonInclude(JsonInclude.Include.NON_NULL) Optional<CardLatestVitals> latestVitals) {
+                                        @JsonInclude(JsonInclude.Include.NON_NULL) Optional<CardLatestVitals> latestVitals,
+                                        boolean roundDoneToday) {
+
+        /** The SAH-37 facts: no round flag (false). SAH-67-1 (ADR-025 D8) adds {@code roundDoneToday}. */
+        public AdmittedClinicalFlags(CardEscalationFlag escalation, VitalsViews.EwsSummary latestEws, boolean vitalsDue,
+                                     CardAllergy allergy, String diagnosis, Optional<CardLatestVitals> latestVitals) {
+            this(escalation, latestEws, vitalsDue, allergy, diagnosis, latestVitals, false);
+        }
 
         /** The SAH-36 facts only: no diagnosis and no vitals tiles (both absent from the JSON). */
         public AdmittedClinicalFlags(CardEscalationFlag escalation, VitalsViews.EwsSummary latestEws, boolean vitalsDue,
                                      CardAllergy allergy) {
             this(escalation, latestEws, vitalsDue, allergy, null, null);
+        }
+
+        /** The same facts with the round flag: a doctor signed today's progress note in the EMR. */
+        public AdmittedClinicalFlags withRoundDone(boolean done) {
+            return new AdmittedClinicalFlags(escalation, latestEws, vitalsDue, allergy, diagnosis, latestVitals, done);
         }
 
         @Override
@@ -256,7 +268,17 @@ public final class AdmissionViews {
         }
     }
 
-    public record DepositEntry(UUID id, long amountPaise, String mode, Instant collectedAt, String collectedByName) {
+    /**
+     * {@code mode} is null only for a COURSE deposit; {@code source} is DESK or COURSE and {@code courseNo} (for
+     * example "TC-0412") is set for COURSE only (SAH-58, docs/api/ipd.yaml 0.2.0).
+     */
+    public record DepositEntry(UUID id, long amountPaise, String mode, Instant collectedAt, String collectedByName,
+                               String source, String courseNo) {
+
+        /** A deposit collected at the desk. */
+        public DepositEntry(UUID id, long amountPaise, String mode, Instant collectedAt, String collectedByName) {
+            this(id, amountPaise, mode, collectedAt, collectedByName, "DESK", null);
+        }
     }
 
     /**

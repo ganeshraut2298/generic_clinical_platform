@@ -12,8 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sahaj.patient.application.PatientInput;
-import com.sahaj.patient.application.PatientRepository.PatientPage;
+import com.sahaj.patient.api.PatientAge;
+import com.sahaj.patient.application.MergeOutcome;
 import com.sahaj.patient.application.PatientService;
+import com.sahaj.patient.application.PatientSummaryPage;
 import com.sahaj.patient.application.PatientSummaryView;
 import com.sahaj.patient.application.PatientUpdateInput;
 import com.sahaj.patient.application.PatientView;
@@ -22,6 +24,7 @@ import com.sahaj.platform.api.NotFoundException;
 import com.sahaj.platform.support.TestTenantSecurity;
 import com.sahaj.platform.web.security.SecurityConfig;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -56,7 +59,7 @@ class PatientControllerTest {
 
     private static PatientView view(UUID id, UUID duplicateOfId) {
         return new PatientView(id, "PT-00001", "Asha Rao", 30, "F", "9123450001", null, "mr", null, null, false,
-                Instant.now(), duplicateOfId);
+                Instant.now(), duplicateOfId, null, PatientAge.undated(30, LocalDate.of(2026, 11, 13)));
     }
 
     @Test
@@ -65,12 +68,14 @@ class PatientControllerTest {
     }
 
     @Test
-    void everyClinicRoleCanReadButOnlyOwnerAndFrontDeskCanWrite() throws Exception {
-        when(patientService.search(eq(TENANT_ID), any(), any(), eq(0))).thenReturn(new PatientPage(List.of(), 0));
+    void sevenRolesCanReadCounsellorCannotAndOnlyOwnerAndFrontDeskCanWrite() throws Exception {
+        when(patientService.search(eq(TENANT_ID), any(), any(), eq(0))).thenReturn(new PatientSummaryPage(List.of(), 0));
 
-        for (String role : new String[] {"OWNER", "FRONT_DESK", "NURSE", "DOCTOR", "VISITING_DOCTOR"}) {
+        for (String role : new String[] {"OWNER", "FRONT_DESK", "NURSE", "DOCTOR", "VISITING_DOCTOR", "BILLING",
+                "PHARMACIST"}) {
             mockMvc.perform(get(BASE).with(as(role))).andExpect(status().isOk());
         }
+        mockMvc.perform(get(BASE).with(as("COUNSELLOR"))).andExpect(status().isForbidden());
         for (String role : new String[] {"NURSE", "DOCTOR", "VISITING_DOCTOR", "BILLING", "PHARMACIST"}) {
             mockMvc.perform(post(BASE).with(as(role)).contentType(JSON)
                             .content("{\"name\":\"Asha\",\"age\":30,\"sex\":\"F\",\"mobile\":\"9123450001\"}"))
@@ -158,7 +163,7 @@ class PatientControllerTest {
     void familyListsTheContractShape() throws Exception {
         when(patientService.family(TENANT_ID, PATIENT_ID)).thenReturn(List.of(
                 new PatientSummaryView(UUID.randomUUID(), "PT-00002", "Ramesh Rao", 8, "M", "9123450001", null,
-                        null)));
+                        null, PatientAge.undated(8, LocalDate.of(2026, 11, 13)))));
 
         mockMvc.perform(get(BASE + "/" + PATIENT_ID + "/family").with(as("DOCTOR")))
                 .andExpect(status().isOk())
@@ -170,7 +175,8 @@ class PatientControllerTest {
     void mergeIsOwnerOrFrontDeskOnlyAndReturnsTheSurvivor() throws Exception {
         UUID keepId = UUID.randomUUID();
         UUID mergeId = UUID.randomUUID();
-        when(patientService.merge(TENANT_ID, USER_ID, keepId, mergeId)).thenReturn(view(keepId, null));
+        when(patientService.mergeWithNotice(TENANT_ID, USER_ID, keepId, mergeId))
+                .thenReturn(new MergeOutcome(view(keepId, null), false));
 
         mockMvc.perform(post(BASE + "/merge").with(as("NURSE")).contentType(JSON)
                         .content("{\"keepId\":\"" + keepId + "\",\"mergeId\":\"" + mergeId + "\"}"))

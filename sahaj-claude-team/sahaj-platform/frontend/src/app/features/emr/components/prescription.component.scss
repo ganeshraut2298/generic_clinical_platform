@@ -1,0 +1,285 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.rx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+}
+
+.star {
+  color: var(--crit);
+}
+
+.acts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.act {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  &:disabled {
+    opacity: 0.55;
+  }
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--crit);
+  border-radius: var(--r-sm);
+  background: var(--crit-soft);
+  color: var(--crit);
+  font-weight: 600;
+}
+
+.atext {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--ink);
+
+  input {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.searchrow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.results,
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.opt,
+.qchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+
+  &:hover {
+    border-color: var(--pri);
+    color: var(--pri-text);
+  }
+}
+
+.qchip,
+.create {
+  border-style: dashed;
+}
+
+.qlabel {
+  color: var(--ink-3);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.grid {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+
+  th,
+  td {
+    padding: 6px 10px;
+    text-align: left;
+    border-top: 1px solid var(--line-2);
+    vertical-align: middle;
+  }
+
+  th {
+    border-top: 0;
+    color: var(--ink-3);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+
+  tr.flag td {
+    background: var(--crit-soft);
+  }
+}
+
+.nm {
+  display: block;
+  font-weight: 600;
+}
+
+.sub {
+  display: block;
+  color: var(--ink-3);
+  font-size: 0.76rem;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pill-btn {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri);
+    color: var(--pri-ink);
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.days {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 700;
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.attr {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.rm {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.emptytext {
+  color: var(--ink-3);
+
+  &.bad {
+    color: var(--crit);
+  }
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.undo {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--pri-ink);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.linkbtn {
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--pri-text);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+p {
+  margin: 0;
+}

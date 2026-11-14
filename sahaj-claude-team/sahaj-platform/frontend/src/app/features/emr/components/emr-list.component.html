@@ -1,0 +1,260 @@
+<section class="el" [class.bad]="bad()" [attr.aria-labelledby]="inputId() + '-t'" [attr.data-kind]="kind()">
+  <header class="head">
+    <h3 [id]="inputId() + '-t'">
+      {{ title() }}@if (required()) {<span class="star" aria-hidden="true"> *</span><span class="sr-only"> (required)</span>}
+    </h3>
+    <span class="count" [class.bad]="bad()" data-testid="list-count">{{ count() }}</span>
+    <div class="tools">
+      <div class="views" role="tablist" aria-label="View">
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="view() === 'chips'"
+          data-act="view-chips"
+          (click)="setView('chips')"
+        >
+          Chips
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="view() === 'table'"
+          data-act="view-table"
+          (click)="setView('table')"
+        >
+          Table
+        </button>
+      </div>
+      @if (!disabled()) {
+        <button
+          type="button"
+          class="addbtn"
+          [attr.aria-expanded]="adding()"
+          data-act="toggle-add"
+          (click)="toggleAdd()"
+        >
+          <app-icon [name]="adding() ? 'x' : 'plus'" [size]="14" />
+          {{ adding() ? 'Close' : 'Add' }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (canChangePrintLanguage()) {
+    <label class="plang">
+      <span>Print advice in</span>
+      <select class="input" data-testid="print-language" (change)="setPrintLanguage($event)">
+        @for (l of languages; track l.key) {
+          <option [value]="l.key" [selected]="printLanguage() === l.key">{{ l.label }}</option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (adding() && !disabled()) {
+    <div class="panel">
+      <label class="search">
+        <span>Search your {{ spec().noun }} list</span>
+        <input
+          class="input"
+          type="search"
+          autocomplete="off"
+          [id]="inputId()"
+          [value]="query()"
+          [attr.maxlength]="200"
+          [placeholder]="spec().placeholder"
+          (input)="onQuery($event)"
+          (keydown.enter)="onEnter($event)"
+        />
+      </label>
+      <div class="results" role="group" [attr.aria-label]="spec().nameLabel + ' matches'">
+        @for (r of visibleResults(); track r.itemKey) {
+          <button type="button" class="opt" data-act="add-result" (click)="pick(r)">
+            + {{ r.text }}
+            @if (r.code && kind() === 'DIAGNOSIS') {
+              <span class="code">{{ r.code }}</span>
+            }
+            @if (r.meta) {
+              <span class="faint t-xs">{{ r.meta }}</span>
+            }
+          </button>
+        }
+        @if (canCreate()) {
+          <button type="button" class="opt create" data-act="create-new" (click)="createTyped()">
+            + Add “{{ typedText() }}” as new {{ spec().noun }}
+          </button>
+        }
+      </div>
+      @if (searchFailed()) {
+        <p class="err-text" role="alert">We could not search. Typing and Add still work.</p>
+      }
+      <span class="faint t-xs hint">{{ addHint() }}</span>
+    </div>
+  }
+
+  @if (view() === 'chips') {
+    <ul class="chips" [attr.aria-label]="title() + ' added'">
+      @for (item of active(); track item.id) {
+        <li class="chip">
+          @if (code(item); as c) {
+            <span class="code">{{ c }}</span>
+          }
+          <span class="nm">{{ item.text }}</span>
+          @if (item.newToList) {
+            <span class="pill p-wait">New to list</span>
+          }
+          @if (price(item); as p) {
+            <span class="faint t-xs">{{ p }}</span>
+          }
+          <select
+            class="attr"
+            [disabled]="disabled()"
+            [attr.aria-label]="spec().attr1.label + ' of ' + item.text"
+            (change)="onAttr(item, 1, $event)"
+          >
+            @for (c of specOf(1).choices; track c.key) {
+              <option [value]="c.key" [selected]="item.attr1 === c.key">{{ c.label }}</option>
+            }
+          </select>
+          @if (noTextNote(item); as note) {
+            <span class="faint t-xs">{{ note }}</span>
+          }
+          @if (!disabled()) {
+            <button type="button" class="rm" [attr.aria-label]="'Remove ' + item.text" data-act="remove" (click)="remove(item)">
+              <app-icon name="x" [size]="13" />
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  } @else {
+    <div class="tablewrap" tabindex="0" role="region" [attr.aria-label]="title() + ' table'">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th scope="col" class="s1">#</th>
+            <th scope="col" class="s2">{{ spec().nameLabel }}</th>
+            <th scope="col">{{ spec().attr1.label }}</th>
+            <th scope="col">{{ spec().attr2.label }}</th>
+            @if (kind() === 'DIAGNOSIS') {
+              <th scope="col">Code</th>
+            }
+            <th scope="col">Added on</th>
+            <th scope="col">Added by</th>
+            <th scope="col">Active</th>
+            <th scope="col"><span class="sr-only">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.id; let i = $index) {
+            <tr [class.off]="!item.active">
+              <td class="s1 num">{{ i + 1 }}</td>
+              <td class="s2">
+                <span class="nm">{{ item.text }}</span>
+                @if (item.newToList) {
+                  <span class="pill p-wait">New to list</span>
+                }
+                @if (price(item); as p) {
+                  <span class="faint t-xs">{{ p }}</span>
+                }
+              </td>
+              <td>
+                <select
+                  class="attr"
+                  [disabled]="disabled()"
+                  [attr.aria-label]="spec().attr1.label + ' of ' + item.text"
+                  (change)="onAttr(item, 1, $event)"
+                >
+                  @for (c of specOf(1).choices; track c.key) {
+                    <option [value]="c.key" [selected]="item.attr1 === c.key">{{ c.label }}</option>
+                  }
+                </select>
+                @if (noTextNote(item); as note) {
+                  <div class="faint t-xs">{{ note }}</div>
+                }
+              </td>
+              <td>
+                <select
+                  class="attr"
+                  [disabled]="disabled()"
+                  [attr.aria-label]="spec().attr2.label + ' of ' + item.text"
+                  (change)="onAttr(item, 2, $event)"
+                >
+                  @for (c of specOf(2).choices; track c.key) {
+                    <option [value]="c.key" [selected]="item.attr2 === c.key" [disabled]="isChoiceDisabled(2, c.key)">
+                      {{ c.label }}{{ isChoiceDisabled(2, c.key) ? ' · ' + whatsappNote : '' }}
+                    </option>
+                  }
+                </select>
+              </td>
+              @if (kind() === 'DIAGNOSIS') {
+                <td>{{ code(item) ?? '' }}</td>
+              }
+              <td class="faint">{{ addedOn(item) }}</td>
+              <td class="faint">{{ item.addedByName ?? '—' }}</td>
+              <td>
+                <button
+                  type="button"
+                  role="switch"
+                  class="sw"
+                  [attr.aria-checked]="item.active"
+                  [attr.aria-label]="toggleLabel(item)"
+                  [disabled]="disabled()"
+                  data-act="toggle-active"
+                  (click)="toggleActive(item)"
+                ></button>
+              </td>
+              <td>
+                @if (!disabled()) {
+                  <button type="button" class="rm" [attr.aria-label]="'Delete ' + item.text" data-act="remove" (click)="remove(item)">
+                    <app-icon name="x" [size]="14" />
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (empty()) {
+    <p class="emptytext" [class.bad]="bad()" data-testid="list-empty">{{ spec().empty }}</p>
+  }
+
+  @if (!disabled()) {
+    <div class="quick" role="group" aria-label="Your most used">
+      <span class="qlabel" title="Ranked by how often you used each one and how recently">
+        <app-icon name="star" [size]="13" /> Your most used:
+      </span>
+      @for (q of visibleQuick(); track q.itemKey) {
+        <button type="button" class="qchip" [attr.aria-label]="'Add ' + q.text" data-act="add-quick" (click)="pick(q)">
+          + {{ q.text }}
+          @if (q.meta) {
+            <span class="faint t-xs">{{ q.meta }}</span>
+          }
+        </button>
+      }
+      @if (quickFailed()) {
+        <span class="err-text" role="alert">
+          We could not load the list.
+          <button type="button" class="linkbtn" data-act="retry-quick" (click)="loadQuick()">Try again</button>
+          You can still type and tap Add.
+        </span>
+      }
+    </div>
+  }
+
+  @if (notice(); as message) {
+    <p class="err-text" role="alert" data-testid="list-notice">{{ message }}</p>
+  }
+
+  @if (toast(); as message) {
+    <div class="toast" role="status" data-testid="list-toast">
+      {{ message }}
+      @if (undoItems()) {
+        <button type="button" class="undo" data-act="undo" (click)="undo()">Undo</button>
+      }
+    </div>
+  }
+</section>

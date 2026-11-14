@@ -31,16 +31,18 @@ public class ModulesService {
 
     private final ModuleEntitlementRepository repository;
     private final TenantRepository tenantRepository;
+    private final TeamRepository teamRepository;
     private final OwnerGuard ownerGuard;
     private final AuditLog auditLog;
     private final Clock clock;
     private final boolean ownerIpdTrial;
 
     public ModulesService(ModuleEntitlementRepository repository, TenantRepository tenantRepository,
-                           OwnerGuard ownerGuard, AuditLog auditLog, Clock clock,
+                           TeamRepository teamRepository, OwnerGuard ownerGuard, AuditLog auditLog, Clock clock,
                            @Value("${sahaj.modules.owner-ipd-trial:false}") boolean ownerIpdTrial) {
         this.repository = repository;
         this.tenantRepository = tenantRepository;
+        this.teamRepository = teamRepository;
         this.ownerGuard = ownerGuard;
         this.auditLog = auditLog;
         this.clock = clock;
@@ -48,8 +50,8 @@ public class ModulesService {
     }
 
     @Transactional(readOnly = true)
-    public ModulesView get(UUID tenantId, String roleName) {
-        return view(tenantId, roleName, repository.find(tenantId).orElse(ModuleEntitlements.DEFAULTS));
+    public ModulesView get(UUID tenantId, UUID userId, String roleName) {
+        return view(tenantId, userId, roleName, repository.find(tenantId).orElse(ModuleEntitlements.DEFAULTS));
     }
 
     @Transactional
@@ -62,12 +64,12 @@ public class ModulesService {
             throw ipdNotOff();
         }
         if (before.ipdRequestedAt() != null) {
-            return view(tenantId, roleName, before);
+            return view(tenantId, actorUserId, roleName, before);
         }
         EntitlementRow after = new EntitlementRow(before.ipdState(), before.ipdTrialEndsAt(), before.hraOn(),
                 before.bedLimit(), now);
         save(tenantId, actorUserId, "MODULE_IPD_REQUESTED", before, after);
-        return view(tenantId, roleName, after);
+        return view(tenantId, actorUserId, roleName, after);
     }
 
     @Transactional
@@ -85,7 +87,7 @@ public class ModulesService {
         EntitlementRow after = new EntitlementRow("trial", now.plus(TRIAL_LENGTH), before.hraOn(),
                 before.bedLimit(), before.ipdRequestedAt());
         save(tenantId, actorUserId, "MODULE_IPD_TRIAL_STARTED", before, after);
-        return view(tenantId, roleName, after);
+        return view(tenantId, actorUserId, roleName, after);
     }
 
     @Transactional
@@ -97,12 +99,12 @@ public class ModulesService {
         repository.lockForWrite(tenantId, ModuleEntitlements.DEFAULTS, actorUserId);
         EntitlementRow before = repository.find(tenantId).orElse(ModuleEntitlements.DEFAULTS);
         if (before.hraOn() == on) {
-            return view(tenantId, roleName, before);
+            return view(tenantId, actorUserId, roleName, before);
         }
         EntitlementRow after = new EntitlementRow(before.ipdState(), before.ipdTrialEndsAt(), on,
                 before.bedLimit(), before.ipdRequestedAt());
         save(tenantId, actorUserId, "MODULE_HRA_CHANGED", before, after);
-        return view(tenantId, roleName, after);
+        return view(tenantId, actorUserId, roleName, after);
     }
 
     private void save(UUID tenantId, UUID actorUserId, String action, EntitlementRow before, EntitlementRow after) {
@@ -110,20 +112,22 @@ public class ModulesService {
         auditLog.record(action, ENTITY_TYPE, tenantId, snapshot(before), snapshot(after));
     }
 
-    private ModulesView view(UUID tenantId, String roleName, EntitlementRow row) {
+    private ModulesView view(UUID tenantId, UUID userId, String roleName, EntitlementRow row) {
         String plan = tenantRepository.findProfile(tenantId)
                 .orElseThrow(() -> new IllegalStateException("The signed-in clinic was not found"))
                 .plan();
         MembershipRole role = MembershipRole.valueOf(roleName);
         String state = ModuleEntitlements.effectiveIpdState(row, clock.instant());
         boolean requested = row.ipdRequestedAt() != null;
+        boolean doctorDetails = role == MembershipRole.OWNER && teamRepository.findByUser(tenantId, userId)
+                .map(TeamRepository.TeamRow::hasDoctorProfile).orElse(false);
         NavigationPolicy.ModuleFlags flags = new NavigationPolicy.ModuleFlags(row.hraOn(), !"off".equals(state),
                 "trial".equals(state) || "on".equals(state));
         return new ModulesView("FREE".equals(plan) ? "FREE" : "PRO",
                 new ModulesView.Ipd(state, row.ipdTrialEndsAt(), requested, row.ipdRequestedAt()),
                 ownerIpdTrial && "off".equals(state), row.hraOn(),
-                new ModulesView.MenuCounts(NavigationPolicy.menuFor(role, "simple", flags).size(),
-                        NavigationPolicy.menuFor(role, "advanced", flags).size()));
+                new ModulesView.MenuCounts(NavigationPolicy.menuFor(role, "simple", flags, doctorDetails).size(),
+                        NavigationPolicy.menuFor(role, "advanced", flags, doctorDetails).size()));
     }
 
     private static ConflictException ipdNotOff() {

@@ -359,7 +359,7 @@ class EmergencyTableIT extends EmergencySupport {
         // the constraint exists exactly as designed and holds for every stored row
         assertThat(ownerText("select pg_get_constraintdef(oid) from pg_constraint where conname = 'ck_emergency_case_patient_admitted' "
                 + "and conrelid = 'ipd.emergency_case'::regclass")).contains("patient_id IS NULL").contains("ADMITTED");
-        assertThat(ownerText("select count(*)::text from ipd.emergency_case where patient_id is not null and status <> 'ADMITTED'"))
+        assertThat(ownerText("select count(*)::text from ipd.emergency_case where patient_id is not null and status not in ('ADMITTED', 'SENT_TO_OPD')"))
                 .isEqualTo("0");
     }
 

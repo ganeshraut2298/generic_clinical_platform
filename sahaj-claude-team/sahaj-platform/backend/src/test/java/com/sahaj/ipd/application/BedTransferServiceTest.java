@@ -104,7 +104,8 @@ class BedTransferServiceTest {
         AdmissionService sheets = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team,
                 patients, patientAccess, mock(ActorDirectoryPort.class), gate, catalog, charges,
                 new IpdBilling(charges, transfers, catalog), mock(DischargeRepository.class),
-                mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class), ScopeStubs.unscoped(), ScopeStubs.repository());
+                mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class), ScopeStubs.unscoped(), ScopeStubs.repository(),
+                mock(com.sahaj.opd.api.EmrAdmissionRequestPort.class));
         service = new BedTransferService(admissions, beds, wards, settings, transfers, ownerGuard, auditLog,
                 patientAccess, gate, catalog, sheets, guard);
 

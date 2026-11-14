@@ -531,4 +531,28 @@ describe('AdmittedPanelComponent', () => {
     expect(names(again)).toEqual(['Asha Patil']);
     expect(q(again, '[data-testid=admitted-cards]').classList.contains('cols-2')).toBe(true);
   });
+
+  describe('Open EMR (SAH-46-1)', () => {
+    it('is not drawn on a card unless the user may open the EMR', () => {
+      const view = render(listOf());
+      expect(view.querySelector('[data-act=open-emr]')).toBeNull();
+    });
+
+    it('is drawn on every card for a doctor, and passes up the admission of the card', () => {
+      const list = listOf();
+      fixture = TestBed.createComponent(AdmittedPanelComponent);
+      fixture.componentRef.setInput('list', list);
+      fixture.componentRef.setInput('canOpenEmr', true);
+      const opened: string[] = [];
+      fixture.componentInstance.openEmrRecord.subscribe((id) => opened.push(id));
+      const view = fixture.nativeElement as HTMLElement;
+      mounted.push(view);
+      document.body.appendChild(view);
+      fixture.detectChanges();
+      const buttons = view.querySelectorAll<HTMLButtonElement>('[data-act=open-emr]');
+      expect(buttons.length).toBe(list.items.length);
+      buttons[0].click();
+      expect(opened).toEqual([list.items[0].id]);
+    });
+  });
 });

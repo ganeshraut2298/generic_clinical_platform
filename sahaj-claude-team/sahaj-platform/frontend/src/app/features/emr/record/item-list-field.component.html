@@ -1,0 +1,72 @@
+<div class="il">
+  @if (entries().length > 0) {
+    <ul class="chosen" [attr.aria-label]="field().label + ' chosen'">
+      @for (e of entries(); track $index) {
+        <li class="chip">
+          <span class="txt">{{ e.text }}</span>
+          @if (e.newToList) {
+            <span class="pill p-wait">New to list</span>
+          }
+          @if (!disabled()) {
+            <button type="button" class="rm" [attr.aria-label]="'Remove ' + e.text" (click)="remove($index)">
+              <app-icon name="x" [size]="13" />
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  @if (!disabled()) {
+    @if (visibleQuick().length > 0) {
+      <div class="quick" role="group" [attr.aria-label]="'Quick add for ' + field().label">
+        @for (q of visibleQuick(); track q.itemKey) {
+          <button type="button" class="qchip" (click)="pick(q)">+ {{ q.text }}</button>
+        }
+      </div>
+    }
+
+    @if (canType()) {
+      <div class="searchrow">
+        <input
+          class="input"
+          type="search"
+          autocomplete="off"
+          [id]="inputId()"
+          [value]="query()"
+          [attr.maxlength]="200"
+          [attr.aria-label]="'Search ' + field().label"
+          [placeholder]="field().meta || 'Search'"
+          (input)="onInput($event)"
+          (keydown.enter)="onEnter($event)"
+        />
+        @if (canAddTyped()) {
+          <button type="button" class="addbtn" (click)="addTyped()">Add “{{ typedText() }}”</button>
+        }
+      </div>
+      @if (visibleResults().length > 0) {
+        <ul class="results" role="listbox" [attr.aria-label]="field().label + ' matches'">
+          @for (r of visibleResults(); track r.itemKey) {
+            <li role="option" [attr.aria-selected]="false">
+              <button type="button" class="res" (click)="pick(r)">
+                <span>{{ r.text }}</span>
+                @if (r.hint) {
+                  <span class="faint t-xs">{{ r.hint }}</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      } @else if (searchFailed()) {
+        <p class="err-text" role="alert">We could not search. Try again.</p>
+      } @else if (typedText() && !canAddFree()) {
+        <p class="faint t-xs">No match. Pick one from the list.</p>
+      }
+    }
+    @if (listError(); as message) {
+      <p class="err-text" role="alert">{{ message }}</p>
+    }
+  } @else if (entries().length === 0) {
+    <p class="faint t-xs">Nothing recorded.</p>
+  }
+</div>

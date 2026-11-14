@@ -54,6 +54,7 @@ public class RevenueService {
     private final BillRepository billRepository;
     private final BillItemRepository billItemRepository;
     private final PaymentRepository paymentRepository;
+    private final CoursePaymentRepository coursePayments;
     private final VisitBillingPort visitBillingPort;
     private final PatientLookupPort patientLookupPort;
     private final ActorDirectoryPort actorDirectoryPort;
@@ -63,7 +64,8 @@ public class RevenueService {
     public RevenueService(BillRepository billRepository, BillItemRepository billItemRepository,
                           PaymentRepository paymentRepository, VisitBillingPort visitBillingPort,
                           PatientLookupPort patientLookupPort, ActorDirectoryPort actorDirectoryPort, OwnerGuard ownerGuard,
-                          Clock clock) {
+                          Clock clock, CoursePaymentRepository coursePayments) {
+        this.coursePayments = coursePayments;
         this.billRepository = billRepository;
         this.billItemRepository = billItemRepository;
         this.paymentRepository = paymentRepository;
@@ -102,7 +104,11 @@ public class RevenueService {
 
         Map<UUID, Bill> bills = billsFor(tenantId, visits);
 
-        long collected = payments.stream().mapToLong(PaymentOfVisit::amountPaise).sum();
+        // SAH-58, DEC-042 H3: course payments are money collected too (no visit, so no doctor line and no refunds).
+        List<PaymentOfVisit> moneyIn = new ArrayList<>(payments);
+        coursePayments.findBetween(tenantId, from, to).forEach(p -> moneyIn.add(
+                new PaymentOfVisit(null, p.mode(), p.amountPaise(), null, null, p.recordedAt())));
+        long collected = moneyIn.stream().mapToLong(PaymentOfVisit::amountPaise).sum();
         long refunds = -payments.stream().mapToLong(PaymentOfVisit::amountPaise).filter(a -> a < 0).sum();
 
         Totals totals = new Totals();
@@ -143,14 +149,18 @@ public class RevenueService {
             }
         }
 
-        PaymentTotals previous = paymentRepository.totalsBetween(tenantId, previousFrom, from);
+        PaymentTotals visitPrevious = paymentRepository.totalsBetween(tenantId, previousFrom, from);
+        PaymentTotals coursePrevious = coursePayments.totalsBetween(tenantId, previousFrom, from);
+        PaymentTotals previous = new PaymentTotals(visitPrevious.netPaise() + coursePrevious.netPaise(),
+                visitPrevious.count() + coursePrevious.count());
         Instant startOfToday = today.atStartOfDay(BillingService.INDIA).toInstant();
-        long cashInDrawer = paymentRepository.sumByModeSince(tenantId, "CASH", startOfToday);
+        long cashInDrawer = paymentRepository.sumByModeSince(tenantId, "CASH", startOfToday)
+                + coursePayments.sumByModeSince(tenantId, "CASH", startOfToday);
 
         return new RevenueView(range, collected, changePercent(collected, previous), totals.billed,
                 totals.patients.size(), totals.doneBills == 0 ? 0 : totals.billed / totals.doneBills, totals.due,
-                totals.atCounter, totals.discount, refunds, cashInDrawer, days(firstDay, today, payments),
-                modes(payments), doctorViews(doctors.values()), topServices(services),
+                totals.atCounter, totals.discount, refunds, cashInDrawer, days(firstDay, today, moneyIn),
+                modes(moneyIn), doctorViews(doctors.values()), topServices(services),
                 dueViews(tenantId, dues, patientCache), sortAdjustments(adjustments));
     }
 

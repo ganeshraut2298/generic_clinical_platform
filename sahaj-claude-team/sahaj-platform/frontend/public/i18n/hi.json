@@ -1,6 +1,8 @@
 {
   "nav.today": "आज",
   "nav.queue": "कतार",
+  "nav.secondchecks": "दूसरी जाँच",
+  "nav.secondchecksCount": "प्रतीक्षा में",
   "nav.appointments": "अपॉइंटमेंट",
   "nav.patients": "मरीज़",
   "nav.followups": "फ़ॉलो-अप",

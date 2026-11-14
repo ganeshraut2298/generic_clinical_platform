@@ -72,6 +72,12 @@ public class JdbcEmergencyCaseRepository implements EmergencyCaseRepository {
             set status = :status, closed_at = :at, closed_by = :by, mobile = null, version = version + 1
             where tenant_id = :tenantId and id = :id and status in ('WAITING', 'SEEN')
             """;
+    private static final String CLOSE_SENT_TO_OPD = """
+            update ipd.emergency_case
+            set status = 'SENT_TO_OPD', patient_id = :patientId, sent_to_opd_visit_id = :visitId, closed_at = :at,
+                closed_by = :by, mobile = null, version = version + 1
+            where tenant_id = :tenantId and id = :id and status in ('WAITING', 'SEEN')
+            """;
     private static final String MARK_ADMITTED = """
             update ipd.emergency_case
             set status = 'ADMITTED', admission_id = :admissionId, patient_id = :patientId, closed_at = :at,
@@ -145,6 +151,13 @@ public class JdbcEmergencyCaseRepository implements EmergencyCaseRepository {
     public boolean close(UUID tenantId, UUID caseId, String status, Instant at, UUID by) {
         return jdbc.sql(CLOSE).param("tenantId", tenantId).param("id", caseId).param("status", status)
                 .param("at", at).param("by", by).update() == 1;
+    }
+
+    @Override
+    public boolean closeSentToOpd(UUID tenantId, UUID caseId, UUID patientId, UUID opdVisitId, Instant at, UUID by) {
+        return jdbc.sql(CLOSE_SENT_TO_OPD).param("tenantId", tenantId).param("id", caseId)
+                .param("patientId", patientId).param("visitId", opdVisitId).param("at", at).param("by", by)
+                .update() == 1;
     }
 
     @Override

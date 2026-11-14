@@ -84,11 +84,15 @@ export class AdmittedPanelComponent {
   readonly isOwner = input(false);
   /** SAH-34. The signed-in role: it decides who gets "My patients" (AC 32). */
   readonly role = input<string | undefined>(undefined);
+  /** SAH-46-1. The signed-in user may open the EMR (from `GET /emr/me`). */
+  readonly canOpenEmr = input(false);
 
   /** The name, a Transfer or a Discharge was chosen (or Open in the table). */
   readonly openAdmission = output<OpenAdmissionRequest>();
   readonly openNursing = output<string>();
   readonly openEmr = output<string>();
+  /** SAH-46-1. "Open EMR" on a card: the consultation screen for this admission. */
+  readonly openEmrRecord = output<string>();
   /** SAH-34. The button "Emergency access" was chosen; the page opens the sheet. */
   readonly openEmergencyAccess = output<void>();
 

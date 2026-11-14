@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
+import { EmrAccess } from '../../emr/emr-access.service';
 import { DEFAULT_WORKFLOW_STEPS, WorkflowStep, WorkflowVersion } from '../../workflow/workflow.model';
 import { Visit } from '../queue.model';
 import { QueueBoardPage } from './queue-board.page';
@@ -54,6 +55,12 @@ const V2 = version(2, { vitals: { on: false }, counsel: { on: true } });
 describe('QueueBoardPage', () => {
   let fixture: ComponentFixture<QueueBoardPage>;
   let http: HttpTestingController;
+  /** Stands in for `GET /emr/me`: the card button follows `canOpenVisit` (SAH-46-1). */
+  let emrAccess: { ensureLoaded: () => void; canOpen: () => boolean; canOpenVisit: (doctor: string) => boolean };
+
+  beforeEach(() => {
+    emrAccess = { ensureLoaded: () => undefined, canOpen: () => false, canOpenVisit: () => false };
+  });
 
   function flushLoad(visits: Visit[], versions: WorkflowVersion[]): void {
     http.expectOne(`${BASE}/visits/today`).flush(visits);
@@ -72,6 +79,7 @@ describe('QueueBoardPage', () => {
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
         { provide: ShellStore, useValue: { me: () => ({ userId: 'u1', role }) } },
+        { provide: EmrAccess, useValue: emrAccess },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -261,5 +269,43 @@ describe('QueueBoardPage', () => {
     const openSpy = vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => ({ subscribe: () => undefined }) } as never);
     Array.from(el.querySelectorAll('button')).find((b) => b.textContent!.includes('New token'))!.click();
     expect(openSpy).toHaveBeenCalled();
+  });
+
+  describe('Open EMR button (SAH-46-1)', () => {
+    const buttonsOf = (el: HTMLElement) => el.querySelectorAll('[data-act=\'open-emr\']');
+
+    it('is not shown when the user cannot open the EMR', async () => {
+      const el = await open('NURSE');
+      expect(buttonsOf(el).length).toBe(0);
+    });
+
+    it('is shown on each card the user may open, with the patient in its name', async () => {
+      emrAccess.canOpenVisit = () => true;
+      emrAccess.canOpen = () => true;
+      const el = await open('DOCTOR');
+      const buttons = buttonsOf(el);
+      expect(buttons.length).toBe(2);
+      expect(buttons[0].textContent).toContain('Open EMR');
+      expect(buttons[0].getAttribute('aria-label')).toBe('Open EMR for Rohit Patil');
+    });
+
+    it('is offered only on the doctors own patients', async () => {
+      emrAccess.canOpen = () => true;
+      emrAccess.canOpenVisit = (doctor) => doctor === 'd1';
+      const other: Visit = { ...WITH_DOCTOR, doctorMembershipId: 'd2' };
+      const el = await open('DOCTOR', [WAITING, other]);
+      expect(buttonsOf(el).length).toBe(1);
+    });
+
+    it('opens the EMR of the visit and calls the server once', async () => {
+      emrAccess.canOpenVisit = () => true;
+      emrAccess.canOpen = () => true;
+      const el = await open('DOCTOR', [WAITING]);
+      (buttonsOf(el)[0] as HTMLButtonElement).click();
+      const req = http.expectOne(BASE + '/emr/records/open');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ encounterType: 'OPD_VISIT', encounterId: 'v1' });
+      req.flush({}, { status: 500, statusText: 'x' });
+    });
   });
 });

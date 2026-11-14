@@ -1,0 +1,165 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  h2 {
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+.kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--muted-soft);
+  color: var(--ink-2);
+
+  &.spec {
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &.comp {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+}
+
+.switches {
+  display: flex;
+  flex-direction: column;
+}
+
+.srow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-2);
+
+  &:first-child {
+    border-top: 0;
+  }
+}
+
+.stext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slabel {
+  font-weight: 600;
+}
+
+.lock {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 0.88rem;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+}
+
+.ftext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fl {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.star {
+  color: var(--crit);
+}
+
+.ftype {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--muted-soft);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chipb {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.note {
+  font-size: 0.8rem;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--muted-soft);
+}

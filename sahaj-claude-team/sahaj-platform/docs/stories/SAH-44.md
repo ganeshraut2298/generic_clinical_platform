@@ -1,4 +1,12 @@
 # SAH-44 · Stories: Specialty templates as data, clinic overrides, EMR settings, template choice and section snapshot
+
+> **WITHDRAWN on 12 Nov 2026 (DEC-039 answer 2: rework before merge, "Variant B"). SAH-44-1, SAH-44-2, SAH-44-3 and SAH-44-4 below are replaced and must not be built, tested or reviewed any further.** The text is kept only as the record of what was approved in chat under DEC-038 and built. Where each criterion moves:
+> - **SAH-44-1** (four templates as data) → **SAH-53-1** (100-section library and 15 starter departments). Moves unchanged: global read-only data, 403 for any write, versions added by migration, no patient data. Changes: counts, field types, "unknown template" becomes 404.
+> - **SAH-44-2** (Show / Required overrides, reset, 409, audit, tenant and role checks) → **SAH-53-2** (settings, part, order), **SAH-53-3** (draft and publish, 409, audit), **SAH-53-4** (reset and undo); screen **SAH-45-2 to SAH-45-5**. Reversed: part and order may now be changed; Prescription, History and allergies and Medical alerts are no longer locked (only Allergies is); changes take effect at Publish, not at once.
+> - **SAH-44-3** (EMR settings: section panel, right panel first, default part) → dropped; replaced by "Collapsed by default" per section (**SAH-53-2**, **SAH-45-2**) and the Past visits / Case paper tabs, Past visits first (**SAH-47-6**).
+> - **SAH-44-4** (template choice, snapshot, switch for one visit) → **SAH-46-3** (department resolution and snapshot) and **SAH-53-5** (published layout read model). The order is doctor specialty, department, clinic default.
+> - The architect revises ADR-019 and `docs/api/opd.yaml` 0.2.0 and the human approves them again. Resetting the unmerged migrations in `sahaj_test` is a separate human decision. SAH-43 (masters) is kept. Details: `docs/requirements/SAH-45.md`, section "SAH-43 and SAH-44 after DEC-039".
+
 Requirement: `docs/requirements/SAH-43.md` (rules BR10 to BR18, BR3, BR26, BR28; this programme note covers SAH-44, so there is no separate SAH-44 requirement file). Module: opd.
 Mockup screen: Clinic setup → Specialty template, Case paper and Rx (nearest existing screen; the Specialty template page lists the same four templates). **This story has no screen: data and backend only.** The Clinic setup → Doctor EMR page that uses it is SAH-45 and is missing from the repo mockup; nothing here builds it.
 Roles in every story: owner, doctor, visiting doctor, nurse, front desk, billing, pharmacist (the platform also has counsellor). "Wrong role" means a signed-in clinic user whose role may not do the action; "not signed in" gets 401. The clinic always comes from the logged-in user, never from the request body.
@@ -25,6 +33,7 @@ Defaults for open questions (OQ-43-n, in the requirement) are used unless the hu
 - **SO-44-10 · Section keys and editor types** in the table below are the analyst's reading of BRD sections 4 and 5 (FR-11 maps editors to sections; "all other sections" use Chip list). Please confirm.
 
 ### SAH-44-1 · As the Sahaj team, I want the four specialty templates held as data with their sections, so that a new specialty can be added later without changing code
+Status: WITHDRAWN, replaced by SAH-53-1 (DEC-039 answer 2).
 Priority: Must
 ## Acceptance criteria
 - Given a fresh installation, when the templates are read, then four templates exist: General practice, Dental, Paediatrics, Homeopathy, each with a key, a name, a specialty and a version number. (BR10)
@@ -87,6 +96,7 @@ Section keys below are proposals (SO-44-10); the architect and db-engineer decid
 The order within each part is the BRD order. The BRD gives only the number of quick options in the setup table, not their content (OQ-43-8). "Prescription (by weight)" has no weight-based rule in the BRD (SAH-48 blocker).
 
 ### SAH-44-2 · As the owner, I want to show or hide a section and make it required or optional for my clinic, and to reset a template, so that my doctors fill only what we use
+Status: WITHDRAWN, replaced by SAH-53-2, SAH-53-3, SAH-53-4 and SAH-45-2 to SAH-45-5 (DEC-039 answer 2).
 Priority: Must
 ## Acceptance criteria
 - Given the owner and the General practice template, when they set "Local examination" to hidden, then the clinic's effective General practice template no longer has that section for visits opened after the change, and other clinics are unchanged. (BR11, BR14)
@@ -111,6 +121,7 @@ Priority: Must
 Overrides are per clinic, per template, per section (BRD). A change to Show or Required has no effect on signed visits. No numbers for speed are set. The clinic setup screen is SAH-45 and waits for the mockup.
 
 ### SAH-44-3 · As the owner, I want to choose whether the section panel opens collapsed or open and which right-hand tab shows first, so that the EMR opens the way my clinic likes
+Status: WITHDRAWN, dropped; replaced by "Collapsed by default" per section (SAH-53-2, SAH-45-2) and the tab order in SAH-47-6 (DEC-039 answer 2).
 Priority: Must
 ## Acceptance criteria
 - Given a clinic with no saved settings, when the settings are read, then they are: section panel Collapsed, right panel first Case paper, default part Assessment. (BR17)
@@ -128,6 +139,7 @@ Priority: Must
 One set of settings per clinic; the first save creates it and defaults apply before that (the same lazy pattern as other settings). Paper size and language stay in Case paper and Rx (SAH-7): this story must not copy them.
 
 ### SAH-44-4 · As a doctor, I want the EMR to pick the right template for me and keep the sections my visit opened with, so that setup changes never change a visit I started or signed
+Status: WITHDRAWN, replaced by SAH-46-3 and SAH-53-5 (DEC-039 answer 2).
 Priority: Must
 ## Acceptance criteria
 - Given a doctor whose saved specialty reads "General Physician" or "General practice", when the template is chosen, then it is General practice; "Dental Surgeon" or "Dental" gives Dental; "Paediatrician" or "Paediatrics" gives Paediatrics; "Homeopath" or "Homeopathy" gives Homeopathy. The match ignores letter case and extra spaces. The list of names is data that the product owner may extend. (BR15, OQ-43-13)
@@ -158,4 +170,5 @@ BR3 -> SAH-44-2 (override audit), SAH-44-3 (settings audit), SAH-44-4 (switch au
 All are in `docs/requirements/SAH-43.md` with defaults: OQ-43-2 (doctor edits templates: owner only), OQ-43-8 (clinical content of option lists), OQ-43-12 (who writes the EMR), OQ-43-13 (specialty mapping), OQ-43-14 (sections that cannot be hidden; allergy section for Paediatrics and Homeopathy), OQ-43-15 (label and part overrides), OQ-43-16 (default part), OQ-43-17 (new template version), OQ-43-18 (switching template after data is entered), OQ-43-19 (None option), OQ-43-20 (icons).
 
 ## Status log
-- 11 Nov 2026 · written by the business-analyst from the BRD (SAH-43-input), DEC-036, the repo mockup and the built SAH-6 and SAH-7 data. Awaiting human approval of `stories`.
+- 11 Nov 2026 · written by the business-analyst from the BRD (SAH-43-input), DEC-036, the repo mockup and the built SAH-6 and SAH-7 data. Approved in chat (DEC-038).
+- 12 Nov 2026 · WITHDRAWN (DEC-039 answer 2, Variant B). Not for approval, build or test. Replacement stories: SAH-53, SAH-45, SAH-46.

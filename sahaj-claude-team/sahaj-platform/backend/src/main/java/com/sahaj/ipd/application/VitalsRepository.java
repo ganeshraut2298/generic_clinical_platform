@@ -39,6 +39,12 @@ public interface VitalsRepository {
      */
     Map<UUID, LatestScore> findLatestReadingsOfAdmitted(UUID tenantId);
 
+    /** SAH-68-1: the newest record recorded on this Asia/Kolkata day, if any. */
+    Optional<VitalsRow> findLatestOnDay(UUID tenantId, UUID admissionId, java.time.LocalDate day);
+
+    /** SAH-68-1: the newest record recorded before this Asia/Kolkata day, if any. */
+    Optional<VitalsRow> findLatestBeforeDay(UUID tenantId, UUID admissionId, java.time.LocalDate day);
+
     /** The record stored with this client key, in any admission of the clinic. */
     Optional<VitalsRow> findByClientKey(UUID tenantId, UUID clientKey);
 

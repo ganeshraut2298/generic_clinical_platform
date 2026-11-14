@@ -59,6 +59,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import com.sahaj.ipd.application.AdmissionRequestService;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -84,6 +85,9 @@ class AdmissionControllerTest {
 
     @MockBean
     private AdmissionService service;
+
+    @MockBean
+    private AdmissionRequestService requestService;
 
     private static RequestPostProcessor as(String role) {
         return TestTenantSecurity.asUser(TENANT_ID, USER_ID, role);

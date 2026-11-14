@@ -49,6 +49,14 @@ export const SHELL_ROUTES: Routes = [
         loadChildren: () => import('../revenue/revenue.routes').then((m) => m.REVENUE_ROUTES),
       },
       {
+        path: 'emr',
+        loadChildren: () => import('../emr/emr.routes').then((m) => m.EMR_ROUTES),
+      },
+      {
+        path: 'courses',
+        loadChildren: () => import('../emr/course/course.routes').then((m) => m.COURSE_ROUTES),
+      },
+      {
         path: 'staff',
         loadChildren: () => import('../staff/staff.routes').then((m) => m.STAFF_ROUTES),
       },

@@ -1,0 +1,208 @@
+.wchart {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+
+  .plot {
+    fill: var(--surface-2);
+  }
+
+  .guide {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.5;
+
+    &.mid {
+      stroke: var(--ink-3);
+    }
+  }
+
+  .trace {
+    fill: none;
+    stroke: var(--pri);
+    stroke-width: 2.5;
+  }
+
+  .pt {
+    fill: var(--pri);
+    stroke: var(--surface);
+    stroke-width: 2;
+  }
+
+  text {
+    font-size: 10px;
+    fill: var(--ink-3);
+  }
+}
+
+.legend .lg {
+  padding: 2px 10px;
+  border-radius: var(--r-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+
+  &.given {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+  &.due {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &.over {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+}
+
+.sched {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.grow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+
+  &:first-child {
+    border-top: 0;
+  }
+
+  &.hot {
+    background: var(--warn-soft);
+  }
+
+  .age {
+    flex: 0 0 110px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+}
+
+.vac {
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ink-2);
+  background: var(--surface-2);
+
+  &[data-state='GIVEN'] {
+    background: var(--good-soft);
+    color: var(--good);
+    cursor: default;
+  }
+  &[data-state='TODAY'] {
+    background: var(--good);
+    color: var(--pri-ink);
+  }
+  &[data-state='DUE_TODAY'] {
+    border: 1px dashed var(--warn);
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &[data-state='OVERDUE'] {
+    border: 1px dashed var(--crit);
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+  &:disabled:not([data-state='GIVEN']) {
+    cursor: default;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+  }
+}
+
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 600;
+
+  input {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.ms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  .mark {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--pri-ink);
+    background: var(--warn);
+
+    &[data-on='true'] {
+      background: var(--good);
+    }
+  }
+}
+
+.warnText {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.dose {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  b {
+    font-size: 1.125rem;
+  }
+}

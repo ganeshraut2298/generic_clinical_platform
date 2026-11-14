@@ -71,6 +71,10 @@ export interface AdmissionInput {
   consentSigned: boolean;
   /** SAH-28. The emergency case this admission comes from (source EMERGENCY). */
   emergencyCaseId?: string | null;
+  /** SAH-58-2 (ipd.yaml 0.2.0). The planned day-care or IPD sitting of a treatment course this admission does ("Admit now"). */
+  treatmentCourseSittingId?: string | null;
+  /** SAH-67-3 (ipd.yaml 0.3.0). The open EMR admission request this admission completes. */
+  admissionRequestId?: string | null;
 }
 
 export interface AdmissionRow {
@@ -192,6 +196,8 @@ export interface AdmittedClinicalFlags {
   diagnosis?: string;
   /** SAH-37. Present only when a vital reading or Last recorded is shown; null when none was recorded. */
   latestVitals?: CardLatestVitals | null;
+  /** 0.3.0 (SAH-67-1, ADR-025 D8). A doctor signed today's progress note in the EMR: the flag "Round done". For OWNER, DOCTOR and NURSE. */
+  roundDoneToday?: boolean;
 }
 
 /** SAH-36 `AdmittedPatientRow`: `AdmissionRow` plus the card facts. */

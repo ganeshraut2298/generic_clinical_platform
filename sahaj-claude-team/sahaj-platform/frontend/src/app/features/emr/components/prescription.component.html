@@ -1,0 +1,184 @@
+<section class="rx" [class.bad]="bad()" [attr.aria-labelledby]="inputId() + '-t'">
+  <header class="head">
+    <h3 [id]="inputId() + '-t'">
+      {{ title() }}@if (required()) {<span class="star" aria-hidden="true"> *</span><span class="sr-only"> (required)</span>}
+    </h3>
+    @if (showRepeat()) {
+      <div class="acts">
+        <button type="button" class="act" [disabled]="!canRepeat() || copying()" data-act="repeat-last" (click)="repeatLast()">
+          Repeat last Rx
+        </button>
+        <button type="button" class="act" [disabled]="rows().length === 0" data-act="clear-all" (click)="clearAll()">Clear all</button>
+        @if (!canRepeat()) {
+          <span class="faint t-xs" data-testid="no-earlier">No earlier prescription</span>
+        }
+      </div>
+    } @else if (!disabled()) {
+      <div class="acts">
+        <button type="button" class="act" [disabled]="rows().length === 0" data-act="clear-all" (click)="clearAll()">Clear all</button>
+      </div>
+    }
+  </header>
+
+  @for (a of alerts(); track a.rowId) {
+    <div class="alert" role="alert" data-testid="allergy-alert">
+      <app-icon name="alert" [size]="18" />
+      <div class="atext">
+        <span>{{ alertMessage(a) }}</span>
+        <label class="ack">
+          <input
+            type="checkbox"
+            [checked]="a.reviewed"
+            [disabled]="disabled()"
+            data-act="review"
+            (change)="setReviewed(a.rowId, a.allergyClass, $event)"
+          />
+          I have reviewed the alert and want to prescribe anyway
+        </label>
+      </div>
+      @if (!disabled()) {
+        <button type="button" class="act" data-act="remove-flagged" (click)="removeFlagged(a.rowId)">Remove it</button>
+      }
+    </div>
+  }
+
+  @if (!disabled()) {
+    <div class="searchrow">
+      <label class="search">
+        <span>Search medicines</span>
+        <input
+          class="input"
+          type="search"
+          autocomplete="off"
+          [id]="inputId()"
+          [value]="query()"
+          [attr.maxlength]="160"
+          placeholder="Type a generic name, e.g. telmisartan"
+          (input)="onQuery($event)"
+          (keydown.enter)="onEnter($event)"
+        />
+      </label>
+      @if (visibleResults().length > 0 || canAddTyped()) {
+        <div class="results" role="group" aria-label="Medicine matches">
+          @for (r of visibleResults(); track r.medicineId) {
+            <button type="button" class="opt" data-act="add-result" (click)="addOption(r, 'SEARCH')">
+              + {{ r.name }}
+              <span class="faint t-xs">{{ r.form }}{{ r.allergyClass === 'SULFA' ? ' · contains a sulfa drug' : '' }}</span>
+            </button>
+          }
+          @if (canAddTyped()) {
+            <button type="button" class="opt create" data-act="add-typed" (click)="addTyped()">
+              + Add “{{ query().trim() }}” as typed medicine
+            </button>
+          }
+        </div>
+      }
+      @if (searchFailed()) {
+        <p class="err-text" role="alert">We could not search. You can still type a name and tap Add.</p>
+      }
+    </div>
+  }
+
+  <div class="tablewrap" tabindex="0" role="region" [attr.aria-label]="title() + ' medicines'">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th scope="col">Medicine (generic first)</th>
+          <th scope="col">How often</th>
+          <th scope="col">For how long</th>
+          <th scope="col">When</th>
+          <th scope="col"><span class="sr-only">Remove</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.id) {
+          <tr [class.flag]="alertRows().has(row.id)">
+            <td>
+              <span class="nm">{{ row.name }}</span>
+              @if (subline(row); as sub) {
+                <span class="sub">{{ sub }}</span>
+              }
+            </td>
+            <td>
+              @if (row.frequency === null) {
+                <span class="sub" data-testid="rx-fixed-text">{{ row.frequencyText }}</span>
+              } @else {
+                <div class="pills" role="group" [attr.aria-label]="'How often for ' + row.name">
+                  @for (f of frequencies; track f.key) {
+                    <button
+                      type="button"
+                      class="pill-btn"
+                      [attr.aria-pressed]="row.frequency === f.key"
+                      [disabled]="disabled()"
+                      (click)="setFrequency(row, f.key)"
+                    >
+                      {{ f.label }}
+                    </button>
+                  }
+                </div>
+              }
+            </td>
+            <td>
+              <div class="days">
+                <button type="button" class="step" aria-label="Fewer days" [disabled]="disabled() || row.days <= 1" (click)="stepDays(row, -1)">−</button>
+                <span class="num" [attr.aria-label]="row.days + ' days'">{{ row.days }} d</span>
+                <button type="button" class="step" aria-label="More days" [disabled]="disabled() || row.days >= 365" (click)="stepDays(row, 1)">+</button>
+              </div>
+            </td>
+            <td>
+              <select class="attr" [disabled]="disabled()" [attr.aria-label]="'When to take ' + row.name" (change)="setWhen(row, $event)">
+                @for (w of whenChoices; track w.key) {
+                  <option [value]="w.key" [selected]="row.when === w.key">{{ w.label }}</option>
+                }
+              </select>
+            </td>
+            <td>
+              @if (!disabled()) {
+                <button type="button" class="rm" [attr.aria-label]="'Remove ' + row.name" data-act="remove" (click)="remove(row)">
+                  <app-icon name="x" [size]="14" />
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5" class="emptytext" [class.bad]="bad()" data-testid="rx-empty">
+              No medicines yet. Use quick add below or repeat the last prescription.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (!disabled()) {
+    <div class="quick" role="group" aria-label="My favourites">
+      <span class="qlabel">My favourites:</span>
+      @for (f of visibleFavourites(); track f.medicineId) {
+        <button type="button" class="qchip" [attr.aria-label]="'Add ' + f.name" data-act="add-favourite" (click)="addOption(f, 'FAVOURITE')">
+          + {{ f.name }}
+        </button>
+      }
+      @if (favouritesFailed()) {
+        <span class="err-text" role="alert">
+          We could not load your favourites.
+          <button type="button" class="linkbtn" data-act="retry-favourites" (click)="loadFavourites()">Try again</button>
+        </span>
+      }
+    </div>
+  }
+
+  <p class="faint t-xs" data-testid="safety-line">{{ safetyLine }}</p>
+
+  @if (notice(); as message) {
+    <p class="err-text" role="alert" data-testid="rx-notice">{{ message }}</p>
+  }
+  @if (toast(); as message) {
+    <div class="toast" role="status" data-testid="rx-toast">
+      {{ message }}
+      @if (undoRows()) {
+        <button type="button" class="undo" data-act="undo" (click)="undo()">Undo</button>
+      }
+    </div>
+  }
+</section>

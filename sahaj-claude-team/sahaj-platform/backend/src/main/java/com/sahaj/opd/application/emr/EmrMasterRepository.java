@@ -9,7 +9,8 @@ import java.util.UUID;
  */
 public interface EmrMasterRepository {
 
-    record MasterItemRow(UUID id, String name, String specialtyHint) {
+    /** {@code nameMr} and {@code nameHi} are set for the advice master only (ADR-020 D13). */
+    record MasterItemRow(UUID id, String name, String specialtyHint, String nameMr, String nameHi) {
     }
 
     record MasterPageRow(List<MasterItemRow> items, long total) {
@@ -17,7 +18,7 @@ public interface EmrMasterRepository {
 
     /** One ranked item. {@code icd10Code}, {@code form} and {@code favourite} are set for their own master only. */
     record QuickOptionRow(String itemKey, String name, String icd10Code, String form, Boolean favourite,
-                          int useCount, java.time.Instant lastUsedAt) {
+                          int useCount, java.time.Instant lastUsedAt, String nameMr, String nameHi) {
     }
 
     /**

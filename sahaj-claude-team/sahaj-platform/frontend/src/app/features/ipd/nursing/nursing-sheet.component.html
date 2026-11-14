@@ -124,6 +124,15 @@
             </div>
           }
 
+          @if (s.latestRound; as round) {
+            <div class="pcnotes" data-testid="latest-round">
+              <b>Round done · {{ roundTime(round.signedAt) }} IST · {{ round.doctorName }}</b>
+              @if (round.investigationsAdvised; as advised) {
+                <span class="notetext">Investigations advised: {{ advised }}</span>
+              }
+            </div>
+          }
+
           <div class="pcnotes" data-testid="nursing-notes">
             <b>Recent notes</b>
             @for (n of s.recentNotes; track n.id) {

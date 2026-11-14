@@ -35,6 +35,15 @@ class DiagnosisServiceTest {
     }
 
     @Test
+    void aStarterKeyIsMappedToTheSah7SpecialtyCode() {
+        service.search("a", "gm", 0);
+
+        verify(repository).search("a", "gp", 20, 0);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.search("a", "homeo", 0))
+                .isInstanceOf(com.sahaj.platform.api.InvalidInputException.class);
+    }
+
+    @Test
     void aSpecialtyThatIsNotOneOfTheFourOrAPageOutOfRangeIsRefused() {
         assertThatThrownBy(() -> service.search("a", "ayur", 0)).isInstanceOf(InvalidInputException.class);
         assertThatThrownBy(() -> service.search("a", null, 501)).isInstanceOf(InvalidInputException.class);

@@ -1,0 +1,202 @@
+<div class="head">
+  <span class="tick" aria-hidden="true"><app-icon name="check" [size]="20" /></span>
+  <div class="ht">
+    <h2 mat-dialog-title id="finish-title">{{ titles().title }}</h2>
+    <span class="sub faint" data-testid="finish-sub">{{ subtitle() }}</span>
+  </div>
+</div>
+
+<mat-dialog-content class="body">
+  @if (check(); as c) {
+    <div class="sum" data-testid="finish-summary">
+      @for (row of rows(); track $index) {
+        <div class="srow">
+          <span class="sl">{{ row.label }}</span>
+          <span class="st">{{ row.text }}</span>
+        </div>
+      }
+    </div>
+
+    @if (triage(); as t) {
+      <div class="srow" data-testid="finish-triage">
+        <span class="sl">Triage level</span>
+        <span class="st">{{ t.triageLevelName }}</span>
+      </div>
+      <div class="srow" data-testid="finish-outcome">
+        <span class="sl">ER outcome</span>
+        <span class="st">
+          {{ t.outcome ? outcomeLabel[t.outcome] : 'Not chosen' }}
+          <button type="button" class="linkbtn" data-act="change-outcome" (click)="flow.changeOutcome()">Change</button>
+        </span>
+      </div>
+    }
+
+    @if (c.info.length > 0) {
+      <ul class="info" aria-label="For your information">
+        @for (line of c.info; track $index) {
+          <li data-testid="finish-info">{{ line }}</li>
+        }
+      </ul>
+    }
+
+    @if (stageText(); as text) {
+      <p class="eff" data-testid="finish-stage">{{ text }}</p>
+    }
+
+    @for (line of followUpLines(); track $index) {
+      <p class="eff" data-testid="finish-followup">{{ line }}</p>
+    }
+
+    @if (lines().length > 0) {
+      <div class="eff" data-testid="finish-profile">
+        @for (line of lines(); track $index) {
+          <span class="pline">{{ line }}</span>
+        }
+      </div>
+    }
+
+    @if (billLines().length > 0) {
+      <div class="eff" data-testid="finish-bill">
+        <b>{{ profile() === 'dental' ? 'Services' : 'Bill lines' }}</b>
+        <ul>
+          @for (l of billLines(); track $index) {
+            <li [class.billed]="l.state === 'ALREADY_BILLED'">{{ billText(l) }}</li>
+          }
+        </ul>
+      </div>
+    }
+    @if (effects().billTotalPaise; as total) {
+      <span class="faint t-xs" data-testid="finish-total">Total {{ formatPaise(total) }}</span>
+    }
+
+    @if (dental(); as d) {
+      <div class="eff" data-testid="finish-dental">
+        <span class="faint t-xs">Estimate total {{ formatPaise(d.estimateTotalPaise) }}</span>
+        @if (!d.allRowsDone) {
+          <fieldset class="chips">
+            <legend>Next sitting</legend>
+            @for (c of dentalChoices; track c.key) {
+              <button type="button" class="chip" [attr.data-interval]="c.key" [attr.aria-pressed]="flow.dentalInterval() === c.key" (click)="pickDental(c.key)">
+                {{ c.label }}
+              </button>
+            }
+          </fieldset>
+          @for (line of dentalNext(); track $index) {
+            <span class="faint t-xs" data-testid="finish-next-sitting">{{ line }}</span>
+          }
+        }
+      </div>
+    }
+
+    @if (physio(); as ph) {
+      @if (encounter() === 'OPD_VISIT' && ph.nextSessionNo !== null && !ph.packageComplete) {
+        <div class="eff" data-testid="finish-physio">
+          @let slots = flow.freeSlots();
+          @if (slots && slots.length > 0) {
+            <fieldset class="chips">
+              <legend>Book session {{ ph.nextSessionNo }}</legend>
+              @for (s of slots; track s.date + s.time) {
+                <button type="button" class="chip" data-act="pick-slot" [attr.aria-pressed]="flow.physioSlot()?.date === s.date && flow.physioSlot()?.time === s.time" (click)="pickSlot(s)">
+                  {{ slotLabel(s) }}
+                </button>
+              }
+            </fieldset>
+          } @else if (slots) {
+            <span class="faint t-xs">No free slot. Pick a date from Appointments.</span>
+          }
+          @if (flow.slotError(); as slotMessage) {
+            <div class="notice err" role="alert" data-testid="finish-slot-error">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ slotMessage }}</span>
+            </div>
+          }
+        </div>
+      }
+    }
+
+    @if (patientRecord(); as p) {
+      @if (p.text) {
+        <p class="eff" [class.warn]="p.conflict" data-testid="finish-patient">{{ p.text }}</p>
+      }
+      @if (p.removals.length > 0 && !p.conflict) {
+        <label class="tick-row">
+          <input type="checkbox" data-act="remove-allergy" [checked]="flow.removeAllergy()" (change)="toggleRemoval($event)" />
+          Remove from the patient record: {{ p.removals.join(', ') }}
+        </label>
+      }
+    }
+
+    @if (effects().investigationsAdvised; as text) {
+      <p class="eff" data-testid="finish-investigations">Nursing will see: Investigations advised: {{ text }}</p>
+    }
+
+    @for (o of effects().ipdOrders ?? []; track o.rowId) {
+      <div class="order" [class.bad]="o.outcome === 'BLOCKED'" data-testid="finish-order">
+        <b>{{ o.drugName }}</b> · {{ o.frequencyLabel }}
+        @switch (o.outcome) {
+          @case ('BLOCKED') {
+            <p class="oerr" role="alert">Not ordered: {{ o.texts[0] }}</p>
+            <button type="button" class="linkbtn" data-act="remove-order" (click)="removeOrder(o.rowId)">Remove this medicine</button>
+          }
+          @case ('NEEDS_REASON') {
+            @for (t of o.texts; track $index) {
+              <p class="owarn">{{ t }}</p>
+            }
+            <label class="reason">
+              <span>Reason to continue (recorded in the audit trail)</span>
+              <select class="input" data-act="order-reason" [value]="flow.orderReasons()[o.rowId] ?? ''" (change)="pickReason(o.rowId, $event)">
+                <option value="">Choose a reason</option>
+                @for (r of reasons(); track r.key) {
+                  <option [value]="r.key">{{ r.label }}</option>
+                }
+              </select>
+            </label>
+          }
+          @case ('ORDERED') {
+            <span class="faint t-xs"> Already ordered.</span>
+          }
+        }
+      </div>
+    }
+
+    @if (printLine(); as text) {
+      <p class="faint t-xs" data-testid="finish-print">{{ text }}</p>
+    }
+    @if (extraPrintsLine(); as text) {
+      <p class="faint t-xs" data-testid="finish-prints">{{ text }}</p>
+    }
+
+    <label class="share" aria-describedby="finish-wa-note">
+      <input type="checkbox" disabled data-testid="finish-whatsapp" />
+      Send prescription to patient on WhatsApp
+    </label>
+    <span class="faint t-xs" id="finish-wa-note">{{ whatsappNote }}</span>
+
+    @if (flow.signError(); as message) {
+      <div class="notice err" role="alert" data-testid="finish-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        @if (store.conflict()) {
+          <button type="button" mat-stroked-button data-act="finish-reload" (click)="store.reload(); backToEdit()">Reload</button>
+        } @else {
+          <button type="button" mat-stroked-button data-act="finish-retry" [disabled]="flow.signing()" (click)="confirm()">Try again</button>
+        }
+      </div>
+    }
+  } @else {
+    <p class="faint" aria-busy="true">Checking the visit</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button type="button" mat-stroked-button data-act="back-to-edit" [disabled]="flow.signing()" (click)="backToEdit()">{{ titles().back }}</button>
+  <button
+    type="button"
+    mat-flat-button
+    data-act="finish-confirm"
+    [disabled]="!flow.canConfirm() || flow.checking()"
+    (click)="confirm()"
+  >
+    {{ flow.signing() ? 'Signing' : titles().confirm }}
+  </button>
+</mat-dialog-actions>

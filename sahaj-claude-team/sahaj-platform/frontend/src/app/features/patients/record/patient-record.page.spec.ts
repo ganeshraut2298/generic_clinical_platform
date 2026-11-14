@@ -3,7 +3,6 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
@@ -19,6 +18,7 @@ const PATIENT: Patient = {
   uhid: 'PT-00001',
   name: 'Rohit Patil',
   age: 30,
+  ageDetail: { value: 30, unit: 'YEARS', fromDateOfBirth: false },
   sex: 'M',
   mobile: '9876543210',
   area: 'Kothrud',
@@ -33,6 +33,7 @@ const SISTER: PatientSummary = {
   uhid: 'PT-00002',
   name: 'Sunita Patil',
   age: 28,
+  ageDetail: { value: 28, unit: 'YEARS', fromDateOfBirth: false },
   sex: 'F',
   mobile: '9876543210',
 };
@@ -49,6 +50,7 @@ describe('PatientRecordPage', () => {
     id = 'p1',
     privacy: PrivacySettings = ON,
     consents: PatientConsentState = NONE,
+    patient: Patient = PATIENT,
   ) {
     await TestBed.configureTestingModule({
       imports: [PatientRecordPage],
@@ -66,7 +68,7 @@ describe('PatientRecordPage', () => {
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(PatientRecordPage);
     fixture.detectChanges();
-    http.expectOne(`${BASE}/${id}`).flush(PATIENT);
+    http.expectOne(`${BASE}/${id}`).flush(patient);
     http.expectOne(`${BASE}/${id}/family`).flush([SISTER]);
     http.expectOne('/api/v1/platform/privacy').flush(privacy);
     http.expectOne(`${BASE}/${id}/consents`).flush(consents);
@@ -124,12 +126,74 @@ describe('PatientRecordPage', () => {
     expect(data.data).toEqual({ familyMember: true, mobile: '9876543210' });
   });
 
-  it('shows a coming-soon message for Edit details', async () => {
+  it('opens the Edit details sheet for the owner and shows the saved answer', async () => {
     await open('OWNER');
-    const snackBar = TestBed.inject(MatSnackBar);
-    const openSpy = vi.spyOn(snackBar, 'open');
+    const dialog = TestBed.inject(MatDialog);
+    const updated: Patient = {
+      ...PATIENT,
+      age: 1,
+      ageDetail: { value: 17, unit: 'MONTHS', fromDateOfBirth: true },
+      dateOfBirth: '2025-06-10',
+    };
+    const openSpy = vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(updated) } as never);
     buttonByText('Edit details')!.click();
+    fixture.detectChanges();
     expect(openSpy).toHaveBeenCalled();
+    const config = openSpy.mock.calls[0][1] as { data: { patient: Patient } };
+    expect(config.data.patient.id).toBe('p1');
+    expect(el().querySelector('[data-testid="age-line"]')!.textContent).toContain('17 months · Male');
+    expect(el().querySelector('[data-testid="dob"]')!.textContent).toContain('10 Jun 2025');
+  });
+
+  it('keeps the record unchanged when the sheet is cancelled', async () => {
+    await open('FRONT_DESK');
+    const dialog = TestBed.inject(MatDialog);
+    vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(null) } as never);
+    buttonByText('Edit details')!.click();
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="age-line"]')!.textContent).toContain('30 yrs');
+  });
+
+  describe('age and date of birth (SAH-73-3)', () => {
+    const DATED: Patient = {
+      ...PATIENT,
+      age: 1,
+      ageDetail: { value: 18, unit: 'MONTHS', fromDateOfBirth: true },
+      dateOfBirth: '2025-06-13',
+      sex: 'F',
+    };
+
+    it('shows "34 yrs · Female" for an adult and no date when the record has none', async () => {
+      await open('FRONT_DESK', 'p1', ON, NONE, {
+        ...PATIENT,
+        age: 34,
+        ageDetail: { value: 34, unit: 'YEARS', fromDateOfBirth: false },
+        dateOfBirth: null,
+        sex: 'F',
+      });
+      expect(el().querySelector('[data-testid="age-line"]')!.textContent).toContain('34 yrs · Female');
+      expect(el().querySelector('[data-testid="dob"]')).toBeNull();
+    });
+
+    it('shows "18 months · Female" and the date as "13 Jun 2025"', async () => {
+      await open('DOCTOR', 'p1', ON, NONE, DATED);
+      expect(el().querySelector('[data-testid="age-line"]')!.textContent).toContain('18 months · Female');
+      expect(el().querySelector('[data-testid="dob"]')!.textContent).toContain('13 Jun 2025');
+    });
+
+    it('shows no date when the answer carries none (billing and pharmacist)', async () => {
+      const withoutDate: Patient = { ...DATED };
+      delete withoutDate.dateOfBirth;
+      await open('BILLING', 'p1', ON, NONE, withoutDate);
+      expect(el().querySelector('[data-testid="age-line"]')!.textContent).toContain('18 months');
+      expect(el().textContent).not.toContain('Date of birth');
+      expect(el().textContent).not.toContain('13 Jun 2025');
+    });
+
+    it('writes family rows with the age text of the server', async () => {
+      await open('FRONT_DESK');
+      expect(el().querySelector('.famrow small')!.textContent).toContain('28 F');
+    });
   });
 
   it('shows "Patient not found" on a 404', async () => {

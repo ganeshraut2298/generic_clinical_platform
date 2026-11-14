@@ -42,6 +42,9 @@ export function toApiError(error: HttpErrorResponse): ApiError {
         typeof body['retryAfterSeconds'] === 'number' ? body['retryAfterSeconds'] : retryFromHeader,
       triesLeft: typeof body['triesLeft'] === 'number' ? body['triesLeft'] : undefined,
       fieldErrors: readFieldErrors(body['fieldErrors']),
+      holderName: typeof body['holderName'] === 'string' ? body['holderName'] : undefined,
+      blockers: Array.isArray(body['blockers']) ? body['blockers'] : undefined,
+      rows: Array.isArray(body['rows']) ? body['rows'] : undefined,
     });
   }
   return new ApiError({

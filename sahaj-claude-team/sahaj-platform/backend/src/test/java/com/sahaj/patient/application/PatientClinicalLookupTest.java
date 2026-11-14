@@ -209,4 +209,18 @@ class PatientClinicalLookupTest {
         assertThat(lookup.findAll(TENANT, Set.of(PATIENT)).get(PATIENT).allergyText()).isEqualTo("A");
         verify(repository, org.mockito.Mockito.times(1)).findByIds(TENANT, Set.of(KEPT));
     }
+
+    @Test
+    void theChronicTextOfThePatientFileIsReturnedForTheEmrHeader() {
+        PatientRow withChronic = new PatientRow(PATIENT, "UH-000123", "Test Patient", 54, "F", "9000000001", "Area",
+                "mr", "Penicillin", "Type 2 diabetes", false, null, Instant.parse("2026-11-01T00:00:00Z"), 1L);
+        when(repository.findById(TENANT, PATIENT)).thenReturn(Optional.of(withChronic));
+
+        PatientClinical found = lookup.find(TENANT, PATIENT).orElseThrow();
+
+        assertThat(found.chronicText()).isEqualTo("Type 2 diabetes");
+        assertThat(found.allergyText()).isEqualTo("Penicillin");
+        assertThat(found.toString()).doesNotContain("diabetes");
+        assertThat(new PatientClinical(PATIENT, "UH-1", "Name", 30, "M", null).chronicText()).isNull();
+    }
 }

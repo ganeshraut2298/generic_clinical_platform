@@ -17,6 +17,7 @@ import com.sahaj.ipd.application.MedicineViews.PharmacistChecks;
 import com.sahaj.ipd.application.MedicineViews.RejectOrderInput;
 import com.sahaj.ipd.application.MedicineViews.VerifyOrderInput;
 import com.sahaj.ipd.domain.Drug;
+import com.sahaj.ipd.domain.Frequency;
 import com.sahaj.ipd.domain.MedicineSafetyCheck.Finding;
 import com.sahaj.ipd.domain.MedicineSafetyCheck.OrderCheck;
 import com.sahaj.ipd.domain.OverrideReason;
@@ -175,6 +176,54 @@ public class MedicineOrderService {
         return place(call, body, check);
     }
 
+    /**
+     * What the EMR's "Check before completing" needs (SAH-67-1, ADR-025 D8): the same checks as {@link #order}, with
+     * SAH-31's own handling of a hard stop (deny event and audit row) and of a warning (record-access row), but nothing is
+     * ordered. {@code outcome} is PASS, NEEDS_REASON, BLOCKED or ORDERED (the client key already placed an order).
+     */
+    record CheckOnly(String outcome, OrderCheck check, Drug drug, Frequency frequency) {
+
+        @Override
+        public String toString() {
+            return "CheckOnly[outcome=" + outcome + "]";
+        }
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    CheckOnly checkOnly(UUID tenantId, UUID actor, String role, UUID admissionId, MedicineOrderInput input) {
+        return checkOnlyNow(tenantId, actor, role, admissionId, input);
+    }
+
+    private CheckOnly checkOnlyNow(UUID tenantId, UUID actor, String role, UUID admissionId, MedicineOrderInput input) {
+        requireRole(role, MedicineRules.ORDER_ROLES, MedicineRules.ONLY_DOCTOR);
+        ModuleEntitlement ent = gate.check(tenantId, true);
+        Order body = MedicineRules.order(catalogue.catalogue(), input);
+        String memberRole = membershipRole(team, tenantId, actor, MedicineRules.ORDER_ROLES, MedicineRules.ONLY_DOCTOR);
+        AdmissionRow admission = admissions.find(tenantId, admissionId)
+                .orElseThrow(() -> new NotFoundException("Admission not found"));
+        PatientClinical patient = patient(tenantId, admission);
+        guard.requireAdmission(tenantId, actor, role, memberRole, admissionId, "medicine-order");
+        if (orders.findByClientKey(tenantId, body.clientKey()).isPresent()) {
+            return new CheckOnly("ORDERED", null, body.drug(), body.frequency());
+        }
+        if (!"ADMITTED".equals(admission.status())) {
+            throw notAdmitted();
+        }
+        List<OrderRow> chart = orders.findByAdmission(tenantId, admissionId);
+        OrderCheck check = assembler.safety().check(body.drug(), patient.allergyText(),
+                MedicineAssembler.liveKeys(chart, null));
+        OrderCall call = new OrderCall(tenantId, actor, role, memberRole, ent, admission, patient);
+        if (check.blocked()) {
+            recordBlocked(call, body, check);
+            return new CheckOnly("BLOCKED", check, body.drug(), body.frequency());
+        }
+        if (check.needsReason()) {
+            patientAccess.recordOpened(tenantId, admission.patientId(), actor);
+            return new CheckOnly("NEEDS_REASON", check, body.drug(), body.frequency());
+        }
+        return new CheckOnly("PASS", check, body.drug(), body.frequency());
+    }
+
     /** The values every step of {@link #order} needs; the patient is clinical data and leaves {@code toString}. */
     private record OrderCall(UUID tenantId, UUID actor, String role, String memberRole, ModuleEntitlement ent,
                              AdmissionRow admission, PatientClinical patient) {
@@ -187,6 +236,12 @@ public class MedicineOrderService {
 
     /** Step 1, a hard stop: nothing is stored; one denied event and one audit row; the answer is 200 BLOCKED. */
     private MedicineOrderAnswer blocked(OrderCall call, Order body, OrderCheck check, List<OrderRow> chart) {
+        recordBlocked(call, body, check);
+        return answer("BLOCKED", false, check, null, sheet(call, chart));
+    }
+
+    /** The deny clinical event and the IPD_MED_ORDER_BLOCKED audit row of a hard stop (also used by the EMR check). */
+    private void recordBlocked(OrderCall call, Order body, OrderCheck check) {
         UUID admissionId = call.admission().id();
         events.insert(call.tenantId(), admissionId, ClinicalEventRepository.KIND_DENY,
                 MedicineRules.blockedText(body.drug(), check.firstHardStopLogged()), call.actor());
@@ -196,7 +251,6 @@ public class MedicineOrderService {
         after.put("frequencyKey", body.frequency().key());
         after.put("status", "BLOCKED");
         auditLog.record("IPD_MED_ORDER_BLOCKED", ENTITY_ADMISSION, admissionId, null, after);
-        return answer("BLOCKED", false, check, null, sheet(call, chart));
     }
 
     /** Step 2, warnings without the reason or with a stale token: nothing is stored; one record-access row. */

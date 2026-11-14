@@ -1,0 +1,77 @@
+<aside class="panel surf" aria-label="Section settings">
+  @if (store.selectedSection(); as s) {
+    <div class="head">
+      <span class="eyebrow">Section settings</span>
+      <h2>{{ s.name }}</h2>
+      <div class="kind">
+        <span class="tag" [class.spec]="s.kind === 'SPECIALTY'" [class.comp]="s.kind === 'COMPLIANCE'">{{ kindLabel() }}</span>
+        <span class="faint t-xs">in {{ departmentName() }}</span>
+      </div>
+      <p class="muted">{{ s.description }}</p>
+    </div>
+
+    <div class="switches">
+      @for (row of rows; track row.id) {
+        <div class="srow">
+          <div class="stext">
+            <span class="slabel" [id]="'set-' + row.id">{{ row.label }}</span>
+            <span class="faint t-xs">{{ row.hint(departmentName()) }}</span>
+            @if (row.id === 'shown' && s.hideLocked && s.hideLockReason) {
+              <span class="lock t-xs">{{ s.hideLockReason }}</span>
+            }
+          </div>
+          <button
+            type="button"
+            role="switch"
+            class="sw"
+            [attr.aria-checked]="isOn(s, row)"
+            [attr.aria-label]="row.label"
+            [disabled]="isDisabled(s, row)"
+            (click)="toggle(s, row)"
+          ></button>
+        </div>
+      }
+    </div>
+
+    <div class="fields">
+      <h3>Fields ({{ s.fields.length }})</h3>
+      @for (f of s.fields; track f.key) {
+        <div class="field-row">
+          <div class="ftext">
+            <span class="fl">{{ f.label }}@if (f.required) {<span class="star" aria-label=" required"> *</span>}</span>
+            @if (f.meta) {
+              <span class="faint t-xs">{{ f.meta }}</span>
+            }
+          </div>
+          <span class="ftype">{{ typeLabel(f.type) }}</span>
+        </div>
+      } @empty {
+        <p class="empty">This section has no fields.</p>
+      }
+    </div>
+
+    <div class="who">
+      <h3 id="who-h">Who can fill this section</h3>
+      <div class="chips" role="group" aria-labelledby="who-h">
+        @for (role of fillers; track role) {
+          <button
+            type="button"
+            class="chipb"
+            [attr.aria-pressed]="fillerOn(s, role)"
+            [disabled]="!store.canEdit()"
+            (click)="store.toggleFiller(s.key, role)"
+          >
+            {{ fillerLabel[role] }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="note faint">
+      Changes apply to <b>{{ departmentName() }} · {{ store.visitType() }}</b> after you publish. Visits already in
+      progress keep the layout they started with.
+    </div>
+  } @else {
+    <p class="empty">Pick a section to see its settings.</p>
+  }
+</aside>

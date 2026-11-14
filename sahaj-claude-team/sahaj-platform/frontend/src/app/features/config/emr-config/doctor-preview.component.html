@@ -1,0 +1,58 @@
+<ng-template #card let-s>
+  <article class="card" [class.sel]="s.key === store.selectedSectionKey()">
+    <div class="card-h">
+      <button type="button" class="cname" (click)="store.pickSection(s.key)">
+        {{ s.name }}@if (s.required) {<span class="star" aria-hidden="true"> *</span>}
+      </button>
+      <span class="tag">{{ tag(s) }}</span>
+      @if (s.required) {
+        <span class="pill p-crit">Missing</span>
+      }
+    </div>
+    @if (isSpecialEditor(s)) {
+      <p class="placeholder faint t-xs">The special editor for this section comes in a later step.</p>
+    }
+    @if (s.fields.length === 0) {
+      <p class="faint t-xs">This section has no fields.</p>
+    } @else {
+      <div class="fl">
+        @for (f of fieldsOf(s); track f.key) {
+          <div class="fr">
+            <span class="flabel">{{ f.label }}@if (f.required) {<span class="star" aria-hidden="true"> *</span>}</span>
+            <span class="faint t-xs fph">{{ f.meta || typeLabel(f.type) }}</span>
+          </div>
+        }
+      </div>
+    }
+  </article>
+</ng-template>
+
+<section class="pv surf" [attr.aria-label]="'Doctor screen preview for ' + departmentName()">
+  <div class="pv-h">
+    <div class="pv-t">
+      <b>Doctor screen preview · {{ departmentName() }} · {{ store.visitType() }}</b>
+      <span class="faint t-xs">[PATIENT NAME] · 34 F · UHID [ID]</span>
+    </div>
+    <div class="tags">
+      <span class="pill p-teal">ABHA linked</span>
+      <span class="pill p-crit">Allergy: [NONE RECORDED]</span>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="band a">
+      <b>1 · Assessment</b>
+      <span class="faint t-xs">Doctor fills this first</span>
+    </div>
+    @for (s of assessment(); track s.key) {
+      <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: s }" />
+    }
+    <div class="band t">
+      <b>2 · Treatment</b>
+      <span class="faint t-xs">Opens after assessment</span>
+    </div>
+    @for (s of treatment(); track s.key) {
+      <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: s }" />
+    }
+  </div>
+</section>

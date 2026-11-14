@@ -43,14 +43,15 @@ public class PatientController {
     @PreAuthorize(PatientRoles.WRITE)
     public PatientResponse create(@RequestBody PatientCreateRequest request) {
         ClinicUser user = ClinicUser.current();
-        return PatientResponse.from(patientService.create(user.tenantId(), user.userId(), request.toInput()));
+        return PatientResponse.from(patientService.create(user.tenantId(), user.userId(), request.toInput()),
+                user.role());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize(PatientRoles.READ)
     public PatientResponse get(@PathVariable UUID id) {
         ClinicUser user = ClinicUser.current();
-        return PatientResponse.from(patientService.open(user.tenantId(), user.userId(), id));
+        return PatientResponse.from(patientService.open(user.tenantId(), user.userId(), id), user.role());
     }
 
     @PatchMapping("/{id}")
@@ -58,7 +59,7 @@ public class PatientController {
     public PatientResponse update(@PathVariable UUID id, @RequestBody PatientUpdateRequest request) {
         ClinicUser user = ClinicUser.current();
         return PatientResponse.from(
-                patientService.update(user.tenantId(), user.userId(), id, request.toInput()));
+                patientService.update(user.tenantId(), user.userId(), id, request.toInput()), user.role());
     }
 
     @GetMapping("/{id}/family")
@@ -72,7 +73,7 @@ public class PatientController {
     @PreAuthorize(PatientRoles.WRITE)
     public PatientResponse merge(@RequestBody MergeRequest request) {
         ClinicUser user = ClinicUser.current();
-        return PatientResponse.from(patientService.merge(user.tenantId(), user.userId(),
-                request.requireKeepId(), request.requireMergeId()));
+        return PatientResponse.from(patientService.mergeWithNotice(user.tenantId(), user.userId(),
+                request.requireKeepId(), request.requireMergeId()), user.role());
     }
 }

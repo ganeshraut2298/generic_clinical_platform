@@ -1,0 +1,193 @@
+@if (field(); as f) {
+  <div class="fs" data-testid="field-settings">
+    <div class="head">
+      <span class="icon" aria-hidden="true">{{ typeIcon() }}</span>
+      <div class="ht">
+        <strong>{{ typeName() }}</strong>
+        <span class="faint t-xs">Key: {{ f.key }}</span>
+      </div>
+    </div>
+
+    <label class="lab">
+      <span>{{ labelCaption() }}</span>
+      <input class="input" type="text" [value]="f.label" [disabled]="!editable()" [attr.maxlength]="labelMax" (input)="onLabel($event)" />
+    </label>
+    @if (secondLabels(); as lang) {
+      <label class="lab">
+        <span>Label in {{ lang }}</span>
+        <input
+          class="input"
+          type="text"
+          [value]="(lang === 'Marathi' ? f.labelMr : f.labelHi) ?? ''"
+          [disabled]="!editable()"
+          [attr.maxlength]="labelMax"
+          (input)="lang === 'Marathi' ? onLabelMr($event) : onLabelHi($event)"
+        />
+      </label>
+    }
+    @if (canHelp()) {
+      <label class="lab">
+        <span>Help text</span>
+        <input class="input" type="text" [value]="f.help ?? ''" [disabled]="!editable()" [attr.maxlength]="500" placeholder="Shown under the field" (input)="onHelp($event)" />
+      </label>
+    }
+
+    <div class="grp">
+      <span class="gl" id="fs-width">Width on the form</span>
+      <div class="seg" role="group" aria-labelledby="fs-width">
+        @for (w of widths; track w.value) {
+          <button type="button" [attr.aria-pressed]="f.width === w.value" [disabled]="!editable()" (click)="setWidth(w.value)">{{ w.label }}</button>
+        }
+      </div>
+    </div>
+
+    @if (canRequire()) {
+      <div class="tg">
+        <span class="tl"><b>Required</b><span class="faint t-xs">Form cannot be saved without it</span></span>
+        <button type="button" role="switch" class="sw" [attr.aria-checked]="f.required" aria-label="Required" [disabled]="!editable()" (click)="toggle('required')"></button>
+      </div>
+    }
+    <div class="tg">
+      <span class="tl"><b>Print on paper</b><span class="faint t-xs">Shown on the printed form</span></span>
+      <button type="button" role="switch" class="sw" [attr.aria-checked]="f.print" aria-label="Print on paper" [disabled]="!editable()" (click)="toggle('print')"></button>
+    </div>
+    @if (canCopy()) {
+      <div class="tg">
+        <span class="tl"><b>Copy from last visit</b><span class="faint t-xs">Pre-fills the previous answer</span></span>
+        <button type="button" role="switch" class="sw" [attr.aria-checked]="f.copyFromLast" aria-label="Copy from last visit" [disabled]="!editable()" (click)="toggle('copyFromLast')"></button>
+      </div>
+    }
+
+    @if (hasScoredOptions()) {
+      <div class="grp box">
+        <div class="boxh"><b>Options and scores</b><span class="faint t-xs">score is used by Σ fields</span></div>
+        @for (o of optionList(); track o.key; let i = $index) {
+          <div class="orow">
+            @if (isYesNo()) {
+              <span class="olabel">{{ o.label }}</span>
+            } @else {
+              <input class="input" type="text" [value]="o.label" [disabled]="!editable()" [attr.maxlength]="120" [attr.aria-label]="'Option ' + (i + 1)" (input)="onOptionLabel(i, $event)" />
+            }
+            <button type="button" class="step" aria-label="Lower score" [disabled]="!editable()" (click)="scoreOption(o.key, -1)">−</button>
+            <span class="sc" data-testid="option-score">{{ o.score }}</span>
+            <button type="button" class="step" aria-label="Higher score" [disabled]="!editable()" (click)="scoreOption(o.key, 1)">+</button>
+            @if (!isYesNo()) {
+              <button type="button" class="step" aria-label="Remove option" [disabled]="!editable() || optionList().length <= 1" (click)="removeOption(i)">×</button>
+            }
+          </div>
+        }
+        @if (!isYesNo()) {
+          <button type="button" class="add" [disabled]="!editable()" data-act="add-option" (click)="addOneOption()">+ Add option</button>
+        }
+      </div>
+    }
+
+    @if (isNumber()) {
+      <div class="grp box">
+        <label class="lab"><span>Unit</span><input class="input" type="text" [value]="f.unit ?? ''" [disabled]="!editable()" [attr.maxlength]="20" (input)="onUnit($event)" /></label>
+        <label class="lab"><span>Normal from</span><input class="input" type="number" [value]="f.normalFrom ?? ''" [disabled]="!editable()" (input)="onRange('normalFrom', $event)" /></label>
+        <label class="lab"><span>Lowest allowed</span><input class="input" type="number" [value]="f.min ?? ''" [disabled]="!editable()" (input)="onRange('min', $event)" /></label>
+        <label class="lab"><span>Normal to</span><input class="input" type="number" [value]="f.normalTo ?? ''" [disabled]="!editable()" (input)="onRange('normalTo', $event)" /></label>
+        <label class="lab"><span>Highest allowed</span><input class="input" type="number" [value]="f.max ?? ''" [disabled]="!editable()" (input)="onRange('max', $event)" /></label>
+        <span class="faint t-xs">Values outside the normal range are flagged in red on the form.</span>
+      </div>
+    }
+
+    @if (isScore() && f.score; as score) {
+      <div class="grp box">
+        <span class="gl">Adds up the scores of</span>
+        @for (s of sources(); track s.key) {
+          <label class="chk">
+            <input type="checkbox" [checked]="isSource(s.key)" [disabled]="!editable()" (change)="toggleSource(s.key)" />
+            {{ s.label }}
+          </label>
+        } @empty {
+          <span class="faint t-xs">Add a choice field with scores first.</span>
+        }
+        <span class="gl">Extra rules</span>
+        @for (r of score.rules; track $index; let i = $index) {
+          <div class="rule">
+            <span class="rt">{{ ruleText(r) }}</span>
+            <div class="rr">
+              <select class="input" [disabled]="!editable()" [attr.aria-label]="'Rule ' + (i + 1) + ' field'" (change)="onRuleField(i, $event)">
+                @for (n of r.kind === 'NUMBER_BELOW' ? numberFields() : multiFields(); track n.key) {
+                  <option [value]="n.key" [selected]="n.key === r.fieldKey">{{ n.label }}</option>
+                }
+              </select>
+              <input class="input" type="number" [value]="r.threshold" [disabled]="!editable()" [attr.aria-label]="'Rule ' + (i + 1) + ' below'" (input)="onRuleNumber(i, 'threshold', $event)" />
+              <input class="input" type="number" [value]="r.points" [disabled]="!editable()" [attr.aria-label]="'Rule ' + (i + 1) + ' points'" (input)="onRuleNumber(i, 'points', $event)" />
+              <button type="button" class="step" aria-label="Remove rule" [disabled]="!editable()" (click)="removeRule(i)">×</button>
+            </div>
+          </div>
+        }
+        @if (numberFields().length > 0 && score.rules.length < rulesMax) {
+          <button type="button" class="add" [disabled]="!editable()" data-act="add-rule-number" (click)="addRule('NUMBER_BELOW')">+ Add rule on a number field</button>
+        }
+        @if (multiFields().length > 0 && score.rules.length < rulesMax) {
+          <button type="button" class="add" [disabled]="!editable()" data-act="add-rule-count" (click)="addRule('CHOSEN_COUNT_BELOW')">+ Add rule on a multiple choice field</button>
+        }
+      </div>
+    }
+
+    @if (isBand() && f.band; as band) {
+      <div class="grp box">
+        <label class="lab">
+          <span>Band for</span>
+          <select class="input" [disabled]="!editable()" (change)="onBandSource($event)">
+            <option value="" [selected]="!band.sourceFieldKey">Choose a score…</option>
+            @for (s of scoreFields(); track s.key) {
+              <option [value]="s.key" [selected]="s.key === band.sourceFieldKey">{{ s.label }}</option>
+            }
+          </select>
+        </label>
+        @for (b of band.bands; track $index; let i = $index) {
+          <div class="brow">
+            <span class="faint t-xs">from</span>
+            <input class="input from" type="number" [value]="b.from" [disabled]="!editable()" [attr.aria-label]="'Band ' + (i + 1) + ' from'" (input)="onBandFrom(i, $event)" />
+            <input class="input" type="text" [value]="b.label" [disabled]="!editable()" [attr.maxlength]="120" [attr.aria-label]="'Band ' + (i + 1) + ' label'" (input)="onBandLabel(i, $event)" />
+            <button type="button" class="step" aria-label="Remove band" [disabled]="!editable() || band.bands.length <= 1" (click)="removeBand(i)">×</button>
+          </div>
+        }
+        @if (band.bands.length < bandsMax) {
+          <button type="button" class="add" [disabled]="!editable()" data-act="add-band" (click)="addBand()">+ Add band</button>
+        }
+      </div>
+    }
+
+    @if (logicSources().length > 0 && f.type !== 'SECTION_HEADING') {
+      <div class="grp box">
+        <span class="gl" id="fs-logic">Show this field</span>
+        <select class="input" aria-labelledby="fs-logic" data-testid="logic-field" [disabled]="!editable()" (change)="onLogicField($event)">
+          <option value="" [selected]="!f.showIf">Always</option>
+          @for (s of logicSources(); track s.key) {
+            <option [value]="s.key" [selected]="f.showIf?.fieldKey === s.key">Only when “{{ s.label }}” …</option>
+          }
+        </select>
+        @if (logicSource()) {
+          <div class="lv">
+            <span class="faint t-xs">is</span>
+            @for (o of logicOptions(); track o.key) {
+              <button type="button" class="chip" [attr.aria-pressed]="f.showIf?.optionKey === o.key" [disabled]="!editable()" (click)="pickLogicValue(o.key)">{{ o.label }}</button>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <div class="grp">
+      <span class="gl" id="fs-who">Who can fill it</span>
+      <div class="whos" role="group" aria-labelledby="fs-who">
+        @for (w of who; track w.key) {
+          <button type="button" class="chip" [attr.aria-pressed]="f.whoCanFill.includes(w.key)" [disabled]="!editable()" (click)="toggleWho(w.key)">{{ w.label }}</button>
+        }
+      </div>
+    </div>
+
+    <label class="lab">
+      <span>Standard code (optional)</span>
+      <input class="input" type="text" [value]="f.standardCode ?? ''" [disabled]="!editable()" [attr.maxlength]="60" placeholder="SNOMED CT or LOINC, for reports" (input)="onCode($event)" />
+    </label>
+  </div>
+} @else {
+  <div class="none" data-testid="no-field">Select a field on the form to change it.</div>
+}

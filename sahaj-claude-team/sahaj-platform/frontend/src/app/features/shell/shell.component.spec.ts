@@ -69,6 +69,8 @@ describe('ShellComponent', () => {
       'nav.patients': 'Patients',
       'nav.emergency': 'Emergency',
       'nav.emergencyCount': 'in the queue',
+      'nav.secondchecks': 'Second checks',
+      'nav.secondchecksCount': 'waiting',
       'nav.ipd': 'Beds and admissions',
     });
     harness.detectChanges();
@@ -198,6 +200,43 @@ describe('ShellComponent', () => {
       const el = await open();
       http.expectNone(SUMMARY);
       expect(Array.from(el.querySelectorAll('.nav-item .label')).map((e) => e.textContent)).not.toContain('Emergency');
+    });
+  });
+
+  describe('Second checks menu item (ADR-023 D13.5)', () => {
+    const CHECKS = '/api/v1/opd/emr/chemo-checks';
+    const MENU = ['today', 'queue', 'secondchecks', 'patients'];
+    const item = (el: HTMLElement) =>
+      Array.from(el.querySelectorAll<HTMLElement>('.nav-item')).find((a) => a.querySelector('.label')!.textContent === 'Second checks')!;
+
+    it('shows "Second checks" right after Queue, linking to /app/emr/second-checks, in the simple menu too', async () => {
+      const el = await open({ menu: MENU });
+      http.expectOne(CHECKS).flush({ items: [], total: 0, page: 0, pageSize: 20 });
+      expect(Array.from(el.querySelectorAll('.nav-item .label')).map((n) => n.textContent)).toEqual(['Today', 'Queue', 'Second checks', 'Patients']);
+      expect(item(el).getAttribute('href')).toBe('/app/emr/second-checks');
+      TestBed.resetTestingModule();
+      const simple = await open({ menu: MENU, menuMode: 'simple' });
+      http.expectOne(CHECKS).flush({ items: [], total: 0, page: 0, pageSize: 20 });
+      expect(Array.from(simple.querySelectorAll('.nav-item .label')).map((n) => n.textContent)).toContain('Second checks');
+    });
+
+    it('shows the number waiting as a badge from the total of the checker’s list, and says it to screen readers', async () => {
+      const el = await open({ menu: MENU });
+      http.expectOne(CHECKS).flush({ items: [], total: 2, page: 0, pageSize: 20 });
+      harness.detectChanges();
+      expect(item(el).querySelector('.badge')!.textContent).toBe('2');
+      expect(item(el).getAttribute('aria-label')).toBe('Second checks, 2 waiting');
+    });
+
+    it('shows no badge at 0 and asks for nothing when the menu has no such item', async () => {
+      const el = await open({ menu: MENU });
+      http.expectOne(CHECKS).flush({ items: [], total: 0, page: 0, pageSize: 20 });
+      harness.detectChanges();
+      expect(item(el).querySelector('.badge')).toBeNull();
+      TestBed.resetTestingModule();
+      const none = await open();
+      http.expectNone(CHECKS);
+      expect(Array.from(none.querySelectorAll('.nav-item .label')).map((n) => n.textContent)).not.toContain('Second checks');
     });
   });
 

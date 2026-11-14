@@ -143,17 +143,77 @@ class PatientsIT extends SweepSupport {
     }
 
     /**
-     * Contract mismatch, not a crash. {@code docs/api/patient.yaml} says "Reads are for any clinic role", but
-     * {@code PatientRoles.READ} (backend/src/main/java/com/sahaj/patient/web/PatientRoles.java:8) lists only
-     * OWNER, FRONT_DESK, NURSE, DOCTOR and VISITING_DOCTOR, so BILLING, PHARMACIST and COUNSELLOR get 403 on every
-     * patient read. Disabled until java-developer or the human settles which one is right (story SAH-8 AC8 is ambiguous).
+     * DEC-049 answer 2 (closes DEC-013 item 14, patient.yaml 0.2.1): BILLING and PHARMACIST may read the list, the detail and
+     * the family (the name is needed on bills and for dispensing); COUNSELLOR may not. Reading is not the same as seeing the
+     * date of birth: {@code DateOfBirthAccess} stays the separate allow-list, so these two roles get {@code age} and
+     * {@code ageDetail} and the property {@code dateOfBirth} is absent (not null) on all three answers.
      */
-    @org.junit.jupiter.api.Disabled("BUG: PatientRoles.READ excludes BILLING/PHARMACIST/COUNSELLOR but patient.yaml says any clinic role may read")
     @Test
-    void everyClinicRoleMayReadPatientsAsTheContractSays() throws Exception {
+    void billingAndPharmacistReadTheListDetailAndFamilyWithAgeAndNoDateOfBirth() throws Exception {
         Clinic clinic = newClinic();
-        for (String role : new String[] {"BILLING", "PHARMACIST", "COUNSELLOR"}) {
-            ok(HttpMethod.GET, PATIENTS, clinic.as(role), null, 200);
+        String mobile = uniqueMobile();
+        java.time.LocalDate dob = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).minusYears(11).minusDays(5);
+        JsonNode dated = ok(HttpMethod.POST, PATIENTS, clinic.owner(),
+                "{\"name\":\"Dated Reader\",\"sex\":\"F\",\"mobile\":\"" + mobile + "\",\"dateOfBirth\":\"" + dob + "\"}", 201);
+        JsonNode sibling = create(clinic, "Family Reader", 40, "M", mobile);
+        String id = dated.get("id").asText();
+        for (String role : new String[] {"BILLING", "PHARMACIST"}) {
+            JsonNode page = ok(HttpMethod.GET, PATIENTS, clinic.as(role), null, 200);
+            assertThat(page.get("total").asInt()).as(role + " list total").isEqualTo(2);
+            assertThat(page.toString()).as(role + " list").doesNotContain(dob.toString()).doesNotContain("dateOfBirth");
+            JsonNode listed = null;
+            for (JsonNode item : page.get("items")) {
+                assertThat(item.has("dateOfBirth")).as(role + " list item has no dateOfBirth property").isFalse();
+                assertThat(item.get("ageDetail")).as(role + " list item ageDetail").isNotNull();
+                if (id.equals(item.get("id").asText())) {
+                    listed = item;
+                }
+            }
+            assertThat(listed).as(role + " sees the dated patient in the list").isNotNull();
+            assertThat(listed.get("age").asInt()).as(role + " list age").isEqualTo(11);
+            assertThat(listed.get("ageDetail").get("fromDateOfBirth").asBoolean()).isTrue();
+            assertThat(ok(HttpMethod.GET, PATIENTS + "?q=Reader", clinic.as(role), null, 200).get("total").asInt()).isEqualTo(2);
+
+            JsonNode detail = ok(HttpMethod.GET, PATIENTS + "/" + id, clinic.as(role), null, 200);
+            assertThat(detail.get("name").asText()).as(role + " detail name").isEqualTo("Dated Reader");
+            assertThat(detail.has("dateOfBirth")).as(role + " detail: absent, not null").isFalse();
+            assertThat(detail.toString()).as(role + " detail").doesNotContain(dob.toString());
+            assertThat(detail.get("age").asInt()).isEqualTo(11);
+            assertThat(detail.get("ageDetail").get("unit").asText()).isEqualTo("YEARS");
+            assertThat(detail.get("ageDetail").get("fromDateOfBirth").asBoolean()).isTrue();
+
+            JsonNode family = ok(HttpMethod.GET, PATIENTS + "/" + id + "/family", clinic.as(role), null, 200);
+            assertThat(family.findValuesAsText("id")).as(role + " family").containsExactly(sibling.get("id").asText());
+            assertThat(family.get(0).has("dateOfBirth")).as(role + " family row has no dateOfBirth property").isFalse();
+            assertThat(family.get(0).get("age").asInt()).isEqualTo(40);
+            assertThat(family.get(0).get("ageDetail")).isNotNull();
+        }
+    }
+
+    @Test
+    void counsellorGets403OnTheListTheDetailAndTheFamily() throws Exception {
+        Clinic clinic = newClinic();
+        JsonNode p = create(clinic, "Not For Counsellor", 30, "M", uniqueMobile());
+        String id = p.get("id").asText();
+        for (String role : new String[] {"COUNSELLOR"}) {
+            problem(call(HttpMethod.GET, PATIENTS, clinic.as(role), null), 403);
+            problem(call(HttpMethod.GET, PATIENTS + "?q=Counsellor", clinic.as(role), null), 403);
+            problem(call(HttpMethod.GET, PATIENTS + "/" + id, clinic.as(role), null), 403);
+            problem(call(HttpMethod.GET, PATIENTS + "/" + id + "/family", clinic.as(role), null), 403);
+        }
+    }
+
+    @Test
+    void billingAndPharmacistStillCannotWritePatientsAndCannotReadAnotherClinicsPatient() throws Exception {
+        Clinic a = newClinic();
+        Clinic b = newClinic();
+        String inA = create(a, "Only In A", 33, "F", uniqueMobile()).get("id").asText();
+        for (String role : new String[] {"BILLING", "PHARMACIST"}) {
+            problem(call(HttpMethod.POST, PATIENTS, b.as(role), body("Nope", 30, "M", uniqueMobile())), 403);
+            problem(call(HttpMethod.PATCH, PATIENTS + "/" + inA, a.as(role), "{\"name\":\"Hacked\"}"), 403);
+            problem(call(HttpMethod.GET, PATIENTS + "/" + inA, b.as(role), null), 404);
+            problem(call(HttpMethod.GET, PATIENTS + "/" + inA + "/family", b.as(role), null), 404);
+            assertThat(ok(HttpMethod.GET, PATIENTS, b.as(role), null, 200).get("total").asInt()).as(role + " sees no patient of clinic A").isZero();
         }
     }
 
@@ -254,6 +314,11 @@ class PatientsIT extends SweepSupport {
         }
         assertThat(ok(HttpMethod.GET, PATIENTS + "?filter=due", clinic.owner(), null, 200).get("total").asInt()).isZero();
         assertThat(ok(HttpMethod.GET, PATIENTS + "?filter=kids&q=kid", clinic.owner(), null, 200).get("total").asInt()).isEqualTo(1);
+        // SAH-73: Children is under 13 (the mockup), no longer under 18: 13 and 17 are not children
+        create(clinic, "Teen Thirteen", 13, "F", uniqueMobile());
+        create(clinic, "Teen Seventeen", 17, "F", uniqueMobile());
+        create(clinic, "Kid Twelve", 12, "F", uniqueMobile());
+        assertThat(ok(HttpMethod.GET, PATIENTS + "?filter=kids", clinic.owner(), null, 200).get("total").asInt()).isEqualTo(2);
     }
 
     @Test
@@ -353,6 +418,9 @@ class PatientsIT extends SweepSupport {
         assertThat(merged.get("id").asText()).isEqualTo(keep.get("id").asText());
         assertThat(merged.get("name").asText()).isEqualTo("Ramesh Kulkarni");
         assertThat(merged.get("allergy").asText()).isEqualTo("Sulfa");
+        // SAH-73: the merge answer always says whether the two dates of birth differed (false when there are none)
+        assertThat(merged.get("datesOfBirthDiffered").asBoolean()).isFalse();
+        assertThat(merged.get("ageDetail").get("fromDateOfBirth").asBoolean()).isFalse();
         assertThat(ok(HttpMethod.GET, PATIENTS + "?q=" + mobile, clinic.owner(), null, 200).get("total").asInt()).isEqualTo(1);
         assertThat(ok(HttpMethod.GET, PATIENTS + "/" + keep.get("id").asText() + "/family", clinic.owner(), null, 200).size()).isZero();
         // the merged-away record still exists (soft merge)

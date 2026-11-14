@@ -31,11 +31,15 @@ export class PatientCardComponent {
   readonly setup = input<ResolvedCardSetup>(STANDARD_RESOLVED);
   /** Inert drawing for the live preview (AC47). */
   readonly preview = input(false);
+  /** SAH-46-1. The signed-in user may open the EMR of this admission (doctor, visiting doctor, owner with doctor details). */
+  readonly canOpenEmr = input(false);
 
   /** The patient's name was chosen: the admission sheet opens on its main view. */
   readonly openName = output<void>();
   /** An action button was chosen. */
   readonly act = output<CardAction>();
+  /** "Open EMR" was chosen (the consultation screen of SAH-46, not the IPD EMR sheet). */
+  readonly openEmrRecord = output<void>();
 
   protected readonly nameTooltip = NAME_TOOLTIP;
   protected readonly view = computed<CardView>(() =>

@@ -3,7 +3,7 @@
 Stories: SAH-43 (EMR masters, SAH-43-1 to SAH-43-4) and SAH-44 (templates, overrides, settings, snapshot, SAH-44-1 to SAH-44-4)
 Mockup screen: none (data only). Nearest: Sahaj admin portal → Templates and master data; Clinic setup → Specialty template, Case paper and Rx.
 Module: opd (reads platform through `platform.api` only)
-Status: PROPOSED (11 Nov 2026), awaiting `SAH-43 · contract · APPROVED` and `SAH-44 · contract · APPROVED`
+Status: PROPOSED (11 Nov 2026), approved in chat (DEC-038). **SUPERSEDED IN PART (12 Nov 2026) by ADR-020** (DEC-039 answer 2, Variant B: SAH-44 withdrawn): D4, D5, D6 and D11 are replaced in full; the SAH-44 rows of D2, D8, D9, D12 and "Data needed" are replaced; D1, D3, D7, D10 and the fixed-capability principle of D8 stay, with the additive changes in ADR-020 D13.
 Deciders: human (product owner), tech lead; recorded by solution-architect
 Related: `docs/requirements/SAH-43.md` (BR1 to BR28, OQ-43-n, D-n, C-n), `docs/stories/SAH-43.md`, `docs/stories/SAH-44.md`,
 `docs/handoffs/SAH-43-input-doctor-emr-brd.md`, DEC-036, DEC-037, ADR-002 (D3 global tables, D6 authorization, D7 audit),

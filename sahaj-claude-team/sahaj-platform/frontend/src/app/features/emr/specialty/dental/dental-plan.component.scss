@@ -1,0 +1,80 @@
+.sit {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.mini {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+  }
+}
+
+.stat {
+  white-space: nowrap;
+}
+
+.amt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+
+  .input {
+    width: 110px;
+  }
+}
+
+.hl td {
+  background: var(--good-soft);
+}
+
+.total {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.add {
+  align-items: flex-end;
+
+  .grow {
+    flex: 1 1 220px;
+  }
+
+  .num {
+    width: 100px;
+  }
+}
+
+.est {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 600;
+
+  input {
+    width: 20px;
+    height: 20px;
+  }
+}

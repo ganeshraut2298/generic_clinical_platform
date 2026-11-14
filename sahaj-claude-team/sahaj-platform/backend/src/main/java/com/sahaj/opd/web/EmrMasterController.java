@@ -1,6 +1,8 @@
 package com.sahaj.opd.web;
 
 import com.sahaj.opd.application.emr.EmrMasterService;
+import com.sahaj.opd.application.emr.EmrViews.MasterPage;
+import com.sahaj.opd.application.emr.EmrViews.QuickOptionList;
 import com.sahaj.platform.api.ClinicUser;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/opd/emr")
-public class EmrMasterController {
+public class EmrMasterController implements EmrApi {
 
     private static final String DOCTOR_OR_OWNER = "hasAnyRole('OWNER','DOCTOR','VISITING_DOCTOR')";
 
@@ -29,19 +31,18 @@ public class EmrMasterController {
 
     @GetMapping("/masters/{master}")
     @PreAuthorize(OpdRoles.ANY_CLINIC_ROLE)
-    public EmrResponses.MasterPage search(@PathVariable String master,
-                                          @RequestParam(required = false) String q,
-                                          @RequestParam(required = false) String specialty,
-                                          @RequestParam(required = false) Integer page) {
-        return EmrResponses.MasterPage.from(service.search(master, q, specialty, page));
+    public MasterPage search(@PathVariable String master,
+                             @RequestParam(required = false) String q,
+                             @RequestParam(required = false) String specialty,
+                             @RequestParam(required = false) Integer page) {
+        return service.search(master, q, specialty, page);
     }
 
     @GetMapping("/quick-options/{master}")
     @PreAuthorize(DOCTOR_OR_OWNER)
-    public EmrResponses.QuickOptionList quickOptions(@PathVariable String master,
-                                                     @RequestParam(required = false) Integer limit,
-                                                     @RequestParam(required = false) String specialty) {
-        return EmrResponses.QuickOptionList.from(
-                service.quickOptions(ClinicUser.current(), master, limit, specialty));
+    public QuickOptionList quickOptions(@PathVariable String master,
+                                        @RequestParam(required = false) Integer limit,
+                                        @RequestParam(required = false) String specialty) {
+        return service.quickOptions(ClinicUser.current(), master, limit, specialty);
     }
 }

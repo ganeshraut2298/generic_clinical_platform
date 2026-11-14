@@ -26,6 +26,19 @@
   padding: 2px;
 }
 
+.emg {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-left: 4px solid var(--crit);
+}
+
+.emg-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .board > .col {
   scroll-snap-align: start;
 }
@@ -173,4 +186,10 @@
     padding-block: 4px;
     line-height: 1.25;
   }
+}
+
+// "Open EMR" (SAH-46-1): its own row, so it never changes the stage buttons of the card.
+.qemr:not(:empty) {
+  display: flex;
+  padding-top: 3px;
 }

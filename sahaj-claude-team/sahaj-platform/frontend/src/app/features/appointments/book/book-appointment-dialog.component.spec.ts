@@ -60,6 +60,18 @@ describe('BookAppointmentDialogComponent', () => {
     expect(bookButton.disabled).toBe(true);
   });
 
+  it('shows the mockup hint under the Add family member option (SAH-73-1)', async () => {
+    setup();
+    await typeMobile('9876543210');
+    http
+      .expectOne((r) => r.url === `${PATIENT_BASE}/patients`)
+      .flush({ items: [{ id: 'p1', uhid: 'PT-1', name: 'Rohit Patil', age: 30, sex: 'M', mobile: '9876543210' }], total: 1 });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const option = Array.from(el().querySelectorAll('.member')).find((b) => b.textContent!.includes('Add family member'))!;
+    expect(option.querySelector('small')!.textContent!.trim()).toBe('Name, age and sex are enough. ABHA can be added later.');
+  });
+
   it('books the fixed slot with the chosen visit type and source', async () => {
     setup();
     await typeMobile('9876543210');

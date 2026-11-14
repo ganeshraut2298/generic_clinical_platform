@@ -43,6 +43,24 @@ class AuditSanitizerTest {
     }
 
     @Test
+    void keepsTheBodyMapPinNumberOfTheMlcAuditRowButNothingElseNamedLikeAPin() {
+        // DEC-051 M6: {pinNo, mlc} of EMR_MLC_FLAG_CHANGED; only the exact key with a whole number 1 to 60 is kept
+        Map<String, Object> kept = AuditSanitizer.sanitize("EMR_RECORD", Map.of("pinNo", 7, "mlc", true));
+        assertThat(kept).containsEntry("pinNo", 7).containsEntry("mlc", true);
+        assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("pinNo", 60))).containsEntry("pinNo", 60);
+
+        for (Object notAPinNumber : new Object[] {0, 61, 4821, -3, "7", 7L, 7.0}) {
+            assertThat(AuditSanitizer.sanitize("EMR_RECORD", Map.of("pinNo", notAPinNumber)))
+                    .as("pinNo with " + notAPinNumber).containsEntry("pinNo", AuditSanitizer.REDACTED);
+        }
+        assertThat(AuditSanitizer.sanitize("STAFF_PIN", Map.of("pin", 7, "newPin", 7, "pinNumber", 7, "pinNoHash", 7,
+                "pinHash", "$2a$12$abc"))).containsOnly(
+                        Map.entry("pin", AuditSanitizer.REDACTED), Map.entry("newPin", AuditSanitizer.REDACTED),
+                        Map.entry("pinNumber", AuditSanitizer.REDACTED), Map.entry("pinNoHash", AuditSanitizer.REDACTED),
+                        Map.entry("pinHash", AuditSanitizer.REDACTED));
+    }
+
+    @Test
     void keepsTheColleagueCheckAuditFieldsIdsAndTriesLeftIntact() {
         // SAH-32: PLATFORM_PIN_COLLEAGUE_CHECK_FAILED holds ids and a number only; none of the keys may be redacted
         Map<String, Object> result = AuditSanitizer.sanitize("STAFF_PIN", Map.of(

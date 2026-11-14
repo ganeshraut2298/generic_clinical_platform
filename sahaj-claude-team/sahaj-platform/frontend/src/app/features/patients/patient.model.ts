@@ -1,4 +1,7 @@
+import { AgeDetail } from '../../shared/format/patient-age';
 import { ConsentInput } from '../privacy/privacy.model';
+
+export type { AgeDetail, AgeUnit } from '../../shared/format/patient-age';
 
 /** Types for the SAH-8 endpoints in `docs/api/patient.yaml`. No field is invented. */
 
@@ -36,7 +39,10 @@ export interface PatientSummary {
   id: string;
   uhid: string;
   name: string;
+  /** Effective completed years (0.2.0). */
   age: number;
+  /** What the screen shows as the age (0.2.0). A list row never carries the date of birth. */
+  ageDetail: AgeDetail;
   sex: Sex;
   mobile: string;
   chronic?: string | null;
@@ -51,7 +57,10 @@ export interface PatientPage {
 
 export interface PatientCreate {
   name: string;
-  age: number;
+  /** Required only when `dateOfBirth` is absent; the form never sends both. */
+  age?: number;
+  /** ISO date, no time (0.2.0). Personal data: never logged or put in a URL. */
+  dateOfBirth?: string | null;
   sex: Sex;
   mobile: string;
   area?: string | null;
@@ -65,6 +74,8 @@ export interface PatientCreate {
 export interface PatientUpdate {
   name?: string;
   age?: number;
+  /** Absent = unchanged, a date = set or correct, explicit null = clear (0.2.0). */
+  dateOfBirth?: string | null;
   sex?: Sex;
   area?: string | null;
   language?: PatientLanguage;
@@ -78,6 +89,9 @@ export interface Patient {
   uhid: string;
   name: string;
   age: number;
+  ageDetail: AgeDetail;
+  /** Present (a date, or null when not recorded) only for owner, doctor, visiting doctor, nurse and front desk. */
+  dateOfBirth?: string | null;
   sex: Sex;
   mobile: string;
   area?: string | null;
@@ -89,6 +103,14 @@ export interface Patient {
   /** Set when a likely duplicate was found at creation; points at the older, surviving record. */
   possibleDuplicateOfId?: string | null;
 }
+
+/** The merge answer: the kept record plus the date of birth notice (SO-73-8). */
+export interface PatientMergeResult extends Patient {
+  datesOfBirthDiffered: boolean;
+}
+
+export const DATES_OF_BIRTH_DIFFERED_NOTICE =
+  'The two records have different dates of birth. The date on the kept record was kept.';
 
 export const LANGUAGE_LABELS: Record<PatientLanguage, string> = {
   mr: 'मराठी',

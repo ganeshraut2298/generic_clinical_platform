@@ -1,6 +1,7 @@
 package com.sahaj.ipd.web;
 
 import com.sahaj.ipd.application.AdmissionInput;
+import com.sahaj.ipd.application.AdmissionRequestService;
 import com.sahaj.ipd.application.AdmissionService;
 import com.sahaj.ipd.application.AdmissionViews.AdmissionList;
 import com.sahaj.ipd.application.AdmissionViews.ChargeInput;
@@ -39,9 +40,19 @@ public class AdmissionController {
     static final String OWNER = "hasRole('OWNER')";
 
     private final AdmissionService service;
+    private final AdmissionRequestService requestService;
 
-    public AdmissionController(AdmissionService service) {
+    public AdmissionController(AdmissionService service, AdmissionRequestService requestService) {
         this.service = service;
+        this.requestService = requestService;
+    }
+
+    @ScopeExempt("A request has no bed yet: the list shows doctors' requests, not a ward's patients")
+    @GetMapping("/admission-requests")
+    @PreAuthorize(ADMITTERS)
+    public AdmissionRequestService.RequestList admissionRequests() {
+        ClinicUser user = ClinicUser.current();
+        return requestService.list(user.tenantId(), user.role());
     }
 
     @ScopeExempt("Configuration: no patient data")

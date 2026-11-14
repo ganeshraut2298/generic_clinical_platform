@@ -65,7 +65,9 @@ class VitalsCatalogIT extends VitalsSupport {
                 // SAH-32: the medicine administration record is append-only too, and its insert guard is enabled
                 "ipd.dose_administration.trg_dose_administration_no_update_delete",
                 "ipd.dose_administration.trg_dose_administration_no_truncate",
-                "ipd.dose_administration.trg_dose_administration_guard_insert"}) {
+                "ipd.dose_administration.trg_dose_administration_guard_insert",
+                // SAH-67-1 (SAH-51-68): the round note table is insert-only
+                "ipd.round_note.trg_round_note_no_update_delete", "ipd.round_note.trg_round_note_no_truncate"}) {
             assertThat(found).as("trigger " + expected).contains(expected + "=O");
         }
     }
@@ -105,36 +107,52 @@ class VitalsCatalogIT extends VitalsSupport {
     }
 
     /**
-     * SAH-43 / SAH-44 (ADR-019 D4): the three template tables cannot be updated, deleted or truncated by anyone, the table
-     * owner included, because of these six triggers. They are created in V2026_12_08_1000; switching one off would let a
-     * shipped template version change under the visits that refer to it. Test plan: docs/test-plans/SAH-43-44.md.
+     * SAH-53 (ADR-020 D4, D6): the starter layout table (V2026_12_08_1000) and the clinic's published department version
+     * table (V2026_12_08_1040) cannot be updated, deleted or truncated by anyone, the table owner included, because of
+     * these four triggers; switching one off would let a published layout change under the records that point at it.
+     * Test plan: docs/test-plans/SAH-53.md.
      */
     @Test
-    void theEmrTemplateImmutabilityTriggersAreThereByNameAndEnabled() throws Exception {
+    void theEmrLayoutImmutabilityTriggersAreThereByNameAndEnabled() throws Exception {
         List<String> found = triggers("t.tgname like 'trg\\_emr\\_%'");
         for (String expected : new String[] {
-                "opd.emr_template.trg_emr_template_immutable", "opd.emr_template.trg_emr_template_no_truncate",
-                "opd.emr_template_section.trg_emr_template_section_immutable",
-                "opd.emr_template_section.trg_emr_template_section_no_truncate",
-                "opd.emr_template_option.trg_emr_template_option_immutable",
-                "opd.emr_template_option.trg_emr_template_option_no_truncate"}) {
+                "opd.emr_starter_layout.trg_emr_starter_layout_immutable", "opd.emr_starter_layout.trg_emr_starter_layout_no_truncate",
+                "opd.emr_department_version.trg_emr_department_version_immutable",
+                "opd.emr_department_version.trg_emr_department_version_no_truncate"}) {
             assertThat(found).as("trigger " + expected).contains(expected + "=O");
         }
-        assertThat(found).as("no other trg_emr_ trigger appeared unannounced").hasSize(6);
+        // every trg_emr_ trigger of the migrations, by name (a partitioned table repeats its trigger on each partition): the layout,
+        // form, starter-form and chemotherapy-protocol tables (SAH-53, SAH-48-59, SAH-49-71) and the three phase 5 tables (SAH-51-68)
+        java.util.Set<String> names = new java.util.TreeSet<>();
+        for (String f : found) {
+            assertThat(f).as("enabled").endsWith("=O");
+            names.add(f.substring(f.lastIndexOf('.') + 1, f.length() - 2));
+        }
+        assertThat(names).as("no other trg_emr_ trigger appeared unannounced").containsExactlyInAnyOrder(
+                "trg_emr_starter_layout_immutable", "trg_emr_starter_layout_no_truncate", "trg_emr_department_version_immutable",
+                "trg_emr_department_version_no_truncate", "trg_emr_form_starter_immutable", "trg_emr_form_starter_no_truncate",
+                "trg_emr_form_version_immutable", "trg_emr_form_version_no_truncate", "trg_emr_chemo_protocol_immutable",
+                "trg_emr_chemo_protocol_no_truncate", "trg_emr_record_signed_guard", "trg_emr_record_addendum_no_update_delete",
+                "trg_emr_record_addendum_no_truncate", "trg_emr_admission_request_guard", "trg_emr_admission_request_no_truncate");
+        for (String expected : new String[] {"opd.emr_record.trg_emr_record_signed_guard", "opd.emr_record_addendum.trg_emr_record_addendum_no_update_delete",
+                "opd.emr_record_addendum.trg_emr_record_addendum_no_truncate", "opd.emr_admission_request.trg_emr_admission_request_guard",
+                "opd.emr_admission_request.trg_emr_admission_request_no_truncate"}) {
+            assertThat(found).as("SAH-51-68 trigger " + expected).contains(expected + "=O");
+        }
         // the function behind them still refuses with the documented SQLSTATE and wording
-        String definition = db().asMigrator(c -> DbAccess.text(c, "select pg_get_functiondef('opd.deny_emr_template_change()'::regprocedure)"));
+        String definition = db().asMigrator(c -> DbAccess.text(c, "select pg_get_functiondef('opd.deny_emr_immutable_change()'::regprocedure)"));
         assertThat(definition).contains("insufficient_privilege").contains("is immutable");
     }
 
-    /** SAH-43 / SAH-44: the four new clinic tables keep enabled and forced row level security. */
+    /** SAH-43 / SAH-53: the five clinic EMR tables keep enabled and forced row level security. */
     @Test
-    void theFourEmrClinicTablesHaveRowLevelSecurityEnabledAndForced() throws Exception {
+    void theFiveEmrClinicTablesHaveRowLevelSecurityEnabledAndForced() throws Exception {
         List<String> weak = db().asMigrator(c -> {
             List<String> out = new ArrayList<>();
             try (var ps = c.prepareStatement("select n.nspname || '.' || cl.relname || ' enabled=' || cl.relrowsecurity::text "
                     + "|| ' forced=' || cl.relforcerowsecurity::text from pg_class cl join pg_namespace n on n.oid = cl.relnamespace "
-                    + "where n.nspname = 'opd' and cl.relname in ('emr_template_setup', 'emr_template_override', 'emr_settings', "
-                    + "'emr_item_usage') and not (cl.relrowsecurity and cl.relforcerowsecurity) order by 1");
+                    + "where n.nspname = 'opd' and cl.relname in ('emr_item_usage', 'emr_department', 'emr_department_version', "
+                    + "'emr_department_doctor', 'emr_record') and not (cl.relrowsecurity and cl.relforcerowsecurity) order by 1");
                  var rs = ps.executeQuery()) {
                 while (rs.next()) {
                     out.add(rs.getString(1));
@@ -144,8 +162,8 @@ class VitalsCatalogIT extends VitalsSupport {
         });
         assertThat(weak).as("EMR clinic tables without enabled and forced row level security").isEmpty();
         long present = db().<Long>asMigrator(c -> DbAccess.count(c, "select count(*) from pg_class cl join pg_namespace n "
-                + "on n.oid = cl.relnamespace where n.nspname = 'opd' and cl.relname in ('emr_template_setup', "
-                + "'emr_template_override', 'emr_settings', 'emr_item_usage')"));
-        assertThat(present).as("all four tables exist").isEqualTo(4);
+                + "on n.oid = cl.relnamespace where n.nspname = 'opd' and cl.relname in ('emr_item_usage', "
+                + "'emr_department', 'emr_department_version', 'emr_department_doctor', 'emr_record')"));
+        assertThat(present).as("all five tables exist").isEqualTo(5);
     }
 }

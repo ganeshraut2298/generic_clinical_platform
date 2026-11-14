@@ -125,13 +125,19 @@ public class AdmissionService {
     private final CardSetups cardSetups;
     private final ScopeGuard guard;
     private final WardScopeRepository scopeRepository;
+    /** SAH-58: set by Spring; null in a plain unit test (then a course sitting cannot be admitted). */
+    private AdmissionCourseLink courseLink;
+    /** SAH-67-3 (ADR-025 D10): reads and closes the EMR admission requests (implemented by opd). */
+    private final com.sahaj.opd.api.EmrAdmissionRequestPort requestPort;
 
     AdmissionService(AdmissionRepository admissions, BedRepository beds, WardRepository wards,
                      IpdSettingsRepository settings, OwnerGuard ownerGuard, AuditLog auditLog, TeamMemberPort team,
                      PatientLookupPort patients, PatientAccessPort patientAccess, ActorDirectoryPort actors,
                      IpdGate gate, IpdCatalog catalog, ChargeRepository charges, IpdBilling billing,
                      DischargeRepository discharges, EmergencyService emergency, VitalsRepository vitals,
-                     AdmittedCards cards, CardSetups cardSetups, ScopeGuard guard, WardScopeRepository scopeRepository) {
+                     AdmittedCards cards, CardSetups cardSetups, ScopeGuard guard, WardScopeRepository scopeRepository,
+                     com.sahaj.opd.api.EmrAdmissionRequestPort requestPort) {
+        this.requestPort = requestPort;
         this.guard = guard;
         this.scopeRepository = scopeRepository;
         this.cardSetups = cardSetups;
@@ -153,6 +159,11 @@ public class AdmissionService {
         this.actors = actors;
         this.gate = gate;
         this.catalog = catalog;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCourseLink(AdmissionCourseLink courseLink) {
+        this.courseLink = courseLink;
     }
 
     // ---- deposit rules ----
@@ -451,12 +462,35 @@ public class AdmissionService {
                     + ". Collect at least that, or choose Insurance or Corporate.");
         }
 
+        // SAH-58: an admission for a treatment course sitting; the sitting is checked and locked before anything is written.
+        AdmissionCourseLink.Prepared course = null;
+        if (input.treatmentCourseSittingId() != null) {
+            if (courseLink == null) {
+                throw AdmissionCourseLink.notAvailable();
+            }
+            course = courseLink.prepare(tenantId, input.patientId(), input.treatmentCourseSittingId());
+        }
+
+        // SAH-67-3: the EMR admission request this admission completes must still be open and be this patient's or case's.
+        if (input.admissionRequestId() != null) {
+            com.sahaj.opd.api.EmrAdmissionRequestPort.OpenRequest request = requestPort
+                    .lockOpen(tenantId, input.admissionRequestId()).orElse(null);
+            boolean matches = request != null
+                    && (input.patientId().equals(request.patientId())
+                    || (request.emergencyCaseId() != null && request.emergencyCaseId().equals(input.emergencyCaseId())));
+            if (!matches) {
+                throw new ConflictException("admission-request-not-available", "Request already admitted",
+                        "This request was already admitted or changed. Reload the list.");
+            }
+        }
         String year = financialYear(gate.now());
         String ipNumber = "IP/" + year + "/" + String.format("%04d", admissions.nextIpNo(tenantId, year));
         UUID admissionId;
         try {
             admissionId = admissions.insert(tenantId, new NewAdmission(input.patientId(), ipNumber, bed.id(),
-                    doctor.membershipId(), input.admissionType(), input.payer(), reason, actor, source));
+                    doctor.membershipId(), input.admissionType(), input.payer(), reason, actor, source,
+                    course == null ? null : course.courseId(), course == null ? null : course.sittingId(),
+                    input.admissionRequestId()));
         } catch (DuplicateKeyException e) {
             if (isIpNumberClash(e)) {
                 // The number comes from a counter taken under the clinic lock, so a clash means the counter is wrong.
@@ -470,6 +504,10 @@ public class AdmissionService {
         UUID depositId = null;
         if (deposit > 0) {
             depositId = admissions.insertDeposit(tenantId, admissionId, deposit, input.depositMode(), actor);
+        }
+        long carried = 0;
+        if (course != null) {
+            carried = courseLink.complete(tenantId, actor, course, admissionId).amountPaise();
         }
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("ipNumber", ipNumber);
@@ -485,7 +523,17 @@ public class AdmissionService {
             after.put("depositPaise", deposit);
             after.put("depositMode", input.depositMode());
         }
+        if (course != null) {
+            after.put("treatmentCourseId", course.courseId());
+            after.put("carriedPaise", carried);
+        }
+        if (input.admissionRequestId() != null) {
+            after.put("admissionRequestId", input.admissionRequestId());
+        }
         auditLog.record("IPD_ADMITTED", "IPD_ADMISSION", admissionId, null, after);
+        // Every open request of this patient (and of the case) closes with the admission, in this transaction.
+        requestPort.onAdmitted(tenantId, actor, new com.sahaj.opd.api.EmrAdmissionRequestPort.AdmittedFacts(
+                admissionId, input.patientId(), input.emergencyCaseId(), input.admissionRequestId()));
         if (emergencyCase != null) {
             // The case becomes ADMITTED with the admission and the patient linked, in the same transaction.
             emergency.markAdmitted(tenantId, actor, emergencyCase, admissionId, input.patientId());
@@ -532,6 +580,14 @@ public class AdmissionService {
         AdmissionRow updated = admissions.find(tenantId, admissionId)
                 .orElseThrow(() -> new IllegalStateException("The admission was not found"));
         return buildDetail(tenantId, actor, role, ent, updated);
+    }
+
+    /** SAH-58: the course number shown on a COURSE deposit ("From treatment course TC-0412"); null for a desk deposit. */
+    private String courseNoOf(UUID tenantId, UUID admissionId, DepositRow deposit) {
+        if (!"COURSE".equals(deposit.source()) || courseLink == null) {
+            return null;
+        }
+        return courseLink.courseNo(tenantId, admissionId).orElse(null);
     }
 
     // ---- SAH-25 extra charges ----
@@ -697,7 +753,7 @@ public class AdmissionService {
         List<DepositEntry> deposits = new ArrayList<>();
         for (DepositRow d : admissions.findDeposits(tenantId, row.id())) {
             deposits.add(new DepositEntry(d.id(), d.amountPaise(), d.mode(), d.collectedAt(),
-                    lookups.collector(tenantId, d.collectedBy())));
+                    lookups.collector(tenantId, d.collectedBy()), d.source(), courseNoOf(tenantId, row.id(), d)));
         }
         String state = ent.ipdState();
         boolean canCollect = CardAccessRule.DEPOSIT.contains(role) && ("trial".equals(state) || "on".equals(state))
@@ -786,7 +842,7 @@ public class AdmissionService {
         List<DepositEntry> deposits = new ArrayList<>();
         for (DepositRow d : admissions.findDeposits(tenantId, row.id())) {
             deposits.add(new DepositEntry(d.id(), d.amountPaise(), d.mode(), d.collectedAt(),
-                    lookups.collector(tenantId, d.collectedBy())));
+                    lookups.collector(tenantId, d.collectedBy()), d.source(), courseNoOf(tenantId, row.id(), d)));
         }
         DischargeViews.DischargeRecord record = new DischargeViews.DischargeRecord(discharge.type(),
                 discharge.templateKey(), lookups.collector(tenantId, discharge.signedBy()), discharge.signedAt(),

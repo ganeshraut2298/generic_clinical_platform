@@ -1,8 +1,34 @@
 openapi: 3.1.0
 info:
   title: Sahaj Billing API
-  version: 0.1.0
-  description: Phase 1 contract, SAH-10. Reads are for any clinic role; most writes are OWNER/FRONT_DESK (403 otherwise); refund is OWNER only. Errors are RFC 9457 application/problem+json.
+  version: 0.3.0
+  description: >-
+    0.3.0 (13 Nov 2026, EMR phase 5, ADR-025 D7, D14; additive). (1) BillItem.source gains EMR_PLAN: a dental plan row
+    marked done today, added once by the doctor's "Complete & send to billing" (SAH-69-3) at the row's charge from the
+    estimate (tariff price or the typed amount, DEC-044 H17), named by the procedure; added also to a bill that has a
+    payment (a new open line; nothing paid is changed); staff at the counter keep their SAH-10 rights on it. (2)
+    Bill.visitType gains EMERGENCY (opd 0.6.0, SAH-67-4); the consultation fee shown is the visit's fee, which the
+    EMR recomputes only while the bill has no payment. (3) billing implements two more methods of the opd.api port
+    EmrVisitChargePort (hasPayment, addPricedLines); no HTTP operation is added. IPD round and Emergency records add
+    no line anywhere (DEC-042 H8).
+
+    Phase 1 contract, SAH-10. Reads are for any clinic role; most writes are OWNER/FRONT_DESK (403 otherwise); refund is
+    OWNER only. Errors are RFC 9457 application/problem+json; the type is https://sahaj.in/problems/<slug>. The clinic
+    always comes from the signed-in user, never from a body, query, path or header.
+
+    0.2.0 (12 Nov 2026, ADR-022 D7, D12; SAH-48-4, SAH-58). Additive. (1) Visit bill lines from the EMR: the EMR (opd)
+    makes the visit bill's EMR lines equal to the doctor's "Bill today" services through an opd.api port that billing
+    implements (no HTTP call); BillItem gains source (COUNTER or EMR); an EMR line is never removed or changed here by
+    the EMR once the bill has a payment ("Already billed. Ask billing to adjust."); staff at the counter keep their
+    SAH-10 rights on every line. (2) Treatment course account under /courses/{courseId}/**: one running account per
+    course (B-1, tagged "value from the EMR mockup, accepted by the human in DEC-039, not clinically reviewed"); the
+    course plan itself is GET /api/v1/opd/emr/courses/{courseId}. Payments are append-only, numbered RC-<n> by a
+    per-clinic counter, idempotent by the Idempotency-Key header. Credit used is shown as derived adjustment lines;
+    credit carried to an IPD admission is a stored transfer made by ipd at admission (billing.api CourseCreditPort).
+    (3) Course payments count in the day closing's expected cash and in the revenue report's collected amount and
+    modes (ADR-022 H3). (4) Bill.visitType gains REVISIT (opd 0.3.0 added it to visits). New problem types:
+    course-not-found, receipt-not-found (404), amount-over-balance (400), idempotency-conflict (409). No payment
+    gateway: the mode is a record of how money was received. Nothing is sent on WhatsApp (DEC-040).
 servers:
   - url: /api/v1/billing
 security:
@@ -128,6 +154,96 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /courses/{courseId}/account:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-58]
+      operationId: getCourseAccount
+      summary: The course's running account (estimate, paid, credit or due, due today, balance, receipts and adjustments)
+      description: >-
+        SAH-58-1, SAH-58-3, SAH-58-4 (ADR-022 D12). Worked out on read from the course plan (opd.api TreatmentCoursePort)
+        and billing's own payments and transfers. Definitions, all paise, shown as whole rupees with Indian grouping:
+        estimate = sum of the charges of sittings not settled in IPD; paid = course payments minus credit carried to
+        IPD; charges done = charges of DONE sittings not settled in IPD; credit = max(0, paid - charges done)
+        ("Advance balance · Used against next charges"); dueFromEarlier = max(0, charges done - paid); dueToday =
+        max(0, charges done + today's charge - paid); balance = max(0, estimate - paid). A DAY_CARE or IPD sitting
+        linked to an admission is billed in IPD and is out of these sums (ADR-022 H1, default awaiting the human).
+        ledger lists payments (newest last), credit carried to IPD (negative) and derived "Advance used" lines when a
+        DONE sitting used credit; the lines always add up to paid, credit and balance (tested to the rupee).
+        suggestions follow the tagged rules: part payment = half of today's amount rounded to the nearest ₹100, at
+        least ₹500, at most the balance; IPD deposit = 40% of the next planned admission sitting's charge rounded to
+        the nearest ₹500. canCollect is true for the roles that collect at the counter (OWNER, FRONT_DESK). NURSE,
+        PHARMACIST, COUNSELLOR 403. Another clinic's course: 404. Never logged (names, items).
+      x-required-role: OWNER, DOCTOR, VISITING_DOCTOR, FRONT_DESK, BILLING
+      responses:
+        '200': { description: The account, content: { application/json: { schema: { $ref: '#/components/schemas/CourseAccount' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem', description: course-not-found }
+  /courses/{courseId}/payments:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-58]
+      operationId: collectCoursePayment
+      summary: Collect payment against the course ("Payment collected · Receipt RC-<n>")
+      description: >-
+        SAH-58-3 (ADR-022 D12; rules B-1 tagged). Types: VISIT_PAYMENT ("Today's <unit>"), FULL_BALANCE ("Full course
+        balance · Clears the whole estimate"), PART_PAYMENT ("Any amount now, rest later"), ADVANCE, IPD_DEPOSIT
+        ("Advance / IPD deposit", offered when the next planned sitting is a day-care or IPD admission; earmarked to
+        that sitting and carried to the admission's deposits when ipd admits it). amountPaise must be whole rupees and
+        positive; VISIT_PAYMENT, FULL_BALANCE and PART_PAYMENT may not exceed the balance (400 amount-over-balance,
+        nothing recorded); ADVANCE and IPD_DEPOSIT may (they stay as credit). Mode UPI, CASH or CARD is a record only (no
+        gateway). Recorded once, append-only, with the next receipt number of the clinic (RC-<n>). Idempotency-Key is
+        required: the same key and body return the first payment (200); the same key with another body 409
+        idempotency-conflict. Who: the same roles and checks as POST /bills/{visitId}/payments (OWNER, FRONT_DESK;
+        ADR-022 H2: the BILLING role reads only, as at the counter today); others 403; no login 401. One audit entry
+        COURSE_PAYMENT_RECORDED (course id, receipt number, type, mode, amount; never the patient's name, mobile or
+        the sitting items).
+      x-required-role: OWNER, FRONT_DESK
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+          description: 'Made by the client per tap (a uuid); a retry after a lost network sends the same key.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CoursePaymentCreate' }
+            examples:
+              partPayment: { value: { type: PART_PAYMENT, amountPaise: 150000, mode: UPI, useCredit: true, againstSittingId: null } }
+      responses:
+        '201': { description: Recorded, content: { application/json: { schema: { $ref: '#/components/schemas/CoursePaymentResult' } } } }
+        '200': { description: 'Same Idempotency-Key and body: the first payment', content: { application/json: { schema: { $ref: '#/components/schemas/CoursePaymentResult' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation or amount-over-balance.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem', description: course-not-found }
+        '409': { $ref: '#/components/responses/Problem', description: idempotency-conflict }
+  /courses/{courseId}/receipts/{receiptNo}:
+    parameters:
+      - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: receiptNo, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      tags: [SAH-58]
+      operationId: getCourseReceipt
+      summary: A course receipt for printing (browser print)
+      description: >-
+        SAH-58-5 (ADR-022 D12, H4: SAH-10 has no receipt number or receipt view; this read serves course receipts).
+        Clinic letterhead, receipt number, date, patient name and UHID, course number and name, type, mode, against,
+        amount, collected by, and the balance after it. "Send on WhatsApp" is shown disabled ("Needs the WhatsApp
+        service"; DEC-040). OWNER, FRONT_DESK, BILLING; DOCTOR, VISITING_DOCTOR, NURSE, PHARMACIST, COUNSELLOR 403.
+      x-required-role: OWNER, FRONT_DESK, BILLING
+      responses:
+        '200': { description: Receipt, content: { application/json: { schema: { $ref: '#/components/schemas/CourseReceipt' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or receipt-not-found.' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -167,6 +283,7 @@ components:
         amountPaise: { type: integer }
         qty: { type: integer }
         removable: { type: boolean, description: False for the consultation line. }
+        source: { type: string, enum: [COUNTER, EMR, EMR_PLAN], description: '0.2.0. EMR = added by the doctor''s "Bill today" service in the EMR (SAH-48-4); one line per EMR item. 0.3.0: EMR_PLAN = a dental plan row done today, added once at the doctor''s sign (SAH-69-3), name = the procedure, amount = the row''s estimate charge.' }
     Payment:
       type: object
       required: [id, mode, amountPaise, recordedByName, recordedAt]
@@ -187,7 +304,7 @@ components:
         age: { type: integer }
         sex: { type: string, enum: [F, M, O] }
         doctorName: { type: string }
-        visitType: { type: string, enum: [NEW, FOLLOW_UP] }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP, REVISIT, EMERGENCY], description: 'REVISIT added in 0.2.0 (set by the doctor from the EMR, opd 0.3.0). EMERGENCY added in 0.3.0 (opd 0.6.0, SAH-67-4).' }
         items: { type: array, items: { $ref: '#/components/schemas/BillItem' } }
         subtotalPaise: { type: integer }
         discountPercent: { type: integer }
@@ -254,3 +371,91 @@ components:
         note: { type: [string, 'null'] }
         closedByName: { type: string }
         closedAt: { type: string, format: date-time }
+    CoursePaymentType:
+      type: string
+      enum: [VISIT_PAYMENT, FULL_BALANCE, PART_PAYMENT, ADVANCE, IPD_DEPOSIT]
+      description: 'Shown as Visit payment, Full balance, Part payment, Advance, IPD deposit (tagged B-1).'
+    CoursePaymentCreate:
+      type: object
+      additionalProperties: false
+      required: [type, amountPaise, mode, useCredit]
+      properties:
+        type: { $ref: '#/components/schemas/CoursePaymentType' }
+        amountPaise: { type: integer, minimum: 100, maximum: 10000000000, multipleOf: 100, description: 'Whole rupees, positive. Zero, negative or over the balance for VISIT_PAYMENT, FULL_BALANCE, PART_PAYMENT: 400.' }
+        mode: { $ref: '#/components/schemas/PaymentMode' }
+        useCredit: { type: boolean, description: '"Use advance balance first (₹ x credit)". Recorded with the payment; credit is used before cash.' }
+        againstSittingId: { type: [string, 'null'], format: uuid, description: 'VISIT_PAYMENT: today''s sitting; IPD_DEPOSIT: the planned admission sitting it is for (required); otherwise null.' }
+        tenantId: { description: 'Accepted and ignored.' }
+        clinicId: { description: 'Accepted and ignored.' }
+    CourseLedgerLine:
+      type: object
+      required: [kind, date, type, mode, against, amountPaise, receiptNo]
+      description: '"Receipts and adjustments" row: Date, Type, Mode, Against, Amount, Receipt. Lines cannot be changed or deleted; a correction is a new line made by the counter''s own rules.'
+      properties:
+        kind: { type: string, enum: [PAYMENT, CREDIT_USED, CARRIED_TO_IPD] }
+        date: { type: string, format: date }
+        type: { type: [string, 'null'], description: 'PAYMENT: the CoursePaymentType; null otherwise.' }
+        mode: { oneOf: [{ $ref: '#/components/schemas/PaymentMode' }, { type: 'null' }] }
+        against: { type: string, maxLength: 80, description: 'For example "Course advance", "Sitting 2", "Visits 2–3", "Admission IP-2232".' }
+        amountPaise: { type: integer, description: 'Positive for a payment; negative effect on credit for CREDIT_USED and CARRIED_TO_IPD.' }
+        receiptNo: { type: [string, 'null'], description: 'RC-<n> for a payment; null for adjustments.' }
+    CourseAccount:
+      type: object
+      required: [courseId, courseNo, unit, estimatePaise, paidPaise, creditPaise, dueFromEarlierPaise, todayChargePaise, dueTodayPaise, balancePaise, sittingCount, doneCount, receiptCount, nextPlannedAdmission, suggestions, canCollect, ledger]
+      properties:
+        courseId: { type: string, format: uuid }
+        courseNo: { type: string }
+        unit: { type: string, enum: [SITTING, VISIT, CYCLE, STEP, SESSION] }
+        estimatePaise: { type: integer, minimum: 0, description: '"Course estimate · n <unit>s · m done".' }
+        paidPaise: { type: integer, minimum: 0, description: '"Paid so far · n receipt(s)".' }
+        creditPaise: { type: integer, minimum: 0 }
+        dueFromEarlierPaise: { type: integer, minimum: 0, description: 'Shown "Due from earlier · Not paid yet" when credit is 0.' }
+        todayChargePaise: { type: integer, minimum: 0 }
+        dueTodayPaise: { type: integer, minimum: 0, description: '"Due today": today''s charge plus due from earlier, less credit.' }
+        balancePaise: { type: integer, minimum: 0, description: '"Balance on the course: ₹ x".' }
+        sittingCount: { type: integer, minimum: 0 }
+        doneCount: { type: integer, minimum: 0 }
+        receiptCount: { type: integer, minimum: 0 }
+        nextPlannedAdmission:
+          type: [object, 'null']
+          description: 'The next planned DAY_CARE or IPD sitting: the payment type reads "Advance / IPD deposit".'
+          required: [sittingId, sittingNo, chargePaise, note]
+          properties:
+            sittingId: { type: string, format: uuid }
+            sittingNo: { type: integer }
+            chargePaise: { type: integer, minimum: 0 }
+            note: { type: [string, 'null'], description: 'For example "Admission deposit is due by 36 weeks." (no reminder, no block).' }
+        suggestions:
+          type: object
+          required: [partPaymentPaise, ipdDepositPaise]
+          properties:
+            partPaymentPaise: { type: [integer, 'null'], description: 'Null when the balance is 0.' }
+            ipdDepositPaise: { type: [integer, 'null'], description: 'Null when no admission is planned.' }
+        canCollect: { type: boolean, description: 'False hides the "Collect payment" panel.' }
+        ledger: { type: array, items: { $ref: '#/components/schemas/CourseLedgerLine' } }
+    CoursePaymentResult:
+      type: object
+      required: [receiptNo, account]
+      properties:
+        receiptNo: { type: string, description: '"RC-<n>".' }
+        account: { $ref: '#/components/schemas/CourseAccount' }
+    CourseReceipt:
+      type: object
+      required: [receiptNo, clinicName, clinicAddress, clinicPhone, date, patientName, uhid, courseNo, courseName, type, mode, against, amountPaise, collectedByName, balanceAfterPaise]
+      description: 'Screen and print only; never logged.'
+      properties:
+        receiptNo: { type: string }
+        clinicName: { type: string }
+        clinicAddress: { type: [string, 'null'] }
+        clinicPhone: { type: [string, 'null'] }
+        date: { type: string, format: date-time }
+        patientName: { type: string }
+        uhid: { type: [string, 'null'] }
+        courseNo: { type: string }
+        courseName: { type: string }
+        type: { $ref: '#/components/schemas/CoursePaymentType' }
+        mode: { $ref: '#/components/schemas/PaymentMode' }
+        against: { type: string }
+        amountPaise: { type: integer }
+        collectedByName: { type: string }
+        balanceAfterPaise: { type: integer, minimum: 0 }

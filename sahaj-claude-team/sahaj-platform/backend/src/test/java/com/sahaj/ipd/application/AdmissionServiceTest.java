@@ -127,7 +127,8 @@ class AdmissionServiceTest {
                 patientAccess, actors, new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
                 catalog, charges, new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
                 emergency, vitals, new AdmittedCards(clinicalPatients, patients, vitals, safety),
-                new CardSetups(mock(CardSetupRepository.class)), guard, ScopeStubs.repository());
+                new CardSetups(mock(CardSetupRepository.class)), guard, ScopeStubs.repository(),
+                mock(com.sahaj.opd.api.EmrAdmissionRequestPort.class));
 
         state("on");
         freeBed = new BedRow(BED, WARD, null, "101-A", "gen", "free");
@@ -1668,5 +1669,97 @@ class AdmissionServiceTest {
         when(guard.scopeWithMembership(TENANT, ACTOR, "FRONT_DESK", "FRONT_DESK"))
                 .thenReturn(PatientScope.all(ACTOR, "FRONT_DESK", "FRONT_DESK", UUID.randomUUID(), java.util.Set.of()));
         assertThat(listAs("FRONT_DESK", "ADMITTED").items().get(0).mine()).isNull();
+    }
+    // ---- SAH-58: admit now from a treatment course (ADR-022 D12; DEC-042 H1) ----
+
+    private static final UUID SITTING = UUID.randomUUID();
+    private static final UUID COURSE = UUID.randomUUID();
+
+    private static AdmissionInput courseInput() {
+        return new AdmissionInput(PATIENT, DOCTOR, "planned", BED, "Chest pain", "Self", 1_000_000L, "UPI", true,
+                null, SITTING);
+    }
+
+    @Test
+    void admitForACourseSittingChecksFirstLinksAndCarriesTheCreditInTheSameTransaction() {
+        AdmissionCourseLink link = mock(AdmissionCourseLink.class);
+        service.setCourseLink(link);
+        AdmissionCourseLink.Prepared prepared = new AdmissionCourseLink.Prepared(COURSE, "TC-0412", SITTING);
+        when(link.prepare(TENANT, PATIENT, SITTING)).thenReturn(prepared);
+        when(link.complete(TENANT, ACTOR, prepared, ADMISSION))
+                .thenReturn(new AdmissionCourseLink.Carried(500_000L, UUID.randomUUID()));
+        when(link.courseNo(TENANT, ADMISSION)).thenReturn(Optional.of("TC-0412"));
+        when(admissions.findDeposits(TENANT, ADMISSION)).thenReturn(List.of(
+                new DepositRow(DEPOSIT, 1_000_000L, "UPI", ADMITTED_AT, ACTOR),
+                new DepositRow(UUID.randomUUID(), 500_000L, null, ADMITTED_AT, ACTOR, "COURSE")));
+
+        Detail detail = service.admit(TENANT, ACTOR, "FRONT_DESK", courseInput());
+
+        InOrder order = inOrder(link, admissions);
+        order.verify(link).prepare(TENANT, PATIENT, SITTING);
+        ArgumentCaptor<NewAdmission> saved = ArgumentCaptor.forClass(NewAdmission.class);
+        order.verify(admissions).insert(eq(TENANT), saved.capture());
+        order.verify(link).complete(TENANT, ACTOR, prepared, ADMISSION);
+        assertThat(saved.getValue().treatmentCourseId()).isEqualTo(COURSE);
+        assertThat(saved.getValue().treatmentCourseSittingId()).isEqualTo(SITTING);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> after = ArgumentCaptor.forClass(Map.class);
+        verify(auditLog).record(eq("IPD_ADMITTED"), eq("IPD_ADMISSION"), eq(ADMISSION), eq(null), after.capture());
+        assertThat(after.getValue()).containsEntry("treatmentCourseId", COURSE).containsEntry("carriedPaise", 500_000L);
+        assertThat(detail.deposits()).hasSize(2);
+        assertThat(detail.deposits().get(0).source()).isEqualTo("DESK");
+        assertThat(detail.deposits().get(0).courseNo()).isNull();
+        assertThat(detail.deposits().get(1).source()).isEqualTo("COURSE");
+        assertThat(detail.deposits().get(1).mode()).isNull();
+        assertThat(detail.deposits().get(1).courseNo()).isEqualTo("TC-0412");
+    }
+
+    @Test
+    void aSittingThatCannotBeAdmittedIs409AndNothingIsWrittenNotEvenTheIpNumber() {
+        AdmissionCourseLink link = mock(AdmissionCourseLink.class);
+        service.setCourseLink(link);
+        when(link.prepare(TENANT, PATIENT, SITTING)).thenThrow(AdmissionCourseLink.notAvailable());
+
+        assertThatThrownBy(() -> service.admit(TENANT, ACTOR, "FRONT_DESK", courseInput()))
+                .isInstanceOfSatisfying(ConflictException.class,
+                        ex -> assertThat(ex.problemType()).isEqualTo("course-sitting-not-available"));
+        verify(admissions, never()).nextIpNo(any(), anyString());
+        verify(admissions, never()).insert(any(), any());
+        verify(beds, never()).markOccupied(any(), any());
+        verify(link, never()).complete(any(), any(), any(), any());
+        verify(auditLog, never()).record(eq("IPD_ADMITTED"), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void withoutTheCourseLinkASittingIdCannotBeAdmitted() {
+        assertThatThrownBy(() -> service.admit(TENANT, ACTOR, "FRONT_DESK", courseInput()))
+                .isInstanceOf(ConflictException.class);
+        verify(admissions, never()).insert(any(), any());
+    }
+
+    @Test
+    void anAdmissionWithoutASittingNeverTouchesTheCourseLink() {
+        AdmissionCourseLink link = mock(AdmissionCourseLink.class);
+        service.setCourseLink(link);
+
+        service.admit(TENANT, ACTOR, "FRONT_DESK", validInput());
+
+        org.mockito.Mockito.verifyNoInteractions(link);
+    }
+
+    @Test
+    void aCarriedZeroLeavesNoCourseDepositButStillLinksTheSitting() {
+        AdmissionCourseLink link = mock(AdmissionCourseLink.class);
+        service.setCourseLink(link);
+        AdmissionCourseLink.Prepared prepared = new AdmissionCourseLink.Prepared(COURSE, "TC-0412", SITTING);
+        when(link.prepare(TENANT, PATIENT, SITTING)).thenReturn(prepared);
+        when(link.complete(TENANT, ACTOR, prepared, ADMISSION)).thenReturn(new AdmissionCourseLink.Carried(0, null));
+
+        service.admit(TENANT, ACTOR, "FRONT_DESK", courseInput());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> after = ArgumentCaptor.forClass(Map.class);
+        verify(auditLog).record(eq("IPD_ADMITTED"), eq("IPD_ADMISSION"), eq(ADMISSION), eq(null), after.capture());
+        assertThat(after.getValue()).containsEntry("carriedPaise", 0L);
     }
 }

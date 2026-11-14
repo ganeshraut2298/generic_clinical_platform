@@ -738,7 +738,7 @@ class StaffPinIT extends PinTestSupport {
         List<String> offMenu = new ArrayList<>();
         ok(HttpMethod.GET, "/api/v1/platform/me", staff(off, "PHARMACIST").auth(), null, 200).get("menu")
                 .forEach(n -> offMenu.add(n.asText()));
-        assertThat(offMenu).containsExactly("today");
+        assertThat(offMenu).as("0.1.1 of platform.yaml (ADR-023 D13.5): the PHARMACIST also gets the Second checks item, after ipd or at the end").containsExactly("today", "secondchecks");
     }
 
     @Test

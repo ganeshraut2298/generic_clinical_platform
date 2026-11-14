@@ -71,6 +71,12 @@ public class StaffPinService implements StaffPinPort {
         this.scope = scope;
     }
 
+    /** SAH-66: which of these memberships have a PIN set (chemotherapy checker options). */
+    @Override
+    public java.util.Set<UUID> membershipsWithPin(UUID tenantId, java.util.Collection<UUID> membershipIds) {
+        return ops.membershipsWithPin(tenantId, membershipIds);
+    }
+
     /** GET /me/pin. Writes nothing. */
     public PinStatusView status(UUID tenantId, UUID userId) {
         Own own = ops.readOwn(tenantId, userId).orElseThrow(StaffPinService::notAllowed);

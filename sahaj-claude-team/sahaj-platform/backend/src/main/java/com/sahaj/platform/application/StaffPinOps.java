@@ -80,6 +80,18 @@ public class StaffPinOps {
                         staffPinRepository.find(tenantId, member.id(), false).orElse(null)));
     }
 
+    /** SAH-66: the memberships of these that have a PIN set (the clinic is bound by the caller's transaction). */
+    @Transactional(readOnly = true)
+    public java.util.Set<UUID> membershipsWithPin(UUID tenantId, java.util.Collection<UUID> membershipIds) {
+        java.util.Set<UUID> result = new java.util.HashSet<>();
+        for (StaffPinRow row : staffPinRepository.findAll(tenantId)) {
+            if (row.hasPin() && membershipIds.contains(row.membershipId())) {
+                result.add(row.membershipId());
+            }
+        }
+        return result;
+    }
+
     /** The status screen data for an {@link Own}. */
     public PinStatusView statusOf(Own own, boolean available) {
         StaffPinRow row = own.row();

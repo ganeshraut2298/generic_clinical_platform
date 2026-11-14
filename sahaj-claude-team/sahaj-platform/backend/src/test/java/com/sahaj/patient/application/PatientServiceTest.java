@@ -18,7 +18,10 @@ import com.sahaj.patient.application.PatientRepository.PatientRow;
 import com.sahaj.platform.api.AuditLog;
 import com.sahaj.platform.api.InvalidInputException;
 import com.sahaj.platform.api.NotFoundException;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +36,9 @@ class PatientServiceTest {
     private static final UUID TENANT_ID = UUID.randomUUID();
     private static final UUID ACTOR = UUID.randomUUID();
     private static final UUID PATIENT_ID = UUID.randomUUID();
+    /** 13 Nov 2026, 11:30 AM in India (06:00 UTC). */
+    private static final Instant NOW = Instant.parse("2026-11-13T06:00:00Z");
+    private static final LocalDate TODAY = LocalDate.of(2026, 11, 13);
 
     private PatientRepository repository;
     private AuditLog auditLog;
@@ -46,7 +52,8 @@ class PatientServiceTest {
         auditLog = mock(AuditLog.class);
         consentRepository = mock(ConsentRepository.class);
         accessRepository = mock(RecordAccessRepository.class);
-        service = new PatientService(repository, consentRepository, accessRepository, auditLog);
+        service = new PatientService(repository, consentRepository, accessRepository, auditLog,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static PatientRow row(UUID id, String name, int age, String mobile, UUID mergedIntoId) {
@@ -66,7 +73,7 @@ class PatientServiceTest {
         assertThat(created.name()).isEqualTo("Asha Rao");
         assertThat(created.language()).isEqualTo("mr");
         assertThat(created.possibleDuplicateOfId()).isNull();
-        verify(repository).insert(any(UUID.class), eq("Asha Rao"), eq(30), eq("F"), eq("9123450001"), isNull(),
+        verify(repository).insert(any(UUID.class), eq("Asha Rao"), eq(30), isNull(), eq("F"), eq("9123450001"), isNull(),
                 eq("mr"), isNull(), isNull(), eq(false), eq(ACTOR));
         verify(auditLog).record(eq("PATIENT_REGISTERED"), eq("PATIENT"), any(UUID.class), isNull(), any());
     }
@@ -85,7 +92,7 @@ class PatientServiceTest {
         assertThatThrownBy(() -> service.create(TENANT_ID, ACTOR,
                 new PatientInput("Asha", 30, "F", "12345", null, null, null, null, null)))
                 .isInstanceOf(InvalidInputException.class);
-        verify(repository, never()).insert(any(), anyString(), anyInt(), anyString(), anyString(), any(), anyString(),
+        verify(repository, never()).insert(any(), anyString(), anyInt(), any(), anyString(), anyString(), any(), anyString(),
                 any(), any(), anyBoolean(), any());
     }
 
@@ -101,7 +108,7 @@ class PatientServiceTest {
                 new PatientInput("Asha Rao", 30, "F", "9123450001", null, null, null, null, null));
 
         assertThat(created.possibleDuplicateOfId()).isEqualTo(existingId);
-        verify(repository).insert(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), anyBoolean(),
+        verify(repository).insert(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(),
                 any());
     }
 
@@ -122,30 +129,30 @@ class PatientServiceTest {
     @Test
     void searchFiltersThatNeedVisitDataAlwaysReturnZeroWithoutTouchingTheRepository() {
         for (String filter : List.of("due", "missed", "overdue", "lapsed")) {
-            PatientPage page = service.search(TENANT_ID, null, filter, 0);
+            PatientSummaryPage page = service.search(TENANT_ID, null, filter, 0);
             assertThat(page.items()).isEmpty();
             assertThat(page.total()).isZero();
         }
-        verify(repository, never()).search(any(), any(), any(), anyInt(), anyInt());
+        verify(repository, never()).search(any(), any(), any(), anyInt(), anyInt(), any());
     }
 
     @Test
     void anUnknownFilterBehavesLikeAll() {
-        when(repository.search(TENANT_ID, null, "all", 20, 0)).thenReturn(new PatientPage(List.of(), 0));
+        when(repository.search(TENANT_ID, null, "all", 20, 0, TODAY)).thenReturn(new PatientPage(List.of(), 0));
 
         service.search(TENANT_ID, null, "not-a-real-filter", 0);
 
-        verify(repository).search(TENANT_ID, null, "all", 20, 0);
+        verify(repository).search(TENANT_ID, null, "all", 20, 0, TODAY);
     }
 
     @Test
     void searchLowerCasesAndTrimsTheQuery() {
-        when(repository.search(eq(TENANT_ID), eq("asha"), eq("all"), anyInt(), anyInt()))
+        when(repository.search(eq(TENANT_ID), eq("asha"), eq("all"), anyInt(), anyInt(), any()))
                 .thenReturn(new PatientPage(List.of(), 0));
 
         service.search(TENANT_ID, "  Asha  ", "all", 0);
 
-        verify(repository).search(TENANT_ID, "asha", "all", 20, 0);
+        verify(repository).search(TENANT_ID, "asha", "all", 20, 0, TODAY);
     }
 
     @Test
@@ -179,7 +186,7 @@ class PatientServiceTest {
                 new PatientUpdateInput(null, 31, null, null, null, null, null, null));
 
         assertThat(updated.age()).isEqualTo(31);
-        verify(repository).update(PATIENT_ID, "Asha Rao", 31, "F", null, "mr", null, null, false, ACTOR);
+        verify(repository).update(PATIENT_ID, "Asha Rao", 31, null, "F", null, "mr", null, null, false, ACTOR);
         verify(auditLog).record(eq("PATIENT_UPDATED"), eq("PATIENT"), eq(PATIENT_ID), any(), any());
     }
 
@@ -191,7 +198,7 @@ class PatientServiceTest {
         service.update(TENANT_ID, ACTOR, PATIENT_ID,
                 new PatientUpdateInput("Asha Rao", 30, "F", null, "mr", null, null, false));
 
-        verify(repository, never()).update(any(), any(), anyInt(), any(), any(), any(), any(), any(), anyBoolean(),
+        verify(repository, never()).update(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), anyBoolean(),
                 any());
         verify(auditLog, never()).record(any(), any(), any(), any(), any());
     }
@@ -212,7 +219,7 @@ class PatientServiceTest {
         PatientView result = service.merge(TENANT_ID, ACTOR, keepId, mergeId);
 
         assertThat(result.id()).isEqualTo(keepId);
-        verify(repository).update(keepId, "Asha R", 30, "F", null, "mr", null, null, false, ACTOR);
+        verify(repository).update(keepId, "Asha R", 30, null, "F", null, "mr", null, null, false, ACTOR);
         verify(repository).setMergedInto(mergeId, keepId, ACTOR);
         ArgumentCaptor<String> actions = ArgumentCaptor.forClass(String.class);
         verify(auditLog, org.mockito.Mockito.times(2)).record(actions.capture(), eq("PATIENT"), any(), any(), any());
@@ -312,7 +319,7 @@ class PatientServiceTest {
                 List.of(new ConsentInput("RECORDS", true), new ConsentInput("RECORDS", false)))))
                 .isInstanceOfSatisfying(InvalidInputException.class,
                         ex -> assertThat(ex.field()).isEqualTo("consents"));
-        verify(repository, never()).insert(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(),
+        verify(repository, never()).insert(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(),
                 anyBoolean(), any());
         verify(consentRepository, never()).insert(any(), any(), anyBoolean(), any());
     }
@@ -325,7 +332,7 @@ class PatientServiceTest {
         assertThatThrownBy(() -> service.create(TENANT_ID, ACTOR,
                 inputWithConsents(List.of(new ConsentInput("RECORDS", null)))))
                 .isInstanceOf(InvalidInputException.class);
-        verify(repository, never()).insert(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(),
+        verify(repository, never()).insert(any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(),
                 anyBoolean(), any());
     }
 
@@ -352,7 +359,7 @@ class PatientServiceTest {
     void findSearchAndFamilyNeverWriteAnAccessRow() {
         when(repository.findById(TENANT_ID, PATIENT_ID))
                 .thenReturn(Optional.of(row(PATIENT_ID, "Asha Rao", 30, "9123450001", null)));
-        when(repository.search(eq(TENANT_ID), any(), any(), anyInt(), anyInt())).thenReturn(new PatientPage(List.of(), 0));
+        when(repository.search(eq(TENANT_ID), any(), any(), anyInt(), anyInt(), any())).thenReturn(new PatientPage(List.of(), 0));
         when(repository.findFamily(eq(TENANT_ID), any(), any())).thenReturn(List.of());
 
         service.find(TENANT_ID, PATIENT_ID);
@@ -451,7 +458,7 @@ class PatientServiceTest {
 
         service.merge(TENANT_ID, ACTOR, keepId, mergeId);
 
-        verify(repository).update(eq(keepId), anyString(), anyInt(), anyString(), any(), anyString(),
+        verify(repository).update(eq(keepId), anyString(), anyInt(), any(), anyString(), any(), anyString(),
                 eq(expectedAllergy), eq(expectedChronic), anyBoolean(), eq(ACTOR));
     }
 

@@ -26,6 +26,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration",
         "SAHAJ_DB_APP_PASSWORD=not-used-no-database-in-this-test",
+        "sahaj.opd.partition-check.enabled=false",
         "SAHAJ_JWT_SECRET=not-used-no-database-in-this-test-but-must-be-32-plus-chars"
 })
 @ActiveProfiles("dev")

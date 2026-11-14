@@ -34,6 +34,7 @@ import {
 import { goingHomeCount, goingHomeText } from './discharge.model';
 import { AdmitDialogComponent, AdmitDialogData } from './admit/admit-dialog.component';
 import { AdmittedPanelComponent, OpenAdmissionRequest } from './admitted/admitted-panel.component';
+import { AdmissionRequestsComponent } from './requests/admission-requests.component';
 import { AdmittedViewState } from './admitted/admitted-view.state';
 import { isScoped } from './admitted/admitted.model';
 import {
@@ -44,6 +45,8 @@ import { SHEET_TITLE_ID, grantToast } from './emergency-access/emergency-access.
 import { AdmissionsApi } from './admissions.api';
 import { BedBoardComponent } from './board/bed-board.component';
 import { EmergencyComponent, EmergencyRefusal } from './emergency/emergency.component';
+import { EmrAccess } from '../emr/emr-access.service';
+import { EmrLauncher } from '../emr/emr-launcher.service';
 import { EmrSheetComponent, EmrSheetData } from './emr/emr-sheet.component';
 import { EmergencyCounts, tileNumber, tileText } from './emergency/emergency.model';
 import { isModuleOff, isRefusal } from './ipd-refusal';
@@ -66,7 +69,7 @@ import {
   staleBoardText,
 } from './safety/safety.model';
 
-type IpdTab = 'board' | 'admitted' | 'er' | 'safety';
+type IpdTab = 'board' | 'admitted' | 'requests' | 'er' | 'safety';
 const EMERGENCY_LEAD = 'Triage first. Admit, treat and release, or refer out.';
 /** What the beds lead is expected to say before the two calls that complete it answer (mockup `cfg`: midnight, 80%). */
 const EXPECTED_BED_DAY_CUT = 'midnight';
@@ -96,6 +99,7 @@ const LOCK_HEADING_ID = 'ipd-lock-h';
     SafetyComponent,
     PharmacistTabComponent,
     AdmittedPanelComponent,
+    AdmissionRequestsComponent,
     PageHeadComponent,
   ],
   providers: [PharmacistStore, AdmittedViewState],
@@ -117,6 +121,8 @@ export class IpdPage implements OnInit {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly scopeRefusals = inject(ScopeRefusals);
+  protected readonly emrAccess = inject(EmrAccess);
+  private readonly emrLauncher = inject(EmrLauncher);
   private readonly viewState = inject(AdmittedViewState);
 
   protected readonly goingHome = goingHomeCount;
@@ -214,15 +220,20 @@ export class IpdPage implements OnInit {
       counts?.emergencyAccessWaiting,
     );
   });
+  /** SAH-67-3 (ADR-025 H16): the doctors' admission requests, for the roles that can admit. */
+  protected readonly requestsOn = computed(() => this.list()?.canAdmit === true && !this.isPharmacist());
+  protected readonly requestCount = signal<number | null>(null);
+  private readonly requestsPanel = viewChild(AdmissionRequestsComponent);
   protected readonly tabs = computed<IpdTab[]>(() => [
     'board',
     'admitted',
+    ...(this.requestsOn() ? (['requests'] as const) : []),
     ...(this.emergencyOn() ? (['er'] as const) : []),
     ...(this.safetyOn() ? (['safety'] as const) : []),
   ]);
   protected readonly activeTab = computed<IpdTab>(() => {
     const tab = this.tab();
-    if ((tab === 'er' && !this.emergencyOn()) || (tab === 'safety' && !this.safetyOn())) {
+    if ((tab === 'er' && !this.emergencyOn()) || (tab === 'safety' && !this.safetyOn()) || (tab === 'requests' && !this.requestsOn())) {
       return 'board';
     }
     return tab;
@@ -339,6 +350,7 @@ export class IpdPage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.emrAccess.ensureLoaded();
     if (this.isPharmacist()) {
       // The admissions list and the escalations board are not for this role (they carry bills).
       this.loading.set(false);
@@ -689,6 +701,23 @@ export class IpdPage implements OnInit {
     });
   }
 
+  /** "Admit" on an admission request: the existing sheet, pre-filled; the request closes when the admission is made. */
+  protected admitFromRequest(data: AdmitDialogData): void {
+    this.track(
+      this.dialog.open<AdmitDialogComponent, AdmitDialogData, AdmissionDetail | null>(AdmitDialogComponent, {
+        panelClass: 'sheet-panel',
+        width: '640px',
+        maxWidth: '100vw',
+        data,
+      }),
+    ).subscribe((admission) => {
+      if (admission) {
+        this.afterAdmitted(admission);
+        this.requestsPanel()?.load();
+      }
+    });
+  }
+
   /** Toast and reloads after the Admit sheet saved (from the page, a bed tile or an emergency card). */
   protected afterAdmitted(admission: AdmissionDetail): void {
     const deposit =
@@ -741,6 +770,11 @@ export class IpdPage implements OnInit {
         data: { admissionId },
       }),
     ).subscribe();
+  }
+
+  /** SAH-46-4. "Open EMR" on an admitted card: the consultation screen for this admission. */
+  protected openEmrRecord(admissionId: string): void {
+    this.emrLauncher.open('IPD_ROUND', admissionId);
   }
 
   protected refreshCounts(): void {

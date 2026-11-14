@@ -1,6 +1,7 @@
 <div class="sheet-h">
   <div>
     <h2 id="pf-title">{{ data.familyMember ? 'Add family member' : 'New patient' }}</h2>
+    <p class="muted" data-testid="pf-hint">Name, age and sex are enough. ABHA can be added later.</p>
     @if (data.familyMember) {
       <p class="muted">Saved under the same mobile number, as part of this family.</p>
     }
@@ -19,23 +20,15 @@
     }
   </mat-form-field>
 
-  <div class="row2">
-    <mat-form-field appearance="outline" subscriptSizing="dynamic">
-      <mat-label>Age</mat-label>
-      <input matInput class="num" formControlName="age" type="number" inputmode="numeric" placeholder="Years" min="0" max="120" />
-      @if (errorOf('age'); as error) {
-        <mat-error>{{ error }}</mat-error>
-      }
-    </mat-form-field>
+  <app-dob-age-fields [age]="form.controls.age" [dateOfBirth]="form.controls.dateOfBirth" />
 
-    <div class="field">
-      <span id="pf-sex-label" class="field-label">Sex</span>
-      <mat-button-toggle-group class="seg" formControlName="sex" aria-labelledby="pf-sex-label">
-        <mat-button-toggle value="F">F</mat-button-toggle>
-        <mat-button-toggle value="M">M</mat-button-toggle>
-        <mat-button-toggle value="O">O</mat-button-toggle>
-      </mat-button-toggle-group>
-    </div>
+  <div class="field">
+    <span id="pf-sex-label" class="field-label">Sex</span>
+    <mat-button-toggle-group class="seg" formControlName="sex" aria-labelledby="pf-sex-label">
+      <mat-button-toggle value="F">F</mat-button-toggle>
+      <mat-button-toggle value="M">M</mat-button-toggle>
+      <mat-button-toggle value="O">O</mat-button-toggle>
+    </mat-button-toggle-group>
   </div>
 
   <mat-form-field appearance="outline" subscriptSizing="dynamic">

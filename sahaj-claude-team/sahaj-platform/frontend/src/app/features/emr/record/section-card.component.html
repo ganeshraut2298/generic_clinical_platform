@@ -1,0 +1,101 @@
+<section
+  class="card"
+  [class.hl]="highlighted()"
+  [class.done]="state()?.status === 'DONE'"
+  [id]="'sec-' + section().key"
+  tabindex="-1"
+  [attr.aria-labelledby]="'sec-h-' + section().key"
+  [attr.data-section]="section().key"
+>
+  <header class="head">
+    <button
+      type="button"
+      class="toggle"
+      [attr.aria-expanded]="!collapsed()"
+      [attr.aria-controls]="bodyId()"
+      (click)="store.toggleCollapsed(section().key)"
+    >
+      <app-icon [name]="collapsed() ? 'chevR' : 'chevD'" [size]="16" />
+      <h3 [id]="'sec-h-' + section().key">
+        {{ section().name }}@if (section().required) {<span class="star" aria-hidden="true"> *</span>}
+      </h3>
+    </button>
+    <span
+      class="pill"
+      [class.p-good]="state()?.status === 'DONE'"
+      [class.p-crit]="state()?.status === 'REQUIRED'"
+      [class.p-wait]="state()?.status === 'OPTIONAL'"
+      data-testid="section-status"
+      >{{ statusText() }}</span
+    >
+    @if (section().source === 'FORM') {
+      <span class="pill p-teal" data-testid="custom-tag">Custom</span>
+    }
+    @if (fillers()) {
+      <span class="faint t-xs who">Can be filled by: {{ fillers() }}</span>
+    }
+  </header>
+
+  @if (!collapsed()) {
+    <div class="body" [id]="bodyId()">
+      @if (copiedText(); as copied) {
+        <div class="copied" role="status">
+          <span>{{ copied }}</span>
+          @if (pending() && !store.readOnly()) {
+            <button type="button" class="keep" data-act="keep-copy" (click)="store.confirmCopy(section().key)">
+              Keep these values
+            </button>
+          }
+        </div>
+      }
+      @let form = section().form;
+      @if (section().source === 'FORM' && form) {
+        <app-form-fill
+          [definition]="form"
+          [values]="values()"
+          [disabled]="store.readOnly()"
+          [errors]="problems()"
+          [specialty]="specialty()"
+          [idPrefix]="'f-' + section().key"
+          (fieldChange)="store.setValue(section().key, $event.key, $event.value)"
+        />
+        @if (!store.readOnly()) {
+          <div class="formfoot">
+            <button mat-stroked-button type="button" data-act="save-form" [disabled]="store.saving()" (click)="saveForm(form.name)">
+              Save to patient record
+            </button>
+          </div>
+        }
+      } @else if (hasEditor()) {
+        @if (legacy().length > 0) {
+          <div class="copied" role="status" data-testid="legacy-values">
+            <span>Earlier entries (read only, replaced by your first change here):</span>
+            @for (l of legacy(); track l.key) {
+              <span class="faint t-xs">{{ l.key }}: {{ l.text }}</span>
+            }
+          </div>
+        }
+        <app-specialty-host [section]="section()" />
+      } @else {
+        @if (section().key === 'vitals' && store.record()?.encounterType === 'IPD_ROUND') {
+          <app-vitals-note />
+        }
+        @for (field of section().fields; track field.key) {
+          @if (field.valueKind !== 'COVERED') {
+            <app-field-renderer
+              [field]="field"
+              [value]="values()[field.key] ?? null"
+              [disabled]="store.readOnly()"
+              [error]="problems()[field.key] ?? null"
+              [specialty]="specialty()"
+              [idPrefix]="'f-' + section().key"
+              (valueChange)="store.setValue(section().key, field.key, $event)"
+            />
+          }
+        } @empty {
+          <p class="faint t-xs">This section has no fields.</p>
+        }
+      }
+    </div>
+  }
+</section>

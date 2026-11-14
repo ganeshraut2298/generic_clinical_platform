@@ -8,14 +8,17 @@ import { Observable, forkJoin } from 'rxjs';
 import { ApiError } from '../../../core/http/problem-detail';
 import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { patientAgeText } from '../../../shared/format/patient-age';
 import { PageHeadComponent } from '../../../shared/ui/page-head.component';
 import { PatientFormDialogComponent } from '../form/patient-form-dialog.component';
 import { MergeConfirmDialogComponent } from '../merge/merge-confirm-dialog.component';
 import { PatientApi } from '../patient.api';
 import {
+  DATES_OF_BIRTH_DIFFERED_NOTICE,
   PATIENT_FILTERS,
   Patient,
   PatientFilter,
+  PatientMergeResult,
   PatientPage,
   PatientSummary,
   patientInitials,
@@ -47,6 +50,7 @@ export class PatientsListPage implements OnInit {
 
   protected readonly filters = PATIENT_FILTERS;
   protected readonly initials = patientInitials;
+  protected readonly ageOf = (patient: PatientSummary): string => patientAgeText(patient, 'row');
 
   protected readonly canWrite = computed(() => {
     const role = this.store.me()?.role;
@@ -69,6 +73,7 @@ export class PatientsListPage implements OnInit {
   protected readonly registeredCount = computed(() => this.counts().all ?? 0);
 
   protected readonly duplicatePair = signal<{ keep: Patient; mergeInto: Patient } | null>(null);
+  protected readonly mergeNotice = signal<string | null>(null);
 
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -133,13 +138,18 @@ export class PatientsListPage implements OnInit {
       return;
     }
     const ref = this.dialog.open(MergeConfirmDialogComponent, { ...FORM_DIALOG_CONFIG, data: pair });
-    ref.afterClosed().subscribe((merged: Patient | null) => {
+    ref.afterClosed().subscribe((merged: PatientMergeResult | null | undefined) => {
       if (merged) {
         this.duplicatePair.set(null);
+        this.mergeNotice.set(merged.datesOfBirthDiffered ? DATES_OF_BIRTH_DIFFERED_NOTICE : null);
         this.loadCounts();
         this.loadList();
       }
     });
+  }
+
+  protected dismissMergeNotice(): void {
+    this.mergeNotice.set(null);
   }
 
   protected dismissDuplicate(): void {

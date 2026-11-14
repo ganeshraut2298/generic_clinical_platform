@@ -22,6 +22,9 @@ public class StaffPinException extends RuntimeException {
     private static final String COLLEAGUE_NOT_SET = "The second nurse has not set a PIN yet. Choose another nurse.";
     private static final String COLLEAGUE_WRONG_PIN = "That PIN is not right.";
     private static final String PAIR_LIMIT_TEXT = "Too many wrong PIN tries for this nurse. Choose another nurse.";
+    /** SAH-66 (ADR-023 D6, H7): the neutral texts of the chemotherapy second check, whose checker may have several roles. */
+    private static final String CHECKER_NOT_SET = "The checker has not set a PIN yet. Choose another checker.";
+    private static final String CHECKER_PAIR_LIMIT_TEXT = "Too many wrong PIN tries for this person. Choose another checker.";
     private static final String CHECK_FAILED_TEXT = "We could not check the PIN. Try again.";
 
     private static final DateTimeFormatter CLOCK_IST = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
@@ -67,7 +70,14 @@ public class StaffPinException extends RuntimeException {
      * {@code COLLEAGUE}: another person's PIN, checked for a second-nurse check; the texts never name the colleague,
      * and the same problem types and statuses are used.
      */
-    public enum Subject { SELF, COLLEAGUE }
+    public enum Subject {
+        SELF, COLLEAGUE,
+        /**
+         * SAH-66 (ADR-023 D6, H7): the independent checker of a chemotherapy order, who may have several roles. The texts
+         * are the colleague texts without the word "nurse"; the problem types and statuses are the same.
+         */
+        CHECKER
+    }
 
     private final Kind kind;
     private final long retryAfterSeconds;
@@ -95,7 +105,8 @@ public class StaffPinException extends RuntimeException {
      * for a colleague (review S4); rate-limit and pin-unavailable read the same for both subjects.
      */
     public static StaffPinException of(PinCheck check, Subject subject) {
-        boolean colleague = subject == Subject.COLLEAGUE;
+        boolean checker = subject == Subject.CHECKER;
+        boolean colleague = subject == Subject.COLLEAGUE || checker;
         switch (check.outcome()) {
             case WRONG:
                 // A colleague's answer never counts the tries left, so a guesser is not told when to stop (review S4).
@@ -103,18 +114,21 @@ public class StaffPinException extends RuntimeException {
                         colleague ? COLLEAGUE_WRONG_PIN : wrongPinText(check.triesLeft()), 0, subject);
             case LOCKED:
                 return new StaffPinException(Kind.PIN_LOCKED,
-                        colleague ? colleagueLockedText(check.lockedUntil()) : lockedText(check.lockedUntil()),
+                        checker ? checkerLockedText(check.lockedUntil())
+                                : colleague ? colleagueLockedText(check.lockedUntil()) : lockedText(check.lockedUntil()),
                         Math.max(0, check.retryAfterSeconds()), subject);
             case NOT_SET:
                 return new StaffPinException(Kind.PIN_NOT_SET,
-                        colleague ? COLLEAGUE_NOT_SET : notSetText(check.notSetReason()), 0, subject);
+                        checker ? CHECKER_NOT_SET : colleague ? COLLEAGUE_NOT_SET : notSetText(check.notSetReason()), 0,
+                        subject);
             case RATE_LIMITED:
                 return new StaffPinException(Kind.RATE_LIMIT, RATE_LIMITED_TEXT,
                         Math.max(0, check.retryAfterSeconds()), subject);
             case UNAVAILABLE:
                 return new StaffPinException(Kind.PIN_UNAVAILABLE, UNAVAILABLE_TEXT, 0, subject);
             case PAIR_LIMIT:
-                return new StaffPinException(Kind.COLLEAGUE_PIN_LIMIT, PAIR_LIMIT_TEXT, 0, subject);
+                return new StaffPinException(Kind.COLLEAGUE_PIN_LIMIT, checker ? CHECKER_PAIR_LIMIT_TEXT : PAIR_LIMIT_TEXT,
+                        0, subject);
             case CHECK_FAILED:
                 return new StaffPinException(Kind.PIN_CHECK_FAILED, CHECK_FAILED_TEXT, 0, subject);
             default:
@@ -132,6 +146,11 @@ public class StaffPinException extends RuntimeException {
 
     static String colleagueLockedText(Instant lockedUntil) {
         String base = "The second nurse's PIN is locked after 5 wrong tries. Choose another nurse, or try again";
+        return lockedUntil == null ? base + " later." : base + " at " + CLOCK_IST.format(lockedUntil) + ".";
+    }
+
+    static String checkerLockedText(Instant lockedUntil) {
+        String base = "The checker's PIN is locked after 5 wrong tries. Choose another checker, or try again";
         return lockedUntil == null ? base + " later." : base + " at " + CLOCK_IST.format(lockedUntil) + ".";
     }
 

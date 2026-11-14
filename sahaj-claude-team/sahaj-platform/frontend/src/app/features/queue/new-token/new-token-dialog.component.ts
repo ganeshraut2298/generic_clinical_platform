@@ -132,7 +132,7 @@ export class NewTokenDialogComponent implements OnInit {
       }
       this.selectedPatient.set({ id: patient.id, name: patient.name, age: patient.age, sex: patient.sex });
       this.results.update((items) => [
-        { id: patient.id, uhid: patient.uhid, name: patient.name, age: patient.age, sex: patient.sex, mobile: patient.mobile },
+        { id: patient.id, uhid: patient.uhid, name: patient.name, age: patient.age, ageDetail: patient.ageDetail, sex: patient.sex, mobile: patient.mobile },
         ...items,
       ]);
     });

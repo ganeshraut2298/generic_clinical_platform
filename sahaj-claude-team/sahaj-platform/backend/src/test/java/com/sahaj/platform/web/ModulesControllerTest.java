@@ -66,7 +66,7 @@ class ModulesControllerTest {
     void everyClinicRoleReadsTheViewWithTheContractFieldNames() throws Exception {
         for (String role : new String[] {"OWNER", "DOCTOR", "VISITING_DOCTOR", "NURSE", "FRONT_DESK", "BILLING",
                 "PHARMACIST", "COUNSELLOR"}) {
-            when(modulesService.get(TENANT_ID, role)).thenReturn(view("off", null, false, false, true));
+            when(modulesService.get(TENANT_ID, USER_ID, role)).thenReturn(view("off", null, false, false, true));
             mockMvc.perform(get(URL).with(as(role)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.plan").value("FREE"))

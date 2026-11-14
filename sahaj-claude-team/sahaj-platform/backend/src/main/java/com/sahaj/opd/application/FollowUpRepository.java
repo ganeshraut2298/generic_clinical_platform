@@ -39,6 +39,18 @@ public interface FollowUpRepository {
     Optional<UUID> closeOldestOpen(UUID tenantId, UUID patientId, UUID doctorMembershipId, UUID returnedVisitId,
                                     UUID actorUserId);
 
+    /** One visit's follow-up for the doctor's sign (ADR-025 D6): its due date, state and booked appointment. */
+    record VisitFollowUp(UUID id, LocalDate dueDate, UUID returnedVisitId, UUID appointmentId) {
+    }
+
+    Optional<VisitFollowUp> findBySourceVisit(UUID tenantId, UUID sourceVisitId);
+
+    /** Moves the due date of an open follow-up (a later sign with another interval); bumps the version. */
+    void updateDueDate(UUID tenantId, UUID id, LocalDate dueDate, UUID actorUserId);
+
+    /** Stores the appointment booked for the follow-up and the interval key; bumps the version. */
+    void setAppointment(UUID tenantId, UUID id, UUID appointmentId, String intervalKey, UUID actorUserId);
+
     /** Counts for the four tabs, relative to {@code today} (Asia/Kolkata). */
     Counts counts(UUID tenantId, LocalDate today);
 
@@ -56,7 +68,15 @@ public interface FollowUpRepository {
 
     record FollowUpRow(UUID id, UUID patientId, UUID doctorMembershipId, UUID sourceVisitId,
                         UUID sourceAdmissionId, LocalDate dueDate,
-                        String reason, UUID returnedVisitId) {
+                        String reason, UUID returnedVisitId, LocalDate appointmentDate,
+                        java.time.LocalTime appointmentTime) {
+
+        /** A follow-up with no booked appointment (the shape before 0.6.0). */
+        public FollowUpRow(UUID id, UUID patientId, UUID doctorMembershipId, UUID sourceVisitId,
+                           UUID sourceAdmissionId, LocalDate dueDate, String reason, UUID returnedVisitId) {
+            this(id, patientId, doctorMembershipId, sourceVisitId, sourceAdmissionId, dueDate, reason, returnedVisitId,
+                    null, null);
+        }
 
         /** Ids and due date only: never the reason (SAH-27 security review L2). */
         @Override

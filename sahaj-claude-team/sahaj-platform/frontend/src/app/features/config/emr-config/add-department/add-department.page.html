@@ -1,0 +1,270 @@
+<section class="wiz surf" aria-labelledby="wiz-title">
+  <header class="wiz-h">
+    <div>
+      <h2 id="wiz-title">Add a department</h2>
+      <p class="muted">Start from a ready template built for Indian OPD practice, then change anything.</p>
+    </div>
+    <a class="iconbtn" routerLink="/app/config/specialty" aria-label="Close">
+      <app-icon name="x" [size]="18" />
+    </a>
+  </header>
+
+  <ol class="steps" aria-label="Steps">
+    <li [class.on]="step() === 1" [attr.aria-current]="step() === 1 ? 'step' : null">
+      <span class="dot">1</span>Choose template
+    </li>
+    <li class="sep" aria-hidden="true">—</li>
+    <li [class.on]="step() === 2" [attr.aria-current]="step() === 2 ? 'step' : null">
+      <span class="dot">2</span>Review sections
+    </li>
+    <li class="sep" aria-hidden="true">—</li>
+    <li [class.on]="step() === 3" [attr.aria-current]="step() === 3 ? 'step' : null">
+      <span class="dot">3</span>Assign doctors &amp; rooms
+    </li>
+  </ol>
+
+  @if (!isOwner()) {
+    <div class="notice warn" role="note">
+      <app-icon name="lock" [size]="16" />
+      <span>Only the owner can add a department.</span>
+    </div>
+  } @else if (loading()) {
+    <p class="loading" aria-busy="true">Loading templates</p>
+  } @else if (loadError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+    </div>
+  } @else {
+    @if (createError(); as message) {
+      <div class="notice err" role="alert" data-testid="wiz-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+
+    @switch (step()) {
+      @case (1) {
+        <div class="body">
+          <div class="left">
+            <div class="starts">
+              <button type="button" class="start" [attr.aria-pressed]="choice()?.kind === 'BLANK'" (click)="chooseBlank()">
+                <app-icon name="plus" [size]="18" />
+                <span><b>Start blank</b><small>Common sections only</small></span>
+              </button>
+              <button
+                type="button"
+                class="start"
+                [attr.aria-pressed]="choice()?.kind === 'COPY'"
+                [attr.aria-describedby]="copyable().length === 0 ? 'copy-why' : null"
+                [disabled]="copyable().length === 0"
+                (click)="toggleCopy()"
+              >
+                <app-icon name="link" [size]="18" />
+                <span><b>Copy an existing department</b><small>e.g. copy Dental for a second dental chair</small></span>
+              </button>
+            </div>
+            @if (copyable().length === 0) {
+              <p id="copy-why" class="faint t-xs">
+                You can copy a department after you have saved a draft for it or published it.
+              </p>
+            } @else if (copyOpen()) {
+              <div class="copylist" role="group" aria-label="Departments you can copy">
+                @for (d of copyable(); track d.departmentKey) {
+                  <button type="button" class="member" [attr.aria-pressed]="isCopy(d.departmentKey)" (click)="chooseCopy(d.departmentKey)">
+                    <span class="badge" aria-hidden="true" [style.background]="d.colour">{{ d.initials }}</span>
+                    <span class="main"><b>{{ d.name }}</b></span>
+                  </button>
+                }
+              </div>
+            }
+
+            <span class="eyebrow">Specialty templates</span>
+            <div class="tgrid">
+              @for (t of starters(); track t.starterKey) {
+                <button type="button" class="tcard" [attr.aria-pressed]="isStarter(t.starterKey)" (click)="chooseStarter(t.starterKey)">
+                  <span class="badge" aria-hidden="true" [style.background]="t.colour">{{ t.initials }}</span>
+                  <span class="main">
+                    <b>{{ t.name }}</b>
+                    <small>{{ t.specialtySectionCount }} specialty sections</small>
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="right" aria-live="polite">
+            <span class="eyebrow">Template preview</span>
+            @if (choice()?.kind === 'STARTER') {
+              @if (previewLoading()) {
+                <p class="loading" aria-busy="true">Loading preview</p>
+              } @else if (selectedStarter(); as st) {
+                <h3>{{ st.name }}</h3>
+                @if (st.description) {
+                  <p class="muted">{{ st.description }}</p>
+                }
+                <ul class="plist">
+                  @for (n of previewNames(); track n) {
+                    <li><app-icon name="check" [size]="14" />{{ n }}</li>
+                  }
+                </ul>
+                @if (offLine(); as off) {
+                  <div class="notice warn slim">{{ off }}</div>
+                }
+              }
+            } @else if (choice()?.kind === 'COPY') {
+              <h3>{{ copySourceName() }}</h3>
+              <p class="muted">A copy of this department's saved draft, or its latest published version.</p>
+            } @else if (choice()?.kind === 'BLANK') {
+              <h3>Start blank</h3>
+              <p class="muted">Common sections only.</p>
+            } @else {
+              <p class="empty">Pick a template to see what it holds.</p>
+            }
+
+            <div class="field name">
+              <label for="dept-name" class="field-label">Department name</label>
+              <input
+                id="dept-name"
+                class="input"
+                type="text"
+                autocomplete="off"
+                [maxlength]="nameMax"
+                [formControl]="name"
+                [attr.aria-invalid]="nameInvalid() || nameTaken() !== null"
+                (blur)="nameTouched.set(true)"
+              />
+              @if (nameTaken(); as taken) {
+                <span class="err-text" role="alert">{{ taken }}</span>
+              } @else if (nameInvalid()) {
+                <span class="err-text" role="alert">Type a name for the department (up to {{ nameMax }} characters).</span>
+              }
+            </div>
+          </div>
+        </div>
+      }
+      @case (2) {
+        <div class="body review">
+          @if (choice()?.kind === 'BLANK') {
+            <div class="notice teal">
+              <app-icon name="shield" [size]="16" />
+              <span>
+                A blank department starts with the common sections only. You can change them after it is created.
+              </span>
+            </div>
+          } @else if (reviewLoading()) {
+            <p class="loading" aria-busy="true">Loading sections</p>
+          } @else if (reviewError(); as message) {
+            <div class="notice err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ message }}</span>
+              <button mat-stroked-button type="button" (click)="retryReview()">Try again</button>
+            </div>
+          } @else {
+            <div class="revcols">
+              <app-sections-column />
+              <app-section-settings />
+            </div>
+          }
+        </div>
+      }
+      @case (3) {
+        <div class="body step3">
+          <div class="doctors">
+            <h3>Doctors</h3>
+            @if (doctorsError(); as message) {
+              <div class="notice err" role="alert">
+                <app-icon name="alert" [size]="16" />
+                <span>{{ message }}</span>
+                <button mat-stroked-button type="button" (click)="retryDoctors()">Try again</button>
+              </div>
+            } @else {
+              <div class="members">
+                @for (d of doctors(); track d.membershipId) {
+                  <button
+                    type="button"
+                    class="member"
+                    [attr.aria-pressed]="pickedDoctors().has(d.membershipId)"
+                    (click)="toggleDoctor(d.membershipId)"
+                  >
+                    <span class="main">
+                      <b>{{ d.name }}</b>
+                      <small>{{ d.degree ?? '' }}</small>
+                    </span>
+                  </button>
+                } @empty {
+                  <p class="empty">No doctors in the team yet. You can add doctors later.</p>
+                }
+              </div>
+              @if (pickedDoctors().size === 0 && doctors().length > 0) {
+                <p class="faint t-xs">No doctor selected. You can add doctors later.</p>
+              }
+            }
+          </div>
+
+          <div class="roomsbox">
+            <h3>Rooms</h3>
+            <div class="roomadd">
+              <label class="field">
+                <span class="field-label">Room name</span>
+                <input
+                  class="input"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="e.g. Room 2 or Chair 1"
+                  [maxlength]="40"
+                  [formControl]="roomInput"
+                  (keydown.enter)="onRoomKey($event)"
+                />
+              </label>
+              <button mat-stroked-button type="button" (click)="addRoom()">Add room</button>
+            </div>
+            @if (roomError(); as message) {
+              <span class="err-text" role="alert">{{ message }}</span>
+            }
+            <ul class="roomlist">
+              @for (r of rooms(); track r) {
+                <li>
+                  <span>{{ r }}</span>
+                  <button type="button" class="xbtn" [attr.aria-label]="'Remove ' + r" (click)="removeRoom(r)">
+                    <app-icon name="x" [size]="14" />
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+    }
+
+    <footer class="wiz-f">
+      @if (step() === 1) {
+        <label class="chk">
+          <input type="checkbox" [checked]="copyPrint()" (change)="setCopyPrint($event)" />
+          Also create a matching print template
+        </label>
+      } @else {
+        <span></span>
+      }
+      <div class="btns">
+        <a mat-button routerLink="/app/config/specialty">Cancel</a>
+        @if (step() > 1) {
+          <button mat-stroked-button type="button" data-act="back" (click)="back()">Back</button>
+        }
+        @if (step() === 1) {
+          <button mat-flat-button type="button" data-act="next" [disabled]="!canNext()" (click)="next()">
+            Next: review sections
+          </button>
+        } @else if (step() === 2) {
+          <button mat-flat-button type="button" data-act="next" [disabled]="reviewLoading()" (click)="next()">
+            Next: assign doctors &amp; rooms
+          </button>
+        } @else {
+          <button mat-flat-button type="button" data-act="create" [disabled]="creating()" (click)="create()">
+            {{ creating() ? 'Creating' : 'Create department' }}
+          </button>
+        }
+      </div>
+    </footer>
+  }
+</section>

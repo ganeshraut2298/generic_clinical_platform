@@ -127,7 +127,8 @@ class AdmissionListCardsTest {
                 auditLog, team, lookup, patientAccess, actors, gate, catalog, charges,
                 new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
                 mock(EmergencyService.class), vitals, new AdmittedCards(clinicalPatients, lookup, vitals, safety),
-                new CardSetups(cardSetupRepository), ScopeStubs.unscoped(), ScopeStubs.repository());
+                new CardSetups(cardSetupRepository), ScopeStubs.unscoped(), ScopeStubs.repository(),
+                mock(com.sahaj.opd.api.EmrAdmissionRequestPort.class));
 
         when(entitlements.forTenant(TENANT)).thenAnswer(call -> new ModuleEntitlement(ipdState, false, 25));
         when(team.findActiveByUserId(TENANT, ACTOR)).thenAnswer(call -> memberRole == null ? Optional.empty()

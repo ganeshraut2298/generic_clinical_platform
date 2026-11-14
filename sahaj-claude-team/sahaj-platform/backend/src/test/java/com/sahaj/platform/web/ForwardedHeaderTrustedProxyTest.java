@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration",
         "SAHAJ_DB_APP_PASSWORD=not-used-no-database-in-this-test",
+        "sahaj.opd.partition-check.enabled=false",
         "SAHAJ_JWT_SECRET=not-used-no-database-in-this-test-but-must-be-32-plus-chars",
         "SAHAJ_REMOTE_IP_HEADER=X-Forwarded-For",
         "SAHAJ_TRUSTED_PROXIES=127\\.0\\.0\\.1"

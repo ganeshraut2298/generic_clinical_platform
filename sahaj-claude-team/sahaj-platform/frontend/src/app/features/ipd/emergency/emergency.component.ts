@@ -17,6 +17,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarRef, TextOnlySnackBar } from '@angular/material/snack-bar';
 import { Observable } from 'rxjs';
 import { ApiError } from '../../../core/http/problem-detail';
+import { EmrAccess } from '../../emr/emr-access.service';
+import { EmrLauncher } from '../../emr/emr-launcher.service';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
 import { AdmitDialogComponent, AdmitDialogData } from '../admit/admit-dialog.component';
@@ -77,6 +79,8 @@ const SHEET_ERROR = 'We could not open the admission sheet. Try again.';
 export class EmergencyComponent implements OnInit {
   private readonly api = inject(EmergencyApi);
   private readonly admissions = inject(AdmissionsApi);
+  protected readonly emrAccess = inject(EmrAccess);
+  private readonly emrLauncher = inject(EmrLauncher);
   private readonly badge = inject(EmergencyBadgeStore);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -125,12 +129,18 @@ export class EmergencyComponent implements OnInit {
   private retried = false;
 
   ngOnInit(): void {
+    this.emrAccess.ensureLoaded();
     this.load();
     const timer = setInterval(() => this.refresh(), QUEUE_REFRESH_MS);
     this.destroyRef.onDestroy(() => {
       clearInterval(timer);
       this.closeSheet();
     });
+  }
+
+  /** SAH-46-4. "Open EMR" on an Emergency card: the emergency assessment for this case. */
+  protected openEmr(c: EmergencyCase): void {
+    this.emrLauncher.open('ER_ASSESSMENT', c.id);
   }
 
   protected load(): void {

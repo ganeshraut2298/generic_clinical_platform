@@ -1,0 +1,134 @@
+<section class="cp" aria-labelledby="cp-title">
+  <div class="tools">
+    <div class="topline">
+      <h3 id="cp-title">Live case paper</h3>
+      <span class="live">● Live</span>
+      <span class="fill" data-testid="paper-fill">{{ filled() }} of 10 filled</span>
+    </div>
+    <div class="bar" aria-hidden="true"><span [style.width.%]="percent()"></span></div>
+
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Paper size">
+        @for (s of sizes; track s) {
+          <button type="button" [attr.aria-pressed]="size() === s" [attr.data-size]="s" (click)="setSize(s)">{{ s }}</button>
+        }
+      </div>
+      <div class="seg" role="group" aria-label="Heading language">
+        @for (l of languages; track l.key) {
+          <button type="button" [attr.aria-pressed]="language() === l.key" [attr.data-lang]="l.key" (click)="setLanguage(l.key)">
+            {{ l.label }}
+          </button>
+        }
+      </div>
+      <button type="button" class="toggle" [attr.aria-pressed]="hideEmpty()" data-act="hide-empty" (click)="toggleHideEmpty()">
+        {{ hideEmpty() ? '✓ Hiding empty' : 'Hide empty' }}
+      </button>
+    </div>
+    <div class="actions">
+      <span class="sharewrap">
+        <button type="button" class="share" disabled aria-describedby="cp-share-note" data-act="share">Share · WhatsApp / ABHA</button>
+        <span class="faint t-xs" id="cp-share-note">{{ shareNote }}</span>
+      </span>
+      <button type="button" class="print" [disabled]="blocked() || !context()" aria-describedby="cp-print-note" data-act="print" (click)="print()">
+        Print
+      </button>
+    </div>
+    @if (blocked()) {
+      <p class="err-text" id="cp-print-note" role="status" data-testid="print-blocked">{{ printBlockedNote }}</p>
+    }
+  </div>
+
+  @if (store.paperError(); as message) {
+    <div class="notice err" role="alert">
+      <span>{{ message }}</span>
+      <button type="button" class="linkbtn" data-act="retry-paper" (click)="store.loadPaperContext()">Try again</button>
+    </div>
+  }
+
+  @if (context(); as c) {
+    <article #sheet class="sheet" [class.a5]="size() === 'A5'" [class.a4]="size() === 'A4'" aria-label="Case paper preview" [attr.lang]="language().toLowerCase()">
+      <header class="letter">
+        <div class="clinic">
+          <span class="logo" aria-hidden="true">+</span>
+          <div class="cl">
+            <strong>{{ c.letterhead.clinicName }}</strong>
+            <span class="sm">{{ [c.letterhead.address, c.letterhead.phone, c.departmentName].filter(present).join(' · ') }}</span>
+          </div>
+        </div>
+        <div class="doc">
+          <strong>{{ c.doctor.name }}</strong>
+          @if (c.doctor.qualification) {
+            <span class="sm">{{ c.doctor.qualification }}</span>
+          }
+          <span class="sm">{{ c.doctor.registrationNo ? 'Reg. No. ' + c.doctor.registrationNo : regNotSet }}</span>
+        </div>
+      </header>
+
+      <div class="pat">
+        <strong>{{ c.patient.name }}</strong>
+        <span>{{ patientMeta() }}</span>
+        <span>{{ when }}</span>
+        <span>{{ uhid() }}</span>
+        <span>{{ c.visitLine }}</span>
+        @if (model()?.vitalsLine; as vitals) {
+          <span>{{ vitals }}</span>
+        }
+      </div>
+
+      @for (r of rows(); track r.heading) {
+        <section class="prow" [class.rx]="r.heading === 'MEDICINES'">
+          <span class="h" [class.has]="r.filled">{{ r.label }}</span>
+          <div class="b">
+            @for (line of r.lines; track $index) {
+              <span class="line">{{ line }}</span>
+            }
+            @for (m of r.rx; track m.n) {
+              <div class="med">
+                <span>{{ m.n }}.</span>
+                <span class="mn">{{ m.name }}</span>
+                <span>{{ m.how }}</span>
+                <span>{{ m.days }}</span>
+                <span>{{ m.note }}</span>
+              </div>
+            }
+            @if (!r.filled) {
+              <span class="none">Not recorded yet</span>
+            }
+          </div>
+        </section>
+      }
+
+      @if (addenda().length > 0) {
+        <section class="adds" aria-label="Addenda" data-testid="paper-addenda">
+          @for (a of addenda(); track a.id) {
+            <span class="line">Addendum · {{ addendumTime(a.createdAt) }} · {{ drName(a.createdByName) }}: {{ a.reason }}. {{ a.text }}</span>
+          }
+        </section>
+      }
+
+      <footer class="foot">
+        <span class="legal">{{ footer().join(' ') }}</span>
+        <div class="sign">
+          @if (c.signature.signed) {
+            <span class="signed">{{ c.signature.signerName }}</span>
+          } @else {
+            <span class="signline"></span>
+          }
+          <span>{{ c.doctor.name }}</span>
+          <span class="sm">
+            {{ c.doctor.registrationNo ? 'Reg. No. ' + c.doctor.registrationNo : regNotSet }}
+            @if (c.signature.signed) {
+              · {{ signedAt() }}
+            }
+          </span>
+        </div>
+      </footer>
+    </article>
+  } @else if (!store.paperError()) {
+    <p class="faint" aria-busy="true">Loading the case paper</p>
+  }
+
+  @if (toast(); as message) {
+    <div class="toast" role="status" data-testid="paper-toast">{{ message }}</div>
+  }
+</section>

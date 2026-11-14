@@ -29,11 +29,26 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
                 select 1 from ipd.admission
                 where tenant_id = :tenantId and patient_id = :patientId and status = 'ADMITTED')
             """;
+    private static final String FIND_ADMITTED_OF = """
+            select id, ip_number from ipd.admission
+            where tenant_id = :tenantId and patient_id = :patientId and status = 'ADMITTED' limit 1
+            """;
     private static final String INSERT = """
             insert into ipd.admission (patient_id, ip_number, bed_id, doctor_membership_id, admission_type, source,
-                                       payer, reason, consent_signed, status, admitted_by)
-            values (:patientId, :ipNumber, :bedId, :doctor, :type, :source, :payer, :reason, true, 'ADMITTED', :by)
+                                       payer, reason, consent_signed, status, admitted_by, treatment_course_id,
+                                       treatment_course_sitting_id, admission_request_id)
+            values (:patientId, :ipNumber, :bedId, :doctor, :type, :source, :payer, :reason, true, 'ADMITTED', :by,
+                    :courseId, :sittingId, :requestId)
             returning id
+            """;
+    private static final String INSERT_COURSE_DEPOSIT = """
+            insert into ipd.deposit (admission_id, amount_paise, mode, collected_by, source, course_credit_transfer_id)
+            values (:admissionId, :amount, null, :by, 'COURSE', :transferId)
+            returning id
+            """;
+    private static final String COURSE_LINK = """
+            select treatment_course_id, treatment_course_sitting_id from ipd.admission
+            where tenant_id = :tenantId and id = :id and treatment_course_id is not null
             """;
     private static final String INSERT_DEPOSIT = """
             insert into ipd.deposit (admission_id, amount_paise, mode, collected_by)
@@ -93,7 +108,7 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
             where tenant_id = :tenantId and id = :id and status = 'ADMITTED'
             """;
     private static final String FIND_DEPOSITS = """
-            select id, amount_paise, mode, collected_at, collected_by
+            select id, amount_paise, mode, collected_at, collected_by, source
             from ipd.deposit
             where tenant_id = :tenantId and admission_id = :admissionId
             order by collected_at, id
@@ -122,8 +137,16 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
         return jdbc.sql(INSERT).param("patientId", a.patientId()).param("ipNumber", a.ipNumber())
                 .param("bedId", a.bedId()).param("doctor", a.doctorMembershipId()).param("type", a.admissionType())
                 .param("source", a.source()).param("payer", a.payer()).param("reason", a.reason())
-                .param("by", a.admittedBy())
+                .param("by", a.admittedBy()).param("courseId", a.treatmentCourseId())
+                .param("sittingId", a.treatmentCourseSittingId()).param("requestId", a.admissionRequestId())
                 .query((rs, rowNum) -> rs.getObject(1, UUID.class)).single();
+    }
+
+    @Override
+    public Optional<AdmittedRef> findAdmittedOf(UUID tenantId, UUID patientId) {
+        return jdbc.sql(FIND_ADMITTED_OF).param("tenantId", tenantId).param("patientId", patientId)
+                .query((rs, rowNum) -> new AdmittedRef(rs.getObject("id", UUID.class), rs.getString("ip_number")))
+                .optional();
     }
 
     @Override
@@ -149,6 +172,32 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
     @Override
     public int countAdmitted(UUID tenantId) {
         return jdbc.sql(COUNT_ADMITTED).param("tenantId", tenantId).query((rs, rowNum) -> rs.getInt(1)).single();
+    }
+
+    private static final String BY_PATIENT = SELECT + """
+            where a.tenant_id = :tenantId and a.patient_id = :patientId
+            order by a.admitted_at desc, a.id limit :limit
+            """;
+
+    @Override
+    public UUID insertCourseDeposit(UUID tenantId, UUID admissionId, long amountPaise, UUID transferId,
+                                    UUID collectedBy) {
+        return jdbc.sql(INSERT_COURSE_DEPOSIT).param("admissionId", admissionId).param("amount", amountPaise)
+                .param("transferId", transferId).param("by", collectedBy)
+                .query((rs, rowNum) -> rs.getObject(1, UUID.class)).single();
+    }
+
+    @Override
+    public Optional<CourseLink> findCourseLink(UUID tenantId, UUID admissionId) {
+        return jdbc.sql(COURSE_LINK).param("tenantId", tenantId).param("id", admissionId)
+                .query((rs, rowNum) -> new CourseLink(rs.getObject("treatment_course_id", UUID.class),
+                        rs.getObject("treatment_course_sitting_id", UUID.class))).optional();
+    }
+
+    @Override
+    public List<AdmissionRow> findByPatient(UUID tenantId, UUID patientId, int limit) {
+        return jdbc.sql(BY_PATIENT).param("tenantId", tenantId).param("patientId", patientId).param("limit", limit)
+                .query(JdbcAdmissionRepository::admission).list();
     }
 
     @Override
@@ -196,7 +245,7 @@ public class JdbcAdmissionRepository implements AdmissionRepository {
         return jdbc.sql(FIND_DEPOSITS).param("tenantId", tenantId).param("admissionId", admissionId)
                 .query((rs, rowNum) -> new DepositRow(rs.getObject("id", UUID.class), rs.getLong("amount_paise"),
                         rs.getString("mode"), rs.getObject("collected_at", OffsetDateTime.class).toInstant(),
-                        rs.getObject("collected_by", UUID.class)))
+                        rs.getObject("collected_by", UUID.class), rs.getString("source")))
                 .list();
     }
 

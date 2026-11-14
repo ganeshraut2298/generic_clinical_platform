@@ -16,6 +16,8 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'today', icon: 'home', route: 'today', group: 'work', labelKey: 'nav.today' },
   { key: 'queue', icon: 'users', route: 'queue', group: 'work', labelKey: 'nav.queue' },
+  // ADR-023 D13.5: chemotherapy orders waiting for the signed-in user's second check.
+  { key: 'secondchecks', icon: 'check', route: 'emr/second-checks', group: 'work', labelKey: 'nav.secondchecks' },
   {
     key: 'appointments',
     icon: 'calendar',
@@ -50,6 +52,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 export const SIMPLE_MENU_KEYS: readonly string[] = [
   'today',
   'queue',
+  'secondchecks',
   'appointments',
   'ipd',
   'patients',

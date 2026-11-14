@@ -14,4 +14,10 @@ describe('newClientKey', () => {
       Object.defineProperty(globalThis.crypto, 'randomUUID', { value: original, configurable: true });
     }
   });
+
+  it('never starts with "sign-", which the server keeps for the requests a sign makes (opd.yaml 0.6.2)', () => {
+    for (let i = 0; i < 50; i++) {
+      expect(newClientKey().startsWith('sign-')).toBe(false);
+    }
+  });
 });

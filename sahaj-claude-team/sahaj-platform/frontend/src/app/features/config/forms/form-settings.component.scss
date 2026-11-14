@@ -1,0 +1,128 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.st {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.grp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gl {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  &.solid {
+    border-radius: 8px;
+  }
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &.solid[aria-pressed='true'] {
+    background: var(--pri);
+    color: var(--pri-ink);
+  }
+  &:disabled {
+    opacity: 0.65;
+  }
+}
+
+.approve {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  &.solid {
+    border-color: var(--pri);
+    background: var(--pri);
+    color: var(--pri-ink);
+  }
+  &.danger {
+    border-color: var(--crit);
+    color: var(--crit);
+  }
+  &:disabled {
+    opacity: 0.55;
+  }
+}
+
+.lab {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.back {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--crit-soft);
+  color: var(--crit);
+  font-weight: 600;
+}
+
+.ver {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.vs {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+
+  &.live {
+    color: var(--good);
+  }
+}

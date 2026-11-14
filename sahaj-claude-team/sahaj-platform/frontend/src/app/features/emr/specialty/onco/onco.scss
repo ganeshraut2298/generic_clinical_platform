@@ -1,0 +1,110 @@
+.grow {
+  flex: 1 1 200px;
+}
+
+.num {
+  width: 130px;
+}
+
+.grades {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.gr {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &.on {
+    background: var(--good);
+    border-color: var(--good);
+    color: var(--pri-ink);
+  }
+  &.on[data-g='2'] {
+    background: var(--warn);
+    border-color: var(--warn);
+  }
+  &.on[data-g='3'],
+  &.on[data-g='4'] {
+    background: var(--crit);
+    border-color: var(--crit);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 2px;
+  }
+}
+
+.mini {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ch {
+  font-weight: 700;
+
+  &[data-colour='GREEN'] {
+    color: var(--good);
+  }
+  &[data-colour='RED'] {
+    color: var(--crit);
+  }
+}
+
+.resp {
+  margin: 0;
+  font-weight: 700;
+
+  &[data-resp='COMPLETE_RESPONSE'],
+  &[data-resp='PARTIAL_RESPONSE'] {
+    color: var(--good);
+  }
+  &[data-resp='STABLE_DISEASE'] {
+    color: var(--warn);
+  }
+  &[data-resp='PROGRESSIVE_DISEASE'] {
+    color: var(--crit);
+  }
+}
+
+.sysrow {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+}
+
+.ok {
+  font-weight: 700;
+  color: var(--good);
+
+  &.bad {
+    color: var(--crit);
+  }
+}
+
+.grid5 {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.bsa {
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+}

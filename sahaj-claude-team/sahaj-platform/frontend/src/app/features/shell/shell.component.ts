@@ -35,6 +35,7 @@ import { MenuMode, Theme } from '../../core/shell/shell.model';
 import { Language, ROLE_LABELS } from '../../core/platform/platform.model';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { formatIstDateTime } from '../../shared/format/ist-clock';
+import { SecondChecksBadgeStore } from '../emr/specialty/checks/second-checks-badge.store';
 import { EmergencyBadgeStore } from '../ipd/emergency/emergency-badge.store';
 import { ColleagueTriesBannerComponent } from '../pin/colleague-tries-banner.component';
 import { ColleagueTriesNoticeStore } from '../pin/colleague-tries-notice.store';
@@ -77,6 +78,7 @@ export class ShellComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
   private readonly emergencyBadge = inject(EmergencyBadgeStore);
+  private readonly secondChecksBadge = inject(SecondChecksBadgeStore);
   private readonly colleagueNotice = inject(ColleagueTriesNoticeStore);
 
   protected readonly roleLabels = ROLE_LABELS;
@@ -147,6 +149,15 @@ export class ShellComponent implements OnInit {
       }
     });
     this.destroyRef.onDestroy(() => this.emergencyBadge.stop());
+    // The count on "Second checks" is read only while the server's menu has the key (ADR-023 D13.5).
+    effect(() => {
+      if (this.store.menu().includes('secondchecks')) {
+        this.secondChecksBadge.start();
+      } else {
+        this.secondChecksBadge.stop();
+      }
+    });
+    this.destroyRef.onDestroy(() => this.secondChecksBadge.stop());
 
     // SAH-38 (ADR-014 D8): the colleague-tries notice is asked for after the first screen is shown, so
     // sign-in is never slowed. A failed load is tried again at a later route change (once a minute at most).
@@ -160,9 +171,17 @@ export class ShellComponent implements OnInit {
     this.destroyRef.onDestroy(() => this.colleagueNotice.reset());
   }
 
-  /** Number on a menu item; only "Emergency" has one, and only above 0. */
+  /** Number on a menu item; only "Emergency" and "Second checks" have one, and only above 0. */
   protected badgeOf(item: NavItem): number {
-    return item.key === 'emergency' ? this.emergencyBadge.count() : 0;
+    if (item.key === 'emergency') {
+      return this.emergencyBadge.count();
+    }
+    return item.key === 'secondchecks' ? this.secondChecksBadge.count() : 0;
+  }
+
+  /** What the number counts, said to screen readers. */
+  protected badgeUnitKey(item: NavItem): string {
+    return item.key === 'secondchecks' ? 'nav.secondchecksCount' : 'nav.emergencyCount';
   }
 
   ngOnInit(): void {

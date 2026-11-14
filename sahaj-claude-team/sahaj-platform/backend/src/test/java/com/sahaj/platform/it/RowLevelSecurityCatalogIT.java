@@ -30,18 +30,29 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
      * SAH-4.md (tenant_slug, the RLS-free mirror of tenant.slug for cross-tenant lookups), SAH-6.md
      * (role_permission_default, a global reference grid) and SAH-7.md (specialty, specialty_template,
      * opd.medicine, opd.diagnosis, all global reference/catalog data, SELECT only for sahaj_app) and
-     * SAH-43-44.md (ADR-019 D2: the seven global EMR masters and template tables opd.emr_complaint, emr_investigation,
-     * emr_advice, emr_specialty_alias, emr_template, emr_template_section and emr_template_option, no tenant_id, changed
-     * by migration only, SELECT only for sahaj_app, like opd.medicine; the three template tables are also immutable
-     * by trigger).
+     * SAH-43-44.md and SAH-53.md (ADR-019 D2, ADR-020 D2: the global EMR tables (twelve before SAH-49-71, eighteen now), no tenant_id, changed by migration
+     * only, SELECT only for sahaj_app, like opd.medicine: the three masters opd.emr_complaint, emr_investigation and
+     * emr_advice, and the section library, the starter departments, the starter layouts and the department aliases
+     * opd.emr_section, emr_section_field, emr_section_field_option, emr_starter_department, emr_starter_department_section,
+     * emr_starter_layout and emr_department_alias; and from SAH-48-59.md (ADR-022 D5, D11) the allergy classes
+     * opd.emr_allergy_class and the starter forms opd.emr_form_starter; the starter layout and starter form tables are also
+     * immutable by trigger); and from SAH-49-71.md (ADR-023 D4) the six specialty reference tables opd.emr_immunization_group,
+     * emr_immunization_vaccine, emr_growth_band, emr_milestone, emr_joint_item and emr_chemo_protocol (the chemotherapy protocols are
+     * immutable by trigger), 18 global EMR tables in all. The tables of the
+     * withdrawn SAH-44 (emr_template, emr_template_section, emr_template_option, emr_specialty_alias) no longer exist.
+     * The partitions of opd.emr_record are NOT on this list: each one has row level security and a policy.
      */
     private static final Set<String> NO_RLS_BY_DESIGN = Set.of(
             "platform.app_user", "platform.sales_enquiry", "platform.flyway_schema_history",
             "platform.otp_challenge", "platform.consent_record", "platform.tenant_slug",
             "platform.role_permission_default", "platform.specialty", "platform.specialty_template",
             "opd.medicine", "opd.diagnosis",
-            "opd.emr_complaint", "opd.emr_investigation", "opd.emr_advice", "opd.emr_specialty_alias",
-            "opd.emr_template", "opd.emr_template_section", "opd.emr_template_option");
+            "opd.emr_complaint", "opd.emr_investigation", "opd.emr_advice",
+            "opd.emr_section", "opd.emr_section_field", "opd.emr_section_field_option", "opd.emr_starter_department",
+            "opd.emr_starter_department_section", "opd.emr_starter_layout", "opd.emr_department_alias",
+            "opd.emr_allergy_class", "opd.emr_form_starter",
+            "opd.emr_immunization_group", "opd.emr_immunization_vaccine", "opd.emr_growth_band", "opd.emr_milestone",
+            "opd.emr_joint_item", "opd.emr_chemo_protocol");
 
     // ---- row level security on every tenant table ----
 
@@ -79,6 +90,47 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
         assertThat(found).as("the check must find the known tenant tables, otherwise it checks nothing")
                 .contains("platform.tenant", "platform.membership", "platform.audit_event");
         assertThat(report).isEmpty();
+    }
+
+    /**
+     * SAH-53 (docs/database/SAH-53.md "Tenant scope and RLS"): the record table is range-partitioned by month and a partition
+     * does not inherit row level security, so each monthly partition (at least the 24 of the migration, more as the DEC-049
+     * upkeep adds months) and the default one must have it enabled, forced and one policy of its own; none is on the no-RLS
+     * list; and the retired SAH-44 tables are not there.
+     */
+    @Test
+    void theEmrRecordTableAndEveryOneOfItsPartitionsAreProtectedAndNoRetiredEmrTableRemains() throws Exception {
+        List<String> weak = new ArrayList<>();
+        Set<String> names = new HashSet<>();
+        db().asApp(c -> {
+            try (var st = c.createStatement(); var rs = st.executeQuery("""
+                    select c.relname, c.relrowsecurity, c.relforcerowsecurity,
+                           (select count(*) from pg_policy p where p.polrelid = c.oid) as policies
+                    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                    where n.nspname = 'opd' and c.relname ~ '^emr_record(_default|_[0-9]{4}_[0-9]{2})?$' and c.relkind in ('r','p')
+                    order by 1
+                    """)) {
+                while (rs.next()) {
+                    names.add(rs.getString("relname"));
+                    if (!rs.getBoolean("relrowsecurity") || !rs.getBoolean("relforcerowsecurity") || rs.getInt("policies") != 1) {
+                        weak.add(rs.getString("relname"));
+                    }
+                }
+            }
+            return null;
+        });
+        // DEC-049 item 3: the afterMigrate upkeep adds a month as the clock moves, so the count is never fixed. The 24 months
+        // of the SAH-53 migration (Nov 2026 to Oct 2028) are always there, and nothing else may be named emr_record*.
+        List<String> monthly = names.stream().filter(n -> n.matches("emr_record_\\d{4}_(0[1-9]|1[0-2])")).sorted().toList();
+        assertThat(monthly).as("at least the 24 monthly partitions of the SAH-53 migration").hasSizeGreaterThanOrEqualTo(24)
+                .contains("emr_record_2026_11", "emr_record_2028_10");
+        assertThat(names).as("the parent, the monthly partitions and the default partition, no other emr_record table")
+                .hasSize(monthly.size() + 2).contains("emr_record", "emr_record_default");
+        assertThat(weak).as("record tables without enabled and forced row level security and one policy").isEmpty();
+        assertThat(NO_RLS_BY_DESIGN).noneMatch(t -> t.startsWith("opd.emr_record"));
+        assertThat(NO_RLS_BY_DESIGN).doesNotContain("opd.emr_template", "opd.emr_template_section", "opd.emr_template_option",
+                "opd.emr_specialty_alias");
+        assertThat(NO_RLS_BY_DESIGN.stream().filter(t -> t.startsWith("opd.emr_")).count()).as("the eighteen global EMR tables").isEqualTo(18);
     }
 
     @Test
@@ -386,5 +438,34 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
             DbAccess.execute(c, "select set_config('app.tenant_id', 'not-a-uuid', false)");
             return DbAccess.count(c, "select count(*) from platform.tenant");
         })).isInstanceOf(SQLException.class);
+    }
+
+    /**
+     * SAH-51-68 (docs/database/SAH-51-68.md, ADR-025): the three tenant tables of the finish and sign are NOT on the no-RLS list,
+     * each has a tenant_id column, enabled and forced row level security and its policies (the append-only addendum and round
+     * note tables have a select and an insert policy and no other; the admission request has one policy for all commands). The
+     * global count of the no-RLS list is unchanged (still the eighteen global EMR tables).
+     */
+    @Test
+    void theThreeTablesOfTheFinishAndSignAreTenantTablesWithForcedRowLevelSecurityAndTheirOwnPolicies() throws Exception {
+        assertThat(NO_RLS_BY_DESIGN).doesNotContain("opd.emr_record_addendum", "opd.emr_admission_request", "ipd.round_note");
+        assertThat(NO_RLS_BY_DESIGN.stream().filter(t -> t.startsWith("opd.emr_")).count()).isEqualTo(18);
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("opd.emr_record_addendum", "a,r");
+        expected.put("opd.emr_admission_request", "*");
+        expected.put("ipd.round_note", "a,r");
+        db().asApp(c -> {
+            for (Map.Entry<String, String> e : expected.entrySet()) {
+                String schema = e.getKey().substring(0, e.getKey().indexOf('.'));
+                String table = e.getKey().substring(e.getKey().indexOf('.') + 1);
+                String state = DbAccess.text(c, "select c.relrowsecurity::text || '/' || c.relforcerowsecurity::text || '/' || "
+                        + "coalesce((select string_agg(p.polcmd::text, ',' order by p.polcmd::text) from pg_policy p where p.polrelid = c.oid), '') "
+                        + "from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = '" + schema + "' and c.relname = '" + table + "'");
+                assertThat(state).as(e.getKey()).isEqualTo("true/true/" + e.getValue());
+                assertThat(DbAccess.count(c, "select count(*) from information_schema.columns where table_schema = '" + schema + "' and table_name = '" + table
+                        + "' and column_name = 'tenant_id' and is_nullable = 'NO'")).as(e.getKey() + " tenant_id").isOne();
+            }
+            return null;
+        });
     }
 }

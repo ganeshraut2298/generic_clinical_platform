@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { NgTemplateOutlet } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -11,8 +12,12 @@ import { formatInr } from '../../../shared/format/inr';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { PageHeadComponent } from '../../../shared/ui/page-head.component';
+import { EmrAccess } from '../../emr/emr-access.service';
+import { EmrReprintService, roleCanReprint } from '../../emr/reprint/emr-reprint.service';
+import { OpenEmrButtonComponent } from '../../emr/open-emr-button.component';
 import { NewTokenDialogComponent } from '../new-token/new-token-dialog.component';
 import { QueueApi } from '../queue.api';
+import { QueueViewState } from '../queue-view.state';
 import { boardColumns } from '../queue-columns.util';
 import { WorkflowApi } from '../../workflow/workflow.api';
 import { WorkflowStep, WorkflowVersion } from '../../workflow/workflow.model';
@@ -46,7 +51,7 @@ const NEW_TOKEN_DIALOG_CONFIG = { panelClass: 'sheet-panel', width: '560px', max
 @Component({
   selector: 'app-queue-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, MatButtonToggleModule, MatMenuModule, IconComponent, PageHeadComponent, EmptyStateComponent],
+  imports: [MatButtonModule, MatButtonToggleModule, MatMenuModule, NgTemplateOutlet, IconComponent, PageHeadComponent, EmptyStateComponent, OpenEmrButtonComponent],
   styleUrl: './queue-board.page.scss',
   templateUrl: './queue-board.page.html',
 })
@@ -57,6 +62,8 @@ export class QueueBoardPage implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly emrAccess = inject(EmrAccess);
+  protected readonly reprint = inject(EmrReprintService);
 
   protected readonly stageLabels = STAGE_LABELS;
   protected readonly stagePillClass = stagePillClass;
@@ -73,13 +80,19 @@ export class QueueBoardPage implements OnInit {
   protected readonly liveVersion = signal(1);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
-  protected readonly myOnly = signal(false);
+  private readonly view = inject(QueueViewState);
+  protected readonly myOnly = this.view.myOnly;
   protected readonly now = signal(new Date());
   protected readonly movingId = signal<string | null>(null);
 
   private readonly role = computed(() => this.store.me()?.role);
 
   protected readonly canCreateToken = computed(() => roleCanCreateToken(this.role()));
+
+  /** An Emergency visit that is still in the clinic joins the group at the top (SAH-67-4). */
+  private static inEmergencyGroup(visit: Visit): boolean {
+    return visit.visitType === 'EMERGENCY' && visit.stage !== 'DONE';
+  }
 
   protected readonly columns = computed<ColumnView[]>(() => {
     const role = this.role();
@@ -88,10 +101,35 @@ export class QueueBoardPage implements OnInit {
     return boardColumns(this.steps(), visits).map((column) => ({
       ...column,
       visits: visits.filter(
-        (visit) => visit.stage === column.stage && (!mine || ownsStage(role, visit.stage, this.stepsOf(visit))),
+        (visit) =>
+          visit.stage === column.stage &&
+          !QueueBoardPage.inEmergencyGroup(visit) &&
+          (!mine || ownsStage(role, visit.stage, this.stepsOf(visit))),
       ),
     }));
   });
+
+  /** Most urgent first (level 1), then the longest waiting (the rule of the Emergency queue, SAH-28). */
+  protected readonly emergencyVisits = computed<Visit[]>(() => {
+    const role = this.role();
+    const mine = this.myOnly();
+    return this.visits()
+      .filter((v) => QueueBoardPage.inEmergencyGroup(v) && (!mine || ownsStage(role, v.stage, this.stepsOf(v))))
+      .sort((a, b) => (a.triageLevel ?? 99) - (b.triageLevel ?? 99) || a.createdAt.localeCompare(b.createdAt) || a.tokenNo - b.tokenNo);
+  });
+
+  protected triagePill(tone: string | null | undefined): string {
+    return tone === 'crit' ? 'p-crit' : tone === 'warn' ? 'p-warn' : 'p-good';
+  }
+
+  /** "Reprint" on a signed visit for the roles that may (owner, front desk, pharmacist, the visit's doctor). */
+  protected canReprint(visit: Visit): boolean {
+    return visit.emrStatus === 'SIGNED' && roleCanReprint(this.role(), this.emrAccess.canOpenVisit(visit.doctorMembershipId));
+  }
+
+  protected reprintRx(visit: Visit): void {
+    this.reprint.open(visit.id);
+  }
 
   ngOnInit(): void {
     this.load();
@@ -107,7 +145,15 @@ export class QueueBoardPage implements OnInit {
     this.myOnly.set(mine);
   }
 
+  /**
+   * The doctor completes a visit from the EMR, so "Open EMR" takes the place of the move button on the
+   * With doctor card of a doctor who can open it (SAH-51-2, ADR-025 H3). The stage endpoint is unchanged
+   * and front desk keeps moving cards.
+   */
   protected canMove(visit: Visit): boolean {
+    if (visit.stage === 'WITH_DOCTOR' && this.emrAccess.canOpenVisit(visit.doctorMembershipId)) {
+      return false;
+    }
     return canMoveForward(this.role(), visit.stage, this.stepsOf(visit));
   }
 

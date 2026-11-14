@@ -15,6 +15,7 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 import { PrivacyApi } from '../../privacy/privacy.api';
 import { ConsentInput, PrivacySettings, consentLine } from '../../privacy/privacy.model';
 import { PatientApi } from '../patient.api';
+import { DobAgeFieldsComponent, dateOfBirthValidator } from './dob-age-fields.component';
 import { LANGUAGE_LABELS, Patient, PatientLanguage, Sex } from '../patient.model';
 
 export interface PatientFormDialogData {
@@ -29,7 +30,7 @@ export interface PatientFormDialogData {
   defaultLanguage?: PatientLanguage;
 }
 
-type FieldName = 'name' | 'age' | 'sex' | 'mobile' | 'area' | 'language' | 'allergy' | 'chronic';
+type FieldName = 'name' | 'sex' | 'mobile' | 'area' | 'language' | 'allergy' | 'chronic';
 
 /**
  * Plain registration form (SAH-8): name, age, sex, mobile, area, language, allergy, chronic,
@@ -50,6 +51,7 @@ type FieldName = 'name' | 'age' | 'sex' | 'mobile' | 'area' | 'language' | 'alle
     MatSelectModule,
     MatSlideToggleModule,
     IconComponent,
+    DobAgeFieldsComponent,
   ],
   styleUrl: './patient-form-dialog.component.scss',
   templateUrl: './patient-form-dialog.component.html',
@@ -83,6 +85,7 @@ export class PatientFormDialogComponent {
     age: new FormControl<number | null>(this.data.age ?? null, {
       validators: [Validators.required, Validators.min(0), Validators.max(120)],
     }),
+    dateOfBirth: new FormControl('', { nonNullable: true, validators: [dateOfBirthValidator] }),
     sex: new FormControl<Sex>(this.data.sex ?? 'F', { nonNullable: true, validators: [Validators.required] }),
     mobile: new FormControl(this.data.mobile ?? '', {
       nonNullable: true,
@@ -114,17 +117,12 @@ export class PatientFormDialogComponent {
     if (control.errors['required']) {
       return field === 'name'
         ? 'Enter the name'
-        : field === 'age'
-          ? 'Enter the age'
-          : field === 'mobile'
-            ? 'Enter a 10-digit mobile number'
-            : 'This field is required';
+        : field === 'mobile'
+          ? 'Enter a 10-digit mobile number'
+          : 'This field is required';
     }
     if (control.errors['pattern']) {
       return 'Enter a 10-digit mobile number';
-    }
-    if (control.errors['min'] || control.errors['max']) {
-      return 'Age must be between 0 and 120';
     }
     if (control.errors['maxlength']) {
       return 'Use 120 characters or fewer';
@@ -158,7 +156,8 @@ export class PatientFormDialogComponent {
     this.api
       .create({
         name: value.name.trim(),
-        age: value.age as number,
+        // The date and the age are never sent together (SAH-73-1): the date wins and the server works the age out.
+        ...(value.dateOfBirth ? { dateOfBirth: value.dateOfBirth } : { age: value.age as number }),
         sex: value.sex,
         mobile: value.mobile,
         area: value.area.trim() || null,
@@ -201,10 +200,12 @@ export class PatientFormDialogComponent {
   }
 
   private focusFirstInvalid(): void {
-    const order: FieldName[] = ['name', 'age', 'mobile'];
+    const order = ['name', 'age', 'dateOfBirth', 'mobile'] as const;
     const first = order.find((field) => this.form.controls[field].invalid);
     if (first) {
-      this.host.nativeElement.querySelector<HTMLElement>(`[formControlName="${first}"]`)?.focus();
+      this.host.nativeElement
+        .querySelector<HTMLElement>(`[formControlName="${first}"], [data-field="${first}"]`)
+        ?.focus();
     }
   }
 }

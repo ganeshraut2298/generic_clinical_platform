@@ -1,0 +1,266 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.wiz {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.wiz-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+
+  h2 {
+    font-size: 1.2rem;
+  }
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  border-radius: var(--r-sm);
+  background: var(--muted-soft);
+  font-weight: 600;
+  color: var(--ink-2);
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .on {
+    color: var(--pri-text);
+  }
+  .sep {
+    color: var(--ink-3);
+  }
+}
+
+.dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  border: 1px solid var(--ink-3);
+
+  .on & {
+    background: var(--pri);
+    border-color: var(--pri);
+    color: var(--pri-ink);
+  }
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+
+  &.review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  &.step3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.left,
+.right,
+.doctors,
+.roomsbox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.starts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px;
+  border: 1px dashed var(--ink-3);
+  border-radius: var(--r-sm);
+  background: var(--glass-hi);
+  color: var(--ink);
+  text-align: left;
+
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  small {
+    color: var(--ink-3);
+  }
+  &[aria-pressed='true'] {
+    border: 2px solid var(--pri);
+    background: var(--pri-soft);
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.tgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tcard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-hi);
+  color: var(--ink);
+  text-align: left;
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  small {
+    color: var(--ink-3);
+  }
+  &[aria-pressed='true'] {
+    border: 2px solid var(--pri);
+    background: var(--pri-soft);
+  }
+}
+
+.badge {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.plist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.copylist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roomadd {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+
+  .field {
+    flex: 1;
+  }
+  button {
+    min-height: 44px;
+  }
+}
+
+.roomlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--line-2);
+  }
+}
+
+.revcols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 12px;
+  align-items: start;
+}
+
+.wiz-f {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+
+  .btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    a,
+    button {
+      min-height: 44px;
+    }
+  }
+}
+
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .body,
+  .body.step3,
+  .revcols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

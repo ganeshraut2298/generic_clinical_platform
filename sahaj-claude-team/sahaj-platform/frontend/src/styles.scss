@@ -4,6 +4,7 @@
 @use './styles/primitives';
 @use './styles/console';
 @use './styles/shell';
+@use './styles/print';
 
 // Custom M3 theme. The palettes are only the base; tokens.scss overrides the system
 // variables with the Sahaj colours, so light/dark and the clinic brand colour apply.

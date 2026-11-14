@@ -1,6 +1,7 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
@@ -21,6 +22,7 @@ describe('SpecialtyPage', () => {
   async function open(role: Role) {
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
         { provide: ShellStore, useValue: { me: () => ({ userId: 'u1', role }) } },
@@ -31,6 +33,8 @@ describe('SpecialtyPage', () => {
     fixture.detectChanges();
     http.expectOne(`${BASE}/specialties`).flush(LIST);
     http.expectOne(`${BASE}/clinic/profile`).flush({ name: 'Clinic', specialtyCode: 'gp' });
+    // The EMR configuration by department sits below the old cards (SAH-45) and reads its own list.
+    http.expectOne('/api/v1/opd/emr/departments').flush({ canEdit: role === 'OWNER', departments: [] });
     fixture.detectChanges();
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;

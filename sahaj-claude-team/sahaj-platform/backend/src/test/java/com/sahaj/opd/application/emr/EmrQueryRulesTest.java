@@ -33,15 +33,39 @@ class EmrQueryRulesTest {
     }
 
     @Test
-    void onlyTheFourTemplateSpecialtiesAreAccepted() {
+    void onlyTheFifteenStarterDepartmentKeysAreAccepted() {
         assertThat(EmrQueryRules.specialty(null)).isNull();
         assertThat(EmrQueryRules.specialty("")).isNull();
-        for (String code : new String[] {"gp", "dental", "paeds", "homeo"}) {
+        assertThat(EmrKeys.STARTER_KEYS).hasSize(15);
+        for (String code : EmrKeys.STARTER_KEYS) {
             assertThat(EmrQueryRules.specialty(code)).isEqualTo(code);
         }
-        assertThatThrownBy(() -> EmrQueryRules.specialty("ayur"))
-                .isInstanceOfSatisfying(InvalidInputException.class, ex -> assertThat(ex.field()).isEqualTo("specialty"));
-        assertThatThrownBy(() -> EmrQueryRules.specialty("GP")).isInstanceOf(InvalidInputException.class);
+        for (String retired : new String[] {"gp", "homeo", "ayur", "GM"}) {
+            assertThatThrownBy(() -> EmrQueryRules.specialty(retired)).isInstanceOfSatisfying(
+                    InvalidInputException.class, ex -> assertThat(ex.field()).isEqualTo("specialty"));
+        }
+    }
+
+    @Test
+    void aStarterKeyIsMappedToTheSah7DiagnosisCode() {
+        assertThat(EmrKeys.diagnosisSpecialty("gm")).isEqualTo("gp");
+        assertThat(EmrKeys.diagnosisSpecialty("og")).isEqualTo("gynae");
+        assertThat(EmrKeys.diagnosisSpecialty("derm")).isEqualTo("derma");
+        assertThat(EmrKeys.diagnosisSpecialty("ayush")).isEqualTo("ayur");
+        assertThat(EmrKeys.diagnosisSpecialty("dental")).isEqualTo("dental");
+        assertThat(EmrKeys.diagnosisSpecialty("paeds")).isEqualTo("paeds");
+        assertThat(EmrKeys.diagnosisSpecialty("physio")).isEqualTo("physio");
+        assertThat(EmrKeys.diagnosisSpecialty("cardio")).isNull();
+        assertThat(EmrKeys.diagnosisSpecialty(null)).isNull();
+    }
+
+    @Test
+    void theClinicSpecialtyMapsToTheDefaultStarter() {
+        assertThat(EmrKeys.clinicDefaultStarter("gp")).isEqualTo("gm");
+        assertThat(EmrKeys.clinicDefaultStarter("dental")).isEqualTo("dental");
+        assertThat(EmrKeys.clinicDefaultStarter("paeds")).isEqualTo("paeds");
+        assertThat(EmrKeys.clinicDefaultStarter("homeo")).isEqualTo("gm");
+        assertThat(EmrKeys.clinicDefaultStarter(null)).isEqualTo("gm");
     }
 
     @Test
@@ -75,12 +99,13 @@ class EmrQueryRulesTest {
 
     @Test
     void keyFormatsFollowTheContract() {
-        assertThat(EmrKeys.isWellFormedTemplateKey("gp")).isTrue();
-        assertThat(EmrKeys.isWellFormedTemplateKey("ayur")).isTrue();
-        assertThat(EmrKeys.isWellFormedTemplateKey("G")).isFalse();
-        assertThat(EmrKeys.isWellFormedTemplateKey("1gp")).isFalse();
-        assertThat(EmrKeys.isWellFormedTemplateKey("a".repeat(21))).isFalse();
-        assertThat(EmrKeys.isWellFormedTemplateKey("gp'--")).isFalse();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("gp")).isTrue();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("ayur")).isTrue();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("G")).isFalse();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("1gp")).isFalse();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("a".repeat(41))).isFalse();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("d_k7m2q9x4ab")).isTrue();
+        assertThat(EmrKeys.isWellFormedDepartmentKey("gp'--")).isFalse();
         assertThat(EmrKeys.isWellFormedSectionKey("chief_complaints")).isTrue();
         assertThat(EmrKeys.isWellFormedSectionKey("Chief")).isFalse();
         assertThat(EmrKeys.isWellFormedSectionKey("a".repeat(41))).isFalse();

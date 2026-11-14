@@ -39,6 +39,7 @@ class ModulesServiceTest {
     private ModuleEntitlementRepository repository;
     private TenantRepository tenantRepository;
     private OwnerGuard ownerGuard;
+    private TeamRepository teamRepository;
     private AuditLog auditLog;
     private ModulesService service;
 
@@ -47,6 +48,7 @@ class ModulesServiceTest {
         repository = mock(ModuleEntitlementRepository.class);
         tenantRepository = mock(TenantRepository.class);
         ownerGuard = mock(OwnerGuard.class);
+        teamRepository = mock(TeamRepository.class);
         auditLog = mock(AuditLog.class);
         service = newService(true);
         when(repository.find(TENANT_ID)).thenReturn(Optional.empty());
@@ -55,7 +57,7 @@ class ModulesServiceTest {
     }
 
     private ModulesService newService(boolean trialSwitch) {
-        return new ModulesService(repository, tenantRepository, ownerGuard, auditLog,
+        return new ModulesService(repository, tenantRepository, teamRepository, ownerGuard, auditLog,
                 Clock.fixed(NOW, ZoneOffset.UTC), trialSwitch);
     }
 
@@ -65,7 +67,7 @@ class ModulesServiceTest {
 
     @Test
     void withNoRowTheDefaultsAreServedAndNothingIsWritten() {
-        ModulesView view = service.get(TENANT_ID, "OWNER");
+        ModulesView view = service.get(TENANT_ID, OWNER_USER, "OWNER");
 
         assertThat(view.plan()).isEqualTo("FREE");
         assertThat(view.ipd().state()).isEqualTo("off");
@@ -80,29 +82,42 @@ class ModulesServiceTest {
         when(tenantRepository.findProfile(TENANT_ID))
                 .thenReturn(Optional.of(new TenantProfile("Clinic", "teal", "PROFESSIONAL", null)));
 
-        assertThat(service.get(TENANT_ID, "OWNER").plan()).isEqualTo("PRO");
+        assertThat(service.get(TENANT_ID, OWNER_USER, "OWNER").plan()).isEqualTo("PRO");
     }
 
     @Test
     void menuCountsFollowTheSignedInRole() {
-        ModulesView owner = service.get(TENANT_ID, "OWNER");
-        ModulesView nurse = service.get(TENANT_ID, "NURSE");
+        ModulesView owner = service.get(TENANT_ID, OWNER_USER, "OWNER");
+        ModulesView nurse = service.get(TENANT_ID, OWNER_USER, "NURSE");
 
         assertThat(owner.menuCounts().advanced()).isEqualTo(9);
         assertThat(owner.menuCounts().simple()).isEqualTo(6);
-        assertThat(nurse.menuCounts().advanced()).isEqualTo(3);
-        assertThat(nurse.menuCounts().simple()).isEqualTo(3);
+        // SAH-66: Second checks counts for NURSE (and for an owner with doctor details, below)
+        assertThat(nurse.menuCounts().advanced()).isEqualTo(4);
+        assertThat(nurse.menuCounts().simple()).isEqualTo(4);
+    }
+
+    @Test
+    void menuCountsCountSecondChecksForAnOwnerOnlyWithDoctorDetails() {
+        when(teamRepository.findByUser(TENANT_ID, OWNER_USER)).thenReturn(Optional.of(new TeamRepository.TeamRow(
+                UUID.randomUUID(), OWNER_USER, "Asha", "9123456789", com.sahaj.platform.domain.MembershipRole.OWNER,
+                com.sahaj.platform.domain.MembershipStatus.ACTIVE, null, true, "General Medicine", null, null, 0L)));
+
+        ModulesView owner = service.get(TENANT_ID, OWNER_USER, "OWNER");
+
+        assertThat(owner.menuCounts().advanced()).isEqualTo(10);
+        assertThat(owner.menuCounts().simple()).isEqualTo(7);
     }
 
     @Test
     void anExpiredTrialReadsAsReadonlyAndAnActiveTrialAsTrial() {
         when(repository.find(TENANT_ID)).thenReturn(Optional.of(row("trial", NOW.minusSeconds(1), false, null)));
-        ModulesView expired = service.get(TENANT_ID, "OWNER");
+        ModulesView expired = service.get(TENANT_ID, OWNER_USER, "OWNER");
         assertThat(expired.ipd().state()).isEqualTo("readonly");
         assertThat(expired.ipdTrialAvailable()).isFalse();
 
         when(repository.find(TENANT_ID)).thenReturn(Optional.of(row("trial", NOW.plusSeconds(60), false, null)));
-        assertThat(service.get(TENANT_ID, "OWNER").ipd().state()).isEqualTo("trial");
+        assertThat(service.get(TENANT_ID, OWNER_USER, "OWNER").ipd().state()).isEqualTo("trial");
     }
 
     @Test
@@ -185,7 +200,7 @@ class ModulesServiceTest {
 
         assertThatThrownBy(() -> service.startIpdTrial(TENANT_ID, OWNER_USER, "OWNER"))
                 .isInstanceOf(NotFoundException.class);
-        assertThat(service.get(TENANT_ID, "OWNER").ipdTrialAvailable()).isFalse();
+        assertThat(service.get(TENANT_ID, OWNER_USER, "OWNER").ipdTrialAvailable()).isFalse();
         verify(repository, never()).upsert(any(), any(), any());
     }
 
@@ -204,33 +219,33 @@ class ModulesServiceTest {
     void menuCountsIncludeTheIpdEntryForIpdRolesWhenIpdIsNotOff() {
         when(repository.find(TENANT_ID)).thenReturn(Optional.of(row("on", null, false, null)));
 
-        ModulesView owner = service.get(TENANT_ID, "OWNER");
-        ModulesView nurse = service.get(TENANT_ID, "NURSE");
-        ModulesView billing = service.get(TENANT_ID, "BILLING");
+        ModulesView owner = service.get(TENANT_ID, OWNER_USER, "OWNER");
+        ModulesView nurse = service.get(TENANT_ID, OWNER_USER, "NURSE");
+        ModulesView billing = service.get(TENANT_ID, OWNER_USER, "BILLING");
 
         assertThat(owner.menuCounts().advanced()).isEqualTo(11);
         assertThat(owner.menuCounts().simple()).isEqualTo(7);
-        assertThat(nurse.menuCounts().advanced()).isEqualTo(5);
-        assertThat(nurse.menuCounts().simple()).isEqualTo(4);
+        assertThat(nurse.menuCounts().advanced()).isEqualTo(6);
+        assertThat(nurse.menuCounts().simple()).isEqualTo(5);
         assertThat(billing.menuCounts().advanced()).isEqualTo(2);
 
         when(repository.find(TENANT_ID)).thenReturn(Optional.of(row("on", null, true, null)));
-        assertThat(service.get(TENANT_ID, "OWNER").menuCounts().advanced()).isEqualTo(12);
+        assertThat(service.get(TENANT_ID, OWNER_USER, "OWNER").menuCounts().advanced()).isEqualTo(12);
     }
 
     @Test
     void menuCountsHaveNoEmergencyEntryWhenIpdIsReadonly() {
         when(repository.find(TENANT_ID)).thenReturn(Optional.of(row("readonly", null, false, null)));
 
-        assertThat(service.get(TENANT_ID, "OWNER").menuCounts().advanced()).isEqualTo(10);
-        assertThat(service.get(TENANT_ID, "NURSE").menuCounts().advanced()).isEqualTo(4);
+        assertThat(service.get(TENANT_ID, OWNER_USER, "OWNER").menuCounts().advanced()).isEqualTo(10);
+        assertThat(service.get(TENANT_ID, OWNER_USER, "NURSE").menuCounts().advanced()).isEqualTo(5);
     }
 
     @Test
     void menuCountsIncludeTheStaffEntryWhenHraIsOn() {
         when(repository.find(TENANT_ID)).thenReturn(Optional.of(row("off", null, true, null)));
 
-        ModulesView owner = service.get(TENANT_ID, "OWNER");
+        ModulesView owner = service.get(TENANT_ID, OWNER_USER, "OWNER");
 
         assertThat(owner.menuCounts().advanced()).isEqualTo(10);
         assertThat(owner.menuCounts().simple()).isEqualTo(7);

@@ -130,6 +130,22 @@
       >
         Admitted<span class="c num">{{ admittedTabNumber() }}</span>
       </button>
+      @if (requestsOn()) {
+        <button
+          type="button"
+          role="tab"
+          id="ipd-tab-requests"
+          aria-controls="ipd-panel"
+          [attr.aria-selected]="activeTab() === 'requests'"
+          [attr.tabindex]="activeTab() === 'requests' ? 0 : -1"
+          (click)="selectTab('requests')"
+          (keydown)="onTabKeydown($event)"
+        >
+          Admission requests@if ((requestCount() ?? 0) > 0) {
+            <span class="c num">{{ requestCount() }}</span>
+          }
+        </button>
+      }
       @if (emergencyOn()) {
         <button
           type="button"
@@ -171,6 +187,8 @@
         />
       } @else if (noBeds()) {
         <ng-container [ngTemplateOutlet]="setup" />
+      } @else if (activeTab() === 'requests') {
+        <app-admission-requests (admitRequested)="admitFromRequest($event)" (count)="requestCount.set($event)" />
       } @else if (activeTab() === 'safety') {
         <app-safety (counts)="onSafetyCounts($event)" (refused)="onSafetyRefused()" [showPharmacist]="isOwner()" />
       } @else if (activeTab() === 'board') {
@@ -199,7 +217,9 @@
           (openEmergencyAccess)="openEmergencyAccess()"
           (openAdmission)="openFromCard($event)"
           (openNursing)="openNursing($event)"
+          [canOpenEmr]="emrAccess.canOpen()"
           (openEmr)="openEmr($event)"
+          (openEmrRecord)="openEmrRecord($event)"
         />
       }
     </div>

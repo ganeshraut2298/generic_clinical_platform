@@ -11,6 +11,7 @@ import { ApiError } from '../../core/http/problem-detail';
 import { problemDetailInterceptor } from '../../core/http/problem-detail.interceptor';
 import { EmergencyComponent } from './emergency/emergency.component';
 import { ShellStore } from '../../core/shell/shell.store';
+import { EmrAccess } from '../emr/emr-access.service';
 import { AdmissionDetail, AdmissionList, AdmittedPatientRow, BedBoard } from './ipd.model';
 import { EmrSheetComponent } from './emr/emr-sheet.component';
 import { EmergencyAccessSheetComponent } from './emergency-access/emergency-access-sheet.component';
@@ -113,6 +114,7 @@ describe('IpdPage', () => {
         { provide: ShellStore, useValue: { me: signal({ role }), menu: signal(menu) } },
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
+        { provide: EmrAccess, useValue: { ensureLoaded: () => undefined, canOpen: () => false } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -198,7 +200,7 @@ describe('IpdPage', () => {
 
   it('opens on the Bed board tab and switches tabs with the keyboard', async () => {
     const view = setup();
-    await loadOk(list({ emergency: { writable: false, queue: 0, overTarget: 0 } }), false);
+    await loadOk(list({ canAdmit: false, emergency: { writable: false, queue: 0, overTarget: 0 } }), false);
     const tabs = Array.from(view.querySelectorAll<HTMLElement>('[role=tab]'));
     expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
     expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1']);
@@ -518,14 +520,14 @@ describe('IpdPage', () => {
       const view = setup();
       await loadOk(list({ emergency: { writable: false, queue: 0, overTarget: 0 } }), false);
       expect(view.querySelector('[data-kpi=emergency] .v')!.textContent!.trim()).toBe('—');
-      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3']);
+      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Admission requests']);
       expect(view.querySelector('[data-act=open-emergency]')).toBeNull();
     });
 
     it('shows the Emergency tab with the count after Admitted, and the header button Emergency', async () => {
       const view = setup();
       await loadOk(list(), false);
-      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Emergency 3']);
+      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Admission requests', 'Emergency 3']);
       const header = view.querySelector('.pagehead .actions')!;
       expect(Array.from(header.querySelectorAll('button')).map((b) => b.textContent!.trim())).toEqual([
         'Emergency',
@@ -687,19 +689,19 @@ describe('IpdPage', () => {
     it('has no Safety tab when the server sent no safety block (FRONT_DESK, BILLING and the like)', async () => {
       const view = setup('FRONT_DESK');
       await loadOk(list({ safety: null }), false);
-      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Emergency 3']);
+      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Admission requests', 'Emergency 3']);
     });
 
     it('has no Safety tab when nobody is admitted, even with a safety block', async () => {
       const view = setup('NURSE');
       await loadOk(list({ safety: safety(0), items: [] }), false);
-      expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Emergency 3']);
+      expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Admission requests', 'Emergency 3']);
     });
 
     it('shows Safety as the last tab, after Emergency, with the open count', async () => {
       const view = setup('DOCTOR');
       await loadOk(list({ safety: safety(2, LATE) }), false);
-      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Emergency 3', 'Safety 2']);
+      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Admission requests', 'Emergency 3', 'Safety 2']);
       expect(view.querySelector('#ipd-tab-safety')!.getAttribute('role')).toBe('tab');
     });
 
@@ -769,7 +771,7 @@ describe('IpdPage', () => {
     it('hides the count at 0 and still shows Safety after Admitted when Emergency is off', async () => {
       const view = setup('NURSE');
       await loadOk(list({ safety: safety(0), emergency: { writable: false, queue: 0, overTarget: 0 } }), false);
-      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Safety']);
+      expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Admission requests', 'Safety']);
       expect(view.querySelector('#ipd-tab-safety .c')).toBeNull();
     });
 
@@ -1383,7 +1385,7 @@ describe('IpdPage', () => {
         await loadOk(list({ safety: open(2) }), false);
         http.expectOne(SUMMARY).flush(summary(3));
         await settle();
-        expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Emergency 3', 'Safety 5']);
+        expect(tabs(view)).toEqual(['Bed board', 'Admitted 3', 'Admission requests', 'Emergency 3', 'Safety 5']);
       });
 
       it('shows the waiting number alone when no escalation is open, and hides it at 0', async () => {
@@ -1391,7 +1393,7 @@ describe('IpdPage', () => {
         await loadOk(list({ safety: open(0) }), false);
         http.expectOne(SUMMARY).flush(summary(4));
         await settle();
-        expect(tabs(view)[3]).toBe('Safety 4');
+        expect(tabs(view)[4]).toBe('Safety 4');
       });
 
       it('hides the number when both are 0', async () => {
@@ -1434,7 +1436,7 @@ describe('IpdPage', () => {
         http.expectOne(SAFETY_SUMMARY).flush({ open: 2, pastTarget: 0, dosesDue: 0, dosesLate: 0, changeToken: TOKEN_A, asOf: AS_OF });
         http.expectOne(SUMMARY).flush(summary(4));
         await settle();
-        expect(tabs(view)[3]).toBe('Safety 6');
+        expect(tabs(view)[4]).toBe('Safety 6');
       });
 
       it('does not read the waiting orders while the browser tab is hidden, and reads them at once when it shows again', async () => {
@@ -1645,7 +1647,7 @@ describe('IpdPage', () => {
         await settle();
         http.expectOne((r) => r.url === CHECKS).flush(checks(3, []));
         await settle();
-        expect(tabs(view)[3]).toBe('Safety 5');
+        expect(tabs(view)[4]).toBe('Safety 5');
         expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('3');
 
         await advance(60_000);
@@ -1653,7 +1655,7 @@ describe('IpdPage', () => {
         http.expectOne((r) => r.url === EVENTS).flush(pageOf());
         refuse(http.expectOne(SUMMARY));
         await settle();
-        expect(tabs(view)[3]).toBe('Safety');
+        expect(tabs(view)[4]).toBe('Safety');
         expect(view.querySelector('#ipd-tab-safety .c')).toBeNull();
         expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('—');
         expect(view.querySelector('[data-testid=pharmacist-error]')!.textContent).toContain('No access.');
@@ -1811,14 +1813,14 @@ describe('IpdPage', () => {
           await settle();
           http.expectOne((r) => r.url === CHECKS).flush(checks(3, []));
           await settle();
-          expect(tabs(view)[3]).toBe('Safety 5');
+          expect(tabs(view)[4]).toBe('Safety 5');
 
           await advance(60_000);
           http.expectOne(SUMMARY).flush(summary(3));
           refuse(http.expectOne(BOARD));
           http.expectOne((r) => r.url === EVENTS);
           await settle();
-          expect(tabs(view)[3]).toBe('Safety');
+          expect(tabs(view)[4]).toBe('Safety');
           expect(view.querySelector('#ipd-tab-safety .c')).toBeNull();
 
           view.querySelector<HTMLElement>('app-safety .notice.err button')!.click();
@@ -1828,7 +1830,7 @@ describe('IpdPage', () => {
           await settle();
           http.expectOne((r) => r.url === CHECKS).flush(checks(3, []));
           await settle();
-          expect(tabs(view)[3]).toBe('Safety 5');
+          expect(tabs(view)[4]).toBe('Safety 5');
         });
 
         it('after Try again on the page the pharmacist count is read at once, not a minute later (review fix 8)', async () => {
@@ -1966,7 +1968,7 @@ describe('IpdPage', () => {
           scoped({ items: [], scope: { ...WARDS, visible: 0, hasWard: false }, safety: counts() }),
           false,
         );
-        expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Emergency 3', 'Safety']);
+        expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Admission requests', 'Emergency 3', 'Safety']);
       });
 
       it('has no Safety tab when nobody at all is admitted', async () => {
@@ -1975,7 +1977,7 @@ describe('IpdPage', () => {
           scoped({ items: [], scope: { ...WARDS, visible: 0, admitted: 0 }, safety: counts() }),
           false,
         );
-        expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Emergency 3']);
+        expect(tabs(view)).toEqual(['Bed board', 'Admitted 0', 'Admission requests', 'Emergency 3']);
       });
 
       it('passes the signed-in role to the list (My patients is for OWNER and DOCTOR, a nurse with a ward, never FRONT_DESK)', async () => {

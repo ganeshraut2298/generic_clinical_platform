@@ -172,6 +172,23 @@ describe('NursingSheetComponent', () => {
 
   afterEach(() => http.verify());
 
+  describe('the latest signed round (SAH-67-1)', () => {
+    it('shows "Round done" with the time and the doctor, and the investigations advised as text', async () => {
+      await setup({
+        ...SHEET,
+        latestRound: { roundDate: '2026-11-05', signedAt: '2026-11-05T05:35:00Z', doctorName: 'Dr. Meera Rao', investigationsAdvised: 'CBC; Chest X-ray' },
+      });
+      const round = el().querySelector('[data-testid="latest-round"]')!;
+      expect(round.textContent!.replace(/\s+/g, ' ')).toContain('Round done · 11:05 AM IST · Dr. Meera Rao');
+      expect(round.textContent).toContain('Investigations advised: CBC; Chest X-ray');
+    });
+
+    it('shows nothing when no round was signed', async () => {
+      await setup({ ...SHEET, latestRound: null });
+      expect(el().querySelector('[data-testid="latest-round"]')).toBeNull();
+    });
+  });
+
   describe('the sheet', () => {
     it('shows the title, the subtitle from asOf and the five fields with units, prefilled', async () => {
       await setup();

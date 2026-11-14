@@ -66,6 +66,14 @@ class AdmittedCards {
         this.safety = safety;
     }
 
+    /** SAH-67-1: set by Spring; null in a plain unit test (then no card says "Round done"). */
+    private RoundNoteRepository roundNotes;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRoundNotes(RoundNoteRepository roundNotes) {
+        this.roundNotes = roundNotes;
+    }
+
     /** The database clock of the answer, read once: the base of every minute count and of "vitals due". */
     Instant asOf() {
         return safety.databaseNow();
@@ -199,10 +207,15 @@ class AdmittedCards {
             escalations.putIfAbsent(row.escalation().admissionId(), row.escalation());
         }
         Map<UUID, AdmittedClinicalFlags> flags = new HashMap<>();
+        // SAH-67-1 (ADR-025 D8): "Round done" from ipd's own round record, one statement for the whole set
+        Set<UUID> roundDone = roundNotes == null || rows.isEmpty() ? Set.of() : roundNotes.doneOn(tenantId,
+                asOf.atZone(java.time.ZoneId.of("Asia/Kolkata")).toLocalDate(),
+                rows.stream().map(r -> r.admission().id()).toList());
         for (AdmittedRow row : rows) {
             UUID admissionId = row.admission().id();
             flags.put(admissionId, flags(escalations.get(admissionId), latest.get(admissionId),
-                    patientMap.get(row.admission().patientId()), asOf, plan, row.admission().reason(), recorders));
+                    patientMap.get(row.admission().patientId()), asOf, plan, row.admission().reason(), recorders)
+                    .withRoundDone(roundDone.contains(admissionId)));
         }
         return new Clinical(banner, flags);
     }

@@ -1,0 +1,278 @@
+@if (store.loading()) {
+  <p class="loading" aria-busy="true">Opening the form</p>
+} @else if (store.loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button mat-stroked-button type="button" data-act="retry" (click)="store.reload()">Try again</button>
+  </div>
+} @else if (store.view(); as view) {
+  <section class="fb" aria-labelledby="fb-title">
+    <header class="top">
+      <div class="tl">
+        <nav class="crumb" aria-label="Path">
+          <a routerLink="/app/config/specialty">Settings / EMR configuration</a> / <a routerLink="/app/config/forms">Form builder</a>
+        </nav>
+        <h2 id="fb-title" class="sr-only">Form builder — custom clinical forms</h2>
+        <div class="namerow">
+          <label class="nm">
+            <span>Form name</span>
+            <input
+              class="input"
+              type="text"
+              [value]="store.name()"
+              [disabled]="!store.canEdit()"
+              [attr.maxlength]="80"
+              data-testid="form-name"
+              (input)="onNameInput($event)"
+            />
+          </label>
+          <span class="chip" [class.live]="view.state === 'LIVE'" [class.wait]="view.state === 'WAITING_APPROVAL'" role="status" data-testid="state-chip">{{ store.chip() }}</span>
+          <span class="faint t-xs" data-testid="count-line">{{ store.countLine() }}</span>
+        </div>
+      </div>
+      <div class="ta">
+        <div class="modes" role="tablist" aria-label="Mode">
+          @for (m of modes; track m.key) {
+            <button type="button" role="tab" [attr.aria-selected]="store.mode() === m.key" [attr.data-mode]="m.key" (click)="store.setMode(m.key)">
+              {{ m.label }}
+            </button>
+          }
+        </div>
+        @if (store.canEdit()) {
+          <button mat-stroked-button type="button" data-act="save-draft" [disabled]="store.busy() !== null || !store.dirty()" (click)="store.save()">
+            {{ store.busy() === 'save' ? 'Saving' : 'Save draft' }}
+          </button>
+          <button mat-flat-button type="button" data-act="publish" [disabled]="store.busy() !== null || store.retired()" (click)="store.publishOrSubmit()">
+            {{ store.publishLabel() }}
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (!store.canEdit()) {
+      <div class="notice teal slim" role="note" data-testid="readonly-note">
+        <app-icon name="lock" [size]="14" />
+        <span>Only the owner can change forms. You can read and preview this one.</span>
+      </div>
+    }
+    @if (store.saveError(); as message) {
+      <div class="notice err" role="alert" data-testid="save-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        @if (store.conflict()) {
+          <button mat-stroked-button type="button" data-act="reload" (click)="store.reload()">Reload</button>
+        }
+      </div>
+    }
+
+    <div class="cols">
+      @if (store.mode() === 'build' && store.canEdit()) {
+        <aside class="left" aria-label="Fields">
+          <h3>Fields</h3>
+          <span class="faint t-xs">Drag a field onto the form, or tap to add it below the selected field.</span>
+          @for (g of palette; track g.label) {
+            <div class="pg">
+              <span class="gl">{{ g.label }}</span>
+              <div class="pitems">
+                @for (i of g.items; track i.type) {
+                  <button
+                    type="button"
+                    class="pitem"
+                    draggable="true"
+                    [title]="i.hint || 'Drag onto the form or tap to add'"
+                    [attr.data-type]="i.type"
+                    (dragstart)="startNew(i.type, $event)"
+                    (dragend)="endDrag()"
+                    (click)="store.addField(i.type)"
+                  >
+                    <span class="pi" aria-hidden="true">{{ i.icon }}</span>
+                    {{ i.label }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </aside>
+      }
+
+      <main class="mid" [class.narrow]="store.mode() !== 'build'">
+        @if (store.mode() !== 'print') {
+          <div class="canvas">
+            <div class="chead">
+              <div class="ct">
+                <h3>{{ store.name() }}</h3>
+                <span class="faint t-xs">{{ store.metaLine() }}</span>
+              </div>
+              <span class="badge">
+                @if (store.mode() === 'build') { Building · tap a field to edit, drag to reorder }
+                @else { Preview · fill it like a doctor; rules and scores run live }
+              </span>
+            </div>
+
+            @if (store.mode() === 'build') {
+              <div class="grid" data-testid="canvas">
+                @for (f of store.fields(); track f.key; let i = $index) {
+                  <div
+                    class="card"
+                    [class.sel]="store.selectedKey() === f.key"
+                    [class.drop]="dropAt() === i"
+                    [class.rule]="!!f.showIf"
+                    [style.grid-column]="'span ' + f.width"
+                    [attr.draggable]="store.canEdit()"
+                    [attr.data-field]="f.key"
+                    (dragstart)="startMove(f.key, $event)"
+                    (dragover)="over(i, $event)"
+                    (drop)="drop(i, $event)"
+                    (dragend)="endDrag()"
+                  >
+                    <button type="button" class="pick" [attr.aria-label]="'Select field ' + f.label" [attr.aria-pressed]="store.selectedKey() === f.key" (click)="store.select(f.key)"></button>
+                    @if (store.selectedKey() === f.key && store.canEdit()) {
+                      <div class="tools">
+                        <button type="button" aria-label="Move up" title="Move up" [disabled]="i === 0" data-act="up" (click)="store.moveField(f.key, -1)">↑</button>
+                        <button type="button" aria-label="Move down" title="Move down" [disabled]="i === store.fields().length - 1" data-act="down" (click)="store.moveField(f.key, 1)">↓</button>
+                        <button type="button" aria-label="Duplicate" title="Duplicate" data-act="copy" (click)="store.duplicateField(f.key)">Copy</button>
+                        <button type="button" aria-label="Delete field" title="Delete" data-act="delete" (click)="store.deleteField(f.key)">Delete</button>
+                      </div>
+                    }
+                    @switch (kindOf(f)) {
+                      @case ('section') {
+                        <div class="sect"><h4>{{ f.label }}</h4>@if (f.help) { <span class="faint t-xs">{{ f.help }}</span> }</div>
+                      }
+                      @case ('note') {
+                        <div class="note">{{ f.label }}</div>
+                      }
+                      @default {
+                        <div class="flabel">
+                          <span class="fl">{{ f.label }}@if (f.required) { <span class="star" aria-hidden="true"> *</span> }</span>
+                          <span class="badges">
+                            @for (b of badges(f); track b) { <span class="bd">{{ b }}</span> }
+                          </span>
+                        </div>
+                        @switch (kindOf(f)) {
+                          @case ('input') {
+                            <div class="pv"><input class="input" [type]="inputType(f)" disabled [placeholder]="sample(f)" [attr.aria-label]="f.label + ' sample'" />@if (f.unit) { <span class="faint t-xs">{{ f.unit }}</span> }</div>
+                          }
+                          @case ('long') {
+                            <textarea class="input" rows="2" disabled [attr.aria-label]="f.label + ' sample'"></textarea>
+                          }
+                          @case ('chips') {
+                            <div class="pv chipsrow">
+                              @for (o of options(f); track o.key) {
+                                <span class="sc-chip">{{ o.label }}@if (o.score) { <small>+{{ o.score }}</small> }</span>
+                              }
+                            </div>
+                          }
+                          @case ('select') {
+                            <select class="input" disabled [attr.aria-label]="f.label + ' sample'"><option>Choose…</option></select>
+                          }
+                          @case ('calc') {
+                            <div class="calc"><b>{{ calcValue(f) }}</b><span class="faint t-xs">{{ sample(f) }}</span></div>
+                          }
+                          @default {
+                            <div class="block">
+                              <span class="bi" aria-hidden="true">{{ typeIcon[f.type] }}</span>
+                              <span class="bt"><b>{{ typeLabel[f.type] }}</b><span class="faint t-xs">{{ typeHint[f.type] }}</span></span>
+                              @if (f.type === 'SIGNATURE' || f.type === 'PHOTO' || f.type === 'FILE_UPLOAD' || f.type === 'HANDWRITING_PAD' || f.type === 'TOOTH_CHART') {
+                                <span class="pill p-wait">Later</span>
+                              }
+                            </div>
+                          }
+                        }
+                        @if (f.help) { <span class="faint t-xs">{{ f.help }}</span> }
+                      }
+                    }
+                  </div>
+                }
+                <div class="endzone" [class.drop]="dropAt() === store.fields().length" (dragover)="over(store.fields().length, $event)" (drop)="drop(store.fields().length, $event)">
+                  {{ store.canEdit() ? 'Drop a field here, or tap one on the left' : 'No more fields' }}
+                </div>
+              </div>
+            } @else {
+              @if (def(); as d) {
+                <app-form-fill
+                  [definition]="d"
+                  [values]="store.previewValues()"
+                  [idPrefix]="'pv'"
+                  [requiredMissing]="store.saveTried() ? store.previewMissing() : []"
+                  [errors]="previewProblems()"
+                  (fieldChange)="onPreviewChange($event)"
+                />
+              }
+              <div class="pvbar">
+                <span class="status" [class.bad]="previewBad()" role="status" data-testid="preview-status">{{ previewStatus() }}</span>
+                <div class="pvbtn">
+                  <button type="button" mat-stroked-button data-act="clear" (click)="store.clearPreview()">Clear</button>
+                  <button type="button" mat-stroked-button data-act="preview-save" disabled aria-describedby="pv-note">Save to patient record</button>
+                </div>
+                <span class="faint t-xs" id="pv-note">Fill the form from a patient's EMR to save it</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="printwrap">
+            <div class="ptools">
+              <div class="seg" role="group" aria-label="Paper size">
+                <button type="button" [attr.aria-pressed]="paper() === 'A4'" (click)="paper.set('A4')">A4</button>
+                <button type="button" [attr.aria-pressed]="paper() === 'A5'" (click)="paper.set('A5')">A5</button>
+              </div>
+              <span class="faint t-xs">Values come from the Preview tab.</span>
+              <button mat-flat-button type="button" data-act="print" (click)="print()">Print</button>
+            </div>
+            @if (printFailed()) {
+              <p class="err-text" role="alert">We could not print. Try again.</p>
+            }
+            <article #sheet class="sheet" [class.a5]="paper() === 'A5'" aria-label="Printed form preview">
+              <header class="lh">
+                <div class="lc">
+                  <strong>{{ clinicName() }}</strong>
+                  <span class="sm">{{ [letterhead().address, letterhead().phone].filter(nonEmpty).join(' · ') }}</span>
+                </div>
+                <div class="lf">
+                  <strong>{{ store.name() }}</strong>
+                  <span class="sm">{{ versionText() }}</span>
+                </div>
+              </header>
+              <div class="ids">
+                @for (k of wordKeys; track k) { <span>{{ w(k) }}: ____________</span> }
+              </div>
+              @for (r of rows(); track $index) {
+                @if (r.kind === 'heading') {
+                  <div class="prow head"><span>{{ r.label }}</span></div>
+                } @else if (r.kind === 'note') {
+                  <div class="prow noteline"><span>{{ r.label }}</span></div>
+                } @else {
+                  <div class="prow"><span class="pl">{{ r.label }}</span><span class="pvv">{{ r.value }}</span></div>
+                }
+              }
+              <div class="sigline">{{ w('signature') }} · Dr. ____________ · {{ w('regNo') }} ____________</div>
+            </article>
+          </div>
+        }
+      </main>
+
+      @if (store.mode() === 'build') {
+        <aside class="right" aria-label="Settings">
+          <div class="rtabs" role="tablist" aria-label="Settings">
+            <button type="button" role="tab" [attr.aria-selected]="store.tab() === 'field'" data-tab="field" (click)="store.setTab('field')">Field</button>
+            <button type="button" role="tab" [attr.aria-selected]="store.tab() === 'form'" data-tab="form" (click)="store.setTab('form')">Form settings</button>
+          </div>
+          @if (store.tab() === 'field') {
+            <app-field-settings />
+          } @else {
+            <app-form-settings />
+          }
+        </aside>
+      }
+    </div>
+
+    @if (store.toast(); as message) {
+      <div class="toast" role="status" data-testid="builder-toast">
+        {{ message }}
+        @if (store.undoDelete()) {
+          <button type="button" class="undo" data-act="undo" (click)="store.undo()">Undo</button>
+        }
+      </div>
+    }
+  </section>
+}

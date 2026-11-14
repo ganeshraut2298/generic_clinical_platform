@@ -1,0 +1,125 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.fr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lbl {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.meta {
+  color: var(--ink-3);
+  font-size: 0.76rem;
+}
+
+.star {
+  color: var(--crit);
+}
+
+.bad .input {
+  border-color: var(--crit);
+}
+
+.pair {
+  display: flex;
+  gap: 8px;
+
+  .num {
+    flex: 1 1 120px;
+  }
+  .unit,
+  select {
+    flex: 1 1 100px;
+  }
+}
+
+.yn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pick {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+  color: var(--ink-2);
+  font-weight: 600;
+
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+    color: var(--pri-text);
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.tbl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+
+  .input {
+    flex: 1 1 0;
+  }
+}
+
+.addrow {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--pri-text);
+  font-weight: 600;
+}
+
+.later {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .input {
+    text-align: left;
+    color: var(--ink-3);
+  }
+}
+
+textarea.input {
+  resize: vertical;
+}

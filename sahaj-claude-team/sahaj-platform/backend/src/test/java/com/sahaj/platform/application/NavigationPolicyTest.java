@@ -17,7 +17,7 @@ class NavigationPolicyTest {
     @Test
     void hraOffLeavesTheBaseMenuUnchanged() {
         for (MembershipRole role : MembershipRole.values()) {
-            assertThat(NavigationPolicy.menuFor(role, "advanced", false))
+            assertThat(withoutSecondChecks(NavigationPolicy.menuFor(role, "advanced", false)))
                     .isEqualTo(NavigationPolicy.menuFor(role, "advanced"));
         }
     }
@@ -41,7 +41,8 @@ class NavigationPolicyTest {
                         .isEqualTo(expected);
                 assertThat(NavigationPolicy.menuFor(role, mode, IPD_READONLY).contains("ipd")).as(role + " ro " + mode)
                         .isEqualTo(expected);
-                assertThat(NavigationPolicy.menuFor(role, mode, IPD_OFF)).isEqualTo(NavigationPolicy.menuFor(role, mode));
+                assertThat(withoutSecondChecks(NavigationPolicy.menuFor(role, mode, IPD_OFF)))
+                        .isEqualTo(NavigationPolicy.menuFor(role, mode));
             }
         }
     }
@@ -55,9 +56,9 @@ class NavigationPolicyTest {
         assertThat(NavigationPolicy.menuFor(MembershipRole.OWNER, "simple", both)).containsExactly("today", "queue",
                 "appointments", "patients", "billing", "ipd", "staff", "config");
         assertThat(NavigationPolicy.menuFor(MembershipRole.NURSE, "advanced", both))
-                .containsExactly("today", "queue", "patients", "emergency", "ipd", "staff");
+                .containsExactly("today", "queue", "secondchecks", "patients", "emergency", "ipd", "staff");
         assertThat(NavigationPolicy.menuFor(MembershipRole.DOCTOR, "advanced", IPD_ON))
-                .containsExactly("today", "queue", "appointments", "patients", "followups", "ipd");
+                .containsExactly("today", "queue", "secondchecks", "appointments", "patients", "followups", "ipd");
         assertThat(NavigationPolicy.menuFor(MembershipRole.FRONT_DESK, "simple", IPD_ON))
                 .containsExactly("today", "queue", "appointments", "patients", "billing", "ipd");
     }
@@ -65,15 +66,16 @@ class NavigationPolicyTest {
     @Test
     void thePharmacistGetsIpdAfterTodayAndNeverEmergency() {
         assertThat(NavigationPolicy.menuFor(MembershipRole.PHARMACIST, "advanced", IPD_ON))
-                .containsExactly("today", "ipd");
+                .containsExactly("today", "ipd", "secondchecks");
         assertThat(NavigationPolicy.menuFor(MembershipRole.PHARMACIST, "simple", IPD_ON))
-                .containsExactly("today", "ipd");
+                .containsExactly("today", "ipd", "secondchecks");
         assertThat(NavigationPolicy.menuFor(MembershipRole.PHARMACIST, "advanced", IPD_READONLY))
-                .containsExactly("today", "ipd");
+                .containsExactly("today", "ipd", "secondchecks");
         assertThat(NavigationPolicy.menuFor(MembershipRole.PHARMACIST, "advanced", IPD_OFF))
-                .containsExactly("today");
+                .containsExactly("today", "secondchecks");
         assertThat(NavigationPolicy.menuFor(MembershipRole.PHARMACIST, "advanced",
-                new NavigationPolicy.ModuleFlags(true, true, true))).containsExactly("today", "ipd", "staff");
+                new NavigationPolicy.ModuleFlags(true, true, true)))
+                .containsExactly("today", "ipd", "secondchecks", "staff");
     }
 
     @Test
@@ -81,7 +83,7 @@ class NavigationPolicyTest {
         assertThat(NavigationPolicy.menuFor(MembershipRole.FRONT_DESK, "advanced", IPD_ON)).containsExactly("today",
                 "queue", "appointments", "patients", "billing", "followups", "emergency", "ipd");
         assertThat(NavigationPolicy.menuFor(MembershipRole.NURSE, "advanced", IPD_ON))
-                .containsExactly("today", "queue", "patients", "emergency", "ipd");
+                .containsExactly("today", "queue", "secondchecks", "patients", "emergency", "ipd");
         for (MembershipRole role : MembershipRole.values()) {
             assertThat(NavigationPolicy.menuFor(role, "simple", IPD_ON)).as(role + " simple").doesNotContain("emergency");
             boolean expected = role == MembershipRole.OWNER || role == MembershipRole.FRONT_DESK
@@ -109,6 +111,44 @@ class NavigationPolicyTest {
         assertThat(NavigationPolicy.menuFor(MembershipRole.OWNER, "advanced", true)).containsExactly("today", "queue",
                 "appointments", "patients", "billing", "revenue", "followups", "reports", "staff", "config");
         assertThat(NavigationPolicy.menuFor(MembershipRole.NURSE, "advanced", true))
-                .containsExactly("today", "queue", "patients", "staff");
+                .containsExactly("today", "queue", "secondchecks", "patients", "staff");
+    }
+
+    private static List<String> withoutSecondChecks(List<String> menu) {
+        return menu.stream().filter(key -> !"secondchecks".equals(key)).toList();
+    }
+
+    private static final NavigationPolicy.ModuleFlags NONE = new NavigationPolicy.ModuleFlags(false, false, false);
+
+    @Test
+    void secondChecksIsForTheCheckerRolesAndAnOwnerWithDoctorDetailsInBothModes() {
+        for (MembershipRole role : MembershipRole.values()) {
+            boolean checker = role == MembershipRole.NURSE || role == MembershipRole.PHARMACIST
+                    || role == MembershipRole.DOCTOR || role == MembershipRole.VISITING_DOCTOR;
+            for (String mode : new String[] {"simple", "advanced"}) {
+                assertThat(NavigationPolicy.menuFor(role, mode, NONE, false).contains("secondchecks"))
+                        .as(role + " " + mode).isEqualTo(checker);
+                assertThat(NavigationPolicy.menuFor(role, mode, NONE, true).contains("secondchecks"))
+                        .as(role + " " + mode + " with doctor details")
+                        .isEqualTo(checker || role == MembershipRole.OWNER);
+            }
+        }
+    }
+
+    @Test
+    void secondChecksSitsRightAfterQueueAndTheOwnerWithoutDoctorDetailsDoesNotGetIt() {
+        assertThat(NavigationPolicy.menuFor(MembershipRole.DOCTOR, "advanced", NONE))
+                .containsExactly("today", "queue", "secondchecks", "appointments", "patients", "followups");
+        assertThat(NavigationPolicy.menuFor(MembershipRole.VISITING_DOCTOR, "simple", NONE))
+                .containsExactly("today", "queue", "secondchecks", "appointments", "patients");
+        assertThat(NavigationPolicy.menuFor(MembershipRole.NURSE, "advanced", NONE))
+                .containsExactly("today", "queue", "secondchecks", "patients");
+        assertThat(NavigationPolicy.menuFor(MembershipRole.OWNER, "advanced", NONE, true)).containsExactly("today",
+                "queue", "secondchecks", "appointments", "patients", "billing", "revenue", "followups", "reports",
+                "config");
+        assertThat(NavigationPolicy.menuFor(MembershipRole.OWNER, "advanced", NONE))
+                .doesNotContain("secondchecks");
+        assertThat(NavigationPolicy.menuFor(MembershipRole.FRONT_DESK, "advanced", NONE))
+                .doesNotContain("secondchecks");
     }
 }

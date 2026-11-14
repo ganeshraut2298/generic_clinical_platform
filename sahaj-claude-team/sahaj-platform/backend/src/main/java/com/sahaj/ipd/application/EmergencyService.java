@@ -387,6 +387,69 @@ public class EmergencyService {
         return handoff;
     }
 
+    // ---- the doctor's Emergency outcome from the EMR (SAH-67-2, ADR-025 D9; through EmrEmergencyPort) ----
+
+    /**
+     * The clinic IPD lock, then the case row lock, in the caller's (the EMR sign) transaction. A closed case is reported
+     * as not open (the caller answers 409 case-closed); a case of another clinic is a 404.
+     */
+    CaseRow lockForEmr(UUID tenantId, UUID caseId) {
+        wards.lockTenant(tenantId);
+        return cases.findForUpdate(tenantId, caseId).orElseThrow(() -> new NotFoundException("Emergency case not found"));
+    }
+
+    /**
+     * Closes the locked, open case as the SAH-28 code paths do: RELEASED (IPD_ER_RELEASED), REFERRED (IPD_ER_REFERRED) or
+     * SENT_TO_OPD (IPD_ER_SENT_TO_OPD with the visit id). 409 ipd-readonly while IPD is Read-only. The mobile number is cleared in the same update. False when the
+     * case is not open (nothing is written).
+     */
+    boolean closeForEmr(UUID tenantId, UUID actor, UUID caseId, String kind, UUID patientId, UUID opdVisitId) {
+        // a write like every other: refused (409 ipd-readonly) while IPD is Read-only; the EMR sign checks it first (L2)
+        gate.check(tenantId, true);
+        CaseRow row = cases.findForUpdate(tenantId, caseId).orElseThrow(() -> new NotFoundException("Emergency case not found"));
+        if (!row.open()) {
+            return false;
+        }
+        Instant now = cases.databaseNow();
+        String action;
+        switch (kind) {
+            case "RELEASE":
+                requireWritten(cases.close(tenantId, caseId, "RELEASED", now, actor));
+                action = "IPD_ER_RELEASED";
+                break;
+            case "REFER":
+                requireWritten(cases.close(tenantId, caseId, "REFERRED", now, actor));
+                action = "IPD_ER_REFERRED";
+                break;
+            default:
+                if (patientId == null || opdVisitId == null) {
+                    throw new IllegalArgumentException("Sent to OPD needs the patient and the visit");
+                }
+                requireWritten(cases.closeSentToOpd(tenantId, caseId, patientId, opdVisitId, now, actor));
+                action = "IPD_ER_SENT_TO_OPD";
+                break;
+        }
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("caseId", caseId);
+        after.put("level", row.level());
+        after.put("bay", row.bay());
+        after.put("closedAt", now.toString());
+        if ("IPD_ER_SENT_TO_OPD".equals(action)) {
+            after.put("visitId", opdVisitId);
+        }
+        auditLog.record(action, ENTITY_CASE, caseId, null, after);
+        return true;
+    }
+
+    /** The clinic's scale, or the SAH-28 default (also when the clinic never saved Emergency settings). */
+    EmergencySetup setupOrDefault(UUID tenantId) {
+        return catalog.emergencySetup(tenantId);
+    }
+
+    boolean hasEmergencySetup(UUID tenantId) {
+        return settings.findEmergencySetup(tenantId).isPresent();
+    }
+
     // ---- building the answers ----
 
     /**

@@ -58,6 +58,7 @@ class BillingServiceTest {
     private PatientLookupPort patientLookupPort;
     private ActorDirectoryPort actorDirectoryPort;
     private AuditLog auditLog;
+    private CoursePaymentRepository coursePayments;
     private BillingService service;
 
     @BeforeEach
@@ -66,6 +67,7 @@ class BillingServiceTest {
         billItemRepository = mock(BillItemRepository.class);
         paymentRepository = mock(PaymentRepository.class);
         dayClosingRepository = mock(DayClosingRepository.class);
+        coursePayments = mock(CoursePaymentRepository.class);
         visitBillingPort = mock(VisitBillingPort.class);
         serviceLookupPort = mock(ServiceLookupPort.class);
         discountLimitPort = mock(DiscountLimitPort.class);
@@ -74,7 +76,7 @@ class BillingServiceTest {
         auditLog = mock(AuditLog.class);
         service = new BillingService(billRepository, billItemRepository, paymentRepository, dayClosingRepository,
                 visitBillingPort, serviceLookupPort, discountLimitPort, patientLookupPort, actorDirectoryPort,
-                auditLog, CLOCK);
+                auditLog, CLOCK, coursePayments);
 
         when(patientLookupPort.find(TENANT_ID, PATIENT_ID))
                 .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F", "9000000001")));
@@ -392,6 +394,20 @@ class BillingServiceTest {
     }
 
     @Test
+    void courseCashPaymentsCountInTheExpectedCashOfTheDayClosing() {
+        // SAH-58, DEC-042 H3: cash taken for a treatment course is in the drawer too; UPI and card are not.
+        when(dayClosingRepository.findByDate(eq(TENANT_ID), any())).thenReturn(Optional.empty());
+        when(paymentRepository.sumByModeSince(eq(TENANT_ID), eq("CASH"), any())).thenReturn(45000L);
+        when(coursePayments.sumByModeSince(eq(TENANT_ID), eq("CASH"), any())).thenReturn(150000L);
+
+        DayClosingView closing = service.closeDay(TENANT_ID, USER_ID, "OWNER", new DayClosingInput(190000L, null));
+
+        assertThat(closing.expectedCashPaise()).isEqualTo(195000);
+        assertThat(closing.diffPaise()).isEqualTo(-5000);
+        verify(coursePayments, org.mockito.Mockito.never()).sumByModeSince(any(), eq("UPI"), any());
+    }
+
+    @Test
     void aNonCollectRoleCannotCloseTheDay() {
         assertThatThrownBy(() -> service.closeDay(TENANT_ID, USER_ID, "NURSE", new DayClosingInput(10000L, null)))
                 .isInstanceOf(AccessDeniedException.class);
@@ -417,10 +433,14 @@ class BillingServiceTest {
                 List.of(new PaymentRow(UUID.randomUUID(), "CASH", 50000, null, USER_ID, CLOCK.instant())));
         // payments 80000 minus a refund of 30000, as the repository nets them
         when(paymentRepository.netSince(TENANT_ID, Instant.parse("2026-10-31T18:30:00Z"))).thenReturn(50000L);
+        // DEC-044: course payments of the same day are collected money too (day closing and revenue count them)
+        when(coursePayments.totalsBetween(TENANT_ID, Instant.parse("2026-10-31T18:30:00Z"),
+                Instant.parse("2026-11-01T18:30:00Z")))
+                .thenReturn(new PaymentRepository.PaymentTotals(25000L, 1L));
 
         BillingTodaySummary summary = service.todaySummary(TENANT_ID);
 
-        assertThat(summary.collectedPaise()).isEqualTo(50000);
+        assertThat(summary.collectedPaise()).isEqualTo(75000);
         assertThat(summary.billsPending()).isEqualTo(1);
     }
 
@@ -429,14 +449,17 @@ class BillingServiceTest {
         Clock justAfterMidnightIst = Clock.fixed(Instant.parse("2026-11-03T18:40:00Z"), ZoneOffset.UTC);
         BillingService lateService = new BillingService(billRepository, billItemRepository, paymentRepository,
                 dayClosingRepository, visitBillingPort, serviceLookupPort, discountLimitPort, patientLookupPort,
-                actorDirectoryPort, auditLog, justAfterMidnightIst);
+                actorDirectoryPort, auditLog, justAfterMidnightIst, coursePayments);
         when(visitBillingPort.today(TENANT_ID)).thenReturn(List.of());
         when(paymentRepository.netSince(any(), any())).thenReturn(0L);
+        when(coursePayments.totalsBetween(any(), any(), any())).thenReturn(new PaymentRepository.PaymentTotals(0L, 0L));
 
         BillingTodaySummary summary = lateService.todaySummary(TENANT_ID);
 
         assertThat(summary.collectedPaise()).isZero();
         assertThat(summary.billsPending()).isZero();
         verify(paymentRepository).netSince(TENANT_ID, Instant.parse("2026-11-03T18:30:00Z"));
+        verify(coursePayments).totalsBetween(TENANT_ID, Instant.parse("2026-11-03T18:30:00Z"),
+                Instant.parse("2026-11-04T18:30:00Z"));
     }
 }

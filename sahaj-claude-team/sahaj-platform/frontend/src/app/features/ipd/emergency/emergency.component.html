@@ -62,6 +62,13 @@
                   }
                 </div>
 
+                @if (emrAccess.canOpen()) {
+                  <div class="qact">
+                    <button type="button" mat-stroked-button data-act="open-emr" (click)="openEmr(c)">
+                      <app-icon name="emr" [size]="14" /> Open EMR<span class="sr-only">{{ forPatient(c) }}</span>
+                    </button>
+                  </div>
+                }
                 @if (q.canAct || q.canAdmit || q.canRetriage) {
                   <div class="qact">
                     @if (q.canAct && c.status === 'WAITING') {

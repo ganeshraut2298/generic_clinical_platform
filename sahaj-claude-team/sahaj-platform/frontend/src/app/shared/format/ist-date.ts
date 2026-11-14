@@ -90,3 +90,24 @@ export function formatDisplayDateTimeOfInstant(instant: string | null | undefine
   );
   return `${formatDisplayDate(istToday(date))}, ${time}`;
 }
+
+/** An instant as `11:05 AM` in IST. Empty text for a missing or bad value. */
+export function formatTimeOfInstant(instant: string | Date | null | undefined): string {
+  if (!instant) {
+    return '';
+  }
+  const date = instant instanceof Date ? instant : new Date(instant);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return plainSpaces(
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+      .format(date)
+      .toUpperCase(),
+  );
+}

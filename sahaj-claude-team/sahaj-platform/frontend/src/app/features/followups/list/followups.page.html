@@ -54,6 +54,9 @@
             <b>{{ item.patientName }}</b>
             <small>
               {{ item.reason }} · {{ doctorShortName(item.doctorName) }}
+              @if (item.appointmentDate) {
+                · Appointment {{ appointmentText(item.appointmentDate, item.appointmentTime) }}
+              }
               @if (item.mobile) {
                 · <span class="num">{{ item.mobile }}</span>
               }

@@ -1,7 +1,10 @@
 package com.sahaj.patient.application;
 
+import com.sahaj.patient.api.PatientAge;
 import com.sahaj.patient.api.PatientClinicalPort;
 import com.sahaj.patient.application.PatientRepository.PatientRow;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +30,16 @@ public class PatientClinicalLookup implements PatientClinicalPort {
     static final int MAX_HOPS = PatientMergeChains.MAX_HOPS;
 
     private final PatientRepository patientRepository;
+    private final Clock clock;
+
+    @Autowired
+    public PatientClinicalLookup(PatientRepository patientRepository, Clock clock) {
+        this.patientRepository = patientRepository;
+        this.clock = clock;
+    }
 
     public PatientClinicalLookup(PatientRepository patientRepository) {
-        this.patientRepository = patientRepository;
+        this(patientRepository, Clock.systemUTC());
     }
 
     @Override
@@ -51,21 +62,28 @@ public class PatientClinicalLookup implements PatientClinicalPort {
             }
             current = next.get();
         }
-        return Optional.of(clinical(current));
+        return Optional.of(clinical(current, PatientAge.today(clock)));
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
     public Map<UUID, PatientClinical> findAll(UUID tenantId, Collection<UUID> patientIds) {
         Map<UUID, PatientClinical> result = new HashMap<>();
+        LocalDate today = PatientAge.today(clock);
         for (Map.Entry<UUID, PatientRow> entry : PatientMergeChains.current(patientRepository, tenantId, patientIds)
                 .entrySet()) {
-            result.put(entry.getKey(), clinical(entry.getValue()));
+            result.put(entry.getKey(), clinical(entry.getValue(), today));
         }
         return result;
     }
 
-    private static PatientClinical clinical(PatientRow row) {
-        return new PatientClinical(row.id(), row.uhid(), row.name(), row.age(), row.sex(), row.allergy());
+    /**
+     * SAH-73 (ADR-024 D1, D2): {@code age} is the effective completed years as of today in India and {@code ageDetail}
+     * the same computation in full; the date of birth goes to the caller, who decides who may see it (ADR-024 D3).
+     */
+    private static PatientClinical clinical(PatientRow row, LocalDate today) {
+        PatientAge ageDetail = PatientAge.of(row.dateOfBirth(), row.age(), today);
+        return new PatientClinical(row.id(), row.uhid(), row.name(), ageDetail.years(), row.sex(), row.allergy(),
+                row.chronic(), row.dateOfBirth(), ageDetail);
     }
 }

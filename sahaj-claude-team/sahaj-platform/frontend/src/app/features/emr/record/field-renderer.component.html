@@ -1,0 +1,309 @@
+<div class="fr" [class.bad]="error()">
+  @if (field().valueKind !== 'COMPONENT') {
+  <div class="lbl">
+    <label [attr.for]="inputId()" [id]="inputId() + '-l'" class="name">
+      {{ field().label }}@if (field().required) {<span class="star" aria-hidden="true"> *</span><span class="sr-only"> (required)</span>}
+    </label>
+    @if (field().meta) {
+      <span class="meta" [id]="inputId() + '-m'">{{ field().meta }}</span>
+    }
+    @if (flag(); as f) {
+      <span class="pill" [class.p-crit]="f.tone === 'crit'" [class.p-warn]="f.tone === 'warn'" data-testid="vital-flag">{{ f.text }}</span>
+    }
+  </div>
+  }
+
+  @switch (field().valueKind) {
+    @case ('TEXT') {
+      @if (isLong()) {
+        <textarea
+          class="input"
+          rows="3"
+          [id]="inputId()"
+          [value]="text()"
+          [disabled]="disabled()"
+          [attr.maxlength]="10000"
+          [attr.aria-invalid]="error() ? true : null"
+          (input)="onText($event)"
+        ></textarea>
+      } @else {
+        <input
+          class="input"
+          type="text"
+          autocomplete="off"
+          [id]="inputId()"
+          [value]="text()"
+          [disabled]="disabled()"
+          [attr.maxlength]="2000"
+          [attr.aria-invalid]="error() ? true : null"
+          (input)="onText($event)"
+        />
+      }
+    }
+    @case ('NUMBER') {
+      <input
+        class="input num"
+        type="number"
+        inputmode="decimal"
+        step="any"
+        [id]="inputId()"
+        [value]="numberText()"
+        [disabled]="disabled()"
+        [attr.min]="field().min"
+        [attr.max]="field().max"
+        [attr.aria-invalid]="error() ? true : null"
+        (input)="onNumber($event)"
+      />
+    }
+    @case ('NUMBER_UNIT') {
+      <div class="pair">
+        <input
+          class="input num"
+          type="number"
+          inputmode="decimal"
+          step="any"
+          [id]="inputId()"
+          [value]="unitNumber()"
+          [disabled]="disabled()"
+          [attr.aria-invalid]="error() ? true : null"
+          (input)="onUnitNumber($event)"
+        />
+        @if (field().options.length > 0) {
+          <select class="input" [disabled]="disabled()" [attr.aria-label]="field().label + ' unit'" (change)="onUnit($event)">
+            <option value="" [selected]="unitText() === ''">Unit</option>
+            @for (o of field().options; track o.key) {
+              <option [value]="o.label" [selected]="unitText() === o.label">{{ o.label }}</option>
+            }
+          </select>
+        } @else {
+          <input
+            class="input unit"
+            type="text"
+            autocomplete="off"
+            placeholder="Unit"
+            [value]="unitText()"
+            [disabled]="disabled()"
+            [attr.maxlength]="20"
+            [attr.aria-label]="field().label + ' unit'"
+            (input)="onUnit($event)"
+          />
+        }
+      </div>
+    }
+    @case ('DATE') {
+      <input
+        class="input"
+        type="date"
+        [id]="inputId()"
+        [value]="text()"
+        [disabled]="disabled()"
+        [attr.aria-invalid]="error() ? true : null"
+        (input)="onText($event)"
+      />
+    }
+    @case ('BOOLEAN') {
+      <div class="yn">
+        <button
+          type="button"
+          role="switch"
+          class="sw"
+          [id]="inputId()"
+          [attr.aria-checked]="boolValue()"
+          [attr.aria-label]="field().label"
+          [disabled]="disabled()"
+          (click)="onToggle()"
+        ></button>
+        <span>{{ boolValue() ? 'Yes' : 'No' }}</span>
+      </div>
+    }
+    @case ('CHOICE') {
+      @if (field().options.length > 0) {
+        <select
+          class="input"
+          [id]="inputId()"
+          [disabled]="disabled()"
+          [attr.aria-invalid]="error() ? true : null"
+          (change)="onChoice($event)"
+        >
+          <option value="" [selected]="text() === ''">Choose</option>
+          @for (o of field().options; track o.key) {
+            <option [value]="o.key" [selected]="text() === o.key">{{ o.label }}</option>
+          }
+        </select>
+      } @else {
+        <input
+          class="input"
+          type="text"
+          autocomplete="off"
+          [id]="inputId()"
+          [value]="text()"
+          [disabled]="disabled()"
+          [attr.maxlength]="200"
+          [attr.aria-invalid]="error() ? true : null"
+          (input)="onChoice($event)"
+        />
+      }
+    }
+    @case ('MULTI_CHOICE') {
+      @if (field().options.length > 0) {
+        <div class="picks" role="group" [attr.aria-labelledby]="inputId() + '-l'">
+          @for (o of field().options; track o.key) {
+            <button
+              type="button"
+              class="pick"
+              [attr.aria-pressed]="multi().includes(o.key)"
+              [disabled]="disabled()"
+              (click)="togglePick(o.key)"
+            >
+              {{ o.label }}
+            </button>
+          }
+        </div>
+      } @else {
+        <input
+          class="input"
+          type="text"
+          autocomplete="off"
+          placeholder="Separate with commas"
+          [id]="inputId()"
+          [value]="multiText()"
+          [disabled]="disabled()"
+          (change)="onMultiText($event)"
+        />
+      }
+    }
+    @case ('ITEM_LIST') {
+      <app-item-list-field
+        [field]="field()"
+        [entries]="entries()"
+        [disabled]="disabled()"
+        [specialty]="specialty()"
+        [inputId]="inputId()"
+        (changed)="onItems($event)"
+      />
+    }
+    @case ('TABLE') {
+      <div class="tbl">
+        @for (row of rows(); track $index; let i = $index) {
+          <div class="trow">
+            @for (c of columns(); track c.key) {
+              <input
+                class="input"
+                type="text"
+                autocomplete="off"
+                [value]="row[c.key] ?? ''"
+                [disabled]="disabled()"
+                [attr.maxlength]="500"
+                [attr.aria-label]="c.label + ', row ' + (i + 1)"
+                [placeholder]="c.label"
+                (input)="onCell(i, c.key, $event)"
+              />
+            }
+            @if (!disabled()) {
+              <button type="button" class="xbtn" [attr.aria-label]="'Remove row ' + (i + 1)" (click)="removeRow(i)">
+                <app-icon name="x" [size]="14" />
+              </button>
+            }
+          </div>
+        }
+        @if (!disabled()) {
+          <button type="button" class="addrow" (click)="addRow()">
+            <app-icon name="plus" [size]="14" /> Add row
+          </button>
+        } @else if (rows().length === 0) {
+          <span class="faint t-xs">Nothing recorded.</span>
+        }
+      </div>
+    }
+    @case ('STRUCTURED') {
+      <textarea
+        class="input"
+        rows="3"
+        [id]="inputId()"
+        [value]="structuredText()"
+        [disabled]="disabled()"
+        [attr.maxlength]="2000"
+        [attr.aria-invalid]="error() ? true : null"
+        (input)="onStructured($event)"
+      ></textarea>
+    }
+    @case ('COMPONENT') {
+      @switch (field().component?.type) {
+        @case ('EMR_LIST') {
+          <app-emr-list
+            [kind]="field().component?.listKind ?? 'COMPLAINTS'"
+            [title]="field().label"
+            [required]="field().required"
+            [value]="value()"
+            [disabled]="disabled()"
+            [specialty]="specialty()"
+            [inputId]="inputId()"
+            (valueChange)="emit($event)"
+          />
+        }
+        @case ('PRESCRIPTION') {
+          <app-prescription
+            [title]="field().label"
+            [required]="field().required"
+            [value]="value()"
+            [disabled]="disabled()"
+            [inputId]="inputId()"
+            (valueChange)="emit($event)"
+          />
+        }
+        @case ('BODY_MAP') {
+          <app-body-map
+            [title]="field().label"
+            [value]="value()"
+            [disabled]="disabled()"
+            [inputId]="inputId()"
+            (valueChange)="emit($event)"
+          />
+        }
+        @case ('FOLLOW_UP') {
+          <app-follow-up
+            [title]="field().label"
+            [value]="value()"
+            [disabled]="disabled()"
+            [inputId]="inputId()"
+            (valueChange)="emit($event)"
+          />
+        }
+        @case ('IPD_ORDERS') {
+          <app-ipd-orders
+            [title]="field().label"
+            [required]="field().required"
+            [value]="value()"
+            [disabled]="disabled()"
+            [inputId]="inputId()"
+            (valueChange)="emit($event)"
+          />
+        }
+        @default {
+          <span class="faint t-xs">Not available yet</span>
+        }
+      }
+    }
+    @case ('COVERED') {
+      <!-- A sibling the shared component replaces: nothing is drawn, stored or required. -->
+    }
+    @case ('DISPLAY_ONLY') {
+      <span class="faint t-xs">Shown for information. Nothing to fill in.</span>
+    }
+    @case ('LATER') {
+      <div class="later">
+        <button type="button" class="input" disabled [attr.aria-describedby]="inputId() + '-later'">
+          {{ typeLabel() }}
+        </button>
+        <span class="pill p-wait" [id]="inputId() + '-later'">Later</span>
+      </div>
+    }
+    @default {
+      <span class="faint t-xs">Not available yet</span>
+    }
+  }
+
+  @if (error(); as message) {
+    <span class="err-text" role="alert">{{ message }}</span>
+  }
+</div>

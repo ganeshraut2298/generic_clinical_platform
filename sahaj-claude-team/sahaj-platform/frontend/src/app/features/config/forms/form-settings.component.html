@@ -1,0 +1,112 @@
+@if (settings(); as s) {
+  <div class="st" data-testid="form-settings">
+    <div class="grp">
+      <span class="gl" id="fs-dept">Use in departments</span>
+      <div class="chips" role="group" aria-labelledby="fs-dept">
+        @for (d of store.departments(); track d.key) {
+          <button type="button" class="chip" [attr.aria-pressed]="hasDept(d.key)" [disabled]="!editable()" (click)="toggleDept(d.key)">
+            {{ hasDept(d.key) ? '✓ ' : '' }}{{ d.name }}
+          </button>
+        }
+        @for (p of places; track p.key) {
+          <button type="button" class="chip" [attr.aria-pressed]="hasPlace(p.key)" [disabled]="!editable()" (click)="togglePlace(p.key)">
+            {{ hasPlace(p.key) ? '✓ ' : '' }}{{ p.label }}
+          </button>
+        }
+      </div>
+      <span class="faint t-xs">Appears as a custom section in these departments’ EMR.</span>
+    </div>
+
+    <div class="grp">
+      <span class="gl" id="fs-part">EMR part</span>
+      <div class="chips" role="group" aria-labelledby="fs-part">
+        @for (p of parts; track p.key) {
+          <button type="button" class="chip solid" [attr.aria-pressed]="s.emrPart === p.key" [disabled]="!editable()" (click)="setPart(p.key)">{{ p.label }}</button>
+        }
+      </div>
+      <span class="faint t-xs">Where the section sits on the doctor’s screen.</span>
+    </div>
+
+    <div class="grp">
+      <span class="gl" id="fs-visit">Visit types</span>
+      <div class="chips" role="group" aria-labelledby="fs-visit">
+        @for (v of visitTypes; track v.key) {
+          <button type="button" class="chip" [attr.aria-pressed]="visitOn(v.key)" [disabled]="!editable()" (click)="toggleVisit(v.key)">
+            {{ visitOn(v.key) ? '✓ ' : '' }}{{ v.label }}
+          </button>
+        }
+      </div>
+      <span class="faint t-xs">Stored and shown only. A Teleconsult starts no call.</span>
+    </div>
+
+    <div class="grp">
+      <span class="gl" id="fs-who2">Filled by</span>
+      <div class="chips" role="group" aria-labelledby="fs-who2">
+        @for (w of who; track w.key) {
+          <button type="button" class="chip" [attr.aria-pressed]="whoOn(w.key)" [disabled]="!editable()" (click)="toggleWho(w.key)">
+            {{ whoOn(w.key) ? '✓ ' : '' }}{{ w.label }}
+          </button>
+        }
+      </div>
+      <span class="faint t-xs">Patient: filled with help at the desk. A link on WhatsApp needs the WhatsApp service.</span>
+    </div>
+
+    <div class="grp">
+      <span class="gl" id="fs-lang">Print language</span>
+      <div class="chips" role="group" aria-labelledby="fs-lang">
+        @for (l of languages; track l.key) {
+          <button type="button" class="chip solid" [attr.aria-pressed]="s.printLanguage === l.key" [disabled]="!editable()" (click)="setLanguage(l.key)">{{ l.label }}</button>
+        }
+      </div>
+    </div>
+
+    <div class="grp">
+      <span class="gl" id="fs-appr">Approval before publishing</span>
+      <div class="chips" role="group" aria-labelledby="fs-appr">
+        <button type="button" class="chip solid" [attr.aria-pressed]="s.approvalRequired" [disabled]="!editable()" data-act="approval-on" (click)="setApproval(true)">On</button>
+        <button type="button" class="chip solid" [attr.aria-pressed]="!s.approvalRequired" [disabled]="!editable()" data-act="approval-off" (click)="setApproval(false)">Off</button>
+      </div>
+      <span class="faint t-xs">{{ s.approvalRequired ? 'The owner approves each new version.' : 'Publishes straight away.' }}</span>
+    </div>
+
+    @if (store.waiting() && store.canApprove()) {
+      <div class="approve" data-testid="approve-box">
+        <b>This version is waiting for approval.</b>
+        <div class="row">
+          <button type="button" class="btn solid" [disabled]="store.busy() !== null" data-act="approve" (click)="store.approve()">Approve</button>
+          @if (!backing()) {
+            <button type="button" class="btn" data-act="send-back" (click)="startBack()">Send back</button>
+          }
+        </div>
+        @if (backing()) {
+          <label class="lab">
+            <span>Reason</span>
+            <input class="input" type="text" [value]="backReason()" [attr.maxlength]="300" (input)="onBackReason($event)" />
+          </label>
+          <button type="button" class="btn" [disabled]="backReason().trim() === '' || store.busy() !== null" data-act="send-back-now" (click)="sendBack()">
+            Send back with this reason
+          </button>
+        }
+      </div>
+    }
+    @if (sentBack(); as reason) {
+      <p class="back" role="status" data-testid="sent-back">Sent back: {{ reason }}</p>
+    }
+
+    <div class="grp">
+      <span class="gl">Versions</span>
+      @for (v of versions(); track v.versionNo + v.state) {
+        <div class="ver">
+          <b>v{{ v.versionNo }}</b>
+          <span class="faint t-xs">{{ atText(v.at) }} · {{ v.byName }}</span>
+          <span class="vs" [class.live]="v.state === 'LIVE'">{{ stateText(v.state) }}</span>
+        </div>
+      }
+      <span class="faint t-xs">Records already filled keep the version they were filled in.</span>
+    </div>
+
+    @if (editable() && !store.retired()) {
+      <button type="button" class="btn danger" [disabled]="store.busy() !== null" data-act="retire" (click)="store.retire()">Retire this form</button>
+    }
+  </div>
+}

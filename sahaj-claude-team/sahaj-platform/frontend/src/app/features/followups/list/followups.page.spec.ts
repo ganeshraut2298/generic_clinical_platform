@@ -115,6 +115,18 @@ describe('FollowUpsPage', () => {
     expect(Array.from(ret.querySelectorAll('.li button')).length).toBe(0);
   });
 
+  it('shows the appointment the doctor\'s sign booked, with its time (SAH-51-6)', async () => {
+    await open();
+    const view = await flush('DUE', list([fu('DUE', { reason: 'Review after treatment', appointmentDate: '2026-10-24', appointmentTime: '17:00' })]));
+    expect(view.querySelector('.li small')!.textContent!.replace(/\s+/g, ' ')).toContain('Review after treatment · Dr. Asha · Appointment 24 Oct 2026, 5:00 PM');
+  });
+
+  it('shows no appointment text when none was booked', async () => {
+    await open();
+    const view = await flush('DUE', list([fu('DUE', { appointmentDate: null, appointmentTime: null })]));
+    expect(view.querySelector('.li small')!.textContent).not.toContain('Appointment');
+  });
+
   it('shows the WhatsApp actions disabled with the note', async () => {
     const view = await open();
     const done = await flush('DUE', list([fu('DUE')]));

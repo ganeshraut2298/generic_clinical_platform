@@ -15,7 +15,7 @@
       <div class="dupc">
         <b>{{ data.keep.name }}</b>
         <small class="num">{{ data.keep.uhid }}</small>
-        <div class="rulerow"><span>Age</span><b>{{ data.keep.age }} {{ data.keep.sex }}</b></div>
+        <div class="rulerow"><span>Age</span><b>{{ ageOf(data.keep) }} {{ data.keep.sex }}</b></div>
         <div class="rulerow"><span>Mobile</span><b class="num">{{ data.keep.mobile }}</b></div>
       </div>
     </div>
@@ -24,7 +24,7 @@
       <div class="dupc">
         <b>{{ data.mergeInto.name }}</b>
         <small class="num">{{ data.mergeInto.uhid }}</small>
-        <div class="rulerow"><span>Age</span><b>{{ data.mergeInto.age }} {{ data.mergeInto.sex }}</b></div>
+        <div class="rulerow"><span>Age</span><b>{{ ageOf(data.mergeInto) }} {{ data.mergeInto.sex }}</b></div>
         <div class="rulerow"><span>Mobile</span><b class="num">{{ data.mergeInto.mobile }}</b></div>
       </div>
     </div>

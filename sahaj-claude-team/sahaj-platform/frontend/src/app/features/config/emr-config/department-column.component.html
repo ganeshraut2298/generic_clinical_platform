@@ -1,0 +1,56 @@
+<section class="col surf" aria-labelledby="emr-dept-h">
+  <div class="col-h">
+    <h2 id="emr-dept-h">Departments</h2>
+    <span class="faint t-xs">{{ store.departments().length }} available</span>
+  </div>
+
+  <label class="field">
+    <span class="field-label">Search department</span>
+    <input
+      class="input"
+      type="search"
+      autocomplete="off"
+      placeholder="e.g. Dental, Physiotherapy"
+      [value]="store.query()"
+      (input)="onSearch($event)"
+    />
+  </label>
+
+  <div class="dlist">
+    @for (d of store.filtered(); track d.departmentKey) {
+      <button
+        type="button"
+        class="dcard"
+        [attr.aria-pressed]="d.departmentKey === store.selectedKey()"
+        (click)="store.select(d.departmentKey)"
+      >
+        <span class="badge" aria-hidden="true" [style.background]="d.colour">{{ d.initials }}</span>
+        <span class="dtext">
+          <span class="dname">{{ d.name }}</span>
+          <span class="faint t-xs">{{ countText(d) }}</span>
+        </span>
+        <span class="dstat">
+          <span
+            class="pill"
+            [class.p-good]="d.status === 'LIVE'"
+            [class.p-warn]="d.status === 'DRAFT'"
+            [class.p-wait]="d.status === 'TEMPLATE'"
+            >{{ statusLabel[d.status] }}</span
+          >
+          <span class="faint t-xs num">v{{ d.publishedVersion }}</span>
+        </span>
+      </button>
+    } @empty {
+      <p class="empty" role="status">
+        No department matches “{{ store.query() }}”. Add it from a template below.
+      </p>
+    }
+  </div>
+
+  @if (store.canEdit()) {
+    <a class="addlink" routerLink="add-department">
+      <app-icon name="plus" [size]="16" />
+      Add department from template
+    </a>
+  }
+</section>

@@ -6,6 +6,8 @@ import static com.sahaj.platform.support.TestTenantSecurity.runAs;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sahaj.opd.application.emr.EmrMaster;
 import com.sahaj.opd.application.emr.EmrUsageRecorder;
 import com.sahaj.opd.application.emr.MasterItemRef;
@@ -29,7 +31,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Shared set-up of the SAH-43 / SAH-44 integration tests (Doctor EMR masters, templates, overrides, settings, usage
+ * Shared set-up of the SAH-43 / SAH-53 integration tests (Doctor EMR masters, library, departments, records, usage
  * ranking). Everything runs through the real endpoints and the real {@code sahaj_test} database as {@code sahaj_app};
  * the few direct writes are the ones no endpoint exists for (a doctor's specialty text, an owner's doctor details, a
  * clinic's specialty, a membership status), done the way the owning module would, committed under the clinic's tenant.
@@ -40,8 +42,13 @@ abstract class EmrSupport extends SweepSupport {
     static final String EMR = "/api/v1/opd/emr";
     static final String MASTERS = EMR + "/masters/";
     static final String QUICK = EMR + "/quick-options/";
-    static final String TEMPLATES = EMR + "/templates";
-    static final String SETTINGS = EMR + "/settings";
+    static final String LIBRARY = EMR + "/library/sections";
+    static final String STARTERS = EMR + "/starter-departments";
+    static final String DEPARTMENTS = EMR + "/departments";
+    static final String RECORDS = EMR + "/records";
+    static final String OPEN = RECORDS + "/open";
+    static final String VISITS = "/api/v1/opd/visits";
+    static final String DOCTOR_OPTIONS = EMR + "/department-doctor-options";
     static final String ME = EMR + "/me";
     static final String DIAGNOSES = "/api/v1/opd/diagnoses";
     static final String MEDICINES = "/api/v1/opd/medicines";
@@ -51,7 +58,9 @@ abstract class EmrSupport extends SweepSupport {
     static final String[] NON_OWNER_ROLES = {"DOCTOR", "VISITING_DOCTOR", "NURSE", "FRONT_DESK", "BILLING",
             "PHARMACIST", "COUNSELLOR"};
     static final String[] NOT_DOCTOR_ROLES = {"NURSE", "FRONT_DESK", "BILLING", "PHARMACIST", "COUNSELLOR"};
-    static final String[] TEMPLATE_KEYS = {"gp", "dental", "paeds", "homeo"};
+    /** The 15 starter department keys of the EMR mockup, in mockup order (ADR-020 D4). */
+    static final String[] STARTER_KEYS = {"gm", "dental", "og", "paeds", "physio", "ortho", "eye", "ent", "derm", "diab",
+            "cardio", "ayush", "onco", "surgery", "psych"};
 
     @Autowired
     protected PlatformTransactionManager transactionManager;
@@ -85,6 +94,11 @@ abstract class EmrSupport extends SweepSupport {
      */
     protected Staff addStaff(Clinic clinic, String role, String name, String specialty, String degree,
                              String registrationNo) throws Exception {
+        // the free plan allows 5 users in total and a new clinic starts with the owner and one doctor: past that, the
+        // Team endpoint answers 409 plan-limit, so more people are added the way a second sign-up and a membership row do
+        if (count(clinic, "select count(*) from platform.membership where status = 'ACTIVE'") >= 5) {
+            return addStaffBySql(clinic, role, specialty, degree, registrationNo);
+        }
         StringBuilder body = new StringBuilder("{\"name\":\"").append(name).append("\",\"mobile\":\"")
                 .append(uniqueMobile()).append("\",\"role\":\"").append(role).append('"');
         if (role.contains("DOCTOR")) {
@@ -110,6 +124,45 @@ abstract class EmrSupport extends SweepSupport {
         return new Staff(membershipId, userId, role);
     }
 
+    /** A member added without the Team endpoint (no plan limit): a real user from a second sign-up, plus a membership row. */
+    protected Staff addStaffBySql(Clinic clinic, String role, String specialty, String degree, String registrationNo)
+            throws Exception {
+        UUID userId = signUp(uniqueMobile()).userId();
+        addMembership(clinic.tenantId(), userId, role);
+        UUID membershipId = UUID.fromString(row(clinic, "select id::text from platform.membership where user_id = ?::uuid",
+                userId).get(0));
+        if (role.contains("DOCTOR")) {
+            commit(clinic.tenantId(), "insert into platform.doctor_profile (membership_id, specialty, fee_paise, degree, "
+                    + "registration_no) values (?, ?, 0, ?, ?)", membershipId, specialty, degree, registrationNo);
+        }
+        return new Staff(membershipId, userId, role);
+    }
+
+    /** A clinic that has only signed up: an owner with no doctor details (the setup wizard gives the owner a doctor profile). */
+    protected Clinic bareOwnerClinic() throws Exception {
+        Session session = signUp(uniqueMobile());
+        return new Clinic(session.tenantId(), session.userId(), null);
+    }
+
+    /**
+     * One real token per role of {@link #ALL_ROLES}: the owner, and a real member (user id, membership row) for every other
+     * role. A token that only claims a role keeps the owner's user id, and the screens read the role of that user fresh.
+     */
+    protected java.util.Map<String, RequestPostProcessor> tokensOfEveryRole(Clinic clinic) throws Exception {
+        java.util.Map<String, RequestPostProcessor> tokens = new java.util.LinkedHashMap<>();
+        for (String role : ALL_ROLES) {
+            if ("OWNER".equals(role)) {
+                tokens.put(role, clinic.owner());
+            } else if (role.contains("DOCTOR")) {
+                tokens.put(role, addStaff(clinic, role, "Dr Role " + role.toLowerCase().replace('_', ' '), "General physician", "MBBS",
+                        "REG-" + shortId()).token(clinic));
+            } else {
+                tokens.put(role, addNonDoctor(clinic, role).token(clinic));
+            }
+        }
+        return tokens;
+    }
+
     protected Staff addDoctor(Clinic clinic, String specialty) throws Exception {
         return addStaff(clinic, "DOCTOR", "Dr Test Doctor", specialty, "MBBS", "REG-" + shortId());
     }
@@ -130,8 +183,11 @@ abstract class EmrSupport extends SweepSupport {
     protected Staff ownerWithDoctorDetails(Clinic clinic, String specialty, String degree, String registrationNo)
             throws SQLException {
         Staff owner = owner(clinic);
+        // the setup wizard already gives the owner a doctor profile, a clinic that only signed up has none: upsert
         commit(clinic.tenantId(), "insert into platform.doctor_profile (membership_id, specialty, fee_paise, degree, "
-                + "registration_no) values (?, ?, 0, ?, ?)", owner.membershipId(), specialty, degree, registrationNo);
+                + "registration_no) values (?, ?, 0, ?, ?) on conflict (membership_id) do update set "
+                + "specialty = excluded.specialty, degree = excluded.degree, registration_no = excluded.registration_no",
+                owner.membershipId(), specialty, degree, registrationNo);
         return owner;
     }
 
@@ -191,34 +247,189 @@ abstract class EmrSupport extends SweepSupport {
         return URLEncoder.encode(text, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
-    protected static String overrideUrl(String template, String section) {
-        return TEMPLATES + "/" + template + "/sections/" + section + "/override";
+    // ---------------- departments (SAH-45, SAH-53, SAH-54) ----------------
+
+    protected JsonNode department(Clinic clinic, String key) throws Exception {
+        return get(DEPARTMENTS + "/" + key, clinic.owner());
     }
 
-    protected static String resetUrl(String template) {
-        return TEMPLATES + "/" + template + "/reset";
-    }
-
-    protected static String overrideBody(boolean shown, boolean required, long revision) {
-        return "{\"shown\":" + shown + ",\"required\":" + required + ",\"revision\":" + revision + "}";
-    }
-
-    protected static String settingsBody(String sectionPanel, String rightPanelFirst, long version) {
-        return "{\"sectionPanel\":\"" + sectionPanel + "\",\"rightPanelFirst\":\"" + rightPanelFirst
-                + "\",\"version\":" + version + "}";
-    }
-
-    protected JsonNode template(Clinic clinic, String key) throws Exception {
-        return get(TEMPLATES + "/" + key, clinic.owner());
-    }
-
-    protected static JsonNode section(JsonNode template, String key) {
-        for (JsonNode s : template.get("sections")) {
+    protected static JsonNode section(JsonNode view, String key) {
+        for (JsonNode s : view.get("sections")) {
             if (key.equals(s.get("key").asText())) {
                 return s;
             }
         }
-        throw new AssertionError("no section " + key + " in " + template.get("templateKey"));
+        throw new AssertionError("no section " + key + " in " + view.path("departmentKey").asText("layout"));
+    }
+
+    protected static List<String> sectionKeys(JsonNode view) {
+        return texts(view.get("sections"), "key");
+    }
+
+    /** The Save draft / Publish body that sends the department exactly as the view shows it. */
+    protected ObjectNode layoutInput(JsonNode view, String origin) {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("revision", view.get("revision").asLong());
+        body.put("origin", origin);
+        ArrayNode sections = body.putArray("sections");
+        for (JsonNode s : view.get("sections")) {
+            ObjectNode o = sections.addObject();
+            o.put("key", s.get("key").asText());
+            o.put("part", s.get("part").asText());
+            o.put("shown", s.get("shown").asBoolean());
+            o.put("required", s.get("required").asBoolean());
+            o.put("print", s.get("print").asBoolean());
+            o.put("copy", s.get("copy").asBoolean());
+            o.put("collapsed", s.get("collapsed").asBoolean());
+            o.set("whoCanFill", s.get("whoCanFill").deepCopy());
+        }
+        return body;
+    }
+
+    protected ObjectNode layoutInput(JsonNode view) {
+        return layoutInput(view, "EDIT");
+    }
+
+    /** The settings object of one section inside a request body. */
+    protected static ObjectNode sec(ObjectNode body, String key) {
+        for (JsonNode s : body.get("sections")) {
+            if (key.equals(s.get("key").asText())) {
+                return (ObjectNode) s;
+            }
+        }
+        throw new AssertionError("no section " + key + " in the body");
+    }
+
+    protected static void setShown(ObjectNode body, String key, boolean shown, boolean required) {
+        sec(body, key).put("shown", shown).put("required", required);
+    }
+
+    protected JsonNode saveDraft(Clinic clinic, String key, ObjectNode body, int expected) throws Exception {
+        return put(DEPARTMENTS + "/" + key + "/draft", clinic.owner(), body.toString(), expected);
+    }
+
+    protected JsonNode publish(Clinic clinic, String key, ObjectNode body, int expected) throws Exception {
+        return post(DEPARTMENTS + "/" + key + "/publish", clinic.owner(), body.toString(), expected);
+    }
+
+    /** Hides or shows one section of the department as it stands, and publishes; returns the publish answer. */
+    protected JsonNode publishOneChange(Clinic clinic, String key, String section, boolean shown) throws Exception {
+        ObjectNode body = layoutInput(department(clinic, key));
+        setShown(body, section, shown, false);
+        return publish(clinic, key, body, 200);
+    }
+
+    /** Publishes the department with one harmless flag flipped, so that a version is made even for a fresh starter. */
+    protected JsonNode publishAsIs(Clinic clinic, String key) throws Exception {
+        ObjectNode body = layoutInput(department(clinic, key));
+        ObjectNode some = sec(body, "followup");
+        some.put("collapsed", !some.get("collapsed").asBoolean());
+        return publish(clinic, key, body, 200);
+    }
+
+    protected static String createBody(String name, String sourceJson, List<UUID> doctors, List<String> rooms,
+                                       boolean copyPrint) {
+        StringBuilder b = new StringBuilder("{\"name\":\"").append(name).append("\",\"source\":").append(sourceJson)
+                .append(",\"copyPrintFlags\":").append(copyPrint).append(",\"doctorMembershipIds\":[");
+        for (int i = 0; i < doctors.size(); i++) {
+            b.append(i == 0 ? "" : ",").append('"').append(doctors.get(i)).append('"');
+        }
+        b.append("],\"rooms\":[");
+        for (int i = 0; i < rooms.size(); i++) {
+            b.append(i == 0 ? "" : ",").append('"').append(rooms.get(i)).append('"');
+        }
+        return b.append("]}").toString();
+    }
+
+    protected static String starterSource(String starterKey) {
+        return "{\"kind\":\"STARTER\",\"starterKey\":\"" + starterKey + "\"}";
+    }
+
+    protected static String copySource(String departmentKey) {
+        return "{\"kind\":\"COPY\",\"copyFromDepartmentKey\":\"" + departmentKey + "\"}";
+    }
+
+    protected static final String BLANK_SOURCE = "{\"kind\":\"BLANK\"}";
+
+    protected JsonNode addDepartment(Clinic clinic, String name, String sourceJson) throws Exception {
+        return post(DEPARTMENTS, clinic.owner(), createBody(name, sourceJson, List.of(), List.of(), true), 201);
+    }
+
+    // ---------------- visits and records (SAH-46, SAH-47, SAH-52) ----------------
+
+    /** A visit of a new patient with the doctor, made through the real queue endpoint by the owner. */
+    protected JsonNode issueVisit(Clinic clinic, UUID doctorMembershipId) throws Exception {
+        UUID patient = newPatient(clinic);
+        return ok(HttpMethod.POST, VISITS, clinic.owner(),
+                "{\"patientId\":\"" + patient + "\",\"doctorMembershipId\":\"" + doctorMembershipId + "\"}", 201);
+    }
+
+    protected static String openBody(String type, Object encounterId) {
+        return "{\"encounterType\":\"" + type + "\",\"encounterId\":\"" + encounterId + "\"}";
+    }
+
+    /** Opens the EMR of an OPD visit as the person; the answer is 201 when created and 200 when found. */
+    protected JsonNode openVisit(RequestPostProcessor who, Object visitId, int expected) throws Exception {
+        return post(OPEN, who, openBody("OPD_VISIT", visitId), expected);
+    }
+
+    protected JsonNode record(RequestPostProcessor who, Object recordId) throws Exception {
+        return get(RECORDS + "/" + recordId, who);
+    }
+
+    protected ObjectNode draftBody(long revision, String part, String sectionKey, ObjectNode... sections) {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("revision", revision);
+        ObjectNode ui = body.putObject("uiState");
+        ui.put("part", part);
+        if (sectionKey == null) {
+            ui.putNull("sectionKey");
+        } else {
+            ui.put("sectionKey", sectionKey);
+        }
+        ArrayNode list = body.putArray("sections");
+        for (ObjectNode s : sections) {
+            list.add(s);
+        }
+        return body;
+    }
+
+    protected ObjectNode sectionValues(String key, String valuesJson) throws Exception {
+        ObjectNode s = objectMapper.createObjectNode();
+        s.put("key", key);
+        s.set("values", objectMapper.readTree(valuesJson));
+        return s;
+    }
+
+    protected JsonNode saveRecordDraft(RequestPostProcessor who, Object recordId, ObjectNode body, int expected)
+            throws Exception {
+        return put(RECORDS + "/" + recordId + "/draft", who, body.toString(), expected);
+    }
+
+    protected static JsonNode recordSection(JsonNode record, String key) {
+        for (JsonNode s : record.get("sections")) {
+            if (key.equals(s.get("key").asText())) {
+                return s;
+            }
+        }
+        throw new AssertionError("no section " + key + " in the record");
+    }
+
+    protected static JsonNode layoutSection(JsonNode record, String key) {
+        for (JsonNode s : record.get("layout").get("sections")) {
+            if (key.equals(s.get("key").asText())) {
+                return s;
+            }
+        }
+        throw new AssertionError("no section " + key + " in the record layout");
+    }
+
+    protected static List<String> layoutKeys(JsonNode record) {
+        return texts(record.get("layout").get("sections"), "key");
+    }
+
+    protected long recordRows(Clinic clinic) throws SQLException {
+        return count(clinic, "select count(*) from opd.emr_record");
     }
 
     protected static List<String> texts(JsonNode array, String field) {

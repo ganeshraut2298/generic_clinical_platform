@@ -1,0 +1,67 @@
+.sum {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--glass-hi);
+}
+
+.narrow {
+  max-width: 260px;
+}
+
+.grow {
+  flex: 1 1 220px;
+}
+
+.timeline .ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+
+.scan {
+  min-width: 150px;
+
+  &.due {
+    border-color: var(--warn);
+    background: var(--warn-soft);
+  }
+
+  .st {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--ink-3);
+
+    &[data-state='DONE'] {
+      color: var(--good);
+    }
+
+    &[data-state='DUE'] {
+      color: var(--warn);
+    }
+  }
+}
+
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 600;
+
+  input {
+    width: 20px;
+    height: 20px;
+  }
+}

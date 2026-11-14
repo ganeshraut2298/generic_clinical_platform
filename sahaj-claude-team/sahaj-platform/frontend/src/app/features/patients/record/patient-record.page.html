@@ -22,7 +22,7 @@
         <app-icon name="print" [size]="15" /> Print history
       </button>
       @if (canWrite()) {
-        <button mat-stroked-button type="button" (click)="editComingSoon()">Edit details</button>
+        <button mat-stroked-button type="button" (click)="openEdit()">Edit details</button>
       }
     </div>
   </div>
@@ -32,9 +32,12 @@
     <div class="pti">
       <h1>{{ p.name }}</h1>
       <div class="ptmeta">
-        <span
-          >{{ p.age }} yrs · {{ p.sex === 'F' ? 'Female' : p.sex === 'M' ? 'Male' : 'Other' }}</span
+        <span data-testid="age-line"
+          >{{ ageText(p) }} · {{ p.sex === 'F' ? 'Female' : p.sex === 'M' ? 'Male' : 'Other' }}</span
         >
+        @if (p.dateOfBirth; as dob) {
+          <span data-testid="dob">Date of birth {{ displayDate(dob) }}</span>
+        }
         <span class="num">{{ p.uhid }}</span>
         <span class="num">{{ p.mobile }}</span>
         @if (p.area) {
@@ -144,7 +147,7 @@
                 }}</span>
                 <div class="main">
                   <b>{{ member.name }}</b>
-                  <small>{{ member.age }} {{ member.sex }} · {{ member.uhid }}</small>
+                  <small>{{ rowAge(member) }} {{ member.sex }} · {{ member.uhid }}</small>
                 </div>
                 <app-icon name="chevR" [size]="15" />
               </button>

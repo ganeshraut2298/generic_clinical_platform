@@ -1,6 +1,8 @@
 package com.sahaj.opd.application;
 
+import com.sahaj.opd.api.EmrEmergencyPort;
 import com.sahaj.opd.application.FeeSettingsRepository.FeeRow;
+import com.sahaj.opd.application.emr.EmrProblemException;
 import com.sahaj.opd.application.VisitRepository.VisitRow;
 import com.sahaj.patient.api.PatientLookupPort;
 import com.sahaj.patient.api.PatientLookupPort.PatientSummary;
@@ -24,8 +26,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -63,11 +68,23 @@ public class VisitService {
     private final AuditLog auditLog;
     private final FollowUpService followUpService;
     private final Clock clock;
+    /** SAH-67-4: the clinic's triage scale for the Emergency group of the Queue; null in a plain unit test. */
+    private final ObjectProvider<EmrEmergencyPort> emergencyPort;
 
     public VisitService(VisitRepository visitRepository, WorkflowService workflowService,
                          FeeSettingsRepository feeSettingsRepository, PatientLookupPort patientLookup,
                          TeamMemberPort teamMemberPort, OwnerGuard ownerGuard, AuditLog auditLog,
                          FollowUpService followUpService, Clock clock) {
+        this(visitRepository, workflowService, feeSettingsRepository, patientLookup, teamMemberPort, ownerGuard, auditLog,
+                followUpService, clock, null);
+    }
+
+    @Autowired
+    public VisitService(VisitRepository visitRepository, WorkflowService workflowService,
+                         FeeSettingsRepository feeSettingsRepository, PatientLookupPort patientLookup,
+                         TeamMemberPort teamMemberPort, OwnerGuard ownerGuard, AuditLog auditLog,
+                         FollowUpService followUpService, Clock clock, ObjectProvider<EmrEmergencyPort> emergencyPort) {
+        this.emergencyPort = emergencyPort;
         this.visitRepository = visitRepository;
         this.workflowService = workflowService;
         this.feeSettingsRepository = feeSettingsRepository;
@@ -96,7 +113,26 @@ public class VisitService {
         TeamMember doctor = teamMemberPort.find(tenantId, input.doctorMembershipId())
                 .filter(member -> member.active() && DOCTOR_ROLES.contains(member.role()))
                 .orElseThrow(() -> new NotFoundException("Doctor not found"));
+        return issue(tenantId, actorUserId, patient, doctor);
+    }
 
+    /**
+     * SAH-67-2 (ADR-025 D9): the Emergency outcome "Send to OPD" issues a token for an existing patient with the signing
+     * doctor, by the same logic as a walk-in token (visit type and fee rule, first stage, follow-up closing). Runs in the
+     * sign transaction. The signer must be an active DOCTOR, VISITING_DOCTOR or OWNER (an owner with doctor details); anyone
+     * else is 409 opd-doctor-not-available. A patient that is not this clinic's is a 404.
+     */
+    @Transactional
+    public VisitView issueTokenForDoctor(UUID tenantId, UUID actorUserId, UUID patientId, UUID doctorMembershipId) {
+        PatientSummary patient = patientLookup.find(tenantId, patientId)
+                .orElseThrow(EmrProblemException::patientNotFound);
+        TeamMember doctor = teamMemberPort.find(tenantId, doctorMembershipId)
+                .filter(member -> member.active() && (DOCTOR_ROLES.contains(member.role()) || "OWNER".equals(member.role())))
+                .orElseThrow(EmrProblemException::opdDoctorNotAvailable);
+        return issue(tenantId, actorUserId, patient, doctor);
+    }
+
+    private VisitView issue(UUID tenantId, UUID actorUserId, PatientSummary patient, TeamMember doctor) {
         FeeRow feeSettings = feeSettingsRepository.find(tenantId).orElse(FeeSettingsService.DEFAULTS);
         // SAH-27 (ADR-004 D3): a discharge that added a follow-up for this doctor counts as being seen at that instant.
         String visitType = lastSeenAt(tenantId, patient.id(), doctor.membershipId())
@@ -142,7 +178,7 @@ public class VisitService {
             if (patient == null || doctor == null) {
                 continue;
             }
-            views.add(toView(row, patient, doctor));
+            views.add(withTriageNames(tenantId, toView(row, patient, doctor)));
         }
         return views;
     }
@@ -193,6 +229,126 @@ public class VisitService {
         TeamMember doctor = teamMemberPort.find(tenantId, after.doctorMembershipId())
                 .orElseThrow(() -> new NotFoundException("Doctor not found"));
         return toView(after, patient, doctor);
+    }
+
+    /**
+     * SAH-46-2 (ADR-020 D10): opening the EMR moves a WAITING or VITALS visit forward to WITH_DOCTOR through the same
+     * stages the workflow of the visit's own version allows (so a clinic with Vitals off skips it), one audited step at
+     * a time, each as a compare-and-set on the current stage. The doctor's open is itself the act, so the stage-owner
+     * rule of {@link #moveStage} does not apply. Never throws for a race or a refusal: the EMR still opens and the
+     * answer says so. Returns one of MOVED, ALREADY_WITH_DOCTOR, ALREADY_UPDATED (someone moved it first) or
+     * NOT_APPLICABLE (a stage after With doctor). Repeating it is safe.
+     */
+    @Transactional
+    public String startConsultation(UUID tenantId, UUID actorUserId, UUID visitId) {
+        Optional<VisitRow> found = visitRepository.findById(tenantId, visitId);
+        if (found.isEmpty()) {
+            return "ALREADY_UPDATED";
+        }
+        VisitRow visit = found.get();
+        if (WITH_DOCTOR.equals(visit.stage())) {
+            return "ALREADY_WITH_DOCTOR";
+        }
+        List<String> enabled = enabledStages(workflowService.stepsForVersion(tenantId, visit.workflowVersionNo()));
+        int index = enabled.indexOf(visit.stage());
+        int target = enabled.indexOf(WITH_DOCTOR);
+        if (index < 0 || target < 0 || index > target) {
+            return "NOT_APPLICABLE";
+        }
+        while (index < target) {
+            String from = enabled.get(index);
+            String to = enabled.get(index + 1);
+            if (!visitRepository.moveStageIfCurrent(visitId, from, to, actorUserId)) {
+                return "ALREADY_UPDATED";
+            }
+            auditLog.record("VISIT_STAGE_MOVED", ENTITY_TYPE, visitId, Map.of("stage", from), Map.of("stage", to));
+            index++;
+        }
+        return "MOVED";
+    }
+
+    /**
+     * Locks the visit row for the rest of the caller's transaction (ADR-025 D1 step 5): the doctor's sign takes it right after
+     * the record lock, before any follow-up or bill write, so that a card move ("Consult done", which locks the visit and then
+     * writes the follow-up) and the sign never wait on each other in opposite orders.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockForSign(UUID tenantId, UUID visitId) {
+        if (!visitRepository.lockById(tenantId, visitId)) {
+            throw new NotFoundException("Visit not found");
+        }
+    }
+
+    /** The workflow move of the doctor's sign: MOVED (to the stage) or ALREADY_MOVED (the card was past With doctor). */
+    public record FinishMove(String outcome, String to) {
+    }
+
+    /**
+     * SAH-51-2 (ADR-025 D6): the doctor's sign moves the visit to its next workflow step through the visit's own workflow
+     * version: a stage before WITH_DOCTOR walks forward to it as {@link #startConsultation} does, then one step forward
+     * (skip rules and fee timing exactly as {@link #moveStage}, without the stage-owner check: the signature is the act). A
+     * stage already after WITH_DOCTOR answers ALREADY_MOVED. A compare-and-set that fails is 409 workflow-move-refused and
+     * the sign rolls back. A follow-up made earlier in the sign is found by the follow-up step (unique source visit).
+     */
+    @Transactional
+    public FinishMove finishConsultation(UUID tenantId, UUID actorUserId, UUID visitId) {
+        VisitRow visit = findRow(tenantId, visitId);
+        List<WorkflowStep> steps = workflowService.stepsForVersion(tenantId, visit.workflowVersionNo());
+        List<String> enabled = enabledStages(steps);
+        int index = enabled.indexOf(visit.stage());
+        int doctor = enabled.indexOf(WITH_DOCTOR);
+        if (index < 0 || doctor < 0 || index > doctor) {
+            return new FinishMove("ALREADY_MOVED", visit.stage());
+        }
+        String last = visit.stage();
+        while (index <= doctor) {
+            String from = enabled.get(index);
+            String to = enabled.get(index + 1);
+            if (!visitRepository.moveStageIfCurrent(visitId, from, to, actorUserId)) {
+                throw EmrProblemException.workflowMoveRefused();
+            }
+            auditLog.record("VISIT_STAGE_MOVED", ENTITY_TYPE, visitId, Map.of("stage", from), Map.of("stage", to));
+            last = to;
+            index++;
+        }
+        if (isOn(steps, "followup")) {
+            followUpService.createForConsultDone(tenantId, actorUserId, findRow(tenantId, visitId));
+        }
+        return new FinishMove("MOVED", last);
+    }
+
+    /** What the next stage will be for the sign preview: null when the card is already past With doctor. */
+    public Optional<String> nextStageAfterConsultation(UUID tenantId, UUID visitId) {
+        VisitRow visit = findRow(tenantId, visitId);
+        List<String> enabled = enabledStages(workflowService.stepsForVersion(tenantId, visit.workflowVersionNo()));
+        int index = enabled.indexOf(visit.stage());
+        int doctor = enabled.indexOf(WITH_DOCTOR);
+        if (index < 0 || doctor < 0 || index > doctor) {
+            return Optional.empty();
+        }
+        return Optional.of(enabled.get(doctor + 1));
+    }
+
+    /**
+     * SAH-68-2 (ADR-025 D14, H11): the fee of the visit under another type. FOLLOW_UP gets the clinic's follow-up fee only when
+     * the patient was seen by the same doctor (or discharged with a follow-up to them) inside the follow-up window before this
+     * visit; every other case, and NEW, REVISIT and EMERGENCY, the doctor's full fee.
+     */
+    public long feeForType(UUID tenantId, VisitRow visit, String visitType) {
+        TeamMember doctor = teamMemberPort.find(tenantId, visit.doctorMembershipId())
+                .orElseThrow(() -> new NotFoundException("Doctor not found"));
+        FeeRow fees = feeSettingsRepository.find(tenantId).orElse(FeeSettingsService.DEFAULTS);
+        if (!"FOLLOW_UP".equals(visitType)) {
+            return doctor.feePaise();
+        }
+        Optional<Instant> seen = visitRepository.lastVisitBefore(tenantId, visit.patientId(), visit.doctorMembershipId(),
+                visit.createdAt());
+        Optional<Instant> discharge = followUpService.lastDischargeAt(tenantId, visit.patientId(), visit.doctorMembershipId())
+                .filter(at -> at.isBefore(visit.createdAt()));
+        Optional<Instant> last = seen.isEmpty() ? discharge : discharge.isPresent() && discharge.get().isAfter(seen.get())
+                ? discharge : seen;
+        boolean inWindow = last.filter(at -> !at.plus(Duration.ofDays(fees.followUpDays())).isBefore(visit.createdAt())).isPresent();
+        return inWindow ? feeFor(doctor.feePaise(), "FOLLOW_UP", fees.followUpFee()) : doctor.feePaise();
     }
 
     private boolean canMoveForward(String actorRole, String currentStage, List<WorkflowStep> steps) {
@@ -281,7 +437,18 @@ public class VisitService {
     private static VisitView toView(VisitRow row, PatientSummary patient, TeamMember doctor) {
         return new VisitView(row.id(), row.tokenNo(), patient.id(), patient.name(), patient.age(), patient.sex(),
                 doctor.membershipId(), doctor.name(), row.visitType(), row.stage(), row.feePaise(), row.createdAt(),
-                row.workflowVersionNo());
+                row.workflowVersionNo(), row.emrRecordId(), row.emrStatus() == null ? "NONE" : row.emrStatus(),
+                row.triageLevel(), null, null, null);
+    }
+
+    /** SAH-67-4: the name and colour of an Emergency visit's level from the clinic's scale (null without the port). */
+    public VisitView withTriageNames(UUID tenantId, VisitView view) {
+        EmrEmergencyPort port = emergencyPort == null ? null : emergencyPort.getIfAvailable();
+        if (view.triageLevel() == null || port == null) {
+            return view;
+        }
+        return port.triageScale(tenantId).levels().stream().filter(l -> l.level() == view.triageLevel()).findFirst()
+                .map(l -> view.withTriage(l.name(), l.tone(), view.feeChange())).orElse(view);
     }
 
     /** Never the patient's or doctor's name (SAH-8/SAH-9 audit rule): only ids and business facts. */

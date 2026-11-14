@@ -1,0 +1,162 @@
+<div class="grid" [attr.data-testid]="'form-grid'">
+  @for (f of shown(); track f.key) {
+    <div class="cell" [style.grid-column]="span(f)" [attr.data-field]="f.key">
+      @switch (f.type) {
+        @case ('SECTION_HEADING') {
+          <div class="sect">
+            <h4>{{ f.label }}</h4>
+            @if (f.help) {
+              <span class="faint t-xs">{{ f.help }}</span>
+            }
+          </div>
+        }
+        @case ('INFO_NOTE') {
+          <p class="note" role="note">{{ f.label }}</p>
+        }
+        @default {
+          <div class="fr" [class.bad]="isMissing(f) || errors()[f.key] || flag(f)?.kind === 'outside-limits'">
+            @if (f.type !== 'BODY_MAP' && f.type !== 'MEDICINE_LIST' && f.type !== 'LAB_TESTS' && f.type !== 'DIAGNOSIS') {
+              <div class="lbl">
+                <label [attr.for]="id(f)" [id]="id(f) + '-l'" class="name">
+                  {{ f.label }}@if (f.required) {<span class="star" aria-hidden="true"> *</span><span class="sr-only"> (required)</span>}
+                </label>
+                @if (f.unit) {
+                  <span class="meta">{{ f.unit }}</span>
+                }
+                @if (f.standardCode) {
+                  <span class="meta">{{ f.standardCode }}</span>
+                }
+                @if (flag(f)?.kind === 'abnormal') {
+                  <span class="pill p-crit" data-testid="abnormal">Abnormal</span>
+                }
+              </div>
+            }
+
+            @switch (f.type) {
+              @case ('SHORT_TEXT') {
+                <input class="input" type="text" autocomplete="off" [id]="id(f)" [value]="text(f)" [disabled]="disabled()" [attr.maxlength]="200" (input)="onText(f, $event)" />
+              }
+              @case ('LONG_TEXT') {
+                <textarea class="input" rows="3" [id]="id(f)" [value]="text(f)" [disabled]="disabled()" [attr.maxlength]="4000" (input)="onText(f, $event)"></textarea>
+              }
+              @case ('NUMBER') {
+                <input
+                  class="input num"
+                  type="number"
+                  inputmode="decimal"
+                  step="any"
+                  [id]="id(f)"
+                  [value]="numberText(f)"
+                  [disabled]="disabled()"
+                  [attr.min]="f.min ?? null"
+                  [attr.max]="f.max ?? null"
+                  [attr.aria-invalid]="flag(f)?.kind === 'outside-limits' ? true : null"
+                  (input)="onNumber(f, $event)"
+                />
+              }
+              @case ('DATE') {
+                <input class="input" type="date" [id]="id(f)" [value]="text(f)" [disabled]="disabled()" (input)="onText(f, $event)" />
+              }
+              @case ('TIME') {
+                <input class="input" type="time" [id]="id(f)" [value]="text(f)" [disabled]="disabled()" (input)="onText(f, $event)" />
+              }
+              @case ('YES_NO') {
+                <div class="picks" role="group" [attr.aria-labelledby]="id(f) + '-l'" [id]="id(f)">
+                  @for (o of options(f); track o.key) {
+                    <button type="button" class="pick" [attr.aria-pressed]="isPicked(f, o.key)" [disabled]="disabled()" (click)="pick(f, o.key)">{{ o.label }}</button>
+                  }
+                </div>
+              }
+              @case ('SINGLE_CHOICE') {
+                <div class="picks" role="group" [attr.aria-labelledby]="id(f) + '-l'" [id]="id(f)">
+                  @for (o of options(f); track o.key) {
+                    <button type="button" class="pick" [attr.aria-pressed]="isPicked(f, o.key)" [disabled]="disabled()" (click)="pick(f, o.key)">{{ o.label }}</button>
+                  }
+                </div>
+              }
+              @case ('MULTI_CHOICE') {
+                <div class="picks" role="group" [attr.aria-labelledby]="id(f) + '-l'" [id]="id(f)">
+                  @for (o of options(f); track o.key) {
+                    <button type="button" class="pick multi" [attr.aria-pressed]="isPicked(f, o.key)" [disabled]="disabled()" (click)="pick(f, o.key)">
+                      {{ isPicked(f, o.key) ? '✓ ' : '' }}{{ o.label }}
+                    </button>
+                  }
+                </div>
+              }
+              @case ('DROPDOWN') {
+                <select class="input" [id]="id(f)" [disabled]="disabled()" (change)="onSelect(f, $event)">
+                  <option value="" [selected]="text(f) === ''">Choose…</option>
+                  @for (o of options(f); track o.key) {
+                    <option [value]="o.key" [selected]="text(f) === o.key">{{ o.label }}</option>
+                  }
+                </select>
+              }
+              @case ('VITALS_BLOCK') {
+                <div class="vitals" role="group" [attr.aria-labelledby]="id(f) + '-l'" [id]="id(f)">
+                  @for (v of vitals; track v.key) {
+                    <label class="vit">
+                      <span class="faint t-xs">{{ v.label }} ({{ v.unit }})</span>
+                      <input
+                        class="input num"
+                        type="number"
+                        inputmode="decimal"
+                        step="any"
+                        [value]="vitalText(f, v.key)"
+                        [disabled]="disabled()"
+                        [attr.min]="v.min"
+                        [attr.max]="v.max"
+                        (input)="onVital(f, v.key, $event)"
+                      />
+                    </label>
+                  }
+                </div>
+              }
+              @case ('BODY_MAP') {
+                <app-body-map [title]="f.label" [value]="valueOf(f)" [disabled]="disabled()" [inputId]="id(f)" (valueChange)="set(f, $event)" />
+              }
+              @case ('MEDICINE_LIST') {
+                <app-prescription [title]="f.label" [required]="f.required" [value]="valueOf(f)" [disabled]="disabled()" [inputId]="id(f)" (valueChange)="set(f, $event)" />
+              }
+              @case ('LAB_TESTS') {
+                <app-emr-list kind="INVESTIGATIONS" [title]="f.label" [required]="f.required" [value]="valueOf(f)" [disabled]="disabled()" [specialty]="specialty()" [inputId]="id(f)" (valueChange)="set(f, $event)" />
+              }
+              @case ('DIAGNOSIS') {
+                <app-emr-list kind="DIAGNOSIS" [title]="f.label" [required]="f.required" [value]="valueOf(f)" [disabled]="disabled()" [specialty]="specialty()" [inputId]="id(f)" (valueChange)="set(f, $event)" />
+              }
+              @case ('SCORE') {
+                <div class="calc" [id]="id(f)" role="status">
+                  <span class="big" data-testid="score-total">{{ total(f) ?? '—' }}</span>
+                  <span class="faint t-xs">Worked out from your answers</span>
+                </div>
+              }
+              @case ('SCORE_BAND') {
+                @let b = band(f);
+                <div class="calc band" [class.good]="b?.tone === 'good'" [class.warn]="b?.tone === 'warn'" [class.crit]="b?.tone === 'crit'" [id]="id(f)" role="status">
+                  <span class="big" data-testid="band-label">{{ b?.label ?? '—' }}</span>
+                  <span class="faint t-xs">From {{ sourceLabel(f) || '—' }}</span>
+                </div>
+              }
+              @default {
+                <div class="later">
+                  <button type="button" class="input" disabled [attr.aria-describedby]="id(f) + '-later'">{{ f.label }}</button>
+                  <span class="pill p-wait" [id]="id(f) + '-later'">{{ laterNote }}</span>
+                </div>
+              }
+            }
+
+            @if (f.help) {
+              <span class="faint t-xs">{{ f.help }}</span>
+            }
+            @if (errors()[f.key]; as message) {
+              <span class="err-text" role="alert">{{ message }}</span>
+            } @else if (flag(f)?.kind === 'outside-limits') {
+              <span class="err-text" role="alert">{{ flag(f)?.message }}</span>
+            } @else if (isMissing(f)) {
+              <span class="err-text" role="alert">Required</span>
+            }
+          </div>
+        }
+      }
+    </div>
+  }
+</div>

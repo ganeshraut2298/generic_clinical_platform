@@ -1,0 +1,220 @@
+@if (store.loading()) {
+  <p class="loading" aria-busy="true">Opening the EMR</p>
+} @else if (store.loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button mat-stroked-button type="button" data-act="retry" (click)="store.reload()">Try again</button>
+  </div>
+} @else if (record(); as r) {
+  <app-emr-header (back)="goBack()" (admit)="admit()" />
+
+  <app-specialty-strip />
+
+  @if (stageNote(); as note) {
+    <div class="notice teal slim" role="status" data-testid="stage-note">
+      <app-icon name="alert" [size]="14" />
+      <span>{{ note }}</span>
+    </div>
+  }
+  @if (holdText(); as text) {
+    <div class="notice warn slim" role="status" data-testid="hold-banner">
+      <app-icon name="lock" [size]="14" />
+      <span>{{ text }}</span>
+      @if (hold(); as h) {
+        @if (h.expired) {
+          <button mat-stroked-button type="button" data-act="edit-visit" (click)="editThisVisit()">Edit this visit</button>
+        }
+        @if (h.canTakeOver) {
+          <button mat-stroked-button type="button" data-act="take-over" (click)="takeOver()">Take over</button>
+        }
+      }
+    </div>
+  }
+  @if (readOnlyText(); as text) {
+    <div class="notice warn slim" role="status" data-testid="readonly-note">
+      <app-icon name="lock" [size]="14" />
+      <span>{{ text }}</span>
+    </div>
+  }
+  @if (store.infoNote(); as note) {
+    <div class="notice teal slim" role="status" data-testid="info-note">
+      <app-icon name="alert" [size]="14" />
+      <span>{{ note }}</span>
+    </div>
+  }
+  @if (store.saveError(); as message) {
+    <div class="notice err" role="alert" data-testid="save-error">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      @if (store.conflict()) {
+        <button mat-stroked-button type="button" data-act="reload" (click)="store.reload()">Reload</button>
+      }
+    </div>
+  }
+  @if (store.notice(); as message) {
+    <div class="notice err slim" role="alert">
+      <app-icon name="alert" [size]="14" />
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  <div class="layout">
+    <nav class="nav surf" aria-label="EMR sections">
+      @for (part of parts; track part) {
+        @let progress = progressOf(part);
+        <button
+          type="button"
+          class="nav-h"
+          [class.cur]="store.part() === part"
+          [attr.aria-pressed]="store.part() === part"
+          (click)="setPart(part)"
+        >
+          <span class="nav-num">{{ part === 'ASSESSMENT' ? 1 : 2 }}</span>
+          <span class="nav-l">{{ partLabel[part] }}</span>
+          <span class="nav-d">{{ progress?.sectionsDone }}/{{ progress?.sectionsTotal }}</span>
+        </button>
+        @for (item of navStates(part); track item.section.key) {
+          <button type="button" class="nav-i" [class.on]="store.activeSection() === item.section.key" (click)="jump(item.section.key)">
+            <span class="dot" [class.ok]="item.state?.done" [class.req]="!item.state?.done && item.section.required" aria-hidden="true">
+              {{ item.state?.done ? '✓' : item.section.required ? '!' : '' }}
+            </span>
+            <span class="nav-t">{{ item.section.name }}</span>
+            @if (item.section.required && !item.state?.done) {
+              <span class="reqt">Required</span>
+            }
+          </button>
+        }
+      }
+    </nav>
+
+    <main class="main">
+      <div class="parts" role="tablist" aria-label="Visit part">
+        @for (part of parts; track part) {
+          @let progress = progressOf(part);
+          <button
+            type="button"
+            role="tab"
+            class="part"
+            [attr.aria-selected]="store.part() === part"
+            (click)="setPart(part)"
+          >
+            <span class="pnum" [class.full]="progress?.complete">{{ progress?.complete ? '✓' : part === 'ASSESSMENT' ? 1 : 2 }}</span>
+            <span class="ptext">
+              <b>{{ partLabel[part] }}</b>
+              <small>{{ tabSubtitle(part) }}</small>
+            </span>
+            <span class="badge" [class.full]="progress?.complete">{{ progress?.requiredDone }} of {{ progress?.requiredTotal }} required</span>
+          </button>
+        }
+      </div>
+
+      @if (store.part() === 'TREATMENT') {
+        <div class="recap surf">
+          <b>From assessment:</b>
+          <span>{{ recap() }}</span>
+          <button type="button" mat-stroked-button data-act="back-to-assessment" (click)="setPart('ASSESSMENT')">
+            ← Back to assessment
+          </button>
+        </div>
+      }
+
+      <div class="cards">
+        @for (section of currentSections(); track section.key) {
+          <app-section-card [section]="section" [specialty]="specialty()" />
+        } @empty {
+          <p class="empty">No sections in this part.</p>
+        }
+        @if (store.part() === 'ASSESSMENT' && assessmentExtra(); as extra) {
+          <ng-container *ngComponentOutlet="extra" />
+        }
+      </div>
+
+      @if (store.part() === 'ASSESSMENT') {
+        <div class="cont surf">
+          <span class="faint">
+            @if (store.progress()[0].complete) {
+              Assessment done.
+            } @else {
+              Still needed in assessment. You can still go ahead.
+            }
+          </span>
+          <button type="button" mat-flat-button data-act="continue" (click)="setPart('TREATMENT')">
+            Continue to Treatment →
+          </button>
+        </div>
+      }
+    </main>
+
+    <aside class="side surf" aria-label="Patient history and case paper">
+      <div class="rtabs" role="tablist" aria-label="Patient record">
+        @for (t of rightTabs(); track t.id) {
+          <button type="button" role="tab" [attr.aria-selected]="store.rightTab() === t.id" (click)="setRightTab(t.id)">
+            <b>{{ t.label }}</b>
+            <small>{{ tabSubtitleOf(t) }}</small>
+          </button>
+        }
+      </div>
+      <div class="rbody">
+        @if (store.rightTab() === 'history') {
+          <app-past-visits [recordId]="r.id" [allergyLine]="store.allergyLine()" />
+        } @else if (store.rightTab() === 'tools') {
+          <app-gm-tools />
+        } @else {
+          <app-case-paper-panel />
+        }
+      </div>
+    </aside>
+  </div>
+
+  @if (signed() && addenda().length > 0) {
+    <section class="addenda surf" aria-label="Addenda" data-testid="addenda">
+      @for (a of addenda(); track a.id) {
+        <p class="addendum" data-testid="addendum">
+          Addendum · {{ whenOf(a.createdAt) }} · {{ drOf(a.createdByName) }}: {{ a.reason }}. {{ a.text }}
+        </p>
+      }
+    </section>
+  }
+
+  <footer class="foot surf" data-testid="emr-footer">
+    @if (signed()) {
+      <span class="status good" role="status" data-testid="signed-line">{{ signedLine() ?? 'This visit is signed.' }}</span>
+      <div class="fbtns">
+        @if (r.canAddAddendum) {
+          <button type="button" mat-flat-button data-act="add-addendum" (click)="addAddendum()">Add addendum</button>
+        }
+      </div>
+    } @else {
+      <span class="status" [class.good]="footerTone() === 'good'" [class.crit]="footerTone() === 'crit'" role="status">
+        {{ store.footer() }}
+      </span>
+      @if (!hold()) {
+        <span class="saved" aria-live="polite" data-testid="save-status">{{ saveText() }}</span>
+      }
+      <div class="fbtns">
+        @if (!hold()) {
+          <button
+            type="button"
+            mat-stroked-button
+            data-act="save-draft"
+            [disabled]="store.saving() || store.readOnly()"
+            (click)="saveDraft()"
+          >
+            {{ store.saving() ? 'Saving' : 'Save draft' }}
+          </button>
+          <button
+            type="button"
+            mat-flat-button
+            data-act="complete"
+            [attr.aria-disabled]="!store.ready()"
+            [disabled]="store.readOnly() || flow.starting()"
+            (click)="complete()"
+          >
+            {{ finishLabel() }}
+          </button>
+        }
+      </div>
+    }
+  </footer>
+}

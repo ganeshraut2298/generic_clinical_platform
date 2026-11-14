@@ -6,6 +6,8 @@ import { SlotSession } from '../../shared/scheduling/slot.util';
 export type AppointmentStatus = 'BOOKED' | 'ARRIVED' | 'NOSHOW' | 'CANCELLED';
 export type AppointmentVisitType = 'NEW' | 'FOLLOW_UP';
 export type AppointmentSource = 'PHONE' | 'WHATSAPP' | 'FRONT_DESK';
+/** EMR (opd.yaml 0.6.0): booked by the doctor's sign (follow-up, next sitting, next session); never sent by a client. */
+export type AppointmentRowSource = AppointmentSource | 'EMR';
 export type AppointmentSex = 'F' | 'M' | 'O';
 
 export interface DoctorSlotSettings {
@@ -56,7 +58,7 @@ export interface Appointment {
   apptTime: string;
   status: AppointmentStatus;
   visitType: AppointmentVisitType;
-  source: AppointmentSource;
+  source: AppointmentRowSource;
   note?: string | null;
   visitId?: string | null;
   tokenNo?: number | null;
@@ -73,10 +75,11 @@ export const APPOINTMENT_SOURCES: readonly { value: AppointmentSource; label: st
   { value: 'FRONT_DESK', label: 'Front desk' },
 ];
 
-export const APPOINTMENT_SOURCE_LABELS: Record<AppointmentSource, string> = {
+export const APPOINTMENT_SOURCE_LABELS: Record<AppointmentRowSource, string> = {
   PHONE: 'Phone',
   WHATSAPP: 'WhatsApp',
   FRONT_DESK: 'Front desk',
+  EMR: 'the doctor',
 };
 
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {

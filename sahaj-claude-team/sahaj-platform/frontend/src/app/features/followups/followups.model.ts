@@ -17,6 +17,10 @@ export interface FollowUp {
   /** SAH-27. The IPD admission whose discharge added it; null for a visit follow-up. */
   sourceAdmissionId: string | null;
   returnedVisitId?: string | null;
+  /** 0.6.0 (SAH-51-6). The appointment the doctor's sign booked for this follow-up; null when none. */
+  appointmentDate?: string | null;
+  /** 0.6.0. HH:mm of that appointment. */
+  appointmentTime?: string | null;
 }
 
 export interface FollowUpCounts {

@@ -2,6 +2,10 @@ package com.sahaj;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
@@ -32,5 +36,39 @@ class ModularityTests {
     @Test
     void verifiesModularStructure() {
         modules.verify();
+    }
+
+    private static com.tngtech.archunit.core.domain.JavaClasses productionClasses() {
+        ImportOption noTests = location -> !location.contains("/test-classes/");
+        return new ClassFileImporter().withImportOption(noTests).importPackages("com.sahaj");
+    }
+
+    /**
+     * ADR-022 D1 (SAH-58): the module graph is platform, patient, opd, billing, ipd. {@code ipd} reaches
+     * {@code billing.api} (the course credit port); {@code billing} must never import {@code ipd}. If billing ever needs
+     * IPD data it declares a port in {@code billing.api} that ipd implements.
+     */
+    @Test
+    void billingNeverDependsOnIpd() {
+        ArchRule rule = ArchRuleDefinition.noClasses().that().resideInAPackage("com.sahaj.billing..")
+                .should().dependOnClassesThat().resideInAPackage("com.sahaj.ipd..");
+        rule.check(productionClasses());
+    }
+
+    /** ADR-022 D1: {@code opd} is the lowest business module; it reaches billing and ipd only through its own ports. */
+    @Test
+    void opdNeverDependsOnBillingOrIpd() {
+        ArchRule rule = ArchRuleDefinition.noClasses().that().resideInAPackage("com.sahaj.opd..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.sahaj.billing..", "com.sahaj.ipd..");
+        rule.check(productionClasses());
+    }
+
+    /** ADR-022 D1: the one new edge is {@code ipd -> billing.api}; ipd never reaches billing's internals. */
+    @Test
+    void ipdReachesBillingOnlyThroughItsApi() {
+        ArchRule rule = ArchRuleDefinition.noClasses().that().resideInAPackage("com.sahaj.ipd..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.sahaj.billing.application..",
+                        "com.sahaj.billing.web..", "com.sahaj.billing.infrastructure..", "com.sahaj.billing.domain..");
+        rule.check(productionClasses());
     }
 }

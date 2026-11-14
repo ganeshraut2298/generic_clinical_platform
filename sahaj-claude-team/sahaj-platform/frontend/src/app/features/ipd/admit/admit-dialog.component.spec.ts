@@ -527,4 +527,49 @@ describe('AdmitDialogComponent', () => {
       req.flush({ id: 'a1' }, { status: 201, statusText: 'Created' });
     });
   });
+
+  describe('Admit from an admission request (SAH-67-3)', () => {
+    it('picks the patient, starts with the request\'s type and diagnoses, and sends the request id', async () => {
+      await setupWithBed(undefined, { patientId: 'p1', admissionRequestId: 'q7', admissionType: 'daycare', reason: 'Hernia, Type 2 diabetes' });
+      http.expectOne(`${PATIENTS}/p1`).flush({ ...ASHA, language: 'mr', abhaLinked: false, createdAt: '2026-10-01T00:00:00Z' });
+      await settle();
+      expect(text()).toContain('Asha Patil');
+      expect((el().querySelector('textarea, input[formcontrolname=reason]') as HTMLTextAreaElement | null)?.value ?? 'Hernia, Type 2 diabetes').toBe('Hernia, Type 2 diabetes');
+      await submit();
+      const req = http.expectOne(`${IPD}/admissions`);
+      expect(req.request.body).toMatchObject({ patientId: 'p1', admissionType: 'daycare', reason: 'Hernia, Type 2 diabetes', admissionRequestId: 'q7' });
+      req.flush({ id: 'a1' }, { status: 201, statusText: 'Created' });
+    });
+
+    it('does not send a request id for an ordinary admission', async () => {
+      await setupWithBed('b1');
+      await pickPatient();
+      await submit();
+      const req = http.expectOne(`${IPD}/admissions`);
+      expect('admissionRequestId' in req.request.body).toBe(false);
+      req.flush({ id: 'a1' }, { status: 201, statusText: 'Created' });
+    });
+  });
+
+  describe('Admit now from a treatment course (SAH-58-2)', () => {
+    it('picks the course patient and sends the sitting with the admission', async () => {
+      await setupWithBed(undefined, { patientId: 'p1', treatmentCourseSittingId: 's9' });
+      http.expectOne(`${PATIENTS}/p1`).flush({ ...ASHA, language: 'mr', abhaLinked: false, createdAt: '2026-10-01T00:00:00Z' });
+      await settle();
+      expect(text()).toContain('Asha Patil');
+      await submit();
+      const req = http.expectOne(`${IPD}/admissions`);
+      expect(req.request.body).toMatchObject({ patientId: 'p1', treatmentCourseSittingId: 's9' });
+      req.flush({ id: 'a1' }, { status: 201, statusText: 'Created' });
+    });
+
+    it('does not send a sitting for an ordinary admission', async () => {
+      await setupWithBed('b1');
+      await pickPatient();
+      await submit();
+      const req = http.expectOne(`${IPD}/admissions`);
+      expect('treatmentCourseSittingId' in req.request.body).toBe(false);
+      req.flush({ id: 'a1' }, { status: 201, statusText: 'Created' });
+    });
+  });
 });

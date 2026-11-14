@@ -44,6 +44,13 @@ public final class NavigationPolicy {
     private static final Set<MembershipRole> EMERGENCY_ROLES = Set.of(MembershipRole.OWNER, MembershipRole.FRONT_DESK,
             MembershipRole.NURSE);
 
+    /**
+     * SAH-66 (ADR-023 D6, H7, D13.5): who sees Second checks. NURSE, PHARMACIST, DOCTOR and VISITING_DOCTOR always; OWNER
+     * only when the owner's membership has doctor details (the checker roles of the chemotherapy second check).
+     */
+    private static final Set<MembershipRole> SECOND_CHECK_ROLES = Set.of(MembershipRole.NURSE,
+            MembershipRole.PHARMACIST, MembershipRole.DOCTOR, MembershipRole.VISITING_DOCTOR);
+
     private NavigationPolicy() {
     }
 
@@ -69,6 +76,16 @@ public final class NavigationPolicy {
      * in the advanced menu while IPD is Trial or On; then {@code staff} when HRA is on.
      */
     public static List<String> menuFor(MembershipRole role, String menuMode, ModuleFlags flags) {
+        return menuFor(role, menuMode, flags, false);
+    }
+
+    /**
+     * The full menu. {@code ownerHasDoctorDetails} matters for OWNER only: Second checks (key {@code secondchecks}) is added
+     * right after {@code queue} when the role has it, else at the end of the list; it is applied after ipd and emergency and
+     * before staff, in both menu modes, with no module condition (SAH-66).
+     */
+    public static List<String> menuFor(MembershipRole role, String menuMode, ModuleFlags flags,
+                                       boolean ownerHasDoctorDetails) {
         List<String> menu = new ArrayList<>(menuFor(role, menuMode));
         if (flags.ipdOn() && IPD_ROLES.contains(role) && !menu.contains("ipd")) {
             int at = "simple".equals(menuMode) ? menu.indexOf("config") : menu.indexOf("followups") + 1;
@@ -82,6 +99,11 @@ public final class NavigationPolicy {
         if (flags.ipdWritable() && !"simple".equals(menuMode) && EMERGENCY_ROLES.contains(role)
                 && menu.contains("ipd") && !menu.contains("emergency")) {
             menu.add(menu.indexOf("ipd"), "emergency");
+        }
+        boolean checker = SECOND_CHECK_ROLES.contains(role) || (role == MembershipRole.OWNER && ownerHasDoctorDetails);
+        if (checker && !menu.contains("secondchecks")) {
+            int queue = menu.indexOf("queue");
+            menu.add(queue < 0 ? menu.size() : queue + 1, "secondchecks");
         }
         if (flags.hraOn() && !menu.contains("staff")) {
             int at = menu.indexOf("config");

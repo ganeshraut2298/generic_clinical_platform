@@ -26,7 +26,7 @@ public class ModulesController {
     @GetMapping
     @PreAuthorize(TeamController.ANY_CLINIC_ROLE)
     public ModulesDto get(@AuthenticationPrincipal TenantPrincipal principal) {
-        return ModulesDto.from(modulesService.get(principal.tenantId(), role()));
+        return ModulesDto.from(modulesService.get(principal.tenantId(), principal.userId(), role()));
     }
 
     @PostMapping("/ipd-request")

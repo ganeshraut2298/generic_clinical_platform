@@ -130,7 +130,7 @@ class DischargeServiceTest {
         AdmissionService sheets = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team,
                 patients, patientAccess, actors, gate, catalog, charges, billing, discharges,
                 mock(EmergencyService.class), mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class),
-                guard, ScopeStubs.repository());
+                guard, ScopeStubs.repository(), mock(com.sahaj.opd.api.EmrAdmissionRequestPort.class));
         service = new DischargeService(admissions, beds, wards, settings, discharges, ownerGuard, auditLog, team,
                 patients, patientAccess, actors, followUps, gate, catalog, billing, sheets, escalations, events, guard);
 
@@ -1022,7 +1022,8 @@ class DischargeServiceTest {
         AdmissionService sheets = new AdmissionService(admissions, beds, wards, settings, ownerGuard, auditLog, team,
                 mock(PatientLookupPort.class), patientAccess, mock(ActorDirectoryPort.class), gate, catalog,
                 mock(ChargeRepository.class), billing, discharges, mock(EmergencyService.class),
-                mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class), ScopeStubs.unscoped(), ScopeStubs.repository());
+                mock(VitalsRepository.class), mock(AdmittedCards.class), mock(CardSetups.class), ScopeStubs.unscoped(), ScopeStubs.repository(),
+                mock(com.sahaj.opd.api.EmrAdmissionRequestPort.class));
         DischargeService lateService = new DischargeService(admissions, beds, wards, settings, discharges, ownerGuard,
                 auditLog, team, mock(PatientLookupPort.class), patientAccess, mock(ActorDirectoryPort.class),
                 followUps, gate, catalog, billing, sheets, escalations, events, guard);

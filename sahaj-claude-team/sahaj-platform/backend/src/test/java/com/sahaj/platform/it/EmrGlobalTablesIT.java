@@ -4,49 +4,154 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 /**
- * SAH-43 / SAH-44 stored shape of the seven global tables (test cases S-01 to S-21 of docs/database/SAH-43-44.md), by
- * SQL on the real {@code sahaj_test} database: seed counts, the read-only grant of the app role, no tenant column,
- * the check constraints, unique names, stable ids, the immutability trigger (also for the table owner), the section
- * and option rules, the aliases, and the "Starter list, not clinically reviewed" comments. Writes that must work
- * (to prove a constraint is the reason for a refusal) run as the table owner in a transaction that is always rolled
- * back. Test plan: docs/test-plans/SAH-43-44.md.
+ * SAH-43 / SAH-53 stored shape of the global EMR tables (the ten of SAH-53; the two of SAH-48-59 are in EmrPhase3TablesIT) (test cases S-50 to S-57 of docs/database/SAH-53.md and
+ * S-01 to S-09 of docs/database/SAH-43-44.md for the masters), by SQL on the real {@code sahaj_test} database: seed
+ * counts, the starting values of the story lists, the read-only grant of the app role, no tenant column, the check
+ * constraints, unique names, stable ids, the immutable starter layout (also for the table owner), the aliases and the
+ * "Starter list, not clinically reviewed" comments. Writes that must work (to prove a constraint is the reason for a
+ * refusal) run as the table owner in a transaction that is always rolled back. Test plan: docs/test-plans/SAH-53.md.
  */
 @OnTestDatabase
 class EmrGlobalTablesIT extends EmrSupport {
 
-    private static final String[] GLOBAL_TABLES = {"emr_complaint", "emr_investigation", "emr_advice", "emr_template",
-            "emr_template_section", "emr_template_option", "emr_specialty_alias"};
+    private static final String[] GLOBAL_TABLES = {"emr_complaint", "emr_investigation", "emr_advice", "emr_section",
+            "emr_section_field", "emr_section_field_option", "emr_starter_department", "emr_starter_department_section",
+            "emr_starter_layout", "emr_department_alias"};
     private static final String[] MASTER_TABLES = {"emr_complaint", "emr_investigation", "emr_advice"};
-    private static final String[] TEMPLATE_TABLES = {"emr_template", "emr_template_section", "emr_template_option"};
+
+    /** Per starter: the number of sections in its ordered list (SAH-53-1, 341 in all). */
+    private static final Map<String, Integer> PLACEMENTS = new LinkedHashMap<>();
+
+    static {
+        PLACEMENTS.put("gm", 19);
+        PLACEMENTS.put("dental", 24);
+        PLACEMENTS.put("og", 25);
+        PLACEMENTS.put("paeds", 23);
+        PLACEMENTS.put("physio", 27);
+        PLACEMENTS.put("ortho", 22);
+        PLACEMENTS.put("eye", 22);
+        PLACEMENTS.put("ent", 22);
+        PLACEMENTS.put("derm", 20);
+        PLACEMENTS.put("diab", 22);
+        PLACEMENTS.put("cardio", 21);
+        PLACEMENTS.put("ayush", 21);
+        PLACEMENTS.put("onco", 27);
+        PLACEMENTS.put("surgery", 26);
+        PLACEMENTS.put("psych", 20);
+    }
 
     private long count(String sql, Object... params) throws SQLException {
         return globalCount(sql, params);
     }
 
-    // ---------------- S-01 seed counts, S-20 the older tables ----------------
+    private Set<String> keys(String sql, Object... params) throws SQLException {
+        Set<String> out = new TreeSet<>();
+        globalRows(sql, params).forEach(r -> out.add(r.get(0)));
+        return out;
+    }
+
+    private static Set<String> setOf(String... keys) {
+        return new TreeSet<>(Set.of(keys));
+    }
+
+    // ---------------- S-50 seed counts, S-20 the older tables ----------------
 
     @Test
     void theSeedHasTheCountsOfTheDesignNote() throws Exception {
         assertThat(count("select count(*) from opd.emr_complaint")).isEqualTo(59);
         assertThat(count("select count(*) from opd.emr_investigation")).isEqualTo(46);
         assertThat(count("select count(*) from opd.emr_advice")).isEqualTo(50);
-        assertThat(count("select count(*) from opd.emr_template")).isEqualTo(4);
-        assertThat(count("select count(*) from opd.emr_template_section")).isEqualTo(38);
-        assertThat(count("select count(*) from opd.emr_template_option")).isEqualTo(45);
-        assertThat(count("select count(*) from opd.emr_specialty_alias")).isEqualTo(8);
+        assertThat(count("select count(*) from opd.emr_section")).isEqualTo(100);
+        assertThat(count("select count(*) from opd.emr_section where kind = 'COMMON'")).isEqualTo(14);
+        assertThat(count("select count(*) from opd.emr_section where kind = 'SPECIALTY'")).isEqualTo(78);
+        assertThat(count("select count(*) from opd.emr_section where kind = 'COMPLIANCE'")).isEqualTo(8);
+        assertThat(count("select count(*) from opd.emr_section_field")).isEqualTo(313);
+        assertThat(count("select count(*) from opd.emr_section_field_option")).isEqualTo(136);
+        assertThat(count("select count(*) from opd.emr_starter_department")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_department_section")).isEqualTo(341);
+        assertThat(count("select count(*) from opd.emr_department_alias")).isEqualTo(54);
+        assertThat(count("select count(*) from opd.emr_starter_layout")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_layout where layout_version = 1")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_department where current_layout_version = 1")).isEqualTo(15);
+    }
+
+    @Test
+    void theFifteenStartersAreTheMockupDepartmentsInOrderWithTheirSectionCounts() throws Exception {
+        List<List<String>> rows = globalRows("select starter_key, name, initials, colour, position from opd.emr_starter_department order by position");
+        assertThat(rows.stream().map(r -> r.get(0)).toList()).containsExactly(STARTER_KEYS);
+        assertThat(rows.stream().map(r -> r.get(1)).toList()).containsExactly("General Medicine", "Dental",
+                "Obstetrics & Gynaecology", "Paediatrics", "Physiotherapy", "Orthopaedics", "Ophthalmology", "ENT",
+                "Dermatology & Cosmetology", "Diabetology", "Cardiology", "AYUSH (Ayurveda)", "Medical Oncology",
+                "General Surgery", "Psychiatry & Counselling");
+        rows.forEach(r -> {
+            assertThat(r.get(2)).matches("^[A-Z0-9]{1,3}$");
+            assertThat(r.get(3)).matches("^#[0-9A-F]{6}$");
+        });
+        for (Map.Entry<String, Integer> e : PLACEMENTS.entrySet()) {
+            assertThat(count("select count(*) from opd.emr_starter_department_section where starter_key = ?", e.getKey()))
+                    .as(e.getKey()).isEqualTo(e.getValue());
+            // the order is 1..n with no gap
+            assertThat(count("select count(*) from opd.emr_starter_department_section where starter_key = ? and position between 1 and ?",
+                    e.getKey(), e.getValue())).as(e.getKey() + " positions").isEqualTo(e.getValue());
+        }
+        assertThat(PLACEMENTS.values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(341);
+        assertThat(count("select count(*) from opd.emr_section s where not exists (select 1 from "
+                + "opd.emr_starter_department_section p where p.section_key = s.section_key)"))
+                .as("every library section is used by at least one department").isZero();
+    }
+
+    @Test
+    void theDefaultOrderIsTheFourteenCommonSectionsThenSpecialtyThenTheThreeComplianceSections() throws Exception {
+        List<String> common = new ArrayList<>();
+        globalRows("select section_key from opd.emr_section where kind = 'COMMON' order by position")
+                .forEach(r -> common.add(r.get(0)));
+        assertThat(common).hasSize(14).startsWith("vitals", "complaints", "hpi", "history", "allergy", "exam");
+        assertThat(common).endsWith("referral", "attachments");
+        for (String starter : STARTER_KEYS) {
+            List<String> order = new ArrayList<>();
+            globalRows("select section_key from opd.emr_starter_department_section where starter_key = ? order by position",
+                    starter).forEach(r -> order.add(r.get(0)));
+            assertThat(order.subList(0, 14)).as(starter + " starts with the common sections").containsExactlyElementsOf(common);
+            List<String> tail = order.subList(order.size() - ("og".equals(starter) ? 4 : 3), order.size());
+            assertThat(tail).as(starter + " ends with the compliance sections")
+                    .containsExactlyElementsOf("og".equals(starter) ? List.of("abha", "consent", "rxformat", "pcpndt")
+                            : List.of("abha", "consent", "rxformat"));
+            // the sections between are specialty sections
+            for (String key : order.subList(14, order.size() - ("og".equals(starter) ? 4 : 3))) {
+                assertThat(globalRows("select kind from opd.emr_section where section_key = ?", key).get(0).get(0))
+                        .as(starter + "/" + key).isEqualTo("SPECIALTY");
+            }
+        }
     }
 
     @Test
     void theOlderStarterListsOfSah7AreUnchanged() throws Exception {
         assertThat(count("select count(*) from opd.diagnosis")).isEqualTo(53);
-        assertThat(count("select count(*) from opd.medicine")).isEqualTo(52);
+        assertThat(count("select count(*) from opd.medicine")).as("52 of SAH-7, Co-trimoxazole 960 mg of SAH-48 and 10 of SAH-49-71 (V2026_12_11_1020)").isEqualTo(63);
         assertThat(count("select count(*) from platform.specialty_template")).isPositive();
         assertThat(count("select count(*) from information_schema.tables where table_schema = 'platform' "
                 + "and table_name like 'emr%'")).isZero();
+    }
+
+    @Test
+    void theRetiredTablesOfTheWithdrawnTemplateModelAreGone() throws Exception {
+        for (String table : new String[] {"emr_template", "emr_template_section", "emr_template_option",
+                "emr_specialty_alias", "emr_template_setup", "emr_template_override", "emr_settings"}) {
+            assertThat(count("select count(*) from information_schema.tables where table_schema = 'opd' and table_name = ?",
+                    table)).as(table + " must not exist").isZero();
+        }
+        assertThat(count("select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                + "where n.nspname = 'opd' and p.proname = 'deny_emr_template_change'")).isZero();
+        assertThat(count("select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                + "where n.nspname = 'opd' and p.proname = 'deny_emr_immutable_change'")).isEqualTo(1);
     }
 
     /** SAH-43-4: each diagnosis has exactly one ICD-10 code of the enforced pattern, and codes are unique. */
@@ -59,7 +164,146 @@ class EmrGlobalTablesIT extends EmrSupport {
                 + "and table_name = 'diagnosis' and column_name like '%code%'")).as("one code column").isEqualTo(1);
     }
 
-    // ---------------- S-02, S-03 grants and no tenant column ----------------
+    // ---------------- S-51 the starting values of the story ----------------
+
+    @Test
+    void theStartingValuesAreSeededAsDrawnInTheStoryLists() throws Exception {
+        String shown = "from opd.emr_starter_department_section where ";
+        assertThat(keys("select distinct section_key " + shown + "required")).as("Required at start (12 keys)")
+                .isEqualTo(setOf("complaints", "diagnosis", "rx", "rxformat", "dental_chart", "pcpndt", "anc", "pain", "va",
+                        "immunization", "growth", "lesion_map"));
+        assertThat(keys("select distinct section_key " + shown + "print")).as("Print on prescription (12 keys)")
+                .isEqualTo(setOf("vitals", "complaints", "diagnosis", "rx", "advice", "followup", "investigations",
+                        "refraction", "tx_plan", "hep", "anc", "immunization"));
+        assertThat(keys("select distinct section_key " + shown + "copy_from_last")).as("Copy from last visit (10 keys)")
+                .isEqualTo(setOf("history", "allergy", "obstetric", "menstrual", "birth", "dental_chart", "chronic",
+                        "immunization", "growth", "prakriti"));
+        assertThat(keys("select distinct section_key " + shown + "part = 'TREATMENT'")).as("Part 2 Treatment (39 keys)")
+                .hasSize(39).contains("diagnosis", "rx", "rxformat", "dental_chart", "sx_postop", "onc_scheme", "consent");
+        assertThat(keys("select distinct section_key " + shown + "who_nurse")).as("Nurse / assistant")
+                .isEqualTo(setOf("vitals", "complaints", "history", "allergy", "attachments", "abha", "growth", "va",
+                        "refraction", "glucose", "iop", "audiometry"));
+        assertThat(keys("select distinct section_key " + shown + "who_reception")).as("Reception")
+                .isEqualTo(setOf("abha", "consent"));
+        assertThat(count("select count(*) " + shown + "not who_doctor")).as("Doctor on every section").isZero();
+        assertThat(count("select count(*) " + shown + "collapsed")).as("nothing starts collapsed").isZero();
+    }
+
+    @Test
+    void theSectionsOffAtStartAreTheListedOnesAndConsentStartsOnlyForTheSixConsentDepartments() throws Exception {
+        Map<String, Set<String>> hidden = new LinkedHashMap<>();
+        hidden.put("gm", setOf("procedures", "referral", "consent"));
+        hidden.put("dental", setOf("exam", "hpi", "referral"));
+        hidden.put("og", setOf("referral"));
+        hidden.put("paeds", setOf("referral", "procedures", "consent"));
+        hidden.put("physio", setOf("rx", "investigations", "exam", "procedures", "consent"));
+        hidden.put("ortho", setOf());
+        hidden.put("eye", setOf("exam", "consent"));
+        hidden.put("ent", setOf("exam", "consent"));
+        hidden.put("derm", setOf("exam"));
+        hidden.put("diab", setOf("consent"));
+        hidden.put("cardio", setOf("consent"));
+        hidden.put("ayush", setOf("investigations", "consent"));
+        hidden.put("onco", setOf("procedures", "referral", "exam"));
+        hidden.put("surgery", setOf());
+        hidden.put("psych", setOf("exam", "procedures", "consent"));
+        for (Map.Entry<String, Set<String>> e : hidden.entrySet()) {
+            assertThat(keys("select section_key from opd.emr_starter_department_section where starter_key = ? and not shown",
+                    e.getKey())).as("off at start in " + e.getKey()).isEqualTo(e.getValue());
+        }
+        assertThat(keys("select starter_key from opd.emr_starter_department_section where section_key = 'consent' and shown"))
+                .isEqualTo(setOf("dental", "og", "ortho", "derm", "onco", "surgery"));
+        assertThat(keys("select starter_key from opd.emr_starter_department where consent_flag"))
+                .isEqualTo(setOf("dental", "og", "ortho", "derm", "onco", "surgery"));
+        assertThat(count("select count(*) from opd.emr_starter_department_section where not shown")).isEqualTo(30);
+        // a hidden section is never required, and only PCPNDT Form F in og is a placement lock
+        assertThat(count("select count(*) from opd.emr_starter_department_section where required and not shown")).isZero();
+        assertThat(globalRows("select starter_key || '/' || section_key from opd.emr_starter_department_section where always_shown"))
+                .hasSize(1).first().isEqualTo(List.of("og/pcpndt"));
+        assertThat(keys("select section_key from opd.emr_section where always_shown")).isEqualTo(setOf("allergy"));
+        assertThat(count("select count(*) from opd.emr_starter_department_section where section_key = 'allergy' and not shown"))
+                .isZero();
+        // the one departure from the mockup counts, written down in docs/database/SAH-53.md: physiotherapy Rx is off and not required
+        assertThat(globalRows("select shown::text || required::text from opd.emr_starter_department_section "
+                + "where starter_key = 'physio' and section_key = 'rx'").get(0).get(0)).isEqualTo("falsefalse");
+    }
+
+    @Test
+    void everyFieldHasALabelATypeOfTheFixedListAMetaTextAndARequiredFlagAndEverySectionHasAField() throws Exception {
+        assertThat(count("select count(distinct field_type) from opd.emr_section_field")).isEqualTo(30);
+        assertThat(count("select count(*) from opd.emr_section s where not exists (select 1 from opd.emr_section_field f "
+                + "where f.section_key = s.section_key)")).isZero();
+        assertThat(count("select count(*) from opd.emr_section_field where btrim(label) = '' or meta is null")).isZero();
+        assertThat(count("select count(*) from opd.emr_section_field where required")).isEqualTo(73);
+        db().asMigrator(c -> {
+            SqlError err = expectError(c, "insert into opd.emr_section_field (section_key, field_key, position, label, field_type) "
+                    + "values ('vitals', 'qa_free', 99, 'Qa free', 'FREE_TEXT')");
+            assertThat(err.state()).isEqualTo("23514");
+            return null;
+        });
+        // a section the mockup gives no field list carries the three default fields: Findings (rich text), Template
+        // (dropdown) and Attachments (file)
+        List<List<String>> fallback = globalRows("select f.section_key from opd.emr_section_field f group by f.section_key "
+                + "having count(*) = 3 and bool_and(case f.field_key when 'findings' then f.label = 'Findings' and f.field_type = 'RICH_TEXT' "
+                + "when 'template' then f.label = 'Template' and f.field_type = 'DROPDOWN' "
+                + "when 'attachments' then f.label = 'Attachments' and f.field_type = 'FILE' else false end)");
+        assertThat(fallback.size()).as("sections with the default fields").isBetween(30, 60);
+        // the vitals section of the mockup
+        assertThat(globalRows("select string_agg(label, ',' order by position) from opd.emr_section_field where section_key = 'vitals'")
+                .get(0).get(0)).startsWith("BP systolic,BP diastolic,Pulse");
+    }
+
+    // ---------------- S-53 the None option ----------------
+
+    @Test
+    void everyRequiredMultiSelectOrChecklistFieldWithOptionsHasOneNoneOptionExceptTheEightListedChoiceFields() throws Exception {
+        assertThat(count("select count(*) from opd.emr_section_field f where f.required and f.field_type in "
+                + "('MULTI_SELECT', 'CHECKLIST') and exists (select 1 from opd.emr_section_field_option o where "
+                + "o.section_key = f.section_key and o.field_key = f.field_key) and (select count(*) from "
+                + "opd.emr_section_field_option o where o.section_key = f.section_key and o.field_key = f.field_key "
+                + "and o.is_none) <> 1")).as("required multi-select without exactly one None").isZero();
+        assertThat(globalRows("select o.section_key || '.' || o.field_key from opd.emr_section_field_option o "
+                + "where o.is_none order by 1").stream().map(r -> r.get(0)).toList())
+                .containsExactly("modalities.modality", "sx_fitness.pre_op_tests");
+        for (String field : new String[] {"dental_chart.numbering", "pain.scale", "mmt.grade", "onc_ecog.ecog",
+                "onc_regimen.dose_level", "sx_fitness.asa_grade", "sx_fitness.pac", "sx_plan.anaesthesia"}) {
+            String[] parts = field.split("\\.");
+            assertThat(count("select count(*) from opd.emr_section_field_option where section_key = ? and field_key = ? and is_none",
+                    parts[0], parts[1])).as(field + " has no None option").isZero();
+        }
+        db().asMigrator(c -> {
+            // a second None for a field is refused by the partial unique index
+            assertThat(expectError(c, "insert into opd.emr_section_field_option (section_key, field_key, option_key, position, label, is_none) "
+                    + "values ('modalities', 'modality', 'nothing', 99, 'Nothing', true)").state()).isEqualTo("23505");
+            return null;
+        });
+    }
+
+    // ---------------- S-54 option sources ----------------
+
+    @Test
+    void theOptionsSourceRulesHoldInTheStoredData() throws Exception {
+        assertThat(count("select count(*) from opd.emr_section_field where (options_source = 'MASTER') <> (options_master is not null)"))
+                .isZero();
+        assertThat(count("select count(*) from opd.emr_section_field f where f.options_source = 'FIELD' and not exists "
+                + "(select 1 from opd.emr_section_field_option o where o.section_key = f.section_key and o.field_key = f.field_key)"))
+                .as("every FIELD-source field has options").isZero();
+        assertThat(count("select count(*) from opd.emr_section_field f where f.options_source <> 'FIELD' and exists "
+                + "(select 1 from opd.emr_section_field_option o where o.section_key = f.section_key and o.field_key = f.field_key)"))
+                .as("options only where the source is FIELD").isZero();
+        assertThat(count("select count(distinct section_key || '.' || field_key) from opd.emr_section_field_option")).isEqualTo(37);
+        db().asMigrator(c -> {
+            assertThat(expectError(c, "insert into opd.emr_section_field (section_key, field_key, position, label, field_type, options_source) "
+                    + "values ('vitals', 'qa_a', 98, 'Qa a', 'TEXT', 'MASTER')").state()).isEqualTo("23514");
+            assertThat(expectError(c, "insert into opd.emr_section_field (section_key, field_key, position, label, field_type, options_master) "
+                    + "values ('vitals', 'qa_b', 99, 'Qa b', 'TEXT', 'complaints')").state()).isEqualTo("23514");
+            assertThat(expectError(c, "insert into opd.emr_section_field (section_key, field_key, position, label, field_type, min_value, max_value) "
+                    + "values ('vitals', 'qa_c', 97, 'Qa c', 'NUMBER', 5, 1)").state()).isEqualTo("23514");
+            return null;
+        });
+    }
+
+    // ---------------- S-52, S-03 grants and no tenant column ----------------
 
     @Test
     void theAppCanSelectEveryGlobalTableWithNoClinicBound() throws Exception {
@@ -71,8 +315,10 @@ class EmrGlobalTablesIT extends EmrSupport {
     @Test
     void theAppCannotInsertUpdateDeleteOrTruncateAnyGlobalTable() throws Exception {
         for (String table : GLOBAL_TABLES) {
+            String firstColumn = globalRows("select column_name from information_schema.columns where table_schema = 'opd' "
+                    + "and table_name = '" + table + "' order by ordinal_position limit 1").get(0).get(0);
             for (String sql : new String[] {"insert into opd." + table + " default values",
-                    "update opd." + table + " set created_at = now()", "delete from opd." + table,
+                    "update opd." + table + " set " + firstColumn + " = " + firstColumn, "delete from opd." + table,
                     "truncate opd." + table}) {
                 SqlError err = db().asApp(c -> expectError(c, sql));
                 assertThat(err.state()).as(sql).isEqualTo("42501");
@@ -101,17 +347,96 @@ class EmrGlobalTablesIT extends EmrSupport {
     }
 
     @Test
-    void noGlobalTableHasATenantColumn() throws Exception {
+    void noGlobalTableHasATenantColumnOrRowLevelSecurity() throws Exception {
         for (String table : GLOBAL_TABLES) {
             assertThat(count("select count(*) from information_schema.columns where table_schema = 'opd' "
                     + "and table_name = '" + table + "' and column_name = 'tenant_id'")).as(table).isZero();
             assertThat(count("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace "
                     + "where n.nspname = 'opd' and c.relname = '" + table + "' and c.relrowsecurity")).as(table
-                    + " has no row level security by design (ADR-019 D2)").isZero();
+                    + " has no row level security by design (ADR-019 D2, ADR-020 D2)").isZero();
         }
     }
 
-    // ---------------- S-04, S-05 the three masters ----------------
+    // ---------------- S-55 the starter layout is immutable ----------------
+
+    @Test
+    void aStarterLayoutCannotBeUpdatedDeletedOrTruncatedByAnyRoleAndANewVersionIsNewRows() throws Exception {
+        db().asMigrator(c -> {
+            for (String sql : new String[] {"update opd.emr_starter_layout set layout = layout where starter_key = 'gm'",
+                    "delete from opd.emr_starter_layout where starter_key = 'gm'"}) {
+                SqlError err = expectError(c, sql);
+                assertThat(err.state()).as(sql).isEqualTo("42501");
+                assertThat(err.message()).as(sql).contains("immutable");
+            }
+            // truncate is refused too: by the trigger, or earlier because the table is referenced by a foreign key
+            assertThat(expectError(c, "truncate opd.emr_starter_layout").state()).isIn("42501", "0A000");
+            return null;
+        });
+        db().asApp(c -> {
+            assertThat(expectError(c, "update opd.emr_starter_layout set layout = layout").state()).isEqualTo("42501");
+            assertThat(expectError(c, "delete from opd.emr_starter_layout").state()).isEqualTo("42501");
+            return null;
+        });
+        // version 2 can be added next to version 1, and the starter can point at it in the same transaction (deferred key)
+        db().asMigrator(c -> {
+            expectOk(c, "insert into opd.emr_starter_layout (starter_key, layout_version, layout) "
+                    + "select starter_key, 2, layout from opd.emr_starter_layout where starter_key = 'gm' and layout_version = 1");
+            expectOk(c, "update opd.emr_starter_department set current_layout_version = 2 where starter_key = 'gm'");
+            assertThat(DbAccess.count(c, "select count(*) from opd.emr_starter_layout where starter_key = 'gm'")).isEqualTo(2);
+            expectOk(c, "set constraints all immediate");
+            // a layout version that does not exist cannot be pointed at
+            assertThat(expectError(c, "update opd.emr_starter_department set current_layout_version = 3 where starter_key = 'gm'")
+                    .state()).isEqualTo("23503");
+            return null;
+        });
+        assertThat(count("select count(*) from opd.emr_starter_layout where starter_key = 'gm'")).as("rolled back").isEqualTo(1);
+    }
+
+    @Test
+    void theFifteenLayoutDocumentsMatchWhatAQueryOverTheTablesProduces() throws Exception {
+        for (String starter : STARTER_KEYS) {
+            List<List<String>> doc = globalRows("select s ->> 'key', s ->> 'part', s ->> 'shown', s ->> 'required', s ->> 'print', "
+                    + "s ->> 'copy', s ->> 'collapsed', s ->> 'hideLocked', jsonb_array_length(s -> 'fields')::text "
+                    + "from opd.emr_starter_layout l, jsonb_array_elements(l.layout -> 'sections') with ordinality as t(s, n) "
+                    + "where l.starter_key = ? and l.layout_version = 1 order by t.n", starter);
+            List<List<String>> tables = globalRows("select p.section_key, p.part, p.shown::text, p.required::text, p.print::text, "
+                    + "p.copy_from_last::text, p.collapsed::text, (p.always_shown or s.always_shown)::text, "
+                    + "(select count(*) from opd.emr_section_field f where f.section_key = p.section_key)::text "
+                    + "from opd.emr_starter_department_section p join opd.emr_section s on s.section_key = p.section_key "
+                    + "where p.starter_key = ? order by p.position", starter);
+            assertThat(doc).as("layout document of " + starter).isEqualTo(tables);
+        }
+        // hideLocked is true for Allergies everywhere and for PCPNDT Form F in og only
+        assertThat(count("select count(*) from opd.emr_starter_layout l, jsonb_array_elements(l.layout -> 'sections') s "
+                + "where s ->> 'key' = 'allergy' and (s ->> 'hideLocked')::boolean")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_layout l, jsonb_array_elements(l.layout -> 'sections') s "
+                + "where (s ->> 'hideLocked')::boolean and s ->> 'key' <> 'allergy'")).isEqualTo(1);
+        assertThat(count("select count(*) from opd.emr_starter_layout l where jsonb_typeof(l.layout -> 'schemaVersion') <> 'number'"))
+                .isZero();
+    }
+
+    // ---------------- S-56 aliases ----------------
+
+    @Test
+    void onlyTheNormalisedFormOfAnAliasCanBeStoredAndNoAliasMentionsHomeopathy() throws Exception {
+        assertThat(count("select count(*) from opd.emr_department_alias where alias_normalised <> "
+                + "lower(btrim(regexp_replace(alias_normalised, '\\s+', ' ', 'g')))")).isZero();
+        assertThat(count("select count(*) from opd.emr_department_alias where alias_normalised like '%homeo%'")).isZero();
+        assertThat(count("select count(*) from opd.emr_department_alias where starter_key = 'gm' and alias_normalised = 'general physician'"))
+                .isEqualTo(1);
+        db().asMigrator(c -> {
+            for (String bad : new String[] {"Dental", " dental", "dental  surgeon"}) {
+                assertThat(expectError(c, "insert into opd.emr_department_alias (alias_normalised, starter_key) values (?, 'dental')", bad)
+                        .state()).as("'" + bad + "'").isEqualTo("23514");
+            }
+            assertThat(expectError(c, "insert into opd.emr_department_alias (alias_normalised, starter_key) values ('qa alias', 'homeo')")
+                    .state()).isIn("23503", "23514");
+            expectOk(c, "insert into opd.emr_department_alias (alias_normalised, starter_key) values ('qa alias', 'dental')");
+            return null;
+        });
+    }
+
+    // ---------------- S-04, S-05, S-57 the three masters ----------------
 
     @Test
     void aNameRepeatedIgnoringLetterCaseIsRefusedButTheSameNameInTwoMastersIsAllowed() throws Exception {
@@ -131,7 +456,7 @@ class EmrGlobalTablesIT extends EmrSupport {
     }
 
     @Test
-    void theNameHintAndOrderChecksOfTheMasters() throws Exception {
+    void theNameHintAndOrderChecksOfTheMastersAcceptTheFifteenStarterKeysAndRefuseTheRetiredOnes() throws Exception {
         for (String table : MASTER_TABLES) {
             db().asMigrator(c -> {
                 for (String bad : new String[] {"", "   ", "x".repeat(201)}) {
@@ -139,18 +464,46 @@ class EmrGlobalTablesIT extends EmrSupport {
                             .as(table + " name length " + bad.length()).isEqualTo("23514");
                 }
                 expectOk(c, "insert into opd." + table + " (name) values (?)", "y".repeat(200));
-                assertThat(expectError(c, "insert into opd." + table + " (name, specialty_hint) values ('Qa hint', 'ayur')").state())
-                        .isEqualTo("23514");
+                for (String refused : new String[] {"ayur", "gp", "homeo", "GM", "dental "}) {
+                    assertThat(expectError(c, "insert into opd." + table + " (name, specialty_hint) values ('Qa hint', ?)", refused)
+                            .state()).as(table + " hint '" + refused + "'").isEqualTo("23514");
+                }
                 assertThat(expectError(c, "insert into opd." + table + " (name, sort_order) values ('Qa order', -1)").state())
                         .isEqualTo("23514");
                 assertThat(expectError(c, "insert into opd." + table + " (name) values (null)").state()).isEqualTo("23502");
                 int i = 0;
-                for (String hint : new String[] {null, "gp", "dental", "paeds", "homeo"}) {
+                expectOk(c, "insert into opd." + table + " (name, specialty_hint) values (?, null)", "Qa hint accepted null");
+                for (String hint : STARTER_KEYS) {
                     expectOk(c, "insert into opd." + table + " (name, specialty_hint) values (?, ?)", "Qa hint accepted " + i++, hint);
                 }
                 return null;
             });
         }
+    }
+
+    @Test
+    void theThreeFormerHomeopathyComplaintsNowHaveNoHintAndNoMasterRowCarriesTheRetiredKeys() throws Exception {
+        for (String table : MASTER_TABLES) {
+            assertThat(count("select count(*) from opd." + table + " where specialty_hint in ('gp', 'homeo')")).as(table).isZero();
+        }
+        assertThat(count("select count(*) from opd.emr_complaint where specialty_hint is not null and specialty_hint not in "
+                + "('gm', 'dental', 'og', 'paeds', 'physio', 'ortho', 'eye', 'ent', 'derm', 'diab', 'cardio', 'ayush', 'onco', 'surgery', 'psych')"))
+                .isZero();
+    }
+
+    @Test
+    void theAdviceMastersMarathiAndHindiNamesAreEmptyInTheSeedAndLimitedToOneToTwoHundredCharacters() throws Exception {
+        assertThat(count("select count(*) from opd.emr_advice where name_mr is not null or name_hi is not null")).isZero();
+        db().asMigrator(c -> {
+            for (String column : new String[] {"name_mr", "name_hi"}) {
+                for (String bad : new String[] {"", "x".repeat(201)}) {
+                    assertThat(expectError(c, "insert into opd.emr_advice (name, " + column + ") values ('Qa lang " + column + "', ?)", bad)
+                            .state()).as(column + " length " + bad.length()).isEqualTo("23514");
+                }
+                expectOk(c, "insert into opd.emr_advice (name, " + column + ") values ('Qa lang ok " + column + "', ?)", "x".repeat(200));
+            }
+            return null;
+        });
     }
 
     // ---------------- S-06 prefix search and its index ----------------
@@ -218,255 +571,10 @@ class EmrGlobalTablesIT extends EmrSupport {
         }
     }
 
-    // ---------------- S-10, S-11, S-12 the templates ----------------
-
     @Test
-    void theFourTemplatesAreVersionOneWithTheNamesAndCountsOfTheStory() throws Exception {
-        String[][] expected = {{"gp", "General practice", "11", "6"}, {"dental", "Dental", "11", "7"},
-                {"paeds", "Paediatrics", "9", "4"}, {"homeo", "Homeopathy", "7", "6"}};
-        for (String[] e : expected) {
-            List<String> row = globalRows("select t.name, t.version::text, count(s.*)::text, "
-                    + "count(*) filter (where s.required_default)::text, max(s.position)::text, count(distinct s.position)::text "
-                    + "from opd.emr_template t join opd.emr_template_section s on s.template_key = t.template_key and s.version = t.version "
-                    + "where t.template_key = ? group by t.name, t.version", e[0]).get(0);
-            assertThat(row.get(0)).isEqualTo(e[1]);
-            assertThat(row.get(1)).as(e[0] + " version").isEqualTo("1");
-            assertThat(row.get(2)).as(e[0] + " sections").isEqualTo(e[2]);
-            assertThat(row.get(3)).as(e[0] + " required by default").isEqualTo(e[3]);
-            assertThat(row.get(4)).as(e[0] + " positions run 1 to n without gaps").isEqualTo(e[2]);
-            assertThat(row.get(5)).isEqualTo(e[2]);
-        }
-        assertThat(count("select count(*) from opd.emr_template_section")).isEqualTo(38);
-    }
-
-    @Test
-    void everySectionMatchesTheStoryTableRowByRow() throws Exception {
-        for (String key : TEMPLATE_KEYS) {
-            String[][] expected = EmrTemplatesReadIT.TABLE_FOR(key);
-            List<List<String>> stored = globalRows("select section_key, label, part, required_default::text, editor_type, "
-                    + "options_source || case when options_master is null then '' else ':' || options_master end "
-                    + "from opd.emr_template_section where template_key = ? and version = 1 order by position", key);
-            assertThat(stored).as(key).hasSize(expected.length);
-            for (int i = 0; i < expected.length; i++) {
-                List<String> row = stored.get(i);
-                assertThat(row.get(0)).as(key + " #" + (i + 1) + " key").isEqualTo(expected[i][0]);
-                assertThat(row.get(1)).as(key + "/" + expected[i][0] + " label").isEqualTo(expected[i][1]);
-                assertThat(row.get(2)).as(key + "/" + expected[i][0] + " part").isEqualTo(expected[i][2]);
-                assertThat(row.get(3)).as(key + "/" + expected[i][0] + " required").isEqualTo(
-                        expected[i][3].equals("true") ? "true" : "false");
-                assertThat(row.get(4)).as(key + "/" + expected[i][0] + " editor").isEqualTo(expected[i][4]);
-                assertThat(row.get(5)).as(key + "/" + expected[i][0] + " options").isEqualTo(expected[i][5]);
-            }
-        }
-    }
-
-    @Test
-    void exactlySixSectionsAreNotHideable() throws Exception {
-        List<String> fixed = new ArrayList<>();
-        globalRows("select template_key || '/' || section_key from opd.emr_template_section where not hideable")
-                .forEach(r -> fixed.add(r.get(0)));
-        assertThat(fixed).containsExactlyInAnyOrder(EmrTemplatesReadIT.NOT_HIDEABLE);
-        assertThat(count("select count(*) from opd.emr_template_section where hideable")).isEqualTo(32);
-    }
-
-    // ---------------- S-13, S-14, S-15 rules for sections and options ----------------
-
-    private static final String NEW_TEMPLATE = "insert into opd.emr_template (template_key, version, name) values ('gp', 2, 'General practice v2')";
-    private static final String SECTION = "insert into opd.emr_template_section (template_key, version, section_key, position, label, "
-            + "part, editor_type, icon_key, options_source, options_master) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-    private static Object[] section(String key, int position, String label, String part, String editor, String icon,
-                                    String source, String master) {
-        return new Object[] {"gp", 2, key, position, label, part, editor, icon, source, master};
-    }
-
-    @Test
-    void aSectionThatBreaksTheRulesCannotBeStored() throws Exception {
-        db().asMigrator(c -> {
-            DbAccess.execute(c, NEW_TEMPLATE);
-            expectOk(c, SECTION, section("test_one", 1, "Test", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null));
-            Object[][] bad = {
-                    section("t_editor", 2, "Test", "ASSESSMENT", "FREE_TEXT", null, "TEMPLATE", null),
-                    section("t_part", 2, "Test", "OTHER", "CHIP_LIST", null, "TEMPLATE", null),
-                    section("t_source", 2, "Test", "ASSESSMENT", "CHIP_LIST", null, "X", null),
-                    section("t_master_on_template", 2, "Test", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", "complaints"),
-                    section("t_no_master", 2, "Test", "ASSESSMENT", "COMPLAINTS", null, "MASTER", null),
-                    section("t_bad_master", 2, "Test", "ASSESSMENT", "COMPLAINTS", null, "MASTER", "allergies"),
-                    section("t_label", 2, "x".repeat(61), "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null),
-                    section("t_icon", 2, "Test", "ASSESSMENT", "CHIP_LIST", "Bad Icon", "TEMPLATE", null),
-                    section("t_position", 0, "Test", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null),
-                    section("Bad-Key", 2, "Test", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null),
-                    section("a", 2, "Test", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null)};
-            for (Object[] row : bad) {
-                assertThat(expectError(c, SECTION, row).state()).as("section " + row[2]).isEqualTo("23514");
-            }
-            // all eleven editor types are accepted, and an icon key is optional
-            String[] editors = {"COMPLAINTS", "VITALS_STEPPERS", "SIGNS", "SYSTEMS", "DIAGNOSIS", "PRESCRIPTION", "TOOTH_CHART",
-                    "TREATMENT_PLAN", "SERVICES", "ADVICE", "CHIP_LIST"};
-            int position = 10;
-            for (String editor : editors) {
-                expectOk(c, SECTION, section("ed_" + editor.toLowerCase(), position++, "Test", "TREATMENT", editor, "star-1", "NONE", null));
-            }
-            // duplicates
-            assertThat(expectError(c, SECTION, section("test_one", 50, "Dup key", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null)).state())
-                    .as("same section key in one version").isEqualTo("23505");
-            assertThat(expectError(c, SECTION, section("other_key", 1, "Dup position", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null)).state())
-                    .as("same position in one version").isEqualTo("23505");
-            // a section of a template version that does not exist, and an option of a section that does not exist
-            assertThat(expectError(c, SECTION, new Object[] {"gp", 99, "orphan", 1, "Test", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null}).state())
-                    .isEqualTo("23503");
-            assertThat(expectError(c, "insert into opd.emr_template_option (template_key, version, section_key, option_key, position, label) "
-                    + "values ('gp', 2, 'no_such_section', 'opt', 1, 'Option')").state()).isEqualTo("23503");
-            return null;
-        });
-    }
-
-    @Test
-    void anOptionThatBreaksTheRulesCannotBeStoredAndOnlyOneNoneIsAllowedPerSection() throws Exception {
-        db().asMigrator(c -> {
-            DbAccess.execute(c, NEW_TEMPLATE);
-            DbAccess.execute(c, SECTION, section("chips", 1, "Chips", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null));
-            String option = "insert into opd.emr_template_option (template_key, version, section_key, option_key, position, label, style, is_none) "
-                    + "values ('gp', 2, 'chips', ?, ?, ?, ?, ?)";
-            expectOk(c, option, "red_one", 1, "Red one", "ALERT", false);
-            expectOk(c, option, "none", 2, "None", "NORMAL", true);
-            assertThat(expectError(c, option, "second_none", 3, "Nothing abnormal", "NORMAL", true).state())
-                    .as("a second None in one section").isEqualTo("23505");
-            assertThat(expectError(c, option, "bad_style", 3, "Bad", "RED", false).state()).isEqualTo("23514");
-            assertThat(expectError(c, option, "Bad-Key", 3, "Bad", "NORMAL", false).state()).isEqualTo("23514");
-            assertThat(expectError(c, option, "long_label", 3, "x".repeat(81), "NORMAL", false).state()).isEqualTo("23514");
-            assertThat(expectError(c, option, "red_one", 4, "Same key", "NORMAL", false).state()).isEqualTo("23505");
-            assertThat(expectError(c, option, "same_position", 1, "Same position", "NORMAL", false).state()).isEqualTo("23505");
-            assertThat(expectError(c, option, "zero_position", 0, "Zero", "NORMAL", false).state()).isEqualTo("23514");
-            return null;
-        });
-    }
-
-    // ---------------- S-16 immutability ----------------
-
-    @Test
-    void aShippedTemplateVersionCannotBeUpdatedDeletedOrTruncatedEvenByTheOwner() throws Exception {
-        for (String table : TEMPLATE_TABLES) {
-            long before = count("select count(*) from opd." + table);
-            for (String sql : new String[] {"update opd." + table + " set created_at = now()", "delete from opd." + table,
-                    "truncate opd." + table + " cascade"}) {
-                SqlError err = db().asMigrator(c -> expectError(c, sql));
-                assertThat(err.state()).as(sql).isEqualTo("42501");
-                assertThat(err.message()).as(sql).contains("immutable");
-            }
-            // a plain truncate is refused too: by the trigger, or first by the foreign key that points at the table
-            SqlError plain = db().asMigrator(c -> expectError(c, "truncate opd." + table));
-            assertThat(plain.state()).as("plain truncate of " + table).isIn("42501", "0A000");
-            // the owner cannot work around it with a where clause either
-            SqlError narrow = db().asMigrator(c -> expectError(c, "delete from opd." + table + " where created_at is not null"));
-            assertThat(narrow.message()).contains("immutable");
-            assertThat(count("select count(*) from opd." + table)).as(table + " rows unchanged").isEqualTo(before);
-        }
-        // the three tables only; the aliases may be fixed by a later migration
-        db().asMigrator(c -> {
-            expectOk(c, "update opd.emr_specialty_alias set created_at = now()");
-            return null;
-        });
-    }
-
-    @Test
-    void aNewVersionIsNewRowsAndTheOldVersionStaysAsItWas() throws Exception {
-        db().asMigrator(c -> {
-            long oldSections = DbAccess.count(c, "select count(*) from opd.emr_template_section where template_key = 'gp' and version = 1");
-            long oldOptions = DbAccess.count(c, "select count(*) from opd.emr_template_option where template_key = 'gp' and version = 1");
-            DbAccess.execute(c, NEW_TEMPLATE);
-            DbAccess.execute(c, SECTION, section("only_section", 1, "Only section", "ASSESSMENT", "CHIP_LIST", null, "TEMPLATE", null));
-            DbAccess.execute(c, "insert into opd.emr_template_option (template_key, version, section_key, option_key, position, label) "
-                    + "values ('gp', 2, 'only_section', 'opt', 1, 'Option')");
-            assertThat(DbAccess.count(c, "select max(version) from opd.emr_template where template_key = 'gp'"))
-                    .as("the newest version per key").isEqualTo(2);
-            assertThat(DbAccess.count(c, "select count(*) from opd.emr_template_section where template_key = 'gp' and version = 1"))
-                    .isEqualTo(oldSections);
-            assertThat(DbAccess.count(c, "select count(*) from opd.emr_template_option where template_key = 'gp' and version = 1"))
-                    .isEqualTo(oldOptions);
-            assertThat(DbAccess.count(c, "select count(*) from opd.emr_template_section where template_key = 'gp' and version = 2"))
-                    .isEqualTo(1);
-            return null;
-        });
-        assertThat(count("select max(version) from opd.emr_template where template_key = 'gp'")).as("rolled back").isEqualTo(1);
-    }
-
-    // ---------------- S-17, S-18 options ----------------
-
-    @Test
-    void everyTemplateSectionHasChipsAndEveryRequiredChipListHasExactlyOneNoneOption() throws Exception {
-        assertThat(count("select count(*) from opd.emr_template_section s where s.options_source = 'TEMPLATE' and not exists "
-                + "(select 1 from opd.emr_template_option o where o.template_key = s.template_key and o.version = s.version "
-                + "and o.section_key = s.section_key)")).as("TEMPLATE sections without a chip").isZero();
-        List<List<String>> required = globalRows("select s.template_key || '/' || s.section_key, "
-                + "(select count(*) from opd.emr_template_option o where o.template_key = s.template_key and o.version = s.version "
-                + "and o.section_key = s.section_key and o.is_none)::text from opd.emr_template_section s "
-                + "where s.editor_type = 'CHIP_LIST' and s.required_default order by 1");
-        assertThat(required.stream().map(r -> r.get(0)).toList()).containsExactlyInAnyOrder("dental/medical_alerts",
-                "dental/intra_oral_exam", "homeo/case_history", "homeo/mentals_generals");
-        required.forEach(r -> assertThat(r.get(1)).as(r.get(0)).isEqualTo("1"));
-        assertThat(count("select count(*) from opd.emr_template_section s where s.options_source <> 'TEMPLATE' and exists "
-                + "(select 1 from opd.emr_template_option o where o.template_key = s.template_key and o.version = s.version "
-                + "and o.section_key = s.section_key)")).as("chips only on TEMPLATE sections").isZero();
-    }
-
-    @Test
-    void theGeneralExaminationAndSystemChipsAreInTheStoryOrderAndAllergyChipsAreRed() throws Exception {
-        for (String template : new String[] {"gp", "paeds"}) {
-            List<String> signs = new ArrayList<>();
-            globalRows("select option_key from opd.emr_template_option where template_key = ? and section_key = 'general_exam' "
-                    + "order by position", template).forEach(r -> signs.add(r.get(0)));
-            assertThat(signs).as(template).containsExactly("pallor", "icterus", "cyanosis", "clubbing", "lymph_nodes",
-                    "oedema", "dehydration");
-        }
-        List<String> systems = new ArrayList<>();
-        globalRows("select option_key from opd.emr_template_option where template_key = 'gp' and section_key = 'systemic_exam' "
-                + "order by position").forEach(r -> systems.add(r.get(0)));
-        assertThat(systems).containsExactly("cvs", "rs", "cns", "abdomen");
-        assertThat(count("select count(*) from opd.emr_template_option where template_key = 'gp' "
-                + "and section_key = 'history_allergies' and style = 'ALERT'")).isPositive();
-        assertThat(count("select count(*) from opd.emr_template_option where template_key = 'dental' "
-                + "and section_key = 'medical_alerts' and style = 'ALERT'")).isPositive();
-    }
-
-    // ---------------- S-19, S-21 aliases and specialties without a template ----------------
-
-    @Test
-    void theEightAliasesMapAsTheDecisionSaysAndOnlyTheNormalisedFormCanBeStored() throws Exception {
-        String[][] expected = {{"general physician", "gp"}, {"general practice", "gp"}, {"dental surgeon", "dental"},
-                {"dental", "dental"}, {"paediatrician", "paeds"}, {"paediatrics", "paeds"}, {"homeopath", "homeo"},
-                {"homeopathy", "homeo"}};
-        for (String[] e : expected) {
-            assertThat(globalRows("select template_key from opd.emr_specialty_alias where alias_normalised = ?", e[0]).get(0).get(0))
-                    .as(e[0]).isEqualTo(e[1]);
-        }
-        db().asMigrator(c -> {
-            for (String bad : new String[] {"Dental", " dental", "dental ", "dental  surgeon", "", "x".repeat(81), "GENERAL"}) {
-                assertThat(expectError(c, "insert into opd.emr_specialty_alias (alias_normalised, template_key) values (?, 'dental')", bad).state())
-                        .as("alias '" + bad + "'").isEqualTo("23514");
-            }
-            assertThat(expectError(c, "insert into opd.emr_specialty_alias (alias_normalised, template_key) values ('ayurveda', 'ayur')").state())
-                    .isEqualTo("23514");
-            assertThat(expectError(c, "insert into opd.emr_specialty_alias (alias_normalised, template_key) values ('dental', 'dental')").state())
-                    .as("duplicate alias").isEqualTo("23505");
-            expectOk(c, "insert into opd.emr_specialty_alias (alias_normalised, template_key) values ('dentist', 'dental')");
-            return null;
-        });
-    }
-
-    @Test
-    void specialtiesWithoutAnEmrTemplateHaveNeitherATemplateNorAnAlias() throws Exception {
-        assertThat(count("select count(*) from opd.emr_template where template_key not in ('gp', 'dental', 'paeds', 'homeo')")).isZero();
-        assertThat(count("select count(*) from opd.emr_specialty_alias where template_key not in ('gp', 'dental', 'paeds', 'homeo')")).isZero();
-        for (String alias : new String[] {"ayurveda", "physiotherapy", "dermatology", "gynaecology", "ent", "oncology", "surgery"}) {
-            assertThat(count("select count(*) from opd.emr_specialty_alias where alias_normalised like ?", alias + "%")).as(alias).isZero();
-        }
-        db().asMigrator(c -> {
-            for (String key : new String[] {"ayur", "physio", "derma", "gynae", "ent", "oncology", "surgery"}) {
-                assertThat(expectError(c, "insert into opd.emr_template (template_key, version, name) values (?, 1, 'x')", key).state())
-                        .as(key).isEqualTo("23514");
-            }
-            return null;
-        });
+    void noSeededTextLooksLikeAPatientNameOrMobileNumber() throws Exception {
+        assertThat(count("select count(*) from opd.emr_section where name ~ '[0-9]{10}' or description ~ '[0-9]{10}'")).isZero();
+        assertThat(count("select count(*) from opd.emr_section_field where label ~ '[0-9]{10}' or meta ~ '[0-9]{10}'")).isZero();
+        assertThat(count("select count(*) from opd.emr_starter_department where name ~ '[0-9]{10}' or description ~ '[0-9]{10}'")).isZero();
     }
 }

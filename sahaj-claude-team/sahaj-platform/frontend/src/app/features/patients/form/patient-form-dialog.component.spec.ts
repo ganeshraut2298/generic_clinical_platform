@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { ShellStore } from '../../../core/shell/shell.store';
+import { addDays, istToday } from '../../../shared/format/ist-date';
 import { PrivacySettings } from '../../privacy/privacy.model';
 import { PatientFormDialogComponent, PatientFormDialogData } from './patient-form-dialog.component';
 
@@ -38,7 +39,7 @@ describe('PatientFormDialogComponent', () => {
 
   const el = () => fixture.nativeElement as HTMLElement;
   const input = (name: string) =>
-    el().querySelector<HTMLInputElement>(`input[formControlName="${name}"]`)!;
+    el().querySelector<HTMLInputElement>(`input[formControlName="${name}"], input[data-field="${name}"]`)!;
 
   async function type(name: string, value: string) {
     const field = input(name);
@@ -58,6 +59,20 @@ describe('PatientFormDialogComponent', () => {
   it('titles itself "New patient" by default', async () => {
     await setup();
     expect(el().querySelector('h2')!.textContent).toContain('New patient');
+  });
+
+  it('shows the mockup hint under the title for a new patient (SAH-73-1)', async () => {
+    await setup();
+    expect(el().querySelector('[data-testid="pf-hint"]')!.textContent!.trim()).toBe(
+      'Name, age and sex are enough. ABHA can be added later.',
+    );
+  });
+
+  it('shows the same hint when adding a family member (SAH-73-1)', async () => {
+    await setup({ familyMember: true, mobile: '9876543210' });
+    expect(el().querySelector('[data-testid="pf-hint"]')!.textContent!.trim()).toBe(
+      'Name, age and sex are enough. ABHA can be added later.',
+    );
   });
 
   it('titles itself "Add family member" and pre-fills the mobile when adding family', async () => {
@@ -161,6 +176,133 @@ describe('PatientFormDialogComponent', () => {
     cancel.click();
     expect(dialogRef.close).toHaveBeenCalledWith(null);
     http.expectNone(URL);
+  });
+
+  describe('date of birth (SAH-73-1)', () => {
+    const dob = () => el().querySelector<HTMLInputElement>('input[data-field="dateOfBirth"]')!;
+    const ageBox = () => el().querySelector<HTMLInputElement>('input[data-field="age"]');
+    const preview = () => el().querySelector<HTMLInputElement>('[data-testid="age-preview"]');
+    const labels = () =>
+      Array.from(el().querySelectorAll('mat-label, .field-label')).map((l) => l.textContent!.trim());
+
+    async function typeDate(value: string) {
+      dob().value = value;
+      dob().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    async function fillBasics() {
+      await type('name', 'Baby Patil');
+      await type('mobile', '9876543210');
+    }
+
+    it('shows Full name, Age, Date of birth and Sex in that order with the hint', async () => {
+      await setup();
+      const order = labels().filter((l) => ['Full name', 'Age', 'Date of birth', 'Sex'].includes(l));
+      expect(order).toEqual(['Full name', 'Age', 'Date of birth', 'Sex']);
+      expect(el().textContent).toContain('Optional. If you know it, the age is worked out for you.');
+      expect(dob().type).toBe('date');
+    });
+
+    it('shows the worked-out age read-only while a date is filled, and clears it with the date', async () => {
+      await setup();
+      await type('age', '34');
+      await typeDate(addDays(istToday(), -30));
+      expect(ageBox()).toBeNull();
+      expect(preview()!.readOnly).toBe(true);
+      expect(preview()!.value).toBe('4 weeks');
+      await typeDate('');
+      expect(preview()).toBeNull();
+      expect(ageBox()!.value).toBe('');
+      expect(ageBox()!.readOnly).toBe(false);
+    });
+
+    it('sends the date and no age when a date is filled', async () => {
+      await setup();
+      await fillBasics();
+      const date = addDays(istToday(), -30);
+      await typeDate(date);
+      await submit();
+      const req = http.expectOne(URL);
+      expect(req.request.body.dateOfBirth).toBe(date);
+      expect('age' in req.request.body).toBe(false);
+      req.flush({ id: 'p1' });
+    });
+
+    it('sends the typed age and no date when the date is empty', async () => {
+      await setup();
+      await fillBasics();
+      await type('age', '34');
+      await submit();
+      const req = http.expectOne(URL);
+      expect(req.request.body.age).toBe(34);
+      expect('dateOfBirth' in req.request.body).toBe(false);
+      req.flush({ id: 'p1' });
+    });
+
+    it('accepts today (a baby born today) and shows 0 days', async () => {
+      await setup();
+      await fillBasics();
+      await typeDate(istToday());
+      expect(preview()!.value).toBe('0 days');
+      await submit();
+      http.expectOne(URL).flush({ id: 'p1' });
+    });
+
+    it('refuses neither a date nor an age with the existing age message', async () => {
+      await setup();
+      await fillBasics();
+      await submit();
+      expect(el().textContent).toContain('Enter the age');
+      http.expectNone(URL);
+    });
+
+    it('refuses a future date under the field and keeps the other values', async () => {
+      await setup();
+      await fillBasics();
+      await typeDate(addDays(istToday(), 1));
+      await submit();
+      expect(el().textContent).toContain('Date of birth cannot be in the future.');
+      expect(input('name').value).toBe('Baby Patil');
+      http.expectNone(URL);
+    });
+
+    it('refuses a date more than 120 years ago', async () => {
+      await setup();
+      await fillBasics();
+      await typeDate('1800-01-01');
+      await submit();
+      expect(el().textContent).toContain('Date of birth must be within the last 120 years.');
+      http.expectNone(URL);
+    });
+
+    it('shows a server error on the date field and keeps the typed values', async () => {
+      await setup();
+      await fillBasics();
+      await typeDate(addDays(istToday(), -30));
+      await submit();
+      http.expectOne(URL).flush(
+        {
+          type: 'https://sahaj.in/problems/validation',
+          title: 'Check the form',
+          status: 400,
+          fieldErrors: [{ field: 'dateOfBirth', message: 'Enter a valid date of birth.' }],
+        },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      fixture.detectChanges();
+      expect(el().textContent).toContain('Enter a valid date of birth.');
+      expect(input('name').value).toBe('Baby Patil');
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('does not keep the date in the address or the page title', async () => {
+      await setup();
+      await typeDate(addDays(istToday(), -30));
+      expect(document.title).not.toContain(dob().value);
+      expect(location.href).not.toContain(dob().value);
+    });
   });
 
   describe('consent (SAH-17)', () => {

@@ -3,10 +3,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
+import { of } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
-import { PATIENT_FILTERS, Patient, PatientSummary } from '../patient.model';
+import { PATIENT_FILTERS, Patient, PatientMergeResult, PatientSummary } from '../patient.model';
 import { PatientsListPage } from './patients-list.page';
 
 const BASE = '/api/v1/patient/patients';
@@ -16,6 +17,7 @@ const ROHIT: PatientSummary = {
   uhid: 'PT-00001',
   name: 'Rohit Patil',
   age: 30,
+  ageDetail: { value: 30, unit: 'YEARS', fromDateOfBirth: false },
   sex: 'M',
   mobile: '9876543210',
   chronic: null,
@@ -26,9 +28,22 @@ const MEERA: PatientSummary = {
   uhid: 'PT-00002',
   name: 'Meera Patil',
   age: 65,
+  ageDetail: { value: 65, unit: 'YEARS', fromDateOfBirth: false },
   sex: 'F',
   mobile: '9988776655',
   chronic: 'Diabetes',
+  lastVisitAt: null,
+};
+
+const BABY: PatientSummary = {
+  id: 'p3',
+  uhid: 'PT-00003',
+  name: 'Baby Patil',
+  age: 1,
+  ageDetail: { value: 18, unit: 'MONTHS', fromDateOfBirth: true },
+  sex: 'F',
+  mobile: '9876500000',
+  chronic: null,
   lastVisitAt: null,
 };
 
@@ -53,7 +68,7 @@ describe('PatientsListPage', () => {
     for (const f of PATIENT_FILTERS) {
       http
         .match((r) => r.url === BASE && r.params.get('filter') === f.key && r.params.get('page') === '0')
-        .forEach((req) => req.flush({ items: f.key === 'all' ? [ROHIT, MEERA] : [], total: f.key === 'chronic' ? 1 : f.key === 'all' ? 2 : 0 }));
+        .forEach((req) => req.flush({ items: f.key === 'all' ? [ROHIT, MEERA, BABY] : [], total: f.key === 'chronic' ? 1 : f.key === 'all' ? 2 : 0 }));
     }
     fixture.detectChanges();
     await fixture.whenStable();
@@ -74,6 +89,65 @@ describe('PatientsListPage', () => {
     expect(el().textContent).toContain('Meera Patil');
     const chip = buttonByText('Long-term care')!;
     expect(chip.textContent).toContain('1');
+  });
+
+  it('writes the age of each row from ageDetail: "30 M", "65 F", "18 months F"', async () => {
+    await open();
+    const rows = Array.from(el().querySelectorAll('.list .li small')).map((s) => s.textContent!.replace(/\s+/g, ' ').trim());
+    expect(rows[0]).toContain('30 M · PT-00001');
+    expect(rows[1]).toContain('65 F · PT-00002');
+    expect(rows[2]).toContain('18 months F · PT-00003');
+  });
+
+  it('never shows a date of birth in the list', async () => {
+    await open();
+    expect(el().textContent).not.toContain('Date of birth');
+  });
+
+  it('keeps the chip label "Children"', async () => {
+    await open();
+    expect(buttonByText('Children')).toBeTruthy();
+  });
+
+  it('shows the dates-of-birth notice after a merge when the dates differed', async () => {
+    await open();
+    const dialog = TestBed.inject(MatDialog);
+    const created = { ...ROHIT, language: 'mr', abhaLinked: false, createdAt: '2026-11-01T00:00:00Z', possibleDuplicateOfId: 'p9' } as unknown as Patient;
+    const keep = { ...created, id: 'p9', possibleDuplicateOfId: null } as Patient;
+    const merged = { ...keep, datesOfBirthDiffered: true } as PatientMergeResult;
+    const spy = vi
+      .spyOn(dialog, 'open')
+      .mockReturnValueOnce({ afterClosed: () => of(created) } as never)
+      .mockReturnValueOnce({ afterClosed: () => of(merged) } as never);
+    buttonByText('New patient')!.click();
+    http.match((r) => r.url === BASE).forEach((req) => req.flush({ items: [], total: 0 }));
+    http.expectOne(`${BASE}/p9`).flush(keep);
+    fixture.detectChanges();
+    buttonByText('Review and merge')!.click();
+    http.match((r) => r.url === BASE).forEach((req) => req.flush({ items: [], total: 0 }));
+    fixture.detectChanges();
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(el().querySelector('[data-testid="merge-dob-notice"]')!.textContent).toContain(
+      'The two records have different dates of birth. The date on the kept record was kept.',
+    );
+  });
+
+  it('shows no dates-of-birth notice after a merge when the dates did not differ', async () => {
+    await open();
+    const dialog = TestBed.inject(MatDialog);
+    const created = { ...ROHIT, language: 'mr', abhaLinked: false, createdAt: '2026-11-01T00:00:00Z', possibleDuplicateOfId: 'p9' } as unknown as Patient;
+    const keep = { ...created, id: 'p9', possibleDuplicateOfId: null } as Patient;
+    vi.spyOn(dialog, 'open')
+      .mockReturnValueOnce({ afterClosed: () => of(created) } as never)
+      .mockReturnValueOnce({ afterClosed: () => of({ ...keep, datesOfBirthDiffered: false }) } as never);
+    buttonByText('New patient')!.click();
+    http.match((r) => r.url === BASE).forEach((req) => req.flush({ items: [], total: 0 }));
+    http.expectOne(`${BASE}/p9`).flush(keep);
+    fixture.detectChanges();
+    buttonByText('Review and merge')!.click();
+    http.match((r) => r.url === BASE).forEach((req) => req.flush({ items: [], total: 0 }));
+    fixture.detectChanges();
+    expect(el().querySelector('[data-testid="merge-dob-notice"]')).toBeNull();
   });
 
   it('shows the chronic tag on a row that has one', async () => {

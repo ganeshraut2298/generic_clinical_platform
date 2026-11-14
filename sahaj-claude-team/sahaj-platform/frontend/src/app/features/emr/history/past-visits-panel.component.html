@@ -1,0 +1,175 @@
+<section class="pv" aria-labelledby="pv-title">
+  <header class="head">
+    <h3 id="pv-title">Patient history</h3>
+    <span class="count" data-testid="history-count">{{ countText() }}</span>
+  </header>
+
+  <div class="facts" aria-label="Key facts" data-testid="key-facts">
+    @for (f of factRows(); track f.key) {
+      <div class="fact">
+        <span class="fl">{{ f.label }}</span>
+        <span class="fv" [class.imp]="f.important">
+          @if (f.important && f.shown) {
+            <app-icon name="alert" [size]="13" />
+            <span class="sr-only">Important: </span>
+          }
+          {{ f.shown || notRecorded }}
+        </span>
+      </div>
+    }
+    @if (factsFailed()) {
+      <p class="err-text" role="alert">
+        We could not load the key facts.
+        <button type="button" class="linkbtn" data-act="retry-facts" (click)="loadFacts()">Try again</button>
+      </p>
+    }
+  </div>
+
+  <div class="bar">
+    <div class="tabs" role="tablist" aria-label="Visit type">
+      @for (f of filters; track f.key) {
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="filter() === f.key"
+          [attr.data-filter]="f.key"
+          (click)="setFilter(f.key)"
+        >
+          {{ f.label }}
+        </button>
+      }
+    </div>
+    <label class="search">
+      <span class="sr-only">Search history</span>
+      <input
+        class="input"
+        type="search"
+        autocomplete="off"
+        [value]="query()"
+        [attr.maxlength]="100"
+        [attr.aria-busy]="loading()"
+        placeholder="Search: drug, test, diagnosis"
+        (input)="onQuery($event)"
+      />
+    </label>
+  </div>
+
+  @if (someHidden()) {
+    <p class="hidden-note" role="status" data-testid="some-hidden">Some entries are hidden</p>
+  }
+
+  @if (loading()) {
+    <p class="faint" aria-busy="true" data-testid="history-loading">Loading</p>
+  }
+  @if (error(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="14" />
+      <span>{{ message }}</span>
+      <button type="button" class="linkbtn" data-act="retry-history" (click)="reload()">Try again</button>
+    </div>
+  }
+
+  <ul class="visits">
+    @for (v of items(); track v.kind + v.id) {
+      <li class="visit" [class.ipd]="typeOf(v) === 'IPD'">
+        <button
+          type="button"
+          class="vh"
+          [attr.aria-expanded]="isOpen(v)"
+          data-act="toggle-visit"
+          (click)="toggle(v)"
+        >
+          <span class="vline">
+            <span class="type" [class.ipd]="typeOf(v) === 'IPD'">{{ typeOf(v) }}</span>
+            <span class="date">{{ dateText(v) }}</span>
+            <span class="chev">{{ isOpen(v) ? 'Hide ▴' : 'Details ▾' }}</span>
+          </span>
+          <span class="title">{{ v.title }}</span>
+          <span class="who">{{ v.place }}</span>
+        </button>
+        @if (isOpen(v)) {
+          <div class="detail" data-testid="visit-detail">
+            @if (detailBusy() === v.kind + ':' + v.id) {
+              <p class="faint" aria-busy="true">Loading</p>
+            } @else if (detailOf(v); as d) {
+              @if (!d.signed) {
+                <p class="faint">{{ noSignedRecord }}</p>
+              }
+              @for (l of d.lines; track $index) {
+                <div class="dl"><span class="dk">{{ l.label }}</span><span>{{ l.value }}</span></div>
+              }
+              @if (d.results.length > 0) {
+                <div class="blk">
+                  <span class="dk">Results</span>
+                  @for (r of d.results; track $index) {
+                    <div class="res">
+                      <span>{{ r.test }}</span>
+                      <span [class.abn]="r.abnormal">{{ r.value }}@if (r.abnormal) { · Abnormal }</span>
+                    </div>
+                  }
+                </div>
+              }
+              @if (d.medicines.length > 0) {
+                <div class="blk">
+                  <span class="dk">Medicines</span>
+                  @for (m of d.medicines; track $index) {
+                    <span>• {{ medicineLine(m) }}</span>
+                  }
+                </div>
+              }
+              <div class="actions">
+                @if (d.medicines.length > 0) {
+                  <button
+                    type="button"
+                    class="act"
+                    data-act="copy-medicines"
+                    [disabled]="!d.canCopyMedicines || copying() !== null"
+                    (click)="copyMedicines(v)"
+                  >
+                    Copy medicines to today
+                  </button>
+                }
+                @if (d.tests.length > 0) {
+                  <button
+                    type="button"
+                    class="act"
+                    data-act="repeat-tests"
+                    [disabled]="!d.canRepeatTests || copying() !== null"
+                    (click)="repeatTests(v)"
+                  >
+                    Repeat these tests
+                  </button>
+                }
+                <button type="button" class="act" data-act="open-full" [disabled]="!d.signed" (click)="openFull(v, d)">
+                  {{ typeOf(v) === 'IPD' ? 'Open discharge summary' : 'Open full visit' }}
+                </button>
+              </div>
+              @if (d.copyDisabledReason === 'RECORD_SIGNED') {
+                <p class="faint t-xs" data-testid="signed-note">{{ signedNote }}</p>
+              }
+            }
+            @if (detailError(); as message) {
+              <p class="err-text" role="alert">{{ message }}</p>
+            }
+          </div>
+        }
+      </li>
+    }
+  </ul>
+
+  @if (firstVisit()) {
+    <p class="empty" data-testid="first-visit">{{ firstVisitText }}</p>
+  } @else if (nothingMatches()) {
+    <p class="empty" data-testid="nothing-matches">{{ nothingMatchesText }}</p>
+  }
+
+  @if (hasMore()) {
+    <button type="button" class="more" data-act="load-more" [disabled]="loadingMore()" (click)="loadMore()">
+      {{ loadingMore() ? 'Loading' : 'Load more' }}
+    </button>
+  }
+
+  @if (toast(); as message) {
+    <div class="toast" role="status" data-testid="history-toast">{{ message }}</div>
+  }
+</section>

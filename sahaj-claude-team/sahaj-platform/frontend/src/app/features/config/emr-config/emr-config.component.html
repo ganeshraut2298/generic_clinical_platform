@@ -1,0 +1,156 @@
+<section class="emr surf panel" aria-labelledby="emr-title">
+  <header class="emr-h">
+    <div class="emr-t">
+      <h2 id="emr-title">EMR configuration by department</h2>
+      <p class="muted">
+        Choose a department, then pick which EMR sections the doctor sees, in what order, and which are required.
+      </p>
+      @if (clinicName()) {
+        <p class="faint t-xs">Clinic: {{ clinicName() }}</p>
+      }
+    </div>
+    <div class="emr-a">
+      @let chip = store.chip();
+      <span
+        class="pill"
+        [class.p-warn]="chip.tone === 'warn'"
+        [class.p-good]="chip.tone === 'good'"
+        [class.p-teal]="chip.tone === 'info'"
+        role="status"
+        data-testid="emr-chip"
+        >{{ chip.text }}</span
+      >
+      <a mat-stroked-button routerLink="/app/config/forms" data-act="form-builder">+ Form builder</a>
+      @if (store.canEdit()) {
+        <button
+          mat-stroked-button
+          type="button"
+          data-act="save-draft"
+          [disabled]="store.busy() !== null || store.viewLoading() || !store.view()"
+          (click)="store.saveDraft()"
+        >
+          {{ store.busy() === 'save' ? 'Saving' : 'Save draft' }}
+        </button>
+        <button
+          mat-flat-button
+          type="button"
+          data-act="publish"
+          [disabled]="store.busy() !== null || store.viewLoading() || !store.view()"
+          (click)="store.publish()"
+        >
+          {{ store.busy() === 'publish' ? 'Publishing' : 'Publish changes' }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (!store.canEdit() && !store.loading() && !store.loadError()) {
+    <div class="notice teal slim" role="note" data-testid="emr-readonly">
+      <app-icon name="lock" [size]="14" />
+      <span>Only the owner can change this.</span>
+    </div>
+  }
+
+  @if (store.saveError(); as message) {
+    <div class="notice err" role="alert" data-testid="emr-save-error">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      @if (store.conflict()) {
+        <button mat-stroked-button type="button" data-act="reload" (click)="store.reloadSelected()">Reload</button>
+      }
+    </div>
+  }
+
+  @if (store.loading()) {
+    <p class="loading" aria-busy="true">Loading departments</p>
+  } @else if (store.loadError(); as message) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button mat-stroked-button type="button" data-act="retry" (click)="store.load()">Try again</button>
+    </div>
+  } @else {
+    <div class="cols">
+      <app-department-column />
+
+      <div class="mid">
+        @if (store.selected(); as dept) {
+          <section class="dhead surf">
+            <div class="dtitle">
+              <span class="badge" aria-hidden="true" [style.background]="dept.colour">{{ dept.initials }}</span>
+              <div>
+                <h3>{{ dept.name }}</h3>
+                <span class="faint t-xs">{{ summary() }}</span>
+              </div>
+            </div>
+            <div class="dtools">
+              @if (store.canEdit()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  data-act="reset"
+                  [disabled]="store.busy() !== null || !store.view()"
+                  (click)="store.resetToTemplate()"
+                >
+                  Reset to template
+                </button>
+              }
+              <div class="tabs" role="tablist" aria-label="View">
+                @for (t of tabs; track t.id) {
+                  <button
+                    type="button"
+                    role="tab"
+                    [attr.aria-selected]="store.tab() === t.id"
+                    (click)="store.setTab(t.id)"
+                  >
+                    {{ t.label }}
+                  </button>
+                }
+              </div>
+            </div>
+            <div class="visit">
+              <span class="field-label">Visit type</span>
+              <div class="seg" role="group" aria-label="Visit type">
+                @for (v of visitTypes; track v) {
+                  <button type="button" [attr.aria-pressed]="visitPressed(v)" (click)="store.setVisitType(v)">
+                    {{ v }}
+                  </button>
+                }
+              </div>
+            </div>
+          </section>
+
+          @if (store.viewLoading()) {
+            <p class="loading" aria-busy="true">Loading sections</p>
+          } @else if (store.viewError(); as message) {
+            <div class="notice err" role="alert">
+              <app-icon name="alert" [size]="16" />
+              <span>{{ message }}</span>
+              <button mat-stroked-button type="button" data-act="retry-view" (click)="store.retryView()">Try again</button>
+            </div>
+          } @else if (store.tab() === 'sections') {
+            <app-sections-column />
+          } @else {
+            <app-doctor-preview />
+          }
+        } @else {
+          <p class="empty">No department is selected.</p>
+        }
+      </div>
+
+      @if (store.selected() && !store.viewLoading() && !store.viewError()) {
+        <app-section-settings />
+      }
+    </div>
+
+    <div class="formband" data-testid="form-builder-band">
+      <div>
+        <strong>Have your own chart or form?</strong>
+        <span class="faint t-xs">
+          Build it in the Form builder: fields, scores, show-if rules and print layout. It appears here as a custom section.
+        </span>
+      </div>
+      <a mat-stroked-button routerLink="/app/config/forms" data-act="open-form-builder">Open form builder</a>
+    </div>
+  }
+</section>

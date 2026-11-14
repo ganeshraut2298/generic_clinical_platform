@@ -81,7 +81,7 @@ public class MeService {
                 .map(row -> flagsOf(row, ModuleEntitlements.effectiveIpdState(row, clock.instant())))
                 .orElse(new NavigationPolicy.ModuleFlags(false, false, false));
         return new MeView(userId, member.id(), member.name(), role.name(), clinic,
-                NavigationPolicy.menuFor(role, preferences.menuMode(), flags), preferences);
+                NavigationPolicy.menuFor(role, preferences.menuMode(), flags, member.hasDoctorProfile()), preferences);
     }
 
     /** SAH-28: IPD is writable (menu item Emergency) in Trial and On, not in Read-only. */

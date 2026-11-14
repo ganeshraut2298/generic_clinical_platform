@@ -47,6 +47,9 @@ logging:
     # Spring MVC prints "Resolved [exception]" at DEBUG, and that text can carry a submitted value
     # (a mobile number in a bad request). Keep it at INFO even if the root level is raised.
     org.springframework.web.servlet: INFO
+    # The security filter chain prints "Securing GET <path>?<query>" at DEBUG. The EMR search text (SAH-43) travels in
+    # the query string and must never reach a log, so keep this logger at INFO even if the root level is raised.
+    org.springframework.security.web.FilterChainProxy: INFO
   pattern:
     # requestId and tenantId come from RequestLogContextFilter's MDC; they are never a patient name,
     # mobile number or clinical value, so they are safe to print on every line.

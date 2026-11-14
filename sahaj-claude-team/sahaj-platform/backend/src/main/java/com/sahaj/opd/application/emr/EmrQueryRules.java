@@ -26,13 +26,13 @@ public final class EmrQueryRules {
         return text;
     }
 
-    /** Null means no specialty; anything but the four template codes is a 400 validation on field specialty. */
+    /** Null means no specialty; anything but one of the 15 starter department keys is a 400 validation on field specialty. */
     public static String specialty(String code) {
         if (code == null || code.isEmpty()) {
             return null;
         }
-        if (!EmrKeys.isSpecialtyCode(code)) {
-            throw new InvalidInputException("specialty", "Choose one of gp, dental, paeds or homeo.");
+        if (!EmrKeys.isStarterKey(code)) {
+            throw new InvalidInputException("specialty", "Choose one of the starter departments.");
         }
         return code;
     }
@@ -42,6 +42,15 @@ public final class EmrQueryRules {
         int value = page == null ? 0 : page;
         if (value < 0 || value > MAX_PAGE) {
             throw new InvalidInputException("page", "Page must be between 0 and 500.");
+        }
+        return value;
+    }
+
+    /** As {@link #page(Integer)} with another maximum (the history pages stop at 200). */
+    public static int page(Integer page, int max) {
+        int value = page == null ? 0 : page;
+        if (value < 0 || value > max) {
+            throw new InvalidInputException("page", "Page must be between 0 and " + max + ".");
         }
         return value;
     }

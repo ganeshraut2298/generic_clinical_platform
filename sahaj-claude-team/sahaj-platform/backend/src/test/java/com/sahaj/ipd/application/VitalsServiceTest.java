@@ -1225,6 +1225,16 @@ class VitalsServiceTest {
         }
 
         @Override
+        public Optional<VitalsRow> findLatestOnDay(UUID tenantId, UUID admissionId, java.time.LocalDate day) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<VitalsRow> findLatestBeforeDay(UUID tenantId, UUID admissionId, java.time.LocalDate day) {
+            return Optional.empty();
+        }
+
+        @Override
         public java.util.Map<UUID, LatestScore> findLatestOfAdmitted(UUID tenantId) {
             throw new UnsupportedOperationException("not used by the vitals service");
         }

@@ -17,11 +17,26 @@ public interface AdmissionRepository {
 
     boolean existsAdmitted(UUID tenantId, UUID patientId);
 
+    /** SAH-67-3: the patient's ADMITTED admission, if any (id and IP number only). */
+    Optional<AdmittedRef> findAdmittedOf(UUID tenantId, UUID patientId);
+
+    record AdmittedRef(UUID admissionId, String ipNumber) {
+    }
+
     /** Inserts the admission as ADMITTED with its source (DIRECT, or EMERGENCY from the emergency queue); returns the new id. */
     UUID insert(UUID tenantId, NewAdmission admission);
 
     /** Returns the new deposit id. */
     UUID insertDeposit(UUID tenantId, UUID admissionId, long amountPaise, String mode, UUID collectedBy);
+
+    /**
+     * SAH-58 (ADR-022 D12): the credit carried from a treatment course as a deposit with source COURSE and no mode;
+     * {@code transferId} is the billing credit transfer it came from. Returns the new deposit id.
+     */
+    UUID insertCourseDeposit(UUID tenantId, UUID admissionId, long amountPaise, UUID transferId, UUID collectedBy);
+
+    /** SAH-58: the treatment course and sitting an admission was made for, if any. */
+    Optional<CourseLink> findCourseLink(UUID tenantId, UUID admissionId);
 
     /** Admitted patients, newest first, with the total of their deposits. */
     List<AdmissionRow> findAdmitted(UUID tenantId);
@@ -36,6 +51,9 @@ public interface AdmissionRepository {
     int countAdmitted(UUID tenantId);
 
     Optional<AdmissionRow> find(UUID tenantId, UUID admissionId);
+
+    /** SAH-50: the patient's admissions (any status), newest first, at most {@code limit}. */
+    List<AdmissionRow> findByPatient(UUID tenantId, UUID patientId, int limit);
 
     /** SAH-26: the admission row locked ({@code select ... for update of} the admission) until the transaction ends. */
     Optional<AdmissionRow> findForUpdate(UUID tenantId, UUID admissionId);
@@ -57,7 +75,23 @@ public interface AdmissionRepository {
 
     /** The reason is clinical text: {@code toString} leaves it out. */
     record NewAdmission(UUID patientId, String ipNumber, UUID bedId, UUID doctorMembershipId, String admissionType,
-                        String payer, String reason, UUID admittedBy, String source) {
+                        String payer, String reason, UUID admittedBy, String source, UUID treatmentCourseId,
+                        UUID treatmentCourseSittingId, UUID admissionRequestId) {
+
+        /** An admission with a course sitting but no EMR admission request (SAH-58). */
+        public NewAdmission(UUID patientId, String ipNumber, UUID bedId, UUID doctorMembershipId,
+                            String admissionType, String payer, String reason, UUID admittedBy, String source,
+                            UUID treatmentCourseId, UUID treatmentCourseSittingId) {
+            this(patientId, ipNumber, bedId, doctorMembershipId, admissionType, payer, reason, admittedBy, source,
+                    treatmentCourseId, treatmentCourseSittingId, null);
+        }
+
+        /** An admission with a source but no treatment course (SAH-28). */
+        public NewAdmission(UUID patientId, String ipNumber, UUID bedId, UUID doctorMembershipId,
+                            String admissionType, String payer, String reason, UUID admittedBy, String source) {
+            this(patientId, ipNumber, bedId, doctorMembershipId, admissionType, payer, reason, admittedBy, source, null,
+                    null);
+        }
 
         /** An admission from the front desk (source DIRECT). */
         public NewAdmission(UUID patientId, String ipNumber, UUID bedId, UUID doctorMembershipId,
@@ -119,6 +153,18 @@ public interface AdmissionRepository {
         }
     }
 
-    record DepositRow(UUID id, long amountPaise, String mode, Instant collectedAt, UUID collectedBy) {
+    /**
+     * {@code mode} is null only for a COURSE deposit (SAH-58); {@code source} is DESK or COURSE.
+     */
+    record DepositRow(UUID id, long amountPaise, String mode, Instant collectedAt, UUID collectedBy, String source) {
+
+        /** A deposit collected at the desk. */
+        public DepositRow(UUID id, long amountPaise, String mode, Instant collectedAt, UUID collectedBy) {
+            this(id, amountPaise, mode, collectedAt, collectedBy, "DESK");
+        }
+    }
+
+    /** The treatment course and sitting an admission was made for (SAH-58). */
+    record CourseLink(UUID courseId, UUID sittingId) {
     }
 }

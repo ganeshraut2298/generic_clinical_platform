@@ -63,11 +63,11 @@ function sameBoxes(a: readonly Box[], b: readonly Box[]): boolean {
 }
 
 /**
- * Decorative dot grid behind the public home page (SAH-39). Dots near a mouse pointer split
+ * Decorative dot grid behind the public home page (SAH-39) and the login page (SAH-74). Dots near a mouse pointer split
  * into four small coloured points and settle back. Still grid only for touch and reduced motion.
  *
  * It runs outside Angular's change detection: no template event bindings, no host listeners and
- * no signal writes from listeners or frames. Mount it once, in the home page, never in the shell.
+ * no signal writes from listeners or frames. Mount it once, in the home page and the login page, never in the shell.
  */
 @Component({
   selector: 'app-kinetic-background',

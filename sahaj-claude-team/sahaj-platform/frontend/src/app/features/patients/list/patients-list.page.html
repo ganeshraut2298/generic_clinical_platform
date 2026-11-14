@@ -31,6 +31,16 @@
   </div>
 </section>
 
+@if (mergeNotice(); as notice) {
+  <div class="notice warn" role="status" data-testid="merge-dob-notice">
+    <app-icon name="alert" [size]="16" />
+    <span class="flex1">{{ notice }}</span>
+    <button mat-icon-button type="button" aria-label="Dismiss" (click)="dismissMergeNotice()">
+      <app-icon name="x" [size]="14" />
+    </button>
+  </div>
+}
+
 @if (duplicatePair(); as pair) {
   <div class="notice warn">
     <app-icon name="users" [size]="16" />
@@ -86,7 +96,7 @@
           <div class="main">
             <b>{{ patient.name }}</b>
             <small>
-              {{ patient.age }} {{ patient.sex }} · {{ patient.uhid }} · {{ patient.mobile }}
+              {{ ageOf(patient) }} {{ patient.sex }} · {{ patient.uhid }} · {{ patient.mobile }}
             </small>
           </div>
           @if (patient.chronic) {

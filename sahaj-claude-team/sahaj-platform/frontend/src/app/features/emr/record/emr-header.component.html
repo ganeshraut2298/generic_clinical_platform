@@ -1,0 +1,109 @@
+@if (record(); as r) {
+  @if (header(); as h) {
+    <header class="eh surf" data-testid="emr-header">
+      <div class="top">
+        <button type="button" class="backbtn" data-act="back" (click)="back.emit()">
+          <app-icon name="back" [size]="16" /> Back
+        </button>
+        <div class="ttl">
+          <h2>{{ title() }}</h2>
+          <span class="dept">{{ r.layout.departmentName }}</span>
+          @if (layoutNote(); as note) {
+            <span class="faint t-xs" data-testid="layout-note">{{ note }}</span>
+          }
+          @if (choiceNote(); as note) {
+            <span class="faint t-xs">{{ note }}</span>
+          }
+        </div>
+
+        @if (canSwitch()) {
+          <label class="sw-dept">
+            <span class="faint t-xs">Department</span>
+            <select class="input" data-act="switch-department" (change)="onSwitch($event)">
+              @for (o of r.departmentOptions; track o.departmentKey) {
+                <option [value]="o.departmentKey" [selected]="o.departmentKey === r.layout.departmentKey">{{ o.name }}</option>
+              }
+            </select>
+          </label>
+        }
+
+        <div class="right">
+          @if (isOpd()) {
+            <div class="seg" role="group" aria-label="Visit type">
+              @for (t of visitTypes; track t.value) {
+                <button
+                  type="button"
+                  [attr.aria-pressed]="visitTypeOn(t.value)"
+                  [attr.data-type]="t.value"
+                  [disabled]="store.readOnly()"
+                  (click)="pickVisitType(t.value)"
+                >
+                  {{ typeLabel(t.value, t.label) }}
+                </button>
+              }
+            </div>
+          } @else if (isIpd() && h.admission; as adm) {
+            <span class="pill p-teal" data-testid="ipd-day">IPD · day {{ adm.dayNumber }}</span>
+          } @else if (h.emergency; as er) {
+            <span class="pill p-crit" data-testid="triage">{{ er.triageLevelName }}</span>
+          }
+          @if (showAdmit()) {
+            <button
+              type="button"
+              class="admit"
+              data-act="admit"
+              [attr.aria-pressed]="admitPressed()"
+              [disabled]="admitDisabled()"
+              (click)="admit.emit()"
+            >
+              <app-icon name="bed" [size]="15" /> {{ admitLabel() }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="who">
+        <span class="pav" aria-hidden="true">{{ h.initials }}</span>
+        <div class="pid">
+          <b class="pname">{{ h.patientName }}</b>
+          <span class="faint">
+            @if (ageLabel(); as age) {
+              {{ age }} ·
+            }
+            {{ sexWord() }} · {{ h.uhid ? 'UHID ' + h.uhid : 'New patient' }}
+            @if (visitText(); as v) {
+              · {{ v }}
+            }
+          </span>
+        </div>
+        <span class="faint dr">
+          {{ h.doctor.name }}
+          @if (h.doctor.room) {
+            · {{ h.doctor.room }}
+          }
+        </span>
+      </div>
+
+      <div class="tags">
+        @if (h.allergyText; as a) {
+          <span class="pill p-crit">Allergy: {{ a }}</span>
+        }
+        @if (h.chronicText; as c) {
+          <span class="pill p-warn">Known: {{ c }}</span>
+        }
+        @if (lastVisit(); as l) {
+          <span class="pill p-wait">{{ l }}</span>
+        }
+        @if (h.visitType === 'EMERGENCY') {
+          <span class="pill p-crit" data-testid="emergency-tag">Emergency{{ h.triageLevelName ? ' · ' + h.triageLevelName : '' }}</span>
+        }
+        @if (r.admissionAdvised) {
+          <span class="pill p-warn" data-testid="advised">Admission advised</span>
+        }
+        @if (store.mlc()) {
+          <span class="pill p-crit" data-testid="mlc-tag">MLC</span>
+        }
+      </div>
+    </header>
+  }
+}

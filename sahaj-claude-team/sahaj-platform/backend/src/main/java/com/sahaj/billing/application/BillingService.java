@@ -55,6 +55,7 @@ public class BillingService {
     private final BillRepository billRepository;
     private final BillItemRepository billItemRepository;
     private final PaymentRepository paymentRepository;
+    private final CoursePaymentRepository coursePayments;
     private final DayClosingRepository dayClosingRepository;
     private final VisitBillingPort visitBillingPort;
     private final ServiceLookupPort serviceLookupPort;
@@ -68,7 +69,9 @@ public class BillingService {
                            PaymentRepository paymentRepository, DayClosingRepository dayClosingRepository,
                            VisitBillingPort visitBillingPort, ServiceLookupPort serviceLookupPort,
                            DiscountLimitPort discountLimitPort, PatientLookupPort patientLookupPort,
-                           ActorDirectoryPort actorDirectoryPort, AuditLog auditLog, Clock clock) {
+                           ActorDirectoryPort actorDirectoryPort, AuditLog auditLog, Clock clock,
+                           CoursePaymentRepository coursePayments) {
+        this.coursePayments = coursePayments;
         this.billRepository = billRepository;
         this.billItemRepository = billItemRepository;
         this.paymentRepository = paymentRepository;
@@ -106,12 +109,16 @@ public class BillingService {
     }
 
     /**
-     * SAH-15: collected = net of today's payments (payments minus refunds, Asia/Kolkata day); pending = visits in
-     * the Billing stage with a balance above zero (the counter's "Awaiting payment").
+     * SAH-15: collected = net of today's payments (payments minus refunds, Asia/Kolkata day) plus the treatment course
+     * payments of the day (DEC-044: the Today page matches day closing and revenue); pending = visits in the Billing stage
+     * with a balance above zero (the counter's "Awaiting payment").
      */
     @Transactional(readOnly = true)
     public BillingTodaySummary todaySummary(UUID tenantId) {
-        long collected = paymentRepository.netSince(tenantId, startOfToday());
+        Instant startOfToday = startOfToday();
+        long collected = paymentRepository.netSince(tenantId, startOfToday)
+                + coursePayments.totalsBetween(tenantId, startOfToday, startOfToday.plus(java.time.Duration.ofDays(1)))
+                        .netPaise();
         int pending = (int) counter(tenantId).awaiting().stream().filter(bill -> bill.balancePaise() > 0).count();
         return new BillingTodaySummary(collected, pending);
     }
@@ -251,7 +258,9 @@ public class BillingService {
                     "Today's cash has already been closed.");
         }
         Instant startOfToday = businessDate.atStartOfDay(INDIA).toInstant();
-        long expectedCashPaise = paymentRepository.sumByModeSince(tenantId, "CASH", startOfToday);
+        // SAH-58, DEC-042 H3: cash taken for a treatment course is in the drawer too.
+        long expectedCashPaise = paymentRepository.sumByModeSince(tenantId, "CASH", startOfToday)
+                + coursePayments.sumByModeSince(tenantId, "CASH", startOfToday);
         long diffPaise = input.countedCashPaise() - expectedCashPaise;
         UUID id = UUID.randomUUID();
         dayClosingRepository.insert(id, businessDate, input.countedCashPaise(), expectedCashPaise, diffPaise,
@@ -323,7 +332,8 @@ public class BillingService {
         List<BillItemView> itemViews = new ArrayList<>();
         itemViews.add(new BillItemView(visit.id(), "Consultation", visit.feePaise(), 1, false));
         for (BillItemRow item : totals.items()) {
-            itemViews.add(new BillItemView(item.id(), item.name(), item.amountPaise(), item.qty(), true));
+            itemViews.add(new BillItemView(item.id(), item.name(), item.amountPaise(), item.qty(), true,
+                    "EMR".equals(item.sourceKind()) || "EMR_PLAN".equals(item.sourceKind()) ? item.sourceKind() : "COUNTER"));
         }
         List<PaymentView> paymentViews = totals.payments().stream()
                 .map(payment -> new PaymentView(payment.id(), payment.mode(), payment.amountPaise(),

@@ -61,6 +61,28 @@ describe('PatientApi', () => {
     req.flush({});
   });
 
+  it('registers a patient with a date of birth and no age', () => {
+    api.create({ name: 'Baby', dateOfBirth: '2025-06-10', sex: 'F', mobile: '9876543210' }).subscribe();
+    const req = http.expectOne(`${BASE}/patients`);
+    expect(req.request.body).toEqual({ name: 'Baby', dateOfBirth: '2025-06-10', sex: 'F', mobile: '9876543210' });
+    req.flush({});
+  });
+
+  it('clears a date of birth with an explicit null in the body', () => {
+    api.update('p1', { dateOfBirth: null, age: 6 }).subscribe();
+    const req = http.expectOne(`${BASE}/patients/p1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(JSON.stringify(req.request.body)).toBe('{"dateOfBirth":null,"age":6}');
+    req.flush({});
+  });
+
+  it('never puts the date of birth in the address or the query', () => {
+    api.update('p1', { dateOfBirth: '2025-06-10' }).subscribe();
+    const req = http.expectOne(`${BASE}/patients/p1`);
+    expect(req.request.urlWithParams).not.toContain('2025');
+    req.flush({});
+  });
+
   it('lists the family for a patient', () => {
     api.family('p1').subscribe();
     const req = http.expectOne(`${BASE}/patients/p1/family`);

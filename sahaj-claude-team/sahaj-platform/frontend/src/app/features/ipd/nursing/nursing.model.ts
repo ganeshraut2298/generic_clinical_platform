@@ -52,6 +52,11 @@ export interface NursingSheet {
   recentNotes: NursingNote[];
   /** SAH-32: slots of today in state DUE or LATE of the Active orders. The tab count, shown only above 0. */
   doseCount: number;
+  /**
+   * 0.3.0 (SAH-67-1, ADR-025 D8). The latest daily progress note a doctor signed in the EMR; null when none.
+   * Clinical text: on screen only, never logged.
+   */
+  latestRound?: { roundDate: string; signedAt: string; doctorName: string; investigationsAdvised: string | null } | null;
 }
 
 export interface VitalsInput {

@@ -22,7 +22,7 @@
       </div>
       <div class="notice good">
         <app-icon name="check" [size]="16" />
-        <span>Booked through {{ appointment.source === 'FRONT_DESK' ? 'front desk' : appointment.source.toLowerCase() }}.</span>
+        <span>Booked through {{ appointment.source === 'FRONT_DESK' ? 'front desk' : appointment.source === 'EMR' ? 'the doctor' : appointment.source.toLowerCase() }}.</span>
       </div>
     </div>
     <div class="sheet-f">
@@ -81,7 +81,7 @@
             <span class="av b"><app-icon name="plus" [size]="16" /></span>
             <div class="main">
               <b>Add {{ results().length ? 'family member' : 'new patient' }}</b>
-              <small>Opens the registration form.</small>
+              <small>Name, age and sex are enough. ABHA can be added later.</small>
             </div>
           </button>
         </div>

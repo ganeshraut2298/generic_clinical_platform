@@ -148,7 +148,9 @@
           [asOf]="list().asOf"
           [setup]="setup()"
           (openName)="openDetails(a)"
+          [canOpenEmr]="canOpenEmr()"
           (act)="onAction(a, $event)"
+          (openEmrRecord)="openEmrRecord.emit(a.id)"
         />
       } @empty {
         <div class="empty pcempty" data-testid="admitted-empty">{{ emptyText }}</div>

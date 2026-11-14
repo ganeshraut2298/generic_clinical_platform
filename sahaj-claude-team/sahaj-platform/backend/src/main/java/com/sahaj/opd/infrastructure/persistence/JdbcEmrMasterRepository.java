@@ -1,5 +1,6 @@
 package com.sahaj.opd.infrastructure.persistence;
 
+import com.sahaj.opd.application.emr.EmrKeys;
 import com.sahaj.opd.application.emr.EmrMaster;
 import com.sahaj.opd.application.emr.EmrMasterRepository;
 import java.sql.ResultSet;
@@ -50,6 +51,8 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
         private final String favourite;
         private final String extraJoin;
         private final String masterOrder;
+        private final String nameMr;
+        private final String nameHi;
 
         Source(EmrMaster master, String table, String key, String name, String icd10, String form, String favourite,
                String extraJoin, String masterOrder) {
@@ -62,6 +65,9 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
             this.favourite = favourite;
             this.extraJoin = extraJoin;
             this.masterOrder = masterOrder;
+            boolean advice = master == EmrMaster.ADVICE;
+            this.nameMr = advice ? "m.name_mr" : "null::text";
+            this.nameHi = advice ? "m.name_hi" : "null::text";
         }
 
         static Source of(EmrMaster master) {
@@ -75,7 +81,8 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
 
         String selectColumns(String useCount, String lastUsedAt) {
             return key + " as item_key, " + name + " as name, " + icd10 + " as icd10_code, " + form + " as form, "
-                    + favourite + " as favourite, " + useCount + " as use_count, " + lastUsedAt + " as last_used_at";
+                    + favourite + " as favourite, " + useCount + " as use_count, " + lastUsedAt + " as last_used_at, "
+                    + nameMr + " as name_mr, " + nameHi + " as name_hi";
         }
 
         /** Items this doctor used, most used first, then newest use; an item that left its master is not joined. */
@@ -95,7 +102,7 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
         }
     }
 
-    private static final String SEARCH_COLUMNS = "select m.id, m.name, m.specialty_hint from ";
+    private static final String SEARCH_COLUMNS = "select m.id, m.name, m.specialty_hint, ";
 
     private final JdbcClient jdbc;
 
@@ -110,13 +117,14 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
             throw new IllegalArgumentException("This master is searched elsewhere.");
         }
         String where = " m where lower(m.name) like :pattern escape '\\'";
-        String sql = SEARCH_COLUMNS + source.table + where + " order by " + source.masterOrder
+        String sql = SEARCH_COLUMNS + source.nameMr + " as name_mr, " + source.nameHi + " as name_hi from "
+                + source.table + where + " order by " + source.masterOrder
                 + " limit :limit offset :offset";
         List<MasterItemRow> items = jdbc.sql(sql)
                 .param("pattern", pattern).param("specialty", specialty == null ? "" : specialty)
                 .param("limit", limit).param("offset", offset)
                 .query((rs, row) -> new MasterItemRow(rs.getObject("id", UUID.class), rs.getString("name"),
-                        rs.getString("specialty_hint")))
+                        rs.getString("specialty_hint"), rs.getString("name_mr"), rs.getString("name_hi")))
                 .list();
         long total = jdbc.sql("select count(*) from " + source.table + where)
                 .param("pattern", pattern).query(Long.class).single();
@@ -127,6 +135,8 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
     public List<QuickOptionRow> ranked(UUID tenantId, UUID doctorMembershipId, EmrMaster master, String specialty,
                                        int limit) {
         Source source = Source.of(master);
+        // ADR-020 D13: diagnoses keep the SAH-7 platform code as their hint; a starter key is mapped to it here.
+        String hint = master == EmrMaster.DIAGNOSES ? EmrKeys.diagnosisSpecialty(specialty) : specialty;
         List<QuickOptionRow> result = new ArrayList<>(jdbc.sql(source.usedSql())
                 .param("tenantId", tenantId).param("doctor", doctorMembershipId).param("masterKey", master.key())
                 .param("limit", limit)
@@ -136,7 +146,7 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
             result.addAll(jdbc.sql(source.unusedSql())
                     .param("tenantId", tenantId).param("doctor", doctorMembershipId)
                     .param("masterKey", master.key()).param("limit", remaining)
-                    .param("specialty", specialty == null ? "" : specialty)
+                    .param("specialty", hint == null ? "" : hint)
                     .query(JdbcEmrMasterRepository::map).list());
         }
         return result;
@@ -147,6 +157,6 @@ public class JdbcEmrMasterRepository implements EmrMasterRepository {
         Boolean favourite = (Boolean) rs.getObject("favourite");
         return new QuickOptionRow(rs.getString("item_key"), rs.getString("name"), rs.getString("icd10_code"),
                 rs.getString("form"), favourite, rs.getInt("use_count"),
-                lastUsed == null ? null : lastUsed.toInstant());
+                lastUsed == null ? null : lastUsed.toInstant(), rs.getString("name_mr"), rs.getString("name_hi"));
     }
 }

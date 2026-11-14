@@ -154,4 +154,20 @@ describe('NewTokenDialogComponent', () => {
     ) as HTMLButtonElement).click();
     expect(openSpy).toHaveBeenCalled();
   });
+
+  it('shows the mockup hint under the Add new patient option (SAH-73-1)', async () => {
+    await setup();
+    await typeMobile('9876543210');
+    http
+      .expectOne((r) => r.url === `${PATIENT_BASE}/patients`)
+      .flush({ items: [], total: 0 });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const option = Array.from(el().querySelectorAll('.member')).find((b) =>
+      b.textContent!.includes('Add new patient'),
+    )!;
+    expect(option.querySelector('small')!.textContent!.trim()).toBe(
+      'Name, age and sex are enough. ABHA can be added later.',
+    );
+  });
 });

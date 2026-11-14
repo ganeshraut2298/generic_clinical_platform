@@ -14,8 +14,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiError } from '../../../core/http/problem-detail';
 import { ShellStore } from '../../../core/shell/shell.store';
-import { formatDisplayDateOfInstant } from '../../../shared/format/ist-date';
+import { formatDisplayDate, formatDisplayDateOfInstant } from '../../../shared/format/ist-date';
+import { patientAgeText } from '../../../shared/format/patient-age';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { PatientEditDialogComponent } from '../edit/patient-edit-dialog.component';
 import { PatientFormDialogComponent } from '../form/patient-form-dialog.component';
 import { PrivacyApi } from '../../privacy/privacy.api';
 import {
@@ -32,8 +34,8 @@ export type RecordTab = 'visits' | 'bills';
 /**
  * Patient record (SAH-8), mockup `ptRecord`. Visits, bills, vitals trend and the money column
  * need SAH-9 (Queue/consultation) and SAH-10 (Billing); they show "No visits yet" here rather
- * than faked data. "Print history" and "Edit details" are "coming soon" in the mockup itself
- * (`data-act="soon"`) so they stay that way here too.
+ * than faked data. "Print history" is "coming soon" in the mockup itself (`data-act="soon"`) so it
+ * stays that way here. "Edit details" opens the Date of birth and Age sheet (SAH-73-2).
  */
 @Component({
   selector: 'app-patient-record',
@@ -54,6 +56,9 @@ export class PatientRecordPage implements OnInit {
 
   protected readonly languageLabels = LANGUAGE_LABELS;
   protected readonly initials = patientInitials;
+  protected readonly displayDate = formatDisplayDate;
+  protected readonly ageText = (patient: Patient): string => patientAgeText(patient, 'header');
+  protected readonly rowAge = (member: PatientSummary): string => patientAgeText(member, 'row');
 
   protected readonly canWrite = computed(() => {
     const role = this.store.me()?.role;
@@ -194,7 +199,18 @@ export class PatientRecordPage implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((member: Patient | null) => {
         if (member) {
-          this.family.update((list) => [...list, { ...member }]);
+          // A family row never carries the date of birth (BR73-12).
+          const row: PatientSummary = {
+            id: member.id,
+            uhid: member.uhid,
+            name: member.name,
+            age: member.age,
+            ageDetail: member.ageDetail,
+            sex: member.sex,
+            mobile: member.mobile,
+            chronic: member.chronic ?? null,
+          };
+          this.family.update((list) => [...list, row]);
         }
       });
   }
@@ -203,8 +219,26 @@ export class PatientRecordPage implements OnInit {
     this.router.navigate(['/app/patients', member.id]);
   }
 
-  protected editComingSoon(): void {
-    this.snackBar.open('Editing patient details is coming soon.', 'Close', { duration: 4000 });
+  protected openEdit(): void {
+    const patient = this.patient();
+    if (!patient || !this.canWrite()) {
+      return;
+    }
+    this.dialog
+      .open(PatientEditDialogComponent, {
+        panelClass: 'sheet-panel',
+        width: '560px',
+        maxWidth: '100vw',
+        data: { patient },
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((updated: Patient | null | undefined) => {
+        if (updated) {
+          // The server's answer replaces everything on screen, including the worked-out age.
+          this.patient.set(updated);
+        }
+      });
   }
 
   protected printComingSoon(): void {

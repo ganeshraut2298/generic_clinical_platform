@@ -72,4 +72,13 @@ public interface StaffPinPort {
      */
     ColleaguePinCheck checkColleague(UUID tenantId, UUID callerUserId, UUID colleagueMembershipId,
                                      String requiredRole, String pin);
+
+    /**
+     * SAH-66 (ADR-023 D6): which of these memberships of the clinic have a PIN set, for the chemotherapy checker options
+     * ("hasPin"). A locked or switched-off PIN is not revealed here. Runs in the caller's transaction (the clinic is
+     * bound); the default answers none, so a fake of this port needs no change.
+     */
+    default java.util.Set<UUID> membershipsWithPin(UUID tenantId, java.util.Collection<UUID> membershipIds) {
+        return java.util.Set.of();
+    }
 }

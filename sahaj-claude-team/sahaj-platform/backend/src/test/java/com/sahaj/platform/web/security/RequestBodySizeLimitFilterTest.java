@@ -298,6 +298,70 @@ class RequestBodySizeLimitFilterTest {
         assertThat(response.getStatus()).isEqualTo(200);
     }
 
+    // ---- DEC-051 M2 (ADR-022 D11): the two form-save paths take up to 256 KB ----
+
+    private static final String FORM_KEY = "f_abcdefghij";
+
+    @Test
+    void aSignedInFormDraftOf200KbIsAcceptedOnBothFormSavePaths() throws Exception {
+        signIn();
+        for (String path : new String[] {"/api/v1/opd/emr/forms", "/api/v1/opd/emr/forms/" + FORM_KEY + "/draft"}) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            int[] seen = new int[1];
+
+            filter.doFilter(postOf(path, 200 * 1024), response,
+                    (req, res) -> seen[0] = StreamUtils.copyToByteArray(req.getInputStream()).length);
+
+            assertThat(response.getStatus()).as(path).isEqualTo(200);
+            assertThat(seen[0]).as(path).isEqualTo(200 * 1024);
+        }
+    }
+
+    @Test
+    void aFormSaveOfExactly256KbGoesThroughAndOneByteMoreAnswers413With256Kb() throws Exception {
+        signIn();
+        MockHttpServletResponse exact = new MockHttpServletResponse();
+        filter.doFilter(postOf("/api/v1/opd/emr/forms", (int) RequestBodySizeLimitFilter.FORM_SAVE_MAX_BODY_BYTES), exact,
+                (req, res) -> { });
+        assertThat(exact.getStatus()).isEqualTo(200);
+
+        MockHttpServletResponse over = new MockHttpServletResponse();
+        filter.doFilter(postOf("/api/v1/opd/emr/forms/" + FORM_KEY + "/draft",
+                (int) RequestBodySizeLimitFilter.FORM_SAVE_MAX_BODY_BYTES + 1), over, mustNotRun());
+        assertThat(over.getStatus()).isEqualTo(413);
+        assertThat(over.getContentAsString()).contains("The request body must be 256 KB or smaller.");
+    }
+
+    @Test
+    void theFormSaveCapDoesNotApplyToAnyOtherPathOrToACallerWithNoPrincipal() throws Exception {
+        signIn();
+        for (String path : new String[] {"/api/v1/opd/emr/forms/" + FORM_KEY, "/api/v1/opd/emr/forms/" + FORM_KEY + "/publish",
+                "/api/v1/opd/emr/forms/" + FORM_KEY + "/draft/x", "/api/v1/opd/emr/records/x/draft",
+                "/api/v1/opd/emr/forms/F_ABCDEFGHIJ/draft"}) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(postOf(path, 100 * 1024), response, mustNotRun());
+            assertThat(response.getStatus()).as(path).isEqualTo(413);
+            assertThat(response.getContentAsString()).as(path).contains("64 KB or smaller");
+        }
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        MockHttpServletResponse anonymous = new MockHttpServletResponse();
+        filter.doFilter(postOf("/api/v1/opd/emr/forms", 5000), anonymous, mustNotRun());
+        assertThat(anonymous.getStatus()).isEqualTo(413);
+        assertThat(anonymous.getContentAsString()).contains("4 KB or smaller");
+    }
+
+    @Test
+    void aConfiguredSignedInCapAbove256KbIsKeptOnTheFormSavePaths() throws Exception {
+        signIn();
+        RequestBodySizeLimitFilter large =
+                new RequestBodySizeLimitFilter(new ProblemJsonWriter(new ObjectMapper()), 512 * 1024);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        large.doFilter(postOf("/api/v1/opd/emr/forms", 300 * 1024), response, (req, res) -> { });
+
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
     @Test
     void aRequestWithNoBodyGoesThrough() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/ipd/admissions");

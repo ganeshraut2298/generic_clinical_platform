@@ -29,6 +29,11 @@ export interface BillItem {
   qty: number;
   /** False for the consultation line: it cannot be removed. */
   removable: boolean;
+  /**
+   * 0.2.0 EMR: a "Bill today" service of the doctor's EMR. 0.3.0 EMR_PLAN: a dental plan row done today,
+   * added once at the doctor's sign (named by the procedure). Staff at the counter keep their rights on every line.
+   */
+  source?: 'COUNTER' | 'EMR' | 'EMR_PLAN';
 }
 
 export interface Payment {
@@ -42,7 +47,8 @@ export interface Payment {
 }
 
 export type VisitSex = 'F' | 'M' | 'O';
-export type VisitType = 'NEW' | 'FOLLOW_UP';
+/** REVISIT (0.2.0) and EMERGENCY (0.3.0) are set by the doctor from the EMR. */
+export type VisitType = 'NEW' | 'FOLLOW_UP' | 'REVISIT' | 'EMERGENCY';
 
 export interface Bill {
   visitId: string;

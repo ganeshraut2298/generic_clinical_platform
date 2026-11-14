@@ -1,6 +1,8 @@
 {
   "nav.today": "Today",
   "nav.queue": "Queue",
+  "nav.secondchecks": "Second checks",
+  "nav.secondchecksCount": "waiting",
   "nav.appointments": "Appointments",
   "nav.patients": "Patients",
   "nav.followups": "Follow-ups",

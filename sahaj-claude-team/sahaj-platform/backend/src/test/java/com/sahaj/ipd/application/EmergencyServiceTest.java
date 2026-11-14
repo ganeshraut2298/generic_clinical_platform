@@ -1566,6 +1566,13 @@ class EmergencyServiceTest {
         }
 
         @Override
+        public boolean closeSentToOpd(UUID tenantId, UUID caseId, UUID patientId, UUID opdVisitId, Instant at, UUID by) {
+            return replace(caseId, r -> new CaseRow(r.id(), patientId, r.displayName(), r.age(), r.sex(), null,
+                    r.complaint(), r.identityPending(), r.level(), r.bay(), "SENT_TO_OPD", r.arrivedAt(),
+                    r.registeredBy(), r.seenAt(), r.seenBy(), at, by, null, r.clientKey(), r.version() + 1), false);
+        }
+
+        @Override
         public boolean markAdmitted(UUID tenantId, UUID caseId, UUID admissionId, UUID patientId, Instant at, UUID by) {
             return replace(caseId, r -> new CaseRow(r.id(), patientId, r.displayName(), r.age(), r.sex(), null,
                     r.complaint(), r.identityPending(), r.level(), r.bay(), "ADMITTED", r.arrivedAt(),

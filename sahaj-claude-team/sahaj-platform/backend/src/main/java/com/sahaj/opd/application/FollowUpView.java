@@ -13,7 +13,16 @@ public record FollowUpView(Counts counts, List<Item> items) {
     /** {@code mobile} is for the screen only; it is never logged or audited. */
     public record Item(UUID id, UUID patientId, String patientName, String mobile, UUID doctorMembershipId,
                         String doctorName, LocalDate dueDate, String reason, String status, int daysLate,
-                        UUID sourceVisitId, UUID sourceAdmissionId, UUID returnedVisitId) {
+                        UUID sourceVisitId, UUID sourceAdmissionId, UUID returnedVisitId, LocalDate appointmentDate,
+                        java.time.LocalTime appointmentTime) {
+
+        /** An item with no booked appointment (the shape before 0.6.0). */
+        public Item(UUID id, UUID patientId, String patientName, String mobile, UUID doctorMembershipId,
+                    String doctorName, LocalDate dueDate, String reason, String status, int daysLate,
+                    UUID sourceVisitId, UUID sourceAdmissionId, UUID returnedVisitId) {
+            this(id, patientId, patientName, mobile, doctorMembershipId, doctorName, dueDate, reason, status, daysLate,
+                    sourceVisitId, sourceAdmissionId, returnedVisitId, null, null);
+        }
 
         /** Ids, due date and status only: never the name, mobile or reason (SAH-27 security review L2). */
         @Override

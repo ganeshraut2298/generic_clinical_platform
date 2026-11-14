@@ -57,6 +57,12 @@ public interface EmergencyCaseRepository {
      */
     boolean markAdmitted(UUID tenantId, UUID caseId, UUID admissionId, UUID patientId, Instant at, UUID by);
 
+    /**
+     * SAH-67-2 (ADR-025 D9): WAITING or SEEN to SENT_TO_OPD with the patient and the OPD visit it was sent to, the closure
+     * and the cleared mobile number in one update; bumps the version. False when the case was not open.
+     */
+    boolean closeSentToOpd(UUID tenantId, UUID caseId, UUID patientId, UUID opdVisitId, Instant at, UUID by);
+
     /** What an insert gives back: the new id and the arrival time of the database clock. */
     record Created(UUID id, Instant arrivedAt) {
     }
