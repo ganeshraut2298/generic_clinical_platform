@@ -9,6 +9,7 @@ const agent = process.argv[2];
 const input = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const file = input.tool_input?.file_path || input.tool_input?.notebook_path;
+if (agent === 'tech-lead' && input.agent_id) process.exit(0); // subagent call: its own frontmatter hook decides
 const who = input.agent_id || input.session_id || 'unknown';
 if (!file) process.exit(0);
 const block = msg => { process.stderr.write(msg + '\n'); process.exit(2); };

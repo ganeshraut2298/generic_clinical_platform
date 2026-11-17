@@ -578,8 +578,8 @@ class PharmacistCheckIT extends MedicineSupport {
         assertThat(after.events()).isEqualTo(before.events());
         assertThat(after.audits()).isEqualTo(before.audits());
         assertThat(after.access()).isEqualTo(before.access() + 1);
-        problemOf(call(HttpMethod.POST, stopUrl(id), w.owner().auth(), null), 409, "order-state", ALREADY_STOPPED);
-        problemOf(call(HttpMethod.POST, stopUrl(rejected), w.doctor().auth(), null), 409, "order-state", REJECTED_CANNOT_STOP);
+        problemOf(call(HttpMethod.POST, stopUrl(id), w.owner().auth(), stopBody(1)), 409, "order-state", ALREADY_STOPPED);
+        problemOf(call(HttpMethod.POST, stopUrl(rejected), w.doctor().auth(), stopBody(1)), 409, "order-state", REJECTED_CANNOT_STOP);
         assertThat(medSnap(w.clinic(), w.adm()).orders()).isEqualTo(before.orders());
     }
 
@@ -607,8 +607,8 @@ class PharmacistCheckIT extends MedicineSupport {
         assertThat(s.get("waiting").asInt()).isOne();
         assertThat(s.get("changeToken").asText()).isNotEqualTo(tokenBefore);
         MedSnap before = medSnap(w.clinic(), w.adm());
-        problemOf(call(HttpMethod.POST, stopUrl(a), w.doctor().auth(), null), 409, "not-admitted", NOT_ADMITTED_TEXT);
-        problemOf(call(HttpMethod.POST, stopUrl(b), w.doctor().auth(), null), 409, "not-admitted", NOT_ADMITTED_TEXT);
+        problemOf(call(HttpMethod.POST, stopUrl(a), w.doctor().auth(), stopBody(1)), 409, "not-admitted", NOT_ADMITTED_TEXT);
+        problemOf(call(HttpMethod.POST, stopUrl(b), w.doctor().auth(), stopBody(1)), 409, "not-admitted", NOT_ADMITTED_TEXT);
         problemOf(rejectCall(w.pharmacist().auth(), a, "WRONG_DOSE"), 409, "not-admitted", NOT_ADMITTED_TEXT);
         problemOf(verifyCall(w.pharmacist(), a, w.pin(), token), 409, "not-admitted", NOT_ADMITTED_TEXT);
         problemOf(orderCall(w.doctor().auth(), w.adm().id(), "ondan"), 409, "not-admitted", NOT_ADMITTED_TEXT);
@@ -639,6 +639,7 @@ class PharmacistCheckIT extends MedicineSupport {
                 }
                 ps.executeBatch();
             }
+            backfillVersionOne(c, w.clinic().tenantId()); // SAH-76: a head needs its version 1
             return null;
         });
     }
@@ -745,7 +746,7 @@ class PharmacistCheckIT extends MedicineSupport {
     void theSummaryIsCountsOnlyAndItsChangeTokenFollowsTheWaitingOrdersExactly() throws Exception {
         World w = world(NONE_KNOWN);
         JsonNode empty = summary(w.pharmacist().auth());
-        assertThat(empty.fieldNames()).toIterable().containsExactlyInAnyOrder("waiting", "changeToken", "asOf");
+        assertThat(empty.fieldNames()).toIterable().containsExactlyInAnyOrder("waiting", "changeToken", "asOf", "queried", "reviewsOpen");
         assertThat(empty.get("waiting").asInt()).isZero();
         assertThat(empty.get("changeToken").asText()).isEqualTo(EMPTY_TOKEN).isEqualTo(expectedToken(w.clinic()));
 

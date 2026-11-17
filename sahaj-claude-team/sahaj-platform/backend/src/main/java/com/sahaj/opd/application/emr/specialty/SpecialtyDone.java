@@ -85,7 +85,9 @@ public final class SpecialtyDone {
         boolean marked = false;
         var signs = value.path("signs").fields();
         while (signs.hasNext()) {
-            marked = marked || signs.next().getValue().isTextual();
+            // always advance the iterator: with "marked || next()" the call is skipped once marked is true and the loop never ends
+            JsonNode sign = signs.next().getValue();
+            marked = marked || sign.isTextual();
         }
         var systems = value.path("systems").fields();
         while (systems.hasNext()) {

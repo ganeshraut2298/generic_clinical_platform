@@ -23,11 +23,13 @@ import { ApiError } from '../../../core/http/problem-detail';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { problemMessage } from '../../config/config-format';
 import { MedicineRoundComponent } from './medicine-round.component';
+import { OrdersToAcknowledgeComponent } from './orders-to-acknowledge.component';
 import { PharmacistStore } from '../pharmacist/pharmacist.store';
 import { EmergencyReviewComponent } from '../emergency-access/emergency-review.component';
 import { TILE_TEXT as EMERGENCY_TILE_TEXT, TILE_TITLE as EMERGENCY_TILE_TITLE } from '../emergency-access/emergency-access.model';
 import { focusIsLost, isOutsideScope, isRefusal } from '../ipd-refusal';
 import { ScopeRefusals } from '../ipd-scope-refusal';
+import { UndoToast } from '../mar/undo-toast.component';
 import { PharmacistPanelComponent } from '../pharmacist/pharmacist-panel.component';
 import { PharmacistTileComponent } from '../pharmacist/pharmacist-tile.component';
 import { ResponseSheetComponent, ResponseSheetData } from './response-sheet.component';
@@ -107,6 +109,7 @@ export const ESCALATIONS_HEADING_ID = 'sf-esc-h';
     PharmacistTileComponent,
     PharmacistPanelComponent,
     MedicineRoundComponent,
+    OrdersToAcknowledgeComponent,
     EmergencyReviewComponent,
   ],
   styleUrl: './safety.component.scss',
@@ -124,6 +127,7 @@ export class SafetyComponent implements OnInit {
   private readonly pharmacist = inject(PharmacistStore, { optional: true });
   private readonly roundPanel = viewChild(MedicineRoundComponent);
   private readonly scopeRefusals = inject(ScopeRefusals);
+  private readonly undoToast = inject(UndoToast);
 
   /** Counts of every board answer: the tab number and the banner of the page follow them. */
   readonly counts = output<SafetyCounts>();
@@ -195,6 +199,8 @@ export class SafetyComponent implements OnInit {
     this.load();
     // SAH-34 AC 38: a sheet met 403 `outside-scope` for a patient (a transfer, an ended emergency access): the rows read again.
     this.scopeRefusals.refusals.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reloadAll());
+    // SAH-76-5: a dose was recorded in error (Undo): the late and due counts read again.
+    this.undoToast.corrected.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reloadAll());
     startVisiblePoll(this.doc, SAFETY_REFRESH_MS, () => this.refresh(), this.destroyRef);
     this.destroyRef.onDestroy(() => {
       this.boardSub?.unsubscribe();

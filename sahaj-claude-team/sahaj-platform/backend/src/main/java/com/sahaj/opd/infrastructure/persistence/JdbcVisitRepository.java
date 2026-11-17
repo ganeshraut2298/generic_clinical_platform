@@ -27,6 +27,9 @@ public class JdbcVisitRepository implements VisitRepository {
             + " where v.tenant_id = :tenantId and v.created_at >= :since order by v.token_no";
     private static final String FIND_BETWEEN = SELECT
             + " where v.tenant_id = :tenantId and v.created_at >= :from and v.created_at < :to order by v.created_at";
+    private static final String FIND_BETWEEN_IN_STAGES = SELECT
+            + " where v.tenant_id = :tenantId and v.created_at >= :from and v.created_at < :to"
+            + " and v.stage in (:stages) order by v.created_at desc limit :limit";
     private static final String FIND_BY_IDS = SELECT + " where v.tenant_id = :tenantId and v.id in (:ids)";
     private static final String MOVE_IF_CURRENT = """
             update opd.visit
@@ -125,6 +128,16 @@ public class JdbcVisitRepository implements VisitRepository {
     public List<VisitRow> findBetween(UUID tenantId, Instant from, Instant to) {
         return jdbc.sql(FIND_BETWEEN).param("tenantId", tenantId).param("from", from).param("to", to)
                 .query(JdbcVisitRepository::map).list();
+    }
+
+    @Override
+    public List<VisitRow> findBetweenInStages(UUID tenantId, Instant from, Instant to,
+                                              java.util.Collection<String> stages, int limit) {
+        if (stages.isEmpty() || limit <= 0) {
+            return List.of();
+        }
+        return jdbc.sql(FIND_BETWEEN_IN_STAGES).param("tenantId", tenantId).param("from", from).param("to", to)
+                .param("stages", stages).param("limit", limit).query(JdbcVisitRepository::map).list();
     }
 
     @Override

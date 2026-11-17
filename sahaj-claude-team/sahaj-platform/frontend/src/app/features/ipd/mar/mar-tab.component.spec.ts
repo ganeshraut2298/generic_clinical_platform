@@ -123,7 +123,7 @@ describe('MarTabComponent', () => {
       expect(squash(pcm.querySelector('[data-testid=mar-status]'))).toBe('Active');
       expect(pcm.querySelector('[data-testid=mar-status]')!.classList.contains('p-good')).toBe(true);
       expect(pcm.querySelector('[data-testid=mar-high-alert]')).toBeNull();
-      expect(pcm.querySelector('[data-testid=mar-pending-note]')).toBeNull();
+      expect(pcm.querySelector('[data-testid=mar-order-lock]')).toBeNull();
     });
 
     it('a high-alert medicine has the red pill with its class and the hint', async () => {
@@ -146,8 +146,8 @@ describe('MarTabComponent', () => {
       const b = block('o3');
       expect(squash(b.querySelector('[data-testid=mar-status]'))).toBe('Pharmacist check');
       expect(b.querySelector('[data-testid=mar-status]')!.classList.contains('p-warn')).toBe(true);
-      expect(squash(b.querySelector('[data-testid=mar-pending-note]'))).toBe('Cannot be given until the pharmacist checks the order.');
-      expect(b.querySelector('[data-testid=mar-pending-note] app-icon')).toBeTruthy();
+      expect(squash(b.querySelector('[data-testid=mar-order-lock]'))).toBe('Cannot be given until the pharmacist checks the order.');
+      expect(b.querySelector('[data-testid=mar-order-lock] app-icon')).toBeTruthy();
       expect(squash(slot('o3', AT_8AM))).toBe('8 AMWaiting for pharmacist');
       expect(slot('o3', AT_8AM).tagName).toBe('SPAN');
     });
@@ -412,6 +412,66 @@ describe('MarTabComponent', () => {
       expect(changes.length).toBe(before);
       expect(document.activeElement).toBe(slot('o1', AT_8AM));
       expect(slot('o1', AT_8AM).tagName).toBe('BUTTON');
+    });
+  });
+
+  describe('slots the nurse cannot act on: right words, not buttons (contract 0.4.2)', () => {
+    const DOCTOR = 'Dr. Meera Kulkarni';
+    const held = { heldAt: '2026-11-06T05:00:00Z', heldByName: DOCTOR, reason: null };
+    const mar = () =>
+      marOf({
+        orders: [
+          orderOf({
+            orderId: 'oh',
+            status: 'ON_HOLD',
+            hold: held,
+            slots: [slotOf({ slotAt: AT_8AM, state: 'ON_HOLD', canGive: false, stateBy: DOCTOR })],
+          }),
+          orderOf({
+            orderId: 'oq',
+            status: 'QUERIED',
+            slots: [slotOf({ slotAt: AT_8AM, state: 'WAITING', canGive: false })],
+          }),
+          orderOf({
+            orderId: 'or',
+            slots: [slotOf({ slotAt: AT_8AM, state: 'REPLACED', canGive: false, stateBy: DOCTOR, stateAt: AT_2PM })],
+          }),
+          orderOf({
+            orderId: 'os',
+            status: 'STOPPED',
+            slots: [slotOf({ slotAt: AT_8AM, state: 'STOPPED', canGive: false, stateBy: DOCTOR, stateAt: AT_2PM })],
+          }),
+        ],
+      });
+
+    const expected: [string, string, string][] = [
+      ['ON_HOLD', 'oh', `8 AMOn hold by ${DOCTOR}`],
+      ['QUERIED', 'oq', '8 AMQueried'],
+      ['REPLACED', 'or', `8 AMReplaced by a change by ${DOCTOR} at 2 PM`],
+      ['STOPPED', 'os', `8 AMStopped by ${DOCTOR} at 2 PM`],
+    ];
+
+    for (const [name, orderId, words] of expected) {
+      it(`${name}: shows "${words}" and is not a button`, async () => {
+        await open(mar());
+        const chip = slot(orderId, AT_8AM);
+        expect(chip.textContent!.replace(/\s+/g, ' ').trim()).toBe(words);
+        expect(chip.tagName).not.toBe('BUTTON');
+        expect(chip.hasAttribute('disabled')).toBe(false);
+        expect(block(orderId).querySelector('button[data-testid=mar-slot]')).toBeNull();
+      });
+
+      it(`${name}: tapping it opens no Give sheet`, async () => {
+        await open(mar());
+        slot(orderId, AT_8AM).click();
+        await settle();
+        expect(dialog.open).not.toHaveBeenCalled();
+      });
+    }
+
+    it('shows no patient name on any of the four blocks', async () => {
+      await open(mar());
+      expect(squash(q('[data-testid=mar-orders]'))).not.toContain('Ramesh Kale');
     });
   });
 });

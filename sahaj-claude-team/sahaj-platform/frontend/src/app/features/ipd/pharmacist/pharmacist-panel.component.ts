@@ -28,12 +28,17 @@ import {
   PharmacistActionResult,
   PharmacistCheckRow,
   SHOW_MORE,
+  changeLines,
+  queriedToast,
   rejectedToast,
   rowLine,
   rowTitle,
   verifiedToast,
 } from './pharmacist.model';
 import { PharmacistStore } from './pharmacist.store';
+import { detailsLine } from '../orders/order.model';
+import { QuerySheetComponent, QuerySheetData } from './query-sheet.component';
+import { ReviewListComponent } from './review-list.component';
 import { RejectSheetComponent, RejectSheetData } from './reject-sheet.component';
 import { VerifySheetComponent, VerifySheetData } from './verify-sheet.component';
 
@@ -54,7 +59,7 @@ export const PHARMACIST_HEADING_ID = 'ph-h';
 @Component({
   selector: 'app-pharmacist-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButtonModule, IconComponent],
+  imports: [MatButtonModule, IconComponent, ReviewListComponent],
   styleUrl: './pharmacist-panel.component.scss',
   templateUrl: './pharmacist-panel.component.html',
 })
@@ -80,6 +85,8 @@ export class PharmacistPanelComponent implements OnInit {
   protected readonly lockHint = LOCK_HINT;
   protected readonly titleOf = rowTitle;
   protected readonly severity = severityWord;
+  protected readonly detail = (row: PharmacistCheckRow): string => detailsLine(row.details);
+  protected readonly changeText = changeLines;
 
   protected readonly asOf = computed(() => this.store.meta()?.asOf ?? '');
   protected readonly staleText = computed(() => staleBoardText(this.store.meta()?.asOf));
@@ -130,7 +137,7 @@ export class PharmacistPanelComponent implements OnInit {
   }
 
   /** The store read again for a sheet that met a conflict; never while refused (only Try again reads). */
-  private conflict(): void {
+  protected conflict(): void {
     if (!this.store.refused()) {
       this.store.load();
     }
@@ -178,6 +185,42 @@ export class PharmacistPanelComponent implements OnInit {
         this.sheetClosed(sheet);
         this.afterAction(answer, (a) => verifiedToast(a.result.drugName, a.result.actorName));
       });
+  }
+
+  /** SAH-76-2: Query doctor on a waiting row: the order becomes Queried. */
+  protected query(row: PharmacistCheckRow): void {
+    if (!this.store.meta() || !row.canQuery) {
+      return;
+    }
+    const sheet = this.dialog.open<QuerySheetComponent, QuerySheetData, PharmacistActionResult | undefined>(
+      QuerySheetComponent,
+      {
+        panelClass: 'sheet-panel',
+        width: '520px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'sf-qd-title',
+        data: {
+          orderId: row.orderId,
+          orderVersion: row.orderVersion,
+          drugName: row.drugName,
+          subtitle: `${row.patient.name} · ordered by ${row.orderedByName}`,
+          onConflict: () => this.conflict(),
+        },
+      },
+    );
+    this.sheet = sheet;
+    sheet
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((answer) => {
+        this.sheetClosed(sheet);
+        this.afterAction(answer, (a) => queriedToast(a.result.drugName));
+      });
+  }
+
+  /** A question sent from a Review after dose row: the answer carries the queue now. */
+  protected reviewQueried(answer: PharmacistActionResult): void {
+    this.store.apply(answer.checks);
   }
 
   protected reject(row: PharmacistCheckRow): void {

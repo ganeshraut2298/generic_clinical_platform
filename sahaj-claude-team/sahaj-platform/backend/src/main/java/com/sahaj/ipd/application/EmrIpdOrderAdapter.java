@@ -43,6 +43,9 @@ class EmrIpdOrderAdapter implements EmrIpdOrderPort {
         }
         List<KeyLabel> frequencies = new ArrayList<>();
         for (Frequency f : Frequency.values()) {
+            if (f == Frequency.PRN) {
+                continue;
+            }
             frequencies.add(new KeyLabel(f.key(), f.label()));
         }
         List<KeyLabel> reasons = new ArrayList<>();
@@ -99,7 +102,7 @@ class EmrIpdOrderAdapter implements EmrIpdOrderPort {
     public PlaceResult place(UUID tenantId, UUID actorUserId, String actorRole, UUID admissionId, List<OrderLine> lines) {
         List<Placed> placed = new ArrayList<>();
         for (OrderLine line : lines) {
-            MedicineOrderAnswer answer = orders.order(tenantId, actorUserId, actorRole, admissionId, input(line));
+            MedicineOrderAnswer answer = orders.orderForPort(tenantId, actorUserId, actorRole, admissionId, input(line));
             if (!"PLACED".equals(answer.outcome()) || answer.order() == null) {
                 List<String> texts = new ArrayList<>();
                 String kind = null;

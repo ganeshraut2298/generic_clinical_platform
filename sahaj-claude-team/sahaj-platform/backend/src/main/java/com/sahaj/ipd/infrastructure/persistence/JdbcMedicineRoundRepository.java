@@ -20,11 +20,12 @@ import org.springframework.stereotype.Repository;
 public class JdbcMedicineRoundRepository implements MedicineRoundRepository {
 
     private static final String ACTIVE_OF_ADMITTED = """
-            select o.id, o.admission_id, o.drug_key, o.frequency_key, o.verified_at, a.patient_id, b.code as bed_code
+            select o.id, o.admission_id, o.drug_key, o.status, a.patient_id, b.code as bed_code
             from ipd.admission a
             join ipd.medicine_order o on o.tenant_id = a.tenant_id and o.admission_id = a.id
             join ipd.bed b on b.tenant_id = a.tenant_id and b.id = a.bed_id
-            where a.tenant_id = :tenantId and a.status = 'ADMITTED' and o.status = 'ACTIVE'
+            where a.tenant_id = :tenantId and a.status = 'ADMITTED'
+              and (o.status = 'ACTIVE' or (o.status = 'PENDING' and o.priority = 'STAT'))
             """;
     private static final String DOSES_BETWEEN = """
             select d.order_id, d.slot_at, d.outcome
@@ -32,6 +33,7 @@ public class JdbcMedicineRoundRepository implements MedicineRoundRepository {
             where d.tenant_id = :tenantId
               and d.admission_id = any(cast(:admissionIds as uuid[]))
               and d.slot_at >= :from and d.slot_at < :to
+              and not exists (select 1 from ipd.dose_correction c where c.tenant_id = d.tenant_id and c.dose_id = d.id)
             """;
 
     private final JdbcClient jdbc;
@@ -45,8 +47,7 @@ public class JdbcMedicineRoundRepository implements MedicineRoundRepository {
         return jdbc.sql(ACTIVE_OF_ADMITTED).param("tenantId", tenantId)
                 .query((rs, rowNum) -> new ActiveOrder(rs.getObject("id", UUID.class),
                         rs.getObject("admission_id", UUID.class), rs.getObject("patient_id", UUID.class),
-                        rs.getString("bed_code"), rs.getString("drug_key"), rs.getString("frequency_key"),
-                        instant(rs.getObject("verified_at", OffsetDateTime.class))))
+                        rs.getString("bed_code"), rs.getString("drug_key"), rs.getString("status")))
                 .list();
     }
 

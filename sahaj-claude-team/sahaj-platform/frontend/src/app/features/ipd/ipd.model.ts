@@ -2,6 +2,7 @@ import { BedStatus, CategoryKey } from '../config/ipd/ipd.model';
 import type { DischargeRecord, FinalBill } from './discharge.model';
 import type { EmergencyCounts, EmergencyHandoff } from './emergency/emergency.model';
 import type { AllergyStatus } from './emr/emr.model';
+import type { NoticeCount } from './orders/order.model';
 import type { EwsSummary } from './nursing/nursing.model';
 import type { AdmissionSafety } from './safety/safety.model';
 import type { CardDataGroup, CardLatestVitals, ResolvedCardSetup } from './card/card-setup.model';
@@ -198,6 +199,8 @@ export interface AdmittedClinicalFlags {
   latestVitals?: CardLatestVitals | null;
   /** 0.3.0 (SAH-67-1, ADR-025 D8). A doctor signed today's progress note in the EMR: the flag "Round done". For OWNER, DOCTOR and NURSE. */
   roundDoneToday?: boolean;
+  /** 0.4.0 (SAH-76-3). The badge "<count> to acknowledge" for OWNER, DOCTOR and NURSE. */
+  ordersToAcknowledge?: NoticeCount;
 }
 
 /** SAH-36 `AdmittedPatientRow`: `AdmissionRow` plus the card facts. */

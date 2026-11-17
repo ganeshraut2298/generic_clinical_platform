@@ -344,6 +344,7 @@ class QueryPlansIT extends RoundSupport {
                 + "ordered_by, ordered_at, verified_by, verified_at) select a.tenant_id, a.id, gen_random_uuid(), d.key, 'bd', "
                 + "'ACTIVE', ?::uuid, now() - interval '1 day', ?::uuid, now() - interval '1 day' + interval '1 hour' from ipd.admission a "
                 + "cross join ipd.drug d where a.tenant_id = ?::uuid and a.status = 'ADMITTED'", doctor.toString(), pharmacist.toString(), t);
+        backfillVersionOne(c, tenant); // SAH-76: doses point at version 1 of their order
         // doses: three on a past day for every stopped order, and the 8 AM and 8 PM slots of today for every active order
         String today = "(date_trunc('day', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')";
         DbAccess.execute(c, "insert into ipd.dose_administration (tenant_id, admission_id, order_id, client_key, slot_at, outcome, "

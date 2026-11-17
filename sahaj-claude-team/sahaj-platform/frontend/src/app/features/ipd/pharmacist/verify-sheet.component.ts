@@ -327,7 +327,7 @@ export class VerifySheetComponent {
     this.running.set(true);
     const row = this.current();
     this.api
-      .verify(row.orderId, { pin, checkToken: row.check.checkToken })
+      .verify(row.orderId, { pin, checkToken: row.check.checkToken, orderVersion: row.orderVersion })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (answer) => {

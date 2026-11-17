@@ -87,8 +87,7 @@ class SafetyServiceRoundTest {
         roundRepository = mock(MedicineRoundRepository.class);
         service = new SafetyService(board, mock(AdmissionRepository.class), mock(ClinicalEventRepository.class),
                 patients, actors, team, new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()),
-                        new SkippedOrderWarningsTest.MutableClock()), ScopeStubs.unscoped(), ScopeStubs.repository(), mock(EmergencyAccessReader.class));
+                RoundFixtures.reader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()), new SkippedOrderWarningsTest.MutableClock()), ScopeStubs.unscoped(), ScopeStubs.repository(), mock(EmergencyAccessReader.class));
         when(entitlements.forTenant(TENANT)).thenAnswer(call -> new ModuleEntitlement(ipdState, false, 25));
         when(board.databaseNow()).thenReturn(NOW);
         when(board.findOnBoard(TENANT, NOW)).thenReturn(List.of());
@@ -109,7 +108,7 @@ class SafetyServiceRoundTest {
         if (patientName != null) {
             patientMap.put(patientId, new PatientSummary(patientId, patientName, 40, "F", "9000000000"));
         }
-        ActiveOrder order = new ActiveOrder(UUID.randomUUID(), UUID.randomUUID(), patientId, bed, drugKey,
+        ActiveOrder order = RoundFixtures.order(UUID.randomUUID(), UUID.randomUUID(), patientId, bed, drugKey,
                 frequencyKey, verifiedAt);
         orders.add(order);
         return order;

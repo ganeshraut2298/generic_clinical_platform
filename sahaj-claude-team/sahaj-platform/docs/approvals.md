@@ -9,6 +9,8 @@ Add one line per decision, for example: `| SAH-1 | stories | APPROVED | Ganesh |
 
 | Story | Stage | Decision | By | Date |
 |---|---|---|---|---|
-| SAH-13 | stories | APPROVED | Human | 2026-11-02 |
-| SAH-13 | contract | APPROVED | Human | 2026-11-02 |
-| SAH-13 | db-design | COMPLETE | db-engineer | 2026-11-02 |
+| SAH-13 | stories | APPROVED | Ganesh | 2026-11-02 |
+| SAH-13 | contract | APPROVED | Ganesh | 2026-11-02 |
+| SAH-13 | db-design | COMPLETE | Ganesh | 2026-11-02 |
+| SAH-76 | stories | APPROVED | Ganesh | 2026-11-15 |
+| SAH-76 | contract | APPROVED | Ganesh | 2026-11-15 |

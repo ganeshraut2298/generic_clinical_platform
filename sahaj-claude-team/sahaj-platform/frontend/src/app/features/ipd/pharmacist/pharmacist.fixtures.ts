@@ -1,4 +1,4 @@
-import { AS_OF, PATIENT, REJECT_REASONS, TOKEN_1, checkOf } from '../emr/emr.fixtures';
+import { AS_OF, DETAILS, PATIENT, REJECT_REASONS, TOKEN_1, checkOf } from '../emr/emr.fixtures';
 import { PharmacistActionResult, PharmacistCheckRow, PharmacistChecks } from './pharmacist.model';
 
 /** Test data in the shape of docs/api/ipd.yaml. Fictional names only. */
@@ -20,6 +20,13 @@ export const ROW: PharmacistCheckRow = {
   canVerify: true,
   verifyLockReason: null,
   canReject: true,
+  status: 'PENDING',
+  orderVersion: 1,
+  details: DETAILS,
+  changes: [],
+  changeReason: null,
+  query: null,
+  canQuery: true,
 };
 
 export const rowOf = (over: Partial<PharmacistCheckRow> = {}): PharmacistCheckRow => ({ ...ROW, ...over });
@@ -34,6 +41,8 @@ export function checksOf(over: Partial<PharmacistChecks> = {}): PharmacistChecks
     rejectReasons: REJECT_REASONS,
     items,
     nextCursor: null,
+    queried: 0,
+    reviewsOpen: 0,
     ...over,
   };
 }

@@ -26,11 +26,13 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class ScopeRaceIT extends ScopeSupport {
 
     /**
-     * Code review finding 5: the grant ends this long after it is inserted (was 10 s). The dose request must reach the admission
-     * row lock before that, which takes well under a second on a quiet machine; 30 s leaves a loaded gate machine room, and the
-     * test fails loudly (it does not pass vacuously) if the dose still queued too late. The test lasts about this long.
+     * Code review finding 5: the grant ends this long after it is inserted (5 s; it was 10 s, and an earlier draft of this comment
+     * said 30 s). The dose request must reach the admission row lock before that, which takes well under a second on a quiet
+     * machine, and it waits in the lock queue for about this long plus 0.3 s, which must stay under the 10 s lock_timeout of
+     * DEC-054 (a longer wait would end as a 503 database-busy, not as the refusal the test wants). The test fails loudly (it does
+     * not pass vacuously) if the dose still queued too late. The test lasts about this long. Security review L4.
      */
-    private static final long GRANT_ENDS_IN_SECONDS = 30;
+    private static final long GRANT_ENDS_IN_SECONDS = 5; // the dose wait (this + 0.3 s) must stay under the 10 s lock_timeout
 
     /**
      * Any session waiting on a lock in a statement that touches the admission table. The lock-waiter match no longer depends on

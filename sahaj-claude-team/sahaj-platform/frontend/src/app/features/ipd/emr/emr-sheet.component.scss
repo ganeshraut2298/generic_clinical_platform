@@ -41,7 +41,7 @@
   .dn {
     overflow-wrap: anywhere;
   }
-  .sfha {
+  .pill.sfha {
     margin-left: 6px;
     font-size: 0.68rem;
   }
@@ -55,6 +55,8 @@
   }
   .acts {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     justify-content: flex-end;
     font-weight: 400;
   }

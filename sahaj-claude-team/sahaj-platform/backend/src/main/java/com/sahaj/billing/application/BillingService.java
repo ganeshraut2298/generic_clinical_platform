@@ -1,7 +1,9 @@
 package com.sahaj.billing.application;
 
+import com.sahaj.billing.application.BillItemRepository.BillItemOfBill;
 import com.sahaj.billing.application.BillItemRepository.BillItemRow;
 import com.sahaj.billing.application.BillRepository.BillRow;
+import com.sahaj.billing.application.PaymentRepository.BillPaid;
 import com.sahaj.billing.application.PaymentRepository.PaymentRow;
 import com.sahaj.opd.api.DiscountLimitPort;
 import com.sahaj.opd.api.ServiceLookupPort;
@@ -20,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +49,8 @@ public class BillingService {
     static final Set<String> COLLECT_ROLES = Set.of("OWNER", "FRONT_DESK");
     static final Set<String> MODES = Set.of("CASH", "UPI", "CARD");
     static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
+    /** How far back the counter looks for unpaid bills of earlier days. */
+    static final int EARLIER_DAYS = 30;
     private static final String STAGE_BILLING = "BILLING";
     private static final String STAGE_DONE = "DONE";
     private static final String ENTITY_BILL = "BILL";
@@ -105,6 +110,21 @@ public class BillingService {
                 }
             }
         }
+        // Follows the Dues rule in SAH-10: an unpaid bill of an earlier day stays on the counter (Billing stage =
+        // awaiting, Done with a balance = dues, oldest first). The 30-day lookback is pending a human decision.
+        // Earlier fully paid visits do not show: "Paid today" is today only.
+        List<BillSummaryView> earlierDues = new ArrayList<>();
+        List<VisitForBilling> earlier = visitBillingPort.earlier(tenantId, EARLIER_DAYS);
+        Map<UUID, Totals> earlierTotals = totalsInBatch(tenantId, earlier);
+        for (VisitForBilling visit : earlier) {
+            Totals totals = earlierTotals.get(visit.id());
+            if (STAGE_BILLING.equals(visit.stage())) {
+                awaiting.add(summaryFrom(tenantId, visit, totals));
+            } else if (STAGE_DONE.equals(visit.stage()) && totals.balancePaise() > 0) {
+                earlierDues.add(summaryFrom(tenantId, visit, totals));
+            }
+        }
+        dues.addAll(0, earlierDues);
         return new CounterView(awaiting, dues, paidToday);
     }
 
@@ -322,6 +342,38 @@ public class BillingService {
         BillMath math = BillMath.of(feePaise, itemsTotal, discountPercent, paid);
         return new Totals(bill == null ? null : bill.id(), math.subtotalPaise(), discountPercent, discountReason,
                 math.discountPaise(), math.totalPaise(), paid, math.balancePaise(), items, payments);
+    }
+
+    /**
+     * Totals of many visits with three queries (bills, extra lines, net payments) instead of three per visit.
+     * Only the money fields are filled; a visit with no bill row yet has just its consultation fee.
+     */
+    private Map<UUID, Totals> totalsInBatch(UUID tenantId, List<VisitForBilling> visits) {
+        Map<UUID, BillRow> billByVisit = new HashMap<>();
+        for (BillRow bill : billRepository.findByVisits(tenantId, visits.stream().map(VisitForBilling::id).toList())) {
+            billByVisit.put(bill.visitId(), bill);
+        }
+        List<UUID> billIds = billByVisit.values().stream().map(BillRow::id).toList();
+        Map<UUID, Long> itemsByBill = new HashMap<>();
+        for (BillItemOfBill item : billItemRepository.findByBills(tenantId, billIds)) {
+            itemsByBill.merge(item.billId(), item.amountPaise() * item.qty(), Long::sum);
+        }
+        Map<UUID, Long> paidByBill = new HashMap<>();
+        for (BillPaid paid : paymentRepository.paidByBills(tenantId, billIds)) {
+            paidByBill.put(paid.billId(), paid.paidPaise());
+        }
+        Map<UUID, Totals> totals = new HashMap<>();
+        for (VisitForBilling visit : visits) {
+            BillRow bill = billByVisit.get(visit.id());
+            int discountPercent = bill == null ? 0 : bill.discountPercent();
+            long paid = bill == null ? 0 : paidByBill.getOrDefault(bill.id(), 0L);
+            long items = bill == null ? 0 : itemsByBill.getOrDefault(bill.id(), 0L);
+            BillMath math = BillMath.of(visit.feePaise(), items, discountPercent, paid);
+            totals.put(visit.id(), new Totals(bill == null ? null : bill.id(), math.subtotalPaise(), discountPercent,
+                    bill == null ? null : bill.discountReason(), math.discountPaise(), math.totalPaise(), paid,
+                    math.balancePaise(), List.of(), List.of()));
+        }
+        return totals;
     }
 
     private BillView toBillView(UUID tenantId, String actorRole, VisitForBilling visit) {

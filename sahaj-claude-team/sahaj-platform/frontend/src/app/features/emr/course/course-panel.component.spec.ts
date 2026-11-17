@@ -1,5 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -18,6 +19,8 @@ describe('CoursePanelComponent (SAH-75-3)', () => {
   let http: HttpTestingController;
   let el: HTMLElement;
   let dirty = false;
+  const rec = (): unknown => ({ encounterType: 'OPD_VISIT', encounterId: 'v7', header: { patientId: 'p1' } });
+  const record = signal<unknown>(rec());
   const save = vi.fn(() => of(true));
 
   function boot(kind: TreatmentCourseKind, opts: { readOnly?: boolean; showStart?: boolean } = {}): void {
@@ -31,7 +34,7 @@ describe('CoursePanelComponent (SAH-75-3)', () => {
         {
           provide: EmrRecordStore,
           useValue: {
-            record: () => ({ encounterType: 'OPD_VISIT', encounterId: 'v7', header: { patientId: 'p1' } }),
+            record,
             recordId: () => 'r1',
             readOnly: () => opts.readOnly ?? false,
             dirty: () => dirty,
@@ -55,6 +58,7 @@ describe('CoursePanelComponent (SAH-75-3)', () => {
 
   afterEach(() => {
     dirty = false;
+    record.set(rec());
     save.mockClear();
   });
 
@@ -116,6 +120,40 @@ describe('CoursePanelComponent (SAH-75-3)', () => {
     listCall('REHAB').flush([]);
     fixture.detectChanges();
     expect(q('[data-act=start-course]')).toBeNull();
+  });
+
+  const ACTIVE = { id: 'c1', courseNo: 'TC-0412', kind: 'CHEMO', unit: 'CYCLE', name: 'Chemo', startedOn: '2026-10-28', status: 'ACTIVE', sittingCount: 3, doneCount: 1 };
+  const showCourse = (): void => {
+    listCall('CHEMO').flush([ACTIVE]);
+    fixture.detectChanges();
+    http.expectOne(`${OPD}/c1`).flush(course({ kind: 'CHEMO', unit: 'CYCLE' }));
+    http.expectOne(`${BILLING}/c1/account`).flush(account());
+    http.expectOne((r) => r.url === OPD && r.params.get('kind') === 'CHEMO').flush([]);
+    fixture.detectChanges();
+  };
+
+  it('does not reload or blank the panel when the record is saved twice', () => {
+    boot('CHEMO');
+    showCourse();
+    record.set(rec());
+    fixture.detectChanges();
+    record.set(rec());
+    fixture.detectChanges();
+    http.expectNone((r) => r.url === OPD && r.params.get('patientId') === 'p1');
+    expect(q('[data-testid=course-no]')!.textContent).toBe('TC-0412');
+    expect(q('[data-testid=course-panel-loading]')).toBeNull();
+  });
+
+  it('keeps an already shown course when a later list call fails', () => {
+    boot('CHEMO');
+    showCourse();
+    (fixture.componentInstance as unknown as { load(): void }).load();
+    fixture.detectChanges();
+    expect(q('[data-testid=course-no]')).not.toBeNull();
+    listCall('CHEMO').flush({ title: 'x', status: 500 }, { status: 500, statusText: 'Err' });
+    fixture.detectChanges();
+    expect(q('[data-testid=course-panel-error]')).toBeNull();
+    expect(q('[data-testid=course-no]')!.textContent).toBe('TC-0412');
   });
 
   it('shows an error with a retry that does not hide anything else', () => {

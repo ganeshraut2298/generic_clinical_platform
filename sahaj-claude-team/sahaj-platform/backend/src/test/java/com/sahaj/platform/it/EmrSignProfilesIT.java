@@ -55,7 +55,9 @@ class EmrSignProfilesIT extends EmrSignSupport {
         Staff doctor = addDoctor(clinic, "General physician");
         relax(clinic, "dental", "complaints", "diagnosis", "rx", "rxformat");
         Rec rec = specialtyRec(clinic, doctor, newPatient(clinic), "dental");
-        rec = fillRequired(rec);
+        // Dental has no vitals log editor (SpecialtyProfiles: only gm and onco), so the General Medicine fillRequired (which saves a VITALS_LOG) does not apply
+        rec = save(rec, sectionValues("complaints", COMPLAINTS_JSON), sectionValues("diagnosis", DIAGNOSIS_JSON),
+                sectionValues("rx", RX_JSON), sectionValues("rxformat", RXFORMAT_JSON));
         rec = save(rec, spSection("tx_plan", "DENTAL_PLAN", "{\"rows\":[" + rowsJson + "]}"));
         assertReady(rec);
         return rec;

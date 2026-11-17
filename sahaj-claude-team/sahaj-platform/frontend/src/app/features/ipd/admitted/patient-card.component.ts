@@ -1,5 +1,15 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+} from '@angular/core';
+import { OrderNoticesStore } from '../orders/order-notices.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { CardActionsComponent } from '../card/card-actions.component';
 import { CardVitalsComponent } from '../card/card-vitals.component';
@@ -41,15 +51,42 @@ export class PatientCardComponent {
   /** "Open EMR" was chosen (the consultation screen of SAH-46, not the IPD EMR sheet). */
   readonly openEmrRecord = output<void>();
 
+  private readonly notices = inject(OrderNoticesStore);
+  private readonly destroyRef = inject(DestroyRef);
+  private attached = false;
+
   protected readonly nameTooltip = NAME_TOOLTIP;
+  /**
+   * The row with the badge of the 30-second counts poll (SAH-76-3) in place of the one the list carried,
+   * once a poll has answered. A card without the badge field (front desk) or the preview never changes.
+   */
+  private readonly liveRow = computed<AdmittedPatientRow>(() => {
+    const row = this.row();
+    const clinical = row.clinical;
+    if (this.preview() || !clinical || clinical.ordersToAcknowledge === undefined) {
+      return row;
+    }
+    const live = this.notices.countFor(row.id);
+    return live === null ? row : { ...row, clinical: { ...clinical, ordersToAcknowledge: live } };
+  });
   protected readonly view = computed<CardView>(() =>
-    buildCard(this.row(), this.card(), this.setup(), this.asOf()),
+    buildCard(this.liveRow(), this.card(), this.setup(), this.asOf()),
   );
   protected readonly layout = computed(() => this.setup().layout);
   protected readonly cardClass = computed(
     () => `pc lay-${this.layout()}${this.view().critical ? ' pc-crit' : ''}`,
   );
   protected readonly foldedLabel = foldedText;
+
+  constructor() {
+    // The poll runs while a card that carries the badge field is on screen (the Admitted list).
+    effect(() => {
+      if (!this.attached && !this.preview() && this.row().clinical?.ordersToAcknowledge !== undefined) {
+        this.attached = true;
+        this.notices.attach(this.destroyRef);
+      }
+    });
+  }
 
   protected press(action: CardAction): void {
     if (!this.preview()) {

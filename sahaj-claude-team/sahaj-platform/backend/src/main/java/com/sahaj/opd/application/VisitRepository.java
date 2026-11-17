@@ -23,6 +23,13 @@ public interface VisitRepository {
     /** Every visit created at or after {@code from} and before {@code to}, oldest first (SAH-16 revenue). */
     List<VisitRow> findBetween(UUID tenantId, Instant from, Instant to);
 
+    /**
+     * Visits created in {@code [from, to)} that are in one of {@code stages}, newest first, at most {@code limit}
+     * (the billing counter's earlier-days lookback).
+     */
+    List<VisitRow> findBetweenInStages(UUID tenantId, Instant from, Instant to, java.util.Collection<String> stages,
+                                       int limit);
+
     /** The visits with these ids that belong to the tenant (SAH-16 revenue); unknown ids are simply absent. */
     List<VisitRow> findByIds(UUID tenantId, java.util.Collection<UUID> ids);
 

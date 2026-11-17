@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sahaj HRA API
-  version: 0.1.0
+  version: 0.1.1
   description: Phase 1 contract, SAH-20 (staff, roster, attendance). Every call answers 403 (problem type module-off) when the HRA add-on is off for the clinic. Reads are for any clinic role. Errors are RFC 9457 application/problem+json.
 servers:
   - url: /api/v1/hra
@@ -32,6 +32,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /roster/publish:
     post:
       tags: [SAH-20]
@@ -39,6 +40,7 @@ paths:
       responses:
         '200': { description: Updated roster, content: { application/json: { schema: { $ref: '#/components/schemas/Roster' } } } }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /attendance:
     get:
       tags: [SAH-20]
@@ -59,6 +61,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /leave:
     get:
       tags: [SAH-21]
@@ -78,6 +81,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /leave/{id}/approve:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -89,6 +93,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /leave/{id}/decline:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -100,6 +105,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -119,6 +125,28 @@ components:
               fieldErrors:
                 type: array
                 items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+    DatabaseBusy:
+      description: >-
+        0.1.1 (DEC-054, SAH-39; additive, referenced from every write). The database did not answer in time: a lock
+        that stayed taken, a statement that ran past the statement timeout, or no free connection. The request was
+        rolled back, so nothing was saved by this attempt; the client may try again after Retry-After seconds. Type
+        https://sahaj.in/problems/database-busy, title "Sahaj is busy", detail "This is taking longer than usual and
+        was stopped. Nothing was saved by this attempt. Wait a moment and try again."
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again (5).
+          schema: { type: integer, minimum: 1, examples: [5] }
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status, retryAfterSeconds]
+            properties:
+              type: { type: string, const: 'https://sahaj.in/problems/database-busy' }
+              title: { type: string, examples: ['Sahaj is busy'] }
+              status: { type: integer, const: 503 }
+              detail: { type: string }
+              retryAfterSeconds: { type: integer, minimum: 1, description: 'Same value as the Retry-After header (5).' }
   schemas:
     Shift:
       type: string

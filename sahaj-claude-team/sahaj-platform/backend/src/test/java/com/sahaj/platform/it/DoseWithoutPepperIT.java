@@ -31,8 +31,12 @@ class DoseWithoutPepperIT extends MarSupport {
 
     private String activate(Clinic clinic, Adm adm, Staff doctor, String drug) throws Exception {
         String id = orderIdOf(place(doctor.auth(), adm.id(), drug));
+        String verifier = UUID.randomUUID().toString();
+        // SAH-76: the version carries the verification; the head follows in its own commit (the deferred head check)
+        commitAsTenant(clinic.tenantId(), "update ipd.medicine_order_version set verified_by = ?::uuid where order_id = ?::uuid and version_no = 1",
+                verifier, id);
         commitAsTenant(clinic.tenantId(), "update ipd.medicine_order set status = 'ACTIVE', verified_by = ?::uuid, version = version + 1 "
-                + "where id = ?::uuid and status = 'PENDING'", UUID.randomUUID().toString(), id);
+                + "where id = ?::uuid and status = 'PENDING'", verifier, id);
         java.time.LocalDate before = day.minusDays(1);
         verifiedAt(clinic, id, istOn(before, 6, 0), istOn(before, 7, 0));
         return id;

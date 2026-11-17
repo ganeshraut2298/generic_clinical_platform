@@ -64,9 +64,8 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
     @BeforeEach
     void setUp() {
         staffPin = mock(StaffPinPort.class);
-        orders = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team, auditLog,
-                gate, catalogue, assembler, guard);
-        service = new PharmacistCheckService(orders, fake, assembler, staffPin, team, gate);
+        orders = newOrderService();
+        service = new PharmacistCheckService(orders, fake, assembler, staffPin, team, gate, reviewRepo);
         when(staffPin.check(eq(TENANT), any(), anyString())).thenReturn(new PinCheck(Outcome.OK, 5, null, 0));
     }
 
@@ -85,7 +84,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
     }
 
     private PharmacistActionResult verifyAs(UUID actor, String role, OrderRow order, String token) {
-        return service.verify(TENANT, actor, role, order.id(), new VerifyOrderInput("4821", token));
+        return service.verify(TENANT, actor, role, order.id(), verifyV1("4821", token));
     }
 
     @SuppressWarnings("unchecked")
@@ -148,6 +147,75 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
         assertThat(checks.items().get(0).canVerify()).isFalse();
         assertThat(checks.items().get(0).verifyLockReason()).isEqualTo("SELF");
         assertThat(checks.items().get(0).canReject()).isTrue();
+    }
+
+    @Test
+    void theDoctorWhoChangedTheOrderSeesVerifyAndQueryLockedWithSelfChanged() {
+        memberRoles.put(OTHER_DOCTOR, "OWNER");
+        OrderRow order = pending("pcm");
+        appendVersionBy(order, OTHER_DOCTOR);
+
+        PharmacistCheckRow row = list(OTHER_DOCTOR, "OWNER").items().get(0);
+
+        assertThat(row.canVerify()).isFalse();
+        assertThat(row.verifyLockReason()).isEqualTo("SELF_CHANGED");
+        assertThat(row.canQuery()).isFalse();
+        assertThat(row.canReject()).isTrue();
+        // The orderer is still SELF, and another pharmacist can do both.
+        memberRoles.put(DOCTOR, "OWNER");
+        assertThat(list(DOCTOR, "OWNER").items().get(0).verifyLockReason()).isEqualTo("SELF");
+        PharmacistCheckRow other = list(PHARMACIST, "PHARMACIST").items().get(0);
+        assertThat(other.canVerify()).isTrue();
+        assertThat(other.canQuery()).isTrue();
+        assertThat(other.verifyLockReason()).isNull();
+    }
+
+    @Test
+    void selfChangedComesAfterHardStopAndSelfAndBeforeReadOnly() {
+        memberRoles.put(OTHER_DOCTOR, "OWNER");
+        OrderRow order = pending("pcm");
+        appendVersionBy(order, OTHER_DOCTOR);
+        ipdState("readonly");
+
+        assertThat(list(OTHER_DOCTOR, "OWNER").items().get(0).verifyLockReason()).isEqualTo("SELF_CHANGED");
+        // The orderer who also wrote the change is SELF, not SELF_CHANGED.
+        appendVersionBy(order, DOCTOR);
+        memberRoles.put(DOCTOR, "OWNER");
+        assertThat(list(DOCTOR, "OWNER").items().get(0).verifyLockReason()).isEqualTo("SELF");
+    }
+
+    @Test
+    void theAuthorOfTheCurrentVersionCannotVerifyAndNeverSpendsPinTries() {
+        memberRoles.put(OTHER_DOCTOR, "OWNER");
+        OrderRow order = pending("pcm");
+        String token = tokenOf(order);
+        appendVersionBy(order, OTHER_DOCTOR);
+
+        assertThatThrownBy(() -> verifyAs(OTHER_DOCTOR, "OWNER", order, token)).isInstanceOf(ForbiddenException.class)
+                .hasMessage("The doctor who changed this order cannot verify it. Ask the pharmacist.")
+                .satisfies(e -> {
+                    assertThat(((ForbiddenException) e).problemType()).isEqualTo("self-verification");
+                    assertThat(((ForbiddenException) e).title()).isEqualTo("You cannot verify your own order");
+                });
+
+        verifyNoInteractions(staffPin);
+        assertThat(fake.rows.get(order.id()).status()).isEqualTo("PENDING");
+        assertThat(fake.writes).isZero();
+    }
+
+    @Test
+    void theAuthorOfTheCurrentVersionIsAlsoRefusedOnLockedDataAfterThePin() {
+        memberRoles.put(OTHER_DOCTOR, "OWNER");
+        OrderRow order = pending("pcm");
+        String token = tokenOf(order);
+        appendVersionBy(order, OTHER_DOCTOR);
+
+        assertThatThrownBy(() -> orders.verifyLocked(TENANT, OTHER_DOCTOR, "OWNER", order.id(),
+                verifyV1("4821", token))).isInstanceOf(ForbiddenException.class)
+                .hasMessage("The doctor who changed this order cannot verify it. Ask the pharmacist.");
+
+        assertThat(fake.rows.get(order.id()).status()).isEqualTo("PENDING");
+        assertThat(fake.writes).isZero();
     }
 
     @Test
@@ -442,7 +510,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
 
         assertThat(service.summary(TENANT, PHARMACIST, "PHARMACIST").waiting()).isEqualTo(2);
         assertThat(fake.findWaitingKeysCalls).isEqualTo(1);
-        assertThat(fake.countWaitingCalls).isEqualTo(1);
+        assertThat(fake.countWaitingCalls).isEqualTo(2);
     }
 
     @Test
@@ -511,10 +579,10 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
         OrderRow order = pending("pcm");
         String token = tokenOf(order);
         MedicineOrderService spyOrders = org.mockito.Mockito.spy(orders);
-        PharmacistCheckService s = new PharmacistCheckService(spyOrders, fake, assembler, staffPin, team, gate);
+        PharmacistCheckService s = new PharmacistCheckService(spyOrders, fake, assembler, staffPin, team, gate, reviewRepo);
 
         PharmacistActionResult result = s.verify(TENANT, PHARMACIST, "PHARMACIST", order.id(),
-                new VerifyOrderInput("4821", token));
+                verifyV1("4821", token));
 
         InOrder sequence = inOrder(spyOrders, staffPin);
         sequence.verify(spyOrders).prepareVerify(eq(TENANT), eq(PHARMACIST), eq("PHARMACIST"), eq(order.id()), any());
@@ -615,8 +683,8 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
     void verifyChecksTheBodyBeforeAnythingElseIsRead() {
         OrderRow order = pending("pcm");
 
-        for (VerifyOrderInput bad : new VerifyOrderInput[] {new VerifyOrderInput("12", "x"),
-            new VerifyOrderInput(null, null), null}) {
+        for (VerifyOrderInput bad : new VerifyOrderInput[] {verifyV1("12", "x"),
+            verifyV1(null, null), null}) {
             assertThatThrownBy(() -> service.verify(TENANT, PHARMACIST, "PHARMACIST", order.id(), bad))
                     .isInstanceOf(InvalidFieldsException.class);
         }
@@ -646,7 +714,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
     @Test
     void verifyOfAMissingOrderIs404BeforeThePinIsSpent() {
         assertThatThrownBy(() -> service.verify(TENANT, PHARMACIST, "PHARMACIST", UUID.randomUUID(),
-                new VerifyOrderInput("4821", "AAAAAAAAAAAAAAAAAAAAAA"))).isInstanceOf(NotFoundException.class);
+                verifyV1("4821", "AAAAAAAAAAAAAAAAAAAAAA"))).isInstanceOf(NotFoundException.class);
 
         verifyNoInteractions(staffPin);
     }
@@ -722,7 +790,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
         OrderRow rejected = pending("panto");
         orders.reject(TENANT, PHARMACIST, "PHARMACIST", rejected.id(), new RejectOrderInput("WRONG_DOSE"));
         OrderRow stopped = pending("ondan");
-        orders.stop(TENANT, DOCTOR, "DOCTOR", stopped.id());
+        orders.stop(TENANT, DOCTOR, "DOCTOR", stopped.id(), stopV1());
 
         assertThatThrownBy(() -> verifyAs(PHARMACIST, "PHARMACIST", verifiedByOther, "AAAAAAAAAAAAAAAAAAAAAA"))
                 .isInstanceOf(ConflictException.class).hasMessage("Ph. Sunita Patil already verified this order.")
@@ -837,7 +905,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
         OrderRow active = pending("pcm");
         verifyAs(OTHER_PHARMACIST, "PHARMACIST", active, tokenOf(active));
         OrderRow stopped = pending("panto");
-        orders.stop(TENANT, DOCTOR, "DOCTOR", stopped.id());
+        orders.stop(TENANT, DOCTOR, "DOCTOR", stopped.id(), stopV1());
 
         assertThatThrownBy(() -> orders.reject(TENANT, PHARMACIST, "PHARMACIST", active.id(),
                 new RejectOrderInput("WRONG_DOSE"))).isInstanceOf(ConflictException.class)
@@ -881,7 +949,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
         // The admission lock serialises them: whichever runs second reads the other's result.
         OrderRow order = pending("pcm");
         String token = tokenOf(order);
-        orders.stop(TENANT, DOCTOR, "DOCTOR", order.id());
+        orders.stop(TENANT, DOCTOR, "DOCTOR", order.id(), stopV1());
 
         assertThatThrownBy(() -> verifyAs(PHARMACIST, "PHARMACIST", order, token)).isInstanceOf(ConflictException.class)
                 .hasMessage("The doctor stopped this order.");
@@ -893,7 +961,7 @@ class PharmacistCheckServiceTest extends MedicineTestBase {
         OrderRow order = pending("pcm");
         verifyAs(PHARMACIST, "PHARMACIST", order, tokenOf(order));
 
-        orders.stop(TENANT, OTHER_DOCTOR, "DOCTOR", order.id());
+        orders.stop(TENANT, OTHER_DOCTOR, "DOCTOR", order.id(), stopV1());
 
         assertThat(fake.rows.get(order.id()).status()).isEqualTo("STOPPED");
         assertThat(fake.rows.get(order.id()).verifiedBy()).isEqualTo(PHARMACIST);

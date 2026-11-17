@@ -53,9 +53,17 @@ class JdbcVitalsRepositoriesTest {
                 98, new BigDecimal("37.0"), 16, 0, Risk.LOW, false, ID)));
 
         assertThat(sql).contains("insert into ipd.vitals (admission_id, client_key, bp_systolic, bp_diastolic, pulse, "
-                + "spo2, temp_c, rr,").contains("ews_score, ews_risk, note_added, recorded_by)")
-                .contains("returning id, recorded_at").doesNotContain("recorded_at,").doesNotContain("tenant_id")
+                + "spo2, temp_c, rr,").contains("ews_score, ews_risk, note_added, recorded_by, due_interval_min)")
+                .contains(":noteAdded, :by, :dueInterval)").contains("returning id, recorded_at").doesNotContain("recorded_at,").doesNotContain("tenant_id")
                 .doesNotContain("update ").doesNotContain("delete ");
+    }
+
+    @Test
+    void theStampedIntervalIsBoundAsAnIntegerOrNull() {
+        sqlSent(() -> new JdbcVitalsRepository(jdbc).insert(TENANT, new NewVitals(ID, ID, 120, 80, 80, 98,
+                new BigDecimal("37.0"), 16, 0, Risk.LOW, false, ID, 60)));
+
+        org.mockito.Mockito.verify(spec).param("dueInterval", 60, java.sql.Types.INTEGER);
     }
 
     @Test

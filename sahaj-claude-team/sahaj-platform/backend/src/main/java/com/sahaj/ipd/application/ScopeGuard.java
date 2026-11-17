@@ -152,6 +152,12 @@ class ScopeGuard {
         require(tenantId, scope, admissionId, route, false);
     }
 
+    /*
+     * SAH-76: the contract kinds notice-locked and dose-locked (ScopeGuarded.Kind NOTICE and DOSE) need no new method:
+     * the service finds the admission of the notice or dose with a plain read (404 when absent), locks it, and calls
+     * requireAdmissionLocked below with that admission id.
+     */
+
     /**
      * A write, after the admission row is locked (or the clinic IPD lock is held): the bed's ward is read from locked
      * data and a grant is checked again against the database clock, so a transfer, a discharge or an expiry that races

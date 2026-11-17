@@ -27,6 +27,22 @@ public enum AllergyStatus {
     private static final Set<String> NONE_WORDS = Set.of("none", "nil", "nka", "nkda", "none known",
             "no known allergy", "no known allergies", "no known drug allergy", "no known drug allergies");
 
+    /** The other "nothing real written" texts: the stored placeholders that are not none words. */
+    private static final Set<String> NO_INFORMATION_WORDS = Set.of("not recorded", "unknown", "not known", "?");
+
+    /**
+     * True when the text says nothing real: null, blank, a {@linkplain #isNoneWord none word} or one of "not recorded",
+     * "unknown", "not known", "?" (whole text, any case). The one list that the patient merge and the record header
+     * use to drop a placeholder.
+     */
+    public static boolean isPlaceholder(String text) {
+        if (text == null || strip(text).isEmpty()) {
+            return true;
+        }
+        return isNoneWord(text) || NO_INFORMATION_WORDS.contains(strip(Normalizer.normalize(text, Normalizer.Form.NFC))
+                .toLowerCase(Locale.ROOT));
+    }
+
     /** The status of an allergy text (null allowed). */
     public static AllergyStatus of(String allergyText) {
         if (allergyText == null || strip(allergyText).isEmpty()) {

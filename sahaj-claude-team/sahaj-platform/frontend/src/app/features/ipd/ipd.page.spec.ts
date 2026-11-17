@@ -22,6 +22,7 @@ import { NursingSheetComponent } from './nursing/nursing-sheet.component';
 import { PharmacistStore } from './pharmacist/pharmacist.store';
 import { TOKEN_A, TOKEN_B, boardOf, pageOf } from './safety/safety.fixtures';
 import { AdmissionSafety, SafetyBannerItem } from './safety/safety.model';
+import { provideOrderNoticesStubs } from './orders/order-notices.testing';
 
 const IPD = '/api/v1/ipd';
 
@@ -111,6 +112,7 @@ describe('IpdPage', () => {
         { provide: ActivatedRoute, useValue: { snapshot: { data: routeData } } },
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
+        ...provideOrderNoticesStubs(),
         { provide: ShellStore, useValue: { me: signal({ role }), menu: signal(menu) } },
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
@@ -1420,7 +1422,7 @@ describe('IpdPage', () => {
         expect(tiles).toEqual(['escalations', 'app-pharmacist-tile', 'doses']);
         expect(view.querySelector('[data-kpi=pharmacist] .v')!.textContent).toBe('1');
         const panels = Array.from(view.querySelectorAll('.safety > *')).map((n) => n.tagName.toLowerCase());
-        expect(panels).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'app-medicine-round', 'section']);
+        expect(panels).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'app-medicine-round', 'app-orders-to-acknowledge', 'section']);
         expect(view.querySelector('#sf-esc-h')).not.toBeNull();
         expect(view.querySelector('#ph-h')).not.toBeNull();
         expect(view.querySelector('#sf-aud-h')).not.toBeNull();
@@ -2000,6 +2002,17 @@ describe('IpdPage', () => {
         http.expectOne(`${IPD}/pharmacist-checks/summary`).flush({ waiting: 3, changeToken: TOKEN_A, asOf: '2026-11-06T05:47:00Z' });
         await settle();
         // open 1 + pharmacist 3 + emergency access 2
+        expect(tabs(view)).toContain('Safety 6');
+      });
+
+      it('adds the pharmacist reviews open (contract 0.4.0) to the Safety tab number', async () => {
+        const view = setup('OWNER');
+        await loadOk(list({ safety: counts({ open: 1 }) }), false);
+        http
+          .expectOne(`${IPD}/pharmacist-checks/summary`)
+          .flush({ waiting: 3, reviewsOpen: 2, changeToken: TOKEN_A, asOf: '2026-11-06T05:47:00Z' });
+        await settle();
+        // open 1 + waiting 3 + reviews open 2
         expect(tabs(view)).toContain('Safety 6');
       });
 

@@ -57,7 +57,7 @@ class MedicineAccessIT extends MedicineSupport {
         for (String role : NON_ORDER_ROLES) {
             RequestPostProcessor auth = staff(w.clinic(), role).auth();
             refusedWith(orderCall(auth, w.adm().id(), "panto"), 403, "forbidden", ONLY_DOCTOR);
-            refusedWith(call(HttpMethod.POST, stopUrl(orderId), auth, null), 403, "forbidden", ONLY_DOCTOR);
+            refusedWith(call(HttpMethod.POST, stopUrl(orderId), auth, stopBody(1)), 403, "forbidden", ONLY_DOCTOR);
         }
         assertThat(medSnap(w.clinic(), w.adm())).isEqualTo(before);
         assertThat(state(w.clinic(), orderId).status()).isEqualTo("PENDING");
@@ -92,7 +92,7 @@ class MedicineAccessIT extends MedicineSupport {
         String id = UUID.randomUUID().toString();
         assertType(problem(call(HttpMethod.GET, emrUrl(id), noSession(), null), 401), "unauthorized");
         assertType(problem(call(HttpMethod.POST, ordersUrl(id), noSession(), "{}"), 401), "unauthorized");
-        assertType(problem(call(HttpMethod.POST, stopUrl(id), noSession(), null), 401), "unauthorized");
+        assertType(problem(call(HttpMethod.POST, stopUrl(id), noSession(), stopBody(1)), 401), "unauthorized");
         assertType(problem(call(HttpMethod.POST, verifyUrl(id), noSession(), "{}"), 401), "unauthorized");
         assertType(problem(call(HttpMethod.POST, rejectUrl(id), noSession(), "{}"), 401), "unauthorized");
         assertType(problem(call(HttpMethod.GET, CHECKS, noSession(), null), 401), "unauthorized");
@@ -111,7 +111,7 @@ class MedicineAccessIT extends MedicineSupport {
         for (String claim : new String[] {"DOCTOR", "OWNER"}) {
             RequestPostProcessor forged = tokenOf(w.clinic(), nurse.userId(), claim);
             refusedWith(orderCall(forged, w.adm().id(), "panto"), 403, "forbidden", ONLY_DOCTOR);
-            refusedWith(call(HttpMethod.POST, stopUrl(orderId), forged, null), 403, "forbidden", ONLY_DOCTOR);
+            refusedWith(call(HttpMethod.POST, stopUrl(orderId), forged, stopBody(1)), 403, "forbidden", ONLY_DOCTOR);
             refusedWith(call(HttpMethod.POST, verifyUrl(orderId), forged, verifyBody("4827", "AAAAAAAAAAAAAAAAAAAAAA")), 403,
                     "forbidden", ONLY_PHARMACIST);
             refusedWith(rejectCall(forged, orderId, "WRONG_DOSE"), 403, "forbidden", ONLY_PHARMACIST);
@@ -138,7 +138,7 @@ class MedicineAccessIT extends MedicineSupport {
         // doctor -> nurse: ordering and stopping stop at once, reading the EMR stays allowed
         setMembershipRole(w.clinic(), w.doctor().userId(), "NURSE");
         refusedWith(orderCall(w.doctor().auth(), w.adm().id(), "panto"), 403, "forbidden", ONLY_DOCTOR);
-        refusedWith(call(HttpMethod.POST, stopUrl(orderId), w.doctor().auth(), null), 403, "forbidden", ONLY_DOCTOR);
+        refusedWith(call(HttpMethod.POST, stopUrl(orderId), w.doctor().auth(), stopBody(1)), 403, "forbidden", ONLY_DOCTOR);
         emr(w.doctor().auth(), w.adm().id());
         // nurse -> front desk: the EMR is hidden
         setMembershipRole(w.clinic(), w.doctor().userId(), "FRONT_DESK");
@@ -176,7 +176,7 @@ class MedicineAccessIT extends MedicineSupport {
         refusedWith(call(HttpMethod.GET, emrUrl(id), off.as("OWNER"), null), 403, "module-off", OFF_TEXT);
         refusedWith(call(HttpMethod.GET, emrUrl(id), off.as("NURSE"), null), 403, "module-off", OFF_TEXT);
         refusedWith(call(HttpMethod.POST, ordersUrl(id), off.as("DOCTOR"), "{}"), 403, "module-off", OFF_TEXT);
-        refusedWith(call(HttpMethod.POST, stopUrl(id), off.as("OWNER"), null), 403, "module-off", OFF_TEXT);
+        refusedWith(call(HttpMethod.POST, stopUrl(id), off.as("OWNER"), stopBody(1)), 403, "module-off", OFF_TEXT);
         refusedWith(call(HttpMethod.POST, verifyUrl(id), off.as("PHARMACIST"), "{}"), 403, "module-off", OFF_TEXT);
         refusedWith(call(HttpMethod.POST, rejectUrl(id), off.as("OWNER"), "{}"), 403, "module-off", OFF_TEXT);
         refusedWith(call(HttpMethod.GET, CHECKS, off.as("PHARMACIST"), null), 403, "module-off", OFF_TEXT);
@@ -236,7 +236,7 @@ class MedicineAccessIT extends MedicineSupport {
         MedSnap before = medSnap(a.clinic(), a.adm());
         refusedWith(call(HttpMethod.GET, emrUrl(a.adm().id()), bDoctor.auth(), null), 404, "not-found", null);
         refusedWith(orderCall(bDoctor.auth(), a.adm().id(), "panto"), 404, "not-found", null);
-        refusedWith(call(HttpMethod.POST, stopUrl(orderId), bDoctor.auth(), null), 404, "not-found", null);
+        refusedWith(call(HttpMethod.POST, stopUrl(orderId), bDoctor.auth(), stopBody(1)), 404, "not-found", null);
         refusedWith(call(HttpMethod.POST, verifyUrl(orderId), bPharmacist.auth(), verifyBody("4827", "AAAAAAAAAAAAAAAAAAAAAA")),
                 404, "not-found", null);
         refusedWith(rejectCall(bPharmacist.auth(), orderId, "WRONG_DOSE"), 404, "not-found", null);
@@ -267,14 +267,16 @@ class MedicineAccessIT extends MedicineSupport {
         JsonNode all = refusedWith(call(HttpMethod.POST, ordersUrl(w.adm().id()), w.doctor().auth(),
                 "{\"clientKey\":\"x\",\"drugKey\":\"zzz\",\"frequencyKey\":\"qd\",\"overrideReasonKey\":\"OTHER\","
                         + "\"checkToken\":\"short\"}"), 400, "validation", RELOAD_TEXT);
-        assertThat(fieldNames(all)).containsExactly("clientKey", "drugKey", "frequencyKey", "overrideReasonKey", "checkToken");
+        // SAH-76 (0.4.0): the new required fields are appended after the SAH-31 ones
+        assertThat(fieldNames(all)).containsExactly("clientKey", "drugKey", "frequencyKey", "overrideReasonKey", "checkToken",
+                "priority", "doseAmount", "doseUnit", "routeKey");
         assertThat(fieldMessage(all, "clientKey")).isEqualTo(RELOAD_TEXT);
         assertThat(fieldMessage(all, "drugKey")).isEqualTo("Choose a medicine from the list");
         assertThat(fieldMessage(all, "frequencyKey")).isEqualTo("Choose how often");
         assertThat(fieldMessage(all, "overrideReasonKey")).isEqualTo("Choose a reason from the list");
         assertThat(fieldMessage(all, "checkToken")).isEqualTo(RELOAD_TEXT);
         assertThat(fieldNames(problem(call(HttpMethod.POST, ordersUrl(w.adm().id()), w.doctor().auth(), "{}"), 400)))
-                .containsExactly("clientKey", "drugKey", "frequencyKey");
+                .containsExactly("clientKey", "drugKey", "frequencyKey", "priority", "doseAmount", "doseUnit", "routeKey");
         for (String bad : new String[] {"{\"clientKey\":\"" + newKey() + "\",\"drugKey\":\"PCM\",\"frequencyKey\":\"od\"}",
                 "{\"clientKey\":\"" + newKey() + "\",\"drugKey\":\"pcm\",\"frequencyKey\":\"OD\"}",
                 "{\"clientKey\":\"" + newKey() + "\",\"drugKey\":\"pcm\",\"frequencyKey\":\"od\",\"checkToken\":\"" + "a".repeat(23)
@@ -295,11 +297,11 @@ class MedicineAccessIT extends MedicineSupport {
         MedSnap before = medSnap(w.clinic(), w.adm());
         JsonNode v = problem(call(HttpMethod.POST, verifyUrl(orderId), w.pharmacist().auth(),
                 "{\"pin\":\"12a4\",\"checkToken\":\"x\"}"), 400);
-        assertThat(fieldNames(v)).containsExactly("pin", "checkToken");
+        assertThat(fieldNames(v)).containsExactly("pin", "checkToken", "orderVersion"); // SAH-76: orderVersion is required
         assertThat(fieldMessage(v, "pin")).isEqualTo("Enter the 4-digit PIN.");
         assertThat(fieldMessage(v, "checkToken")).isEqualTo(RELOAD_TEXT);
         assertThat(fieldNames(problem(call(HttpMethod.POST, verifyUrl(orderId), w.pharmacist().auth(), "{}"), 400)))
-                .containsExactly("pin", "checkToken");
+                .containsExactly("pin", "checkToken", "orderVersion");
         for (String pin : new String[] {"123", "12345", "١٢٣٤", " 123", ""}) {
             JsonNode p = problem(call(HttpMethod.POST, verifyUrl(orderId), w.pharmacist().auth(),
                     verifyBody(pin, "AAAAAAAAAAAAAAAAAAAAAA")), 400);
@@ -321,7 +323,7 @@ class MedicineAccessIT extends MedicineSupport {
     void anUnknownOrderIsA404AndAnIdThatIsNoUuidIsA400ForStopVerifyAndReject() throws Exception {
         World w = world(NONE_KNOWN);
         UUID unknown = UUID.randomUUID();
-        refusedWith(call(HttpMethod.POST, stopUrl(unknown), w.doctor().auth(), null), 404, "not-found", null);
+        refusedWith(call(HttpMethod.POST, stopUrl(unknown), w.doctor().auth(), stopBody(1)), 404, "not-found", null);
         refusedWith(rejectCall(w.pharmacist().auth(), unknown.toString(), "WRONG_DOSE"), 404, "not-found", null);
         refusedWith(call(HttpMethod.POST, verifyUrl(unknown), w.pharmacist().auth(), verifyBody(w.pin(),
                 "AAAAAAAAAAAAAAAAAAAAAA")), 404, "not-found", null);

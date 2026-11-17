@@ -215,7 +215,7 @@ export class IpdPage implements OnInit {
     }
     return safetyTabCount(
       counts?.open,
-      this.pharmacist.waiting(),
+      (this.pharmacist.waiting() ?? 0) + (this.pharmacist.reviewsOpen() ?? 0),
       counts?.dosesLate,
       counts?.emergencyAccessWaiting,
     );

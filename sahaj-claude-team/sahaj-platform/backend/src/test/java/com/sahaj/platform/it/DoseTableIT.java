@@ -41,8 +41,8 @@ class DoseTableIT extends MarSupport {
     private static final Instant S_8PM = Instant.parse("2026-11-06T14:30:00Z");
 
     private static final String INS = "insert into ipd.dose_administration (admission_id, order_id, client_key, slot_at, outcome, "
-            + "reason_key, recorded_by, second_check_by, high_alert, identity_scan, identity_confirmed) values (?::uuid, ?::uuid, "
-            + "?::uuid, ?, ?, ?, ?::uuid, ?::uuid, ?, ?, ?) returning id::text, recorded_at::text";
+            + "reason_key, recorded_by, second_check_by, high_alert, identity_scan, identity_confirmed, scan_method) values (?::uuid, "
+            + "?::uuid, ?::uuid, ?, ?, ?, ?::uuid, ?::uuid, ?, ?, ?, ?) returning id::text, recorded_at::text";
     private static final String BY_ID = " where id = ?::uuid";
 
     /** Both clinics, their orders in every state, and a second admission of clinic A; made once (committed). */
@@ -124,7 +124,8 @@ class DoseTableIT extends MarSupport {
     private static Object[] row(String adm, String order, UUID key, Instant slot, String outcome, String reason, UUID by, UUID second,
                                 Boolean high, String scan, Boolean confirmed) {
         return new Object[] {adm, order, key.toString(), Timestamp.from(slot), outcome, reason, by.toString(),
-                second == null ? null : second.toString(), high, scan, confirmed};
+                second == null ? null : second.toString(), high, scan, confirmed,
+            "GIVEN".equals(outcome) ? "SCAN" : null}; // SAH-76: a GIVEN dose names how the patient was identified
     }
 
     private static Object[] given(String adm, String order, Instant slot, boolean high, UUID second) {
@@ -168,16 +169,16 @@ class DoseTableIT extends MarSupport {
         inA((c, fx) -> {
             String adm = fx.a().adm().id();
             String id = DbAccess.text(c, "insert into ipd.dose_administration (admission_id, order_id, client_key, slot_at, outcome, "
-                    + "reason_key, recorded_by, second_check_by, high_alert, identity_scan, identity_confirmed) values (?::uuid, ?::uuid, "
-                    + "?::uuid, ?, 'GIVEN', null, ?::uuid, null, false, 'SJ-00001', true) returning id::text", adm, fx.pcmA(),
+                    + "reason_key, recorded_by, second_check_by, high_alert, identity_scan, identity_confirmed, scan_method) values (?::uuid, ?::uuid, "
+                    + "?::uuid, ?, 'GIVEN', null, ?::uuid, null, false, 'SJ-00001', true, 'SCAN') returning id::text", adm, fx.pcmA(),
                     UUID.randomUUID().toString(), Timestamp.from(S_8AM), U1.toString());
             assertThat(DbAccess.text(c, "select (id is not null and tenant_id = ?::uuid and reason_key is null and second_check_by is null "
                     + "and identity_scan = 'SJ-00001' and identity_confirmed and not high_alert and recorded_at <= clock_timestamp() "
                     + "and recorded_at > clock_timestamp() - interval '1 second')::text from ipd.dose_administration" + BY_ID,
                     fx.a().clinic().tenantId().toString(), id)).isEqualTo("true");
             String second = DbAccess.text(c, "insert into ipd.dose_administration (admission_id, order_id, client_key, slot_at, outcome, "
-                    + "recorded_by, high_alert, identity_scan, identity_confirmed) values (?::uuid, ?::uuid, gen_random_uuid(), ?, 'GIVEN', "
-                    + "?::uuid, false, 'SJ-00001', true) returning id::text", adm, fx.pcmA(), Timestamp.from(S_2PM), U1.toString());
+                    + "recorded_by, high_alert, identity_scan, identity_confirmed, scan_method) values (?::uuid, ?::uuid, gen_random_uuid(), ?, 'GIVEN', "
+                    + "?::uuid, false, 'SJ-00001', true, 'SCAN') returning id::text", adm, fx.pcmA(), Timestamp.from(S_2PM), U1.toString());
             assertThat(DbAccess.text(c, "select ((select recorded_at from ipd.dose_administration where id = ?::uuid) < "
                     + "(select recorded_at from ipd.dose_administration where id = ?::uuid))::text", id, second))
                     .as("clock_timestamp, not the transaction start").isEqualTo("true");
@@ -302,7 +303,7 @@ class DoseTableIT extends MarSupport {
             constraint(insErr(c, row(adm, o, UUID.randomUUID(), S_8AM, "HELD", "PATIENT_REFUSED", U1, null, false, null, null)),
                     "ck_dose_administration_refused_reason");
             constraint(insErr(c, row(adm, o, UUID.randomUUID(), S_8AM, "HELD", "OTHER", U1, null, false, null, null)),
-                    "ck_dose_administration_reason");
+                    "ck_dose_administration_reason", "ck_dose_administration_other_needs_note"); // SAH-76: OTHER is a reason now and needs a note
             constraint(insErr(c, row(adm, o, UUID.randomUUID(), S_8AM, "GONE", null, U1, null, false, null, null)),
                     "ck_dose_administration_outcome", "ck_dose_administration_reason_by_outcome",
                     "ck_dose_administration_identity_scan_by_outcome");
@@ -330,8 +331,9 @@ class DoseTableIT extends MarSupport {
         inA((c, fx) -> {
             String adm = fx.a().adm().id();
             String o = fx.pcmA();
+            // DEC-057: the insert guard fires before the table checks and says the wristband scan is needed (same SQLSTATE 23514)
             constraint(insErr(c, row(adm, o, UUID.randomUUID(), S_8AM, "GIVEN", null, U1, null, false, null, true)),
-                    "ck_dose_administration_identity_scan_by_outcome");
+                    "given dose needs the wristband scan");
             constraint(insErr(c, row(adm, o, UUID.randomUUID(), S_8AM, "GIVEN", null, U1, null, false, "SJ-00001", null)),
                     "ck_dose_administration_identity_confirmed_by_outcome");
             constraint(insErr(c, row(adm, o, UUID.randomUUID(), S_8AM, "GIVEN", null, U1, null, false, "SJ-00001", false)),
@@ -427,7 +429,8 @@ class DoseTableIT extends MarSupport {
                     + "identity_confirmed = null" + BY_ID, id), "42501", "append-only");
             is(err(c, "update ipd.dose_administration set recorded_by = recorded_by" + BY_ID, id), "42501", "append-only");
             is(err(c, "delete from ipd.dose_administration" + BY_ID, id), "42501", "append-only");
-            is(err(c, "truncate ipd.dose_administration"), "42501", "append-only");
+            is(err(c, "truncate ipd.dose_administration"), "0A000", "foreign key"); // SAH-76: dose_correction references it
+            is(err(c, "truncate ipd.dose_administration, ipd.dose_correction, ipd.pharmacist_review"), "42501", "append-only");
             return null;
         });
         assertThat(doseDb(w.clinic(), order, ist(8, 0))).isEqualTo(before);
@@ -490,7 +493,12 @@ class DoseTableIT extends MarSupport {
         });
         asOwner(false, DOSE_TABLES, c -> {
             is(err(c, "truncate ipd.medicine_order"), "0A000");
-            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration"), "42501", "append-only");
+            // DEC-057: ipd.dose_scan_stop also references the order, so a list without it is refused by the foreign key (0A000)
+            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration, ipd.medicine_order_version, ipd.order_notice, ipd.order_hold, "
+                    + "ipd.medicine_order_query, ipd.pharmacist_review, ipd.dose_correction"), "0A000", "foreign key");
+            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration, ipd.medicine_order_version, ipd.order_notice, ipd.order_hold, "
+                    + "ipd.medicine_order_query, ipd.pharmacist_review, ipd.dose_correction, ipd.dose_scan_stop"), "42501", "append-only");
+            is(err(c, "truncate ipd.dose_scan_stop"), "42501", "append-only");
             is(err(c, "truncate ipd.medicine_order cascade"), "42501", "append-only");
             is(err(c, "delete from ipd.medicine_order" + BY_ID, order), "42501", "append-only");
             return null;
@@ -544,7 +552,10 @@ class DoseTableIT extends MarSupport {
                     + "cl.oid = p.polrelid where cl.relname = 'dose_administration' and p.polcmd = 'a'")).contains("current_tenant");
 
             Set<String> insert = Set.of("admission_id", "order_id", "client_key", "slot_at", "outcome", "reason_key", "recorded_by",
-                    "second_check_by", "high_alert", "identity_scan", "identity_confirmed");
+                    "second_check_by", "high_alert", "identity_scan", "identity_confirmed",
+                    // SAH-76 (docs/database/SAH-76.md 1.7): every new column except undo_until (stamped by the trigger)
+                    "attempt", "supersedes_dose_id", "order_version", "dose_kind", "scan_method", "override_reason_key", "override_note",
+                    "medicine_scan", "before_verification", "not_given_note");
             Set<String> insertable = new HashSet<>();
             Set<String> updatable = new HashSet<>();
             List<String> all = new ArrayList<>();
@@ -554,7 +565,7 @@ class DoseTableIT extends MarSupport {
                     all.add(rs.getString(1));
                 }
             }
-            assertThat(all).hasSize(14);
+            assertThat(all).hasSize(25); // 14 + 11 new columns of SAH-76
             for (String column : all) {
                 if (Boolean.parseBoolean(DbAccess.text(c, "select has_column_privilege('sahaj_app', 'ipd.dose_administration', ?, "
                         + "'INSERT')::text", column))) {
@@ -618,9 +629,10 @@ class DoseTableIT extends MarSupport {
                     + "'uq_dose_administration_tenant_client_key'")).contains("UNIQUE").contains("tenant_id, client_key");
             String comment = DbAccess.text(c, "select obj_description('ipd.dose_administration'::regclass)");
             assertThat(comment).contains("slot_at").containsIgnoringCase("partition").containsIgnoringCase("append-only");
-            // nothing points at the table by a foreign key (it can be partitioned later)
+            // SAH-76 (docs/database/SAH-76.md section 5): three foreign keys now point at the table (dose_correction, pharmacist_review and
+            // the self reference supersedes_dose_id); the partition plan must rebuild them (action for the tech lead)
             assertThat(DbAccess.count(c, "select count(*) from pg_constraint where contype = 'f' and confrelid = "
-                    + "'ipd.dose_administration'::regclass")).isZero();
+                    + "'ipd.dose_administration'::regclass")).isEqualTo(3);
             return null;
         });
     }
@@ -644,7 +656,8 @@ class DoseTableIT extends MarSupport {
     void item20TheMarOfTodayTheLastDosePerOrderTheSlotProbeAndTheReplayLookupUseTheirIndexesWith200000Rows() throws Exception {
         Ward w = ward();
         asOwner(false, DOSE_TABLES, c -> {
-            for (String fk : new String[] {"fk_dose_administration_admission", "fk_dose_administration_order", "fk_dose_administration_tenant"}) {
+            for (String fk : new String[] {"fk_dose_administration_admission", "fk_dose_administration_order", "fk_dose_administration_tenant",
+                "fk_dose_administration_version"}) { // SAH-76: the version foreign key too
                 DbAccess.execute(c, "alter table ipd.dose_administration drop constraint " + fk);
             }
             DbAccess.execute(c, "alter table ipd.dose_administration disable trigger trg_dose_administration_guard_insert");
@@ -752,7 +765,7 @@ class DoseTableIT extends MarSupport {
         }
         // an uncommitted stop does not block the insert (a non-key update and a key-share check do not conflict): both commit
         try (Connection stop = tenantConnection(w.clinic()); Connection give = tenantConnection(w.clinic())) {
-            DbAccess.execute(stop, "update ipd.medicine_order set status = 'STOPPED', stopped_by = ?::uuid, version = version + 1 "
+            DbAccess.execute(stop, "update ipd.medicine_order set status = 'STOPPED', stopped_by = ?::uuid, stop_reason = 'Not needed any more', version = version + 1 "
                     + "where id = ?::uuid", U3.toString(), givesFirst);
             DbAccess.text(give, INS, given(w.adm().id(), givesFirst, S_8AM, false, null));
             give.commit();

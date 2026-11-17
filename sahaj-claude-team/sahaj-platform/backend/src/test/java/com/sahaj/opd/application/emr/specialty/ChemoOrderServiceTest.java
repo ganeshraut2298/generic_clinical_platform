@@ -545,9 +545,12 @@ class ChemoOrderServiceTest {
                 "CYCLE", "Course", null, DOCTOR_M, java.time.LocalDate.parse("2026-10-01"), "ACTIVE", 0, "h", NOW);
     }
 
+    private boolean setRegimenChangesARow = true;
+
     private void sendWithLinkedSitting(com.sahaj.opd.application.course.TreatmentCourseRepository.SittingRow sitting,
                                        String courseKind) {
         when(courses.sittingByVisit(TENANT, VISIT)).thenReturn(Optional.of(sitting));
+        when(courses.setRegimenIfEmpty(any(), any(), any(), any())).thenReturn(setRegimenChangesARow);
         when(courses.find(TENANT, sitting.courseId())).thenReturn(Optional.of(courseOf(courseKind)));
         ObjectNode view = confirmedOrder();
         service.send(DOCTOR, RECORD, new ActionInput(stored().revision, view.path("fingerprint").asText()));
@@ -561,6 +564,17 @@ class ChemoOrderServiceTest {
 
         verify(courses).setRegimenIfEmpty(TENANT, sitting.id(), "AC", DOCTOR_USER);
         verify(courses).bumpRevision(TENANT, sitting.courseId(), DOCTOR_USER);
+    }
+
+    @Test
+    void theRevisionIsNotBumpedWhenTheRegimenUpdateChangedNoRow() {
+        setRegimenChangesARow = false;
+        var sitting = linkedCycle(null, null);
+
+        sendWithLinkedSitting(sitting, "CHEMO");
+
+        verify(courses).setRegimenIfEmpty(TENANT, sitting.id(), "AC", DOCTOR_USER);
+        verify(courses, org.mockito.Mockito.never()).bumpRevision(any(), any(), any());
     }
 
     @Test

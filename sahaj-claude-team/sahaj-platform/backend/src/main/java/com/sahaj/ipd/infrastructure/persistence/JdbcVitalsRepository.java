@@ -24,7 +24,7 @@ public class JdbcVitalsRepository implements VitalsRepository {
 
     private static final String COLUMNS = """
             v.id, v.admission_id, v.bp_systolic, v.bp_diastolic, v.pulse, v.spo2, v.temp_c, v.rr, v.ews_score,
-            v.ews_risk, v.note_added, v.recorded_at, v.recorded_by
+            v.ews_risk, v.note_added, v.recorded_at, v.recorded_by, v.due_interval_min
             """;
     private static final String FIND_LATEST = "select " + COLUMNS + """
             from ipd.vitals v
@@ -48,10 +48,10 @@ public class JdbcVitalsRepository implements VitalsRepository {
             """;
     // SAH-36 (ADR-013 R4): one probe of ix_vitals_tenant_admission_recorded per admitted admission, newest first.
     private static final String FIND_LATEST_OF_ADMITTED = """
-            select v.admission_id, v.ews_score, v.ews_risk, v.recorded_at
+            select v.admission_id, v.ews_score, v.ews_risk, v.recorded_at, v.due_interval_min
             from ipd.admission a
             cross join lateral (
-                select x.admission_id, x.ews_score, x.ews_risk, x.recorded_at
+                select x.admission_id, x.ews_score, x.ews_risk, x.recorded_at, x.due_interval_min
                 from ipd.vitals x
                 where x.tenant_id = a.tenant_id and x.admission_id = a.id
                 order by x.recorded_at desc, x.id desc
@@ -62,11 +62,11 @@ public class JdbcVitalsRepository implements VitalsRepository {
     // setup switches a reading or Last recorded on, or for the owner's preview.
     private static final String FIND_LATEST_READINGS_OF_ADMITTED = """
             select v.admission_id, v.ews_score, v.ews_risk, v.recorded_at, v.bp_systolic, v.bp_diastolic, v.pulse,
-                   v.spo2, v.temp_c, v.rr, v.recorded_by
+                   v.spo2, v.temp_c, v.rr, v.recorded_by, v.due_interval_min
             from ipd.admission a
             cross join lateral (
                 select x.admission_id, x.ews_score, x.ews_risk, x.recorded_at, x.bp_systolic, x.bp_diastolic,
-                       x.pulse, x.spo2, x.temp_c, x.rr, x.recorded_by
+                       x.pulse, x.spo2, x.temp_c, x.rr, x.recorded_by, x.due_interval_min
                 from ipd.vitals x
                 where x.tenant_id = a.tenant_id and x.admission_id = a.id
                 order by x.recorded_at desc, x.id desc
@@ -79,9 +79,9 @@ public class JdbcVitalsRepository implements VitalsRepository {
             """;
     private static final String INSERT = """
             insert into ipd.vitals (admission_id, client_key, bp_systolic, bp_diastolic, pulse, spo2, temp_c, rr,
-                                    ews_score, ews_risk, note_added, recorded_by)
+                                    ews_score, ews_risk, note_added, recorded_by, due_interval_min)
             values (:admissionId, :clientKey, :systolic, :diastolic, :pulse, :spo2, :temp, :rr, :score, :risk,
-                    :noteAdded, :by)
+                    :noteAdded, :by, :dueInterval)
             returning id, recorded_at
             """;
     private static final String INSERT_NOTE = """
@@ -133,7 +133,8 @@ public class JdbcVitalsRepository implements VitalsRepository {
         jdbc.sql(FIND_LATEST_OF_ADMITTED).param("tenantId", tenantId)
                 .query((rs, rowNum) -> new LatestScore(rs.getObject("admission_id", UUID.class),
                         rs.getInt("ews_score"), Risk.valueOf(rs.getString("ews_risk")),
-                        rs.getObject("recorded_at", OffsetDateTime.class).toInstant()))
+                        rs.getObject("recorded_at", OffsetDateTime.class).toInstant(), null, null,
+                        (Integer) rs.getObject("due_interval_min")))
                 .list().forEach(row -> latest.put(row.admissionId(), row));
         return latest;
     }
@@ -147,7 +148,7 @@ public class JdbcVitalsRepository implements VitalsRepository {
                         rs.getObject("recorded_at", OffsetDateTime.class).toInstant(),
                         new Readings(rs.getInt("bp_systolic"), rs.getInt("bp_diastolic"), rs.getInt("pulse"),
                                 rs.getInt("spo2"), rs.getBigDecimal("temp_c"), rs.getInt("rr")),
-                        rs.getObject("recorded_by", UUID.class)))
+                        rs.getObject("recorded_by", UUID.class), (Integer) rs.getObject("due_interval_min")))
                 .list().forEach(row -> latest.put(row.admissionId(), row));
         return latest;
     }
@@ -164,6 +165,7 @@ public class JdbcVitalsRepository implements VitalsRepository {
                 .param("systolic", v.bpSystolic()).param("diastolic", v.bpDiastolic()).param("pulse", v.pulse())
                 .param("spo2", v.spo2()).param("temp", v.tempC()).param("rr", v.rr()).param("score", v.ewsScore())
                 .param("risk", v.ewsRisk().name()).param("noteAdded", v.noteAdded()).param("by", v.recordedBy())
+                .param("dueInterval", v.dueIntervalMin(), java.sql.Types.INTEGER)
                 .query((rs, rowNum) -> new Stored(rs.getObject("id", UUID.class),
                         rs.getObject("recorded_at", OffsetDateTime.class).toInstant()))
                 .single();
@@ -191,6 +193,6 @@ public class JdbcVitalsRepository implements VitalsRepository {
                 rs.getBigDecimal("temp_c"), rs.getInt("rr"), rs.getInt("ews_score"),
                 Risk.valueOf(rs.getString("ews_risk")), rs.getBoolean("note_added"),
                 rs.getObject("recorded_at", OffsetDateTime.class).toInstant(),
-                rs.getObject("recorded_by", UUID.class));
+                rs.getObject("recorded_by", UUID.class), (Integer) rs.getObject("due_interval_min"));
     }
 }

@@ -20,6 +20,14 @@
       </div>
     }
 
+    @if ((store.meta()?.reviewsOpen ?? 0) > 0) {
+      <app-review-list
+        [open]="store.meta()?.reviewsOpen ?? 0"
+        (changed)="conflict()"
+        (queried)="reviewQueried($event)"
+      />
+    }
+
     @if (store.items().length === 0) {
       <div class="empty" data-testid="pharmacist-empty">{{ empty }}</div>
     } @else {
@@ -34,6 +42,28 @@
                 }
               </b>
               <small data-testid="ph-line">{{ line(r) }}</small>
+              <small data-testid="ph-details">{{ detail(r) }}</small>
+              @if (r.status === 'QUERIED') {
+                <span class="pill p-warn sfha" data-testid="ph-queried">Queried</span>
+              }
+              @if (r.details.priority === 'STAT') {
+                <span class="pill p-crit sfha" data-testid="ph-stat">STAT</span>
+              } @else if (r.details.priority === 'URGENT') {
+                <span class="pill p-warn sfha" data-testid="ph-urgent">Urgent</span>
+              }
+              @for (c of changeText(r); track $index) {
+                <small data-testid="ph-change">{{ c }}</small>
+              }
+              @if (r.changeReason) {
+                <small data-testid="ph-change-reason">Doctor's reason for the change: {{ r.changeReason }}</small>
+              }
+              @if (r.query; as q) {
+                @if (q.reply) {
+                  <small data-testid="ph-reply">Doctor's reply: {{ q.reply }}</small>
+                } @else {
+                  <small data-testid="ph-question">Your query: {{ q.question }}</small>
+                }
+              }
               @for (f of r.check.hardStops; track $index) {
                 <small class="sfbad" data-testid="ph-hardstop">
                   <app-icon name="alert" [size]="12" /> {{ f.text }}
@@ -60,6 +90,18 @@
                   Reject
                 </button>
               }
+              @if (r.canQuery) {
+                <button
+                  type="button"
+                  mat-stroked-button
+                  data-act="sfquery"
+                  [attr.aria-label]="'Query doctor about ' + r.drugName + ' for ' + r.patient.name"
+                  (click)="query(r)"
+                >
+                  Query doctor
+                </button>
+              }
+              @if (r.status !== 'QUERIED') {
               <button
                 type="button"
                 mat-flat-button
@@ -71,7 +113,8 @@
               >
                 Verify
               </button>
-              @if (!r.canVerify && r.verifyLockReason; as why) {
+              }
+              @if (r.status !== 'QUERIED' && !r.canVerify && r.verifyLockReason; as why) {
                 <small class="faint sfhint" [id]="'ph-hint-' + r.orderId" data-testid="ph-hint">
                   {{ lockHint[why] }}
                 </small>

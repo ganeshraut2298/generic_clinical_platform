@@ -18,12 +18,24 @@
       </p>
     }
 
-    <div class="sfmeds" role="list" aria-label="Medicines on the chart" tabindex="-1" data-testid="mar-orders">
-      @for (o of m.orders; track o.orderId) {
+    <div class="sfcounts" data-testid="mar-counters">
+      <span class="pill p-crit" data-testid="mar-count-late">{{ m.counters.late }} late</span>
+      <span class="pill p-warn" data-testid="mar-count-due">{{ m.counters.dueNow }} due now</span>
+      <span class="pill p-good" data-testid="mar-count-given">{{ m.counters.given }} given</span>
+      <span class="sfhint faint">{{ headerHint }}</span>
+    </div>
+
+    @if (nothingDueNow()) {
+      <p class="faint nothing-due" data-testid="mar-nothing-due">{{ nothingDueText }}</p>
+    }
+
+    <div class="sfmeds" role="list" [attr.aria-label]="listLabel" tabindex="-1" data-testid="mar-orders">
+      @for (o of shown(); track o.orderId) {
         <div
           role="listitem"
           class="sfmed"
-          [class.pend]="o.status === 'PENDING'"
+          [class.pend]="o.status === 'PENDING' || o.status === 'QUERIED'"
+          [class.off]="o.status === 'ON_HOLD' || o.status === 'STOPPED' || o.status === 'REJECTED'"
           [attr.data-order]="o.orderId"
           [attr.data-status]="o.status"
         >
@@ -32,66 +44,152 @@
               <b [id]="'mar-name-' + o.orderId" data-testid="mar-drug">{{ o.drugName }}</b>
               <small data-testid="mar-order-line">{{ line(o) }}</small>
             </span>
+            @if (o.prn) {
+              <span class="pill p-blue" data-testid="mar-prn-chip">PRN</span>
+            }
+            @if (marker(o); as text) {
+              <span class="pill p-wait" data-testid="mar-changed">{{ text }}</span>
+            }
             @if (o.highAlert) {
               <span class="pill p-crit sfha" data-testid="mar-high-alert" [attr.title]="highAlertHint">
                 <app-icon name="alert" [size]="12" /> {{ highAlertText(o) }}
                 <span class="sr-only">. {{ highAlertHint }}</span>
               </span>
             }
+            @if (o.details.pharmacistChecked === false) {
+              <span class="pill p-wait" data-testid="mar-not-checked">Not pharmacist checked</span>
+            }
             @let p = pill(o);
             <span [class]="'pill ' + p.css" data-testid="mar-status">{{ p.text }}</span>
           </div>
 
-          <div class="sfslots">
-            @for (s of o.slots; track s.slotAt) {
-              @let c = chip(s);
-              @if (c.kind === 'button') {
+          @if (o.prn; as prnLine) {
+            @let pv = prnOf(prnLine, o);
+            <div class="sfprn" data-testid="mar-prn">
+              @if (pv.indication) {
+                <span data-testid="mar-prn-indication">{{ pv.indication }}</span>
+              }
+              <span data-testid="mar-prn-interval">{{ pv.interval }}</span>
+              <span data-testid="mar-prn-used">{{ pv.used }}</span>
+              @if (pv.canGive) {
                 <button
                   type="button"
-                  [class]="'sfs ' + c.tone"
-                  data-testid="mar-slot"
+                  class="sfs warn"
+                  data-testid="mar-prn-give"
                   [attr.data-order]="o.orderId"
-                  [attr.data-slot]="s.slotAt"
-                  [attr.data-state]="s.state"
                   [attr.aria-describedby]="'mar-name-' + o.orderId"
-                  [disabled]="!s.canGive || !m.canGive"
-                  (click)="give(o, s)"
+                  [disabled]="!m.canGive"
+                  (click)="give(o, null)"
                 >
-                  {{ c.time }}<small>{{ c.small }}</small>
+                  Give<small>As needed</small>
                 </button>
-              } @else {
-                <span
-                  [class]="'sfs ' + c.tone"
-                  tabindex="-1"
-                  data-testid="mar-slot"
-                  [attr.data-order]="o.orderId"
-                  [attr.data-slot]="s.slotAt"
-                  [attr.data-state]="s.state"
-                  [attr.title]="c.hint"
-                >
-                  @if (c.kind === 'done') {
-                    <app-icon name="check" [size]="12" />
-                  }
-                  {{ c.time }}<small>{{ c.small }}</small>
-                  <!-- The reason of a not-given slot is already in its small text; only "Given by" is extra. -->
-                  @if (c.kind === 'done' && c.hint; as hint) {
-                    <span class="sr-only">. {{ hint }}</span>
-                  }
-                </span>
               }
+            </div>
+            @if (pv.lock; as lock) {
+              <p class="sfnote" data-testid="mar-prn-lock"><app-icon name="lock" [size]="12" /> {{ lock }}</p>
             }
-          </div>
+          }
 
-          @if (o.status === 'PENDING') {
-            <p class="sfnote" data-testid="mar-pending-note">
-              <app-icon name="lock" [size]="12" /> {{ pendingLock }}
-            </p>
+          @if (o.slots.length > 0) {
+            <div class="sfslots">
+              @for (s of o.slots; track s.slotAt + s.orderVersion) {
+                @let c = chip(s, o);
+                @if (c.kind === 'button') {
+                  <button
+                    type="button"
+                    [class]="'sfs ' + c.tone"
+                    data-testid="mar-slot"
+                    [attr.data-order]="o.orderId"
+                    [attr.data-slot]="s.slotAt"
+                    [attr.data-state]="s.state"
+                    [attr.aria-describedby]="'mar-name-' + o.orderId"
+                    [disabled]="!s.canGive || !m.canGive"
+                    (click)="give(o, s)"
+                  >
+                    {{ c.time }}<small>{{ c.small }}</small>
+                  </button>
+                } @else if (c.kind === 'done' && s.dose?.canMarkInError) {
+                  <button
+                    type="button"
+                    [class]="'sfs ' + c.tone"
+                    data-testid="mar-slot"
+                    data-correctable="true"
+                    [attr.data-order]="o.orderId"
+                    [attr.data-slot]="s.slotAt"
+                    [attr.data-state]="s.state"
+                    [attr.aria-describedby]="'mar-name-' + o.orderId"
+                    [attr.aria-label]="'Given at ' + c.time + '. Open to mark as recorded in error'"
+                    (click)="openError(o, s)"
+                  >
+                    <app-icon name="check" [size]="12" />
+                    {{ c.time }}<small>{{ c.small }}</small>
+                  </button>
+                } @else {
+                  <span
+                    [class]="'sfs ' + c.tone"
+                    tabindex="-1"
+                    data-testid="mar-slot"
+                    [attr.data-order]="o.orderId"
+                    [attr.data-slot]="s.slotAt"
+                    [attr.data-state]="s.state"
+                    [attr.title]="c.hint"
+                  >
+                    @if (c.kind === 'done') {
+                      <app-icon name="check" [size]="12" />
+                    }
+                    {{ c.time }}<small>{{ c.small }}</small>
+                    <!-- The reason of a not-given slot is already in its small text; only "Given by" is extra. -->
+                    @if (c.kind === 'done' && c.hint; as hint) {
+                      <span class="sr-only">. {{ hint }}</span>
+                    }
+                  </span>
+                }
+              }
+            </div>
+          }
+
+          @for (s of o.slots; track s.slotAt + s.orderVersion) {
+            @for (h of s.history; track h.id) {
+              @let hl = history(h);
+              <p class="sfhist" data-testid="mar-history">
+                <s>{{ hl.original }}</s> · {{ hl.note }}
+              </p>
+            }
+          }
+
+          @if (lockLine(o); as lock) {
+            <p class="sfnote" data-testid="mar-order-lock"><app-icon name="lock" [size]="12" /> {{ lock }}</p>
           }
         </div>
       } @empty {
         <div class="empty" data-testid="mar-empty">{{ noMedicines }}</div>
       }
     </div>
+
+    @if (m.foldedCount > 0) {
+      <button
+        type="button"
+        class="linkbtn foldbtn"
+        data-act="mar-fold"
+        [attr.aria-expanded]="showFolded()"
+        (click)="showFolded.set(!showFolded())"
+      >
+        {{ foldLabel(m.foldedCount, showFolded()) }}
+      </button>
+    }
+
+    @if (errorView(); as view) {
+      <app-dose-error-panel
+        [admissionId]="m.admissionId"
+        [order]="view.order"
+        [slot]="view.slot"
+        [dose]="view.dose"
+        [reasons]="m.inErrorReasons"
+        (corrected)="errorCorrected($event)"
+        (closed)="closeError()"
+        (reload)="errorReload()"
+      />
+    }
 
     <p class="faint sfleg" data-testid="mar-legend">
       <app-icon name="shieldu" [size]="12" /> {{ closingLine }}

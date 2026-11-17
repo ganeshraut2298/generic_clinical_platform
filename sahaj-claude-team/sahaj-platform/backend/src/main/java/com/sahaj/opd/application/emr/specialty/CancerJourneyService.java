@@ -45,6 +45,8 @@ public class CancerJourneyService {
 
     static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final Pattern HTML = Pattern.compile("<[a-zA-Z/!]");
+    /** A control character (NUL, tab, line break and the like) in a one-line text (SAH-75 security L5). */
+    private static final Pattern CONTROL = Pattern.compile("\\p{Cc}");
     private static final Set<String> FIELDS = Set.of("expectedVersion", "stageGroup", "tnmText", "markersText",
             "ki67Pct", "geneticsText", "intent", "setting", "lineNo", "boardDate");
     /** Accepted and ignored: the clinic is always the signed-in user's. */
@@ -100,6 +102,10 @@ public class CancerJourneyService {
         List<String> changed = new ArrayList<>();
         JourneyRow next = merge(latest, parsed, authorized.patientId(), current + 1, recordId, member.membershipId(),
                 user.userId(), changed);
+        if (latest != null && changed.isEmpty()) {
+            // SAH-75 review #5: nothing changed, so no new version and no audit; the answer is the latest version.
+            return view(tenantId, latest, clock.instant());
+        }
         try {
             journeys.insert(tenantId, next);
         } catch (DuplicateKeyException e) {
@@ -209,6 +215,8 @@ public class CancerJourneyService {
             errors.add(new FieldMessage(name, "Enter up to " + max + " characters."));
         } else if (HTML.matcher(text).find()) {
             errors.add(new FieldMessage(name, "Remove the markup."));
+        } else if (CONTROL.matcher(text).find()) {
+            errors.add(new FieldMessage(name, "Remove the control characters."));
         } else {
             parsed.values.put(name, text.isEmpty() ? null : text);
         }

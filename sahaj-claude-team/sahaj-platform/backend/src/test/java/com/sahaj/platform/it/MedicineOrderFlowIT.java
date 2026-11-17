@@ -110,7 +110,8 @@ class MedicineOrderFlowIT extends MedicineSupport {
         JsonNode sheet = emr(w.doctor().auth(), w.adm().id());
         List<String> labels = new ArrayList<>();
         sheet.get("frequencies").forEach(x -> labels.add(x.get("key").asText() + ":" + x.get("label").asText()));
-        assertThat(labels).containsExactly("od:Once daily", "bd:Twice daily", "tds:Three times daily", "q8:8-hourly");
+        assertThat(labels).containsExactly("od:Once daily", "bd:Twice daily", "tds:Three times daily", "q8:8-hourly",
+                "prn:As needed (PRN)"); // SAH-76: PRN joins the list
     }
 
     @Test

@@ -247,7 +247,7 @@ export function cardLabel(row: Pick<AdmittedPatientRow, 'patientName' | 'bedCode
 
 // ---- Flags (ADR-013 D4) ----
 
-export type FlagKind = 'escalation' | 'emergency-access' | 'allergy' | 'ews' | 'vitals' | 'home' | 'deposit' | 'round';
+export type FlagKind = 'escalation' | 'orders' | 'emergency-access' | 'allergy' | 'ews' | 'vitals' | 'home' | 'deposit' | 'round';
 export type FlagTone = 'crit' | 'warn' | 'blue' | 'grey' | 'good';
 
 export interface CardFlag {
@@ -291,6 +291,19 @@ export function cardFlags(row: AdmittedPatientRow, card: AdmittedCardAbilities):
         tone: 'warn',
         icon: 'siren',
         title: 'Doctor reviewing',
+        safety: true,
+      });
+    }
+    const orders = c.ordersToAcknowledge;
+    if (orders && orders.count > 0) {
+      // SAH-76-3: after the escalation flag. Red when any open order is STAT, else amber; the words always show.
+      const text = `${orders.count} to acknowledge`;
+      flags.push({
+        kind: 'orders',
+        text,
+        tone: orders.stat > 0 ? 'crit' : 'warn',
+        icon: 'emr',
+        title: orders.stat > 0 ? `${text}, including STAT` : text,
         safety: true,
       });
     }

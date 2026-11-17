@@ -121,7 +121,7 @@ class MedicineDbErrorsIT extends MedicineSupport {
             String toReject = orderIdOf(place(w.doctor().auth(), w.adm().id(), "panto"));
             MedSnap before = medSnap(w.clinic(), w.adm());
             forced(w.clinic(), "update", "new.status = 'STOPPED'", error[0], error[1], () ->
-                    assertGeneric500(problem(call(HttpMethod.POST, stopUrl(toStop), w.doctor().auth(), null), 500)));
+                    assertGeneric500(problem(call(HttpMethod.POST, stopUrl(toStop), w.doctor().auth(), stopBody(1)), 500)));
             forced(w.clinic(), "update", "new.status = 'REJECTED'", error[0], error[1], () ->
                     assertGeneric500(problem(rejectCall(w.pharmacist().auth(), toReject, "WRONG_DOSE"), 500)));
             assertThat(medSnap(w.clinic(), w.adm())).as(error[0]).isEqualTo(before);
@@ -141,7 +141,7 @@ class MedicineDbErrorsIT extends MedicineSupport {
         String id = orderIdOf(place(w.doctor().auth(), w.adm().id(), "pcm"));
         MedSnap before = medSnap(w.clinic(), w.adm());
         forced(w.clinic(), "update", "new.status = 'STOPPED'", "23514", "ck_medicine_order_stopped_at", () -> {
-            JsonNode p = problem(call(HttpMethod.POST, stopUrl(id), w.doctor().auth(), null), 500);
+            JsonNode p = problem(call(HttpMethod.POST, stopUrl(id), w.doctor().auth(), stopBody(1)), 500);
             assertGeneric500(p, "only while the patient is admitted");
         });
         assertThat(medSnap(w.clinic(), w.adm())).isEqualTo(before);

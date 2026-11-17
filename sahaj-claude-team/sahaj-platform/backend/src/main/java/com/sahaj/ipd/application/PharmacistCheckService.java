@@ -44,9 +44,12 @@ public class PharmacistCheckService {
     private final StaffPinPort staffPin;
     private final TeamMemberPort team;
     private final IpdGate gate;
+    private final PharmacistReviewRepository reviews;
 
     PharmacistCheckService(MedicineOrderService orders, MedicineOrderRepository repository,
-                           MedicineAssembler assembler, StaffPinPort staffPin, TeamMemberPort team, IpdGate gate) {
+                           MedicineAssembler assembler, StaffPinPort staffPin, TeamMemberPort team, IpdGate gate,
+                           PharmacistReviewRepository reviews) {
+        this.reviews = reviews;
         this.orders = orders;
         this.repository = repository;
         this.assembler = assembler;
@@ -87,7 +90,10 @@ public class PharmacistCheckService {
         pharmacistMembership(tenantId, actor);
         Instant asOf = repository.databaseNow();
         List<WaitingKey> keys = repository.findWaitingKeys(tenantId);
-        return new PharmacistChecksSummary(keys.size(), changeToken(keys), asOf);
+        int waiting = repository.countWaiting(tenantId);
+        int queried = repository.countQueried(tenantId);
+        List<UUID> reviewIds = reviews.findOpenIds(tenantId);
+        return new PharmacistChecksSummary(waiting, changeToken(keys, reviewIds), asOf, queried, reviewIds.size());
     }
 
     /**
@@ -108,9 +114,20 @@ public class PharmacistCheckService {
      * It holds no name, drug or text, and changes when an order starts or stops waiting.
      */
     static String changeToken(List<WaitingKey> keys) {
+        return changeToken(keys, List.of());
+    }
+
+    /**
+     * SAH-76: the same hash also over the queried orders (they are in {@code keys}) and the open review-after-dose items
+     * (the lines {@code r:<id>}), so the page reloads when either changes.
+     */
+    static String changeToken(List<WaitingKey> keys, List<UUID> openReviewIds) {
         List<String> lines = new ArrayList<>();
         for (WaitingKey key : keys) {
             lines.add(key.id().toString().toLowerCase(Locale.ROOT) + ":" + key.version());
+        }
+        for (UUID reviewId : openReviewIds) {
+            lines.add("r:" + reviewId.toString().toLowerCase(Locale.ROOT));
         }
         Collections.sort(lines);
         return Fingerprint.of(lines);

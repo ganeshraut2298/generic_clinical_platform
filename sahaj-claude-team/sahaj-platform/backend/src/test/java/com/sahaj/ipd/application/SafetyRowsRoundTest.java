@@ -8,6 +8,7 @@ import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState.Status;
 import com.sahaj.ipd.domain.Frequency;
 import com.sahaj.ipd.domain.MedicineRound;
+import com.sahaj.ipd.domain.RoundOrders;
 import com.sahaj.ipd.domain.MedicineRound.RoundOrder;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,7 +39,7 @@ class SafetyRowsRoundTest {
     }
 
     private static RoundOrder odOrder(UUID id) {
-        return new RoundOrder(id, UUID.randomUUID(), UUID.randomUUID(), "101", "Tab. Paracetamol 650 mg", null,
+        return RoundOrders.of(id, UUID.randomUUID(), UUID.randomUUID(), "101", "Tab. Paracetamol 650 mg", null,
                 Frequency.OD, LONG_AGO);
     }
 

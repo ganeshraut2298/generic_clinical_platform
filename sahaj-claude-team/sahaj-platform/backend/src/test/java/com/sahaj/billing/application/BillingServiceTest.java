@@ -369,6 +369,68 @@ class BillingServiceTest {
         assertThat(counter.paidToday()).extracting(BillSummaryView::visitId).containsExactly(paidVisit);
     }
 
+    private static VisitForBilling earlierVisit(UUID id, String stage, int token, long fee) {
+        return new VisitForBilling(id, PATIENT_ID, "Dr Rao", "NEW", stage, token, fee);
+    }
+
+    @Test
+    void counterKeepsAnUnpaidBillOfAnEarlierDayAndDropsAPaidOne() {
+        UUID unpaidDone = UUID.randomUUID();
+        UUID paidDone = UUID.randomUUID();
+        UUID stuckInBilling = UUID.randomUUID();
+        UUID paidBillId = UUID.randomUUID();
+        when(visitBillingPort.today(TENANT_ID)).thenReturn(List.of());
+        when(visitBillingPort.earlier(TENANT_ID, BillingService.EARLIER_DAYS)).thenReturn(List.of(
+                earlierVisit(unpaidDone, "DONE", 1, 45000), earlierVisit(paidDone, "DONE", 2, 50000),
+                earlierVisit(stuckInBilling, "BILLING", 3, 50000)));
+        when(billRepository.findByVisits(eq(TENANT_ID), any()))
+                .thenReturn(List.of(new BillRow(paidBillId, paidDone, 0, null, 0)));
+        when(paymentRepository.paidByBills(eq(TENANT_ID), any()))
+                .thenReturn(List.of(new PaymentRepository.BillPaid(paidBillId, 50000)));
+
+        CounterView counter = service.counter(TENANT_ID);
+
+        assertThat(counter.dues()).extracting(BillSummaryView::visitId).containsExactly(unpaidDone);
+        assertThat(counter.awaiting()).extracting(BillSummaryView::visitId).containsExactly(stuckInBilling);
+        assertThat(counter.paidToday()).isEmpty();
+        verify(billRepository, never()).findByVisit(any(), any());
+    }
+
+    @Test
+    void counterListsEarlierDuesOldestFirstBeforeTodaysDues() {
+        UUID todayDue = UUID.randomUUID();
+        UUID oldest = UUID.randomUUID();
+        UUID newer = UUID.randomUUID();
+        when(visitBillingPort.today(TENANT_ID)).thenReturn(List.of(earlierVisit(todayDue, "DONE", 5, 50000)));
+        when(billRepository.findByVisit(TENANT_ID, todayDue)).thenReturn(Optional.empty());
+        when(visitBillingPort.earlier(TENANT_ID, BillingService.EARLIER_DAYS)).thenReturn(List.of(
+                earlierVisit(oldest, "DONE", 1, 50000), earlierVisit(newer, "DONE", 2, 50000)));
+
+        CounterView counter = service.counter(TENANT_ID);
+
+        assertThat(counter.dues()).extracting(BillSummaryView::visitId).containsExactly(oldest, newer, todayDue);
+    }
+
+    @Test
+    void aPartialPaymentOnAnEarlierDayLeavesTheRemainingBalanceInDues() {
+        UUID visitId = UUID.randomUUID();
+        UUID billId = UUID.randomUUID();
+        when(visitBillingPort.today(TENANT_ID)).thenReturn(List.of());
+        when(visitBillingPort.earlier(TENANT_ID, BillingService.EARLIER_DAYS))
+                .thenReturn(List.of(earlierVisit(visitId, "DONE", 1, 50000)));
+        when(billRepository.findByVisits(eq(TENANT_ID), any()))
+                .thenReturn(List.of(new BillRow(billId, visitId, 0, null, 0)));
+        when(paymentRepository.paidByBills(eq(TENANT_ID), any()))
+                .thenReturn(List.of(new PaymentRepository.BillPaid(billId, 20000)));
+
+        CounterView counter = service.counter(TENANT_ID);
+
+        assertThat(counter.dues()).singleElement().satisfies(due -> {
+            assertThat(due.visitId()).isEqualTo(visitId);
+            assertThat(due.balancePaise()).isEqualTo(30000);
+        });
+    }
+
     // --- day closing ---
 
     @Test

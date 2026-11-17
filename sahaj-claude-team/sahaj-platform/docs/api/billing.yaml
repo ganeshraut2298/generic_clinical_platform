@@ -1,8 +1,14 @@
 openapi: 3.1.0
 info:
   title: Sahaj Billing API
-  version: 0.4.0
+  version: 0.4.1
   description: >-
+    0.4.1 (15 Nov 2026, DEC-054, SAH-39; additive). New reusable response DatabaseBusy: 503 with problem type
+    database-busy ("Sahaj is busy"), header Retry-After 5 and body field retryAfterSeconds 5, when a database lock wait,
+    statement timeout or no free connection stopped the request. The request was rolled back: nothing was saved by that
+    attempt and the client may try again after the wait. Referenced from every write and from the revenue report; no
+    path, schema or problem type is otherwise changed.
+
     0.4.0 (14 Nov 2026, SAH-75-3 and SAH-75-10, DEC-052; ADR-026 D4). No path, problem type or table is added; the
     course account reads three new facts of the course plan through opd.api TreatmentCoursePort. (1) A sitting removed
     from the plan ("Remove") is not returned by the port and is out of the estimate, the counts and the IPD deposit
@@ -84,6 +90,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /bills/{visitId}/items/{itemId}:
     parameters:
       - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -94,6 +101,7 @@ paths:
         '200': { description: Item removed, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /bills/{visitId}/discount:
     parameters:
       - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -107,6 +115,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /bills/{visitId}/payments:
     parameters:
       - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -120,6 +129,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /bills/{visitId}/refund:
     parameters:
       - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -133,6 +143,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /revenue:
     get:
       tags: [SAH-16]
@@ -142,6 +153,7 @@ paths:
         '200': { description: Revenue report for the Asia/Kolkata range, content: { application/json: { schema: { $ref: '#/components/schemas/RevenueReport' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /today-summary:
     get:
       tags: [SAH-15]
@@ -167,6 +179,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /courses/{courseId}/account:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -237,6 +250,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: course-not-found }
         '409': { $ref: '#/components/responses/Problem', description: idempotency-conflict }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /courses/{courseId}/receipts/{receiptNo}:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -276,6 +290,28 @@ components:
               fieldErrors:
                 type: array
                 items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
+    DatabaseBusy:
+      description: >-
+        0.4.1 (DEC-054). The database did not answer in time: a lock that stayed taken, a statement that ran past the
+        statement timeout, or no free connection. The request was rolled back, so nothing was saved by this attempt;
+        the client may try again after Retry-After seconds. Type https://sahaj.in/problems/database-busy, title "Sahaj
+        is busy", detail "This is taking longer than usual and was stopped. Nothing was saved by this attempt. Wait a
+        moment and try again."
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again (5).
+          schema: { type: integer, minimum: 1, examples: [5] }
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status, retryAfterSeconds]
+            properties:
+              type: { type: string, const: 'https://sahaj.in/problems/database-busy' }
+              title: { type: string, examples: ['Sahaj is busy'] }
+              status: { type: integer, const: 503 }
+              detail: { type: string }
+              retryAfterSeconds: { type: integer, minimum: 1, description: 'Same value as the Retry-After header (5).' }
   schemas:
     PaymentMode:
       type: string

@@ -1,0 +1,21 @@
+// Order fields (SAH-76-1). Colours come from the tokens only.
+:host {
+  display: block;
+}
+
+.grid-f {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.stat-note {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+}

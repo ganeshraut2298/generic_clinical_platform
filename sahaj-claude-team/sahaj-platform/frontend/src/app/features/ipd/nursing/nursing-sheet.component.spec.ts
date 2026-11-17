@@ -7,6 +7,7 @@ import { problemDetailInterceptor } from '../../../core/http/problem-detail.inte
 import { marOf } from '../mar/mar.fixtures';
 import { NursingSheetComponent } from './nursing-sheet.component';
 import { LatestVitals, NursingSheet, VitalsSaved } from './nursing.model';
+import { provideOrderNoticesStubs } from '../orders/order-notices.testing';
 
 const SHEET_URL = '/api/v1/ipd/admissions/a1/nursing';
 const VITALS_URL = '/api/v1/ipd/admissions/a1/vitals';
@@ -41,6 +42,9 @@ const SHEET: NursingSheet = {
   latest: LATEST,
   vitalsDue: false,
   doseCount: 0,
+  ordersToAcknowledge: { count: 0, stat: 0, overdue: 0 },
+  vitalsDueAt: null,
+  vitalsIntervalMinutes: 240,
   recentNotes: [
     { id: 'n1', text: 'BP rechecked after medicine: 154/92.', recordedAt: minutesBefore(45), recordedByName: 'Sr. Anjali Pawar' },
     { id: 'n2', text: 'Slept well.', recordedAt: minutesBefore(300), recordedByName: 'Sr. Meena Rao' },
@@ -111,6 +115,7 @@ describe('NursingSheetComponent', () => {
         { provide: MatSnackBar, useValue: { open: snack } },
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
+        ...provideOrderNoticesStubs(),
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -993,7 +998,7 @@ describe('NursingSheetComponent', () => {
 
   describe('the tabs (SAH-32, mockup sfNsTabs)', () => {
     const MAR_URL = '/api/v1/ipd/admissions/a1/mar';
-    const tab = (key: 'vit' | 'mar') => el().querySelector<HTMLButtonElement>(`#nv-tab-${key}`)!;
+    const tab = (key: 'vit' | 'mar' | 'ord') => el().querySelector<HTMLButtonElement>(`#nv-tab-${key}`)!;
     const panel = (key: 'vit' | 'mar') => el().querySelector<HTMLElement>(`#nv-panel-${key}`);
     const key = (target: HTMLElement, k: string): KeyboardEvent => {
       const event = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
@@ -1008,12 +1013,12 @@ describe('NursingSheetComponent', () => {
       await settle();
     }
 
-    it('has a tablist named "Nursing" with the two tabs, icons and no count when nothing is due', async () => {
+    it('has a tablist named "Nursing" with the three tabs, icons and no count when nothing is due', async () => {
       await setup();
       const list = el().querySelector('[role=tablist]')!;
       expect(list.getAttribute('aria-label')).toBe('Nursing');
       const tabs = Array.from(list.querySelectorAll('[role=tab]'));
-      expect(tabs.map((t) => (t.textContent ?? '').replace(/\s+/g, ' ').trim())).toEqual(['Vitals and notes', 'Medicines (MAR)']);
+      expect(tabs.map((t) => (t.textContent ?? '').replace(/\s+/g, ' ').trim())).toEqual(['Vitals and notes', 'Medicines (MAR)', 'Orders']);
       expect(tab('vit').querySelector('app-icon')).toBeTruthy();
       expect(tab('mar').querySelector('app-icon')).toBeTruthy();
       expect(el().querySelector('[data-testid="nursing-dose-count"]')).toBeNull();
@@ -1156,14 +1161,12 @@ describe('NursingSheetComponent', () => {
       expect(document.activeElement).toBe(tab('vit'));
     });
 
-    it('End goes to the last tab and Home to the first', async () => {
+    it('End goes to the last tab (Orders) and Home to the first', async () => {
       await setup();
       key(tab('vit'), 'End');
       await settle();
-      http.expectOne(MAR_URL).flush(marOf());
-      await settle();
-      expect(tab('mar').getAttribute('aria-selected')).toBe('true');
-      key(tab('mar'), 'Home');
+      expect(tab('ord').getAttribute('aria-selected')).toBe('true');
+      key(tab('ord'), 'Home');
       await settle();
       http.expectOne(SHEET_URL).flush(SHEET);
       await settle();

@@ -109,8 +109,6 @@ public class EmrRecordService {
     static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final String ENTITY = "EMR_RECORD";
     private static final Set<String> OPEN_CASE_STATUSES = Set.of("WAITING", "SEEN");
-    private static final Set<String> NO_INFORMATION = Set.of("none known", "not recorded", "unknown", "not known", "?",
-            "none", "nil");
     private static final int MAX_REFERRAL = 300;
 
     private final EmrAccess access;
@@ -567,7 +565,8 @@ public class EmrRecordService {
                 errors.add(new FieldMessage(where + ".values", "This section has a field that is not in the layout."));
                 continue;
             }
-            if (value == null || value.isNull()) {
+            if (value == null || value.isNull() || (value.isTextual() && value.asText().isBlank())) {
+                // null or blank text means nothing entered: the field is cleared, whatever its kind (SAH-75).
                 continue;
             }
             String name = where + ".values." + field.key();
@@ -1871,7 +1870,7 @@ public class EmrRecordService {
             return null;
         }
         String trimmed = text.strip();
-        return trimmed.isEmpty() || NO_INFORMATION.contains(trimmed.toLowerCase(Locale.ROOT)) ? null : trimmed;
+        return AllergyStatus.isPlaceholder(trimmed) ? null : trimmed;
     }
 
     /** First letters of up to two words, upper case. */

@@ -32,7 +32,9 @@ export const NO_COURSE = 'No course started yet.';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatButtonModule, IconComponent, CoursePage],
   template: `
-    @if (loading()) {
+    @if (courseId(); as id) {
+      <app-course [courseId]="id" [embedded]="true" [visitId]="visitId()" [kind]="kind()" />
+    } @else if (loading()) {
       <p class="faint" aria-busy="true" data-testid="course-panel-loading">Opening the course</p>
     } @else if (error(); as message) {
       <div class="notice err" role="alert" data-testid="course-panel-error">
@@ -40,8 +42,6 @@ export const NO_COURSE = 'No course started yet.';
         <span>{{ message }}</span>
         <button mat-stroked-button type="button" data-act="retry-panel" (click)="load()">Try again</button>
       </div>
-    } @else if (courseId(); as id) {
-      <app-course [courseId]="id" [embedded]="true" [visitId]="visitId()" [kind]="kind()" />
     } @else if (showStart()) {
       <section class="empty surf" [attr.aria-label]="title()" data-testid="course-panel-empty">
         <h3>{{ title() }}</h3>
@@ -103,20 +103,25 @@ export class CoursePanelComponent {
     const r = this.store.record();
     return r?.encounterType === 'OPD_VISIT' ? r.encounterId : null;
   });
+  /** The patient of this record; a save changes the record but not the patient, so it does not reload the panel. */
+  private readonly patientId = computed(() => this.store.record()?.header.patientId ?? null);
   private readonly startKey = newClientKey();
 
   constructor() {
     effect(() => {
-      const patientId = this.store.record()?.header.patientId;
+      const patientId = this.patientId();
       this.kind();
       if (patientId) {
-        untracked(() => this.load());
+        untracked(() => {
+          this.courseId.set(null);
+          this.load();
+        });
       }
     });
   }
 
   protected load(): void {
-    const patientId = this.store.record()?.header.patientId;
+    const patientId = this.patientId();
     if (!patientId) {
       return;
     }
@@ -124,12 +129,14 @@ export class CoursePanelComponent {
     this.error.set(null);
     this.api.listForPatient(patientId, this.kind()).subscribe({
       next: (list) => {
-        this.courseId.set(list[0]?.id ?? null);
+        this.courseId.set(list[0]?.id ?? this.courseId());
         this.loading.set(false);
       },
       error: (e: unknown) => {
         this.loading.set(false);
-        this.error.set(detailOr(e, 'We could not open the course. Try again.'));
+        if (!this.courseId()) {
+          this.error.set(detailOr(e, 'We could not open the course. Try again.'));
+        }
       },
     });
   }

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
  * and the locked transaction ({@link MedicineAdministration#recordLocked}). Both transactional methods are on another
  * bean, so each call goes through the transaction proxy.
  *
- * <p>A wristband mismatch is answered 409, but its clinical event and audit row must stay: the transaction that wrote
+ * <p>A wristband or medicine mismatch, or an audited refusal, is answered 409, but its clinical event and audit row must stay: the transaction that wrote
  * them returns a result and commits, and only this class throws afterwards.
  */
 @Service
@@ -49,8 +49,8 @@ public class DoseService {
         switch (prepared.kind()) {
             case REPLAY:
                 return new DoseResult(prepared.replay(), false);
-            case MISMATCH:
-                throw mismatch();
+            case REFUSED:
+                throw refusal(prepared.refusal());
             default:
                 break;
         }
@@ -62,8 +62,8 @@ public class DoseService {
         Recorded recorded = administration.recordLocked(tenantId, actor, role, orderId, input.withoutPin(),
                 colleagueUserId);
         switch (recorded.kind()) {
-            case MISMATCH:
-                throw mismatch();
+            case REFUSED:
+                throw refusal(recorded.refusal());
             case REPLAYED:
                 return new DoseResult(recorded.answer(), false);
             default:
@@ -71,8 +71,8 @@ public class DoseService {
         }
     }
 
-    /** 409 wristband-mismatch: no name in a problem detail (the client builds the toast from the MAR it holds). */
-    private static ConflictException mismatch() {
-        return new ConflictException("wristband-mismatch", MISMATCH_TITLE, DoseRules.MISMATCH);
+    /** The 409 of a refusal whose entries are already committed: no name in a problem detail. */
+    private static ConflictException refusal(MedicineAdministration.Refusal refusal) {
+        return new ConflictException(refusal.problem(), refusal.title(), refusal.detail());
     }
 }

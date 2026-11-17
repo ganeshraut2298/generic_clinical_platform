@@ -1,11 +1,16 @@
 package com.sahaj.ipd.application;
 
+import com.sahaj.ipd.application.MarViews.CorrectionInput;
 import com.sahaj.ipd.application.MarViews.DoseInput;
+import com.sahaj.ipd.application.MarViews.OverrideInput;
 import com.sahaj.ipd.domain.Drug;
 import com.sahaj.ipd.domain.DoseSlots;
+import com.sahaj.ipd.domain.InErrorReason;
 import com.sahaj.ipd.domain.NotGivenReason;
+import com.sahaj.ipd.domain.ScanOverrideReason;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
+import com.sahaj.platform.api.InvalidInputException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -44,7 +49,37 @@ final class DoseRules {
     static final String NOT_A_DOSE_TIME =
             "This is not a dose time of this medicine today. Reload the page and try again.";
     static final String BEFORE_START = "This dose time is before the pharmacist checked the order.";
-    static final String NOT_DUE = "This dose is not due yet. It can be given from 1 hour before its time.";
+    static final String ON_HOLD = "This order is on hold. Do not give it.";
+    static final String ORDER_CHANGED = "This order was changed. Reload and check the new order.";
+    static final String CANNOT_NOW = "This dose cannot be given now. Reload the page.";
+    static final String SCAN_MEDICINE = "Scan or type the medicine code.";
+    static final String CHOOSE_OVERRIDE = "Choose why you cannot scan.";
+    static final String OVERRIDE_NOTE = "Write what you checked instead.";
+    static final String OVERRIDE_AFTER_MISMATCH_TITLE = "Override not allowed";
+    static final String OVERRIDE_AFTER_MISMATCH =
+            "A scan for this dose did not match in the last 15 minutes. Check the patient and the medicine, then scan the medicine code.";
+    static final String WRITE_WHAT_HAPPENED = "Write what happened.";
+    static final String CHOOSE_IN_ERROR = "Choose why it is in error.";
+    static final String ONLY_CORRECTORS = "Only nurses and the clinic owner can correct a dose.";
+    static final String ONLY_RECORDER = "Only the nurse who recorded this dose can undo it.";
+    static final String CANNOT_UNDO = "This dose cannot be undone.";
+    static final String CANNOT_MARK_ERROR = "This dose cannot be marked in error.";
+    static final String UNDO_EXPIRED = "The time to undo has passed. Mark it as recorded in error instead.";
+    static final String ERROR_WINDOW_CLOSED = "This dose is from an earlier day and cannot be changed.";
+    static final int NOTE_MIN = 4;
+    static final int NOTE_MAX = 200;
+
+    /** The IST time as the contract writes it in a PRN answer: "2:30 PM" (minutes always shown). */
+    static String clockText(Instant instant) {
+        java.time.ZonedDateTime time = instant.atZone(DoseSlots.IST);
+        int hour = time.getHour() % 12 == 0 ? 12 : time.getHour() % 12;
+        return hour + ":" + (time.getMinute() < 10 ? "0" : "") + time.getMinute() + (time.getHour() < 12 ? " AM" : " PM");
+    }
+
+    /** The text of a dose that is not due yet: names the window in force (ADR-027 D2). */
+    static String notDue(int windowBeforeMin) {
+        return "This dose is not due yet. It can be given from " + windowBeforeMin + " min before its time.";
+    }
     static final String RECORDED = "This dose is already recorded.";
     static final String KEY_REUSED = "This dose was already recorded with different values. Reload the page.";
     static final String LOCK_READONLY = "IPD is read-only. Doses cannot be recorded.";
@@ -59,10 +94,11 @@ final class DoseRules {
     }
 
     /**
-     * The checked format of the body: clientKey, slotAt, outcome (every format error together; the detail is the first).
-     * The bedside fields and the reason are checked later, one message at a time.
+     * The checked format of the body: clientKey, slotAt (when sent), outcome, orderVersion (every format error together;
+     * the detail is the first). {@code slotAt} is null for a PRN dose: whether it is required is decided once the order is
+     * known. The bedside fields and the reason are checked later, one message at a time.
      */
-    record Body(UUID clientKey, Instant slotAt, boolean given) {
+    record Body(UUID clientKey, Instant slotAt, boolean given, int orderVersion) {
 
         @Override
         public String toString() {
@@ -76,8 +112,9 @@ final class DoseRules {
         if (clientKey == null) {
             errors.add(new FieldMessage("clientKey", MedicineRules.RELOAD_MESSAGE));
         }
-        Instant slotAt = slot(input == null ? null : input.slotAt());
-        if (slotAt == null) {
+        String slotText = input == null ? null : input.slotAt();
+        Instant slotAt = slot(slotText);
+        if (slotText != null && slotAt == null) {
             errors.add(new FieldMessage("slotAt", MedicineRules.RELOAD_MESSAGE));
         }
         String outcome = input == null ? null : input.outcome();
@@ -85,10 +122,33 @@ final class DoseRules {
         if (!given && !OUTCOME_NOT_GIVEN.equals(outcome)) {
             errors.add(new FieldMessage("outcome", MedicineRules.RELOAD_MESSAGE));
         }
+        Integer version = orderVersion(input == null ? null : input.orderVersion());
+        if (version == null) {
+            errors.add(new FieldMessage("orderVersion", MedicineRules.RELOAD_MESSAGE));
+        }
         if (!errors.isEmpty()) {
             throw new InvalidFieldsException(errors, true);
         }
-        return new Body(clientKey, slotAt, given);
+        return new Body(clientKey, slotAt, given, version);
+    }
+
+    /** The order version as sent: a whole number of 1 or more (a JSON number or its text), else null. */
+    static Integer orderVersion(Object value) {
+        if (value instanceof Integer i) {
+            return i >= 1 ? i : null;
+        }
+        if (value instanceof Long l) {
+            return l >= 1 && l <= Integer.MAX_VALUE ? Integer.valueOf((int) (long) l) : null;
+        }
+        if (value instanceof String text) {
+            try {
+                int parsed = Integer.parseInt(text.strip());
+                return parsed >= 1 ? Integer.valueOf(parsed) : null;
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static Instant slot(String text) {
@@ -121,6 +181,57 @@ final class DoseRules {
         return input == null ? null : NotGivenReason.ofKey(input.reasonKey()).orElse(null);
     }
 
+    /** The manual override: its reason and the trimmed note (clinical text). */
+    record ScanOverride(ScanOverrideReason reason, String note) {
+        @Override
+        public String toString() {
+            return "ScanOverride[reason=" + reason + "]";
+        }
+    }
+
+    /** True when the body carries an override object (valid or not): the medicine code may then be empty (the wristband never). */
+    static boolean hasOverride(DoseInput input) {
+        return input != null && input.override() != null;
+    }
+
+    /** The override, checked: reason key of the three accepted on input (400 field override.reasonKey), then a note of 4 to 200 characters after trimming. */
+    static ScanOverride override(DoseInput input) {
+        OverrideInput o = input.override();
+        ScanOverrideReason reason = ScanOverrideReason.ofInputKey(o.reasonKey()).orElse(null);
+        if (reason == null) {
+            throw new InvalidInputException("override.reasonKey", CHOOSE_OVERRIDE);
+        }
+        String note = o.note() == null ? "" : o.note().strip();
+        if (note.length() < NOTE_MIN || note.length() > NOTE_MAX) {
+            throw new InvalidInputException("override.note", OVERRIDE_NOTE);
+        }
+        return new ScanOverride(reason, note);
+    }
+
+    /** The note of a NOT_GIVEN dose with reason OTHER: 4 to 200 characters after trimming (400 field note). */
+    static String otherNote(DoseInput input) {
+        String note = input.note() == null ? "" : input.note().strip();
+        if (note.length() < NOTE_MIN || note.length() > NOTE_MAX) {
+            throw new InvalidInputException("note", WRITE_WHAT_HAPPENED);
+        }
+        return note;
+    }
+
+    /** The client key of an undo or an in-error mark (400 field clientKey). */
+    static UUID correctionKey(CorrectionInput input) {
+        UUID key = ClientKeys.parse(input == null ? null : input.clientKey());
+        if (key == null) {
+            throw new InvalidInputException("clientKey", MedicineRules.RELOAD_MESSAGE);
+        }
+        return key;
+    }
+
+    /** The reason of an in-error mark (400 field reasonKey). */
+    static InErrorReason inErrorReason(CorrectionInput input) {
+        return InErrorReason.ofKey(input.reasonKey())
+                .orElseThrow(() -> new InvalidInputException("reasonKey", CHOOSE_IN_ERROR));
+    }
+
     // ---- clinical event templates (ADR-011 D9; wording changed forward only by ADR-014 D11: the record must not claim a
     // scan that may not have happened; events written before keep "wristband scanned") ----
 
@@ -130,7 +241,19 @@ final class DoseRules {
     private static final String SECOND_CHECK = " · second check by ";
 
     static String gaveText(Drug drug, Instant slotAt, String secondNurseName) {
+        return gaveText(drug, slotAt, secondNurseName, null, false);
+    }
+
+    /** SAH-76: " · scan override: <reason label>" for an override and " · before pharmacist check" for a STAT dose. */
+    static String gaveText(Drug drug, Instant slotAt, String secondNurseName, ScanOverrideReason override,
+                           boolean beforeVerification) {
         String text = "Gave " + drug.name() + " (" + DoseSlots.clock(slotAt) + " dose) · identity checked against UHID";
+        if (override != null) {
+            text += " · scan override: " + override.label();
+        }
+        if (beforeVerification) {
+            text += " · before pharmacist check";
+        }
         if (secondNurseName == null) {
             return fit(text);
         }
@@ -142,6 +265,19 @@ final class DoseRules {
 
     static String notGivenText(Drug drug, Instant slotAt, NotGivenReason reason) {
         return fit("Did not give " + drug.name() + " (" + DoseSlots.clock(slotAt) + " dose) · " + reason.label());
+    }
+
+    /** The deny entry of a medicine code mismatch; {@code code} is a code of the drug master or the fixed words. */
+    static String medicineDeniedText(String code, Drug drug) {
+        return fit("Stopped at the medicine check: entered " + code + ", expected " + drug.name());
+    }
+
+    static String undoneText(Drug drug) {
+        return fit("Undid the dose of " + drug.name());
+    }
+
+    static String inErrorText(Drug drug, InErrorReason reason) {
+        return fit("Marked the dose of " + drug.name() + " recorded in error: " + reason.label());
     }
 
     static String deniedText(String scan, String uhid, Drug drug) {

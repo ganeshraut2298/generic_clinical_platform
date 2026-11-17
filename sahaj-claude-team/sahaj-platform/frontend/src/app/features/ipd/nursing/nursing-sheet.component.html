@@ -48,6 +48,27 @@
             <span class="c num" data-testid="nursing-dose-count">{{ n }}</span>
           }
         </button>
+        <button
+          type="button"
+          role="tab"
+          id="nv-tab-ord"
+          [attr.aria-controls]="tab() === 'ord' ? 'nv-panel-ord' : null"
+          data-testid="nursing-tab-ord"
+          [attr.aria-selected]="tab() === 'ord'"
+          [attr.tabindex]="tab() === 'ord' ? 0 : -1"
+          (click)="selectTab('ord')"
+          (keydown)="tabKey($event)"
+        >
+          <app-icon name="emr" [size]="14" /> {{ tabOrders }}
+          @if (ordersBadge(); as o) {
+            <span
+              [class]="'c num ' + (o.stat > 0 ? 'stat' : 'amber')"
+              data-testid="nursing-orders-count"
+              [attr.aria-label]="o.count + ' to acknowledge'"
+              >{{ o.count }}</span
+            >
+          }
+        </button>
       </div>
 
       @if (tab() === 'vit') {
@@ -57,6 +78,14 @@
               <app-icon name="heart" [size]="16" />
               <span>Early warning score <b>{{ n.strong }}</b>{{ n.advice }}</span>
             </div>
+          }
+
+          @if (sheet(); as sh) {
+            <app-vitals-due-line
+              [dueAt]="sh.vitalsDueAt ?? null"
+              [asOf]="sh.asOf"
+              [discharged]="sh.status === 'DISCHARGED'"
+            />
           }
 
           <div class="nvg">
@@ -145,9 +174,13 @@
             }
           </div>
         </div>
-      } @else {
+      } @else if (tab() === 'mar') {
         <div class="panel" role="tabpanel" tabindex="0" id="nv-panel-mar" aria-labelledby="nv-tab-mar">
           <app-mar-tab [admissionId]="s.admissionId" (marChange)="marChanged($event)" />
+        </div>
+      } @else {
+        <div class="panel" role="tabpanel" tabindex="0" id="nv-panel-ord" aria-labelledby="nv-tab-ord">
+          <app-orders-tab [admissionId]="s.admissionId" (counted)="ordersCounted($event)" />
         </div>
       }
     </div>
@@ -166,8 +199,10 @@
             <app-icon name="check" [size]="15" /> Save vitals and note
           </button>
         }
-      } @else {
+      } @else if (tab() === 'mar') {
         <button mat-flat-button type="button" data-act="mar-done" (click)="close()">Done</button>
+      } @else {
+        <button mat-flat-button type="button" data-act="orders-done" (click)="close()">Done</button>
       }
     </div>
   } @else {

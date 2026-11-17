@@ -27,12 +27,12 @@ class EmrGlobalTablesIT extends EmrSupport {
             "emr_starter_layout", "emr_department_alias"};
     private static final String[] MASTER_TABLES = {"emr_complaint", "emr_investigation", "emr_advice"};
 
-    /** Per starter: the number of sections in its ordered list (SAH-53-1, 341 in all). */
+    /** Per starter: the number of sections in its ordered list (SAH-53-1, 349 in all after SAH-75). */
     private static final Map<String, Integer> PLACEMENTS = new LinkedHashMap<>();
 
     static {
-        PLACEMENTS.put("gm", 19);
-        PLACEMENTS.put("dental", 24);
+        PLACEMENTS.put("gm", 20);
+        PLACEMENTS.put("dental", 30);
         PLACEMENTS.put("og", 25);
         PLACEMENTS.put("paeds", 23);
         PLACEMENTS.put("physio", 27);
@@ -44,7 +44,7 @@ class EmrGlobalTablesIT extends EmrSupport {
         PLACEMENTS.put("cardio", 21);
         PLACEMENTS.put("ayush", 21);
         PLACEMENTS.put("onco", 27);
-        PLACEMENTS.put("surgery", 26);
+        PLACEMENTS.put("surgery", 27);
         PLACEMENTS.put("psych", 20);
     }
 
@@ -69,18 +69,22 @@ class EmrGlobalTablesIT extends EmrSupport {
         assertThat(count("select count(*) from opd.emr_complaint")).isEqualTo(59);
         assertThat(count("select count(*) from opd.emr_investigation")).isEqualTo(46);
         assertThat(count("select count(*) from opd.emr_advice")).isEqualTo(50);
-        assertThat(count("select count(*) from opd.emr_section")).isEqualTo(100);
+        assertThat(count("select count(*) from opd.emr_section")).isEqualTo(107);
         assertThat(count("select count(*) from opd.emr_section where kind = 'COMMON'")).isEqualTo(14);
-        assertThat(count("select count(*) from opd.emr_section where kind = 'SPECIALTY'")).isEqualTo(78);
+        assertThat(count("select count(*) from opd.emr_section where kind = 'SPECIALTY'")).isEqualTo(85);
         assertThat(count("select count(*) from opd.emr_section where kind = 'COMPLIANCE'")).isEqualTo(8);
-        assertThat(count("select count(*) from opd.emr_section_field")).isEqualTo(313);
-        assertThat(count("select count(*) from opd.emr_section_field_option")).isEqualTo(136);
+        assertThat(count("select count(*) from opd.emr_section_field")).isEqualTo(335);
+        assertThat(count("select count(*) from opd.emr_section_field_option")).isEqualTo(244);
         assertThat(count("select count(*) from opd.emr_starter_department")).isEqualTo(15);
-        assertThat(count("select count(*) from opd.emr_starter_department_section")).isEqualTo(341);
+        assertThat(count("select count(*) from opd.emr_starter_department_section")).isEqualTo(349);
         assertThat(count("select count(*) from opd.emr_department_alias")).isEqualTo(54);
-        assertThat(count("select count(*) from opd.emr_starter_layout")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_layout")).isEqualTo(32);
+        // SAH-75 (docs/database/SAH-75.md 7.6): 15 x v1, 15 x v2, and v3 for og and onco only
         assertThat(count("select count(*) from opd.emr_starter_layout where layout_version = 1")).isEqualTo(15);
-        assertThat(count("select count(*) from opd.emr_starter_department where current_layout_version = 1")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_layout where layout_version = 2")).isEqualTo(15);
+        assertThat(count("select count(*) from opd.emr_starter_layout where layout_version = 3")).isEqualTo(2);
+        assertThat(keys("select starter_key from opd.emr_starter_department where current_layout_version = 3")).isEqualTo(setOf("og", "onco"));
+        assertThat(count("select count(*) from opd.emr_starter_department where current_layout_version = 2")).isEqualTo(13);
     }
 
     @Test
@@ -102,7 +106,7 @@ class EmrGlobalTablesIT extends EmrSupport {
             assertThat(count("select count(*) from opd.emr_starter_department_section where starter_key = ? and position between 1 and ?",
                     e.getKey(), e.getValue())).as(e.getKey() + " positions").isEqualTo((long) e.getValue());
         }
-        assertThat(PLACEMENTS.values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(341);
+        assertThat(PLACEMENTS.values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(349);
         assertThat(count("select count(*) from opd.emr_section s where not exists (select 1 from "
                 + "opd.emr_starter_department_section p where p.section_key = s.section_key)"))
                 .as("every library section is used by at least one department").isZero();
@@ -119,13 +123,21 @@ class EmrGlobalTablesIT extends EmrSupport {
             List<String> order = new ArrayList<>();
             globalRows("select section_key from opd.emr_starter_department_section where starter_key = ? order by position",
                     starter).forEach(r -> order.add(r.get(0)));
-            assertThat(order.subList(0, 14)).as(starter + " starts with the common sections").containsExactlyElementsOf(common);
+            if (Set.of("gm", "dental", "surgery").contains(starter)) {
+                // SAH-75 (ADR-026 D2): gm, dental and surgery are renumbered (local_exam, the six Dental cards, the Treatment order)
+                assertThat(order).as(starter + " still holds the fourteen common sections").containsAll(common);
+                assertThat(order.subList(0, 2)).as(starter + " starts with vitals and complaints").containsExactly("vitals", "complaints");
+            } else {
+                assertThat(order.subList(0, 14)).as(starter + " starts with the common sections").containsExactlyElementsOf(common);
+            }
             List<String> tail = order.subList(order.size() - ("og".equals(starter) ? 4 : 3), order.size());
             assertThat(tail).as(starter + " ends with the compliance sections")
                     .containsExactlyElementsOf("og".equals(starter) ? List.of("abha", "consent", "rxformat", "pcpndt")
                             : List.of("abha", "consent", "rxformat"));
             // the sections between are specialty sections
-            for (String key : order.subList(14, order.size() - ("og".equals(starter) ? 4 : 3))) {
+            List<String> between = new ArrayList<>(order.subList(0, order.size() - ("og".equals(starter) ? 4 : 3)));
+            between.removeAll(common);
+            for (String key : between) {
                 assertThat(globalRows("select kind from opd.emr_section where section_key = ?", key).get(0).get(0))
                         .as(starter + "/" + key + " (a consent or scheme section of the library is COMPLIANCE by ADR-020 yet sits among the specialty sections)")
                         .isIn("SPECIALTY", "COMPLIANCE");
@@ -170,12 +182,13 @@ class EmrGlobalTablesIT extends EmrSupport {
     @Test
     void theStartingValuesAreSeededAsDrawnInTheStoryLists() throws Exception {
         String shown = "from opd.emr_starter_department_section where ";
-        assertThat(keys("select distinct section_key " + shown + "required")).as("Required at start (12 keys)")
-                .isEqualTo(setOf("complaints", "diagnosis", "rx", "rxformat", "dental_chart", "pcpndt", "anc", "pain", "va",
-                        "immunization", "growth", "lesion_map"));
-        assertThat(keys("select distinct section_key " + shown + "print")).as("Print on prescription (12 keys)")
+        assertThat(keys("select distinct section_key " + shown + "required")).as("Required at start (17 keys after SAH-75: rxformat and dental_chart no longer; vitals, dental_medhx, tx_plan, menstrual, sx_fitness, sx_plan, sx_consent new)")
+                .isEqualTo(setOf("complaints", "diagnosis", "rx", "pcpndt", "anc", "pain", "va",
+                        "immunization", "growth", "lesion_map", "vitals", "dental_medhx", "tx_plan", "menstrual", "sx_fitness",
+                        "sx_plan", "sx_consent"));
+        assertThat(keys("select distinct section_key " + shown + "print")).as("Print on prescription (13 keys: local_exam added by SAH-75)")
                 .isEqualTo(setOf("vitals", "complaints", "diagnosis", "rx", "advice", "followup", "investigations",
-                        "refraction", "tx_plan", "hep", "anc", "immunization"));
+                        "refraction", "tx_plan", "hep", "anc", "immunization", "local_exam"));
         assertThat(keys("select distinct section_key " + shown + "copy_from_last")).as("Copy from last visit (10 keys)")
                 .isEqualTo(setOf("history", "allergy", "obstetric", "menstrual", "birth", "dental_chart", "chronic",
                         "immunization", "growth", "prakriti"));
@@ -193,8 +206,8 @@ class EmrGlobalTablesIT extends EmrSupport {
     @Test
     void theSectionsOffAtStartAreTheListedOnesAndConsentStartsOnlyForTheSixConsentDepartments() throws Exception {
         Map<String, Set<String>> hidden = new LinkedHashMap<>();
-        hidden.put("gm", setOf("procedures", "referral", "consent"));
-        hidden.put("dental", setOf("exam", "hpi", "referral"));
+        hidden.put("gm", setOf("referral", "consent")); // SAH-75: procedures is shown
+        hidden.put("dental", setOf("exam", "hpi", "referral", "intraoral", "extraoral")); // SAH-75: the two old cards stay, hidden
         hidden.put("og", setOf("referral"));
         hidden.put("paeds", setOf("referral", "procedures", "consent"));
         hidden.put("physio", setOf("rx", "investigations", "exam", "procedures", "consent"));
@@ -216,7 +229,7 @@ class EmrGlobalTablesIT extends EmrSupport {
                 .isEqualTo(setOf("dental", "og", "ortho", "derm", "onco", "surgery"));
         assertThat(keys("select starter_key from opd.emr_starter_department where consent_flag"))
                 .isEqualTo(setOf("dental", "og", "ortho", "derm", "onco", "surgery"));
-        assertThat(count("select count(*) from opd.emr_starter_department_section where not shown")).isEqualTo(30);
+        assertThat(count("select count(*) from opd.emr_starter_department_section where not shown")).isEqualTo(31);
         // a hidden section is never required, and only PCPNDT Form F in og is a placement lock
         assertThat(count("select count(*) from opd.emr_starter_department_section where required and not shown")).isZero();
         assertThat(globalRows("select starter_key || '/' || section_key from opd.emr_starter_department_section where always_shown"))
@@ -265,7 +278,8 @@ class EmrGlobalTablesIT extends EmrSupport {
                 + "and o.is_none) <> 1")).as("required multi-select without exactly one None").isZero();
         assertThat(globalRows("select o.section_key || '.' || o.field_key from opd.emr_section_field_option o "
                 + "where o.is_none order by 1").stream().map(r -> r.get(0)).toList())
-                .containsExactly("modalities.modality", "sx_fitness.pre_op_tests");
+                .containsExactly("dental_intraoral.soft_tissue", "dental_medhx.allergies", "dental_medhx.conditions",
+                        "dental_medhx.medicines", "modalities.modality", "sx_fitness.pre_op_tests");
         for (String field : new String[] {"dental_chart.numbering", "pain.scale", "mmt.grade", "onc_ecog.ecog",
                 "onc_regimen.dose_level", "sx_fitness.asa_grade", "sx_fitness.pac", "sx_plan.anaesthesia"}) {
             String[] parts = field.split("\\.");
@@ -292,7 +306,7 @@ class EmrGlobalTablesIT extends EmrSupport {
         assertThat(count("select count(*) from opd.emr_section_field f where f.options_source <> 'FIELD' and exists "
                 + "(select 1 from opd.emr_section_field_option o where o.section_key = f.section_key and o.field_key = f.field_key)"))
                 .as("options only where the source is FIELD").isZero();
-        assertThat(count("select count(distinct section_key || '.' || field_key) from opd.emr_section_field_option")).isEqualTo(37);
+        assertThat(count("select count(distinct section_key || '.' || field_key) from opd.emr_section_field_option")).isEqualTo(60);
         db().asMigrator(c -> {
             assertThat(expectError(c, "insert into opd.emr_section_field (section_key, field_key, position, label, field_type, options_source) "
                     + "values ('vitals', 'qa_a', 98, 'Qa a', 'TEXT', 'MASTER')").state()).isEqualTo("23514");
@@ -381,16 +395,16 @@ class EmrGlobalTablesIT extends EmrSupport {
         // version 2 can be added next to version 1, and the starter can point at it in the same transaction (deferred key)
         db().asMigrator(c -> {
             expectOk(c, "insert into opd.emr_starter_layout (starter_key, layout_version, layout) "
-                    + "select starter_key, 2, layout from opd.emr_starter_layout where starter_key = 'gm' and layout_version = 1");
-            expectOk(c, "update opd.emr_starter_department set current_layout_version = 2 where starter_key = 'gm'");
-            assertThat(DbAccess.count(c, "select count(*) from opd.emr_starter_layout where starter_key = 'gm'")).isEqualTo(2);
+                    + "select starter_key, 3, layout from opd.emr_starter_layout where starter_key = 'gm' and layout_version = 2");
+            expectOk(c, "update opd.emr_starter_department set current_layout_version = 3 where starter_key = 'gm'");
+            assertThat(DbAccess.count(c, "select count(*) from opd.emr_starter_layout where starter_key = 'gm'")).isEqualTo(3);
             expectOk(c, "set constraints all immediate");
             // a layout version that does not exist cannot be pointed at
-            assertThat(expectError(c, "update opd.emr_starter_department set current_layout_version = 3 where starter_key = 'gm'")
+            assertThat(expectError(c, "update opd.emr_starter_department set current_layout_version = 4 where starter_key = 'gm'")
                     .state()).isEqualTo("23503");
             return null;
         });
-        assertThat(count("select count(*) from opd.emr_starter_layout where starter_key = 'gm'")).as("rolled back").isEqualTo(1);
+        assertThat(count("select count(*) from opd.emr_starter_layout where starter_key = 'gm'")).as("rolled back").isEqualTo(2);
     }
 
     @Test
@@ -399,7 +413,8 @@ class EmrGlobalTablesIT extends EmrSupport {
             List<List<String>> doc = globalRows("select s ->> 'key', s ->> 'part', s ->> 'shown', s ->> 'required', s ->> 'print', "
                     + "s ->> 'copy', s ->> 'collapsed', s ->> 'hideLocked', jsonb_array_length(s -> 'fields')::text "
                     + "from opd.emr_starter_layout l, jsonb_array_elements(l.layout -> 'sections') with ordinality as t(s, n) "
-                    + "where l.starter_key = ? and l.layout_version = 1 order by t.n", starter);
+                    + "where l.starter_key = ? and l.layout_version = (select current_layout_version from opd.emr_starter_department d "
+                    + "where d.starter_key = l.starter_key) order by t.n", starter);
             List<List<String>> tables = globalRows("select p.section_key, p.part, p.shown::text, p.required::text, p.print::text, "
                     + "p.copy_from_last::text, p.collapsed::text, (p.always_shown or s.always_shown)::text, "
                     + "(select count(*) from opd.emr_section_field f where f.section_key = p.section_key)::text "
@@ -408,10 +423,11 @@ class EmrGlobalTablesIT extends EmrSupport {
             assertThat(doc).as("layout document of " + starter).isEqualTo(tables);
         }
         // hideLocked is true for Allergies everywhere and for PCPNDT Form F in og only
+        // every layout row (15 x v1, 15 x v2, 2 x v3 since SAH-75) keeps the Allergies lock; Form F is locked in the 3 og rows only
         assertThat(count("select count(*) from opd.emr_starter_layout l, jsonb_array_elements(l.layout -> 'sections') s "
-                + "where s ->> 'key' = 'allergy' and (s ->> 'hideLocked')::boolean")).isEqualTo(15);
+                + "where s ->> 'key' = 'allergy' and (s ->> 'hideLocked')::boolean")).isEqualTo(32);
         assertThat(count("select count(*) from opd.emr_starter_layout l, jsonb_array_elements(l.layout -> 'sections') s "
-                + "where (s ->> 'hideLocked')::boolean and s ->> 'key' <> 'allergy'")).isEqualTo(1);
+                + "where (s ->> 'hideLocked')::boolean and s ->> 'key' <> 'allergy'")).isEqualTo(3);
         assertThat(count("select count(*) from opd.emr_starter_layout l where jsonb_typeof(l.layout -> 'schemaVersion') <> 'number'"))
                 .isZero();
     }

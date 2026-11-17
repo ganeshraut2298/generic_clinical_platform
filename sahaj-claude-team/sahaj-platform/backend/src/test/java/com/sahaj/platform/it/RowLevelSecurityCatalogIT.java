@@ -175,7 +175,8 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
      * still work. {@link #globalCatalogueTablesHaveExactlyTheSelectAndMigratorPoliciesAndNoTenantData} proves exactly that, so
      * the tenant rule below skips them.
      */
-    private static final Set<String> GLOBAL_CATALOGUE_TABLES = Set.of("ipd.drug", "ipd.drug_interaction");
+    private static final Set<String> GLOBAL_CATALOGUE_TABLES = Set.of("ipd.drug", "ipd.drug_interaction",
+            "ipd.nursing_profile_template", "ipd.drug_code");
 
     @Test
     void everyPolicyAppliesToSahajAppOnlyAndIsBuiltOnTheBoundTenantWithNoEscape() throws Exception {
@@ -244,6 +245,10 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
         expectedPolicies.put("ipd.drug", Set.of("p_drug_select|r|sahaj_app|true|", "p_drug_migrator|*|sahaj_migrator|true|true"));
         expectedPolicies.put("ipd.drug_interaction", Set.of("p_drug_interaction_select|r|sahaj_app|true|",
                 "p_drug_interaction_migrator|*|sahaj_migrator|true|true"));
+        // SAH-76 (docs/database/SAH-76.md sections 1.1 and 4): two more global tables, same pattern
+        expectedPolicies.put("ipd.nursing_profile_template", Set.of("p_nursing_profile_template_select|r|sahaj_app|true|",
+                "p_nursing_profile_template_migrator|*|sahaj_migrator|true|true"));
+        expectedPolicies.put("ipd.drug_code", Set.of("p_drug_code_select|r|sahaj_app|true|", "p_drug_code_migrator|*|sahaj_migrator|true|true"));
         assertThat(expectedPolicies.keySet()).containsExactlyInAnyOrderElementsOf(GLOBAL_CATALOGUE_TABLES);
         db().asApp(c -> {
             for (var entry : expectedPolicies.entrySet()) {
@@ -287,7 +292,10 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
                 assertThat(DbAccess.count(c, "select count(*) from pg_class cl, aclexplode(cl.relacl) a where cl.oid = ?::regclass and a.grantee = 0",
                         table)).as(table + " grants to PUBLIC").isZero();
                 // readable without a bound tenant (policy using (true))
-                assertThat(DbAccess.count(c, "select count(*) from " + table)).as(table + " rows without a tenant").isPositive();
+                // ipd.drug_code ships empty on purpose (SAH-76 design note 1.1): only its policies are proved, not a row
+                if (!"ipd.drug_code".equals(table)) {
+                    assertThat(DbAccess.count(c, "select count(*) from " + table)).as(table + " rows without a tenant").isPositive();
+                }
             }
             assertThat(DbAccess.count(c, "select count(*) from ipd.drug")).isEqualTo(14);
             assertThat(DbAccess.count(c, "select count(*) from ipd.drug_interaction")).isEqualTo(3);

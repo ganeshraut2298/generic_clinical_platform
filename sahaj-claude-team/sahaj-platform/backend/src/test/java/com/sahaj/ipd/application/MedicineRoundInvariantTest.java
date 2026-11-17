@@ -39,7 +39,7 @@ class MedicineRoundInvariantTest extends DoseTestBase {
                 List<ActiveOrder> found = new ArrayList<>();
                 for (OrderRow o : fake.rows.values()) {
                     if (admitted.contains(o.admissionId()) && MedicineOrderRepository.ACTIVE.equals(o.status())) {
-                        found.add(new ActiveOrder(o.id(), o.admissionId(), UUID.randomUUID(), "B-" + o.admissionId(),
+                        found.add(RoundFixtures.order(o.id(), o.admissionId(), UUID.randomUUID(), "B-" + o.admissionId(),
                                 o.drugKey(), o.frequencyKey(), o.verifiedAt()));
                     }
                 }
@@ -58,7 +58,7 @@ class MedicineRoundInvariantTest extends DoseTestBase {
                 return found;
             }
         };
-        reader = new MedicineRoundReader(repository, catalogue, new SkippedOrderWarningsTest.MutableClock());
+        reader = RoundFixtures.reader(repository, catalogue, new SkippedOrderWarningsTest.MutableClock());
     }
 
     private void seedWard() {

@@ -22,6 +22,7 @@ import {
   roundOf,
 } from './safety.fixtures';
 import { EscalationActionResult, EscalationRow, SafetyBoard, SafetyCounts } from './safety.model';
+import { provideOrderNoticesStubs } from '../orders/order-notices.testing';
 
 const IPD = '/api/v1/ipd';
 const BOARD = `${IPD}/safety`;
@@ -89,6 +90,7 @@ describe('SafetyComponent', () => {
       providers: [
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
+        ...provideOrderNoticesStubs(),
         { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
         { provide: MatDialog, useValue: dialog },
       ],
@@ -554,6 +556,7 @@ describe('SafetyComponent', () => {
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
+          ...provideOrderNoticesStubs(),
           { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },
         ],
@@ -605,6 +608,7 @@ describe('SafetyComponent', () => {
         providers: [
           provideHttpClient(withInterceptors([problemDetailInterceptor])),
           provideHttpClientTesting(),
+          ...provideOrderNoticesStubs(),
           { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },
         ],
@@ -660,7 +664,7 @@ describe('SafetyComponent', () => {
     it('puts the tile after Escalations open and before Your patients (nurse), and the panel before the audit trail', async () => {
       await open(boardOf({ view: 'NURSE', yourPatients: 4, escalations: [asNurse(ROW)] }));
       expect(kpiNames()).toEqual(['Escalations open', 'Doses due or overdue', 'Your patients']);
-      expect(panels()).toEqual(['Early warning escalations', 'Medicine round', 'Clinical audit trail']);
+      expect(panels()).toEqual(['Early warning escalations', 'Medicine round', 'Orders to acknowledge', 'Clinical audit trail']);
     });
 
     it('a doctor reads the same tile and rows but gets no Give and no line', async () => {
@@ -766,6 +770,7 @@ describe('SafetyComponent', () => {
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
+          ...provideOrderNoticesStubs(),
           { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },
         ],
@@ -1057,6 +1062,7 @@ describe('SafetyComponent', () => {
           providers: [
             provideHttpClient(withInterceptors([problemDetailInterceptor])),
             provideHttpClientTesting(),
+            ...provideOrderNoticesStubs(),
             { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
             { provide: MatDialog, useValue: dialog },
           ],

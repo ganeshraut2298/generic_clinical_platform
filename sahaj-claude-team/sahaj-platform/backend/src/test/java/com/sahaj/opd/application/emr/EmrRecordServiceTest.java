@@ -362,6 +362,49 @@ class EmrRecordServiceTest {
         assertThat(cleaned.path("flow").asText()).isEqualTo("normal");
     }
 
+    private com.fasterxml.jackson.databind.node.ObjectNode cleanDietValues(String json,
+            List<InvalidFieldsException.FieldMessage> errors) throws Exception {
+        LayoutSection section = EmrTestData.section("history", "COMMON", "ASSESSMENT", true, false, false,
+                EmrTestData.choice("diet", true, "veg", "non_veg"), EmrTestData.field("note", "TEXT", false));
+        return service.cleanValues("sections[0]", section, EmrTestData.MAPPER.readTree(json), errors, null,
+                new EmrComponentValues.Context(NOW, MEMBER, null, null), new java.util.ArrayList<>());
+    }
+
+    @Test
+    void anEmptyOrBlankStringClearsAChoiceOrTextFieldInsteadOfFailing() throws Exception {
+        List<InvalidFieldsException.FieldMessage> errors = new java.util.ArrayList<>();
+
+        com.fasterxml.jackson.databind.node.ObjectNode cleaned = cleanDietValues(
+                "{\"diet\":\"\",\"note\":\"  \"}", errors);
+
+        assertThat(errors).isEmpty();
+        assertThat(cleaned.has("diet")).isFalse();
+        assertThat(cleaned.has("note")).isFalse();
+    }
+
+    @Test
+    void aWhitespaceOnlyChoiceValueIsClearedAndValidValuesAreKept() throws Exception {
+        List<InvalidFieldsException.FieldMessage> errors = new java.util.ArrayList<>();
+
+        com.fasterxml.jackson.databind.node.ObjectNode cleaned = cleanDietValues(
+                "{\"diet\":\" \",\"note\":\"ok\"}", errors);
+
+        assertThat(errors).isEmpty();
+        assertThat(cleaned.has("diet")).isFalse();
+        assertThat(cleaned.path("note").asText()).isEqualTo("ok");
+    }
+
+    @Test
+    void aNonBlankChoiceValueThatIsNotInTheListIsStillRejected() throws Exception {
+        List<InvalidFieldsException.FieldMessage> errors = new java.util.ArrayList<>();
+
+        com.fasterxml.jackson.databind.node.ObjectNode cleaned = cleanDietValues("{\"diet\":\"keto\"}", errors);
+
+        assertThat(cleaned).isNull();
+        assertThat(errors).hasSize(1);
+        assertThat(errors.get(0).field()).isEqualTo("sections[0].values.diet");
+    }
+
     // ---- open: IPD and Emergency ----
 
     private AdmissionFacts admission(String status, Access access) {

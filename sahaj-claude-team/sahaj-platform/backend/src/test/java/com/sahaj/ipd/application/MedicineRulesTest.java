@@ -122,19 +122,19 @@ class MedicineRulesTest {
 
     @Test
     void aVerifyBodyNeedsAFourDigitPinAndATokenAndNeverShowsThem() {
-        MedicineRules.Verify body = MedicineRules.verify(new VerifyOrderInput("0482", TOKEN));
+        MedicineRules.Verify body = MedicineRules.verify(MedicineTestBase.verifyV1("0482", TOKEN));
 
         assertThat(body.pin()).isEqualTo("0482");
         assertThat(body.checkToken()).isEqualTo(TOKEN);
         assertThat(body.toString()).doesNotContain("0482").doesNotContain(TOKEN);
-        assertThat(new VerifyOrderInput("0482", TOKEN).toString()).doesNotContain("0482");
+        assertThat(MedicineTestBase.verifyV1("0482", TOKEN).toString()).doesNotContain("0482");
     }
 
     @Test
     void thePinMustBeExactlyFourAsciiDigits() {
         for (String bad : new String[] {null, "", "123", "12345", "12a4", " 123", "1 23", "١٢٣٤",
             "1234\n"}) {
-            List<FieldMessage> errors = errorsOf(() -> MedicineRules.verify(new VerifyOrderInput(bad, TOKEN)));
+            List<FieldMessage> errors = errorsOf(() -> MedicineRules.verify(MedicineTestBase.verifyV1(bad, TOKEN)));
             assertThat(errors).extracting(FieldMessage::field).containsExactly("pin");
             assertThat(errors.get(0).message()).isEqualTo("Enter the 4-digit PIN.");
         }
@@ -142,12 +142,12 @@ class MedicineRulesTest {
 
     @Test
     void verifyErrorsComeInTheOrderPinThenToken() {
-        List<FieldMessage> errors = errorsOf(() -> MedicineRules.verify(new VerifyOrderInput("x", null)));
+        List<FieldMessage> errors = errorsOf(() -> MedicineRules.verify(MedicineTestBase.verifyV1("x", null)));
 
         assertThat(errors).extracting(FieldMessage::field).containsExactly("pin", "checkToken");
         assertThat(errors.get(1).message()).isEqualTo("Reload the page and try again.");
         assertThat(errorsOf(() -> MedicineRules.verify(null))).extracting(FieldMessage::field)
-                .containsExactly("pin", "checkToken");
+                .containsExactly("pin", "checkToken", "orderVersion");
     }
 
     @Test

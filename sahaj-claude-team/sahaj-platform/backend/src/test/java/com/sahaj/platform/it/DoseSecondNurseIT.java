@@ -71,7 +71,7 @@ class DoseSecondNurseIT extends MarSupport {
         assertThat(row.recordedBy()).isEqualTo(w.nurse().userId().toString());
         assertThat(row.scan()).isEqualTo(w.uhid());
         assertThat(eventLines(w.clinic(), w.adm().id())).contains("give|Gave Inj. Heparin 5,000 IU (8 AM dose) · identity checked against UHID"
-                + " · second check by " + displayName(w.nurse2()));
+                + " · scan override: Medicine has no barcode · second check by " + displayName(w.nurse2()));
         JsonNode after = auditRow(w.clinic(), "IPD_DOSE_GIVEN", 0);
         assertThat(after.get("highAlert").asBoolean()).isTrue();
         assertThat(after.get("secondCheckUserId").asText()).isEqualTo(w.nurse2().userId().toString());
@@ -117,7 +117,7 @@ class DoseSecondNurseIT extends MarSupport {
         assertThat(gave).hasSize(1);
         String text = gave.get(0).substring("give|".length());
         assertThat(text.length()).as("the longest medicine name is " + drugNameLength + " characters").isLessThanOrEqualTo(300);
-        assertThat(text).startsWith("Gave ").contains(" · identity checked against UHID · second check by Priyadarshini ");
+        assertThat(text).startsWith("Gave ").contains(" · identity checked against UHID · scan override: Medicine has no barcode · second check by Priyadarshini ");
         assertThat(text).as("the name is shortened with an ellipsis, the rest of the wording is not cut").endsWith("…");
         assertThat(count(w.clinic(), "select count(*) from ipd.clinical_event where admission_id = ?::uuid and char_length(text) > 300",
                 w.adm().id())).isZero();

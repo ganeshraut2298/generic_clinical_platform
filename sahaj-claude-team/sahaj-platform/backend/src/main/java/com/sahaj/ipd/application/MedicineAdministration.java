@@ -2,27 +2,37 @@ package com.sahaj.ipd.application;
 
 import com.sahaj.ipd.application.AdmissionRepository.AdmissionRow;
 import com.sahaj.ipd.application.DoseRepository.DoseRow;
+import com.sahaj.ipd.application.DoseRepository.GivenAt;
 import com.sahaj.ipd.application.DoseRepository.NewDose;
 import com.sahaj.ipd.application.DoseRepository.Stored;
 import com.sahaj.ipd.application.DoseRules.Body;
+import com.sahaj.ipd.application.DoseRules.ScanOverride;
+import com.sahaj.ipd.application.DoseViews.Viewer;
 import com.sahaj.ipd.application.MarViews.DoseInput;
 import com.sahaj.ipd.application.MarViews.DoseRecorded;
 import com.sahaj.ipd.application.MarViews.DoseView;
 import com.sahaj.ipd.application.MarViews.Mar;
 import com.sahaj.ipd.application.MedicineOrderRepository.OrderRow;
-import com.sahaj.ipd.domain.Drug;
 import com.sahaj.ipd.domain.DoseOutcome;
 import com.sahaj.ipd.domain.DoseSlots;
-import com.sahaj.ipd.domain.DoseSlots.Stage;
-import com.sahaj.ipd.domain.DoseSlots.State;
-import com.sahaj.ipd.domain.Frequency;
+import com.sahaj.ipd.domain.DoseSlots.LiveDose;
+import com.sahaj.ipd.domain.DoseSlots.Slot;
+import com.sahaj.ipd.domain.Drug;
+import com.sahaj.ipd.domain.EffectiveNursingSettings;
+import com.sahaj.ipd.domain.MedicineCodeCheck;
 import com.sahaj.ipd.domain.NotGivenReason;
+import com.sahaj.ipd.domain.PrnRules;
 import com.sahaj.ipd.domain.WristbandCheck;
+import com.sahaj.ipd.domain.order.MedicineOrderVersion;
+import com.sahaj.ipd.domain.order.MedicineOrderVersion.Kind;
+import com.sahaj.ipd.domain.order.OrderPriority;
+import com.sahaj.ipd.domain.order.OrderRef;
+import com.sahaj.ipd.domain.order.OrderStatus;
+import com.sahaj.ipd.domain.order.OrderTimeline;
 import com.sahaj.patient.api.PatientAccessPort;
 import com.sahaj.patient.api.PatientClinicalPort;
 import com.sahaj.patient.api.PatientClinicalPort.PatientClinical;
 import com.sahaj.platform.api.ActorDirectoryPort;
-import com.sahaj.platform.api.AuditLog;
 import com.sahaj.platform.api.ConflictException;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
@@ -31,7 +41,9 @@ import com.sahaj.platform.api.ModuleEntitlementPort.ModuleEntitlement;
 import com.sahaj.platform.api.NotFoundException;
 import com.sahaj.platform.api.TeamMemberPort;
 import com.sahaj.platform.api.TeamMemberPort.TeamMember;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,21 +58,24 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * SAH-32 the two IPD transactions of giving a dose or recording that it was not given (ADR-011 D4 to D9). The
- * non-transactional {@link DoseService} calls them with the second nurse's PIN check between them, the shape of
- * verify (ADR-009 B1): the PIN is checked outside any transaction and never with an admission lock held.
+ * SAH-32 and SAH-76 the two IPD transactions of giving a dose or recording that it was not given (ADR-011 D4 to D9,
+ * ADR-027 D7). The non-transactional {@link DoseService} calls them with the second nurse's PIN check between them, the
+ * shape of verify (ADR-009 B1): the PIN is checked outside any transaction and never with an admission lock held.
  *
  * <ul>
- *   <li>{@link #prepare}: every check, no lock. Read-write only so that it can write the deny entry of a wristband
- *       mismatch and the record-access row of a replay; every other refusal writes nothing.</li>
+ *   <li>{@link #prepare}: every check, no lock. Read-write only so that it can write the deny entry of a wristband or
+ *       medicine mismatch, the audit row of a refusal, and the record-access row of a replay; every other refusal writes
+ *       nothing.</li>
  *   <li>{@link #recordLocked}: the role, state and membership again, then the bare admission row
  *       {@code for no key update} (the only lock), the database clock read after the lock, every check again, the
- *       dose, one clinical event and one audit row.</li>
+ *       dose, the acknowledgement of the order's open notices, the review item of a STAT dose before the pharmacist
+ *       check, one clinical event and one audit row.</li>
  * </ul>
  *
  * <p>A refusal by the unique index, a database check, the guard trigger or a foreign key on the insert is a code
  * fault: it is never swallowed, the whole transaction rolls back and the caller sees a generic 500. The scanned text,
- * the PIN, names and allergy text are never logged or audited; the audit rows hold ids and fixed keys.
+ * the medicine code, the notes, the PIN, names and allergy text are never logged or audited; the audit rows hold ids and
+ * fixed keys.
  */
 @Service
 public class MedicineAdministration {
@@ -78,17 +93,25 @@ public class MedicineAdministration {
     private final PatientAccessPort patientAccess;
     private final ActorDirectoryPort actors;
     private final TeamMemberPort team;
-    private final AuditLog auditLog;
+    private final IpdAudit audit;
     private final IpdGate gate;
     private final MedicineAssembler medicines;
     private final MarAssembler marAssembler;
     private final ScopeGuard guard;
+    private final OrderTimelineRepository timelines;
+    private final NursingSettingsReader settingsReader;
+    private final DrugCodeRepository drugCodes;
+    private final OrderNotices notices;
+    private final PharmacistReviews reviews;
+    private final MedicineCatalogue catalogue;
 
     MedicineAdministration(MedicineOrderRepository orders, DoseRepository doses, AdmissionRepository admissions,
                            ClinicalEventRepository events, PatientClinicalPort patients,
                            PatientAccessPort patientAccess, ActorDirectoryPort actors, TeamMemberPort team,
-                           AuditLog auditLog, IpdGate gate, MedicineAssembler medicines, MarAssembler marAssembler,
-                           ScopeGuard guard) {
+                           IpdAudit audit, IpdGate gate, MedicineAssembler medicines, MarAssembler marAssembler,
+                           ScopeGuard guard, OrderTimelineRepository timelines, NursingSettingsReader settingsReader,
+                           DrugCodeRepository drugCodes, OrderNotices notices, PharmacistReviews reviews,
+                           MedicineCatalogue catalogue) {
         this.guard = guard;
         this.orders = orders;
         this.doses = doses;
@@ -98,10 +121,16 @@ public class MedicineAdministration {
         this.patientAccess = patientAccess;
         this.actors = actors;
         this.team = team;
-        this.auditLog = auditLog;
+        this.audit = audit;
         this.gate = gate;
         this.medicines = medicines;
         this.marAssembler = marAssembler;
+        this.timelines = timelines;
+        this.settingsReader = settingsReader;
+        this.drugCodes = drugCodes;
+        this.notices = notices;
+        this.reviews = reviews;
+        this.catalogue = catalogue;
     }
 
     // ---- results ----
@@ -112,15 +141,19 @@ public class MedicineAdministration {
         READY,
         /** A repeat of a recorded dose: the answer is {@link Prepared#replay()}, 200. */
         REPLAY,
-        /** The wristband did not match: the deny entry is written and committed; the caller answers 409. */
-        MISMATCH
+        /** A refusal whose deny entry or audit row was written and committed; the caller answers 409. */
+        REFUSED
+    }
+
+    /** A 409 answer that is thrown by the caller after the transaction that wrote its entries has committed. */
+    public record Refusal(String problem, String title, String detail) {
     }
 
     /**
      * The first transaction's answer. {@code pin} is the second nurse's PIN to check and {@code secondNurseId} the
      * membership to check it for, both null unless this is a high-alert GIVEN. The PIN is hidden from toString.
      */
-    public record Prepared(PrepareKind kind, DoseRecorded replay, UUID secondNurseId, String pin) {
+    public record Prepared(PrepareKind kind, DoseRecorded replay, UUID secondNurseId, String pin, Refusal refusal) {
 
         public boolean pinRequired() {
             return pin != null;
@@ -132,10 +165,10 @@ public class MedicineAdministration {
         }
     }
 
-    /** What the locked transaction decided: a new dose (201), a replay (200) or a mismatch (409, entry committed). */
-    public enum RecordKind { CREATED, REPLAYED, MISMATCH }
+    /** What the locked transaction decided: a new dose (201), a replay (200) or a refusal (409, entries committed). */
+    public enum RecordKind { CREATED, REPLAYED, REFUSED }
 
-    public record Recorded(RecordKind kind, DoseRecorded answer) {
+    public record Recorded(RecordKind kind, DoseRecorded answer, Refusal refusal) {
 
         @Override
         public String toString() {
@@ -164,15 +197,15 @@ public class MedicineAdministration {
 
         Decision decision = decide(tenantId, actor, caller, order, admission, patient, body, input, asOf, false);
         if (decision.replay != null) {
-            return new Prepared(PrepareKind.REPLAY, replayAnswer(tenantId, actor, caller, admission, patient,
-                    decision.replay), null, null);
+            return new Prepared(PrepareKind.REPLAY, replayAnswer(tenantId, actor, role, caller, admission, patient,
+                    decision.replay), null, null, null);
         }
-        if (decision.mismatch) {
-            return new Prepared(PrepareKind.MISMATCH, null, null, null);
+        if (decision.refusal != null) {
+            return new Prepared(PrepareKind.REFUSED, null, null, null, decision.refusal);
         }
         boolean pin = decision.highAlertGiven;
         return new Prepared(PrepareKind.READY, null, pin ? decision.secondNurse.membershipId() : null,
-                pin ? input.secondNursePin() : null);
+                pin ? input.secondNursePin() : null, null);
     }
 
     // ---- the locked transaction ----
@@ -201,11 +234,11 @@ public class MedicineAdministration {
 
         Decision decision = decide(tenantId, actor, caller, order, admission, patient, body, input, asOf, true);
         if (decision.replay != null) {
-            return new Recorded(RecordKind.REPLAYED, replayAnswer(tenantId, actor, caller, admission, patient,
-                    decision.replay));
+            return new Recorded(RecordKind.REPLAYED, replayAnswer(tenantId, actor, role, caller, admission, patient,
+                    decision.replay), null);
         }
-        if (decision.mismatch) {
-            return new Recorded(RecordKind.MISMATCH, null);
+        if (decision.refusal != null) {
+            return new Recorded(RecordKind.REFUSED, null, decision.refusal);
         }
         if (decision.highAlertGiven) {
             if (colleagueUserId == null) {
@@ -215,28 +248,35 @@ public class MedicineAdministration {
                 throw new InvalidInputException("secondNurseId", DoseRules.DIFFERENT_NURSE);
             }
         }
-        return new Recorded(RecordKind.CREATED, store(tenantId, actor, caller, order, admission, patient, body,
-                input, decision, colleagueUserId));
+        return new Recorded(RecordKind.CREATED, store(tenantId, actor, role, caller, order, admission, patient, body,
+                input, decision, colleagueUserId), null);
     }
 
     // ---- the checks (the same code in both transactions) ----
 
-    /** The outcome of the checks: exactly one of a replay, a mismatch or a go-ahead with the values to store. */
+    /** The outcome of the checks: exactly one of a replay, a refusal or a go-ahead with the values to store. */
     private static final class Decision {
         DoseRow replay;
-        boolean mismatch;
+        Refusal refusal;
         boolean highAlertGiven;
         Drug drug;
         TeamMember secondNurse;
         NotGivenReason reason;
+        String notGivenNote;
         String scan;
+        String medicineScan;
+        ScanOverride override;
+        MedicineOrderVersion version;
+        Instant slotAt;
+        int attempt = 1;
+        UUID supersedes;
+        boolean beforeVerification;
     }
 
     /**
-     * D5 steps 5 to 11 and, for GIVEN, the bedside checks of D4 up to the second nurse's membership; the PIN itself
-     * is checked by the caller between the two transactions ({@code pinChecked} is true under the lock, where the
-     * PIN is not available any more). A wristband mismatch writes the deny entry and the audit row and returns, so the
-     * surrounding transaction commits them.
+     * ADR-027 D7 steps 2 to 7. The PIN itself is checked by the caller between the two transactions
+     * ({@code pinChecked} is true under the lock, where the PIN is not available any more). A refusal that must leave a
+     * trace writes its deny entry and audit row and returns, so the surrounding transaction commits them.
      */
     private Decision decide(UUID tenantId, UUID actor, Caller caller, OrderRow order, AdmissionRow admission,
                             PatientClinical patient, Body body, DoseInput input, Instant asOf, boolean pinChecked) {
@@ -246,35 +286,66 @@ public class MedicineAdministration {
 
         DoseRow repeat = doses.findByClientKey(tenantId, body.clientKey()).orElse(null);
         if (repeat != null) {
-            decision.replay = checkRepeat(tenantId, repeat, order, body, input);
+            decision.replay = checkRepeat(tenantId, actor, repeat, order, body, input);
             return decision;
         }
         if (!"ADMITTED".equals(admission.status())) {
             throw new ConflictException("not-admitted", "Patient is not admitted", DoseRules.NOT_ADMITTED);
         }
-        if (MedicineOrderRepository.PENDING.equals(order.status())) {
-            throw new ConflictException("order-not-verified", "Order not checked", DoseRules.NOT_VERIFIED);
+        OrderTimeline timeline = timelines.findTimelines(tenantId, List.of(admission.id())).get(order.id());
+        if (timeline == null) {
+            throw new IllegalStateException("An order has no timeline");
         }
-        if (MedicineOrderRepository.STOPPED.equals(order.status())) {
+        MedicineOrderVersion current = timeline.current();
+        decision.version = current;
+        OrderStatus status = timeline.status();
+
+        // Step 3: the order state.
+        if (status == OrderStatus.STOPPED) {
             throw new ConflictException(MedicineOrderService.STATE_PROBLEM, "Order stopped", DoseRules.STOPPED);
         }
-        if (MedicineOrderRepository.REJECTED.equals(order.status())) {
+        if (status == OrderStatus.REJECTED) {
             throw new ConflictException(MedicineOrderService.STATE_PROBLEM, "Order rejected", DoseRules.REJECTED);
         }
-        Frequency frequency = Frequency.ofKey(order.frequencyKey())
-                .orElseThrow(() -> new IllegalStateException("An order has an unknown frequency"));
-        if (!DoseSlots.times(frequency, asOf).contains(body.slotAt())) {
-            throw new InvalidInputException("slotAt", DoseRules.NOT_A_DOSE_TIME);
+        if (status == OrderStatus.ON_HOLD) {
+            return refuse(decision, tenantId, actor, order, admission, "order-on-hold", "Order on hold",
+                    DoseRules.ON_HOLD, asOf);
         }
-        State clock = DoseSlots.clockState(body.slotAt(), Stage.ACTIVE, order.verifiedAt(), true, asOf);
-        if (clock == State.BEFORE_START) {
-            throw new ConflictException("dose-before-start", "Dose before the order started", DoseRules.BEFORE_START);
+        if (status == OrderStatus.QUERIED) {
+            return refuse(decision, tenantId, actor, order, admission, "order-not-verified", "Order not checked",
+                    DoseRules.NOT_VERIFIED, asOf);
         }
-        if (clock == State.LATER) {
-            throw new ConflictException("dose-not-due", "Dose not due yet", DoseRules.NOT_DUE);
+        if (status == OrderStatus.PENDING) {
+            boolean stat = current.kind() == Kind.ONCE && current.priority() == OrderPriority.STAT;
+            if (!stat || doses.hasLiveGiven(tenantId, order.id())) {
+                return refuse(decision, tenantId, actor, order, admission, "order-not-verified", "Order not checked",
+                        DoseRules.NOT_VERIFIED, asOf);
+            }
+            decision.beforeVerification = true;
         }
-        if (doses.findByOrderAndSlot(tenantId, order.id(), body.slotAt()).isPresent()) {
-            throw recorded();
+        // Step 4: the version the nurse saw.
+        if (body.orderVersion() != current.versionNo()) {
+            return refuse(decision, tenantId, actor, order, admission, "order-changed", "Order changed",
+                    DoseRules.ORDER_CHANGED, asOf);
+        }
+        // Step 5: the slot.
+        EffectiveNursingSettings settings = settingsReader.effectiveFor(tenantId, admission.id());
+        decision.slotAt = slotFor(tenantId, order, admission, timeline, body, settings, asOf);
+        DoseRow earlier = doses.findByOrderAndSlot(tenantId, order.id(), decision.slotAt).orElse(null);
+        boolean prnSlotTaken = false;
+        if (earlier != null) {
+            if (earlier.live()) {
+                if (current.kind() == Kind.PRN && body.given()) {
+                    // A PRN slot is the database minute, not a dose time: the PRN rules answer (too soon or the daily
+                    // maximum, audited). Only if they allow it (no limit applies) is the minute itself the conflict.
+                    prnSlotTaken = true;
+                } else {
+                    throw recorded();
+                }
+            } else {
+                decision.attempt = earlier.attempt() + 1;
+                decision.supersedes = earlier.id();
+            }
         }
 
         if (!body.given()) {
@@ -282,20 +353,50 @@ public class MedicineAdministration {
             if (decision.reason == null) {
                 throw new InvalidInputException("reasonKey", DoseRules.CHOOSE_REASON);
             }
+            if (decision.reason.needsNote()) {
+                decision.notGivenNote = DoseRules.otherNote(input);
+            }
             return decision;
         }
 
-        // The bedside checks, one message at a time, in the order of AC6.
+        // Step 6 (contract 0.4.3, ADR-027 A9): wristband, medicine code, override fields, override after a mismatch,
+        // identityConfirmed, second nurse, PRN limits; one message at a time. The wristband is always required.
         WristbandCheck.Result wristband = WristbandCheck.check(input.wristband(), patient.uhid());
         if (wristband == WristbandCheck.Result.EMPTY) {
             throw new InvalidInputException("wristband", DoseRules.SCAN_FIRST);
         }
         if (wristband == WristbandCheck.Result.MISMATCH) {
-            denyAtWristband(tenantId, actor, order, admission, patient, drug, body, input);
-            decision.mismatch = true;
+            denyAtWristband(tenantId, actor, order, admission, patient, drug, decision.slotAt, input);
+            doses.insertScanStop(tenantId, admission.id(), order.id(), decision.slotAt, DoseRepository.STOP_WRISTBAND,
+                    actor);
+            decision.refusal = new Refusal("wristband-mismatch", DoseService.MISMATCH_TITLE, DoseRules.MISMATCH);
             return decision;
         }
         decision.scan = WristbandCheck.normalise(input.wristband());
+        MedicineCodeCheck.Result code = MedicineCodeCheck.check(input.medicineCode(), drugCodes.codesOf(drug.key()));
+        boolean override = DoseRules.hasOverride(input);
+        if (code == MedicineCodeCheck.Result.EMPTY && !override) {
+            throw new InvalidInputException("medicineCode", DoseRules.SCAN_MEDICINE);
+        }
+        if (code == MedicineCodeCheck.Result.MISMATCH) {
+            denyAtMedicine(tenantId, actor, order, admission, drug, decision.slotAt, input);
+            doses.insertScanStop(tenantId, admission.id(), order.id(), decision.slotAt, DoseRepository.STOP_MEDICINE,
+                    actor);
+            decision.refusal = new Refusal("medicine-mismatch", "Wrong medicine", wrongMedicine(input, drug));
+            return decision;
+        }
+        if (code == MedicineCodeCheck.Result.MATCH) {
+            // A code of the ordered drug: method SCAN; an override sent with it is ignored (not checked, not stored).
+            decision.medicineScan = MedicineCodeCheck.normalise(input.medicineCode());
+        } else {
+            // Empty code with an override: the override fields (400), then the 15 minutes after the caller's own stop.
+            decision.override = DoseRules.override(input);
+            Instant stopSlot = current.kind() == Kind.PRN ? null : decision.slotAt;
+            if (doses.hasScanStopWithin15Minutes(tenantId, order.id(), actor, stopSlot)) {
+                return refuse(decision, tenantId, actor, order, admission, "override-after-mismatch",
+                        DoseRules.OVERRIDE_AFTER_MISMATCH_TITLE, DoseRules.OVERRIDE_AFTER_MISMATCH, asOf);
+            }
+        }
         if (!DoseRules.confirmed(input)) {
             throw new InvalidInputException("identityConfirmed", DoseRules.CONFIRM);
         }
@@ -303,6 +404,103 @@ public class MedicineAdministration {
             decision.highAlertGiven = true;
             decision.secondNurse = checkSecondNurse(tenantId, caller, input, pinChecked);
         }
+        if (current.kind() == Kind.PRN) {
+            PrnRules.Decision prn = prnDecision(tenantId, order, admission, current, asOf);
+            if (!prn.allowed()) {
+                String text = DoseRules.clockText(prn.nextAllowedAt());
+                boolean tooSoon = prn.lock() == PrnRules.Lock.TOO_SOON;
+                return refuse(decision, tenantId, actor, order, admission, tooSoon ? "prn-too-soon" : "prn-max-reached",
+                        tooSoon ? "Too soon" : "Daily maximum reached",
+                        (tooSoon ? "Too soon. Next dose allowed at " : "Daily maximum reached. Next dose allowed at ")
+                                + text + ".", asOf);
+            }
+            if (prnSlotTaken) {
+                throw recorded();
+            }
+        }
+        return decision;
+    }
+
+    /**
+     * The slot of the dose. A scheduled or STAT order needs the slot of the body to be one of today's slots of the order,
+     * given now; a PRN order has no slot (the body must not send one) and records the database minute.
+     */
+    private Instant slotFor(UUID tenantId, OrderRow order, AdmissionRow admission, OrderTimeline timeline, Body body,
+                            EffectiveNursingSettings settings, Instant asOf) {
+        MedicineOrderVersion current = timeline.current();
+        if (current.kind() == Kind.PRN) {
+            if (body.slotAt() != null) {
+                throw new InvalidInputException("slotAt", MedicineRules.RELOAD_MESSAGE);
+            }
+            // ADR-027 A9: a PRN dose (either outcome) before the version starts or at or after it ends is not due. Not audited.
+            if (asOf.isBefore(current.startAt()) || (current.endAt() != null && !asOf.isBefore(current.endAt()))) {
+                throw new ConflictException("dose-not-due", "Dose cannot be given now", DoseRules.CANNOT_NOW);
+            }
+            return asOf.truncatedTo(ChronoUnit.MINUTES);
+        }
+        if (body.slotAt() == null) {
+            throw new InvalidInputException("slotAt", MedicineRules.RELOAD_MESSAGE);
+        }
+        List<LiveDose> live = new ArrayList<>();
+        for (DoseRow d : doses.findBetween(tenantId, admission.id(), DoseSlots.dayStart(asOf), DoseSlots.dayEnd(asOf))) {
+            if (d.orderId().equals(order.id()) && d.live() && !"PRN".equals(d.doseKind())) {
+                live.add(new LiveDose(d.id(), d.slotAt(), DoseOutcome.ofKey(d.outcome())
+                        .orElseThrow(() -> new IllegalStateException("A dose has an unknown outcome"))));
+            }
+        }
+        Slot slot = null;
+        for (Slot s : DoseSlots.slots(timeline, null, live, true, settings, asOf)) {
+            if (s.slotAt().equals(body.slotAt())) {
+                slot = s;
+            }
+        }
+        if (slot == null) {
+            throw new InvalidInputException("slotAt", DoseRules.NOT_A_DOSE_TIME);
+        }
+        switch (slot.state()) {
+            case GIVEN:
+            case HELD:
+            case REFUSED:
+                throw recorded();
+            case BEFORE_START:
+                throw new ConflictException("dose-before-start", "Dose before the order started",
+                        DoseRules.BEFORE_START);
+            case LATER:
+                throw new ConflictException("dose-not-due", "Dose not due yet",
+                        DoseRules.notDue(settings.windowBeforeMin()));
+            case DUE:
+            case LATE:
+                break;
+            default:
+                throw new ConflictException("dose-not-due", "Dose cannot be given now", DoseRules.CANNOT_NOW);
+        }
+        if (!slot.current()) {
+            throw new ConflictException("dose-not-due", "Dose cannot be given now", DoseRules.CANNOT_NOW);
+        }
+        return slot.slotAt();
+    }
+
+    private PrnRules.Decision prnDecision(UUID tenantId, OrderRow order, AdmissionRow admission,
+                                          MedicineOrderVersion version, Instant asOf) {
+        List<Instant> given = new ArrayList<>();
+        for (GivenAt g : doses.findGivenSince(tenantId, admission.id(), asOf.minus(Duration.ofHours(24)))) {
+            if (g.orderId().equals(order.id())) {
+                given.add(g.recordedAt());
+            }
+        }
+        // A PRN order always carries both limits (database check); an old row without them cannot reach here.
+        return PrnRules.decide(given, version.minIntervalMin(), version.maxPer24h(), asOf);
+    }
+
+    /** A 409 whose audit row must stay although the answer is 409 (ADR-027 D11, Q11). */
+    private Decision refuse(Decision decision, UUID tenantId, UUID actor, OrderRow order, AdmissionRow admission,
+                            String problem, String title, String detail, Instant asOf) {
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("orderId", order.id());
+        after.put("admissionId", admission.id());
+        after.put("refusal", problem);
+        audit.record("IPD_DOSE_REFUSED", ENTITY_ORDER, order.id(), null, after);
+        decision.refusal = new Refusal(problem, title, detail);
         return decision;
     }
 
@@ -340,13 +538,20 @@ public class MedicineAdministration {
     /**
      * A repeat of a client key (ADR-011 D8): another order's key is a 400; any different value is a 409; the same
      * values are a replay. The second nurse of a high-alert dose is compared by display name, the one thing the
-     * stored user id and the membership id sent have in common through {@code platform.api}.
+     * stored user id and the membership id sent have in common through {@code platform.api}. A PRN dose has no slot: the
+     * body must not send one.
      */
-    private DoseRow checkRepeat(UUID tenantId, DoseRow stored, OrderRow order, Body body, DoseInput input) {
+    private DoseRow checkRepeat(UUID tenantId, UUID actor, DoseRow stored, OrderRow order, Body body, DoseInput input) {
         if (!stored.orderId().equals(order.id())) {
             throw new InvalidInputException("clientKey", MedicineRules.RELOAD_MESSAGE);
         }
-        boolean same = stored.slotAt().equals(body.slotAt());
+        // ADR-027 A9 (security L1): the key of a dose recorded by someone else tells the caller nothing about it. Nothing is
+        // written: the exception rolls back the transaction (no record-access row, no audit).
+        if (!actor.equals(stored.recordedBy())) {
+            throw new ConflictException("client-key-reused", "Client key already used", DoseRules.KEY_REUSED);
+        }
+        boolean prn = "PRN".equals(stored.doseKind());
+        boolean same = prn ? body.slotAt() == null : stored.slotAt().equals(body.slotAt());
         if (same && body.given()) {
             same = DoseRepository.GIVEN.equals(stored.outcome());
             if (same && stored.highAlert()) {
@@ -375,30 +580,78 @@ public class MedicineAdministration {
 
     /** The deny entry and the audit row of a wristband mismatch (D4). Neither holds a name or the typed text. */
     private void denyAtWristband(UUID tenantId, UUID actor, OrderRow order, AdmissionRow admission,
-                                 PatientClinical patient, Drug drug, Body body, DoseInput input) {
+                                 PatientClinical patient, Drug drug, Instant slotAt, DoseInput input) {
         events.insert(tenantId, admission.id(), ClinicalEventRepository.KIND_DENY,
                 DoseRules.deniedText(WristbandCheck.scanForEvent(input.wristband()), patient.uhid(), drug), actor);
+        audit.record("IPD_DOSE_WRISTBAND_MISMATCH", ENTITY_ORDER, order.id(), null,
+                mismatchAudit(order, admission, drug, slotAt));
+    }
+
+    /**
+     * The deny entry and the audit row of a medicine code mismatch (ADR-027 D7). The entry holds the code only when it
+     * is a code of the drug master; otherwise the fixed words. Neither holds a name or the typed text.
+     */
+    private void denyAtMedicine(UUID tenantId, UUID actor, OrderRow order, AdmissionRow admission, Drug drug,
+                                Instant slotAt, DoseInput input) {
+        events.insert(tenantId, admission.id(), ClinicalEventRepository.KIND_DENY,
+                DoseRules.medicineDeniedText(MedicineCodeCheck.codeForEvent(input.medicineCode(), knownCode(input)),
+                        drug), actor);
+        audit.record("IPD_DOSE_MEDICINE_MISMATCH", ENTITY_ORDER, order.id(), null,
+                mismatchAudit(order, admission, drug, slotAt));
+    }
+
+    private static Map<String, Object> mismatchAudit(OrderRow order, AdmissionRow admission, Drug drug, Instant slotAt) {
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("orderId", order.id());
         after.put("admissionId", admission.id());
         after.put("drugKey", drug.key());
-        after.put("slotAt", body.slotAt().toString());
-        auditLog.record("IPD_DOSE_WRISTBAND_MISMATCH", ENTITY_ORDER, order.id(), null, after);
+        after.put("slotAt", slotAt == null ? null : slotAt.toString());
+        return after;
+    }
+
+    /** True when the box is a code of the drug master (any drug). */
+    private boolean knownCode(DoseInput input) {
+        String box = input.medicineCode();
+        if (box == null || box.length() > MedicineCodeCheck.MAX_BOX) {
+            return false;
+        }
+        String code = MedicineCodeCheck.normalise(box);
+        return MedicineCodeCheck.looksLikeCode(code) && drugCodes.drugKeyOf(code).isPresent();
+    }
+
+    /** "Wrong medicine. This is NAME, not NAME." (the name of the drug of that code, else "an item not on this order"). */
+    private String wrongMedicine(DoseInput input, Drug ordered) {
+        String box = input.medicineCode();
+        String found = null;
+        if (box != null && box.length() <= MedicineCodeCheck.MAX_BOX) {
+            String code = MedicineCodeCheck.normalise(box);
+            if (MedicineCodeCheck.looksLikeCode(code)) {
+                found = drugCodes.drugKeyOf(code).flatMap(key -> catalogue.catalogue().find(key)).map(Drug::name)
+                        .orElse(null);
+            }
+        }
+        return "Wrong medicine. This is " + (found == null ? "an item not on this order" : found) + ", not "
+                + ordered.name() + ".";
     }
 
     // ---- the write ----
 
-    private DoseRecorded store(UUID tenantId, UUID actor, Caller caller, OrderRow order, AdmissionRow admission,
-                               PatientClinical patient, Body body, DoseInput input, Decision decision,
-                               UUID colleagueUserId) {
+    private DoseRecorded store(UUID tenantId, UUID actor, String role, Caller caller, OrderRow order,
+                               AdmissionRow admission, PatientClinical patient, Body body, DoseInput input,
+                               Decision decision, UUID colleagueUserId) {
         Drug drug = decision.drug;
         boolean given = body.given();
         boolean highAlert = drug.highAlert() != null;
         UUID secondCheckBy = given && highAlert ? colleagueUserId : null;
         DoseOutcome outcome = given ? DoseOutcome.GIVEN : decision.reason.outcome();
-        NewDose dose = new NewDose(admission.id(), order.id(), body.clientKey(), body.slotAt(), outcome.name(),
+        MedicineOrderVersion version = decision.version;
+        NewDose dose = new NewDose(admission.id(), order.id(), body.clientKey(), decision.slotAt, outcome.name(),
                 given ? null : decision.reason.key(), actor, secondCheckBy, highAlert, given ? decision.scan : null,
-                given ? Boolean.TRUE : null);
+                given ? Boolean.TRUE : null, decision.attempt, decision.supersedes, version.versionNo(),
+                version.kind().name(), given ? (decision.override != null ? "OVERRIDE" : "SCAN") : null,
+                given && decision.override != null ? decision.override.reason().key() : null,
+                given && decision.override != null ? decision.override.note() : null,
+                given ? decision.medicineScan : null, decision.beforeVerification, decision.notGivenNote);
         Stored stored;
         try {
             stored = doses.insert(tenantId, dose);
@@ -408,10 +661,17 @@ public class MedicineAdministration {
             log.error("Dose insert refused tenantId={} orderId={} sqlState={}", tenantId, order.id(), sqlState(e));
             throw new IllegalStateException("The dose could not be stored", e);
         }
+        OrderRef ref = OrderRef.medicine(order.id(), version.versionNo());
+        // OQ-76-5: a recorded dose, given or not, acknowledges every open notice of the order.
+        notices.acknowledgeByDose(tenantId, order.id(), actor);
+        if (given && decision.beforeVerification) {
+            reviews.openForDose(tenantId, admission.id(), ref, stored.id());
+        }
 
         String text = given
-                ? DoseRules.gaveText(drug, body.slotAt(), highAlert ? decision.secondNurse.name() : null)
-                : DoseRules.notGivenText(drug, body.slotAt(), decision.reason);
+                ? DoseRules.gaveText(drug, decision.slotAt, highAlert ? decision.secondNurse.name() : null,
+                        decision.override == null ? null : decision.override.reason(), decision.beforeVerification)
+                : DoseRules.notGivenText(drug, decision.slotAt, decision.reason);
         events.insert(tenantId, admission.id(), ClinicalEventRepository.KIND_GIVE, text, actor);
 
         Map<String, Object> after = new LinkedHashMap<>();
@@ -419,34 +679,50 @@ public class MedicineAdministration {
         after.put("orderId", order.id());
         after.put("admissionId", admission.id());
         after.put("drugKey", drug.key());
-        after.put("slotAt", body.slotAt().toString());
+        after.put("slotAt", decision.slotAt.toString());
         after.put("outcome", outcome.name());
+        after.put("orderVersion", version.versionNo());
+        after.put("doseKind", version.kind().name());
         if (given) {
             after.put("highAlert", highAlert);
             after.put("secondCheckUserId", secondCheckBy);
+            after.put("method", decision.override != null ? "OVERRIDE" : "SCAN");
+            after.put("overrideReasonKey", decision.override == null ? null : decision.override.reason().key());
+            after.put("notePresent", decision.override != null);
+            after.put("beforeVerification", decision.beforeVerification);
         } else {
             after.put("reasonKey", decision.reason.key());
+            after.put("notePresent", decision.notGivenNote != null);
         }
-        auditLog.record(given ? "IPD_DOSE_GIVEN" : "IPD_DOSE_NOT_GIVEN", ENTITY_DOSE, stored.id(), null, after);
+        audit.record(given ? "IPD_DOSE_GIVEN" : "IPD_DOSE_NOT_GIVEN", ENTITY_DOSE, stored.id(), null, after);
 
-        DoseRow row = new DoseRow(stored.id(), admission.id(), order.id(), body.clientKey(), body.slotAt(),
-                outcome.name(), dose.reasonKey(), actor, secondCheckBy, highAlert, stored.recordedAt());
-        DoseView view = marAssembler.view(tenantId, row);
+        DoseRow row = new DoseRow(stored.id(), admission.id(), order.id(), body.clientKey(), decision.slotAt,
+                outcome.name(), dose.reasonKey(), actor, secondCheckBy, highAlert, stored.recordedAt(),
+                decision.attempt, version.versionNo(), version.kind().name(), dose.scanMethod(),
+                dose.overrideReasonKey(), decision.beforeVerification, stored.undoUntil(), null);
         // The clock is read again after the writes, so asOf is never before the recorded time.
-        Mar mar = marNow(tenantId, caller, admission, patient);
+        Instant now = orders.databaseNow();
+        Viewer viewer = marAssembler.viewer(actor, role, caller.memberRole(), caller.entitlement(), true, now);
+        DoseView view = marAssembler.view(tenantId, row, viewer);
+        Mar mar = marNow(tenantId, actor, role, caller, admission, patient, now);
         return new DoseRecorded(false, view, mar);
     }
 
     /** A replay answers the stored dose and the MAR now; it writes one record-access row and nothing else. */
-    private DoseRecorded replayAnswer(UUID tenantId, UUID actor, Caller caller, AdmissionRow admission,
+    private DoseRecorded replayAnswer(UUID tenantId, UUID actor, String role, Caller caller, AdmissionRow admission,
                                       PatientClinical patient, DoseRow stored) {
         patientAccess.recordOpened(tenantId, admission.patientId(), actor);
-        return new DoseRecorded(true, marAssembler.view(tenantId, stored), marNow(tenantId, caller, admission, patient));
+        Instant now = orders.databaseNow();
+        Viewer viewer = marAssembler.viewer(actor, role, caller.memberRole(), caller.entitlement(),
+                "ADMITTED".equals(admission.status()), now);
+        return new DoseRecorded(true, marAssembler.view(tenantId, stored, viewer),
+                marNow(tenantId, actor, role, caller, admission, patient, now));
     }
 
-    private Mar marNow(UUID tenantId, Caller caller, AdmissionRow admission, PatientClinical patient) {
-        return marAssembler.mar(tenantId, caller.membershipId(), caller.tokenRole(), caller.memberRole(),
-                caller.entitlement(), admission, patient, orders.databaseNow());
+    private Mar marNow(UUID tenantId, UUID actor, String role, Caller caller, AdmissionRow admission,
+                       PatientClinical patient, Instant now) {
+        return marAssembler.mar(tenantId, actor, caller.membershipId(), role, caller.memberRole(), caller.entitlement(),
+                admission, patient, now);
     }
 
     // ---- the caller ----
@@ -483,4 +759,5 @@ public class MedicineAdministration {
         Throwable root = e.getMostSpecificCause();
         return root instanceof java.sql.SQLException sql ? sql.getSQLState() : "-";
     }
+
 }

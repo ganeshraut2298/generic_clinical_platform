@@ -1,7 +1,9 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { of } from 'rxjs';
+import { StopSheetComponent } from './stop-sheet.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { EmrSheetComponent } from './emr-sheet.component';
@@ -20,7 +22,16 @@ import { EmrSheet, MedicineOrderAnswer } from './emr.model';
 
 const EMR = '/api/v1/ipd/admissions/a1/emr';
 const ORDERS = '/api/v1/ipd/admissions/a1/medicine-orders';
-const STOP = '/api/v1/ipd/medicine-orders/o1/stop';
+const RESUME = '/api/v1/ipd/medicine-orders/o1/resume';
+/** What the form sends for the first medicine when only the dose is typed. */
+const FIRST = {
+  drugKey: 'pcm',
+  frequencyKey: 'od',
+  doseAmount: 1,
+  doseUnit: 'TABLET',
+  routeKey: 'ORAL',
+  priority: 'ROUTINE',
+};
 
 const answer = (over: Partial<MedicineOrderAnswer>): MedicineOrderAnswer => ({
   outcome: 'PLACED',
@@ -37,11 +48,15 @@ describe('EmrSheetComponent', () => {
   let snack: ReturnType<typeof vi.fn>;
   let close: ReturnType<typeof vi.fn>;
   let ref: { close: ReturnType<typeof vi.fn>; disableClose?: boolean };
+  let dialogOpen: ReturnType<typeof vi.fn>;
+  let dialogResult: unknown;
 
   async function open(first: EmrSheet | { status: number; body: object } = sheetOf()): Promise<void> {
     snack = vi.fn();
     close = vi.fn();
     ref = { close };
+    dialogResult = undefined;
+    dialogOpen = vi.fn(() => ({ afterClosed: () => of(dialogResult) }));
     await TestBed.configureTestingModule({
       imports: [EmrSheetComponent],
       providers: [
@@ -50,6 +65,7 @@ describe('EmrSheetComponent', () => {
         { provide: MAT_DIALOG_DATA, useValue: { admissionId: 'a1' } },
         { provide: MatDialogRef, useValue: ref },
         { provide: MatSnackBar, useValue: { open: snack } },
+        { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -74,7 +90,13 @@ describe('EmrSheetComponent', () => {
   const squash = (node: Element | null | undefined) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
   const q = <T extends HTMLElement>(sel: string) => el().querySelector<T>(sel);
   const drug = () => q<HTMLSelectElement>('#emr-drug')!;
-  const freq = () => q<HTMLSelectElement>('#emr-freq')!;
+  const freq = () => q<HTMLSelectElement>('#ord-freq')!;
+  const dose = () => q<HTMLInputElement>('#ord-dose')!;
+  const typeInto = async (input: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> => {
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    await settle();
+  };
   const reason = () => q<HTMLSelectElement>('#emr-reason');
   const orderButton = () => q<HTMLButtonElement>('[data-act=sfordchk]')!;
   const toasts = () => snack.mock.calls.map((c) => c[0] as string);
@@ -87,6 +109,9 @@ describe('EmrSheetComponent', () => {
   }
 
   async function press(): Promise<TestRequest> {
+    if (dose().value === '') {
+      await typeInto(dose(), '1');
+    }
     orderButton().click();
     await settle();
     return http.expectOne(ORDERS);
@@ -133,12 +158,13 @@ describe('EmrSheetComponent', () => {
       expect(squash(chip)).toBe('Allergies not recorded');
     });
 
-    it('shows no "Last dose" line while no dose was recorded', async () => {
+    it('shows what the nurses did, under the small line (SAH-76-5): not acknowledged and no dose yet', async () => {
       await open();
-      expect(q('[data-testid=order-last-dose]')).toBeNull();
+      const lines = Array.from(el().querySelectorAll('[data-testid=order-execution]'));
+      expect(lines.map((l) => squash(l))).toEqual(['Not acknowledged yet']);
     });
 
-    it('shows the "Last dose" line under the small line (OQ-32-4): Given in the normal colour', async () => {
+    it('shows the last dose and when the next is due, with the acknowledgement', async () => {
       const given = {
         id: 'd1',
         slotAt: '2026-11-06T02:30:00Z',
@@ -148,39 +174,94 @@ describe('EmrSheetComponent', () => {
         recordedByName: 'Sr. Anjali Pawar',
         secondCheckByName: null,
       };
-      await open(sheetOf({ orders: [{ ...ORDER, lastDose: given }] }));
-      const line = q('[data-testid=order-last-dose]')!;
-      expect(squash(line)).toBe('Last dose 8 AM: Given · 8:04 AM · Pawar');
-      expect(line.getAttribute('data-warn')).toBe('false');
-      expect(line.classList.contains('warnline')).toBe(false);
-      expect(q('[data-testid=order-line]')!.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const execution = {
+        notGivenToday: 0,
+        nextDueAt: '2026-11-06T08:30:00Z',
+        lateCount: 0,
+        acknowledged: true,
+        acknowledgedByName: 'Sr. Anjali Pawar',
+        acknowledgedAt: '2026-11-06T02:20:00Z',
+      };
+      await open(sheetOf({ orders: [{ ...ORDER, lastDose: given, execution }] }));
+      const lines = Array.from(el().querySelectorAll('[data-testid=order-execution]'));
+      expect(lines.map((l) => squash(l))).toEqual([
+        'Last dose: Given 8:04 AM by Sr. Anjali Pawar',
+        'Next due 2:00 PM',
+        'Acknowledged by Sr. Anjali Pawar at 7:50 AM',
+      ]);
+      expect(lines.every((l) => l.getAttribute('data-warn') === 'false')).toBe(true);
+      expect(q('[data-testid=order-line]')!.compareDocumentPosition(lines[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('shows Refused and Not given in the warn colour, with the reason in words, and another day with its date', async () => {
-      const base = {
+    it('shows Not given in the warn colour with the reason, the time and the nurse, and the late and not-given counts', async () => {
+      const held = {
         id: 'd2',
         slotAt: '2026-11-06T02:30:00Z',
-        reason: { key: 'PATIENT_REFUSED', label: 'Patient refused' },
+        outcome: 'HELD' as const,
+        reason: { key: 'NIL_BY_MOUTH', label: 'Nil by mouth' },
         recordedAt: '2026-11-06T02:34:00Z',
         recordedByName: 'Sr. Anjali Pawar',
         secondCheckByName: null,
       };
-      await open(
-        sheetOf({
-          orders: [
-            { ...ORDER, id: 'o1', lastDose: { ...base, outcome: 'REFUSED' as const } },
-            { ...ORDER, id: 'o2', lastDose: { ...base, outcome: 'HELD' as const, reason: { key: 'NIL_BY_MOUTH', label: 'Nil by mouth' } } },
-            { ...ORDER, id: 'o3', lastDose: { ...base, outcome: 'REFUSED' as const, slotAt: '2026-10-24T14:30:00Z' } },
-          ],
-        }),
-      );
-      const lines = Array.from(el().querySelectorAll('[data-testid=order-last-dose]'));
+      const execution = { ...ORDER.execution, lateCount: 2, notGivenToday: 1 };
+      await open(sheetOf({ orders: [{ ...ORDER, lastDose: held, execution }] }));
+      const lines = Array.from(el().querySelectorAll('[data-testid=order-execution]'));
       expect(lines.map((l) => squash(l))).toEqual([
-        'Last dose 8 AM: Refused · Patient refused',
-        'Last dose 8 AM: Not given · Nil by mouth',
-        'Last dose 24 Oct, 8 PM: Refused · Patient refused',
+        'Not given · Nil by mouth · 8:04 AM · Sr. Anjali Pawar',
+        '2 late',
+        'Not given today: 1',
+        'Not acknowledged yet',
       ]);
-      expect(lines.every((l) => l.classList.contains('warnline') && l.getAttribute('data-warn') === 'true')).toBe(true);
+      expect(lines.map((l) => l.getAttribute('data-warn'))).toEqual(['true', 'true', 'true', 'false']);
+    });
+
+    describe('execution line comes from the server fields only (SAH-76-5, review #1)', () => {
+      const lines = () => Array.from(el().querySelectorAll('[data-testid=order-execution]')).map((l) => squash(l));
+      const exec = (over: Partial<typeof ORDER.execution>) => ({ ...ORDER.execution, ...over });
+
+      afterEach(() => vi.useRealTimers());
+
+      it('shows "N late" from lateCount and leaves out "Next due" while the order is late', async () => {
+        await open(sheetOf({ orders: [{ ...ORDER, execution: exec({ lateCount: 3, nextDueAt: '2026-11-06T08:30:00Z' }) }] }));
+        expect(lines()).toEqual(['3 late', 'Not acknowledged yet']);
+      });
+
+      it('shows "Next due <time>" from nextDueAt when nothing is late', async () => {
+        await open(sheetOf({ orders: [{ ...ORDER, execution: exec({ nextDueAt: '2026-11-06T08:30:00Z' }) }] }));
+        expect(lines()).toEqual(['Next due 2:00 PM', 'Not acknowledged yet']);
+      });
+
+      it('shows no next due line when nextDueAt is null, and no late line when lateCount is 0', async () => {
+        await open(sheetOf({ orders: [{ ...ORDER, execution: exec({ nextDueAt: null, lateCount: 0 }) }] }));
+        expect(lines()).toEqual(['Not acknowledged yet']);
+      });
+
+      it('never reads the device clock: the same server fields give the same lines on any device date', async () => {
+        const execution = exec({ nextDueAt: '2026-11-06T08:30:00Z', lateCount: 0 });
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2031-03-01T12:00:00Z'));
+        await open(sheetOf({ orders: [{ ...ORDER, execution }] }));
+        const farFuture = lines();
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        vi.setSystemTime(new Date('2020-01-01T00:00:00Z'));
+        await open(sheetOf({ orders: [{ ...ORDER, execution }] }));
+        expect(lines()).toEqual(farFuture);
+        expect(farFuture).toEqual(['Next due 2:00 PM', 'Not acknowledged yet']);
+      });
+
+      it('does not turn a next due time that is past on the device into "late"', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-11-06T20:00:00Z'));
+        await open(sheetOf({ orders: [{ ...ORDER, execution: exec({ nextDueAt: '2026-11-06T08:30:00Z', lateCount: 0 }) }] }));
+        expect(lines()).toEqual(['Next due 2:00 PM', 'Not acknowledged yet']);
+      });
+
+      it('a PRN order shows no next due line', async () => {
+        const prn = { ...ORDER, execution: exec({ nextDueAt: '2026-11-06T08:30:00Z' }), details: { ...ORDER.details, kind: 'PRN' as const } };
+        await open(sheetOf({ orders: [prn] }));
+        expect(lines()).toEqual(['Not acknowledged yet']);
+      });
     });
 
     it('lists the medicines with the High-alert pill, the small line and the status pill', async () => {
@@ -204,6 +285,7 @@ describe('EmrSheetComponent', () => {
       await open(sheetOf({ orders: [ORDER, hep, rejected, stopped] }));
       const rows = Array.from(el().querySelectorAll('[data-order]'));
       expect(rows.map((r) => r.getAttribute('data-order'))).toEqual(['o1', 'o2', 'o3', 'o4']);
+      const start = '1 tablet · Oral · Once daily · from 6 Nov, 10:00 AM · Until stopped';
       expect(rows.map((r) => squash(r.querySelector('[data-testid=order-pill]')))).toEqual([
         'Active',
         'Pharmacist check',
@@ -213,12 +295,14 @@ describe('EmrSheetComponent', () => {
       expect(rows[1].querySelector('[data-testid=high-alert]')!.textContent).toBe('High-alert');
       expect(rows[0].querySelector('[data-testid=high-alert]')).toBeNull();
       expect(squash(rows[1].querySelector('[data-testid=order-line]'))).toBe(
-        'SC · Once daily · Dr. Meera Kulkarni · override: Recent coronary stent, cardiology advised',
+        `${start} · Dr. Meera Kulkarni · override: Recent coronary stent, cardiology advised`,
       );
       expect(squash(rows[2].querySelector('[data-testid=order-line]'))).toBe(
-        'Oral · Once daily · Dr. Meera Kulkarni · rejected: Wrong dose or frequency',
+        `${start} · Dr. Meera Kulkarni · rejected: Wrong dose or frequency`,
       );
       expect(rows[0].querySelector('[data-act=sfstop]')).not.toBeNull();
+      expect(squash(rows[0].querySelector('[data-act=ordchange]'))).toBe('Change');
+      expect(squash(rows[0].querySelector('[data-act=ordhold]'))).toBe('Hold');
       expect(rows[2].querySelector('[data-act=sfstop]')).toBeNull();
       expect(rows[3].querySelector('[data-act=sfstop]')).toBeNull();
       expect(rows[0].querySelector('.pill.p-good')).not.toBeNull();
@@ -228,6 +312,47 @@ describe('EmrSheetComponent', () => {
     it('says "No medicines ordered yet" for an empty chart', async () => {
       await open(sheetOf({ orders: [] }));
       expect(squash(q('[data-testid=emr-orders]'))).toBe('No medicines ordered yet');
+    });
+
+    it('shows the order fields after Medicine in the order of the contract', async () => {
+      await open();
+      const labels = Array.from(el().querySelectorAll('.sford .field > label')).map((l) => squash(l));
+      expect(labels).toEqual([
+        'Medicine',
+        'How often',
+        'Dose',
+        'Route',
+        'Start',
+        'Duration (days)',
+        'Indication (optional)',
+        'Priority',
+      ]);
+      expect(Array.from(q<HTMLSelectElement>('#ord-unit')!.options).map((o) => o.textContent)).toEqual(['tablet', 'mg']);
+      expect(q<HTMLSelectElement>('#ord-route')!.value).toBe('ORAL');
+      expect(q<HTMLSelectElement>('#ord-priority')!.value).toBe('ROUTINE');
+    });
+
+    it('takes the route and units of the medicine chosen', async () => {
+      await open();
+      await choose(drug(), 'hep');
+      expect(q<HTMLSelectElement>('#ord-route')!.value).toBe('SC');
+      expect(Array.from(q<HTMLSelectElement>('#ord-unit')!.options).map((o) => o.textContent)).toEqual(['IU', 'ml']);
+    });
+
+    it('hides How often and Duration for STAT and says it is one dose, due now', async () => {
+      await open();
+      await choose(q<HTMLSelectElement>('#ord-priority')!, 'STAT');
+      expect(q('#ord-freq')).toBeNull();
+      expect(q('#ord-duration')).toBeNull();
+      expect(squash(q('[data-testid=stat-note]'))).toBe('A STAT order is one dose, due now. Give within 15 min.');
+    });
+
+    it('asks for the indication, the minimum interval and the most doses for As needed (PRN)', async () => {
+      await open();
+      await choose(freq(), 'prn');
+      expect(squash(q('label[for=ord-indication]'))).toBe('Indication');
+      expect(q('#ord-interval')).not.toBeNull();
+      expect(q('#ord-max')).not.toBeNull();
     });
 
     it('fills the selects: the catalogue in order, high-alert marked, the first preselected', async () => {
@@ -244,10 +369,11 @@ describe('EmrSheetComponent', () => {
         'Twice daily',
         'Three times daily',
         '8-hourly',
+        'As needed (PRN)',
       ]);
       expect(freq().value).toBe('od');
       expect(squash(q('label[for=emr-drug]'))).toBe('Medicine');
-      expect(squash(q('label[for=emr-freq]'))).toBe('How often');
+      expect(squash(q('label[for=ord-freq]'))).toBe('How often');
       expect(squash(orderButton())).toBe('Check and order');
       expect(q('[data-act=sfordx]')).toBeNull();
       expect(squash(q('.sford .row small'))).toBe(
@@ -304,11 +430,7 @@ describe('EmrSheetComponent', () => {
     it('sends the first medicine and frequency with a client key and no reason, then shows the placed order', async () => {
       await open();
       const req = await press();
-      expect(req.request.body).toEqual({
-        clientKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
-        drugKey: 'pcm',
-        frequencyKey: 'od',
-      });
+      expect(req.request.body).toEqual({ clientKey: expect.stringMatching(/^[0-9a-f-]{36}$/), ...FIRST });
       const placed = { ...ORDER, id: 'o9', status: 'PENDING' as const, canStop: true };
       req.flush(answer({ outcome: 'PLACED', order: placed, sheet: sheetOf({ orders: [ORDER, placed] }) }), {
         status: 201,
@@ -423,8 +545,9 @@ describe('EmrSheetComponent', () => {
         const req = await press();
         expect(req.request.body).toEqual({
           clientKey: key,
+          ...FIRST,
           drugKey: 'asp',
-          frequencyKey: 'od',
+          doseUnit: 'TABLET',
           overrideReasonKey: 'CARDIOLOGY_STENT',
           checkToken: TOKEN_1,
         });
@@ -441,7 +564,7 @@ describe('EmrSheetComponent', () => {
       it('shows the "Choose a reason" toast when the button is pressed again with no reason and the same medicine', async () => {
         const key = await toReason();
         const req = await press();
-        expect(req.request.body).toEqual({ clientKey: key, drugKey: 'asp', frequencyKey: 'od' });
+        expect(req.request.body).toEqual({ clientKey: key, ...FIRST, drugKey: 'asp' });
         req.flush(
           answer({
             outcome: 'NEEDS_REASON',
@@ -572,7 +695,7 @@ describe('EmrSheetComponent', () => {
       );
       await settle();
       expect(squash(q('#emr-drug-err'))).toBe('Choose a medicine from the list');
-      expect(squash(q('#emr-freq-err'))).toBe('Choose how often');
+      expect(squash(q('#ord-freq-err'))).toBe('Choose how often');
       expect(drug().getAttribute('aria-invalid')).toBe('true');
       expect(drug().getAttribute('aria-describedby')).toBe('emr-drug-err');
       expect(toasts()).toEqual([]);
@@ -608,87 +731,233 @@ describe('EmrSheetComponent', () => {
     });
   });
 
-  describe('Stop', () => {
-    const openStopConfirm = async (): Promise<void> => {
+  describe('Change, Hold, Resume, Stop (SAH-76-1)', () => {
+    it('opens the Stop sheet for the order and shows the answer it hands back with the toast', async () => {
+      await open();
+      dialogResult = {
+        kind: 'done',
+        sheet: sheetOf({ orders: [{ ...ORDER, status: 'STOPPED', canStop: false }] }),
+        toast: 'Tab. Paracetamol 650 mg stopped. Remaining doses are removed from the MAR.',
+      };
       q<HTMLButtonElement>('[data-act=sfstop]')!.click();
       await settle();
-    };
-
-    it('asks first, with Keep focused, and sends nothing until Stop is confirmed', async () => {
-      await open();
-      await openStopConfirm();
-      http.expectNone(STOP);
-      const confirm = q('[data-testid=stop-confirm]')!;
-      expect(squash(confirm)).toContain('Stop this medicine?');
-      expect(Array.from(confirm.querySelectorAll('button')).map((b) => squash(b))).toEqual(['Stop', 'Keep']);
       await tick();
-      expect(document.activeElement?.id).toBe('emr-keep-o1');
-    });
-
-    it('Keep closes the question and gives the focus back to the Stop button', async () => {
-      await open();
-      await openStopConfirm();
-      q<HTMLButtonElement>('[data-act=sfstopkeep]')!.click();
-      await settle();
-      await tick();
-      expect(q('[data-testid=stop-confirm]')).toBeNull();
-      expect(document.activeElement?.id).toBe('emr-stop-o1');
-    });
-
-    it('stops the order, shows the new sheet, the toast, and puts the focus on the Medicines heading', async () => {
-      await open();
-      await openStopConfirm();
-      q<HTMLButtonElement>('[data-act=sfstopok]')!.click();
-      await settle();
-      expect(q<HTMLButtonElement>('[data-act=sfstopok]')!.disabled).toBe(true);
-      const req = http.expectOne(STOP);
-      expect(req.request.method).toBe('POST');
-      req.flush(sheetOf({ orders: [{ ...ORDER, status: 'STOPPED', canStop: false }] }));
-      await settle();
-      await tick();
+      expect(dialogOpen).toHaveBeenCalledWith(
+        StopSheetComponent,
+        expect.objectContaining({ data: { admissionId: 'a1', order: ORDER } }),
+      );
       expect(toasts()).toEqual(['Tab. Paracetamol 650 mg stopped. Remaining doses are removed from the MAR.']);
       expect(squash(q('[data-testid=order-pill]'))).toBe('Stopped');
       expect(q('[data-act=sfstop]')).toBeNull();
       expect(document.activeElement?.id).toBe('emr-meds-h');
     });
 
-    it('shows the server text and reads the sheet again on a 409', async () => {
+    it('shows the server text and reads the sheet again when a sheet reports that the order moved on', async () => {
       await open();
-      await openStopConfirm();
-      q<HTMLButtonElement>('[data-act=sfstopok]')!.click();
+      dialogResult = { kind: 'conflict', message: 'This order was changed by someone else. Reload and check the new order.' };
+      q<HTMLButtonElement>('[data-act=sfstop]')!.click();
       await settle();
-      http.expectOne(STOP).flush(problem('order-state', 409, 'This order is already stopped.'), {
+      http.expectOne(EMR).flush(sheetOf({ orders: [{ ...ORDER, orderVersion: 2 }] }));
+      await settle();
+      expect(squash(q('[data-testid=emr-action-notice]'))).toContain('This order was changed by someone else.');
+      q<HTMLButtonElement>('[data-act=emr-notice-x]')!.click();
+      await settle();
+      expect(q('[data-testid=emr-action-notice]')).toBeNull();
+    });
+
+    it('does nothing when the sheet is closed without an answer', async () => {
+      await open();
+      q<HTMLButtonElement>('[data-act=ordhold]')!.click();
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledTimes(1);
+      expect(toasts()).toEqual([]);
+    });
+
+    it('shows Resume only on a held order and sends the version with a new key', async () => {
+      const held = {
+        ...ORDER,
+        status: 'ON_HOLD' as const,
+        canHold: false,
+        canResume: true,
+        canChange: false,
+        orderVersion: 3,
+        hold: { heldAt: '2026-11-06T05:00:00Z', heldByName: 'Dr. Meera Kulkarni', reason: 'Nil by mouth' },
+      };
+      await open(sheetOf({ orders: [held] }));
+      expect(q('[data-act=ordhold]')).toBeNull();
+      expect(squash(q('[data-testid=order-hold]'))).toBe('On hold by Dr. Meera Kulkarni at 10:30 AM · Nil by mouth');
+      expect(squash(q('[data-testid=order-pill]'))).toBe('On hold');
+      q<HTMLButtonElement>('[data-act=ordresume]')!.click();
+      await settle();
+      const req = http.expectOne(RESUME);
+      expect(req.request.body).toEqual({ clientKey: expect.stringMatching(/^[0-9a-f-]{36}$/), orderVersion: 3 });
+      expect(q<HTMLButtonElement>('[data-act=ordresume]')!.disabled).toBe(true);
+      req.flush(sheetOf({ orders: [{ ...ORDER, orderVersion: 3 }] }));
+      await settle();
+      expect(toasts()).toEqual(['Tab. Paracetamol 650 mg resumed.']);
+      expect(q('[data-act=ordresume]')).toBeNull();
+    });
+
+    it('reads the sheet again and shows the server text when Resume is refused with 409', async () => {
+      await open(sheetOf({ orders: [{ ...ORDER, status: 'ON_HOLD', canResume: true }] }));
+      q<HTMLButtonElement>('[data-act=ordresume]')!.click();
+      await settle();
+      http.expectOne(RESUME).flush(problem('order-state', 409, 'This order is not on hold.'), {
         status: 409,
         statusText: 'Conflict',
       });
       await settle();
-      http.expectOne(EMR).flush(sheetOf({ orders: [{ ...ORDER, status: 'STOPPED', canStop: false }] }));
+      http.expectOne(EMR).flush(sheetOf());
       await settle();
-      expect(toasts()).toEqual(['This order is already stopped.']);
-      expect(q('[data-testid=stop-confirm]')).toBeNull();
-      expect(squash(q('[data-testid=order-pill]'))).toBe('Stopped');
+      expect(squash(q('[data-testid=emr-action-notice]'))).toContain('This order is not on hold.');
     });
 
-    it('shows a generic toast when the connection is lost', async () => {
-      await open();
-      await openStopConfirm();
-      q<HTMLButtonElement>('[data-act=sfstopok]')!.click();
-      await settle();
-      http.expectOne(STOP).error(new ProgressEvent('error'));
-      await settle();
-      expect(toasts()).toEqual(['We could not stop that medicine. Try again.']);
+    it('shows the tags and the changed lines of a changed STAT order, and Not pharmacist checked', async () => {
+      const changed = {
+        ...ORDER,
+        orderVersion: 2,
+        details: { ...ORDER.details, priority: 'STAT' as const, pharmacistChecked: false },
+        changes: [{ field: 'dose' as const, label: 'Dose', before: '1 tablet', after: '2 tablet' }],
+        changeReason: 'Not enough effect',
+      };
+      await open(sheetOf({ orders: [changed] }));
+      const tags = Array.from(el().querySelectorAll('[data-tag]')).map((t) => squash(t));
+      expect(tags).toEqual(['STAT', 'Changed · v2', 'Not pharmacist checked']);
+      expect(squash(q('[data-testid=order-change]'))).toBe('Changed: Dose: 1 tablet → 2 tablet');
+      expect(squash(q('[data-testid=order-change-reason]'))).toBe('Reason for the change: Not enough effect');
     });
 
-    it('turns every button off while the stop runs', async () => {
-      await open();
-      await openStopConfirm();
-      q<HTMLButtonElement>('[data-act=sfstopok]')!.click();
+    it('shows the pharmacist query and a Reply box that sends the reply with the version', async () => {
+      const queried = {
+        ...ORDER,
+        status: 'QUERIED' as const,
+        canReply: true,
+        orderVersion: 2,
+        query: {
+          question: 'Is this the right dose?',
+          askedByName: 'Rahul Deshmukh',
+          askedAt: '2026-11-06T05:00:00Z',
+          reply: null,
+          repliedByName: null,
+          repliedAt: null,
+        },
+      };
+      await open(sheetOf({ orders: [queried] }));
+      expect(squash(q('[data-testid=order-query]'))).toBe('Pharmacist query: Is this the right dose?');
+      expect(squash(q('[data-testid=order-pill]'))).toBe('Queried');
+      q<HTMLButtonElement>('[data-act=query-reply]')!.click();
       await settle();
-      expect(q<HTMLButtonElement>('[data-act=sfstopkeep]')!.disabled).toBe(true);
-      expect(orderButton().disabled).toBe(true);
-      expect(q<HTMLButtonElement>('[data-act=emr-done]')!.disabled).toBe(true);
-      expect(ref.disableClose).toBe(true);
-      http.expectOne(STOP).flush(sheetOf());
+      http.expectNone('/api/v1/ipd/medicine-orders/o1/query-reply');
+      expect(squash(q('#reply-o1 + .err-text'))).toBe('Write your reply.');
+      await typeInto(q<HTMLTextAreaElement>('#reply-o1')!, 'Yes, checked with the chart.');
+      q<HTMLButtonElement>('[data-act=query-reply]')!.click();
+      await settle();
+      const req = http.expectOne('/api/v1/ipd/medicine-orders/o1/query-reply');
+      expect(req.request.body).toEqual({
+        clientKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        orderVersion: 2,
+        reply: 'Yes, checked with the chart.',
+      });
+      req.flush(sheetOf());
+      await settle();
+      expect(toasts()).toEqual(['Reply sent for Tab. Paracetamol 650 mg.']);
+    });
+
+    it('shows no Reply box when the server does not allow it', async () => {
+      await open();
+      expect(q('[data-testid=query-reply]')).toBeNull();
+    });
+  });
+
+  describe('STAT and PRN orders', () => {
+    it('sends no frequency and no duration for STAT', async () => {
+      await open();
+      await choose(q<HTMLSelectElement>('#ord-priority')!, 'STAT');
+      const req = await press();
+      expect(req.request.body).toEqual({
+        clientKey: expect.any(String),
+        drugKey: 'pcm',
+        doseAmount: 1,
+        doseUnit: 'TABLET',
+        routeKey: 'ORAL',
+        priority: 'STAT',
+      });
+      req.flush(answer({ outcome: 'PLACED', order: { ...ORDER, status: 'PENDING' } }));
+    });
+
+    it('sends the PRN fields with the interval in minutes (hours converted)', async () => {
+      await open();
+      await choose(freq(), 'prn');
+      await typeInto(dose(), '650');
+      await typeInto(q<HTMLInputElement>('#ord-indication')!, 'Fever above 38.5 C');
+      await typeInto(q<HTMLInputElement>('#ord-interval')!, '6');
+      await choose(el().querySelector<HTMLSelectElement>('select[aria-label="Interval unit"]')!, 'h');
+      await typeInto(q<HTMLInputElement>('#ord-max')!, '4');
+      const req = await press();
+      expect(req.request.body).toMatchObject({
+        frequencyKey: 'prn',
+        doseAmount: 650,
+        indication: 'Fever above 38.5 C',
+        prnMinIntervalMinutes: 360,
+        prnMaxPer24h: 4,
+      });
+      req.flush(answer({ outcome: 'PLACED', order: { ...ORDER, status: 'PENDING' } }));
+    });
+
+    it('sends nothing and names every missing field when the dose and the PRN fields are empty', async () => {
+      await open();
+      await choose(freq(), 'prn');
+      orderButton().click();
+      await settle();
+      http.expectNone(ORDERS);
+      expect(squash(q('#ord-dose-err'))).toBe('Enter the dose.');
+      expect(squash(q('#ord-indication-err'))).toBe('Enter what it is for.');
+      expect(squash(q('#ord-interval-err'))).toBe('Enter the minimum time between doses.');
+      expect(squash(q('#ord-max-err'))).toBe('Enter the most doses in 24 hours.');
+    });
+
+    it('rejects a duration that is not whole days', async () => {
+      await open();
+      await typeInto(dose(), '1');
+      await typeInto(q<HTMLInputElement>('#ord-duration')!, '2.5');
+      orderButton().click();
+      await settle();
+      http.expectNone(ORDERS);
+      expect(squash(q('#ord-duration-err'))).toBe('Enter whole days, or choose Until stopped.');
+    });
+
+    it('sends the duration in days and a typed start as an IST instant', async () => {
+      await open();
+      await typeInto(dose(), '1');
+      await typeInto(q<HTMLInputElement>('#ord-duration')!, '5');
+      await typeInto(q<HTMLInputElement>('#ord-start')!, '2026-11-07T08:30');
+      const req = await press();
+      expect(req.request.body).toMatchObject({ durationDays: 5, startAt: '2026-11-07T08:30:00+05:30' });
+      req.flush(answer({ outcome: 'PLACED', order: { ...ORDER, status: 'PENDING' } }));
+    });
+
+    it('says the order is on the MAR when no pharmacist check was needed', async () => {
+      await open();
+      const req = await press();
+      const placed = { ...ORDER, id: 'o9', details: { ...ORDER.details, pharmacistChecked: false } };
+      req.flush(answer({ outcome: 'PLACED', order: placed, sheet: sheetOf({ orders: [ORDER, placed] }) }));
+      await settle();
+      expect(toasts()).toEqual(['Tab. Paracetamol 650 mg ordered. It is on the MAR now.']);
+    });
+
+    it('shows the field messages of the server for the new fields', async () => {
+      await open();
+      const req = await press();
+      req.flush(
+        problem('validation', 400, 'Start cannot be in the past.', [
+          { field: 'startAt', message: 'Start cannot be in the past.' },
+          { field: 'routeKey', message: 'Choose the route.' },
+        ]),
+        { status: 400, statusText: 'Bad Request' },
+      );
+      await settle();
+      expect(squash(q('#ord-route-err'))).toBe('Choose the route.');
+      expect(toasts()).toEqual([]);
     });
   });
 

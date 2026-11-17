@@ -1,7 +1,7 @@
 import { EmrLayoutSection } from '../emr.model';
 import { EmrSpecialtyView, EmrStillNeededItem } from '../specialty/specialty.model';
 import { ACCENT, PROFILE_CHROME, accentVars, chromeOf } from '../specialty/specialty-registry';
-import { assessmentBar, badgeFull, badgeText, cardNumber, dentalAllergyFooter, gmRecap, oncoCounts, readyFooterText, stillNeededText, surgeryRecap } from './frame.logic';
+import { assessmentBar, badgeFull, badgeText, cardNumber, dentalAllergyFooter, gmRecap, oncoCounts, plural, readyFooterText, stillNeededText, surgeryRecap } from './frame.logic';
 
 const view = (over: Partial<EmrSpecialtyView>): EmrSpecialtyView => ({ profile: 'gm', mode: null, tagNote: 't', ...over });
 const sec = (key: string): EmrLayoutSection => ({ key }) as EmrLayoutSection;
@@ -142,11 +142,16 @@ describe('the sticky footer sentences when nothing is still needed (SAH-75-2)', 
     expect(dentalAllergyFooter('Amoxicillin')).toBe('Remove Amoxicillin before completing (penicillin allergy).');
   });
 
-  it('Gynae: warnings, then the next ANC visit from the gestational age, and the Gynae sentence', () => {
+  it('Gynae: warnings, then the next ANC visit the doctor set, and the Gynae sentence', () => {
     const og = (alerts: string[], weeks: number | null): EmrSpecialtyView =>
       view({ og: { alerts, gestationalAge: weeks === null ? null : { weeks, days: 1 } } as unknown as EmrSpecialtyView['og'] });
     expect(readyFooterText({ ...input, profile: 'og', mode: 'ANC', view: og(['WARNING_SIGN', 'ANAEMIA_MILD'], 27) })).toBe('2 warning(s) on this visit, reviewed before completing.');
     expect(readyFooterText({ ...input, profile: 'og', mode: 'ANC', view: og([], 27), nextAncWeeks: 30 })).toBe('Next ANC visit suggested at 30 weeks (in 3 weeks).');
+    expect(readyFooterText({ ...input, profile: 'og', mode: 'ANC', view: og([], 27) })).toBe('Ready to complete.');
+    expect(readyFooterText({ ...input, profile: 'og', mode: 'ANC', view: og([], 29), nextAncWeeks: 30 })).toBe('Next ANC visit suggested at 30 weeks (in 1 week).');
+    expect(readyFooterText({ ...input, profile: 'og', mode: 'ANC', view: og([], null), nextAncWeeks: 30 })).toBe('Next ANC visit suggested at 30 weeks.');
+    expect(plural(1, 'week')).toBe('1 week');
+    expect(plural(0, 'week')).toBe('0 weeks');
     expect(readyFooterText({ ...input, profile: 'og', mode: 'GYNAE', view: og([], null) })).toBe('Gynae visit: menstrual history required.');
   });
 

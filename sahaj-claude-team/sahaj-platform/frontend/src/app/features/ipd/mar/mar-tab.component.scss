@@ -161,3 +161,52 @@ button.sfs:disabled {
   margin-left: auto;
   min-height: 44px;
 }
+
+// SAH-76-4: counters, PRN line, struck-through history, fold button.
+.sfcounts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sfhint {
+  flex: 1;
+  min-width: 200px;
+  text-align: right;
+  font-size: 0.76rem;
+}
+
+.nothing-due {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.sfmed.off {
+  opacity: 0.8;
+}
+
+.sfprn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+
+.sfhist {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--crit);
+
+  s {
+    color: var(--ink-3);
+  }
+}
+
+.foldbtn {
+  align-self: flex-start;
+  min-height: 44px;
+  font-size: 0.84rem;
+}

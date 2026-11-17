@@ -13,7 +13,11 @@ public enum NotGivenReason {
     HELD_DOCTOR("Held on doctor's advice", DoseOutcome.HELD),
     NIL_BY_MOUTH("Nil by mouth", DoseOutcome.HELD),
     NOT_AVAILABLE("Medicine not available", DoseOutcome.HELD),
-    AWAY_FROM_WARD("Patient away from the ward", DoseOutcome.HELD);
+    AWAY_FROM_WARD("Patient away from the ward", DoseOutcome.HELD),
+    /** SAH-76-5 (OQ-76-26): added after the five. */
+    VOMITED("Vomited", DoseOutcome.HELD),
+    /** SAH-76-5: needs the nurse's note of 4 to 200 characters. */
+    OTHER("Other", DoseOutcome.HELD);
 
     private final String label;
     private final DoseOutcome outcome;
@@ -21,6 +25,11 @@ public enum NotGivenReason {
     NotGivenReason(String label, DoseOutcome outcome) {
         this.label = label;
         this.outcome = outcome;
+    }
+
+    /** True for the reason that needs the nurse's note (OTHER). */
+    public boolean needsNote() {
+        return this == OTHER;
     }
 
     public String key() {

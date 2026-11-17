@@ -29,6 +29,7 @@ describe('MarApi', () => {
     const body: DoseInput = {
       clientKey: '6f1c1c4e-3a8a-4a43-9a1b-0c5f8b3c1d11',
       slotAt: '2026-11-06T02:30:00Z',
+      orderVersion: 2,
       outcome: 'NOT_GIVEN',
       reasonKey: 'PATIENT_REFUSED',
     };
@@ -37,5 +38,23 @@ describe('MarApi', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(body);
     req.flush({}, { status: 201, statusText: 'Created' });
+  });
+
+  it('posts an undo to the dose', () => {
+    const body = { clientKey: '6f1c1c4e-3a8a-4a43-9a1b-0c5f8b3c1d11' };
+    api.undo('d1', body).subscribe();
+    const req = http.expectOne(`${IPD}/doses/d1/undo`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+    req.flush({});
+  });
+
+  it('posts recorded in error with the reason key', () => {
+    const body = { clientKey: '6f1c1c4e-3a8a-4a43-9a1b-0c5f8b3c1d11', reasonKey: 'DUPLICATE' };
+    api.recordedInError('d1', body).subscribe();
+    const req = http.expectOne(`${IPD}/doses/d1/recorded-in-error`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+    req.flush({});
   });
 });

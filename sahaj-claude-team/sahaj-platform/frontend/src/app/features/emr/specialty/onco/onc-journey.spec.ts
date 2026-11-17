@@ -71,7 +71,7 @@ describe('Cancer journey strip (SAH-75-7)', () => {
   it('shows the plan, the cycle line and one chip per cycle with the hover words', () => {
     const h = mount(strip());
     expect(h.el.querySelector('.plan')!.textContent).toContain('Plan · AC ×4 → Paclitaxel ×4');
-    expect(h.el.querySelector('[data-testid="cycle-text"]')!.textContent).toBe('Cycle 4 of 8 · day 1');
+    expect(h.el.querySelector('[data-testid="cycle-text"]')!.textContent).toBe('Cycle 4 of 8');
     const chips = Array.from(h.el.querySelectorAll('.cy'));
     expect(chips.map((c) => `${c.textContent}:${c.getAttribute('data-state')}:${c.getAttribute('title')}`)).toEqual([
       'AC1:GIVEN:Given',
@@ -82,11 +82,11 @@ describe('Cancer journey strip (SAH-75-7)', () => {
     ]);
   });
 
-  it('turns today\'s chip amber with "Delayed 1 week" and the line "Cycle n delayed" when the decision is Delay', () => {
+  it('turns today\'s chip amber with "Delayed" and the line "Cycle n delayed" when the decision is Delay', () => {
     const base = strip();
     const h = mount({ ...base, plan: { ...base.plan!, cycles: base.plan!.cycles.map((c) => (c.state === 'TODAY' ? { ...c, state: 'DELAYED' as const } : c)) } });
     expect(h.el.querySelector('[data-testid="cycle-text"]')!.textContent).toBe('Cycle 4 delayed');
-    expect(h.el.querySelector('.cy[data-state="DELAYED"]')!.getAttribute('title')).toBe('Delayed 1 week');
+    expect(h.el.querySelector('.cy[data-state="DELAYED"]')!.getAttribute('title')).toBe('Delayed');
   });
 
   it('reads "Not recorded" and "No chemotherapy plan" for a patient with no journey and no course', () => {

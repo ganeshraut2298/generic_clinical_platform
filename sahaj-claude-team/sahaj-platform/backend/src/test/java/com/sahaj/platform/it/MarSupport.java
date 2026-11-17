@@ -60,7 +60,7 @@ abstract class MarSupport extends MedicineSupport {
     static final String DOSE_REJECTED = "This order was rejected by the pharmacist. It cannot be given.";
     static final String NOT_A_DOSE_TIME = "This is not a dose time of this medicine today. Reload the page and try again.";
     static final String BEFORE_START = "This dose time is before the pharmacist checked the order.";
-    static final String NOT_DUE = "This dose is not due yet. It can be given from 1 hour before its time.";
+    static final String NOT_DUE = "This dose is not due yet. It can be given from 60 min before its time.";
     static final String DOSE_RECORDED = "This dose is already recorded.";
     static final String DOSE_KEY_REUSED = "This dose was already recorded with different values. Reload the page.";
     static final String COLLEAGUE_NOT_SET = "The second nurse has not set a PIN yet. Choose another nurse.";
@@ -227,7 +227,36 @@ abstract class MarSupport extends MedicineSupport {
                 ps.setString(3, orderId);
                 assertThat(ps.executeUpdate()).as("rows backdated").isOne();
             }
+            // SAH-76: the slots come from the version row, so version 1 is backdated with the head (its guard off for this update)
+            DbAccess.execute(c, "alter table ipd.medicine_order_version disable trigger trg_medicine_order_version_guard_update");
+            try (PreparedStatement ps = c.prepareStatement("update ipd.medicine_order_version set start_at = ?, created_at = ?, "
+                    + "verified_at = case when verified_by is null then null else ?::timestamptz end where order_id = ?::uuid and version_no = 1")) {
+                ps.setTimestamp(1, java.sql.Timestamp.from(orderedAt));
+                ps.setTimestamp(2, java.sql.Timestamp.from(orderedAt));
+                ps.setTimestamp(3, java.sql.Timestamp.from(verifiedAt));
+                ps.setString(4, orderId);
+                assertThat(ps.executeUpdate()).as("version 1 backdated").isOne();
+            }
+            DbAccess.execute(c, "alter table ipd.medicine_order_version enable trigger trg_medicine_order_version_guard_update");
+            // SAH-76: the update fired the deferred head check; ALTER TABLE refuses while it is pending
+            DbAccess.execute(c, "set constraints all immediate");
             DbAccess.execute(c, "alter table ipd.medicine_order enable trigger trg_medicine_order_guard_update");
+            return null;
+        });
+    }
+
+    /** SAH-76: moves the start and creation of version 1 back (table owner, committed): slots exist only from the version start. */
+    protected void startedAt(Clinic clinic, String orderId, Instant start) throws SQLException {
+        asOwner(true, new String[] {"ipd.medicine_order_version", "ipd.medicine_order"}, c -> {
+            DbAccess.execute(c, "alter table ipd.medicine_order_version disable trigger trg_medicine_order_version_guard_update");
+            try (PreparedStatement ps = c.prepareStatement("update ipd.medicine_order_version set start_at = ?, created_at = ? "
+                    + "where order_id = ?::uuid and version_no = 1")) {
+                ps.setTimestamp(1, java.sql.Timestamp.from(start));
+                ps.setTimestamp(2, java.sql.Timestamp.from(start));
+                ps.setString(3, orderId);
+                assertThat(ps.executeUpdate()).as("version 1 moved").isOne();
+            }
+            DbAccess.execute(c, "alter table ipd.medicine_order_version enable trigger trg_medicine_order_version_guard_update");
             return null;
         });
     }
@@ -254,6 +283,9 @@ abstract class MarSupport extends MedicineSupport {
         m.put("outcome", "GIVEN");
         m.put("wristband", wristband);
         m.put("identityConfirmed", true);
+        m.put("orderVersion", 1);
+        // SAH-76: no medicine codes are loaded (ipd.drug_code ships empty), so every GIVEN needs the manual override
+        m.put("override", Map.of("reasonKey", "NO_BARCODE", "note", "Checked the label against the order"));
         return m;
     }
 
@@ -271,6 +303,7 @@ abstract class MarSupport extends MedicineSupport {
         m.put("slotAt", slot.toString());
         m.put("outcome", "NOT_GIVEN");
         m.put("reasonKey", reason);
+        m.put("orderVersion", 1);
         return m;
     }
 

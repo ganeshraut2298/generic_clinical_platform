@@ -1,7 +1,8 @@
 package com.sahaj.ipd.domain;
 
 import com.sahaj.ipd.domain.DoseSlots.Slot;
-import com.sahaj.ipd.domain.DoseSlots.Stage;
+import com.sahaj.ipd.domain.order.OrderStatus;
+import com.sahaj.ipd.domain.order.OrderTimeline;
 import com.sahaj.ipd.domain.DoseSlots.State;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,10 +42,13 @@ public final class MedicineRound {
     private MedicineRound() {
     }
 
-    /** An ACTIVE order of an ADMITTED admission, with what the row shows. Names of people are not part of it. */
+    /**
+     * A medicine order of an ADMITTED admission that may have a givable slot (ACTIVE, or PENDING for a STAT dose before the
+     * pharmacist check), with its timeline and the settings in force. Names of people are not part of it.
+     */
     public record RoundOrder(UUID orderId, UUID admissionId, UUID patientId, String bedCode, String drugName,
-                             String highAlert, Frequency frequency, Instant verifiedAt) {
-
+                             String highAlert, OrderStatus status, OrderTimeline timeline,
+                             EffectiveNursingSettings settings) {
         @Override
         public String toString() {
             return "RoundOrder[orderId=" + orderId + "]";
@@ -98,15 +102,16 @@ public final class MedicineRound {
         if (orders.isEmpty()) {
             return EMPTY;
         }
-        Map<UUID, Map<Instant, DoseOutcome>> byOrder = new HashMap<>();
+        Map<UUID, List<DoseSlots.LiveDose>> byOrder = new HashMap<>();
         for (Recorded r : recorded) {
-            byOrder.computeIfAbsent(r.orderId(), k -> new HashMap<>()).put(r.slotAt(), r.outcome());
+            byOrder.computeIfAbsent(r.orderId(), k -> new ArrayList<>())
+                    .add(new DoseSlots.LiveDose(null, r.slotAt(), r.outcome()));
         }
         List<Entry> listed = new ArrayList<>();
         for (RoundOrder order : orders) {
-            Map<Instant, DoseOutcome> mine = byOrder.getOrDefault(order.orderId(), Map.of());
-            for (Slot slot : DoseSlots.slots(order.frequency(), Stage.ACTIVE, order.verifiedAt(), mine, true, asOf)) {
-                if (slot.state().actionable()) {
+            List<DoseSlots.LiveDose> mine = byOrder.getOrDefault(order.orderId(), List.of());
+            for (Slot slot : DoseSlots.slots(order.timeline(), null, mine, true, order.settings(), asOf)) {
+                if (DoseSlots.givable(slot, order.status())) {
                     listed.add(new Entry(order.admissionId(), order.orderId(), order.patientId(), slot.slotAt(),
                             slot.state(), slot.lateHours(), order.drugName(), order.highAlert(), order.bedCode()));
                 }

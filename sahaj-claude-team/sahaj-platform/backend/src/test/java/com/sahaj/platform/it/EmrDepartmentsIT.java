@@ -80,8 +80,8 @@ class EmrDepartmentsIT extends EmrSupport {
         }
         JsonNode gm = summary(list, "gm");
         assertThat(gm.get("name").asText()).isEqualTo("General Medicine");
-        assertThat(gm.get("sectionsTotal").asInt()).isEqualTo(19);
-        assertThat(gm.get("sectionsOn").asInt()).isEqualTo(16);
+        assertThat(gm.get("sectionsTotal").asInt()).isEqualTo(20);
+        assertThat(gm.get("sectionsOn").asInt()).isEqualTo(18);
         assertThat(gm.get("requiredOn").asInt()).isEqualTo(4);
         assertThat(departmentRows(clinic)).as("listing creates no row").isZero();
     }
@@ -95,7 +95,7 @@ class EmrDepartmentsIT extends EmrSupport {
             assertThat(list.get("canEdit").asBoolean()).as(role).isEqualTo("OWNER".equals(role));
             JsonNode view = get(DEPARTMENTS + "/gm", tokens.get(role));
             assertThat(view.get("canEdit").asBoolean()).as(role).isEqualTo("OWNER".equals(role));
-            assertThat(view.get("sections").size()).isEqualTo(19);
+            assertThat(view.get("sections").size()).isEqualTo(20);
         }
         // the role comes from the membership, not from the token
         Staff doctor = addDoctor(clinic, "General physician");
@@ -110,7 +110,7 @@ class EmrDepartmentsIT extends EmrSupport {
         JsonNode view = department(clinic, "gm");
         assertThat(view.get("revision").asLong()).isZero();
         assertThat(view.get("layoutSource").asText()).isEqualTo("STARTER");
-        assertThat(view.get("sections").size()).isEqualTo(19);
+        assertThat(view.get("sections").size()).isEqualTo(20);
         JsonNode complaints = section(view, "complaints");
         for (String field : new String[] {"key", "source", "name", "kind", "description", "part", "position", "shown", "required", "print",
                 "copy", "collapsed", "whoCanFill", "hideLocked", "hideLockReason", "fields"}) {
@@ -118,7 +118,7 @@ class EmrDepartmentsIT extends EmrSupport {
         }
         assertThat(complaints.get("fields").size()).isEqualTo(4);
         assertThat(complaints.get("fields").get(0).get("label").asText()).isEqualTo("Complaint");
-        assertThat(section(view, "procedures").get("shown").asBoolean()).isFalse();
+        assertThat(section(view, "procedures").get("shown").asBoolean()).isTrue();
         assertThat(section(view, "allergy").get("hideLocked").asBoolean()).isTrue();
         long positionsInOrder = 0;
         for (JsonNode s : view.get("sections")) {
@@ -159,7 +159,7 @@ class EmrDepartmentsIT extends EmrSupport {
         assertThat(view.get("revision").asLong()).isEqualTo(1);
         assertThat(view.get("hasDraft").asBoolean()).isTrue();
         assertThat(view.get("layoutSource").asText()).isEqualTo("DRAFT");
-        assertThat(view.get("sectionsOn").asInt()).as("x of y on counts shown sections only").isEqualTo(15);
+        assertThat(view.get("sectionsOn").asInt()).as("x of y on counts shown sections only").isEqualTo(17);
         assertThat(section(view, "chronic").get("shown").asBoolean()).isFalse();
         assertThat(section(view, "history").get("collapsed").asBoolean()).isTrue();
         assertThat(section(view, "vitals").get("whoCanFill").toString()).isEqualTo("[\"DOCTOR\"]");
@@ -172,7 +172,7 @@ class EmrDepartmentsIT extends EmrSupport {
         JsonNode layout = get(DEPARTMENTS + "/gm/layout", clinic.as("DOCTOR"));
         assertThat(layout.get("layoutSource").asText()).isEqualTo("STARTER");
         assertThat(texts(layout.get("sections"), "key")).contains("chronic");
-        assertThat(layout.get("sections").size()).isEqualTo(16);
+        assertThat(layout.get("sections").size()).isEqualTo(18);
         // the owner reading again gets the draft; the list says there is a draft
         assertThat(section(department(clinic, "gm"), "chronic").get("shown").asBoolean()).isFalse();
         assertThat(summary(listOf(clinic), "gm").get("hasDraft").asBoolean()).isTrue();
@@ -220,7 +220,7 @@ class EmrDepartmentsIT extends EmrSupport {
         assertThat(section(view, "diagnosis").get("shown").asBoolean()).isFalse();
         assertThat(section(view, "diagnosis").get("required").asBoolean()).isFalse();
         assertThat(view.get("requiredOn").asInt()).as("required counts shown sections only").isEqualTo(3);
-        assertThat(view.get("sectionsOn").asInt()).isEqualTo(15);
+        assertThat(view.get("sectionsOn").asInt()).isEqualTo(17);
     }
 
     @Test
@@ -566,7 +566,7 @@ class EmrDepartmentsIT extends EmrSupport {
         assertThat(v1.get("versionNo").asInt()).isEqualTo(1);
         assertThat(v1.get("publishedByName").asText()).isNotBlank();
         assertThat(v1.get("publishedAt").asText()).isNotBlank();
-        assertThat(v1.get("sections").size()).as("hidden sections are in the version").isEqualTo(19);
+        assertThat(v1.get("sections").size()).as("hidden sections are in the version").isEqualTo(20);
         assertThat(section(v1, "chronic").get("shown").asBoolean()).isFalse();
         assertThat(section(v1, "hpi").get("required").asBoolean()).isTrue();
         assertThat(section(v1, "complaints").get("fields").size()).isEqualTo(4);
@@ -590,7 +590,7 @@ class EmrDepartmentsIT extends EmrSupport {
         assertThat(starter.get("layoutSource").asText()).isEqualTo("STARTER");
         assertThat(starter.get("versionNo").isNull()).isTrue();
         assertThat(starter.get("starterKey").asText()).isEqualTo("gm");
-        assertThat(starter.get("sections").size()).isEqualTo(16);
+        assertThat(starter.get("sections").size()).isEqualTo(18);
         for (JsonNode s : starter.get("sections")) {
             assertThat(s.get("shown").asBoolean()).isTrue();
             for (String field : new String[] {"name", "kind", "part", "required", "print", "copy", "collapsed", "whoCanFill", "fields"}) {
@@ -603,8 +603,8 @@ class EmrDepartmentsIT extends EmrSupport {
         JsonNode v1 = get(DEPARTMENTS + "/gm/layout", clinic.as("PHARMACIST"));
         assertThat(v1.get("layoutSource").asText()).isEqualTo("PUBLISHED");
         assertThat(v1.get("versionNo").asInt()).isEqualTo(1);
-        assertThat(v1.get("sections").size()).isEqualTo(15);
-        assertThat(texts(v1.get("sections"), "key")).doesNotContain("chronic", "procedures", "referral", "consent");
+        assertThat(v1.get("sections").size()).isEqualTo(17);
+        assertThat(texts(v1.get("sections"), "key")).doesNotContain("chronic", "referral", "consent");
         // a saved draft is not in what doctors read
         ObjectNode draft = layoutInput(department(clinic, "gm"));
         setShown(draft, "adult_vax", false, false);
@@ -658,8 +658,8 @@ class EmrDepartmentsIT extends EmrSupport {
             assertThat(target.get("departmentKey").asText()).isEqualTo("gm");
             assertThat(target.get("basis").asText()).isEqualTo("STARTER");
             JsonNode starter = get(STARTERS + "/gm", clinic.as(role));
-            assertThat(target.get("sections").size()).isEqualTo(19);
-            for (int i = 0; i < 19; i++) {
+            assertThat(target.get("sections").size()).isEqualTo(20);
+            for (int i = 0; i < 20; i++) {
                 JsonNode t = target.get("sections").get(i);
                 JsonNode s = starter.get("sections").get(i);
                 assertThat(t.get("key").asText()).isEqualTo(s.get("key").asText());
@@ -677,7 +677,7 @@ class EmrDepartmentsIT extends EmrSupport {
         JsonNode copy = addDepartment(clinic, "Medicine copy", copySource("gm"));
         JsonNode copyTarget = get(DEPARTMENTS + "/" + copy.get("departmentKey").asText() + "/reset-target", clinic.owner());
         assertThat(copyTarget.get("basis").asText()).isEqualTo("STARTER");
-        assertThat(copyTarget.get("sections").size()).isEqualTo(19);
+        assertThat(copyTarget.get("sections").size()).isEqualTo(20);
         assertThat(sectionKeys(copy)).isEqualTo(sectionKeys(department(clinic, "gm")));
     }
 
@@ -690,7 +690,7 @@ class EmrDepartmentsIT extends EmrSupport {
         sec(body, "followup").put("part", "ASSESSMENT");
         publish(clinic, "gm", body, 200);
         JsonNode changed = department(clinic, "gm");
-        assertThat(changed.get("sectionsOn").asInt()).isEqualTo(14);
+        assertThat(changed.get("sectionsOn").asInt()).isEqualTo(16);
         // Reset to template: the page reads the target and saves it with origin RESET
         JsonNode target = get(DEPARTMENTS + "/gm/reset-target", clinic.owner());
         ObjectNode reset = objectMapper.createObjectNode();
@@ -700,21 +700,21 @@ class EmrDepartmentsIT extends EmrSupport {
         JsonNode saved = saveDraft(clinic, "gm", reset, 200);
         assertThat(saved.get("outcome").asText()).isEqualTo("SAVED");
         JsonNode view = saved.get("department");
-        assertThat(view.get("sectionsOn").asInt()).isEqualTo(16);
+        assertThat(view.get("sectionsOn").asInt()).isEqualTo(18);
         assertThat(view.get("requiredOn").asInt()).isEqualTo(4);
         assertThat(view.get("publishedVersion").asInt()).as("the published version is unchanged").isEqualTo(1);
         assertThat(view.get("hasDraft").asBoolean()).isTrue();
         assertThat(sectionKeys(view)).isEqualTo(sectionKeys(get(STARTERS + "/gm", clinic.owner())));
         assertThat(get(DEPARTMENTS + "/gm/layout", clinic.as("DOCTOR")).get("versionNo").asInt()).isEqualTo(1);
-        assertThat(get(DEPARTMENTS + "/gm/layout", clinic.as("DOCTOR")).get("sections").size()).as("doctors still see v1").isEqualTo(14);
+        assertThat(get(DEPARTMENTS + "/gm/layout", clinic.as("DOCTOR")).get("sections").size()).as("doctors still see v1").isEqualTo(16);
         // one audit entry with the before and after counts of shown and required sections
         List<List<String>> resets = auditRows(clinic, "EMR_DEPARTMENT_RESET");
         assertThat(resets).hasSize(1);
         JsonNode before = objectMapper.readTree(resets.get(0).get(1));
         JsonNode after = objectMapper.readTree(resets.get(0).get(2));
-        assertThat(before.get("sectionsOn").asInt()).isEqualTo(14);
+        assertThat(before.get("sectionsOn").asInt()).isEqualTo(16);
         assertThat(before.get("requiredOn").asInt()).isEqualTo(3);
-        assertThat(after.get("sectionsOn").asInt()).isEqualTo(16);
+        assertThat(after.get("sectionsOn").asInt()).isEqualTo(18);
         assertThat(after.get("requiredOn").asInt()).isEqualTo(4);
         assertThat(audits(clinic, "EMR_DEPARTMENT_DRAFT_SAVED")).as("a reset is not audited as a plain save").isZero();
         // Undo: the page sends back exactly the settings it had before; the draft returns to what it was

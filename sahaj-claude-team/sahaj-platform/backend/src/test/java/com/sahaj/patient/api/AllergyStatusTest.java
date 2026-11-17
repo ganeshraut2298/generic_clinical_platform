@@ -56,4 +56,13 @@ class AllergyStatusTest {
         assertThat(new PatientClinical(id, "UH-1", "A B", 30, "F", "  ", null, null).allergyStatus())
                 .isEqualTo(AllergyStatus.NOT_RECORDED);
     }
+
+    @Test
+    void aPlaceholderIsBlankANoneWordOrOneOfTheNotRecordedWords() {
+        for (String text : new String[] {null, " ", "None known", "NKDA.", "Not recorded", "unknown", "Not known", "?"}) {
+            assertThat(AllergyStatus.isPlaceholder(text)).as(String.valueOf(text)).isTrue();
+        }
+        assertThat(AllergyStatus.isPlaceholder("Peanuts")).isFalse();
+        assertThat(AllergyStatus.isPlaceholder("Peanuts; none known otherwise")).isFalse();
+    }
 }

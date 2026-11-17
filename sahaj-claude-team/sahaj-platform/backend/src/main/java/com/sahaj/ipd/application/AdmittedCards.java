@@ -69,6 +69,14 @@ class AdmittedCards {
     /** SAH-67-1: set by Spring; null in a plain unit test (then no card says "Round done"). */
     private RoundNoteRepository roundNotes;
 
+    /** SAH-76-3: set by Spring; null in a plain unit test (then no card shows orders to acknowledge). */
+    private OrderNotices orderNotices;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOrderNotices(OrderNotices orderNotices) {
+        this.orderNotices = orderNotices;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setRoundNotes(RoundNoteRepository roundNotes) {
         this.roundNotes = roundNotes;
@@ -217,6 +225,16 @@ class AdmittedCards {
                     patientMap.get(row.admission().patientId()), asOf, plan, row.admission().reason(), recorders)
                     .withRoundDone(roundDone.contains(admissionId)));
         }
+        // SAH-76-3 (ADR-027 D5): "n to acknowledge" on each card, one grouped read for the whole set.
+        if (orderNotices != null && !rows.isEmpty()) {
+            Map<UUID, OrderNotices.OpenCount> open = orderNotices.openStats(tenantId,
+                    rows.stream().map(r -> r.admission().id()).toList(), asOf);
+            for (AdmittedRow row : rows) {
+                OrderNotices.OpenCount c = open.getOrDefault(row.admission().id(), OrderNotices.OpenCount.NONE);
+                flags.computeIfPresent(row.admission().id(), (id, f) -> f.withOrdersToAcknowledge(
+                        new OrderNoticeViews.NoticeCount(c.count(), c.stat(), c.overdue())));
+            }
+        }
         return new Clinical(banner, flags);
     }
 
@@ -242,7 +260,8 @@ class AdmittedCards {
                         asOf),
                 escalation.targetMinutes(), SafetyRows.pastTarget(escalation, asOf));
         EwsSummary ews = latest == null ? null : new EwsSummary(latest.ewsScore(), latest.ewsRisk(), latest.recordedAt());
-        boolean due = VitalsDue.isDue(true, latest == null ? null : latest.recordedAt(), asOf);
+        boolean due = VitalsDue.isDue(true, latest == null ? null : latest.recordedAt(),
+                latest == null ? VitalsDue.DEFAULT_INTERVAL_MINUTES : latest.intervalMinutes(), asOf);
         String diagnosis = plan.diagnosis() ? diagnosis(reason) : null;
         Optional<CardLatestVitals> tiles = null;
         if (plan.anyVitals()) {

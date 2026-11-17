@@ -1,0 +1,120 @@
+// Orders tab of the Nursing sheet (reference "Nursing orders"). Colours come from the tokens only; every
+// state is also written in words, so colour is never the only signal.
+:host {
+  display: block;
+}
+
+.orders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  h3 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+}
+
+.badge {
+  border-radius: 10px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+
+  &.warn {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  &.crit {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+}
+
+.ord {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+
+  &.open {
+    border-color: var(--warn);
+    background: var(--warn-soft);
+  }
+
+  .kind {
+    min-width: 64px;
+    text-align: center;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    background: var(--pri-soft);
+    color: var(--pri-text);
+
+    &.k-stopped,
+    &.k-held {
+      background: var(--crit-soft);
+      color: var(--crit);
+    }
+  }
+
+  .body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    b {
+      font-size: 0.9rem;
+    }
+    small {
+      color: var(--ink-2);
+      font-size: 0.8rem;
+      overflow-wrap: anywhere;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    small.late {
+      color: var(--crit);
+      font-weight: 700;
+    }
+    small.ok {
+      color: var(--good);
+    }
+    .tag {
+      margin-left: 6px;
+      font-size: 0.68rem;
+    }
+  }
+
+  // Touch target (angular.md): 44 px tall.
+  button {
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 620px) {
+    flex-wrap: wrap;
+
+    button {
+      width: 100%;
+    }
+  }
+}
+
+.notice button {
+  margin-left: auto;
+  min-height: 44px;
+}

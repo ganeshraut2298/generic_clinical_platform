@@ -64,7 +64,7 @@ public class MarService {
         // SAH-34: after the 404 checks, before the record-access row (a refusal writes nothing).
         guard.requireAdmission(tenantId, actor, role, member.role(), admissionId, "mar-sheet");
         patientAccess.recordOpened(tenantId, admission.patientId(), actor);
-        return marAssembler.mar(tenantId, member.membershipId(), role, member.role(), ent, admission, patient,
+        return marAssembler.mar(tenantId, actor, member.membershipId(), role, member.role(), ent, admission, patient,
                 orders.databaseNow());
     }
 }

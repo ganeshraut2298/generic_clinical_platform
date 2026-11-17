@@ -74,6 +74,43 @@ class VisitBillingAdapterTest {
         assertThat(today).hasSize(2);
     }
 
+    private static final Instant DAY_30_START = Instant.parse("2026-10-01T18:30:00Z");
+    private static final Instant TODAY_START = Instant.parse("2026-10-31T18:30:00Z");
+
+    @Test
+    void earlierAsksOnlyForBillingAndDoneVisitsOfThe30DaysBeforeTodayCappedAt200() {
+        when(visitRepository.findBetweenInStages(TENANT_ID, DAY_30_START, TODAY_START, List.of("BILLING", "DONE"), 200))
+                .thenReturn(List.of(row("DONE")));
+
+        List<VisitForBilling> earlier = adapter.earlier(TENANT_ID, 30);
+
+        assertThat(earlier).singleElement().satisfies(v -> assertThat(v.doctorName()).isEqualTo("Dr Rao"));
+    }
+
+    @Test
+    void earlierDay30IsInsideTheWindowAndDay31IsOutsideIt() {
+        adapter.earlier(TENANT_ID, 30);
+
+        // Clock is 1 Nov 2026 IST: day 30 back is 2 Oct (window start, inclusive), day 31 is 1 Oct (before it).
+        verify(visitRepository).findBetweenInStages(TENANT_ID, DAY_30_START, TODAY_START,
+                List.of("BILLING", "DONE"), 200);
+        assertThat(DAY_30_START).isEqualTo(java.time.LocalDate.of(2026, 10, 2).atStartOfDay(VisitService.INDIA)
+                .toInstant());
+    }
+
+    @Test
+    void earlierGivesTheNewest200OldestFirst() {
+        VisitRow newest = new VisitRow(UUID.randomUUID(), PATIENT_ID, DOCTOR_ID, "NEW", "DONE", 9, 100,
+                Instant.parse("2026-10-30T05:00:00Z"), 0);
+        VisitRow oldest = new VisitRow(UUID.randomUUID(), PATIENT_ID, DOCTOR_ID, "NEW", "DONE", 1, 100,
+                Instant.parse("2026-10-05T05:00:00Z"), 0);
+        when(visitRepository.findBetweenInStages(TENANT_ID, DAY_30_START, TODAY_START, List.of("BILLING", "DONE"), 200))
+                .thenReturn(List.of(newest, oldest));
+
+        assertThat(adapter.earlier(TENANT_ID, 30)).extracting(VisitForBilling::id)
+                .containsExactly(oldest.id(), newest.id());
+    }
+
     @Test
     void advanceToDoneMovesABillingVisitForward() {
         when(visitRepository.findById(TENANT_ID, VISIT_ID)).thenReturn(Optional.of(row("BILLING")));

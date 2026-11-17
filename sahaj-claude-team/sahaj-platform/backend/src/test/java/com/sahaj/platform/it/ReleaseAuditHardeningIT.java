@@ -58,7 +58,7 @@ class ReleaseAuditHardeningIT extends RoundSupport {
     private String giveJson(String clientKey, String slotAt, String outcome, String reasonKey, Ward w) {
         return "{\"clientKey\":" + clientKey + ",\"slotAt\":" + slotAt + ",\"outcome\":" + outcome
                 + (reasonKey == null ? "" : ",\"reasonKey\":" + reasonKey)
-                + ",\"wristband\":\"" + w.uhid() + "\",\"identityConfirmed\":true}";
+                + ",\"wristband\":\"" + w.uhid() + "\",\"identityConfirmed\":true,\"orderVersion\":1}"; // SAH-76: orderVersion is required
     }
 
     private void unreadable(Fix f, String json, String field, String message, String label) throws Exception {

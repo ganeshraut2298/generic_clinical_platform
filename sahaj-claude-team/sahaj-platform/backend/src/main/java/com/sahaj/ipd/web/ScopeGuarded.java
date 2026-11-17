@@ -28,6 +28,16 @@ public @interface ScopeGuarded {
         ORDER,
         /** A path with an escalation id: the escalation's admission is found first. */
         ESCALATION,
+        /**
+         * SAH-76 (contract kind notice-locked): a path with an order notice id. The notice's admission is found first
+         * (another clinic's id is 404), then checked after the admission row lock.
+         */
+        NOTICE,
+        /**
+         * SAH-76 (contract kind dose-locked): a path with a dose id (undo, recorded in error). The dose's admission is
+         * found first, then checked after the admission row lock.
+         */
+        DOSE,
         /** Emergency access endpoints (the picker, open, the owner's list and review). */
         GRANT
     }

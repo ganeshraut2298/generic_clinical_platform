@@ -261,7 +261,7 @@ class DoseServiceTest extends DoseTestBase {
     void theTokenRoleIsCheckedBeforeTheModuleAndTheModuleBeforeTheBody() {
         OrderRow order = active("pcm", "od");
         ipdState("off");
-        DoseInput broken = new DoseInput(null, null, null, null, null, null, null, null);
+        DoseInput broken = dose(null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> give(NURSE, "FRONT_DESK", order, broken)).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> give(NURSE, "NURSE", order, broken)).isInstanceOf(ModuleOffException.class);
@@ -274,7 +274,7 @@ class DoseServiceTest extends DoseTestBase {
     @Test
     void everyFormatErrorIsAnsweredTogetherInTheOrderClientKeySlotAtOutcome() {
         OrderRow order = active("pcm", "od");
-        DoseInput broken = new DoseInput("not-a-key", "yesterday", "MAYBE", UHID, Boolean.TRUE, null, null, null);
+        DoseInput broken = dose("not-a-key", "yesterday", "MAYBE", UHID, Boolean.TRUE, null, null, null);
 
         assertThatThrownBy(() -> nurseGives(order, broken)).isInstanceOfSatisfying(InvalidFieldsException.class, e -> {
             assertThat(e.errors()).containsExactly(new FieldMessage("clientKey", "Reload the page and try again."),
@@ -291,7 +291,7 @@ class DoseServiceTest extends DoseTestBase {
 
         assertThatThrownBy(() -> nurseGives(order, null)).isInstanceOfSatisfying(InvalidFieldsException.class,
                 e -> assertThat(e.errors()).extracting(FieldMessage::field)
-                        .containsExactly("clientKey", "slotAt", "outcome"));
+                        .containsExactly("clientKey", "outcome", "orderVersion"));
     }
 
     @ParameterizedTest
@@ -299,7 +299,7 @@ class DoseServiceTest extends DoseTestBase {
     void anOutcomeOtherThanGivenOrNotGivenIsAFormatError(String outcome) {
         OrderRow order = active("pcm", "od");
         DoseInput base = given(EIGHT_AM);
-        DoseInput body = new DoseInput(base.clientKey(), base.slotAt(), outcome, UHID, Boolean.TRUE, null, null, null);
+        DoseInput body = dose(base.clientKey(), base.slotAt(), outcome, UHID, Boolean.TRUE, null, null, null);
 
         assertThatThrownBy(() -> nurseGives(order, body)).isInstanceOfSatisfying(InvalidFieldsException.class,
                 e -> assertThat(e.errors()).extracting(FieldMessage::field).containsExactly("outcome"));
@@ -309,7 +309,7 @@ class DoseServiceTest extends DoseTestBase {
     void aSlotWithAnOffsetIsTheSameInstant() {
         OrderRow order = active("pcm", "od");
         DoseInput base = given(EIGHT_AM);
-        DoseInput body = new DoseInput(base.clientKey(), "2026-11-11T08:00:00+05:30", "GIVEN", UHID, Boolean.TRUE, null,
+        DoseInput body = dose(base.clientKey(), "2026-11-11T08:00:00+05:30", "GIVEN", UHID, Boolean.TRUE, null,
                 null, null);
 
         assertThat(nurseGives(order, body).created()).isTrue();
@@ -357,7 +357,11 @@ class DoseServiceTest extends DoseTestBase {
 
         assertThatThrownBy(() -> nurseGives(order, given(EIGHT_AM))).satisfies(e -> assertConflict(e,
                 "order-not-verified", "This order is not checked by the pharmacist yet."));
-        assertNothingWritten();
+        // SAH-76 (ADR-027 D11): the refusal is audited, nothing else is written.
+        assertThat(auditAfter("IPD_DOSE_REFUSED")).containsEntry("orderId", order.id())
+                .containsEntry("refusal", "order-not-verified").containsKey("device");
+        assertThat(doses.writes).isZero();
+        verify(events, never()).insert(any(), any(), anyString(), anyString(), any());
     }
 
     @Test
@@ -367,6 +371,51 @@ class DoseServiceTest extends DoseTestBase {
         assertThatThrownBy(() -> nurseGives(order, given(EIGHT_AM))).satisfies(e -> assertConflict(e, "order-state",
                 "This medicine was stopped. Its doses can no longer be recorded."));
         assertNothingWritten();
+    }
+
+    @Test
+    void aHighAlertGiveOnAnOnHoldOrderIsRefusedBeforeAnyPinTryAndWritesNoDose() {
+        OrderRow order = fake.seedAt(ADMISSION, "hep", "bd", "ON_HOLD", DOCTOR, CHECKED_LONG_AGO);
+
+        assertThatThrownBy(() -> nurseGives(order, givenHighAlert(EIGHT_AM))).satisfies(e -> assertConflict(e,
+                "order-on-hold", DoseRules.ON_HOLD));
+
+        verifyNoInteractions(staffPin);
+        assertThat(doses.writes).isZero();
+        assertThat(doses.rows).isEmpty();
+        verify(events, never()).insert(any(), any(), anyString(), anyString(), any());
+        verify(auditLog, never()).record(eq("IPD_DOSE_GIVEN"), anyString(), any(), any(), any());
+        assertThat(auditAfter("IPD_DOSE_REFUSED")).containsEntry("orderId", order.id())
+                .containsEntry("refusal", "order-on-hold").doesNotContainKey("secondNursePin");
+    }
+
+    @Test
+    void aHighAlertGiveOnAQueriedOrderIsRefusedBeforeAnyPinTryAndWritesNoDose() {
+        OrderRow order = fake.seedAt(ADMISSION, "hep", "bd", "QUERIED", DOCTOR, null);
+
+        assertThatThrownBy(() -> nurseGives(order, givenHighAlert(EIGHT_AM))).satisfies(e -> assertConflict(e,
+                "order-not-verified", DoseRules.NOT_VERIFIED));
+
+        verifyNoInteractions(staffPin);
+        assertThat(doses.writes).isZero();
+        assertThat(doses.rows).isEmpty();
+        verify(events, never()).insert(any(), any(), anyString(), anyString(), any());
+        verify(auditLog, never()).record(eq("IPD_DOSE_GIVEN"), anyString(), any(), any(), any());
+        assertThat(auditAfter("IPD_DOSE_REFUSED")).containsEntry("orderId", order.id())
+                .containsEntry("refusal", "order-not-verified").doesNotContainKey("secondNursePin");
+    }
+
+    @Test
+    void aPlainGiveOnAnOnHoldOrderIsRefusedAndNotRecordedAsGivenOrNotGiven() {
+        OrderRow order = ofStatus("ON_HOLD", CHECKED_LONG_AGO);
+
+        assertThatThrownBy(() -> nurseGives(order, given(EIGHT_AM))).satisfies(e -> assertConflict(e,
+                "order-on-hold", DoseRules.ON_HOLD));
+        assertThatThrownBy(() -> nurseGives(order, notGiven(EIGHT_AM, "HELD_DOCTOR"))).satisfies(e -> assertConflict(e,
+                "order-on-hold", DoseRules.ON_HOLD));
+
+        assertThat(doses.writes).isZero();
+        verifyNoInteractions(staffPin);
     }
 
     @Test
@@ -386,7 +435,7 @@ class DoseServiceTest extends DoseTestBase {
     void aSlotThatIsNotADoseTimeOfThisMedicineTodayIs400OnTheSlotField(String slot) {
         OrderRow order = active("pcm", "od");
         DoseInput base = given(EIGHT_AM);
-        DoseInput body = new DoseInput(base.clientKey(), slot, "GIVEN", UHID, Boolean.TRUE, null, null, null);
+        DoseInput body = dose(base.clientKey(), slot, "GIVEN", UHID, Boolean.TRUE, null, null, null);
         fake.now = Instant.parse("2026-11-11T08:40:00Z");
 
         assertThatThrownBy(() -> nurseGives(order, body)).satisfies(e -> assertField(e, "slotAt",
@@ -427,7 +476,7 @@ class DoseServiceTest extends DoseTestBase {
         fake.now = EIGHT_AM.minusSeconds(61 * 60);
 
         assertThatThrownBy(() -> nurseGives(order, given(EIGHT_AM))).satisfies(e -> assertConflict(e, "dose-not-due",
-                "This dose is not due yet. It can be given from 1 hour before its time."));
+                "This dose is not due yet. It can be given from 60 min before its time."));
         assertNothingWritten();
     }
 
@@ -531,7 +580,7 @@ class DoseServiceTest extends DoseTestBase {
                 NURSE);
         verify(events, times(1)).insert(any(), any(), anyString(), anyString(), any());
         Map<String, Object> after = auditAfter("IPD_DOSE_WRISTBAND_MISMATCH");
-        assertThat(after).containsOnlyKeys("orderId", "admissionId", "drugKey", "slotAt")
+        assertThat(after).containsOnlyKeys("orderId", "admissionId", "drugKey", "slotAt", "device")
                 .containsEntry("orderId", order.id()).containsEntry("admissionId", ADMISSION)
                 .containsEntry("drugKey", "pcm").containsEntry("slotAt", EIGHT_AM.toString());
         verify(auditLog).record(eq("IPD_DOSE_WRISTBAND_MISMATCH"), eq("IPD_MEDICINE_ORDER"), eq(order.id()), isNull(),
@@ -861,7 +910,7 @@ class DoseServiceTest extends DoseTestBase {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "OTHER", "patient_refused", " "})
+    @ValueSource(strings = {"", "Other", "patient_refused", " "})
     void aMissingOrUnknownReasonIs400OnTheReasonField(String reason) {
         OrderRow order = active("pcm", "od");
 
@@ -881,7 +930,7 @@ class DoseServiceTest extends DoseTestBase {
     @Test
     void notGivenNeedsNeitherTheWristbandNorTheTickNorTheSecondNurse() {
         OrderRow order = active("hep", "bd");
-        DoseInput body = new DoseInput(UUID.randomUUID().toString(), EIGHT_AM.toString(), "NOT_GIVEN", "wrong band",
+        DoseInput body = dose(UUID.randomUUID().toString(), EIGHT_AM.toString(), "NOT_GIVEN", "wrong band",
                 Boolean.FALSE, "garbage", "1", "AWAY_FROM_WARD");
 
         DoseResult result = nurseGives(order, body);
@@ -912,7 +961,7 @@ class DoseServiceTest extends DoseTestBase {
                 .isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> nurseGives(ahead, notGiven(EIGHT_AM, "NIL_BY_MOUTH")))
                 .satisfies(e -> assertConflict(e, "dose-not-due",
-                        "This dose is not due yet. It can be given from 1 hour before its time."));
+                        "This dose is not due yet. It can be given from 60 min before its time."));
     }
 
     // ---- a repeat of the client key ----
@@ -950,7 +999,7 @@ class DoseServiceTest extends DoseTestBase {
     void aRepeatOfAHighAlertDoseWithTheSameSecondNurseChecksNoPin() {
         OrderRow order = active("hep", "bd");
         UUID key = UUID.randomUUID();
-        DoseInput body = new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
+        DoseInput body = dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
                 secondMembership.toString(), PIN, null);
         nurseGives(order, body);
         org.mockito.Mockito.clearInvocations(staffPin);
@@ -965,10 +1014,10 @@ class DoseServiceTest extends DoseTestBase {
     void aRepeatEvenWithABadPinOrNoWristbandIsStillAReplay() {
         OrderRow order = active("hep", "bd");
         UUID key = UUID.randomUUID();
-        nurseGives(order, new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
+        nurseGives(order, dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
                 secondMembership.toString(), PIN, null));
 
-        DoseResult again = nurseGives(order, new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", "", null,
+        DoseResult again = nurseGives(order, dose(key.toString(), EIGHT_AM.toString(), "GIVEN", "", null,
                 secondMembership.toString(), "x", null));
 
         assertThat(again.answer().replayed()).isTrue();
@@ -982,10 +1031,10 @@ class DoseServiceTest extends DoseTestBase {
         roster.put(other, new com.sahaj.platform.api.TeamMemberPort.TeamMember(other, "Br. Nikhil Jadhav", "NURSE", true,
                 0L));
         UUID key = UUID.randomUUID();
-        nurseGives(order, new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
+        nurseGives(order, dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
                 secondMembership.toString(), PIN, null));
 
-        assertThatThrownBy(() -> nurseGives(order, new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID,
+        assertThatThrownBy(() -> nurseGives(order, dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID,
                 Boolean.TRUE, other.toString(), PIN, null))).satisfies(e -> assertConflict(e, "client-key-reused",
                 "This dose was already recorded with different values. Reload the page."));
         assertThat(otherUser).isNotNull();
@@ -996,10 +1045,10 @@ class DoseServiceTest extends DoseTestBase {
     void aRepeatWithNoSecondNurseOfAHighAlertDoseIsAReusedKey() {
         OrderRow order = active("hep", "bd");
         UUID key = UUID.randomUUID();
-        nurseGives(order, new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
+        nurseGives(order, dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
                 secondMembership.toString(), PIN, null));
 
-        assertThatThrownBy(() -> nurseGives(order, new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID,
+        assertThatThrownBy(() -> nurseGives(order, dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID,
                 Boolean.TRUE, null, null, null))).isInstanceOf(ConflictException.class);
     }
 
@@ -1019,7 +1068,7 @@ class DoseServiceTest extends DoseTestBase {
         OrderRow order = active("pcm", "od");
         UUID key = UUID.randomUUID();
         nurseGives(order, givenWithKey(key, EIGHT_AM));
-        DoseInput notGiven = new DoseInput(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null,
+        DoseInput notGiven = dose(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null,
                 "PATIENT_REFUSED");
 
         assertThatThrownBy(() -> nurseGives(order, notGiven)).satisfies(e -> assertConflict(e, "client-key-reused",
@@ -1030,15 +1079,15 @@ class DoseServiceTest extends DoseTestBase {
     void aRepeatOfNotGivenWithTheSameReasonIsAReplayAndWithAnotherReasonIsAReusedKey() {
         OrderRow order = active("pcm", "od");
         UUID key = UUID.randomUUID();
-        DoseInput first = new DoseInput(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null,
+        DoseInput first = dose(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null,
                 "NIL_BY_MOUTH");
         nurseGives(order, first);
 
         assertThat(nurseGives(order, first).answer().replayed()).isTrue();
-        DoseInput other = new DoseInput(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null,
+        DoseInput other = dose(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null,
                 "NOT_AVAILABLE");
         assertThatThrownBy(() -> nurseGives(order, other)).isInstanceOf(ConflictException.class);
-        DoseInput none = new DoseInput(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null, null);
+        DoseInput none = dose(key.toString(), EIGHT_AM.toString(), "NOT_GIVEN", null, null, null, null, null);
         assertThatThrownBy(() -> nurseGives(order, none)).isInstanceOf(ConflictException.class);
     }
 
@@ -1058,7 +1107,7 @@ class DoseServiceTest extends DoseTestBase {
         OrderRow order = active("pcm", "od");
         UUID key = UUID.randomUUID();
         nurseGives(order, givenWithKey(key, EIGHT_AM));
-        fake.markStopped(TENANT, order.id(), DOCTOR);
+        fake.markStopped(TENANT, order.id(), DOCTOR, "No longer needed");
         admission = admissionRow("DISCHARGED");
 
         DoseResult again = nurseGives(order, givenWithKey(key, EIGHT_AM));

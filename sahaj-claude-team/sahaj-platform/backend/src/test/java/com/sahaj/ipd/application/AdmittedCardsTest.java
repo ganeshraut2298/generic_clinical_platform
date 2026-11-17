@@ -144,6 +144,16 @@ class AdmittedCardsTest {
     }
 
     @Test
+    void theCardUsesTheIntervalStampedOnTheLatestVitals() {
+        Instant at = AS_OF.minusSeconds(61 * 60);
+        LatestScore hourly = new LatestScore(ADMISSION, 2, Risk.LOW, at, null, null, 60);
+
+        assertThat(AdmittedCards.flags(null, hourly, patient(null), AS_OF).vitalsDue()).isTrue();
+        assertThat(AdmittedCards.flags(null, score(2, Risk.LOW, at), patient(null), AS_OF).vitalsDue())
+                .as("no stamped interval is read as 240 minutes").isFalse();
+    }
+
+    @Test
     void vitalsAreDueOnlyAfterMoreThan240WholeMinutes() {
         assertThat(flagsWithVitalsAt(AS_OF.minusSeconds(239 * 60)).vitalsDue()).isFalse();
         assertThat(flagsWithVitalsAt(AS_OF.minusSeconds(240 * 60)).vitalsDue()).isFalse();
@@ -164,8 +174,9 @@ class AdmittedCardsTest {
 
     @Test
     void noneKnownAndNotRecordedSendNoText() {
-        for (String text : new String[] {"None known", "no known allergies - none known", "Not recorded", "unknown",
-            "?", "", "   ", null}) {
+        // "no known allergies - none known" is not here: AllergyStatus is the single none-word list and only a
+        // whole-text none word counts as none. Mixed text is RECORDED (the safe side: the chip shows the text).
+        for (String text : new String[] {"None known", "Not recorded", "unknown", "?", "", "   ", null}) {
             CardAllergy allergy = AdmittedCards.allergy(patient(text));
             assertThat(allergy.status()).as(String.valueOf(text)).isNotEqualTo(AllergyStatus.RECORDED);
             assertThat(allergy.text()).as(String.valueOf(text)).isNull();
@@ -173,6 +184,9 @@ class AdmittedCardsTest {
         assertThat(AdmittedCards.allergy(patient("None known")).status()).isEqualTo(AllergyStatus.NONE_KNOWN);
         assertThat(AdmittedCards.allergy(patient(null)).status()).isEqualTo(AllergyStatus.NOT_RECORDED);
         assertThat(AdmittedCards.allergy(patient("  ")).status()).isEqualTo(AllergyStatus.NOT_RECORDED);
+        CardAllergy mixed = AdmittedCards.allergy(patient("no known allergies - none known"));
+        assertThat(mixed.status()).isEqualTo(AllergyStatus.RECORDED);
+        assertThat(mixed.text()).isEqualTo("no known allergies - none known");
     }
 
     @Test

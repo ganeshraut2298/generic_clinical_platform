@@ -218,7 +218,7 @@ class ScopeReviewFixIT extends ScopeSupport {
         sign(clinic, h.inB().id(), "lama", "general");
         dischargeNow(clinic, h.inB().id(), "lama", "general", "UPI");
         assertThat(values(clinic, "select status from ipd.admission where id = ?::uuid", h.inB().id()).get(0)).isEqualTo("DISCHARGED");
-        String dose = "{\"clientKey\":\"" + newKey() + "\",\"slotAt\":\"" + ist(8, 0) + "\",\"outcome\":\"NOT_GIVEN\",\"reasonKey\":\"NIL_BY_MOUTH\"}";
+        String dose = "{\"clientKey\":\"" + newKey() + "\",\"slotAt\":\"" + ist(8, 0) + "\",\"outcome\":\"NOT_GIVEN\",\"reasonKey\":\"NIL_BY_MOUTH\",\"orderVersion\":1}";
         String call = "{\"version\":0,\"seniorCalls\":0}";
         String written = written(clinic);
         // ward A's nurse: outside scope, on the discharged admission's order and escalation

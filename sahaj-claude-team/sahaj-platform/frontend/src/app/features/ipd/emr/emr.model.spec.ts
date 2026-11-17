@@ -66,7 +66,7 @@ describe('emr.model', () => {
 
   describe('small line under a medicine', () => {
     it('shows route, frequency and the person who ordered', () => {
-      expect(orderSmallLine(ORDER)).toBe('Oral · Once daily · Dr. Meera Kulkarni');
+      expect(orderSmallLine(ORDER)).toBe('1 tablet · Oral · Once daily · from 6 Nov, 10:00 AM · Until stopped · Dr. Meera Kulkarni');
     });
     it('adds the override reason', () => {
       const line = orderSmallLine({
@@ -74,7 +74,7 @@ describe('emr.model', () => {
         overrideReason: { key: 'CARDIOLOGY_STENT', label: 'Recent coronary stent, cardiology advised' },
       });
       expect(line).toBe(
-        'Oral · Once daily · Dr. Meera Kulkarni · override: Recent coronary stent, cardiology advised',
+        '1 tablet · Oral · Once daily · from 6 Nov, 10:00 AM · Until stopped · Dr. Meera Kulkarni · override: Recent coronary stent, cardiology advised',
       );
     });
     it('adds the reject reason for a rejected order only', () => {
@@ -84,10 +84,10 @@ describe('emr.model', () => {
         rejectReason: { key: 'WRONG_DOSE', label: 'Wrong dose or frequency' },
       };
       expect(orderSmallLine(rejected)).toBe(
-        'Oral · Once daily · Dr. Meera Kulkarni · rejected: Wrong dose or frequency',
+        '1 tablet · Oral · Once daily · from 6 Nov, 10:00 AM · Until stopped · Dr. Meera Kulkarni · rejected: Wrong dose or frequency',
       );
       expect(orderSmallLine({ ...rejected, status: 'STOPPED' })).toBe(
-        'Oral · Once daily · Dr. Meera Kulkarni',
+        '1 tablet · Oral · Once daily · from 6 Nov, 10:00 AM · Until stopped · Dr. Meera Kulkarni',
       );
     });
     it('puts the override before the rejection', () => {
@@ -98,7 +98,7 @@ describe('emr.model', () => {
         rejectReason: { key: 'INTERACTION_RISK', label: 'Interaction risk too high' },
       };
       expect(orderSmallLine(both)).toBe(
-        'Oral · Once daily · Dr. Meera Kulkarni · override: Specialist advised this combination · rejected: Interaction risk too high',
+        '1 tablet · Oral · Once daily · from 6 Nov, 10:00 AM · Until stopped · Dr. Meera Kulkarni · override: Specialist advised this combination · rejected: Interaction risk too high',
       );
     });
   });

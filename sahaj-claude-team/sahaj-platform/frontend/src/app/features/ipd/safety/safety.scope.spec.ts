@@ -9,6 +9,8 @@ import { ScopeRefusals } from '../ipd-scope-refusal';
 import { AS_OF, ROW, asNurse, boardOf, eventOf, pageOf, problem } from './safety.fixtures';
 import { SafetyComponent } from './safety.component';
 import { SafetyBoard, SafetyCounts } from './safety.model';
+import { UndoToast } from '../mar/undo-toast.component';
+import { provideOrderNoticesStubs } from '../orders/order-notices.testing';
 
 const IPD = '/api/v1/ipd';
 const BOARD = `${IPD}/safety`;
@@ -49,6 +51,7 @@ describe('SafetyComponent: ward scope and emergency access review (SAH-34)', () 
       providers: [
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
+        ...provideOrderNoticesStubs(),
         { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
         { provide: MatDialog, useValue: { open: vi.fn() } },
       ],
@@ -273,6 +276,16 @@ describe('SafetyComponent: ward scope and emergency access review (SAH-34)', () 
     it('reads the board again when a sheet elsewhere meets a refusal (the Medicine round Give, for example)', async () => {
       await open(nurseBoard());
       bus.report('a2', false);
+      await settle();
+      http.expectOne(BOARD).flush(nurseBoard());
+      eventsReq().flush(pageOf([eventOf()]));
+      await settle();
+      expect(q('[data-testid=safety-board]')).not.toBeNull();
+    });
+
+    it('reads the board again after a dose is undone from the toast (SAH-76-5)', async () => {
+      await open(nurseBoard());
+      TestBed.inject(UndoToast).corrected.next({ admissionId: 'a2', mar: null });
       await settle();
       http.expectOne(BOARD).flush(nurseBoard());
       eventsReq().flush(pageOf([eventOf()]));

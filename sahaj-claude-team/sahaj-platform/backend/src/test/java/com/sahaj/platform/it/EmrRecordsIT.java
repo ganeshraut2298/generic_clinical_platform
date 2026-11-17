@@ -75,9 +75,15 @@ class EmrRecordsIT extends EmrSupport {
         return saveRecordDraft(c.token(), record.get("id").asText(), draftBody(record.get("revision").asLong(), "ASSESSMENT", null, sections), 200);
     }
 
-    /** Fills the four required sections of General Medicine and returns the record after the save. */
+    /** The vitals log editor value (SAH-60); the General Medicine Vitals section is required since SAH-75 (V2026_12_14_1010). */
+    private ObjectNode vitalsLog() throws Exception {
+        return sectionValues("vitals", "{\"specialty\":{\"component\":\"VITALS_LOG\",\"schemaVersion\":1,"
+                + EmrSignSupport.VITALS_LOG_JSON.substring(1).replace("ENTRY_ID", UUID.randomUUID().toString()) + "}");
+    }
+
+    /** Fills the required sections of General Medicine (vitals, complaints, diagnosis, rx) and returns the record after the save. */
     private JsonNode fillRequired(Ctx c, JsonNode record) throws Exception {
-        return save(c, record, sectionValues("complaints", COMPLAINTS), sectionValues("diagnosis", DIAGNOSIS),
+        return save(c, record, vitalsLog(), sectionValues("complaints", COMPLAINTS), sectionValues("diagnosis", DIAGNOSIS),
                 sectionValues("rx", RX), sectionValues("rxformat", RXFORMAT));
     }
 
@@ -113,12 +119,12 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(layout.get("departmentName").asText()).isEqualTo("General Medicine");
         assertThat(layout.get("starterKey").asText()).isEqualTo("gm");
         assertThat(layout.get("layoutSource").asText()).isEqualTo("STARTER");
-        assertThat(layout.get("versionNo").asInt()).isEqualTo(1);
+        assertThat(layout.get("versionNo").asInt()).as("starter layout version 2 since SAH-75").isEqualTo(2);
         assertThat(layout.get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
         assertThat(layout.get("takenAt").asText()).isNotBlank();
-        assertThat(layout.get("sections").size()).as("only the sections that are on").isEqualTo(16);
-        assertThat(layoutKeys(record)).doesNotContain("procedures", "referral", "consent");
-        assertThat(record.get("sections").size()).as("one entry per section of the layout").isEqualTo(16);
+        assertThat(layout.get("sections").size()).as("only the sections that are on").isEqualTo(18);
+        assertThat(layoutKeys(record)).contains("procedures", "local_exam").doesNotContain("referral", "consent");
+        assertThat(record.get("sections").size()).as("one entry per section of the layout").isEqualTo(18);
         for (JsonNode s : record.get("sections")) {
             assertThat(s.get("values").size()).isZero();
             assertThat(s.get("copiedFrom").isNull()).isTrue();
@@ -130,12 +136,12 @@ class EmrRecordsIT extends EmrSupport {
         JsonNode treatment = record.get("parts").get(1);
         assertThat(assessment.get("part").asText()).isEqualTo("ASSESSMENT");
         assertThat(treatment.get("part").asText()).isEqualTo("TREATMENT");
-        assertThat(assessment.get("requiredTotal").asInt()).isEqualTo(1);
-        assertThat(treatment.get("requiredTotal").asInt()).isEqualTo(3);
-        assertThat(assessment.get("sectionsTotal").asInt()).isEqualTo(9);
-        assertThat(treatment.get("sectionsTotal").asInt()).isEqualTo(7);
+        assertThat(assessment.get("requiredTotal").asInt()).isEqualTo(2);
+        assertThat(treatment.get("requiredTotal").asInt()).isEqualTo(2);
+        assertThat(assessment.get("sectionsTotal").asInt()).isEqualTo(10);
+        assertThat(treatment.get("sectionsTotal").asInt()).isEqualTo(8);
         assertThat(assessment.get("complete").asBoolean()).isFalse();
-        assertThat(texts(record.get("stillNeeded"), null)).containsExactly("complaints", "diagnosis", "rx", "rxformat");
+        assertThat(texts(record.get("stillNeeded"), null)).containsExactly("vitals", "complaints", "diagnosis", "rx");
         assertThat(record.get("readyToComplete").asBoolean()).isFalse();
         assertThat(record.get("uiState").get("part").asText()).isEqualTo("ASSESSMENT");
         assertThat(record.get("uiState").get("sectionKey").isNull()).isTrue();
@@ -168,7 +174,7 @@ class EmrRecordsIT extends EmrSupport {
                 + "(ipd_admission_id is null)::text, (er_case_id is null)::text, (round_date is null)::text, (patient_id is not null)::text "
                 + "from opd.emr_record where id = ?::uuid",
                 record.get("id").asText());
-        assertThat(row).containsExactly("STARTER_LAYOUT", "true", "1", "gm", "gm", "DOCTOR_SPECIALTY", "DRAFT", "0", "{}", "OPD_VISIT",
+        assertThat(row).containsExactly("STARTER_LAYOUT", "true", "2", "gm", "gm", "DOCTOR_SPECIALTY", "DRAFT", "0", "{}", "OPD_VISIT",
                 c.visitId(), "true", "true", "true", "true");
         publishOneChange(c.clinic(), "gm", "chronic", false);
         Ctx next = ctxFor(c.clinic(), c.doctor());
@@ -382,7 +388,7 @@ class EmrRecordsIT extends EmrSupport {
         JsonNode record = open(c);
         assertThat(record.get("layout").get("departmentKey").asText()).isEqualTo("dental");
         assertThat(record.get("layout").get("choiceSource").asText()).isEqualTo("DOCTOR_SPECIALTY");
-        assertThat(layoutKeys(record)).contains("dental_chart", "intraoral");
+        assertThat(layoutKeys(record)).contains("dental_chart", "dental_intraoral").doesNotContain("intraoral");
         setDoctorSpecialty(clinic, dentist, "Paediatrician");
         assertThat(record(c.token(), record.get("id").asText()).get("layout").get("departmentKey").asText()).isEqualTo("dental");
         assertThat(openVisit(c.token(), c.visitId(), 200).get("record").get("layout").get("departmentKey").asText()).isEqualTo("dental");
@@ -408,7 +414,7 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(opened.get("layout").get("layoutSource").asText()).isEqualTo("PUBLISHED");
         assertThat(opened.get("layout").get("versionNo").asInt()).isEqualTo(1);
         assertThat(layoutKeys(opened)).doesNotContain("chronic");
-        assertThat(texts(opened.get("stillNeeded"), null)).containsExactly("complaints", "hpi", "diagnosis", "rx", "rxformat");
+        assertThat(texts(opened.get("stillNeeded"), null)).containsExactly("vitals", "complaints", "hpi", "diagnosis", "rx");
         // v2: chronic back, hpi optional, prescription hidden and not required; v3: a reset to the starter values
         ObjectNode v2 = layoutInput(department(clinic, "gm"));
         setShown(v2, "chronic", true, false);
@@ -432,8 +438,8 @@ class EmrRecordsIT extends EmrSupport {
         // a visit opened now reads v3
         JsonNode fresh = open(ctxFor(clinic, doctor));
         assertThat(fresh.get("layout").get("versionNo").asInt()).isEqualTo(3);
-        assertThat(layoutKeys(fresh)).contains("chronic", "rx").doesNotContain("procedures");
-        assertThat(texts(fresh.get("stillNeeded"), null)).containsExactly("complaints", "diagnosis", "rx", "rxformat");
+        assertThat(layoutKeys(fresh)).contains("chronic", "rx", "procedures").doesNotContain("referral");
+        assertThat(texts(fresh.get("stillNeeded"), null)).containsExactly("vitals", "complaints", "diagnosis", "rx");
         // the version the old record points at is still there and unchanged
         JsonNode version = get(DEPARTMENTS + "/gm/versions/1", clinic.owner());
         List<String> shownInVersion = new ArrayList<>();
@@ -497,7 +503,8 @@ class EmrRecordsIT extends EmrSupport {
                 + "from opd.emr_record where id = ?::uuid", id)).containsExactly("1", "object", "true", "4", "ASSESSMENT");
         // one audit entry per save: who and the section keys, never a value
         List<List<String>> saves = auditRows(c.clinic(), "EMR_RECORD_DRAFT_SAVED");
-        assertThat(saves).hasSize(5);
+        // four saves: the empty position save, complaints, history, and the clearing save (revisions 1 to 4)
+        assertThat(saves).hasSize(4);
         JsonNode keys = objectMapper.readTree(saves.get(1).get(2));
         assertThat(texts(keys.get("sectionKeys"), null)).containsExactly("complaints");
         assertThat(saves.get(1).get(2)).doesNotContain("Fever");
@@ -521,15 +528,19 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(recordSection(whole, "complaints").get("status").asText()).isEqualTo("DONE");
         assertThat(texts(whole.get("stillNeeded"), null)).doesNotContain("complaints");
         assertThat(whole.get("parts").get(0).get("requiredDone").asInt()).isEqualTo(1);
-        assertThat(whole.get("parts").get(0).get("complete").asBoolean()).as("a tick replaces the number").isTrue();
-        assertThat(whole.get("parts").get(1).get("complete").asBoolean()).isFalse();
+        assertThat(whole.get("parts").get(0).get("complete").asBoolean()).as("Vitals is required too since SAH-75").isFalse();
+        JsonNode withVitals = save(c, whole, vitalsLog());
+        assertThat(withVitals.get("parts").get(0).get("requiredDone").asInt()).isEqualTo(2);
+        assertThat(withVitals.get("parts").get(0).get("complete").asBoolean()).as("a tick replaces the number").isTrue();
+        assertThat(withVitals.get("parts").get(1).get("complete").asBoolean()).isFalse();
+        whole = withVitals;
         // hpi has no required field: one field is enough; an empty text is not a value; it never blocks
         assertThat(recordSection(whole, "hpi").get("status").asText()).isEqualTo("OPTIONAL");
         JsonNode blank = save(c, whole, sectionValues("hpi", "{\"narrative\":\"   \"}"));
         assertThat(recordSection(blank, "hpi").get("status").asText()).isEqualTo("OPTIONAL");
         JsonNode filled = save(c, blank, sectionValues("hpi", "{\"narrative\":\"Fever for three days\"}"));
         assertThat(recordSection(filled, "hpi").get("status").asText()).isEqualTo("DONE");
-        assertThat(filled.get("parts").get(0).get("sectionsDone").asInt()).isEqualTo(2);
+        assertThat(filled.get("parts").get(0).get("sectionsDone").asInt()).as("vitals, complaints and hpi").isEqualTo(3);
         // vitals is filled with the vitals log editor since SAH-60 (specialty only; see EmrSpecialtyScreensIT), so it is not tried with plain values here
     }
 
@@ -543,8 +554,8 @@ class EmrRecordsIT extends EmrSupport {
         assertThat(filled.get("readyToComplete").asBoolean()).isTrue();
         assertThat(filled.get("parts").get(0).get("complete").asBoolean()).isTrue();
         assertThat(filled.get("parts").get(1).get("complete").asBoolean()).isTrue();
-        assertThat(filled.get("parts").get(1).get("requiredDone").asInt()).isEqualTo(3);
-        for (String key : new String[] {"complaints", "diagnosis", "rx", "rxformat"}) {
+        assertThat(filled.get("parts").get(1).get("requiredDone").asInt()).as("diagnosis and rx").isEqualTo(2);
+        for (String key : new String[] {"complaints", "diagnosis", "rx"}) {
             assertThat(recordSection(filled, key).get("status").asText()).isEqualTo("DONE");
         }
         assertThat(filled.get("status").asText()).as("in phase 2 Complete does not sign").isEqualTo("DRAFT");
@@ -566,7 +577,7 @@ class EmrRecordsIT extends EmrSupport {
         setShown(body, "rxformat", false, false);
         publish(clinic, "gm", body, 200);
         JsonNode record = open(ctxFor(clinic, doctor));
-        assertThat(texts(record.get("stillNeeded"), null)).containsExactly("complaints", "diagnosis");
+        assertThat(texts(record.get("stillNeeded"), null)).containsExactly("vitals", "complaints", "diagnosis");
         assertThat(layoutKeys(record)).doesNotContain("rx", "rxformat");
         ObjectNode none = layoutInput(department(clinic, "gm"));
         for (JsonNode s : none.get("sections")) {
@@ -652,8 +663,8 @@ class EmrRecordsIT extends EmrSupport {
     void aSectionThatIsNotInTheRecordsLayoutOrADuplicateOrAWrongShapeIs400() throws Exception {
         Ctx c = ctx();
         String id = open(c).get("id").asText();
-        // procedures, referral and consent are off in General Medicine: they are not in this record's layout
-        for (String key : new String[] {"procedures", "referral", "consent", "dental_chart", "no_such_section", "GM"}) {
+        // referral and consent are off in General Medicine (procedures is on since SAH-75): they are not in this record's layout
+        for (String key : new String[] {"referral", "consent", "dental_chart", "no_such_section", "GM"}) {
             JsonNode problem = problem(call(HttpMethod.PUT, RECORDS + "/" + id + "/draft", c.token(),
                     draftBody(0, "ASSESSMENT", null, sectionValues(key, "{}")).toString()), 400);
             assertThat(problem.get("fieldErrors").get(0).get("field").asText()).as(key).isEqualTo("sections[0].key");

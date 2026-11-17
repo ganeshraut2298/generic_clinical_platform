@@ -166,6 +166,10 @@ abstract class MedicineSupport extends PinTestSupport {
         m.put("clientKey", key);
         m.put("drugKey", drug);
         m.put("frequencyKey", frequency);
+        m.put("doseAmount", 1);
+        m.put("doseUnit", unitOf(drug));
+        m.put("routeKey", routeOf(drug));
+        m.put("priority", "ROUTINE");
         if (reason != null) {
             m.put("overrideReasonKey", reason);
         }
@@ -173,6 +177,38 @@ abstract class MedicineSupport extends PinTestSupport {
             m.put("checkToken", token);
         }
         return m;
+    }
+
+    /** SAH-76 (docs/database/SAH-76.md 1.1): the first unit of the medicine in the shipped demo list. */
+    static String unitOf(String drug) {
+        return switch (drug) {
+            case "pcm", "amox", "cotri", "asp", "ibu", "met" -> "TABLET";
+            case "ns", "kcl" -> "ML";
+            case "hep" -> "IU";
+            case "ins" -> "UNIT";
+            default -> "MG";
+        };
+    }
+
+    /** SAH-76: the route key of the medicine (the route text of the catalogue mapped to the route list). */
+    static String routeOf(String drug) {
+        for (String[] d : DRUGS) {
+            if (d[0].equals(drug)) {
+                return switch (d[2]) {
+                    case "Oral" -> "ORAL";
+                    case "IV" -> "IV";
+                    case "IV infusion" -> "IV_INFUSION";
+                    default -> "SC";
+                };
+            }
+        }
+        return "ORAL"; // an unknown medicine is for the validation tests
+    }
+
+    /** SAH-76 (0.4.0): the stop body (clientKey, orderVersion, reason), version 1 unless said. */
+    static String stopBody(int orderVersion) {
+        return "{\"clientKey\":\"" + UUID.randomUUID() + "\",\"orderVersion\":" + orderVersion
+                + ",\"reason\":\"No longer needed for this patient\"}";
     }
 
     protected static String newKey() {
@@ -243,7 +279,7 @@ abstract class MedicineSupport extends PinTestSupport {
 
     protected static String verifyBody(String pin, String token) {
         return "{\"pin\":" + (pin == null ? "null" : "\"" + pin + "\"") + ",\"checkToken\":"
-                + (token == null ? "null" : "\"" + token + "\"") + "}";
+                + (token == null ? "null" : "\"" + token + "\"") + ",\"orderVersion\":1}";
     }
 
     protected ResultActions verifyCall(Pn p, String orderId, String pin, String token) throws Exception {
@@ -268,7 +304,7 @@ abstract class MedicineSupport extends PinTestSupport {
     }
 
     protected JsonNode stopOk(RequestPostProcessor auth, String orderId) throws Exception {
-        return ok(HttpMethod.POST, stopUrl(orderId), auth, null, 200);
+        return ok(HttpMethod.POST, stopUrl(orderId), auth, stopBody(1), 200);
     }
 
     protected static JsonNode sheetRow(JsonNode sheet, String orderId) {
@@ -453,7 +489,7 @@ abstract class MedicineSupport extends PinTestSupport {
     }
 
     protected Req stopReq(RequestPostProcessor auth, String orderId) {
-        return new Req(HttpMethod.POST, stopUrl(orderId), auth, null);
+        return new Req(HttpMethod.POST, stopUrl(orderId), auth, stopBody(1));
     }
 
     protected Req rejectReq(RequestPostProcessor auth, String orderId, String reason) {

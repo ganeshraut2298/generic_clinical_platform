@@ -163,7 +163,7 @@ class StaffPinColleagueHttpIT extends MarSupport {
         Ward w = f.w();
         doseOk(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin()));
         assertThat(eventLines(w.clinic(), w.adm().id()))
-                .contains("give|Gave Inj. Heparin 5,000 IU (8 AM dose) · identity checked against UHID · second check by "
+                .contains("give|Gave Inj. Heparin 5,000 IU (8 AM dose) · identity checked against UHID · scan override: Medicine has no barcode · second check by "
                         + displayName(w.nurse2()))
                 .noneMatch(l -> l.contains("wristband scanned"));
     }

@@ -23,7 +23,8 @@ class EmrSpecialtyReferenceIT extends EmrSpecialtySupport {
 
     private static final List<String> NAMES_GM = List.of("gmSigns", "gmSystems", "gmFollowUp");
     private static final List<String> NAMES_DENTAL = List.of("dentalConditions", "dentalSurfaces", "dentalMobility", "dentalShades", "dentalGumTones",
-            "dentalSuggestions", "dentalNextIntervals", "dentalLabItems");
+            "dentalSuggestions", "dentalNextIntervals", "dentalLabItems",
+            "dentalMedConditions", "dentalMedMedicines", "dentalMedAllergies"); // 0.7.0 (SAH-75-6)
     private static final List<String> NAMES_OG = List.of("ancSymptoms", "ancDueOrders", "ancScans", "ancSupplements", "gynaeQuickOrders");
     private static final List<String> NAMES_PAEDS = List.of("iapGroups", "iapVaccines", "milestones", "paedsDoseRules");
     private static final List<String> NAMES_PHYSIO = List.of("physioGaits", "physioModalities", "jointRom", "jointMmt", "jointSpecialTests", "outcomeScales");
@@ -49,7 +50,7 @@ class EmrSpecialtyReferenceIT extends EmrSpecialtySupport {
     // ================= the reference of each profile =================
 
     @Test
-    void eachOfTheSevenProfilesAnswersExactlyItsOwnListNamesWithTheTagAndTheListsOfAllSevenAreTheFortyFourClosedNames() throws Exception {
+    void eachOfTheSevenProfilesAnswersExactlyItsOwnListNamesWithTheTagAndTheListsOfAllSevenAreTheFortySevenClosedNames() throws Exception {
         Rec rec = newRec();
         String[][] expected = {{"gm"}, {"dental"}, {"og"}, {"paeds"}, {"physio"}, {"surgery"}, {"onco"}};
         List<List<String>> all = List.of(NAMES_GM, NAMES_DENTAL, NAMES_OG, NAMES_PAEDS, NAMES_PHYSIO, NAMES_SURGERY, NAMES_ONCO);
@@ -71,7 +72,7 @@ class EmrSpecialtyReferenceIT extends EmrSpecialtySupport {
             }
             assertThat(reference.get("thresholds").isObject()).isTrue();
         }
-        assertThat(total).as("the 44 names of the closed set").isEqualTo(44);
+        assertThat(total).as("the 47 names of the closed set (44 plus the three dental medical history lists of opd.yaml 0.7.0)").isEqualTo(47);
     }
 
     @Test

@@ -7,6 +7,7 @@ import {
   OrderCheck,
   OrderFinding,
 } from './emr.model';
+import type { OrderDetails, OrderExecution } from '../orders/order.model';
 
 /** Test data in the shape of docs/api/ipd.yaml. Fictional names only. */
 export const AS_OF = '2026-11-06T05:47:00Z';
@@ -15,10 +16,10 @@ export const TOKEN_1 = 'AAAAAAAAAAAAAAAAAAAAAA';
 export const TOKEN_2 = 'BBBBBBBBBBBBBBBBBBBBBB';
 
 export const DRUGS: DrugOption[] = [
-  { key: 'pcm', name: 'Tab. Paracetamol 650 mg', route: 'Oral', highAlert: null },
-  { key: 'amox', name: 'Tab. Amoxicillin + clavulanate 625 mg', route: 'Oral', highAlert: null },
-  { key: 'asp', name: 'Tab. Aspirin 75 mg', route: 'Oral', highAlert: null },
-  { key: 'hep', name: 'Inj. Heparin 5,000 IU', route: 'SC', highAlert: 'Anticoagulant' },
+  { key: 'pcm', name: 'Tab. Paracetamol 650 mg', route: 'Oral', highAlert: null, routeKey: 'ORAL', doseUnits: ['TABLET', 'MG'], timeCritical: false },
+  { key: 'amox', name: 'Tab. Amoxicillin + clavulanate 625 mg', route: 'Oral', highAlert: null, routeKey: 'ORAL', doseUnits: ['TABLET'], timeCritical: false },
+  { key: 'asp', name: 'Tab. Aspirin 75 mg', route: 'Oral', highAlert: null, routeKey: 'ORAL', doseUnits: ['TABLET'], timeCritical: false },
+  { key: 'hep', name: 'Inj. Heparin 5,000 IU', route: 'SC', highAlert: 'Anticoagulant', routeKey: 'SC', doseUnits: ['IU', 'ML'], timeCritical: false },
 ];
 
 export const FREQUENCIES: KeyLabel[] = [
@@ -26,6 +27,28 @@ export const FREQUENCIES: KeyLabel[] = [
   { key: 'bd', label: 'Twice daily' },
   { key: 'tds', label: 'Three times daily' },
   { key: 'q8', label: '8-hourly' },
+  { key: 'prn', label: 'As needed (PRN)' },
+];
+
+export const ROUTES: KeyLabel[] = [
+  { key: 'ORAL', label: 'Oral' },
+  { key: 'IV', label: 'IV' },
+  { key: 'IV_INFUSION', label: 'IV infusion' },
+  { key: 'IM', label: 'IM' },
+  { key: 'SC', label: 'SC' },
+];
+
+export const DOSE_UNITS: KeyLabel[] = [
+  { key: 'TABLET', label: 'tablet' },
+  { key: 'MG', label: 'mg' },
+  { key: 'ML', label: 'ml' },
+  { key: 'IU', label: 'IU' },
+];
+
+export const PRIORITIES: KeyLabel[] = [
+  { key: 'ROUTINE', label: 'Routine' },
+  { key: 'URGENT', label: 'Urgent' },
+  { key: 'STAT', label: 'STAT' },
 ];
 
 export const OVERRIDE_REASONS: KeyLabel[] = [
@@ -78,6 +101,33 @@ export const checkOf = (over: Partial<OrderCheck> = {}): OrderCheck => ({
   ...over,
 });
 
+export const DETAILS: OrderDetails = {
+  kind: 'SCHEDULED',
+  doseAmount: 1,
+  doseUnit: 'TABLET',
+  routeKey: 'ORAL',
+  routeLabel: 'Oral',
+  frequencyKey: 'od',
+  frequencyLabel: 'Once daily',
+  startAt: '2026-11-06T04:30:00Z',
+  endAt: null,
+  durationDays: null,
+  indication: null,
+  priority: 'ROUTINE',
+  prnMinIntervalMinutes: null,
+  prnMaxPer24h: null,
+  pharmacistChecked: true,
+};
+
+export const EXECUTION: OrderExecution = {
+  notGivenToday: 0,
+  nextDueAt: null,
+  lateCount: 0,
+  acknowledged: false,
+  acknowledgedByName: null,
+  acknowledgedAt: null,
+};
+
 export const ORDER: MedicineOrderRow = {
   id: 'o1',
   drugKey: 'pcm',
@@ -99,6 +149,18 @@ export const ORDER: MedicineOrderRow = {
   stoppedAt: null,
   canStop: true,
   lastDose: null,
+  orderVersion: 1,
+  details: DETAILS,
+  changes: [],
+  changeReason: null,
+  hold: null,
+  stopReason: null,
+  query: null,
+  canChange: true,
+  canHold: true,
+  canResume: false,
+  canReply: false,
+  execution: EXECUTION,
 };
 
 export function sheetOf(over: Partial<EmrSheet> = {}): EmrSheet {
@@ -117,6 +179,10 @@ export function sheetOf(over: Partial<EmrSheet> = {}): EmrSheet {
     drugs: DRUGS,
     frequencies: FREQUENCIES,
     overrideReasons: OVERRIDE_REASONS,
+    routes: ROUTES,
+    doseUnits: DOSE_UNITS,
+    priorities: PRIORITIES,
+    statWindowMinutes: 15,
     ...over,
   };
 }

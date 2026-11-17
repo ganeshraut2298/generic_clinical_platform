@@ -10,6 +10,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.sahaj.ipd.application.MedicineOrderService;
+import com.sahaj.ipd.application.MedicineViews;
+import com.sahaj.ipd.application.OrderChangeService;
+import com.sahaj.ipd.application.PharmacistQueryService;
+import com.sahaj.ipd.application.PharmacistReviewService;
+import com.sahaj.ipd.application.MedicineViews.OrderDetails;
+import com.sahaj.ipd.application.MedicineViews.OrderExecution;
 import com.sahaj.ipd.application.MedicineViews.ActionOutcome;
 import com.sahaj.ipd.application.MedicineViews.DrugOption;
 import com.sahaj.ipd.application.MedicineViews.EmrPatient;
@@ -68,6 +74,8 @@ class MedicineOrderControllerTest {
     private static final String JSON = MediaType.APPLICATION_JSON_VALUE;
     private static final Instant NOW = Instant.parse("2026-11-11T06:00:00Z");
     private static final String TOKEN = "Qm9yZGVyLWNoZWNrLXRva2";
+    private static final String STOP_BODY =
+            "{\"clientKey\":\"3f8e2a8c-5b0e-4f7e-9d43-0c6a0b6f2a11\",\"orderVersion\":1,\"reason\":\"No longer needed\"}";
 
     @Autowired
     private MockMvc mockMvc;
@@ -77,6 +85,15 @@ class MedicineOrderControllerTest {
 
     @MockBean
     private PharmacistCheckService pharmacist;
+
+    @MockBean
+    private OrderChangeService changes;
+
+    @MockBean
+    private PharmacistQueryService queries;
+
+    @MockBean
+    private PharmacistReviewService reviews;
 
     private static RequestPostProcessor as(String role) {
         return TestTenantSecurity.asUser(TENANT_ID, USER_ID, role);
@@ -90,14 +107,21 @@ class MedicineOrderControllerTest {
     private static MedicineOrderRow orderRow() {
         return new MedicineOrderRow(ORDER_ID, "asp", "Tab. Aspirin 75 mg", "Oral", null, "od", "Once daily",
                 "PENDING", "Dr Meera Joshi", NOW, new KeyLabel("CARDIOLOGY_STENT", "Recent coronary stent, cardiology advised"),
-                null, null, null, null, null, null, null, true, null);
+                null, null, null, null, null, null, null, true, null, 1, details(), List.of(), null, null, null, null,
+                false, false, false, false, new OrderExecution(0, null, 0, true, null, null));
+    }
+
+    private static OrderDetails details() {
+        return new OrderDetails("SCHEDULED", null, null, "ORAL", "Oral", "od", "Once daily", NOW, null, null, null,
+                "ROUTINE", null, null, null);
     }
 
     private static EmrSheet sheet() {
         return new EmrSheet(ADMISSION_ID, "ADMITTED", "on", NOW, patient(), "Dr Meera Joshi", "Chest infection", 3,
                 List.of(orderRow()), true, null, List.of(new DrugOption("hep", "Inj. Heparin 5,000 IU", "SC",
-                        "Anticoagulant")), List.of(new KeyLabel("od", "Once daily")),
-                List.of(new KeyLabel("BENEFIT_MONITORED", "Benefit outweighs the risk, monitoring in place")));
+                        "Anticoagulant", "SC", List.of("IU"), false)), List.of(new KeyLabel("od", "Once daily")),
+                List.of(new KeyLabel("BENEFIT_MONITORED", "Benefit outweighs the risk, monitoring in place")),
+                List.of(), List.of(), List.of(), 15);
     }
 
     private static OrderCheckView check() {
@@ -107,9 +131,10 @@ class MedicineOrderControllerTest {
 
     private static PharmacistChecks checks() {
         PharmacistCheckRow row = new PharmacistCheckRow(ORDER_ID, ADMISSION_ID, "asp", "Tab. Aspirin 75 mg", null,
-                "od", "Once daily", patient(), "Dr Meera Joshi", NOW, null, check(), true, null, true);
+                "od", "Once daily", patient(), "Dr Meera Joshi", NOW, null, check(), true, null, true, "PENDING", 1, details(),
+                List.of(), null, null, true);
         return new PharmacistChecks("on", NOW, 1, "Ph. Ravi Kulkarni",
-                List.of(new KeyLabel("ALLERGY_CONFLICT", "Allergy conflict")), List.of(row), "cursor");
+                List.of(new KeyLabel("ALLERGY_CONFLICT", "Allergy conflict")), List.of(row), "cursor", 0, 0);
     }
 
     private static String orderBody() {
@@ -302,10 +327,10 @@ class MedicineOrderControllerTest {
     // ---- stop ----
 
     @Test
-    void stopAnswersTheSheetWithoutABody() throws Exception {
-        when(orders.stop(TENANT_ID, USER_ID, "DOCTOR", ORDER_ID)).thenReturn(sheet());
+    void stopAnswersTheSheet() throws Exception {
+        when(orders.stop(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), any())).thenReturn(sheet());
 
-        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/stop").with(as("DOCTOR")))
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/stop").with(as("DOCTOR")).contentType(JSON).content(STOP_BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.admissionId").value(ADMISSION_ID.toString()))
                 .andExpect(jsonPath("$.orders[0].canStop").value(true));
@@ -313,10 +338,10 @@ class MedicineOrderControllerTest {
 
     @Test
     void stopOfAnOrderInAnotherStateIs409OrderState() throws Exception {
-        when(orders.stop(any(), any(), any(), any())).thenThrow(
+        when(orders.stop(any(), any(), any(), any(), any())).thenThrow(
                 new ConflictException("order-state", "Order already stopped", "This order is already stopped."));
 
-        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/stop").with(as("DOCTOR")))
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/stop").with(as("DOCTOR")).contentType(JSON).content(STOP_BODY))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value(Matchers.endsWith("/order-state")))
                 .andExpect(jsonPath("$.detail").value("This order is already stopped."));
@@ -360,7 +385,7 @@ class MedicineOrderControllerTest {
 
     @Test
     void theSummaryHoldsCountsOnly() throws Exception {
-        when(pharmacist.summary(TENANT_ID, USER_ID, "OWNER")).thenReturn(new PharmacistChecksSummary(4, TOKEN, NOW));
+        when(pharmacist.summary(TENANT_ID, USER_ID, "OWNER")).thenReturn(new PharmacistChecksSummary(4, TOKEN, NOW, 1, 2));
 
         mockMvc.perform(get(URL + "/pharmacist-checks/summary").with(as("OWNER")))
                 .andExpect(status().isOk())
@@ -494,12 +519,135 @@ class MedicineOrderControllerTest {
 
     @Test
     void theClinicAndTheUserComeFromTheTokenNeverFromTheBody() throws Exception {
-        when(orders.stop(any(), any(), any(), any())).thenReturn(sheet());
+        when(orders.stop(any(), any(), any(), any(), any())).thenReturn(sheet());
 
         mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/stop").with(as("DOCTOR"))
                 .contentType(JSON).content("{\"tenantId\":\"" + UUID.randomUUID() + "\",\"userId\":\""
                         + UUID.randomUUID() + "\"}")).andExpect(status().isOk());
 
-        verify(orders).stop(TENANT_ID, USER_ID, "DOCTOR", ORDER_ID);
+        verify(orders).stop(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), any());
+    }
+
+    // ---- SAH-76: change, hold, resume, query, reply, review after dose ----
+
+    private static final String KEYED = "{\"clientKey\":\"3f8e2a8c-5b0e-4f7e-9d43-0c6a0b6f2a11\",\"orderVersion\":1";
+
+    @Test
+    void changeAnswersTheSheetAndTakesTheFullBody() throws Exception {
+        when(changes.change(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), any())).thenReturn(sheet());
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/change").with(as("DOCTOR")).contentType(JSON)
+                        .content(KEYED + ",\"reason\":\"Dose too low\",\"doseAmount\":2.5,\"doseUnit\":\"MG\","
+                                + "\"routeKey\":\"ORAL\",\"frequencyKey\":\"bd\",\"priority\":\"ROUTINE\","
+                                + "\"durationDays\":5}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.admissionId").value(ADMISSION_ID.toString()))
+                .andExpect(jsonPath("$.orders[0].orderVersion").value(1))
+                .andExpect(jsonPath("$.orders[0].canChange").value(false))
+                .andExpect(jsonPath("$.orders[0].execution.acknowledged").value(true))
+                .andExpect(jsonPath("$.routes").isArray()).andExpect(jsonPath("$.statWindowMinutes").value(15));
+        ArgumentCaptor<MedicineViews.ChangeOrderInput> body = ArgumentCaptor.forClass(MedicineViews.ChangeOrderInput.class);
+        verify(changes).change(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), body.capture());
+        org.assertj.core.api.Assertions.assertThat(body.getValue().doseAmount()).isEqualByComparingTo("2.5");
+        org.assertj.core.api.Assertions.assertThat(body.getValue().durationDays()).isEqualTo(5);
+        org.assertj.core.api.Assertions.assertThat(body.getValue().orderVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void aStaleVersionIs409OrderChanged() throws Exception {
+        when(changes.change(any(), any(), any(), any(), any())).thenThrow(new ConflictException("order-changed",
+                "Order was changed", "This order was changed by someone else. Reload and check the new order."));
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/change").with(as("DOCTOR")).contentType(JSON)
+                        .content(KEYED + ",\"reason\":\"Dose too low\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.type").value(Matchers.endsWith("/order-changed")));
+    }
+
+    @Test
+    void aChangeBodyErrorListsEveryField() throws Exception {
+        when(changes.change(any(), any(), any(), any(), any())).thenThrow(new InvalidFieldsException(List.of(
+                new FieldMessage("reason", "Write why you are changing this order."),
+                new FieldMessage("doseAmount", "Enter the dose.")), true));
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/change").with(as("DOCTOR")).contentType(JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("reason"))
+                .andExpect(jsonPath("$.fieldErrors[1].message").value("Enter the dose."));
+    }
+
+    @Test
+    void holdAndResumeAnswerTheSheet() throws Exception {
+        when(changes.hold(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), any())).thenReturn(sheet());
+        when(changes.resume(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), any())).thenReturn(sheet());
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/hold").with(as("DOCTOR")).contentType(JSON)
+                .content(KEYED + ",\"reason\":\"Procedure at noon\"}")).andExpect(status().isOk());
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/resume").with(as("DOCTOR")).contentType(JSON)
+                .content(KEYED + "}")).andExpect(status().isOk());
+    }
+
+    @Test
+    void queryAnswersTheResultAndTheQueue() throws Exception {
+        PharmacistActionResult result = new PharmacistActionResult(new ActionOutcome(ORDER_ID, "Tab. Aspirin 75 mg",
+                "QUERIED", false, "Ph. Ravi Kulkarni", null), checks());
+        when(queries.query(eq(TENANT_ID), eq(USER_ID), eq("PHARMACIST"), eq(ORDER_ID), any())).thenReturn(result);
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/query").with(as("PHARMACIST")).contentType(JSON)
+                        .content(KEYED + ",\"question\":\"Is the dose right?\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.outcome").value("QUERIED"))
+                .andExpect(jsonPath("$.checks.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.checks.items[0].canQuery").value(true))
+                .andExpect(jsonPath("$.checks.queried").value(0)).andExpect(jsonPath("$.checks.reviewsOpen").value(0));
+    }
+
+    @Test
+    void theOrdererQueryingHerOwnOrderIs403SelfVerification() throws Exception {
+        when(queries.query(any(), any(), any(), any(), any())).thenThrow(new ForbiddenException("self-verification",
+                "You cannot check your own order", "The doctor who ordered this cannot check it. Ask the pharmacist."));
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/query").with(as("OWNER")).contentType(JSON)
+                        .content(KEYED + ",\"question\":\"Is the dose right?\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value(Matchers.endsWith("/self-verification")));
+    }
+
+    @Test
+    void replyAnswersTheSheet() throws Exception {
+        when(queries.reply(eq(TENANT_ID), eq(USER_ID), eq("DOCTOR"), eq(ORDER_ID), any())).thenReturn(sheet());
+
+        mockMvc.perform(post(URL + "/medicine-orders/" + ORDER_ID + "/query-reply").with(as("DOCTOR")).contentType(JSON)
+                .content(KEYED + ",\"reply\":\"Yes\"}")).andExpect(status().isOk());
+    }
+
+    @Test
+    void theReviewListPassesTheLimitAndTheCursorAsText() throws Exception {
+        MedicineViews.PharmacistReviewPage page = new MedicineViews.PharmacistReviewPage(NOW, 0, List.of(), null);
+        when(reviews.list(TENANT_ID, USER_ID, "PHARMACIST", "10", "abc")).thenReturn(page);
+
+        mockMvc.perform(get(URL + "/pharmacist-reviews").param("limit", "10").param("cursor", "abc")
+                        .with(as("PHARMACIST")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.open").value(0))
+                .andExpect(jsonPath("$.items").isArray()).andExpect(jsonPath("$.nextCursor").value(Matchers.nullValue()));
+    }
+
+    @Test
+    void markReviewedTakesNoBodyAndAnswersTheList() throws Exception {
+        UUID reviewId = UUID.randomUUID();
+        MedicineViews.PharmacistReviewPage page = new MedicineViews.PharmacistReviewPage(NOW, 0, List.of(), null);
+        when(reviews.markReviewed(TENANT_ID, USER_ID, "PHARMACIST", reviewId)).thenReturn(page);
+
+        mockMvc.perform(post(URL + "/pharmacist-reviews/" + reviewId + "/mark-reviewed").with(as("PHARMACIST")))
+                .andExpect(status().isOk());
+        verify(reviews).markReviewed(TENANT_ID, USER_ID, "PHARMACIST", reviewId);
+    }
+
+    @Test
+    void aHardStopOnMarkReviewedIs409OrderBlocked() throws Exception {
+        UUID reviewId = UUID.randomUUID();
+        when(reviews.markReviewed(any(), any(), any(), any())).thenThrow(new ConflictException("order-blocked",
+                "Order is blocked", "Hard stop on this order. Query the doctor."));
+
+        mockMvc.perform(post(URL + "/pharmacist-reviews/" + reviewId + "/mark-reviewed").with(as("PHARMACIST")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.type").value(Matchers.endsWith("/order-blocked")));
     }
 }

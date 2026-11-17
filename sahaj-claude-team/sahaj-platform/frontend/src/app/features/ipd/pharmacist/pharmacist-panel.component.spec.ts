@@ -289,7 +289,7 @@ describe('PharmacistPanelComponent', () => {
       expect(row.querySelector('[data-testid=ph-hardstop]')).toBeNull();
       expect(row.querySelector('[data-testid=ph-warning]')).toBeNull();
       expect(row.querySelector('[data-testid=ph-reason]')).toBeNull();
-      expect(Array.from(row.querySelectorAll('.sfacts button')).map((b) => squash(b))).toEqual(['Reject', 'Verify']);
+      expect(Array.from(row.querySelectorAll('.sfacts button')).map((b) => squash(b))).toEqual(['Reject', 'Query doctor', 'Verify']);
       expect(row.querySelector<HTMLButtonElement>('[data-act=sfver]')!.disabled).toBe(false);
     });
 
@@ -327,6 +327,7 @@ describe('PharmacistPanelComponent', () => {
     it.each([
       ['HARD_STOP', 'Hard stop: reject this order'],
       ['SELF', 'The doctor who ordered this cannot verify it. Ask the pharmacist.'],
+      ['SELF_CHANGED', 'The doctor who changed this order cannot verify it. Ask the pharmacist.'],
       ['IPD_READONLY', 'IPD is read-only. Nothing can be changed.'],
     ] as const)('turns Verify off with the hint for %s', async (reason, hint) => {
       await open(checksOf({ items: [rowOf({ canVerify: false, verifyLockReason: reason })] }));

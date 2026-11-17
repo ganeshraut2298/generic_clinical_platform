@@ -47,7 +47,7 @@ class EmrLibraryIT extends EmrSupport {
     void everyClinicRoleReadsTheLibraryAndTheStartersAndNotSignedInIs401() throws Exception {
         Clinic clinic = clinicOf(this);
         for (String role : ALL_ROLES) {
-            assertThat(get(LIBRARY, clinic.as(role)).size()).as("library as " + role).isEqualTo(100);
+            assertThat(get(LIBRARY, clinic.as(role)).size()).as("library as " + role).isEqualTo(107);
             assertThat(get(STARTERS, clinic.as(role)).size()).as("starters as " + role).isEqualTo(15);
             assertThat(get(LIBRARY + "/vitals", clinic.as(role)).get("key").asText()).isEqualTo("vitals");
             assertThat(get(STARTERS + "/gm", clinic.as(role)).get("starterKey").asText()).isEqualTo("gm");
@@ -68,9 +68,9 @@ class EmrLibraryIT extends EmrSupport {
     // ---------------- the library ----------------
 
     @Test
-    void theLibraryHoldsHundredSectionsFourteenCommonSeventyEightSpecialtyAndEightComplianceInThatOrder() throws Exception {
+    void theLibraryHoldsHundredAndSevenSectionsFourteenCommonEightyFiveSpecialtyAndEightComplianceInThatOrder() throws Exception {
         JsonNode sections = library("OWNER");
-        assertThat(sections.size()).isEqualTo(100);
+        assertThat(sections.size()).isEqualTo(107);
         Map<String, Integer> kinds = new LinkedHashMap<>();
         List<String> kindOrder = new ArrayList<>();
         Set<String> keys = new TreeSet<>();
@@ -88,9 +88,9 @@ class EmrLibraryIT extends EmrSupport {
             assertThat(s.get("usedBy").size()).as(s.get("key").asText() + " is used by a department").isPositive();
             fields += s.get("fields").size();
         }
-        assertThat(kinds).containsEntry("COMMON", 14).containsEntry("SPECIALTY", 78).containsEntry("COMPLIANCE", 8);
+        assertThat(kinds).containsEntry("COMMON", 14).containsEntry("SPECIALTY", 85).containsEntry("COMPLIANCE", 8);
         assertThat(kindOrder).containsExactly("COMMON", "SPECIALTY", "COMPLIANCE");
-        assertThat(fields).isEqualTo(313);
+        assertThat(fields).isEqualTo(335);
         List<String> common = new ArrayList<>();
         sections.forEach(s -> {
             if ("COMMON".equals(s.get("kind").asText())) {
@@ -249,12 +249,12 @@ class EmrLibraryIT extends EmrSupport {
         assertThat(texts(starters, "name")).containsExactly("General Medicine", "Dental", "Obstetrics & Gynaecology", "Paediatrics",
                 "Physiotherapy", "Orthopaedics", "Ophthalmology", "ENT", "Dermatology & Cosmetology", "Diabetology", "Cardiology",
                 "AYUSH (Ayurveda)", "Medical Oncology", "General Surgery", "Psychiatry & Counselling");
-        Map<String, Integer> sectionCount = Map.ofEntries(Map.entry("gm", 19), Map.entry("dental", 24), Map.entry("og", 25),
+        Map<String, Integer> sectionCount = Map.ofEntries(Map.entry("gm", 20), Map.entry("dental", 30), Map.entry("og", 25),
                 Map.entry("paeds", 23), Map.entry("physio", 27), Map.entry("ortho", 22), Map.entry("eye", 22), Map.entry("ent", 22),
                 Map.entry("derm", 20), Map.entry("diab", 22), Map.entry("cardio", 21), Map.entry("ayush", 21), Map.entry("onco", 27),
-                Map.entry("surgery", 26), Map.entry("psych", 20));
+                Map.entry("surgery", 27), Map.entry("psych", 20));
         // the wizard card of the mockup: the number of Specialty sections (twelve of the fifteen are drawn)
-        Map<String, Integer> specialtyDrawn = Map.ofEntries(Map.entry("gm", 2), Map.entry("dental", 7), Map.entry("og", 7),
+        Map<String, Integer> specialtyDrawn = Map.ofEntries(Map.entry("gm", 3), Map.entry("dental", 13), Map.entry("og", 7),
                 Map.entry("paeds", 6), Map.entry("physio", 10), Map.entry("ortho", 5), Map.entry("eye", 5), Map.entry("ent", 5),
                 Map.entry("derm", 3), Map.entry("diab", 5), Map.entry("cardio", 4), Map.entry("ayush", 4));
         int total = 0;
@@ -274,23 +274,23 @@ class EmrLibraryIT extends EmrSupport {
                 assertThat(s.get("description").isNull()).as(key + " has no wizard description").isTrue();
             }
         }
-        assertThat(total).isEqualTo(341);
+        assertThat(total).isEqualTo(349);
         JsonNode physio = starters.get(4);
         assertThat(physio.get("description").asText()).isEqualTo(
                 "Built for session-based care: assessment on the first visit, then quick session notes against a package.");
         assertThat(texts(physio.get("offAtStart"), null)).contains("Prescription (Rx)", "Investigations", "General & systemic examination",
                 "Procedures");
-        assertThat(texts(starters.get(0).get("offAtStart"), null)).contains("Procedures", "Referral");
+        assertThat(texts(starters.get(0).get("offAtStart"), null)).contains("Referral").doesNotContain("Procedures"); // SAH-75: procedures is shown in gm
     }
 
     @Test
     void aStarterIsReadWithEverySectionHiddenOnesTooInOrderWithItsStartingSettingsAndLocks() throws Exception {
         JsonNode gm = get(STARTERS + "/gm", clinicOf(this).owner());
-        assertThat(gm.get("layoutVersion").asInt()).isEqualTo(1);
-        assertThat(gm.get("sections").size()).isEqualTo(19);
-        assertThat(sectionKeys(gm)).startsWith("vitals", "complaints", "hpi", "history", "allergy", "exam", "diagnosis");
+        assertThat(gm.get("layoutVersion").asInt()).isEqualTo(2);
+        assertThat(gm.get("sections").size()).isEqualTo(20);
+        assertThat(sectionKeys(gm)).startsWith("vitals", "complaints", "hpi", "history", "allergy", "exam", "local_exam", "diagnosis");
         assertThat(sectionKeys(gm)).endsWith("abha", "consent", "rxformat");
-        // "x of y sections on": 16 of 19 shown at start, 4 required
+        // "x of y sections on": 18 of 20 shown at start, 4 required (SAH-75: local_exam added, procedures and vitals changed)
         long shown = 0;
         long required = 0;
         for (JsonNode s : gm.get("sections")) {
@@ -300,9 +300,9 @@ class EmrLibraryIT extends EmrSupport {
             assertThat(s.get("fields").size()).isPositive();
             assertThat(s.get("whoCanFill").toString()).contains("DOCTOR");
         }
-        assertThat(shown).isEqualTo(16);
+        assertThat(shown).isEqualTo(18);
         assertThat(required).isEqualTo(4);
-        assertThat(section(gm, "procedures").get("shown").asBoolean()).isFalse();
+        assertThat(section(gm, "procedures").get("shown").asBoolean()).isTrue();
         assertThat(section(gm, "referral").get("shown").asBoolean()).isFalse();
         assertThat(section(gm, "consent").get("shown").asBoolean()).isFalse();
         assertThat(section(gm, "complaints").get("required").asBoolean()).isTrue();
@@ -322,7 +322,10 @@ class EmrLibraryIT extends EmrSupport {
         assertThat(section(physio, "rx").get("shown").asBoolean()).isFalse();
         assertThat(section(physio, "rx").get("required").asBoolean()).isFalse();
         JsonNode dental = get(STARTERS + "/dental", clinicOf(this).owner());
-        assertThat(section(dental, "dental_chart").get("required").asBoolean()).isTrue();
+        // SAH-75 (docs/database/SAH-75.md 1.3): dental_chart stops being required; dental_medhx and tx_plan are required
+        assertThat(section(dental, "dental_chart").get("required").asBoolean()).isFalse();
+        assertThat(section(dental, "dental_medhx").get("required").asBoolean()).isTrue();
+        assertThat(section(dental, "tx_plan").get("required").asBoolean()).isTrue();
         assertThat(section(dental, "dental_chart").get("part").asText()).isEqualTo("TREATMENT");
         assertThat(section(dental, "dental_chart").get("copy").asBoolean()).isTrue();
         for (JsonNode s : dental.get("sections")) {
@@ -361,7 +364,7 @@ class EmrLibraryIT extends EmrSupport {
         List<List<String>> copies = rows(clinic, "select s ->> 'name', s ->> 'kind', s ->> 'description', "
                 + "jsonb_array_length(s -> 'fields')::text from opd.emr_department_version v, "
                 + "jsonb_array_elements(v.layout -> 'sections') s where v.version_no = 1");
-        assertThat(copies).hasSize(19);
+        assertThat(copies).hasSize(20);
         for (List<String> copy : copies) {
             assertThat(copy.get(0)).isNotBlank();
             assertThat(copy.get(1)).isIn("COMMON", "SPECIALTY", "COMPLIANCE");

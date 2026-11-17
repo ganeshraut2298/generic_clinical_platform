@@ -6,8 +6,21 @@
  * Allergy text, names and findings are clinical data: on screen only, never logged or stored.
  */
 export type AllergyStatus = 'NONE_KNOWN' | 'NOT_RECORDED' | 'RECORDED';
-export type MedicineOrderStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'STOPPED';
-export type FrequencyKey = 'od' | 'bd' | 'tds' | 'q8';
+import type {
+  DoseUnitKey,
+  OrderChangeLine,
+  OrderDetails,
+  OrderExecution,
+  OrderHold,
+  OrderPriority,
+  OrderQuery,
+  RouteKey,
+} from '../orders/order.model';
+import { NOT_PHARMACIST_CHECKED, changeLineText, clock, detailsLine, intervalText } from '../orders/order.model';
+
+export type MedicineOrderStatus = 'PENDING' | 'QUERIED' | 'ACTIVE' | 'ON_HOLD' | 'REJECTED' | 'STOPPED';
+/** SAH-76: `prn` "As needed (PRN)" is the fifth option. */
+export type FrequencyKey = 'od' | 'bd' | 'tds' | 'q8' | 'prn';
 export type OverrideReasonKey =
   | 'BENEFIT_MONITORED'
   | 'SPECIALIST_ADVISED'
@@ -53,6 +66,11 @@ export interface DrugOption {
   name: string;
   route: string;
   highAlert: string | null;
+  /** SAH-76: the default route (Route is prefilled with it). */
+  routeKey: RouteKey;
+  /** SAH-76: the units the doctor may choose for Dose, first preselected. */
+  doseUnits: DoseUnitKey[];
+  timeCritical: boolean;
 }
 
 export interface EmrPatient {
@@ -72,7 +90,9 @@ export type NotGivenReasonKey =
   | 'HELD_DOCTOR'
   | 'NIL_BY_MOUTH'
   | 'NOT_AVAILABLE'
-  | 'AWAY_FROM_WARD';
+  | 'AWAY_FROM_WARD'
+  | 'VOMITED'
+  | 'OTHER';
 
 /** SAH-32 `DoseRow`: one recorded dose (append-only). Names on screen only. */
 export interface DoseRow {
@@ -108,6 +128,22 @@ export interface MedicineOrderRow {
   canStop: boolean;
   /** SAH-32 (OQ-32-4): the dose record with the latest slot, any day, any outcome; null when none. */
   lastDose: DoseRow | null;
+  /** SAH-76: the current version; "v<n>" with "Changed" when above 1. Sent back on change, hold, resume, stop, reply. */
+  orderVersion: number;
+  details: OrderDetails;
+  changes: OrderChangeLine[];
+  /** Clinical text: on screen only. */
+  changeReason: string | null;
+  hold: OrderHold | null;
+  /** Clinical text: on screen only. */
+  stopReason: string | null;
+  /** Null for NURSE. */
+  query: OrderQuery | null;
+  canChange: boolean;
+  canHold: boolean;
+  canResume: boolean;
+  canReply: boolean;
+  execution: OrderExecution;
 }
 
 export interface EmrSheet {
@@ -125,15 +161,71 @@ export interface EmrSheet {
   drugs: DrugOption[];
   frequencies: KeyLabel[];
   overrideReasons: KeyLabel[];
+  routes: KeyLabel[];
+  doseUnits: KeyLabel[];
+  priorities: KeyLabel[];
+  /** The STAT window in force: "A STAT order is one dose, due now. Give within <n> min.". */
+  statWindowMinutes: number;
 }
 
 export interface MedicineOrderInput {
   clientKey: string;
   drugKey: string;
-  frequencyKey: string;
+  /** Absent for a STAT order. */
+  frequencyKey?: string | null;
+  doseAmount: number | null;
+  doseUnit: string | null;
+  routeKey: string | null;
+  startAt?: string | null;
+  durationDays?: number | null;
+  indication?: string | null;
+  priority: OrderPriority;
+  prnMinIntervalMinutes?: number | null;
+  prnMaxPer24h?: number | null;
   overrideReasonKey?: string | null;
   checkToken?: string | null;
 }
+
+/** POST /medicine-orders/{id}/change (ChangeOrderInput): the full new values of the editable fields. */
+export interface ChangeOrderInput {
+  clientKey: string;
+  orderVersion: number;
+  reason: string;
+  doseAmount: number | null;
+  doseUnit: string | null;
+  routeKey: string | null;
+  frequencyKey?: string | null;
+  startAt?: string | null;
+  durationDays?: number | null;
+  indication?: string | null;
+  priority: OrderPriority;
+  prnMinIntervalMinutes?: number | null;
+  prnMaxPer24h?: number | null;
+}
+export interface HoldOrderInput {
+  clientKey: string;
+  orderVersion: number;
+  reason: string;
+}
+export interface ResumeOrderInput {
+  clientKey: string;
+  orderVersion: number;
+}
+export interface StopOrderInput {
+  clientKey: string;
+  orderVersion: number;
+  reason: string;
+}
+export interface QueryReplyInput {
+  clientKey: string;
+  orderVersion: number;
+  reply: string;
+}
+
+/** What a Change, Hold or Stop sheet hands back: the sheet now, or the server's refusal that needs a reload. */
+export type OrderActionResult =
+  | { kind: 'done'; sheet: EmrSheet; toast: string }
+  | { kind: 'conflict'; message: string };
 
 export type OrderOutcome = 'PLACED' | 'BLOCKED' | 'NEEDS_REASON';
 
@@ -181,7 +273,9 @@ export const ORDER_WITH_REASON = 'Order with this reason';
 /** Status pill (mockup `SF_ST`): label and the pill colour class. */
 export const STATUS_PILL: Record<MedicineOrderStatus, { text: string; css: string }> = {
   PENDING: { text: 'Pharmacist check', css: 'p-warn' },
+  QUERIED: { text: 'Queried', css: 'p-warn' },
   ACTIVE: { text: 'Active', css: 'p-good' },
+  ON_HOLD: { text: 'On hold', css: 'p-wait' },
   REJECTED: { text: 'Rejected', css: 'p-crit' },
   STOPPED: { text: 'Stopped', css: 'p-wait' },
 };
@@ -254,7 +348,7 @@ export function drugOptionLabel(drug: Pick<DrugOption, 'name' | 'highAlert'>): s
  * and, for a rejected order, " · rejected: <reason>" (OQ-31-5).
  */
 export function orderSmallLine(order: MedicineOrderRow): string {
-  let line = `${order.route} · ${order.frequencyLabel} · ${order.orderedByName}`;
+  let line = `${detailsLine(order.details)} · ${order.orderedByName}`;
   if (order.overrideReason) {
     line += ` · override: ${order.overrideReason.label}`;
   }
@@ -264,13 +358,89 @@ export function orderSmallLine(order: MedicineOrderRow): string {
   return line;
 }
 
-export const orderedToast = (drugName: string): string =>
-  `${drugName} ordered. It goes to the pharmacist before the first dose.`;
+/** "On hold by Dr. X at 11:05 AM · reason". */
+export const holdLine = (hold: OrderHold): string =>
+  `On hold by ${hold.heldByName} at ${clock(hold.heldAt)}${hold.reason ? ` · ${hold.reason}` : ''}`;
+
+/** "Stopped by Dr. X at 2:00 PM · reason" (a reason only for stops from 0.4.0). */
+export const stoppedLine = (
+  order: Pick<MedicineOrderRow, 'stoppedByName' | 'stoppedAt' | 'stopReason'>,
+): string =>
+  `Stopped by ${order.stoppedByName ?? ''} at ${clock(order.stoppedAt)}${order.stopReason ? ` · ${order.stopReason}` : ''}`;
+
+export const changedLines = (order: Pick<MedicineOrderRow, 'changes'>): string[] =>
+  order.changes.map(changeLineText);
+
+/** Tags beside the medicine name: priority, version, "Not pharmacist checked". */
+export interface OrderTag {
+  key: 'changed' | 'stat' | 'urgent' | 'unchecked';
+  text: string;
+  css: string;
+}
+
+export function orderTags(order: Pick<MedicineOrderRow, 'orderVersion' | 'details'>): OrderTag[] {
+  const tags: OrderTag[] = [];
+  if (order.details.priority === 'STAT') {
+    tags.push({ key: 'stat', text: 'STAT', css: 'p-crit' });
+  } else if (order.details.priority === 'URGENT') {
+    tags.push({ key: 'urgent', text: 'Urgent', css: 'p-warn' });
+  }
+  if (order.orderVersion > 1) {
+    tags.push({ key: 'changed', text: `Changed · v${order.orderVersion}`, css: 'p-wait' });
+  }
+  if (order.details.pharmacistChecked === false) {
+    tags.push({ key: 'unchecked', text: NOT_PHARMACIST_CHECKED, css: 'p-wait' });
+  }
+  return tags;
+}
+
+/** "Minimum interval 6 h · most 4 in 24 hours" for a PRN order; null for the other kinds. */
+export function prnLine(details: OrderDetails): string | null {
+  if (details.kind !== 'PRN') {
+    return null;
+  }
+  return `Minimum interval ${intervalText(details.prnMinIntervalMinutes)} · most ${details.prnMaxPer24h ?? ''} in 24 hours`;
+}
+
+export const orderedToast = (drugName: string, pharmacistChecked: boolean | null = null): string =>
+  pharmacistChecked === false
+    ? `${drugName} ordered. It is on the MAR now.`
+    : `${drugName} ordered. It goes to the pharmacist before the first dose.`;
+export const changedToast = (drugName: string): string => `${drugName} changed.`;
+export const heldToast = (drugName: string): string => `${drugName} is on hold.`;
+export const resumedToast = (drugName: string): string => `${drugName} resumed.`;
+export const repliedToast = (drugName: string): string => `Reply sent for ${drugName}.`;
 export const stoppedToast = (drugName: string): string =>
   `${drugName} stopped. Remaining doses are removed from the MAR.`;
 
 /** Field errors of a 400 that belong to the order form, by the contract's field names. */
-export type OrderField = 'drugKey' | 'frequencyKey' | 'overrideReasonKey';
+export type OrderField =
+  | 'drugKey'
+  | 'frequencyKey'
+  | 'overrideReasonKey'
+  | 'doseAmount'
+  | 'doseUnit'
+  | 'routeKey'
+  | 'startAt'
+  | 'durationDays'
+  | 'indication'
+  | 'prnMinIntervalMinutes'
+  | 'prnMaxPer24h'
+  | 'reason';
+const ORDER_FIELDS: readonly OrderField[] = [
+  'drugKey',
+  'frequencyKey',
+  'overrideReasonKey',
+  'doseAmount',
+  'doseUnit',
+  'routeKey',
+  'startAt',
+  'durationDays',
+  'indication',
+  'prnMinIntervalMinutes',
+  'prnMaxPer24h',
+  'reason',
+];
 export type OrderErrors = Partial<Record<OrderField, string>>;
 
 /**
@@ -306,12 +476,9 @@ export function orderFieldErrors(
   let other: string | null = null;
   let newKey = false;
   for (const item of fieldErrors) {
-    if (item.field === 'drugKey') {
-      shown.drugKey ??= item.message || DRUG_MISSING;
-    } else if (item.field === 'frequencyKey') {
-      shown.frequencyKey ??= item.message || FREQUENCY_MISSING;
-    } else if (item.field === 'overrideReasonKey') {
-      shown.overrideReasonKey ??= item.message || REASON_INVALID;
+    const field = ORDER_FIELDS.find((f) => f === item.field);
+    if (field) {
+      shown[field] ??= item.message || (field === 'drugKey' ? DRUG_MISSING : field === 'frequencyKey' ? FREQUENCY_MISSING : field === 'overrideReasonKey' ? REASON_INVALID : KEY_RELOAD);
     } else {
       newKey = newKey || item.field === 'clientKey';
       other ??= item.message || KEY_RELOAD;

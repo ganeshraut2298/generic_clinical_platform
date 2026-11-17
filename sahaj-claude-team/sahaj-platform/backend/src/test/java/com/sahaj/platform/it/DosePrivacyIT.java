@@ -56,7 +56,7 @@ class DosePrivacyIT extends MarSupport {
             }
             // bedside errors
             problems.add(body(doseCall(w.nurse().auth(), pcm, set(given(w, ist(8, 0)), "identityConfirmed", false))));
-            problems.add(body(doseCall(w.nurse().auth(), pcm, without(given(w, ist(8, 0)), "wristband"))));
+            problems.add(body(doseCall(w.nurse().auth(), pcm, without(without(given(w, ist(8, 0)), "wristband"), "override"))));
             problems.add(body(doseCall(w.nurse().auth(), hep, given(w, ist(8, 0)))));
             problems.add(body(doseCall(w.nurse().auth(), hep, givenHighAlert(w, ist(8, 0), w.nurse(), "1234"))));
             problems.add(body(doseCall(w.nurse().auth(), hep, givenHighAlert(w, ist(8, 0), w.pharmacist(), w.pharmacistPin()))));

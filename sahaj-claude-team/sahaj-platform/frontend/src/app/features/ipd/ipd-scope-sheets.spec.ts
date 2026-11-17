@@ -18,6 +18,7 @@ import { NursingSheetComponent } from './nursing/nursing-sheet.component';
 import { NursingSheet } from './nursing/nursing.model';
 import { MedicineRoundComponent } from './safety/medicine-round.component';
 import { AS_OF, ROUND_DUE, roundOf } from './safety/safety.fixtures';
+import { provideOrderNoticesStubs } from './orders/order-notices.testing';
 
 /**
  * SAH-34 AC 38, 39: a sheet that meets 403 `outside-scope` reports it (ids only), clears the patient's data from the
@@ -46,6 +47,9 @@ const NURSING: NursingSheet = {
   latest: null,
   vitalsDue: false,
   doseCount: 0,
+  ordersToAcknowledge: { count: 0, stat: 0, overdue: 0 },
+  vitalsDueAt: null,
+  vitalsIntervalMinutes: 240,
   recentNotes: [],
 };
 
@@ -100,6 +104,7 @@ describe('SAH-34: sheets meeting 403 outside-scope', () => {
       providers: [
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
+        ...provideOrderNoticesStubs(),
         { provide: MatDialogRef, useValue: ref },
         { provide: MatSnackBar, useValue: { open: snack, dismiss: vi.fn() } },
         ...extra,
@@ -244,6 +249,9 @@ describe('SAH-34: sheets meeting 403 outside-scope', () => {
       const f = mount();
       http.expectOne(`${IPD}/admissions/a1/emr`).flush(sheetOf());
       await settle(f);
+      const dose = (f.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#ord-dose')!;
+      dose.value = '1';
+      dose.dispatchEvent(new Event('input'));
       (f.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-act=sfordchk]')!.click();
       await settle(f);
       refuse(http.expectOne(`${IPD}/admissions/a1/medicine-orders`));
@@ -261,7 +269,11 @@ describe('SAH-34: sheets meeting 403 outside-scope', () => {
       const root = f.nativeElement as HTMLElement;
       root.querySelector<HTMLButtonElement>('[data-act=sfstop]')!.click();
       await settle(f);
-      root.querySelector<HTMLButtonElement>('[data-act=sfstopok]')!.click();
+      // The Stop sheet (SAH-76-1) opens over the EMR sheet and asks for the reason.
+      const reason = document.querySelector<HTMLTextAreaElement>('#ord-stop-reason')!;
+      reason.value = 'Course finished';
+      reason.dispatchEvent(new Event('input'));
+      document.querySelector<HTMLButtonElement>('[data-act=stop-ok]')!.click();
       await settle(f);
       refuse(http.expectOne(`${IPD}/medicine-orders/o1/stop`));
       await settle(f);

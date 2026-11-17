@@ -354,21 +354,29 @@ abstract class VitalsSupport extends DischargeSupport {
      * {@code commit} false everything (including the NO FORCE) is rolled back.
      */
     protected <T> T asOwner(boolean commit, String[] tables, DbAccess.SqlWork<T> work) throws SQLException {
+        // SAH-76: the deferred head check reads the version table, which has no policy for the owner: it goes along with the head
+        java.util.List<String> all = new java.util.ArrayList<>(java.util.List.of(tables));
+        if (all.contains("ipd.medicine_order") && !all.contains("ipd.medicine_order_version")) {
+            all.add("ipd.medicine_order_version");
+        }
+        String[] tables2 = all.toArray(new String[0]);
         try (Connection c = db().migrator()) {
             c.setAutoCommit(false);
             try {
                 DbAccess.execute(c, "set local lock_timeout = '30s'");
-                for (String t : tables) {
+                for (String t : tables2) {
                     DbAccess.execute(c, "alter table " + t + " no force row level security");
                 }
                 T result = work.apply(c);
-                for (String t : tables) {
-                    DbAccess.execute(c, "alter table " + t + " force row level security");
-                }
                 if (commit) {
+                    // SAH-76: the deferred head check must run (and pass) before ALTER TABLE, which refuses pending trigger events
+                    DbAccess.execute(c, "set constraints all immediate");
+                    for (String t : tables2) {
+                        DbAccess.execute(c, "alter table " + t + " force row level security");
+                    }
                     c.commit();
                 } else {
-                    c.rollback();
+                    c.rollback(); // the NO FORCE goes with the transaction; no ALTER is needed (pending trigger events would refuse it)
                 }
                 return result;
             } catch (SQLException | RuntimeException | AssertionError e) {
@@ -376,6 +384,22 @@ abstract class VitalsSupport extends DischargeSupport {
                 throw e;
             }
         }
+    }
+
+    /**
+     * SAH-76: gives every order of the clinic that has no version row a version 1 (SCHEDULED, the head's frequency, no dose,
+     * Oral, start at the order time, verified as the head is), the way the migration's backfill does, for the tests that write
+     * order heads by SQL. The caller is the table owner with NO FORCE on ipd.medicine_order and the version table (asOwner does both); the version table's guard triggers
+     * are off for the insert only.
+     */
+    protected static void backfillVersionOne(Connection c, java.util.UUID tenant) throws SQLException {
+        DbAccess.execute(c, "alter table ipd.medicine_order_version disable trigger user");
+        DbAccess.execute(c, "insert into ipd.medicine_order_version (tenant_id, order_id, version_no, kind, frequency_key, route_key, "
+                + "start_at, priority, created_by, created_at, verification, verified_by, verified_at) select o.tenant_id, o.id, 1, "
+                + "'SCHEDULED', coalesce(o.frequency_key, 'od'), 'ORAL', o.ordered_at, 'ROUTINE', o.ordered_by, o.ordered_at, 'REQUIRED', "
+                + "o.verified_by, o.verified_at from ipd.medicine_order o where o.tenant_id = ?::uuid and not exists "
+                + "(select 1 from ipd.medicine_order_version v where v.order_id = o.id)", tenant.toString());
+        DbAccess.execute(c, "alter table ipd.medicine_order_version enable trigger user");
     }
 
     /** One statement as the table owner (rolled back); returns the error, fails when it is accepted. */

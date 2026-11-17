@@ -250,8 +250,9 @@ public class ChemoOrderService implements SpecialtyRecordSupport.ChemoOrderHook 
         boolean chemo = courses.find(tenantId, sitting.get().courseId()).filter(c -> "CHEMO".equals(c.kind()))
                 .isPresent();
         if (chemo) {
-            courses.setRegimenIfEmpty(tenantId, sitting.get().id(), protocolKey, actorUserId);
-            courses.bumpRevision(tenantId, sitting.get().courseId(), actorUserId);
+            if (courses.setRegimenIfEmpty(tenantId, sitting.get().id(), protocolKey, actorUserId)) {
+                courses.bumpRevision(tenantId, sitting.get().courseId(), actorUserId);
+            }
         }
     }
 

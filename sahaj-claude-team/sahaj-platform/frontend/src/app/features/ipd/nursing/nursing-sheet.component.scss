@@ -31,6 +31,10 @@
       box-shadow: 0 2px 8px -4px var(--pri);
     }
   }
+  .c.amber {
+    background: var(--warn);
+    color: var(--crit-ink);
+  }
   .c {
     background: var(--crit);
     color: var(--crit-ink);

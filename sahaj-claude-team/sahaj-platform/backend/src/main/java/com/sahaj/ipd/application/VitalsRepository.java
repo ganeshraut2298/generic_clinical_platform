@@ -65,11 +65,22 @@ public interface VitalsRepository {
      * {@link #findLatestReadingsOfAdmitted} (null in the score-only read). Clinical data.
      */
     record LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt, Readings readings,
-                       UUID recordedBy) {
+                       UUID recordedBy, Integer dueIntervalMin) {
 
-        /** The score-only row of {@link #findLatestOfAdmitted}. */
+        /** The score-only row with no stamped interval (read as 240 minutes). */
         public LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt) {
-            this(admissionId, ewsScore, ewsRisk, recordedAt, null, null);
+            this(admissionId, ewsScore, ewsRisk, recordedAt, null, null, null);
+        }
+
+        /** A row with readings and no stamped interval (read as 240 minutes). */
+        public LatestScore(UUID admissionId, int ewsScore, Risk ewsRisk, Instant recordedAt, Readings readings,
+                           UUID recordedBy) {
+            this(admissionId, ewsScore, ewsRisk, recordedAt, readings, recordedBy, null);
+        }
+
+        /** The interval stamped when the record was saved; 240 for a record that carries none. */
+        public int intervalMinutes() {
+            return dueIntervalMin == null ? com.sahaj.ipd.domain.VitalsDue.DEFAULT_INTERVAL_MINUTES : dueIntervalMin;
         }
 
         @Override
@@ -89,7 +100,15 @@ public interface VitalsRepository {
 
     /** The five values are clinical data: {@code toString} shows the admission id only. */
     record NewVitals(UUID admissionId, UUID clientKey, int bpSystolic, int bpDiastolic, int pulse, int spo2,
-                     BigDecimal tempC, int rr, int ewsScore, Risk ewsRisk, boolean noteAdded, UUID recordedBy) {
+                     BigDecimal tempC, int rr, int ewsScore, Risk ewsRisk, boolean noteAdded, UUID recordedBy,
+                     Integer dueIntervalMin) {
+
+        /** A record with no stamped interval (the built shape: read as 240 minutes). */
+        public NewVitals(UUID admissionId, UUID clientKey, int bpSystolic, int bpDiastolic, int pulse, int spo2,
+                         BigDecimal tempC, int rr, int ewsScore, Risk ewsRisk, boolean noteAdded, UUID recordedBy) {
+            this(admissionId, clientKey, bpSystolic, bpDiastolic, pulse, spo2, tempC, rr, ewsScore, ewsRisk,
+                    noteAdded, recordedBy, null);
+        }
 
         @Override
         public String toString() {
@@ -99,7 +118,20 @@ public interface VitalsRepository {
 
     record VitalsRow(UUID id, UUID admissionId, int bpSystolic, int bpDiastolic, int pulse, int spo2,
                      BigDecimal tempC, int rr, int ewsScore, Risk ewsRisk, boolean noteAdded, Instant recordedAt,
-                     UUID recordedBy) {
+                     UUID recordedBy, Integer dueIntervalMin) {
+
+        /** A record with no stamped interval (written before SAH-76: read as 240 minutes). */
+        public VitalsRow(UUID id, UUID admissionId, int bpSystolic, int bpDiastolic, int pulse, int spo2,
+                         BigDecimal tempC, int rr, int ewsScore, Risk ewsRisk, boolean noteAdded, Instant recordedAt,
+                         UUID recordedBy) {
+            this(id, admissionId, bpSystolic, bpDiastolic, pulse, spo2, tempC, rr, ewsScore, ewsRisk, noteAdded,
+                    recordedAt, recordedBy, null);
+        }
+
+        /** The interval stamped when the record was saved; 240 for a record that carries none. */
+        public int intervalMinutes() {
+            return dueIntervalMin == null ? com.sahaj.ipd.domain.VitalsDue.DEFAULT_INTERVAL_MINUTES : dueIntervalMin;
+        }
 
         @Override
         public String toString() {

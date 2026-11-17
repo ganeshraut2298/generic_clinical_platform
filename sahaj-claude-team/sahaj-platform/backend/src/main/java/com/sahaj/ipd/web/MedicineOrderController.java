@@ -1,13 +1,23 @@
 package com.sahaj.ipd.web;
 
 import com.sahaj.ipd.application.MedicineOrderService;
+import com.sahaj.ipd.application.OrderChangeService;
+import com.sahaj.ipd.application.PharmacistQueryService;
+import com.sahaj.ipd.application.PharmacistReviewService;
+import com.sahaj.ipd.application.MedicineViews.ChangeOrderInput;
 import com.sahaj.ipd.application.MedicineViews.EmrSheet;
+import com.sahaj.ipd.application.MedicineViews.HoldOrderInput;
 import com.sahaj.ipd.application.MedicineViews.MedicineOrderAnswer;
 import com.sahaj.ipd.application.MedicineViews.MedicineOrderInput;
 import com.sahaj.ipd.application.MedicineViews.PharmacistActionResult;
 import com.sahaj.ipd.application.MedicineViews.PharmacistChecks;
 import com.sahaj.ipd.application.MedicineViews.PharmacistChecksSummary;
+import com.sahaj.ipd.application.MedicineViews.PharmacistReviewPage;
+import com.sahaj.ipd.application.MedicineViews.QueryOrderInput;
+import com.sahaj.ipd.application.MedicineViews.QueryReplyInput;
 import com.sahaj.ipd.application.MedicineViews.RejectOrderInput;
+import com.sahaj.ipd.application.MedicineViews.ResumeOrderInput;
+import com.sahaj.ipd.application.MedicineViews.StopOrderInput;
 import com.sahaj.ipd.application.MedicineViews.VerifyOrderInput;
 import com.sahaj.ipd.application.PharmacistCheckService;
 import com.sahaj.platform.api.ClinicUser;
@@ -41,10 +51,18 @@ public class MedicineOrderController {
 
     private final MedicineOrderService orders;
     private final PharmacistCheckService pharmacist;
+    private final OrderChangeService changes;
+    private final PharmacistQueryService queries;
+    private final PharmacistReviewService reviews;
 
-    public MedicineOrderController(MedicineOrderService orders, PharmacistCheckService pharmacist) {
+    public MedicineOrderController(MedicineOrderService orders, PharmacistCheckService pharmacist,
+                                   OrderChangeService changes, PharmacistQueryService queries,
+                                   PharmacistReviewService reviews) {
         this.orders = orders;
         this.pharmacist = pharmacist;
+        this.changes = changes;
+        this.queries = queries;
+        this.reviews = reviews;
     }
 
     @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
@@ -69,9 +87,69 @@ public class MedicineOrderController {
     @ScopeGuarded(ScopeGuarded.Kind.ORDER)
     @PostMapping("/medicine-orders/{id}/stop")
     @PreAuthorize(CLINIC_ROLES)
-    public EmrSheet stop(@PathVariable UUID id) {
+    public EmrSheet stop(@PathVariable UUID id, @RequestBody StopOrderInput request) {
         ClinicUser user = ClinicUser.current();
-        return orders.stop(user.tenantId(), user.userId(), user.role(), id);
+        return orders.stop(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    /** SAH-76-1: a new order version (ADR-027 D4). */
+    @ScopeGuarded(ScopeGuarded.Kind.ORDER)
+    @PostMapping("/medicine-orders/{id}/change")
+    @PreAuthorize(CLINIC_ROLES)
+    public EmrSheet change(@PathVariable UUID id, @RequestBody ChangeOrderInput request) {
+        ClinicUser user = ClinicUser.current();
+        return changes.change(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    @ScopeGuarded(ScopeGuarded.Kind.ORDER)
+    @PostMapping("/medicine-orders/{id}/hold")
+    @PreAuthorize(CLINIC_ROLES)
+    public EmrSheet hold(@PathVariable UUID id, @RequestBody HoldOrderInput request) {
+        ClinicUser user = ClinicUser.current();
+        return changes.hold(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    @ScopeGuarded(ScopeGuarded.Kind.ORDER)
+    @PostMapping("/medicine-orders/{id}/resume")
+    @PreAuthorize(CLINIC_ROLES)
+    public EmrSheet resume(@PathVariable UUID id, @RequestBody ResumeOrderInput request) {
+        ClinicUser user = ClinicUser.current();
+        return changes.resume(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    /** SAH-76-2: the pharmacist's question. OWNER and PHARMACIST only, scope all. */
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
+    @PostMapping("/medicine-orders/{id}/query")
+    @PreAuthorize(CLINIC_ROLES)
+    public PharmacistActionResult query(@PathVariable UUID id, @RequestBody QueryOrderInput request) {
+        ClinicUser user = ClinicUser.current();
+        return queries.query(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    @ScopeGuarded(ScopeGuarded.Kind.ORDER)
+    @PostMapping("/medicine-orders/{id}/query-reply")
+    @PreAuthorize(CLINIC_ROLES)
+    public EmrSheet queryReply(@PathVariable UUID id, @RequestBody QueryReplyInput request) {
+        ClinicUser user = ClinicUser.current();
+        return queries.reply(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    /** SAH-76-2: the open review-after-dose items (limit and cursor as text, like the queue). */
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
+    @GetMapping("/pharmacist-reviews")
+    @PreAuthorize(CLINIC_ROLES)
+    public PharmacistReviewPage reviews(@RequestParam(name = "limit", required = false) String limit,
+                                        @RequestParam(name = "cursor", required = false) String cursor) {
+        ClinicUser user = ClinicUser.current();
+        return reviews.list(user.tenantId(), user.userId(), user.role(), limit, cursor);
+    }
+
+    @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")
+    @PostMapping("/pharmacist-reviews/{id}/mark-reviewed")
+    @PreAuthorize(CLINIC_ROLES)
+    public PharmacistReviewPage markReviewed(@PathVariable UUID id) {
+        ClinicUser user = ClinicUser.current();
+        return reviews.markReviewed(user.tenantId(), user.userId(), user.role(), id);
     }
 
     @ScopeExempt("Pharmacist check: OWNER and PHARMACIST only, scope all")

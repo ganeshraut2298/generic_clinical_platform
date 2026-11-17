@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sahaj OPD API
-  version: 0.7.1
+  version: 0.7.3
   description: >-
     Phase 1 contract, SAH-7 (and SAH-9, SAH-11, SAH-12, SAH-14, SAH-15, SAH-18 as tagged). Reads are for any logged-in
     clinic user; writes are owner only (403 otherwise) unless an operation says otherwise. Errors are RFC 9457
@@ -229,6 +229,28 @@ info:
     Oncology Assessment card order as drawn (Side effects, Examination, Labs, ECOG; the decision card follows ECOG):
     starter placement only, new starter layout version for og and onco. Values tagged "value from the EMR mockup, not
     clinically reviewed".
+
+    0.7.2 (15 Nov 2026, DEC-054, SAH-39; additive). Adds the reusable response components/responses/DatabaseBusy:
+    503 with problem type database-busy ("Sahaj is busy"), header Retry-After 5 and body field retryAfterSeconds 5,
+    answered when a database lock wait, a statement timeout or no free connection stopped the request. The request
+    was rolled back, so nothing was saved by that attempt; the client may try again after the wait. Listed on every
+    write (POST, PUT, PATCH, DELETE) and on the longer reads GET /follow-ups and GET /emr/records/{recordId}/past-visits;
+    on POST /emr/records/{recordId}/chemo-order/second-check, which already answers 503 for the PIN, the two are merged
+    into that 503's description. No path, schema, permission or other problem type changes.
+
+    0.7.3 (15 Nov 2026; additive notes, description only). Adds no path, field, problem type, permission or audit
+    action. (1) PUT /emr/records/{recordId}/draft: a field value that is null or text that is blank or whitespace only
+    means nothing entered and clears the field (never 400); a non-blank invalid value is still 400 validation. (2) PUT
+    /emr/records/{recordId}/cancer-journey: after the stale-version check (409 journey-changed comes first), a save
+    that changes no field creates no new version and writes no audit; the answer is the current latest version. The
+    very first save (expectedVersion 0) of an empty journey still creates version 1. (3) POST
+    …/sittings/{sittingId}/rebook and /reschedule: plannedDate must be from today to today + 2 years (Asia/Kolkata),
+    else 400 validation with fieldErrors plannedDate "Choose a date within the next 2 years." (replaces "Choose today or a later date." for
+    these two operations). (4) CancerJourneyInput tnmText, markersText and geneticsText refuse control characters
+    (tab and line break included): 400 validation with the field's error "Remove the control characters.". (5) Sitting
+    actions (mark-done, missed, rebook, reschedule, remove, admission-request): when the guarded update changes no row
+    (another action changed the sitting between the checks and the write), the answer is 409 sitting-not-available
+    and nothing is written (no audit).
 servers:
   - url: /api/v1/opd
 security:
@@ -252,6 +274,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /booking-rules:
     get:
       tags: [SAH-11]
@@ -266,6 +289,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/BookingRules' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /appointments:
     get:
       tags: [SAH-11]
@@ -285,6 +309,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /appointments/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -298,6 +323,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /appointments/{id}/token:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -309,6 +335,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /visits/today:
     get:
       tags: [SAH-9]
@@ -328,6 +355,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /visits/{id}/stage:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -341,6 +369,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /visits/{id}/visit-type:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -383,6 +412,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'Visit not found (or another clinic''s).' }
         '409': { $ref: '#/components/responses/Problem', description: '0.6.0: emr-record-signed (the visit''s EMR record is signed).' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /visits/{visitId}/prescription-print:
     parameters:
       - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -429,6 +459,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /services/{id}:
     patch:
       tags: [SAH-7]
@@ -443,6 +474,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /fee-settings:
     get:
       tags: [SAH-7]
@@ -457,6 +489,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/FeeSettings' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /medicines:
     get:
       tags: [SAH-7]
@@ -485,12 +518,14 @@ paths:
         '204': { description: Marked }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
     delete:
       tags: [SAH-7]
       responses:
         '204': { description: Unmarked }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /diagnoses:
     get:
       tags: [SAH-7]
@@ -526,6 +561,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/CasePaperSettings' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /workflow/draft:
     get:
       tags: [SAH-12]
@@ -540,6 +576,7 @@ paths:
         '200': { description: Draft saved, content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowSteps' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /workflow/current:
     get:
       tags: [SAH-12]
@@ -563,6 +600,7 @@ paths:
       responses:
         '200': { description: 'Counts for all four tabs and the items for the requested status (at most 200 rows; oldest due date first, except RETURNED which is newest return first)', content: { application/json: { schema: { $ref: '#/components/schemas/FollowUpList' } } } }
         '400': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /workflow/publish:
     x-note-sah12: 'All /workflow/* operations also answer 401 (no or expired token). Publish answers 409 problem type workflow-conflict when another owner published first or there is nothing to publish; the client reloads the current version.'
     post:
@@ -572,6 +610,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /alert-rules:
     get:
       tags: [SAH-18]
@@ -588,6 +627,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /alert-rules/starter:
     post:
       tags: [SAH-18]
@@ -595,6 +635,7 @@ paths:
       responses:
         '200': { description: 'Rules, now with ids', content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /alert-rules/suggestions/{index}:
     parameters:
       - { name: index, in: path, required: true, schema: { type: integer, minimum: 0 } }
@@ -606,6 +647,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /alert-rules/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -620,6 +662,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
     delete:
       tags: [SAH-18]
       description: OWNER only.
@@ -627,6 +670,7 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AlertRules' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/masters/{master}:
     parameters:
       - { name: master, in: path, required: true, schema: { $ref: '#/components/schemas/EmrSearchMaster' } }
@@ -867,6 +911,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: 'starter-not-found, department-not-found (copy source) or section-not-found.' }
         '413': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/departments/{departmentKey}:
     parameters:
       - { name: departmentKey, in: path, required: true, schema: { $ref: '#/components/schemas/DepartmentKey' } }
@@ -923,6 +968,7 @@ paths:
         '404': { $ref: '#/components/responses/Problem', description: 'department-not-found or section-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: emr-setup-changed }
         '413': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/departments/{departmentKey}/publish:
     parameters:
       - { name: departmentKey, in: path, required: true, schema: { $ref: '#/components/schemas/DepartmentKey' } }
@@ -954,6 +1000,7 @@ paths:
         '404': { $ref: '#/components/responses/Problem', description: 'department-not-found or section-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: emr-setup-changed }
         '413': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/departments/{departmentKey}/reset-target:
     parameters:
       - { name: departmentKey, in: path, required: true, schema: { $ref: '#/components/schemas/DepartmentKey' } }
@@ -1062,6 +1109,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: encounter-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'encounter-closed or ipd-read-only.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1143,6 +1191,9 @@ paths:
         orderedAt are stamped at sign and a row with an orderId cannot be changed or removed (400 validation); a form
         MEDICINE_LIST field stores nothing on IPD_ROUND records. (6) A section may carry prefill (vitals pre-fill from
         the nursing chart); the server keeps prefilledFrom only while the values equal the source entry.
+        0.7.3: a field value that is null, or text that is blank or whitespace only, is treated as nothing entered and
+        clears the field; it is never 400. A non-blank value that does not match its field's valueKind or limits is
+        still 400 validation.
       x-required-permission: clinic.consultation.write
       requestBody:
         required: true
@@ -1168,6 +1219,7 @@ paths:
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-changed, emr-record-signed, already-billed (0.4.0) or emr-record-held (0.6.0). encounter-drafts-not-enabled is no longer answered (0.6.0). 0.6.2 lists two answers the save already gives: encounter-closed (the admission discharged or the Emergency case closed) and ipd-read-only (IPD_ROUND or ER_ASSESSMENT record while IPD is Read-only).' }
         '413': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/department:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1194,6 +1246,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found, department-not-found or department-not-published.' }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-changed or emr-record-signed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/admission-advice:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1222,6 +1275,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-changed or emr-record-signed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/allergy-classes:
     get:
       tags: [SAH-48]
@@ -1315,6 +1369,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient or outside-scope.' }
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found or past-visit-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed, section-not-in-layout or encounter-drafts-not-enabled.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/print-preferences:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1337,6 +1392,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/case-paper:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1390,6 +1446,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient or outside-scope.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/past-visits/{kind}/{pastId}:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1525,6 +1582,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: form-starter-not-found }
         '409': { $ref: '#/components/responses/Problem', description: idempotency-conflict }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1572,6 +1630,7 @@ paths:
         '404': { $ref: '#/components/responses/Problem', description: form-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'form-changed or form-state.' }
         '413': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}/submit:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1596,6 +1655,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: form-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'form-changed or form-state.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}/approve:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1620,6 +1680,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: form-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'form-changed or form-state.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}/send-back:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1640,6 +1701,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: form-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'form-changed or form-state.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}/publish:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1663,6 +1725,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: form-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'form-changed or form-state.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}/retire:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1682,6 +1745,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: form-not-found }
         '409': { $ref: '#/components/responses/Problem', description: form-changed }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/forms/{formKey}/versions/{versionNo}:
     parameters:
       - { name: formKey, in: path, required: true, schema: { $ref: '#/components/schemas/EmrFormKey' } }
@@ -1753,6 +1817,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: idempotency-conflict }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1806,6 +1871,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-own-patient or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: course-not-found }
         '409': { $ref: '#/components/responses/Problem', description: idempotency-conflict }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1834,6 +1900,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-own-patient or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/link-visit:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1862,6 +1929,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found, sitting-not-found or encounter-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, visit-already-linked or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/mark-done:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1882,7 +1950,9 @@ paths:
         changed. Reload."; removed: 404 sitting-not-found. Only the course's doctor or an OWNER with doctor details
         (403 not-own-patient); FRONT_DESK and BILLING 403 (they collect only); NURSE, PHARMACIST, COUNSELLOR 403; another
         clinic's course 404. Audit COURSE_SITTING_MARKED_DONE (course id; sittingId, sittingNo, displayNo, status
-        before and after; no items).
+        before and after; no items). 0.7.3, shared by every sitting action (mark-done, missed, rebook, reschedule,
+        remove, admission-request): when the guarded update changes no row (the sitting changed between the checks and
+        the write), the answer is 409 sitting-not-available and nothing is written (no audit).
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       requestBody:
@@ -1895,6 +1965,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found, sitting-not-found or encounter-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done, sitting-not-available or visit-already-linked.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/missed:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1920,6 +1991,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/rebook:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1933,7 +2005,9 @@ paths:
         plannedDate. The date must be today or later in Asia/Kolkata (400 validation "Choose today or a later date.").
         Not MISSED: 409 sitting-not-available. Toast "Rebooked for <date>". Booking a chair or an appointment stays the
         "next sitting" flow (SAH-69-3). Roles, 409 course-changed and 404 as mark-done. Audit COURSE_SITTING_REBOOKED
-        (dates before and after).
+        (dates before and after). 0.7.3 (changed message): plannedDate must be from today to today + 2 years
+        (Asia/Kolkata); before today or later than that is 400 validation with fieldErrors plannedDate "Choose a date
+        within the next 2 years.". A guarded update that changes no row: 409 sitting-not-available (as mark-done).
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       requestBody:
@@ -1946,6 +2020,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/reschedule:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1959,7 +2034,9 @@ paths:
         "Choose today or a later date."); an OPD sitting moved to today shows TODAY. Date only: items, charge and kind
         do not change (use PUT …/sittings/{sittingId} for those). The design's sample date list is not used. Other
         statuses: 409 sitting-not-available or sitting-done. Roles, 409 course-changed and 404 as mark-done. Audit
-        COURSE_SITTING_RESCHEDULED.
+        COURSE_SITTING_RESCHEDULED. 0.7.3 (changed message): plannedDate must be from today to today + 2 years
+        (Asia/Kolkata); before today or later than that is 400 validation with fieldErrors plannedDate "Choose a date
+        within the next 2 years.". A guarded update that changes no row: 409 sitting-not-available (as mark-done).
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       requestBody:
@@ -1972,6 +2049,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/remove:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1999,6 +2077,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/courses/{courseId}/sittings/{sittingId}/admission-request:
     parameters:
       - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2029,6 +2108,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-own-patient or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: 'course-not-found or sitting-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'course-changed, sitting-done or sitting-not-available.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/specialty-reference/{profile}:
     parameters:
       - { name: profile, in: path, required: true, schema: { $ref: '#/components/schemas/EmrSpecialtyProfile' } }
@@ -2114,6 +2194,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'booking-not-ready, emr-record-changed, emr-record-signed or idempotency-conflict.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/chemo-order:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2160,6 +2241,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'chemo-order-changed, chemo-order-sent or emr-record-signed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/chemo-order/checker-options:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2209,6 +2291,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found or order-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'checks-failing, chemo-order-changed or chemo-order-sent.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/chemo-order/second-check:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2242,7 +2325,7 @@ paths:
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found or order-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'checks-failing, chemo-order-changed, chemo-order-sent or pin-not-set.' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit or colleague-pin-limit (no retryAfterSeconds for the pair cap).' }
-        '503': { $ref: '#/components/responses/Problem', description: 'pin-check-failed or pin-unavailable.' }
+        '503': { $ref: '#/components/responses/Problem', description: 'pin-check-failed or pin-unavailable; or database-busy (0.7.2, DEC-054; as components/responses/DatabaseBusy, with the Retry-After header and retryAfterSeconds, nothing saved).' }
   /emr/records/{recordId}/chemo-order/send:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2272,6 +2355,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found or order-not-found.' }
         '409': { $ref: '#/components/responses/Problem', description: 'checks-failing, second-check-not-confirmed, chemo-order-changed or emr-record-signed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/chemo-order/hold:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2297,6 +2381,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'checks-failing, chemo-order-changed, chemo-order-sent or emr-record-signed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/chemo-checks:
     get:
       tags: [SAH-66]
@@ -2359,6 +2444,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-named-checker or checker-is-prescriber.' }
         '404': { $ref: '#/components/responses/Problem', description: order-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'checks-failing, chemo-order-changed or chemo-order-sent.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/visit-templates:
     get:
       tags: [SAH-60]
@@ -2394,6 +2480,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem', description: 'validation or visit-template-limit.' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/edit-hold:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2424,6 +2511,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient or outside-scope.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-held or emr-record-signed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
     delete:
       tags: [SAH-51]
       operationId: releaseEmrEditHold
@@ -2436,6 +2524,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/finish-check:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2472,6 +2561,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed, or encounter-closed (0.6.3, DEC-051 D2: the admission is discharged or the Emergency case is closed).' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/sign:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2535,6 +2625,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found; patient-not-found (SEND_TO_OPD with a patient not of this clinic).' }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed, emr-record-changed, emr-record-held, ipd-read-only (0.6.2, IPD_ROUND and ER_ASSESSMENT while IPD is Read-only), emr-not-ready (blockers), encounter-closed, case-closed, workflow-move-refused, already-billed, ipd-order-not-placed (rows: EmrIpdOrderNotPlacedRow, 0.6.3, no clinical text), opd-doctor-not-available or idempotency-conflict.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/addenda:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2569,6 +2660,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient or outside-scope.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-not-signed or idempotency-conflict.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/encounter-vitals:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2673,6 +2765,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden, not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed, encounter-closed, emr-record-held (0.6.2, holderName), already-admitted or idempotency-conflict (0.6.2: also the same key on another record).' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/cancer-journey:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2691,6 +2784,11 @@ paths:
         above 100, a board date more than 365 days ahead): 400 validation with fieldErrors. Lists are not clinically
         reviewed (ADR-026 H6). NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR 403; another clinic's record 404.
         Audit ONC_JOURNEY_UPDATED (version and the names of the changed fields; never a value). Never logged.
+        0.7.3: the stale-version check comes first (409 journey-changed). A save that changes no field then creates no
+        new version and writes no audit; the answer is 200 with the current latest version. The very first save
+        (expectedVersion 0) of an empty journey still creates version 1. tnmText, markersText and geneticsText with a
+        control character (tab and line break included): 400 validation with the field's error "Remove the control
+        characters.".
       x-required-role: DOCTOR, VISITING_DOCTOR, or OWNER with doctor details
       x-required-permission: clinic.consultation.write
       requestBody:
@@ -2703,6 +2801,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden or not-own-patient.' }
         '404': { $ref: '#/components/responses/Problem', description: record-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed or journey-changed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /emr/records/{recordId}/free-slots:
     parameters:
       - { name: recordId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2774,6 +2873,28 @@ components:
                 maxItems: 20
                 description: '0.6.3 (DEC-051 D3). Only on 409 ipd-order-not-placed (POST /emr/records/{recordId}/sign): one row per IPD order row that was not placed.'
                 items: { $ref: '#/components/schemas/EmrIpdOrderNotPlacedRow' }
+    DatabaseBusy:
+      description: >-
+        0.7.2 (DEC-054). The database did not answer in time: a lock that stayed taken, a statement that ran past the
+        statement timeout, or no free connection. The request was rolled back, so nothing was saved by this attempt;
+        the client may try again after Retry-After seconds. Type https://sahaj.in/problems/database-busy, title "Sahaj
+        is busy", detail "This is taking longer than usual and was stopped. Nothing was saved by this attempt. Wait a
+        moment and try again."
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again (5).
+          schema: { type: integer, minimum: 1, examples: [5] }
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status, retryAfterSeconds]
+            properties:
+              type: { type: string, const: 'https://sahaj.in/problems/database-busy' }
+              title: { type: string, examples: ['Sahaj is busy'] }
+              status: { type: integer, const: 503 }
+              detail: { type: string }
+              retryAfterSeconds: { type: integer, minimum: 1, description: 'Same value as the Retry-After header (5).' }
   schemas:
     DoctorSlotSettings:
       type: object
@@ -4478,7 +4599,7 @@ components:
       required: [revision, plannedDate]
       properties:
         revision: { type: integer, format: int64, minimum: 0 }
-        plannedDate: { type: string, format: date, description: 'Today or later, Asia/Kolkata (400 validation "Choose today or a later date.").' }
+        plannedDate: { type: string, format: date, description: '0.7.3: from today to today + 2 years, Asia/Kolkata (400 validation, fieldErrors plannedDate "Choose a date within the next 2 years.").' }
     CourseSittingAdmissionRequestInput:
       type: object
       additionalProperties: false
@@ -5554,14 +5675,14 @@ components:
       type: object
       additionalProperties: false
       required: [expectedVersion]
-      description: 'Every field optional; a field sent null clears it in the new version, an absent field keeps the previous version''s value.'
+      description: 'Every field optional; a field sent null clears it in the new version, an absent field keeps the previous version''s value. 0.7.3: a save that changes no field creates no new version and no audit and answers the current latest version (after the journey-changed check); the first save of an empty journey still creates version 1.'
       properties:
         expectedVersion: { type: integer, minimum: 0, description: 'The version read (0 when none); stale 409 journey-changed.' }
         stageGroup: { oneOf: [{ $ref: '#/components/schemas/CancerStageGroup' }, { type: 'null' }] }
-        tnmText: { type: [string, 'null'], minLength: 1, maxLength: 40 }
-        markersText: { type: [string, 'null'], minLength: 1, maxLength: 80 }
+        tnmText: { type: [string, 'null'], minLength: 1, maxLength: 40, description: '0.7.3: no control characters (tab and line break included); 400 validation "Remove the control characters.".' }
+        markersText: { type: [string, 'null'], minLength: 1, maxLength: 80, description: '0.7.3: no control characters (tab and line break included); 400 validation "Remove the control characters.".' }
         ki67Pct: { type: [integer, 'null'], minimum: 0, maximum: 100 }
-        geneticsText: { type: [string, 'null'], minLength: 1, maxLength: 60 }
+        geneticsText: { type: [string, 'null'], minLength: 1, maxLength: 60, description: '0.7.3: no control characters (tab and line break included); 400 validation "Remove the control characters.".' }
         intent: { type: [string, 'null'], enum: [CURATIVE, PALLIATIVE, null] }
         setting: { type: [string, 'null'], enum: [NEOADJUVANT, ADJUVANT, DEFINITIVE, ADVANCED, null] }
         lineNo: { type: [integer, 'null'], minimum: 1, maximum: 10 }

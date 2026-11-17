@@ -127,6 +127,29 @@ public class JdbcIpdSettingsRepository implements IpdSettingsRepository {
                 updated_by = excluded.updated_by
             """;
 
+    private static final String FIND_NURSING = """
+            select med_verification_required, dose_window_before_min, dose_window_after_min, stat_window_min,
+                   unack_flag_min, unack_flag_stat_min, undo_seconds
+            from ipd.config
+            where tenant_id = :tenantId
+            """;
+    private static final String UPSERT_NURSING = """
+            insert into ipd.config (tenant_id, med_verification_required, dose_window_before_min, dose_window_after_min,
+                                    stat_window_min, unack_flag_min, unack_flag_stat_min, undo_seconds,
+                                    updated_at, updated_by)
+            values (:tenantId, :verification, :before, :after, :stat, :unack, :unackStat, :undo, :now, :actor)
+            on conflict (tenant_id) do update set
+                med_verification_required = excluded.med_verification_required,
+                dose_window_before_min = excluded.dose_window_before_min,
+                dose_window_after_min = excluded.dose_window_after_min,
+                stat_window_min = excluded.stat_window_min,
+                unack_flag_min = excluded.unack_flag_min,
+                unack_flag_stat_min = excluded.unack_flag_stat_min,
+                undo_seconds = excluded.undo_seconds,
+                updated_at = excluded.updated_at,
+                updated_by = excluded.updated_by
+            """;
+
     private final JdbcClient jdbc;
 
     public JdbcIpdSettingsRepository(JdbcClient jdbc) {
@@ -221,6 +244,25 @@ public class JdbcIpdSettingsRepository implements IpdSettingsRepository {
         jdbc.sql(UPSERT_EMERGENCY_SETUP).param("tenantId", tenantId).param("scale", setup.scale())
                 .param("targets3", literal(setup.targets3())).param("targets5", literal(setup.targets5()))
                 .param("bays", setup.bays()).param("unknown", setup.unknownPatientRegistration())
+                .param("now", now).param("actor", actorUserId).update();
+    }
+
+    @Override
+    public Optional<NursingSettings> findNursingSettings(UUID tenantId) {
+        return jdbc.sql(FIND_NURSING).param("tenantId", tenantId)
+                .query((rs, rowNum) -> new NursingSettings(rs.getBoolean("med_verification_required"),
+                        rs.getInt("dose_window_before_min"), rs.getInt("dose_window_after_min"),
+                        rs.getInt("stat_window_min"), rs.getInt("unack_flag_min"), rs.getInt("unack_flag_stat_min"),
+                        rs.getInt("undo_seconds")))
+                .optional();
+    }
+
+    @Override
+    public void upsertNursingSettings(UUID tenantId, NursingSettings settings, UUID actorUserId, Instant now) {
+        jdbc.sql(UPSERT_NURSING).param("tenantId", tenantId).param("verification", settings.medVerificationRequired())
+                .param("before", settings.doseWindowBeforeMin()).param("after", settings.doseWindowAfterMin())
+                .param("stat", settings.statWindowMin()).param("unack", settings.unackFlagMin())
+                .param("unackStat", settings.unackFlagStatMin()).param("undo", settings.undoSeconds())
                 .param("now", now).param("actor", actorUserId).update();
     }
 

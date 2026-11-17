@@ -348,7 +348,7 @@ class EmergencyAccessIT extends ScopeSupport {
         // but it gives no other role's action, and no other patient
         for (JsonNode p : new JsonNode[] {
             problem(call(HttpMethod.POST, ordersUrl(h.inB().id()), nurse.auth(), js(orderBody(newKey(), "Paracetamol 500 mg", "od", null, null))), 403),
-            problem(call(HttpMethod.POST, stopUrl(f.orderId()), nurse.auth(), null), 403),
+            problem(call(HttpMethod.POST, stopUrl(f.orderId()), nurse.auth(), stopBody(1)), 403),
             problem(call(HttpMethod.POST, ackUrl(f.escalationId()), nurse.auth(), "{\"version\":0}"), 403)}) {
             assertThat(p.get("type").asText()).doesNotEndWith("outside-scope");
         }

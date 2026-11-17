@@ -13,35 +13,51 @@ class VitalsDueTest {
 
     @Test
     void anAdmittedPatientWithNoVitalsIsDue() {
-        assertThat(VitalsDue.isDue(true, null, NOW)).isTrue();
+        assertThat(VitalsDue.isDue(true, null, 240, NOW)).isTrue();
     }
 
     @Test
     void exactly240MinutesIsNotDueAndTheNextWholeMinuteIs() {
-        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(240)), NOW)).isFalse();
-        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(241)), NOW)).isTrue();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(240)), 240, NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(241)), 240, NOW)).isTrue();
     }
 
     @Test
     void minutesAreRoundedDownSo240MinutesAnd59SecondsIsNotDue() {
-        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofSeconds(240 * 60 + 59)), NOW)).isFalse();
-        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofSeconds(241 * 60)), NOW)).isTrue();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofSeconds(240 * 60 + 59)), 240, NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofSeconds(241 * 60)), 240, NOW)).isTrue();
     }
 
     @Test
     void recentVitalsAreNotDue() {
-        assertThat(VitalsDue.isDue(true, NOW, NOW)).isFalse();
-        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(35)), NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, NOW, 240, NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(35)), 240, NOW)).isFalse();
     }
 
     @Test
     void aRecordInTheFutureIsNotDue() {
-        assertThat(VitalsDue.isDue(true, NOW.plusSeconds(30), NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, NOW.plusSeconds(30), 240, NOW)).isFalse();
+    }
+
+    @Test
+    void theIntervalOfTheWardProfileDecidesWhenVitalsAreDue() {
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(60)), 60, NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(61)), 60, NOW)).isTrue();
+        assertThat(VitalsDue.isDue(true, NOW.minus(Duration.ofMinutes(61)), 1440, NOW)).isFalse();
+        assertThat(VitalsDue.isDue(true, null, 60, NOW)).as("no vitals is always due").isTrue();
+        assertThat(VitalsDue.isDue(false, null, 60, NOW)).isFalse();
+    }
+
+    @Test
+    void theDueTimeIsTheLastRecordPlusItsInterval() {
+        assertThat(VitalsDue.dueAt(NOW, 60)).isEqualTo(NOW.plus(Duration.ofMinutes(60)));
+        assertThat(VitalsDue.dueAt(null, 60)).isNull();
+        assertThat(VitalsDue.DEFAULT_INTERVAL_MINUTES).isEqualTo(240);
     }
 
     @Test
     void aDischargedAdmissionIsNeverDue() {
-        assertThat(VitalsDue.isDue(false, null, NOW)).isFalse();
-        assertThat(VitalsDue.isDue(false, NOW.minus(Duration.ofDays(2)), NOW)).isFalse();
+        assertThat(VitalsDue.isDue(false, null, 240, NOW)).isFalse();
+        assertThat(VitalsDue.isDue(false, NOW.minus(Duration.ofDays(2)), 240, NOW)).isFalse();
     }
 }

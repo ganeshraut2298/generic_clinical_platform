@@ -76,8 +76,7 @@ class EmrDraftSaveHangIT extends EmrPhase3Support {
     private World world() throws Exception {
         Clinic clinic = newClinic();
         Staff doctor = addDoctor(clinic, "General physician");
-        String dressing = ok(HttpMethod.POST, SERVICES, clinic.owner(),
-                "{\"name\":\"Dressing\",\"category\":\"Nursing\",\"priceRupees\":150}", 201).get("id").asText();
+        String dressing = serviceId(clinic, "Dressing", 150);
         // the clinic's own gm layout shows Procedures too, so the record has the section whichever department it picks
         showProcedures(clinic);
         JsonNode added = post(DEPARTMENTS, clinic.owner(),

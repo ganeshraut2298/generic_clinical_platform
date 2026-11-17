@@ -37,6 +37,31 @@ export interface NursingNote {
   recordedByName: string;
 }
 
+import type { NoticeCount } from '../orders/order.model';
+
+/** The three tabs of the sheet (SAH-76-3 adds "Orders" after "Medicines (MAR)"). */
+export type SheetTab = 'vit' | 'mar' | 'ord';
+export const SHEET_TABS: readonly SheetTab[] = ['vit', 'mar', 'ord'];
+export const TAB_ORDERS = 'Orders';
+
+/** The tab a key moves to (arrows wrap, Home and End jump), or null when the key is not a tab key. */
+export function sheetTabAfterKey(key: string, current: SheetTab): SheetTab | null {
+  const at = SHEET_TABS.indexOf(current);
+  const n = SHEET_TABS.length;
+  switch (key) {
+    case 'ArrowRight':
+      return SHEET_TABS[(at + 1) % n];
+    case 'ArrowLeft':
+      return SHEET_TABS[(at - 1 + n) % n];
+    case 'Home':
+      return SHEET_TABS[0];
+    case 'End':
+      return SHEET_TABS[n - 1];
+    default:
+      return null;
+  }
+}
+
 export interface NursingSheet {
   admissionId: string;
   patientName: string;
@@ -52,6 +77,12 @@ export interface NursingSheet {
   recentNotes: NursingNote[];
   /** SAH-32: slots of today in state DUE or LATE of the Active orders. The tab count, shown only above 0. */
   doseCount: number;
+  /** SAH-76-3. Badge of the tab Orders. */
+  ordersToAcknowledge: NoticeCount;
+  /** SAH-76-6. When the next vitals are due; null with no vitals yet. Read by the vitals due line (WP4). */
+  vitalsDueAt: string | null;
+  /** SAH-76-6. The interval that will be stamped on the next save. */
+  vitalsIntervalMinutes: number;
   /**
    * 0.3.0 (SAH-67-1, ADR-025 D8). The latest daily progress note a doctor signed in the EMR; null when none.
    * Clinical text: on screen only, never logged.

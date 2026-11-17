@@ -10,13 +10,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.sahaj.ipd.application.DoseCorrectionService;
 import com.sahaj.ipd.application.DoseService;
 import com.sahaj.ipd.application.DoseService.DoseResult;
 import com.sahaj.ipd.application.MarService;
+import com.sahaj.ipd.application.MarViews.Counters;
+import com.sahaj.ipd.application.MarViews.CorrectionInput;
 import com.sahaj.ipd.application.MarViews.DoseInput;
 import com.sahaj.ipd.application.MarViews.DoseRecorded;
 import com.sahaj.ipd.application.MarViews.DoseView;
 import com.sahaj.ipd.application.MarViews.Mar;
+import com.sahaj.ipd.application.MarViews.NoticeCountView;
+import com.sahaj.ipd.application.MarViews.OrderDetailsView;
+import com.sahaj.ipd.application.MarViews.Windows;
 import com.sahaj.ipd.application.MarViews.MarOrderView;
 import com.sahaj.ipd.application.MarViews.SecondNurseOption;
 import com.sahaj.ipd.application.MarViews.SlotView;
@@ -77,6 +83,9 @@ class MarControllerTest {
     @MockBean
     private DoseService doses;
 
+    @MockBean
+    private DoseCorrectionService corrections;
+
     private static RequestPostProcessor as(String role) {
         return TestTenantSecurity.asUser(TENANT_ID, USER_ID, role);
     }
@@ -86,17 +95,25 @@ class MarControllerTest {
     }
 
     private static Mar marView() {
-        SlotView given = new SlotView(SLOT, "GIVEN", null, false, dose());
-        SlotView later = new SlotView(Instant.parse("2026-11-11T14:30:00Z"), "LATER", null, false, null);
-        SlotView late = new SlotView(Instant.parse("2026-11-11T00:30:00Z"), "LATE", 5, true, null);
+        SlotView given = new SlotView(SLOT, "GIVEN", null, false, dose(), 1, null, null, null, List.of(), false);
+        SlotView later = new SlotView(Instant.parse("2026-11-11T14:30:00Z"), "LATER", null, false, null, 1, null, null,
+                null, List.of(), false);
+        SlotView late = new SlotView(Instant.parse("2026-11-11T00:30:00Z"), "LATE", 5, true, null, 1, 305, null, null,
+                List.of(), false);
+        OrderDetailsView details = new OrderDetailsView("SCHEDULED", null, null, "SC", "SC", "bd", "Twice daily",
+                SLOT, null, null, null, "ROUTINE", null, null, true);
         MarOrderView hep = new MarOrderView(ORDER_ID, "hep", "Inj. Heparin 5,000 IU", "SC", "Anticoagulant", "bd",
-                "Twice daily", "Dr Meera Joshi", "ACTIVE", List.of(given, later));
+                "Twice daily", "Dr Meera Joshi", "ACTIVE", List.of(given, later), 1, false, details, null, null, true,
+                SLOT.plusSeconds(240), true, false);
         MarOrderView pcm = new MarOrderView(UUID.randomUUID(), "pcm", "Tab. Paracetamol 650 mg", "Oral", null, "od",
-                "Once daily", "Dr Meera Joshi", "ACTIVE", List.of(late));
+                "Once daily", "Dr Meera Joshi", "ACTIVE", List.of(late), 1, false, details, null, null, false, null,
+                false, false);
         return new Mar(ADMISSION_ID, "ADMITTED", "on", NOW, new EmrPatient(PATIENT_ID, "Test Patient", "UH-000123", 54,
                 "F", "202", "None known", "NONE_KNOWN"), 1, true, null, List.of(hep, pcm),
                 List.of(new SecondNurseOption(NURSE_MEMBERSHIP, "Sr. Rupali More")),
-                List.of(new KeyLabel("PATIENT_REFUSED", "Patient refused")));
+                List.of(new KeyLabel("PATIENT_REFUSED", "Patient refused")), new Counters(1, 0, 1), 0,
+                new Windows(60, 60, 15, 10), List.of(new KeyLabel("NO_BARCODE", "Medicine has no barcode")),
+                List.of(new KeyLabel("DUPLICATE", "Duplicate entry")), new NoticeCountView(2, 1, 1));
     }
 
     private static DoseResult result(boolean created) {
@@ -156,7 +173,104 @@ class MarControllerTest {
                 .andExpect(jsonPath("$.secondNurses[0].membershipId").value(NURSE_MEMBERSHIP.toString()))
                 .andExpect(jsonPath("$.secondNurses[0].name").value("Sr. Rupali More"))
                 .andExpect(jsonPath("$.notGivenReasons[0].key").value("PATIENT_REFUSED"))
-                .andExpect(jsonPath("$.notGivenReasons[0].label").value("Patient refused"));
+                .andExpect(jsonPath("$.notGivenReasons[0].label").value("Patient refused"))
+                // SAH-76 (ipd.yaml 0.4.0)
+                .andExpect(jsonPath("$.counters.late").value(1))
+                .andExpect(jsonPath("$.counters.dueNow").value(0))
+                .andExpect(jsonPath("$.counters.given").value(1))
+                .andExpect(jsonPath("$.foldedCount").value(0))
+                .andExpect(jsonPath("$.windows.beforeMinutes").value(60))
+                .andExpect(jsonPath("$.windows.undoSeconds").value(10))
+                .andExpect(jsonPath("$.overrideReasons[0].key").value("NO_BARCODE"))
+                .andExpect(jsonPath("$.inErrorReasons[0].key").value("DUPLICATE"))
+                .andExpect(jsonPath("$.ordersToAcknowledge.count").value(2))
+                .andExpect(jsonPath("$.ordersToAcknowledge.stat").value(1))
+                .andExpect(jsonPath("$.ordersToAcknowledge.overdue").value(1))
+                .andExpect(jsonPath("$.orders[0].orderVersion").value(1))
+                .andExpect(jsonPath("$.orders[0].changed").value(false))
+                .andExpect(jsonPath("$.orders[0].details.routeLabel").value("SC"))
+                .andExpect(jsonPath("$.orders[0].details.pharmacistChecked").value(true))
+                .andExpect(jsonPath("$.orders[0].hold").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.orders[0].prn").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.orders[0].hasMedicineCode").value(true))
+                .andExpect(jsonPath("$.orders[0].lastGivenAt").value("2026-11-11T02:34:00Z"))
+                .andExpect(jsonPath("$.orders[0].acknowledged").value(true))
+                .andExpect(jsonPath("$.orders[0].folded").value(false))
+                .andExpect(jsonPath("$.orders[0].slots[0].orderVersion").value(1))
+                .andExpect(jsonPath("$.orders[0].slots[0].history").isEmpty())
+                .andExpect(jsonPath("$.orders[0].slots[0].beforeVerification").value(false))
+                .andExpect(jsonPath("$.orders[0].slots[0].dose.method").value("SCAN"))
+                .andExpect(jsonPath("$.orders[0].slots[0].dose.canUndo").value(false))
+                .andExpect(jsonPath("$.orders[0].slots[0].dose.correction").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.orders[1].slots[0].lateMinutes").value(305));
+    }
+
+    // ---- SAH-76: undo and recorded in error ----
+
+    private static final String UNDO_BODY = "{\"clientKey\":\"2b4f6a8c-1d3e-4f50-9a7b-3c5d7e9f1a2b\"}";
+    private static final String ERROR_BODY = "{\"clientKey\":\"2b4f6a8c-1d3e-4f50-9a7b-3c5d7e9f1a2b\","
+            + "\"reasonKey\":\"WRONG_TIME\",\"unknown\":1}";
+
+    @Test
+    void undoCallsTheServiceWithTheTokenIdentityAndAnswers200WithTheDoseAndTheMar() throws Exception {
+        when(corrections.undo(eq(TENANT_ID), eq(USER_ID), eq("NURSE"), eq(DOSE_ID), any()))
+                .thenReturn(new DoseRecorded(false, dose(), marView()));
+
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/undo").with(as("NURSE")).contentType(JSON).content(UNDO_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.replayed").value(false))
+                .andExpect(jsonPath("$.dose.id").value(DOSE_ID.toString()))
+                .andExpect(jsonPath("$.mar.admissionId").value(ADMISSION_ID.toString()));
+
+        ArgumentCaptor<CorrectionInput> body = ArgumentCaptor.forClass(CorrectionInput.class);
+        verify(corrections).undo(eq(TENANT_ID), eq(USER_ID), eq("NURSE"), eq(DOSE_ID), body.capture());
+        org.assertj.core.api.Assertions.assertThat(body.getValue().clientKey())
+                .isEqualTo("2b4f6a8c-1d3e-4f50-9a7b-3c5d7e9f1a2b");
+    }
+
+    @Test
+    void recordedInErrorPassesTheReasonAndIgnoresUnknownFields() throws Exception {
+        when(corrections.recordedInError(eq(TENANT_ID), eq(USER_ID), eq("OWNER"), eq(DOSE_ID), any()))
+                .thenReturn(new DoseRecorded(false, dose(), marView()));
+
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/recorded-in-error").with(as("OWNER")).contentType(JSON)
+                .content(ERROR_BODY)).andExpect(status().isOk());
+
+        ArgumentCaptor<CorrectionInput> body = ArgumentCaptor.forClass(CorrectionInput.class);
+        verify(corrections).recordedInError(eq(TENANT_ID), eq(USER_ID), eq("OWNER"), eq(DOSE_ID), body.capture());
+        org.assertj.core.api.Assertions.assertThat(body.getValue().reasonKey()).isEqualTo("WRONG_TIME");
+    }
+
+    @Test
+    void theCorrectionRefusalsKeepTheirProblemTypesAndTexts() throws Exception {
+        when(corrections.undo(any(), any(), any(), any(), any())).thenThrow(new ConflictException("undo-expired",
+                "Time to undo has passed", "The time to undo has passed. Mark it as recorded in error instead."));
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/undo").with(as("NURSE")).contentType(JSON).content(UNDO_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/undo-expired"))
+                .andExpect(jsonPath("$.detail").value("The time to undo has passed. Mark it as recorded in error instead."));
+
+        when(corrections.recordedInError(any(), any(), any(), any(), any())).thenThrow(new ForbiddenException("forbidden",
+                "Not allowed", "Only nurses and the clinic owner can correct a dose."));
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/recorded-in-error").with(as("DOCTOR")).contentType(JSON)
+                .content(ERROR_BODY)).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Only nurses and the clinic owner can correct a dose."));
+
+        doThrow(new InvalidInputException("reasonKey", "Choose why it is in error.")).when(corrections)
+                .recordedInError(any(), any(), any(), any(), any());
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/recorded-in-error").with(as("NURSE")).contentType(JSON)
+                .content(UNDO_BODY)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("reasonKey"));
+    }
+
+    @Test
+    void aDoseIdThatIsNotAUuidIs400AndSignedOutVisitorsGet401() throws Exception {
+        mockMvc.perform(post(URL + "/doses/nope/undo").with(as("NURSE")).contentType(JSON).content(UNDO_BODY))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/undo").contentType(JSON).content(UNDO_BODY))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post(URL + "/doses/" + DOSE_ID + "/recorded-in-error").contentType(JSON).content(ERROR_BODY))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

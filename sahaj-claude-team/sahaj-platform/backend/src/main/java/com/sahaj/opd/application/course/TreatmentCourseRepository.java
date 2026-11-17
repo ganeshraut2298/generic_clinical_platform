@@ -155,25 +155,25 @@ public interface TreatmentCourseRepository {
     void markDone(UUID tenantId, UUID sittingId, Instant at, UUID actorUserId);
 
     /** "Mark done": done_at, done_source MARK_DONE and the doctor, when not done yet. */
-    void markDoneByHand(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId);
+    boolean markDoneByHand(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId);
 
     /** "Patient did not come": missed_at and the doctor. */
-    void markMissed(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId);
+    boolean markMissed(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId);
 
     /** "Rebook": clears the missed pair and sets the planned date. */
-    void rebook(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId);
+    boolean rebook(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId);
 
     /** "Reschedule": the planned date only. */
-    void reschedule(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId);
+    boolean reschedule(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId);
 
     /** "Remove": removed_at and the doctor; the row is kept. */
-    void remove(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId);
+    boolean remove(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId);
 
     /** "Move to day care / IPD" or "Request admission": the encounter kind and admission_requested = true. */
-    void requestAdmission(UUID tenantId, UUID sittingId, String encounterKind, UUID actorUserId);
+    boolean requestAdmission(UUID tenantId, UUID sittingId, String encounterKind, UUID actorUserId);
 
     /** Sets the regimen of a sitting that has none (a sent chemotherapy order, ADR-026 D7). */
-    void setRegimenIfEmpty(UUID tenantId, UUID sittingId, String regimenKey, UUID actorUserId);
+    boolean setRegimenIfEmpty(UUID tenantId, UUID sittingId, String regimenKey, UUID actorUserId);
 
     /**
      * Planned, unlinked sittings that ask for admission, of ACTIVE courses, newest first, at most 200 (ADR-025 D10);

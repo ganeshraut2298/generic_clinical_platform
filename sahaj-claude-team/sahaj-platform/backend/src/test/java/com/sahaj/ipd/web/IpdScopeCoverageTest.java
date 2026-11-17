@@ -80,6 +80,17 @@ class IpdScopeCoverageTest {
             Map.entry("GET /admissions/{}/emr", new String[] {"MedicineOrderServiceTest", "emrOutsideScopeWritesNothing"}),
             Map.entry("POST /admissions/{}/medicine-orders", new String[] {"MedicineOrderServiceTest", "orderOutsideScopeWritesNothing"}),
             Map.entry("POST /medicine-orders/{}/stop", new String[] {"MedicineOrderServiceTest", "stopOutsideScopeWritesNothing"}),
+            // SAH-76 (ADR-027): change, hold, resume and the reply to a query (order-locked), the Orders tab of one
+            // patient (admission) and the acknowledgement of a notice (notice-locked). The two dose corrections
+            // (dose-locked) are named by WP3 in DoseCorrectionServiceTest.
+            Map.entry("POST /medicine-orders/{}/change", new String[] {"OrderChangeServiceTest", "changeOutsideScopeWritesNothing"}),
+            Map.entry("POST /medicine-orders/{}/hold", new String[] {"OrderChangeServiceTest", "holdOutsideScopeWritesNothing"}),
+            Map.entry("POST /medicine-orders/{}/resume", new String[] {"OrderChangeServiceTest", "resumeOutsideScopeWritesNothing"}),
+            Map.entry("POST /medicine-orders/{}/query-reply", new String[] {"PharmacistQueryServiceTest", "replyOutsideScopeWritesNothing"}),
+            Map.entry("GET /admissions/{}/order-notices", new String[] {"OrderNoticeServiceTest", "listOutsideScopeWritesNoRecordAccess"}),
+            Map.entry("POST /order-notices/{}/acknowledge", new String[] {"OrderNoticeServiceTest", "acknowledgeOutsideScopeWritesNothing"}),
+            Map.entry("POST /doses/{}/undo", new String[] {"DoseCorrectionServiceTest", "undoOutsideScopeWritesNothing"}),
+            Map.entry("POST /doses/{}/recorded-in-error", new String[] {"DoseCorrectionServiceTest", "recordedInErrorOutsideScopeWritesNothing"}),
             Map.entry("GET /admissions/{}/mar", new String[] {"MarServiceTest", "marOutsideScopeWritesNoRecordAccess"}),
             Map.entry("POST /medicine-orders/{}/doses", new String[] {"DoseServiceTest", "doseOutsideScopeChecksNoPinAndWritesNothing"}),
             Map.entry("POST /escalations/{}/acknowledge", new String[] {"EscalationServiceTest", "acknowledgeOutsideScopeWritesNothing"}),
@@ -137,7 +148,8 @@ class IpdScopeCoverageTest {
             }
             ScopeGuarded.Kind kind = h.guarded().value();
             if (kind == ScopeGuarded.Kind.ADMISSION || kind == ScopeGuarded.Kind.ORDER
-                    || kind == ScopeGuarded.Kind.ESCALATION) {
+                    || kind == ScopeGuarded.Kind.ESCALATION || kind == ScopeGuarded.Kind.NOTICE
+                    || kind == ScopeGuarded.Kind.DOSE) {
                 needed.add(h.key());
             }
         }
@@ -255,14 +267,16 @@ class IpdScopeCoverageTest {
     }
 
     @Test
-    void listEndpointsAreTheFiveScopedReads() {
+    void listEndpointsAreTheSevenScopedReads() {
         Set<String> lists = new TreeSet<>();
         for (Handler h : handlers()) {
             if (h.guarded() != null && h.guarded().value() == ScopeGuarded.Kind.LIST) {
                 lists.add(h.key());
             }
         }
-        assertThat(lists).containsExactly("GET /admissions", "GET /board", "GET /clinical-events", "GET /safety",
+        // SAH-76-3 adds the two order-inbox lists (the Safety panel and its counts).
+        assertThat(lists).containsExactly("GET /admissions", "GET /board", "GET /clinical-events", "GET /order-notices",
+                "GET /order-notices/summary", "GET /safety",
                 "GET /safety/summary");
     }
 

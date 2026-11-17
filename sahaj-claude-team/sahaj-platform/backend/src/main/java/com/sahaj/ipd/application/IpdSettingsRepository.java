@@ -42,6 +42,22 @@ public interface IpdSettingsRepository {
     /** Writes the five emergency columns only, creating the lazy config row (other columns keep their defaults). */
     void upsertEmergencySetup(UUID tenantId, EmergencySetup setup, UUID actorUserId, Instant now);
 
+    /** SAH-76: the seven nursing columns of {@code ipd.config}; an absent row means the defaults. */
+    Optional<NursingSettings> findNursingSettings(UUID tenantId);
+
+    /** Writes the seven nursing columns only, creating the lazy config row (other columns keep their defaults). */
+    void upsertNursingSettings(UUID tenantId, NursingSettings settings, UUID actorUserId, Instant now);
+
+    /**
+     * SAH-76 (ADR-027 D8) the clinic nursing settings: verification On or Off, the dose windows around a slot, the STAT
+     * window, the "not acknowledged" flags (ordinary and STAT) and the undo window in seconds.
+     */
+    record NursingSettings(boolean medVerificationRequired, int doseWindowBeforeMin, int doseWindowAfterMin,
+                           int statWindowMin, int unackFlagMin, int unackFlagStatMin, int undoSeconds) {
+
+        public static final NursingSettings DEFAULTS = new NursingSettings(true, 60, 60, 15, 30, 5, 10);
+    }
+
     /**
      * SAH-28 Emergency and triage setup. {@code scale} is 3 or 5; each target list holds minutes (0 to 240, steps of
      * 5) for its own scale and is kept when the other scale is in use; {@code bays} is 0 to 10.

@@ -58,7 +58,9 @@ class EmrSpecialtyCoursesIT extends EmrSpecialtySupport {
             assertThat(sitting.get("encounterKind").asText()).isEqualTo("OPD");
             assertThat(sitting.get("status").asText()).isEqualTo("PLANNED");
         }
-        assertThat(course.get("note").asText()).as("the estimate was signed").isEqualTo("estimate signed by patient");
+        // opd.yaml 0.7.0 (SAH-75-10): the signed estimate is the estimateSigned flag, the note no longer holds the words
+        assertThat(course.get("estimateSigned").asBoolean()).as("the estimate was signed").isTrue();
+        assertThat(course.get("note").isNull() || course.get("note").asText().isEmpty()).as("the note no longer holds the sentence").isTrue();
         // the plan remembers its course, and the same key returns the first course
         assertThat(valueOf(get(RECORDS + "/" + rec.id(), rec.token()), "tx_plan", "specialty").get("courseId").asText()).isEqualTo(course.get("id").asText());
         assertThat(okKeyed(HttpMethod.POST, COURSES, rec.token(), fromPlanBody(rec, "DENTAL", null), key, 200).get("id").asText()).isEqualTo(course.get("id").asText());

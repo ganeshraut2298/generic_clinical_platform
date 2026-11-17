@@ -7,6 +7,7 @@ import { Observable, Subject } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { problem } from '../emr/emr.fixtures';
 import { GiveSheetComponent, GiveSheetData } from './give-sheet.component';
+import { UndoToast } from './undo-toast.component';
 import { AT_8AM, GIVEN_DOSE, ORDER_HEP, ORDER_PCM, marOf, slotOf } from './mar.fixtures';
 import { DoseRecorded, Mar, MarOrder, MarSlot } from './mar.model';
 
@@ -21,6 +22,7 @@ describe('GiveSheetComponent', () => {
   let ref: { close: ReturnType<typeof vi.fn>; afterOpened: () => Observable<void>; disableClose?: boolean };
   let opened: Subject<void>;
   let snack: ReturnType<typeof vi.fn>;
+  let showGiven: ReturnType<typeof vi.fn>;
   let mar: Mar;
   let order: MarOrder;
 
@@ -30,6 +32,7 @@ describe('GiveSheetComponent', () => {
     opened = new Subject<void>();
     ref = { close: vi.fn(), afterOpened: () => opened.asObservable() };
     snack = vi.fn();
+    showGiven = vi.fn();
     order = over.order ?? ORDER_PCM;
     mar = over.mar ?? marOf();
     const slot = over.slot ?? order.slots[0];
@@ -42,6 +45,7 @@ describe('GiveSheetComponent', () => {
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: ref },
         { provide: MatSnackBar, useValue: { open: snack } },
+        { provide: UndoToast, useValue: { showGiven } },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -168,7 +172,7 @@ describe('GiveSheetComponent', () => {
 
     it('has NO "Scan wristband" button (OQ-32-1, DEC-018)', async () => {
       await open();
-      expect(Array.from(el().querySelectorAll('button')).some((b) => /scan/i.test(b.textContent ?? ''))).toBe(false);
+      expect(Array.from(el().querySelectorAll('button')).some((b) => /^scan wristband$/i.test(squash(b)))).toBe(false);
       expect(q('[data-act=sfscan]')).toBeNull();
     });
 
@@ -180,13 +184,13 @@ describe('GiveSheetComponent', () => {
       expect(box().getAttribute('aria-describedby')).toBe('sf-idok');
     });
 
-    it('without high-alert: no second nurse step, the last step is numbered 2', async () => {
+    it('without high-alert: no second nurse step, the last step is numbered 3', async () => {
       await open();
       expect(q('[data-testid=give-step-second]')).toBeNull();
-      expect(squash(q('[data-testid=give-step-last] > b'))).toBe('2 · If you are not giving it');
+      expect(squash(q('[data-testid=give-step-last] > b'))).toBe('3 · If you are not giving it');
     });
 
-    it('reason select: "Choose a reason" first, then the five reasons in order, none chosen', async () => {
+    it('reason select: "Choose a reason" first, then the seven reasons in order, none chosen', async () => {
       await open();
       expect(squash(q('label[for=sf-why]'))).toBe('Reason');
       expect(Array.from(why().options).map((o) => o.textContent)).toEqual([
@@ -196,13 +200,15 @@ describe('GiveSheetComponent', () => {
         'Nil by mouth',
         'Medicine not available',
         'Patient away from the ward',
+        'Vomited',
+        'Other',
       ]);
       expect(why().value).toBe('');
     });
 
-    it('high-alert: step 2 with the class in lower case, the small text, "Checked by" and a masked "Their PIN"', async () => {
+    it('high-alert: step 3 with the class in lower case, the small text, "Checked by" and a masked "Their PIN"', async () => {
       await open({ order: ORDER_HEP, slot: slotOf({ state: 'DUE' }) });
-      expect(squash(q('[data-testid=give-step-second] > b'))).toBe('2 · Second nurse check · high-alert anticoagulant');
+      expect(squash(q('[data-testid=give-step-second] > b'))).toBe('3 · Second nurse check · high-alert anticoagulant');
       expect(squash(q('[data-testid=give-step-second] > small'))).toBe(
         'A second nurse checks the drug, dose, patient and route, then enters their PIN.',
       );
@@ -220,7 +226,7 @@ describe('GiveSheetComponent', () => {
       expect(pin().placeholder).toBe('4 digits');
       expect(pin().value).toBe('');
       expect(pin().autocomplete).toBe('one-time-code');
-      expect(squash(q('[data-testid=give-step-last] > b'))).toBe('3 · If you are not giving it');
+      expect(squash(q('[data-testid=give-step-last] > b'))).toBe('4 · If you are not giving it');
     });
 
     it('the footer is "Record not given" then "Given" with a check icon', async () => {
@@ -261,9 +267,12 @@ describe('GiveSheetComponent', () => {
       expect(req.request.method).toBe('POST');
       expect(bodyOf(req)).toEqual({
         clientKey: expect.stringMatching(UUID),
+        orderVersion: 1,
         slotAt: AT_8AM,
         outcome: 'GIVEN',
         wristband: 'PT-00042',
+        medicineCode: '',
+        override: null,
         identityConfirmed: true,
       });
       req.flush(recorded(), { status: 201, statusText: 'Created' });
@@ -283,9 +292,12 @@ describe('GiveSheetComponent', () => {
       const req = await clickGiven();
       expect(bodyOf(req)).toEqual({
         clientKey: expect.stringMatching(UUID),
+        orderVersion: 1,
         slotAt: AT_8AM,
         outcome: 'GIVEN',
         wristband: 'PT-00042',
+        medicineCode: '',
+        override: null,
         identityConfirmed: true,
         secondNurseId: 'm-rupali',
         secondNursePin: '4821',
@@ -353,7 +365,12 @@ describe('GiveSheetComponent', () => {
       const answer = recorded();
       (await clickGiven()).flush(answer, { status: 201, statusText: 'Created' });
       await settle();
-      expect(snack).toHaveBeenCalledWith('Inj. Heparin 5,000 IU recorded as given to Ramesh Kale', 'Close', expect.anything());
+      expect(showGiven).toHaveBeenCalledWith({
+        admissionId: 'a1',
+        drugName: 'Inj. Heparin 5,000 IU',
+        dose: answer.dose,
+        override: false,
+      });
       expect(ref.close).toHaveBeenCalledWith({ mar: answer.mar });
       expect(pin().value).toBe('');
     });
@@ -363,7 +380,7 @@ describe('GiveSheetComponent', () => {
       await fillIdentity();
       const answer = { ...recorded(), replayed: true };
       (await clickGiven()).flush(answer, { status: 200, statusText: 'OK' });
-      expect(snack).toHaveBeenCalledWith('Tab. Paracetamol 650 mg recorded as given to Ramesh Kale', 'Close', expect.anything());
+      expect(showGiven).toHaveBeenCalledTimes(1);
       expect(ref.close).toHaveBeenCalledWith({ mar: answer.mar });
     });
 
@@ -385,6 +402,7 @@ describe('GiveSheetComponent', () => {
       const req = await clickNotGiven();
       expect(bodyOf(req)).toEqual({
         clientKey: expect.stringMatching(UUID),
+        orderVersion: 1,
         slotAt: AT_8AM,
         outcome: 'NOT_GIVEN',
         reasonKey: 'NIL_BY_MOUTH',
@@ -465,7 +483,7 @@ describe('GiveSheetComponent', () => {
     it('the close button closes the sheet with no result when nothing runs', async () => {
       await open();
       q<HTMLButtonElement>('[data-act=gv-x]')!.click();
-      expect(ref.close).toHaveBeenCalledWith();
+      expect(ref.close).toHaveBeenCalledWith(undefined);
     });
   });
 
@@ -484,14 +502,16 @@ describe('GiveSheetComponent', () => {
       await tick();
     }
 
-    it('shows the toast and the line under the box, built from the MAR (the detail has no name)', async () => {
+    it('shows the toast and the STOP line under the box, with no name', async () => {
       await mismatch();
       expect(snack).toHaveBeenCalledWith(
-        'Wristband does not match Ramesh Kale. Stop. Check the patient before giving anything.',
+        'Wrong patient. This band belongs to another patient. Check the patient before giving anything.',
         'Close',
         expect.anything(),
       );
-      expect(squash(q('#sf-idok'))).toBe("Wrong patient. This band is not Ramesh Kale's.");
+      expect(squash(q('#sf-idok'))).toBe(
+        'Wrong patient. This band belongs to another patient. Check the patient before giving anything.',
+      );
       expect(q('#sf-idok app-icon')).toBeTruthy();
       expect(ref.close).not.toHaveBeenCalled();
     });
@@ -693,6 +713,7 @@ describe('GiveSheetComponent', () => {
       fail(await clickGiven(), 'wristband-mismatch', 409, 'Wristband does not match this patient.');
       await settle();
       expect(pin().value).toBe('');
+      await typeBox('PT-00042');
       await typePin('4821');
       (await clickGiven()).error(new ProgressEvent('error'));
       await settle();
@@ -782,7 +803,7 @@ describe('GiveSheetComponent', () => {
       await settle();
       expect(ward()).not.toBeNull();
       const labels = Array.from(el().querySelectorAll('button')).map((b) => squash(b));
-      expect(labels.filter(Boolean)).toEqual(['Record not given', 'Given']);
+      expect(labels.filter(Boolean)).toEqual(['Cannot scan the medicine? Manual override', 'Record not given', 'Given']);
       expect(el().textContent).not.toMatch(/give anyway|paper|skip/i);
       await choose(nurse(), '');
       expect(ward()).toBeNull();

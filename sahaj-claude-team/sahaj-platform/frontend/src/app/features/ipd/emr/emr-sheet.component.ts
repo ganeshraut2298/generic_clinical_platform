@@ -9,9 +9,9 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiError } from '../../../core/http/problem-detail';
 import { newClientKey } from '../../../shared/client-key';
@@ -25,7 +25,6 @@ import {
   EMR_HIDDEN,
   EMR_LOAD_ERROR,
   EmrSheet,
-  FREQUENCY_MISSING,
   HARD_STOP_HEAD,
   LOGGED_LINE,
   MEDS_SUBTITLE,
@@ -41,11 +40,16 @@ import {
   REASON_PLACEHOLDER,
   ORDER_LOCK_LINES,
   STATUS_PILL,
-  STOP_CONFIRM,
-  STOP_ERROR,
+  OrderActionResult,
   ShownCheck,
   WARN_HEAD,
+  changedLines,
   drugOptionLabel,
+  holdLine,
+  orderTags,
+  prnLine,
+  resumedToast,
+  stoppedLine,
   emrSubtitle,
   orderButtonText,
   orderFieldErrors,
@@ -53,12 +57,34 @@ import {
   orderedToast,
   reasonChangeNeedsNewKey,
   severityWord,
-  stoppedToast,
 } from './emr.model';
 import { IdentityBarComponent } from './identity-bar.component';
 import { isOutsideScope } from '../ipd-refusal';
 import { ScopeRefusals } from '../ipd-scope-refusal';
-import { lastDoseLine } from '../mar/mar.model';
+import { ChangeSheetComponent, ChangeSheetData } from './change-sheet.component';
+import { HoldSheetComponent, HoldSheetData } from './hold-sheet.component';
+import { OrderFieldsComponent } from './order-fields.component';
+import { QueryReplyComponent } from './query-reply.component';
+import { StopSheetComponent, StopSheetData } from './stop-sheet.component';
+import { OrderForm, blankDraft, drugDefaults, newOrderForm, toOrderInput, validateDraft } from './order-form.logic';
+import { executionLines } from '../orders/order.model';
+
+const ACTION_ERROR = 'We could not do that. Try again.';
+
+/** First field with an error, in screen order, and the control that takes the focus. */
+const FOCUS_ORDER: { field: keyof OrderErrors; id: string }[] = [
+  { field: 'drugKey', id: 'emr-drug' },
+  { field: 'frequencyKey', id: 'ord-freq' },
+  { field: 'doseAmount', id: 'ord-dose' },
+  { field: 'doseUnit', id: 'ord-unit' },
+  { field: 'routeKey', id: 'ord-route' },
+  { field: 'startAt', id: 'ord-start' },
+  { field: 'durationDays', id: 'ord-duration' },
+  { field: 'indication', id: 'ord-indication' },
+  { field: 'prnMinIntervalMinutes', id: 'ord-interval' },
+  { field: 'prnMaxPer24h', id: 'ord-max' },
+  { field: 'overrideReasonKey', id: 'emr-reason' },
+];
 
 export interface EmrSheetData {
   admissionId: string;
@@ -87,13 +113,21 @@ export const MEDS_HEADING_ID = 'emr-meds-h';
 @Component({
   selector: 'app-emr-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MatButtonModule, IconComponent, IdentityBarComponent],
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    IconComponent,
+    IdentityBarComponent,
+    OrderFieldsComponent,
+    QueryReplyComponent,
+  ],
   styleUrls: ['../ipd-bill.scss', './emr-sheet.component.scss'],
   templateUrl: './emr-sheet.component.html',
 })
 export class EmrSheetComponent {
   private readonly api = inject(EmrApi);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   private readonly dialogRef = inject<MatDialogRef<EmrSheetComponent>>(MatDialogRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -111,12 +145,16 @@ export class EmrSheetComponent {
   protected readonly warnHead = WARN_HEAD;
   protected readonly reasonLabel = REASON_LABEL;
   protected readonly reasonPlaceholder = REASON_PLACEHOLDER;
-  protected readonly stopConfirm = STOP_CONFIRM;
   protected readonly hiddenText = EMR_HIDDEN;
   protected readonly pill = (o: MedicineOrderRow) => STATUS_PILL[o.status];
   protected readonly smallLine = orderSmallLine;
-  /** SAH-32 (OQ-32-4): the "Last dose ..." line under an order's small line, or null when no dose was recorded. */
-  protected readonly lastDoseOf = (o: MedicineOrderRow, asOf: string) => lastDoseLine(o.lastDose, asOf);
+  protected readonly tags = orderTags;
+  protected readonly prn = prnLine;
+  protected readonly changes = changedLines;
+  protected readonly holdText = holdLine;
+  protected readonly stoppedText = stoppedLine;
+  /** SAH-76-5: what the nurses did with the order (supersedes the SAH-32 "Last dose" line). */
+  protected readonly execution = (o: MedicineOrderRow) => executionLines(o.execution, o.lastDose, o.details.kind);
   protected readonly drugLabel = drugOptionLabel;
   protected readonly severity = severityWord;
 
@@ -127,15 +165,23 @@ export class EmrSheetComponent {
   protected readonly hidden = signal(false);
   /** One request runs at a time (order or stop): every button is off meanwhile. */
   protected readonly busy = signal(false);
-  protected readonly stopConfirmId = signal<string | null>(null);
+  /** A refusal of a Change, Hold, Resume, Stop or Reply that needs the sheet read again: shown until dismissed. */
+  protected readonly actionNotice = signal<string | null>(null);
+  /** The medicine chosen in the form: its units follow it. */
+  protected readonly drugKey = signal('');
   /** The check the form shows now (hard stop or warnings), for the medicine and frequency it was run for. */
   protected readonly shown = signal<ShownCheck | null>(null);
   protected readonly errors = signal<OrderErrors>({});
 
-  protected readonly form = new FormGroup({
-    drug: new FormControl('', { nonNullable: true }),
-    freq: new FormControl('', { nonNullable: true }),
-    reason: new FormControl('', { nonNullable: true }),
+  protected readonly form: OrderForm = newOrderForm();
+  /** The units of the chosen medicine, labelled (first preselected). */
+  protected readonly unitOptions = computed(() => {
+    const s = this.sheet();
+    const drug = s?.drugs.find((d) => d.key === this.drugKey());
+    return (drug?.doseUnits ?? []).map((u) => ({
+      key: u as string,
+      label: s?.doseUnits.find((x) => x.key === u)?.label ?? u,
+    }));
   });
 
   protected readonly title = computed(() => {
@@ -167,7 +213,6 @@ export class EmrSheetComponent {
     this.sheet.set(null);
     this.shown.set(null);
     this.errors.set({});
-    this.stopConfirmId.set(null);
     this.form.reset();
     this.dialogRef.close();
   }
@@ -225,17 +270,30 @@ export class EmrSheetComponent {
   }
 
   private resetSelects(sheet: EmrSheet): void {
-    this.form.setValue({
-      drug: sheet.drugs[0]?.key ?? '',
-      freq: sheet.frequencies[0]?.key ?? '',
-      reason: '',
-    });
+    const draft = blankDraft(sheet);
+    this.form.setValue(draft);
+    this.drugKey.set(draft.drug);
     this.lastReason = '';
   }
 
   // ---- Order form ----
 
-  /** The medicine or the frequency changed: the check on screen is about something else now. */
+  /** The medicine changed: its default route and unit are taken, and the check on screen is about something else. */
+  protected medicineChanged(): void {
+    const drug = this.sheet()?.drugs.find((d) => d.key === this.form.controls.drug.value);
+    this.drugKey.set(drug?.key ?? '');
+    const defaults = drugDefaults(drug);
+    if (defaults) {
+      this.form.patchValue(defaults);
+    }
+    this.selectionChanged();
+  }
+
+  protected fieldEdited(field: keyof OrderErrors): void {
+    this.dropError(field);
+  }
+
+  /** The medicine, How often or Priority changed: the check on screen is about something else now. */
   protected selectionChanged(): void {
     this.shown.set(null);
     this.errors.set({});
@@ -277,32 +335,29 @@ export class EmrSheetComponent {
     if (this.busy() || !sheet || !sheet.canOrder) {
       return;
     }
-    const { drug, freq, reason } = this.form.getRawValue();
+    const draft = this.form.getRawValue();
     const errors: OrderErrors = {};
-    if (!sheet.drugs.some((d) => d.key === drug)) {
+    if (!sheet.drugs.some((d) => d.key === draft.drug)) {
       errors.drugKey = DRUG_MISSING;
     }
-    if (!sheet.frequencies.some((f) => f.key === freq)) {
-      errors.frequencyKey = FREQUENCY_MISSING;
-    }
+    Object.assign(
+      errors,
+      validateDraft(draft, this.unitOptions().map((u) => u.key), sheet.routes),
+    );
     this.errors.set(errors);
-    if (errors.drugKey) {
-      this.focus('emr-drug');
-      return;
-    }
-    if (errors.frequencyKey) {
-      this.focus('emr-freq');
+    const first = FOCUS_ORDER.find((f) => errors[f.field]);
+    if (first) {
+      this.focus(first.id);
       return;
     }
     const shown = this.shown();
-    const body: MedicineOrderInput = {
-      clientKey: this.key,
-      drugKey: drug,
-      frequencyKey: freq,
-      ...(reason !== '' && shown
-        ? { overrideReasonKey: reason, checkToken: shown.check.checkToken }
-        : {}),
-    };
+    const body: MedicineOrderInput = toOrderInput(
+      draft,
+      this.key,
+      draft.reason !== '' && shown
+        ? { overrideReasonKey: draft.reason, checkToken: shown.check.checkToken }
+        : null,
+    );
     this.busy.set(true);
     this.api
       .order(sheet.admissionId, body)
@@ -328,7 +383,7 @@ export class EmrSheetComponent {
           answer.order?.drugName ??
           answer.sheet.drugs.find((d) => d.key === sent.drugKey)?.name ??
           'Medicine';
-        this.toast(orderedToast(name));
+        this.toast(orderedToast(name, answer.order?.details.pharmacistChecked ?? null));
         this.shown.set(null);
         this.errors.set({});
         this.resetSelects(answer.sheet);
@@ -338,7 +393,7 @@ export class EmrSheetComponent {
       case 'BLOCKED':
         this.shown.set({
           drugKey: sent.drugKey,
-          frequencyKey: sent.frequencyKey,
+          frequencyKey: sent.frequencyKey ?? '',
           outcome: 'BLOCKED',
           check: answer.check,
         });
@@ -351,10 +406,10 @@ export class EmrSheetComponent {
           before !== null &&
           before.outcome === 'NEEDS_REASON' &&
           before.drugKey === sent.drugKey &&
-          before.frequencyKey === sent.frequencyKey;
+          before.frequencyKey === (sent.frequencyKey ?? '');
         this.shown.set({
           drugKey: sent.drugKey,
-          frequencyKey: sent.frequencyKey,
+          frequencyKey: sent.frequencyKey ?? '',
           outcome: 'NEEDS_REASON',
           check: answer.check,
         });
@@ -386,12 +441,9 @@ export class EmrSheetComponent {
       if (newKey) {
         this.key = newClientKey();
       }
-      if (shown.drugKey) {
-        this.focus('emr-drug');
-      } else if (shown.frequencyKey) {
-        this.focus('emr-freq');
-      } else if (shown.overrideReasonKey) {
-        this.focus('emr-reason');
+      const first = FOCUS_ORDER.find((f) => shown[f.field]);
+      if (first) {
+        this.focus(first.id);
       }
       if (other !== null || Object.keys(shown).length === 0) {
         this.toast(other ?? problemMessage(error, ORDER_ERROR));
@@ -410,53 +462,106 @@ export class EmrSheetComponent {
     this.toast(problemMessage(error, ORDER_ERROR));
   }
 
-  // ---- Stop ----
+  // ---- Change, Hold, Resume, Stop, Reply (SAH-76-1, 76-2) ----
 
-  protected askStop(order: MedicineOrderRow): void {
+  protected openChange(order: MedicineOrderRow): void {
+    const sheet = this.sheet();
+    if (this.busy() || !sheet || !order.canChange) {
+      return;
+    }
+    this.dialog
+      .open<ChangeSheetComponent, ChangeSheetData, OrderActionResult>(ChangeSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '640px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'ord-change-title',
+        data: { admissionId: sheet.admissionId, order, sheet },
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => this.actionDone(result));
+  }
+
+  protected openHold(order: MedicineOrderRow): void {
+    if (this.busy() || !order.canHold) {
+      return;
+    }
+    this.dialog
+      .open<HoldSheetComponent, HoldSheetData, OrderActionResult>(HoldSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '520px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'ord-hold-title',
+        data: { admissionId: this.data.admissionId, order },
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => this.actionDone(result));
+  }
+
+  protected openStop(order: MedicineOrderRow): void {
     if (this.busy() || !order.canStop) {
       return;
     }
-    this.stopConfirmId.set(order.id);
-    this.focusLater(`emr-keep-${order.id}`);
+    this.dialog
+      .open<StopSheetComponent, StopSheetData, OrderActionResult>(StopSheetComponent, {
+        panelClass: 'sheet-panel',
+        width: '520px',
+        maxWidth: '100vw',
+        ariaLabelledBy: 'ord-stop-title',
+        data: { admissionId: this.data.admissionId, order },
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => this.actionDone(result));
   }
 
-  protected keepOrder(order: MedicineOrderRow): void {
-    if (this.busy()) {
-      return;
-    }
-    this.stopConfirmId.set(null);
-    this.focusLater(`emr-stop-${order.id}`);
-  }
-
-  protected confirmStop(order: MedicineOrderRow): void {
-    if (this.busy()) {
+  protected resume(order: MedicineOrderRow): void {
+    if (this.busy() || !order.canResume) {
       return;
     }
     this.busy.set(true);
+    this.actionNotice.set(null);
     this.api
-      .stop(order.id)
+      .resume(order.id, { clientKey: newClientKey(), orderVersion: order.orderVersion })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (sheet) => {
           this.busy.set(false);
-          this.stopConfirmId.set(null);
-          this.sheet.set(sheet);
-          this.toast(stoppedToast(order.drugName));
-          this.focusLater(MEDS_HEADING_ID);
+          this.actionDone({ kind: 'done', sheet, toast: resumedToast(order.drugName) });
         },
         error: (error: unknown) => {
           this.busy.set(false);
-          this.stopConfirmId.set(null);
           if (this.outsideScope(error, true)) {
             return;
           }
-          if (error instanceof ApiError && (error.status === 409 || error.status === 404)) {
-            this.reload();
-          }
-          this.toast(problemMessage(error, STOP_ERROR));
-          this.focusLater(MEDS_HEADING_ID);
+          this.actionDone({ kind: 'conflict', message: problemMessage(error, ACTION_ERROR) });
         },
       });
+  }
+
+  /** The reply box answered: the sheet now, or a refusal that needs a reload. */
+  protected replied(result: OrderActionResult): void {
+    this.actionDone(result);
+  }
+
+  private actionDone(result: OrderActionResult | undefined): void {
+    if (!result) {
+      return;
+    }
+    if (result.kind === 'done') {
+      this.actionNotice.set(null);
+      this.sheet.set(result.sheet);
+      this.toast(result.toast);
+    } else {
+      this.actionNotice.set(result.message);
+      this.reload();
+    }
+    this.focusLater(MEDS_HEADING_ID);
+  }
+
+  protected dismissNotice(): void {
+    this.actionNotice.set(null);
   }
 
   // ---- Helpers ----

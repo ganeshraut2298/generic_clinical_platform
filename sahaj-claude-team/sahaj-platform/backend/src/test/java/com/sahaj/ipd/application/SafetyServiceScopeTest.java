@@ -89,9 +89,8 @@ class SafetyServiceScopeTest {
         grantReader = mock(EmergencyAccessReader.class);
         service = new SafetyService(board, admissions, events, patients, actors, team,
                 new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new MedicineRoundReader(roundRepository, new MedicineCatalogue(
-                        com.sahaj.ipd.domain.SeedCatalogue.catalogue()),
-                        new SkippedOrderWarningsTest.MutableClock()), guard, scopeRepository, grantReader);
+                RoundFixtures.reader(roundRepository, new MedicineCatalogue(
+                        com.sahaj.ipd.domain.SeedCatalogue.catalogue()), new SkippedOrderWarningsTest.MutableClock()), guard, scopeRepository, grantReader);
         roles.put(NURSE, "NURSE");
         roles.put(OWNER, "OWNER");
         roles.put(DOCTOR_USER, "DOCTOR");

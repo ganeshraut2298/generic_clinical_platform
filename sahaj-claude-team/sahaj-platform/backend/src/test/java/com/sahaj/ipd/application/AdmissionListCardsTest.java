@@ -121,8 +121,7 @@ class AdmissionListCardsTest {
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
         SafetyService safety = new SafetyService(board, admissions, mock(ClinicalEventRepository.class), lookup,
                 mock(ActorDirectoryPort.class), team, gate,
-                new MedicineRoundReader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()),
-                        new SkippedOrderWarningsTest.MutableClock()), ScopeStubs.unscoped(), ScopeStubs.repository(), mock(EmergencyAccessReader.class));
+                RoundFixtures.reader(roundRepository, new MedicineCatalogue(SeedCatalogue.catalogue()), new SkippedOrderWarningsTest.MutableClock()), ScopeStubs.unscoped(), ScopeStubs.repository(), mock(EmergencyAccessReader.class));
         service = new AdmissionService(admissions, mock(BedRepository.class), wards, settings, mock(OwnerGuard.class),
                 auditLog, team, lookup, patientAccess, actors, gate, catalog, charges,
                 new IpdBilling(charges, mock(TransferRepository.class), catalog), discharges,
@@ -591,7 +590,7 @@ class AdmissionListCardsTest {
     @Test
     void theSafetyBlockStillCarriesTheDoseCountsOfTheMedicineRound() {
         UUID admissionId = admit("Meena Patil", "UH-0001", null);
-        orders.add(new ActiveOrder(UUID.randomUUID(), admissionId, placed.get(0).admission().patientId(), "204",
+        orders.add(RoundFixtures.order(UUID.randomUUID(), admissionId, placed.get(0).admission().patientId(), "204",
                 "pcm", "od", Instant.parse("2026-11-09T05:00:00Z")));
 
         AdmissionList list = service.list(TENANT, ACTOR, "NURSE", null, null);

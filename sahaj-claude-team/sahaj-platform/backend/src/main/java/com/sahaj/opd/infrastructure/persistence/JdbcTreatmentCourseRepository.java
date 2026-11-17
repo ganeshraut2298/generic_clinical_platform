@@ -297,45 +297,45 @@ public class JdbcTreatmentCourseRepository implements TreatmentCourseRepository 
     }
 
     @Override
-    public void markDoneByHand(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
-        jdbc.sql(MARK_DONE_BY_HAND).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
-                .param("by", membershipId).param("actor", actorUserId).update();
+    public boolean markDoneByHand(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
+        return jdbc.sql(MARK_DONE_BY_HAND).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
+                .param("by", membershipId).param("actor", actorUserId).update() == 1;
     }
 
     @Override
-    public void markMissed(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
-        jdbc.sql(MARK_MISSED).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
-                .param("by", membershipId).param("actor", actorUserId).update();
+    public boolean markMissed(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
+        return jdbc.sql(MARK_MISSED).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
+                .param("by", membershipId).param("actor", actorUserId).update() == 1;
     }
 
     @Override
-    public void rebook(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId) {
-        jdbc.sql(REBOOK).param("tenantId", tenantId).param("id", sittingId).param("date", plannedDate)
-                .param("actor", actorUserId).update();
+    public boolean rebook(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId) {
+        return jdbc.sql(REBOOK).param("tenantId", tenantId).param("id", sittingId).param("date", plannedDate)
+                .param("actor", actorUserId).update() == 1;
     }
 
     @Override
-    public void reschedule(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId) {
-        jdbc.sql(RESCHEDULE).param("tenantId", tenantId).param("id", sittingId).param("date", plannedDate)
-                .param("actor", actorUserId).update();
+    public boolean reschedule(UUID tenantId, UUID sittingId, LocalDate plannedDate, UUID actorUserId) {
+        return jdbc.sql(RESCHEDULE).param("tenantId", tenantId).param("id", sittingId).param("date", plannedDate)
+                .param("actor", actorUserId).update() == 1;
     }
 
     @Override
-    public void remove(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
-        jdbc.sql(REMOVE).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
-                .param("by", membershipId).param("actor", actorUserId).update();
+    public boolean remove(UUID tenantId, UUID sittingId, Instant at, UUID membershipId, UUID actorUserId) {
+        return jdbc.sql(REMOVE).param("tenantId", tenantId).param("id", sittingId).param("at", Timestamp.from(at))
+                .param("by", membershipId).param("actor", actorUserId).update() == 1;
     }
 
     @Override
-    public void requestAdmission(UUID tenantId, UUID sittingId, String encounterKind, UUID actorUserId) {
-        jdbc.sql(REQUEST_ADMISSION).param("tenantId", tenantId).param("id", sittingId).param("kind", encounterKind)
-                .param("actor", actorUserId).update();
+    public boolean requestAdmission(UUID tenantId, UUID sittingId, String encounterKind, UUID actorUserId) {
+        return jdbc.sql(REQUEST_ADMISSION).param("tenantId", tenantId).param("id", sittingId).param("kind", encounterKind)
+                .param("actor", actorUserId).update() == 1;
     }
 
     @Override
-    public void setRegimenIfEmpty(UUID tenantId, UUID sittingId, String regimenKey, UUID actorUserId) {
-        jdbc.sql(SET_REGIMEN).param("tenantId", tenantId).param("id", sittingId).param("regimen", regimenKey)
-                .param("actor", actorUserId).update();
+    public boolean setRegimenIfEmpty(UUID tenantId, UUID sittingId, String regimenKey, UUID actorUserId) {
+        return jdbc.sql(SET_REGIMEN).param("tenantId", tenantId).param("id", sittingId).param("regimen", regimenKey)
+                .param("actor", actorUserId).update() == 1;
     }
     private String itemsJson(List<String> items) {
         try {

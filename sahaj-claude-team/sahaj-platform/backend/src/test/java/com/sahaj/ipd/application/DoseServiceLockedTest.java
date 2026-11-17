@@ -61,7 +61,7 @@ class DoseServiceLockedTest extends DoseTestBase {
 
     @Test
     void theOrderStoppedWhileThePinWasCheckedIsRefusedAndThePinStaysCounted() {
-        duringPin(() -> fake.markStopped(TENANT, order.id(), DOCTOR));
+        duringPin(() -> fake.markStopped(TENANT, order.id(), DOCTOR, "No longer needed"));
 
         assertThatThrownBy(() -> highAlert(givenHighAlert(EIGHT_AM))).isInstanceOfSatisfying(ConflictException.class,
                 e -> {
@@ -105,7 +105,7 @@ class DoseServiceLockedTest extends DoseTestBase {
         UUID key = UUID.randomUUID();
         duringPin(() -> doses.rows.add(new DoseRepository.DoseRow(UUID.randomUUID(), ADMISSION, order.id(), key,
                 EIGHT_AM, "GIVEN", null, NURSE, SECOND_NURSE, true, CLOCK)));
-        DoseInput body = new DoseInput(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
+        DoseInput body = dose(key.toString(), EIGHT_AM.toString(), "GIVEN", UHID, Boolean.TRUE,
                 secondMembership.toString(), PIN, null);
 
         DoseResult result = highAlert(body);

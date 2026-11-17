@@ -114,3 +114,16 @@
     }
   }
 }
+
+.rvh {
+  margin: 6px 0 2px;
+  font-size: 0.92rem;
+}
+
+.rv {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}

@@ -220,7 +220,7 @@ class EmrPhase4TablesIT extends EmrPhase3Support {
     @Test
     void noLibraryFieldMayUseTheReservedKeySpecialtyAndNoSeededFieldDoes() throws Exception {
         assertThat(globalCount("select count(*) from opd.emr_section_field where field_key = 'specialty'")).isZero();
-        assertThat(globalCount("select count(*) from opd.emr_section_field")).as("313 seeded fields, all pass the new check").isEqualTo(313);
+        assertThat(globalCount("select count(*) from opd.emr_section_field")).as("335 seeded fields (313 + 20 SAH-75 + 2 cycle_length and method), all pass the new check").isEqualTo(335);
         assertThat(migratorState("insert into opd.emr_section_field (section_key, field_key, position, label, field_type) values ('func_scales', 'specialty', 90, 'Probe', 'TEXT')"))
                 .as("ck_emr_section_field_key_not_reserved").isEqualTo("23514");
         assertThat(migratorState("insert into opd.emr_section_field (section_key, field_key, position, label, field_type) values ('func_scales', 'specialty_x', 90, 'Probe', 'TEXT')"))

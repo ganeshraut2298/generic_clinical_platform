@@ -21,6 +21,7 @@ import com.sahaj.ipd.domain.EarlyWarningScore.Risk;
 import com.sahaj.ipd.domain.EscalationState;
 import com.sahaj.ipd.domain.EscalationState.Status;
 import com.sahaj.ipd.domain.EscalationState.VitalsEffect;
+import com.sahaj.ipd.domain.EffectiveNursingSettings;
 import com.sahaj.ipd.domain.VitalsDue;
 import com.sahaj.patient.api.PatientAccessPort;
 import com.sahaj.patient.api.PatientLookupPort;
@@ -92,6 +93,7 @@ public class VitalsService {
     private final IpdGate gate;
     private final MarAssembler mar;
     private final ScopeGuard guard;
+    private final NursingSettingsReader settingsReader;
     /** SAH-67-1: set by Spring; null in a plain unit test (then the sheet has no latest round). */
     private RoundNoteRepository roundNotes;
 
@@ -103,8 +105,9 @@ public class VitalsService {
     VitalsService(AdmissionRepository admissions, VitalsRepository vitals, EscalationRepository escalations,
                   ClinicalEventRepository events, PatientLookupPort patients, PatientAccessPort patientAccess,
                   ActorDirectoryPort actors, TeamMemberPort team, AuditLog auditLog, IpdGate gate,
-                  MarAssembler mar, ScopeGuard guard) {
+                  MarAssembler mar, ScopeGuard guard, NursingSettingsReader settingsReader) {
         this.guard = guard;
+        this.settingsReader = settingsReader;
         this.admissions = admissions;
         this.vitals = vitals;
         this.escalations = escalations;
@@ -192,11 +195,14 @@ public class VitalsService {
         Risk risk = score.risk();
         boolean noteAdded = valid.note() != null;
         BigDecimal tempC = BigDecimal.valueOf(valid.tempTenths(), 1);
+        // SAH-76-6: the interval of the ward profile in force now is stamped on the record (a later change never moves it).
+        int interval = settingsReader.effectiveFor(tenantId, admissionId).vitalsIntervalMinutes();
 
         Stored stored;
         try {
             stored = vitals.insert(tenantId, new NewVitals(admissionId, clientKey, valid.systolic(),
-                    valid.diastolic(), valid.pulse(), valid.spo2(), tempC, valid.rr(), total, risk, noteAdded, actor));
+                    valid.diastolic(), valid.pulse(), valid.spo2(), tempC, valid.rr(), total, risk, noteAdded, actor,
+                    interval));
         } catch (DuplicateKeyException e) {
             // Under the admission lock a repeat key was looked up above, so a clash means the state is wrong.
             log.error("Vitals insert clash tenantId={} admissionId={} constraint={}", tenantId, admissionId,
@@ -223,7 +229,7 @@ public class VitalsService {
         auditLog.record("IPD_VITALS_RECORDED", ENTITY_VITALS, stored.id(), null, after);
 
         VitalsRow made = new VitalsRow(stored.id(), admissionId, valid.systolic(), valid.diastolic(), valid.pulse(),
-                valid.spo2(), tempC, valid.rr(), total, risk, noteAdded, stored.recordedAt(), actor);
+                valid.spo2(), tempC, valid.rr(), total, risk, noteAdded, stored.recordedAt(), actor, interval);
         // The clock is read after the writes, so asOf is never before the recorded time (ADR-006 D1).
         Sheet sheet = buildSheet(tenantId, role, memberRole, ent, row, patient, vitals.databaseNow(), made,
                 new Names(tenantId));
@@ -349,9 +355,14 @@ public class VitalsService {
         VitalsViews.LatestRound round = roundNotes == null ? null : roundNotes.findLatest(tenantId, row.id())
                 .map(r -> new VitalsViews.LatestRound(r.roundDate(), r.signedAt(), team.find(tenantId, r.signedByMembershipId())
                         .map(m -> m.name()).orElse("Doctor"), r.investigationsAdvised())).orElse(null);
+        EffectiveNursingSettings effective = settingsReader.effectiveFor(tenantId, row.id());
+        Instant last = latest == null ? null : latest.recordedAt();
+        int stamped = latest == null ? effective.vitalsIntervalMinutes() : latest.intervalMinutes();
+        Instant dueAt = admitted ? VitalsDue.dueAt(last, stamped) : null;
         return new Sheet(row.id(), patient.name(), row.bedCode(), row.status(), state, canRecord, reason, asOf,
-                latestView, VitalsDue.isDue(admitted, latest == null ? null : latest.recordedAt(), asOf),
-                List.copyOf(notes), mar.doseCount(tenantId, row.id(), admitted, asOf), round);
+                latestView, VitalsDue.isDue(admitted, last, stamped, asOf), List.copyOf(notes),
+                mar.doseCount(tenantId, row.id(), admitted, asOf), round, dueAt, effective.vitalsIntervalMinutes(),
+                mar.noticeCount(tenantId, row.id(), effective, asOf));
     }
 
     /** The admission's patient; a missing one is a 404 and never a placeholder name (code review N6). */

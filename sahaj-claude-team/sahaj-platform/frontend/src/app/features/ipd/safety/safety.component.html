@@ -202,6 +202,10 @@
 
     <app-medicine-round [round]="b.medicineRound" [asOf]="b.asOf" (answered)="roundAnswered()" />
 
+    @if (b.view === 'NURSE' || showPharmacist()) {
+      <app-orders-to-acknowledge />
+    }
+
     @if (b.emergencyAccess; as eg) {
       @if (eg.waiting > 0) {
         <app-emergency-review [page]="eg" (changed)="reviewChanged()" (refused)="reviewRefused($event)" />

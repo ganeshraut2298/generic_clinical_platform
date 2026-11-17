@@ -16,6 +16,7 @@ import { AuthService } from './core/auth/auth.service';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { problemDetailInterceptor } from './core/http/problem-detail.interceptor';
 import { adminAuthInterceptor } from './features/admin/auth/admin-auth.interceptor';
+import { ipdDeviceInterceptor } from './features/ipd/ipd-device.interceptor';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -33,7 +34,12 @@ export const appConfig: ApplicationConfig = {
     // authInterceptor sits closer to the backend so it sees the raw 401 to retry on.
     // adminAuthInterceptor acts only on /api/v1/admin/**; authInterceptor never touches those URLs.
     provideHttpClient(
-      withInterceptors([problemDetailInterceptor, adminAuthInterceptor, authInterceptor]),
+      withInterceptors([
+        problemDetailInterceptor,
+        adminAuthInterceptor,
+        authInterceptor,
+        ipdDeviceInterceptor,
+      ]),
     ),
     // Silent refresh on app load, from the HttpOnly refresh cookie. Never blocks on failure.
     provideAppInitializer(() => {

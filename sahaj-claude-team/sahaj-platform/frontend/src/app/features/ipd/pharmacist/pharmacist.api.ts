@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../../../core/config/api-config';
 import {
   PharmacistActionResult,
+  PharmacistReviewPage,
+  QueryOrderInput,
   PharmacistChecks,
   PharmacistChecksSummary,
   RejectOrderInput,
@@ -39,6 +41,28 @@ export class PharmacistApi {
     return this.http.post<PharmacistActionResult>(
       `${this.baseUrl}/medicine-orders/${orderId}/verify`,
       body,
+    );
+  }
+
+  /** SAH-76-2. PHARMACIST, OWNER. The order becomes Queried; nothing is sent to the doctor. */
+  query(orderId: string, body: QueryOrderInput): Observable<PharmacistActionResult> {
+    return this.http.post<PharmacistActionResult>(`${this.baseUrl}/medicine-orders/${orderId}/query`, body);
+  }
+
+  /** SAH-76-2. STAT doses given before the pharmacist check, oldest first. */
+  reviews(limit: number, cursor?: string | null): Observable<PharmacistReviewPage> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.http.get<PharmacistReviewPage>(`${this.baseUrl}/pharmacist-reviews`, { params });
+  }
+
+  /** No body. 200 with the review page now. */
+  markReviewed(reviewId: string): Observable<PharmacistReviewPage> {
+    return this.http.post<PharmacistReviewPage>(
+      `${this.baseUrl}/pharmacist-reviews/${reviewId}/mark-reviewed`,
+      null,
     );
   }
 

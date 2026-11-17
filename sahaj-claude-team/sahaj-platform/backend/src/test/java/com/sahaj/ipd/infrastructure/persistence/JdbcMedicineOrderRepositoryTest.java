@@ -48,13 +48,13 @@ class JdbcMedicineOrderRepositoryTest {
     }
 
     @Test
-    void theInsertNamesOnlyTheSevenGrantedColumnsAndNeverTheStatusTheTimeTheVersionOrTheClinic() {
+    void theInsertNamesOnlyTheGrantedColumnsAndNeverTheTimeTheVersionOrTheClinic() {
         String sql = sqlSent(() -> repository().insert(TENANT,
                 new NewOrder(ID, ID, "asp", "od", ID, null, List.of())));
 
         assertThat(sql).contains("insert into ipd.medicine_order (admission_id, client_key, drug_key, frequency_key, "
-                + "ordered_by,").contains("override_reason_key, warnings)").contains("cast(:warnings as text[])")
-                .contains("returning id, ordered_at, version").doesNotContain("tenant_id").doesNotContain("status")
+                + "ordered_by,").contains("override_reason_key, warnings, status, priority)").contains("cast(:warnings as text[])")
+                .contains("returning id, ordered_at, version").doesNotContain("tenant_id")
                 .doesNotContain("update ").doesNotContain("delete ");
         assertThat(sql.substring(0, sql.indexOf("values"))).doesNotContain("ordered_at").doesNotContain("version");
     }
@@ -73,15 +73,38 @@ class JdbcMedicineOrderRepositoryTest {
         String sql = sqlSent(() -> repository().markRejected(TENANT, ID, ID, "WRONG_DOSE"));
 
         assertThat(sql).contains("set status = 'REJECTED', rejected_by = :user, reject_reason_key = :reason, "
-                + "version = version + 1").contains("and status = 'PENDING'").doesNotContain("rejected_at");
+                + "version = version + 1").contains("and status in ('PENDING', 'QUERIED')").doesNotContain("rejected_at");
     }
 
     @Test
-    void theStopUpdateAcceptsPendingAndActiveAndNeverSendsTheTime() {
-        String sql = sqlSent(() -> repository().markStopped(TENANT, ID, ID));
+    void theStopUpdateAcceptsEveryLiveStatusWritesTheReasonAndNeverSendsTheTime() {
+        String sql = sqlSent(() -> repository().markStopped(TENANT, ID, ID, "reason"));
 
-        assertThat(sql).contains("set status = 'STOPPED', stopped_by = :user, version = version + 1")
-                .contains("and status in ('PENDING', 'ACTIVE')").doesNotContain("stopped_at");
+        assertThat(sql).contains("set status = 'STOPPED', stopped_by = :user, stop_reason = :reason, version = version + 1")
+                .contains("and status in ('PENDING', 'QUERIED', 'ACTIVE', 'ON_HOLD')").doesNotContain("stopped_at");
+    }
+
+    @Test
+    void theStatusMovesNameOnlyTheStatusAndTheRowCounterAndTheSourceStatus() {
+        String sql = sqlSent(() -> repository().markHeld(TENANT, ID));
+
+        assertThat(sql).contains("set status = :to, version = version + 1")
+                .contains("tenant_id = :tenantId and id = :id and status = :from").doesNotContain("current_version");
+    }
+
+    @Test
+    void aChangeCountsTheVersionNumberUpByOneFromAChangeableStatusOnly() {
+        String sql = sqlSent(() -> repository().markChanged(TENANT, ID, 2, "PENDING", "STAT"));
+
+        assertThat(sql).contains("set status = :status, current_version = :newVersion, priority = :priority, "
+                + "version = version + 1").contains("status in ('PENDING', 'QUERIED', 'ACTIVE')")
+                .contains("current_version = :newVersion - 1");
+    }
+
+    @Test
+    void theQueriedCountUsesTheSameFiltersAsTheWaitingCount() {
+        assertThat(sqlSent(() -> repository().countQueried(TENANT))).contains("select count(*)")
+                .contains("a.status = 'ADMITTED'").contains("o.status = :status");
     }
 
     @Test
@@ -104,17 +127,18 @@ class JdbcMedicineOrderRepositoryTest {
     }
 
     @Test
-    void theLiveReadTakesPendingAndActiveOfTheGivenAdmissionsOnly() {
+    void theLiveReadTakesTheFourLiveStatusesOfTheGivenAdmissionsOnly() {
         assertThat(sqlSent(() -> repository().findLiveByAdmissions(TENANT, List.of(ID))))
                 .contains("o.tenant_id = :tenantId").contains("o.admission_id in (:admissionIds)")
-                .contains("o.status in ('PENDING', 'ACTIVE')").contains("order by o.admission_id, o.ordered_at, o.id");
+                .contains("o.status in ('PENDING', 'QUERIED', 'ACTIVE', 'ON_HOLD')")
+                .contains("order by o.admission_id, o.ordered_at, o.id");
     }
 
     @Test
     void theQueueIsPendingOrdersOfAdmittedAdmissionsOldestFirstWithAKeysetAndALimit() {
         String first = sqlSent(() -> repository().findPending(TENANT, null, 51));
 
-        assertThat(first).contains("o.tenant_id = :tenantId and o.status = 'PENDING'")
+        assertThat(first).contains("o.tenant_id = :tenantId and o.status in ('PENDING', 'QUERIED')")
                 .contains("a.status = 'ADMITTED'").contains("order by o.ordered_at, o.id limit :limit")
                 .doesNotContain("(o.ordered_at, o.id) >");
     }
@@ -131,7 +155,7 @@ class JdbcMedicineOrderRepositoryTest {
     @Test
     void theWaitingKeysUseTheSameRuleAsTheQueue() {
         assertThat(sqlSent(() -> repository().findWaitingKeys(TENANT)))
-                .contains("o.tenant_id = :tenantId and o.status = 'PENDING'").contains("a.status = 'ADMITTED'")
+                .contains("o.tenant_id = :tenantId and o.status in ('PENDING', 'QUERIED')").contains("a.status = 'ADMITTED'")
                 .contains("select o.id, o.version");
     }
 
@@ -140,7 +164,7 @@ class JdbcMedicineOrderRepositoryTest {
         assertThat(sqlSent(() -> repository().countWaiting(TENANT)))
                 .contains("select count(*)").contains("from ipd.medicine_order o")
                 .contains("join ipd.admission a on a.tenant_id = o.tenant_id and a.id = o.admission_id and a.status = 'ADMITTED'")
-                .contains("o.tenant_id = :tenantId and o.status = 'PENDING'")
+                .contains("o.tenant_id = :tenantId and o.status = :status")
                 .doesNotContain("version");
     }
 

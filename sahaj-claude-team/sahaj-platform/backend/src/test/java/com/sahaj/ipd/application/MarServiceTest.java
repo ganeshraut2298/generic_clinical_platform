@@ -140,9 +140,16 @@ class MarServiceTest extends DoseTestBase {
         assertThat(mar.patient().allergyText()).isEqualTo("None known");
         assertThat(mar.patient().allergyStatus()).isEqualTo("NONE_KNOWN");
         assertThat(mar.notGivenReasons()).extracting(k -> k.key()).containsExactly("PATIENT_REFUSED", "HELD_DOCTOR",
-                "NIL_BY_MOUTH", "NOT_AVAILABLE", "AWAY_FROM_WARD");
+                "NIL_BY_MOUTH", "NOT_AVAILABLE", "AWAY_FROM_WARD", "VOMITED", "OTHER");
         assertThat(mar.notGivenReasons()).extracting(k -> k.label()).containsExactly("Patient refused",
-                "Held on doctor's advice", "Nil by mouth", "Medicine not available", "Patient away from the ward");
+                "Held on doctor's advice", "Nil by mouth", "Medicine not available", "Patient away from the ward",
+                "Vomited", "Other");
+        assertThat(mar.overrideReasons()).extracting(k -> k.key()).containsExactly("NO_BARCODE",
+                "SCANNER_DOWN", "EMERGENCY");
+        assertThat(mar.inErrorReasons()).extracting(k -> k.label()).containsExactly("Dose was not actually given",
+                "Documented on the wrong patient", "Wrong time recorded", "Duplicate entry");
+        assertThat(mar.windows().beforeMinutes()).isEqualTo(60);
+        assertThat(mar.windows().undoSeconds()).isEqualTo(10);
     }
 
     @Test
@@ -163,18 +170,22 @@ class MarServiceTest extends DoseTestBase {
     // ---- which orders are listed ----
 
     @Test
-    void onlyPendingAndActiveOrdersAreListedInChartOrder() {
+    void activeAndWaitingOrdersAndTheOnesStoppedOrRejectedTodayAreListedInTheFoldOrder() {
         OrderRow first = active("pcm", "od");
         OrderRow pending = ofStatus("PENDING", null);
-        ofStatus("REJECTED", null);
-        ofStatus("STOPPED", CHECKED_LONG_AGO);
+        OrderRow rejected = ofStatus("REJECTED", null);
+        OrderRow stopped = ofStatus("STOPPED", CHECKED_LONG_AGO);
         OrderRow last = active("hep", "bd");
 
         Mar mar = nurseMar();
 
-        assertThat(mar.orders()).extracting(MarOrderView::orderId).containsExactly(first.id(), pending.id(),
-                last.id());
-        assertThat(mar.orders()).extracting(MarOrderView::status).containsExactly("ACTIVE", "PENDING", "ACTIVE");
+        // Blocks with a DUE slot first (chart order), then the folded ones (chart order).
+        assertThat(mar.orders()).extracting(MarOrderView::orderId).containsExactly(first.id(), last.id(),
+                pending.id(), rejected.id(), stopped.id());
+        assertThat(mar.orders()).extracting(MarOrderView::status).containsExactly("ACTIVE", "ACTIVE", "PENDING",
+                "REJECTED", "STOPPED");
+        assertThat(mar.orders()).extracting(MarOrderView::folded).containsExactly(false, false, true, true, true);
+        assertThat(mar.foldedCount()).isEqualTo(3);
     }
 
     @Test
@@ -182,6 +193,14 @@ class MarServiceTest extends DoseTestBase {
         OrderRow order = active("hep", "bd");
 
         MarOrderView block = nurseMar().orders().get(0);
+        assertThat(block.orderVersion()).isEqualTo(1);
+        assertThat(block.changed()).isFalse();
+        assertThat(block.details().kind()).isEqualTo("SCHEDULED");
+        assertThat(block.details().routeLabel()).isEqualTo("SC");
+        assertThat(block.details().pharmacistChecked()).isTrue();
+        assertThat(block.hasMedicineCode()).isTrue();
+        assertThat(block.prn()).isNull();
+        assertThat(block.hold()).isNull();
 
         assertThat(block.orderId()).isEqualTo(order.id());
         assertThat(block.drugKey()).isEqualTo("hep");
@@ -210,8 +229,10 @@ class MarServiceTest extends DoseTestBase {
 
         Mar mar = nurseMar();
 
-        assertThat(mar.orders()).extracting(o -> o.slots().size()).containsExactly(1, 2, 3, 3);
-        assertThat(mar.orders().get(3).slots()).extracting(SlotView::slotAt).containsExactly(
+        assertThat(mar.orders()).extracting(o -> o.drugKey() + ":" + o.slots().size())
+                .containsExactlyInAnyOrder("pcm:1", "panto:2", "ondan:3", "ns:3");
+        MarOrderView q8 = mar.orders().stream().filter(o -> o.drugKey().equals("ns")).findFirst().orElseThrow();
+        assertThat(q8.slots()).extracting(SlotView::slotAt).containsExactly(
                 Instant.parse("2026-11-11T00:30:00Z"), Instant.parse("2026-11-11T08:30:00Z"),
                 Instant.parse("2026-11-11T16:30:00Z"));
     }

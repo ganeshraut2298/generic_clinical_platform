@@ -47,6 +47,9 @@ const SHEET: NursingSheet = {
   latest: LATEST,
   vitalsDue: false,
   doseCount: 0,
+  ordersToAcknowledge: { count: 0, stat: 0, overdue: 0 },
+  vitalsDueAt: null,
+  vitalsIntervalMinutes: 240,
   recentNotes: [],
 };
 

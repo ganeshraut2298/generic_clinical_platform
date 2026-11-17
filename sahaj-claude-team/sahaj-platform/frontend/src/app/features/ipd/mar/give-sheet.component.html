@@ -19,6 +19,24 @@
   <div class="sheet-b">
     <app-identity-bar [patient]="patient" />
 
+    @if (prn; as p) {
+      <p class="faint prn-line" data-testid="give-prn">
+        <span class="pill p-blue">PRN</span>
+        @if (p.indication) {
+          <span data-testid="give-prn-indication">{{ p.indication }}</span>
+        }
+        <span>{{ p.interval }}</span>
+        <span>{{ p.used }}</span>
+      </p>
+    }
+
+    @if (statNotice; as text) {
+      <div class="notice warn" data-testid="give-stat-notice">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ text }}</span>
+      </div>
+    }
+
     <div class="sfstep" data-testid="give-step-one">
       <b>{{ stepOne }}</b>
       <input
@@ -65,9 +83,125 @@
       }
     </div>
 
+    <div class="sfstep" data-testid="give-step-code">
+      <b>{{ stepCode }}</b>
+      <input
+        id="sf-code"
+        class="input"
+        type="text"
+        formControlName="code"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        maxlength="100"
+        data-testid="medicine-code"
+        [attr.aria-label]="codeLabel"
+        [placeholder]="codePlaceholder"
+        [attr.aria-invalid]="errors().medicineCode || codeMismatch() ? 'true' : null"
+        [attr.aria-describedby]="errors().medicineCode ? 'sf-code-err sf-codeok' : 'sf-codeok'"
+        (input)="codeEdited()"
+        (keydown)="boxKey($event)"
+      />
+      @if (errors().medicineCode; as message) {
+        <span class="err-text" role="alert" id="sf-code-err" data-testid="code-error">{{ message }}</span>
+      }
+      <div id="sf-codeok" class="sfidok" aria-live="polite" data-testid="code-line">
+        @if (codeMismatch(); as message) {
+          <span class="sfbad" data-testid="code-mismatch">
+            <app-icon name="alert" [size]="13" /> {{ message }}
+          </span>
+        }
+      </div>
+      @if (noCodeLine; as text) {
+        <small class="muted" data-testid="no-code-line">{{ text }}</small>
+      }
+    </div>
+
+    @if (overrideOffered()) {
+      <div class="sfstep sfov" data-testid="give-override">
+        <button
+          type="button"
+          class="linkbtn"
+          data-act="override-toggle"
+          [attr.aria-expanded]="overrideOpen()"
+          [disabled]="running()"
+          (click)="toggleOverride()"
+        >
+          {{ overrideOpenLabel() }}
+        </button>
+        @if (overrideOpen()) {
+          <div class="notice warn">
+            <app-icon name="alert" [size]="16" />
+            <span>{{ overrideLine }}</span>
+          </div>
+          <div
+            id="sf-ov-reason"
+            class="chips"
+            role="group"
+            tabindex="-1"
+            [attr.aria-label]="overrideLegend"
+            data-testid="override-reasons"
+          >
+            @for (r of overrideReasons; track r.key) {
+              <button
+                type="button"
+                class="chip"
+                data-testid="override-reason"
+                [attr.data-key]="r.key"
+                [class.on]="overrideReason() === r.key"
+                [attr.aria-pressed]="overrideReason() === r.key"
+                (click)="pickOverrideReason(r.key)"
+              >
+                {{ r.label }}
+              </button>
+            }
+          </div>
+          @if (errors().overrideReason; as message) {
+            <span class="err-text" role="alert" data-testid="override-reason-error">{{ message }}</span>
+          }
+          <input
+            id="sf-ov-note"
+            class="input"
+            type="text"
+            formControlName="overrideNote"
+            maxlength="200"
+            autocomplete="off"
+            data-testid="override-note"
+            [attr.aria-label]="overrideNoteLabel"
+            [placeholder]="overrideNoteLabel"
+            [attr.aria-invalid]="errors().overrideNote ? 'true' : null"
+            [attr.aria-describedby]="errors().overrideNote ? 'sf-ov-note-err' : null"
+            (input)="dropError('overrideNote')"
+          />
+          @if (errors().overrideNote; as message) {
+            <span class="err-text" role="alert" id="sf-ov-note-err" data-testid="override-note-error">{{ message }}</span>
+          }
+        }
+      </div>
+    }
+
+    @if (checks(); as lines) {
+      <div class="sfstep sfauto" data-testid="give-checks">
+        <b>{{ checkedBySystem }}</b>
+        <ul class="autolist">
+          @for (line of lines; track line.text) {
+            <li [class.warn]="line.warn" [class.pending]="!line.known" data-testid="give-check">
+              @if (line.known) {
+                <app-icon [name]="line.warn ? 'alert' : 'check'" [size]="12" />
+              }
+              <span>{{ line.text }}</span>
+              @if (!line.known) {
+                <small class="muted">&nbsp;· checked when you press Given</small>
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
     @if (highAlert) {
       <div class="sfstep ha" data-testid="give-step-second">
-        <b>{{ stepTwo }}</b>
+        <b>{{ stepSecond }}</b>
         <small>{{ secondSmall }}</small>
         <div class="grid-f">
           <div class="field">
@@ -144,7 +278,34 @@
           <span class="err-text" role="alert" id="sf-why-err" data-testid="reason-error">{{ message }}</span>
         }
       </div>
+      @if (reasonIsOther()) {
+        <div class="field">
+          <label for="sf-why-note">{{ otherNoteLabel }}</label>
+          <input
+            id="sf-why-note"
+            class="input"
+            type="text"
+            formControlName="reasonNote"
+            maxlength="200"
+            autocomplete="off"
+            data-testid="reason-note"
+            [attr.aria-invalid]="errors().note ? 'true' : null"
+            [attr.aria-describedby]="errors().note ? 'sf-why-note-err' : null"
+            (input)="dropError('note')"
+          />
+          @if (errors().note; as message) {
+            <span class="err-text" role="alert" id="sf-why-note-err" data-testid="reason-note-error">{{ message }}</span>
+          }
+        </div>
+      }
     </div>
+
+    @if (prnLock(); as message) {
+      <div class="notice err" role="alert" data-testid="give-prn-lock">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
 
     @if (failure(); as message) {
       <div class="notice err" role="alert" data-testid="give-failure">
@@ -169,7 +330,7 @@
       mat-flat-button
       type="button"
       data-act="sfgiveok"
-      [disabled]="running()"
+      [disabled]="givenOff()"
       [attr.aria-busy]="running()"
       (click)="given()"
     >

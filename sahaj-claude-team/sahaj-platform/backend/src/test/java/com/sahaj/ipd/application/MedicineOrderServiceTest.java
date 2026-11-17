@@ -49,13 +49,12 @@ class MedicineOrderServiceTest extends MedicineTestBase {
 
     @BeforeEach
     void setUp() {
-        service = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team, auditLog,
-                gate, catalogue, assembler, guard);
+        service = newOrderService();
         clientKey = UUID.randomUUID();
     }
 
     private MedicineOrderInput input(String drug, String frequency) {
-        return new MedicineOrderInput(clientKey.toString(), drug, frequency, null, null);
+        return legacyOrder(clientKey.toString(), drug, frequency, null, null);
     }
 
     private MedicineOrderAnswer order(UUID actor, String role, MedicineOrderInput input) {
@@ -105,7 +104,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     @Test
     void theEventAndTheAuditRowCarryFixedTextAndIdsOnly() {
         allergyText = "Peanuts, shellfish";
-        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "pcm", "tds",
+        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "pcm", "tds",
                 null, null));
 
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_ORDER,
@@ -141,9 +140,9 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     void aReasonWithAMissingOrWrongTokenAnswersNeedsReasonAgain() {
         fake.seed(ADMISSION, "hep", "ACTIVE", OTHER_DOCTOR);
 
-        MedicineOrderAnswer noToken = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "asp", "od",
+        MedicineOrderAnswer noToken = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "asp", "od",
                 "CARDIOLOGY_STENT", null));
-        MedicineOrderAnswer wrongToken = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "asp",
+        MedicineOrderAnswer wrongToken = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "asp",
                 "od", "CARDIOLOGY_STENT", "AAAAAAAAAAAAAAAAAAAAAA"));
 
         assertThat(noToken.outcome()).isEqualTo("NEEDS_REASON");
@@ -156,7 +155,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         fake.seed(ADMISSION, "hep", "ACTIVE", OTHER_DOCTOR);
         String token = order(DOCTOR, "DOCTOR", input("asp", "od")).check().checkToken();
 
-        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "asp", "od",
+        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "asp", "od",
                 null, token));
 
         assertThat(answer.outcome()).isEqualTo("NEEDS_REASON");
@@ -167,7 +166,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         fake.seed(ADMISSION, "hep", "ACTIVE", OTHER_DOCTOR);
         String token = order(DOCTOR, "DOCTOR", input("asp", "od")).check().checkToken();
 
-        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "asp", "od",
+        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "asp", "od",
                 "CARDIOLOGY_STENT", token));
 
         assertThat(answer.outcome()).isEqualTo("PLACED");
@@ -191,7 +190,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         String token = order(DOCTOR, "DOCTOR", input("asp", "od")).check().checkToken();
         fake.seed(ADMISSION, "ibu", "PENDING", OTHER_DOCTOR);
 
-        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "asp", "od",
+        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "asp", "od",
                 "CARDIOLOGY_STENT", token));
 
         assertThat(answer.outcome()).isEqualTo("NEEDS_REASON");
@@ -202,7 +201,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
 
     @Test
     void aReasonSentWithNoFindingIsIgnoredAndNotStored() {
-        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "pcm", "od",
+        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "pcm", "od",
                 "SPECIALIST_ADVISED", null));
 
         assertThat(answer.outcome()).isEqualTo("PLACED");
@@ -218,7 +217,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         allergyText = null;
         String token = order(DOCTOR, "DOCTOR", input("pcm", "od")).check().checkToken();
 
-        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "pcm", "od",
+        MedicineOrderAnswer answer = order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "pcm", "od",
                 "BENEFIT_MONITORED", token));
 
         assertThat(answer.outcome()).isEqualTo("PLACED");
@@ -317,14 +316,14 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     void aRepeatWithAnotherMedicineFrequencyOrReasonIs409ClientKeyReused() {
         fake.seed(ADMISSION, "hep", "ACTIVE", OTHER_DOCTOR);
         String token = order(DOCTOR, "DOCTOR", input("asp", "od")).check().checkToken();
-        order(DOCTOR, "DOCTOR", new MedicineOrderInput(clientKey.toString(), "asp", "od", "CARDIOLOGY_STENT", token));
+        order(DOCTOR, "DOCTOR", legacyOrder(clientKey.toString(), "asp", "od", "CARDIOLOGY_STENT", token));
         int writes = fake.writes;
 
         for (MedicineOrderInput other : List.of(
-                new MedicineOrderInput(clientKey.toString(), "pcm", "od", "CARDIOLOGY_STENT", token),
-                new MedicineOrderInput(clientKey.toString(), "asp", "bd", "CARDIOLOGY_STENT", token),
-                new MedicineOrderInput(clientKey.toString(), "asp", "od", "SPECIALIST_ADVISED", token),
-                new MedicineOrderInput(clientKey.toString(), "asp", "od", null, token))) {
+                legacyOrder(clientKey.toString(), "pcm", "od", "CARDIOLOGY_STENT", token),
+                legacyOrder(clientKey.toString(), "asp", "bd", "CARDIOLOGY_STENT", token),
+                legacyOrder(clientKey.toString(), "asp", "od", "SPECIALIST_ADVISED", token),
+                legacyOrder(clientKey.toString(), "asp", "od", null, token))) {
             assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", other)).isInstanceOf(ConflictException.class)
                     .hasMessage("This order was already placed with different values. Reload the page and try again.")
                     .satisfies(e -> assertThat(((ConflictException) e).problemType()).isEqualTo("client-key-reused"));
@@ -334,7 +333,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
 
     @Test
     void aReasonSentWithNoWarningIsNotMistakenForADifferentRequestOnRetry() {
-        MedicineOrderInput withIgnoredReason = new MedicineOrderInput(clientKey.toString(), "pcm", "od",
+        MedicineOrderInput withIgnoredReason = legacyOrder(clientKey.toString(), "pcm", "od",
                 "SPECIALIST_ADVISED", null);
         order(DOCTOR, "DOCTOR", withIgnoredReason);
 
@@ -349,7 +348,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         fake.seed(otherAdmission, "pcm", "PENDING", DOCTOR);
         OrderRow elsewhere = fake.rows.values().iterator().next();
 
-        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", new MedicineOrderInput(elsewhere.clientKey().toString(),
+        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", legacyOrder(elsewhere.clientKey().toString(),
                 "pcm", "od", null, null))).isInstanceOf(InvalidInputException.class)
                 .hasMessage("Reload the page and try again.")
                 .satisfies(e -> assertThat(((InvalidInputException) e).field()).isEqualTo("clientKey"));
@@ -410,11 +409,11 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     @Test
     void moduleOffIs403AndReadOnlyIs409BeforeTheBodyIsChecked() {
         ipdState("off");
-        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", new MedicineOrderInput(null, null, null, null, null)))
+        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", legacyOrder(null, null, null, null, null)))
                 .isInstanceOf(ModuleOffException.class);
 
         ipdState("readonly");
-        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", new MedicineOrderInput(null, null, null, null, null)))
+        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", legacyOrder(null, null, null, null, null)))
                 .isInstanceOf(ConflictException.class).hasMessage("IPD is read-only. Nothing can be changed.")
                 .satisfies(e -> assertThat(((ConflictException) e).problemType()).isEqualTo("ipd-readonly"));
         assertThat(fake.writes).isZero();
@@ -422,7 +421,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
 
     @Test
     void aBadBodyIs400WithEveryFieldErrorAndNoLockIsTaken() {
-        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", new MedicineOrderInput("x", "zzz", "qd", null, null)))
+        assertThatThrownBy(() -> order(DOCTOR, "DOCTOR", legacyOrder("x", "zzz", "qd", null, null)))
                 .isInstanceOf(InvalidFieldsException.class);
 
         verify(admissions, never()).findForNoKeyUpdate(any(), any());
@@ -457,9 +456,9 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         doThrow(new DuplicateKeyException("ux_medicine_order_tenant_admission_drug_live")).when(failing)
                 .insert(any(), any(NewOrder.class));
         MedicineAssembler a = new MedicineAssembler(catalogue, failing, new FakeDoses(), patients, patientAccess, actors,
-                admissionService);
+                admissionService, fake, fake, notices, nursingSettings, reviewRepo);
         MedicineOrderService s = new MedicineOrderService(failing, admissions, events, patients, patientAccess, actors,
-                team, auditLog, gate, catalogue, a, guard);
+                team, ipdAudit, gate, catalogue, a, guard, fake, fake, fake, notices, reviewRepo, nursingSettings);
 
         assertThatThrownBy(() -> s.order(TENANT, DOCTOR, "DOCTOR", ADMISSION, input("pcm", "od")))
                 .isInstanceOf(IllegalStateException.class).hasMessage("The order could not be stored");
@@ -495,7 +494,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         assertThat(sheet.drugs()).hasSize(14);
         assertThat(sheet.drugs().get(11).key()).isEqualTo("hep");
         assertThat(sheet.drugs().get(11).highAlert()).isEqualTo("Anticoagulant");
-        assertThat(sheet.frequencies()).extracting(k -> k.key()).containsExactly("od", "bd", "tds", "q8");
+        assertThat(sheet.frequencies()).extracting(k -> k.key()).containsExactly("od", "bd", "tds", "q8", "prn");
         assertThat(sheet.overrideReasons()).hasSize(4);
         verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_VIEW, "Opened the clinical record",
                 DOCTOR);
@@ -595,7 +594,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     void stoppingAPendingOrderRecordsTheEventTheAuditRowAndAnswersTheSheet() {
         OrderRow pending = fake.seed(ADMISSION, "pcm", "PENDING", OTHER_DOCTOR);
 
-        EmrSheet sheet = service.stop(TENANT, DOCTOR, "DOCTOR", pending.id());
+        EmrSheet sheet = service.stop(TENANT, DOCTOR, "DOCTOR", pending.id(), stopV1());
 
         assertThat(fake.rows.get(pending.id()).status()).isEqualTo("STOPPED");
         assertThat(fake.rows.get(pending.id()).stoppedBy()).isEqualTo(DOCTOR);
@@ -614,7 +613,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     void anyDoctorCanStopAnActiveOrderAndTheLockIsTheAdmissionRow() {
         OrderRow active = fake.seed(ADMISSION, "pcm", "ACTIVE", OTHER_DOCTOR);
 
-        service.stop(TENANT, DOCTOR, "DOCTOR", active.id());
+        service.stop(TENANT, DOCTOR, "DOCTOR", active.id(), stopV1());
 
         assertThat(fake.rows.get(active.id()).status()).isEqualTo("STOPPED");
         assertThat(auditAfter("IPD_MED_STOPPED")).containsEntry("statusBefore", "ACTIVE");
@@ -627,7 +626,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         ipdState("readonly");
         OrderRow active = fake.seed(ADMISSION, "pcm", "ACTIVE", DOCTOR);
 
-        service.stop(TENANT, DOCTOR, "DOCTOR", active.id());
+        service.stop(TENANT, DOCTOR, "DOCTOR", active.id(), stopV1());
 
         assertThat(fake.rows.get(active.id()).status()).isEqualTo("STOPPED");
     }
@@ -635,10 +634,10 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     @Test
     void aRepeatedStopByTheSameUserAnswers200WithOneAccessRowAndNoWrite() {
         OrderRow pending = fake.seed(ADMISSION, "pcm", "PENDING", OTHER_DOCTOR);
-        service.stop(TENANT, DOCTOR, "DOCTOR", pending.id());
+        service.stop(TENANT, DOCTOR, "DOCTOR", pending.id(), stopV1());
         int writes = fake.writes;
 
-        EmrSheet again = service.stop(TENANT, DOCTOR, "DOCTOR", pending.id());
+        EmrSheet again = service.stop(TENANT, DOCTOR, "DOCTOR", pending.id(), stopV1());
 
         assertThat(again.orders().get(0).status()).isEqualTo("STOPPED");
         assertThat(fake.writes).isEqualTo(writes);
@@ -650,13 +649,13 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     @Test
     void stopOfAnOrderStoppedByAnotherUserOrRejectedIs409OrderState() {
         OrderRow pending = fake.seed(ADMISSION, "pcm", "PENDING", DOCTOR);
-        service.stop(TENANT, OTHER_DOCTOR, "DOCTOR", pending.id());
+        service.stop(TENANT, OTHER_DOCTOR, "DOCTOR", pending.id(), stopV1());
         OrderRow rejected = fake.seed(ADMISSION, "panto", "REJECTED", DOCTOR);
 
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", pending.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", pending.id(), stopV1()))
                 .isInstanceOf(ConflictException.class).hasMessage("This order is already stopped.")
                 .satisfies(e -> assertThat(((ConflictException) e).problemType()).isEqualTo("order-state"));
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", rejected.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", rejected.id(), stopV1()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("This order was rejected by the pharmacist. It cannot be stopped.");
     }
@@ -666,7 +665,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         OrderRow active = fake.seed(ADMISSION, "pcm", "ACTIVE", DOCTOR);
         admission = admissionRow("DISCHARGED");
 
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id(), stopV1()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("This patient is not admitted any more. Medicines cannot be ordered or changed.");
         assertThat(fake.rows.get(active.id()).status()).isEqualTo("ACTIVE");
@@ -676,19 +675,19 @@ class MedicineOrderServiceTest extends MedicineTestBase {
     void stopRefusesOtherRolesAndAMissingOrder() {
         OrderRow active = fake.seed(ADMISSION, "pcm", "ACTIVE", DOCTOR);
         for (String role : new String[] {"NURSE", "PHARMACIST", "FRONT_DESK", "BILLING", "VISITING_DOCTOR", null}) {
-            assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, role, active.id()))
+            assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, role, active.id(), stopV1()))
                     .isInstanceOf(ForbiddenException.class).hasMessage("Only a doctor can do this.");
         }
         memberRoles.put(DOCTOR, "NURSE");
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id(), stopV1()))
                 .isInstanceOf(ForbiddenException.class);
         memberRoles.put(DOCTOR, "DOCTOR");
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", UUID.randomUUID()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", UUID.randomUUID(), stopV1()))
                 .isInstanceOf(NotFoundException.class);
         assertThat(fake.rows.get(active.id()).status()).isEqualTo("ACTIVE");
         ModuleEntitlement off = new ModuleEntitlement("off", false, 25);
         when(entitlements.forTenant(TENANT)).thenReturn(off);
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id(), stopV1()))
                 .isInstanceOf(ModuleOffException.class);
     }
 
@@ -722,7 +721,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(DOCTOR), eq("DOCTOR"),
                 any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
 
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", pending.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", pending.id(), stopV1()))
                 .isInstanceOf(OutsideScopeException.class);
 
         assertThat(fake.rows.get(pending.id()).status()).isEqualTo("PENDING");
@@ -736,7 +735,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
         org.mockito.Mockito.doThrow(new OutsideScopeException()).when(guard).requireAdmissionLocked(eq(TENANT), eq(DOCTOR),
                 eq("DOCTOR"), any(), eq(ADMISSION), org.mockito.ArgumentMatchers.anyString());
 
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", active.id(), stopV1()))
                 .isInstanceOf(OutsideScopeException.class);
 
         assertThat(fake.rows.get(active.id()).status()).isEqualTo("ACTIVE");
@@ -745,7 +744,7 @@ class MedicineOrderServiceTest extends MedicineTestBase {
 
     @Test
     void anOrderOfAnotherClinicIsNotFoundAndNeverReachesTheGuard() {
-        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", UUID.randomUUID()))
+        assertThatThrownBy(() -> service.stop(TENANT, DOCTOR, "DOCTOR", UUID.randomUUID(), stopV1()))
                 .isInstanceOf(NotFoundException.class);
 
         org.mockito.Mockito.verify(guard, never()).requireAdmissionLocked(any(), any(), any(), any(), any(), any());

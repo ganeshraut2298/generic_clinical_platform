@@ -137,6 +137,18 @@ class CancerJourneyServiceTest {
     }
 
     @Test
+    void aSaveThatChangesNothingReturnsTheLatestVersionAndWritesNoRowAndNoAudit() {
+        when(journeys.latest(TENANT, PATIENT)).thenReturn(Optional.of(stored(2)));
+
+        JourneyView view = service.save(DOCTOR, RECORD,
+                body("{'expectedVersion':2,'stageGroup':'IIB','tnmText':'cT2 cN2 M0'}"));
+
+        assertThat(view.version()).isEqualTo(2);
+        verify(journeys, never()).insert(any(), any());
+        verify(audit, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void theAuditHoldsTheVersionAndTheNamesOfTheChangedFieldsNeverAValue() {
         when(journeys.latest(TENANT, PATIENT)).thenReturn(Optional.of(stored(2)));
 
@@ -252,6 +264,25 @@ class CancerJourneyServiceTest {
         service.save(DOCTOR, RECORD, body("{'expectedVersion':0,'tenantId':'" + UUID.randomUUID() + "','clinicId':'"
                 + UUID.randomUUID() + "'}"));
         assertThat(inserted().version()).isEqualTo(1);
+    }
+
+    @Test
+    void aControlCharacterInATextIsRefusedAsAFieldErrorNotA500() {
+        when(journeys.latest(TENANT, PATIENT)).thenReturn(Optional.empty());
+
+        for (String field : List.of("tnmText", "markersText", "geneticsText")) {
+            String json = "{\"expectedVersion\":0,\"" + field + "\":\"T2\\u0000N0\"}";
+            assertThatThrownBy(() -> service.save(DOCTOR, RECORD, body(json.replace('\'', '"'))))
+                    .satisfies(e -> {
+                        assertThat(fieldsOf(e)).containsExactly(field);
+                        assertThat(((InvalidFieldsException) e).errors().get(0).message())
+                                .isEqualTo("Remove the control characters.");
+                    });
+        }
+        String tab = "{\"expectedVersion\":0,\"tnmText\":\"T2\\tN0\"}";
+        assertThatThrownBy(() -> service.save(DOCTOR, RECORD, body(tab)))
+                .satisfies(e -> assertThat(fieldsOf(e)).containsExactly("tnmText"));
+        verify(journeys, never()).insert(any(), any());
     }
 
     @Test

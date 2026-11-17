@@ -1,0 +1,82 @@
+// Orders to acknowledge (Safety tab). Colours come from the tokens only; every state is also written in words.
+:host {
+  display: block;
+}
+
+.sfp {
+  gap: 6px;
+}
+
+.sfph h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--crit-soft);
+  color: var(--crit);
+  font-size: 0.84rem;
+}
+
+.sfrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line);
+
+  &:first-child {
+    border-top: 0;
+  }
+  .sfmn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    b {
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+    small {
+      color: var(--ink-3);
+      font-size: 0.78rem;
+      overflow-wrap: anywhere;
+    }
+    small.sfstat {
+      color: var(--warn);
+      font-weight: 700;
+    }
+    small.sfstat.late {
+      color: var(--crit);
+    }
+  }
+  .sfha {
+    font-size: 0.68rem;
+    margin-left: 4px;
+  }
+}
+
+.sfacts button,
+.more button,
+.notice button {
+  min-height: 44px;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+
+.notice button {
+  margin-left: auto;
+}

@@ -122,7 +122,7 @@ class VitalsCatalogIT extends VitalsSupport {
             assertThat(found).as("trigger " + expected).contains(expected + "=O");
         }
         // every trg_emr_ trigger of the migrations, by name (a partitioned table repeats its trigger on each partition): the layout,
-        // form, starter-form and chemotherapy-protocol tables (SAH-53, SAH-48-59, SAH-49-71) and the three phase 5 tables (SAH-51-68)
+        // form, starter-form and chemotherapy-protocol tables (SAH-53, SAH-48-59, SAH-49-71) the three phase 5 tables (SAH-51-68) and the append-only cancer journey (SAH-75, V2026_12_14_1030)
         java.util.Set<String> names = new java.util.TreeSet<>();
         for (String f : found) {
             assertThat(f).as("enabled").endsWith("=O");
@@ -134,7 +134,7 @@ class VitalsCatalogIT extends VitalsSupport {
                 "trg_emr_form_version_immutable", "trg_emr_form_version_no_truncate", "trg_emr_chemo_protocol_immutable",
                 "trg_emr_chemo_protocol_no_truncate", "trg_emr_record_signed_guard", "trg_emr_record_addendum_no_update_delete",
                 "trg_emr_record_addendum_no_truncate", "trg_emr_admission_request_guard", "trg_emr_admission_request_no_truncate",
-                "trg_emr_record_insert_draft");
+                "trg_emr_record_insert_draft", "trg_emr_cancer_journey_no_update_delete", "trg_emr_cancer_journey_no_truncate");
         for (String expected : new String[] {"opd.emr_record.trg_emr_record_signed_guard", "opd.emr_record_addendum.trg_emr_record_addendum_no_update_delete",
                 "opd.emr_record_addendum.trg_emr_record_addendum_no_truncate", "opd.emr_admission_request.trg_emr_admission_request_guard",
                 "opd.emr_admission_request.trg_emr_admission_request_no_truncate"}) {

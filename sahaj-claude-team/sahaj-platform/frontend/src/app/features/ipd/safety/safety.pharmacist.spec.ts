@@ -8,6 +8,7 @@ import { checksOf } from '../pharmacist/pharmacist.fixtures';
 import { PharmacistStore } from '../pharmacist/pharmacist.store';
 import { SafetyComponent } from './safety.component';
 import { boardOf, eventOf, pageOf, problem } from './safety.fixtures';
+import { provideOrderNoticesStubs } from '../orders/order-notices.testing';
 
 const IPD = '/api/v1/ipd';
 
@@ -22,6 +23,7 @@ describe('SafetyComponent with the pharmacist check', () => {
       providers: [
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
+        ...provideOrderNoticesStubs(),
         PharmacistStore,
         { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
         { provide: MatDialog, useValue: { open: vi.fn() } },
@@ -54,7 +56,7 @@ describe('SafetyComponent with the pharmacist check', () => {
     expect(tiles).toEqual(['escalations', 'app-pharmacist-tile', 'doses']);
     expect(el().querySelector('[data-kpi=pharmacist] .eyebrow')!.textContent).toBe('Pharmacist checks');
     const blocks = Array.from(el().querySelectorAll('.safety > *')).map((n) => n.tagName.toLowerCase());
-    expect(blocks).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'app-medicine-round', 'section']);
+    expect(blocks).toEqual(['div', 'section', 'section', 'app-pharmacist-panel', 'app-medicine-round', 'app-orders-to-acknowledge', 'section']);
     expect(store.panelShown()).toBe(true);
     expect(store.waiting()).toBe(2);
   });
@@ -94,6 +96,7 @@ describe('SafetyComponent with the pharmacist check', () => {
         providers: [
           provideHttpClient(withInterceptors([problemDetailInterceptor])),
           provideHttpClientTesting(),
+          ...provideOrderNoticesStubs(),
           PharmacistStore,
           { provide: MatSnackBar, useValue: { open: vi.fn(), dismiss: vi.fn() } },
           { provide: MatDialog, useValue: { open: vi.fn() } },

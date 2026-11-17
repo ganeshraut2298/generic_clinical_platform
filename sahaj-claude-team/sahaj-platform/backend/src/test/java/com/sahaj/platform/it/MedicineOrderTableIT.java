@@ -43,7 +43,7 @@ class MedicineOrderTableIT extends MedicineSupport {
             + "where id = ?::uuid and status = 'PENDING'";
     private static final String REJ = "update ipd.medicine_order set status = 'REJECTED', rejected_by = ?::uuid, "
             + "reject_reason_key = ?, version = version + 1 where id = ?::uuid and status = 'PENDING'";
-    private static final String STP = "update ipd.medicine_order set status = 'STOPPED', stopped_by = ?::uuid, version = version + 1 "
+    private static final String STP = "update ipd.medicine_order set status = 'STOPPED', stopped_by = ?::uuid, stop_reason = 'Not needed any more', version = version + 1 "
             + "where id = ?::uuid and status in ('PENDING', 'ACTIVE')";
     private static final String SET = "update ipd.medicine_order set ";
     private static final String BY_ID = " where id = ?::uuid";
@@ -216,7 +216,7 @@ class MedicineOrderTableIT extends MedicineSupport {
                 // a time sent with the statement is overwritten by the trigger for a column the role may not name: the owner may
                 if (o) {
                     DbAccess.execute(c, "update ipd.medicine_order set status = 'STOPPED', stopped_by = ?::uuid, "
-                            + "stopped_at = now() - interval '1 year', version = version + 1" + BY_ID, U2.toString(), e);
+                            + "stop_reason = 'Not needed any more', stopped_at = now() - interval '1 year', version = version + 1" + BY_ID, U2.toString(), e);
                     assertThat(val(c, e, "abs(extract(epoch from (clock_timestamp() - stopped_at))) < 2")).isEqualTo("true");
                 }
             });
@@ -271,9 +271,9 @@ class MedicineOrderTableIT extends MedicineSupport {
             for (String change : fromActive) {
                 refused(err(c, SET + change + BY_ID, active), "status change is not allowed");
             }
-            refused(err(c, SET + "status = 'PENDING'" + BY_ID, pending), "status change is not allowed");
+            refused(err(c, SET + "status = 'PENDING'" + BY_ID, pending), "version must go up"); // SAH-76: the version check comes first
             refused(err(c, SET + "status = 'PENDING', version = version + 1" + BY_ID, pending), "status change is not allowed");
-            refused(err(c, SET + "version = version + 1" + BY_ID, pending), "status change is not allowed");
+            refused(err(c, SET + "version = version + 1" + BY_ID, pending)); // SAH-76: a bare version bump is refused (text not fixed by the design note)
             refused(err(c, SET + "status = 'GONE', version = version + 1" + BY_ID, pending));
             assertThat(val(c, pending, "status || version")).isEqualTo("PENDING0");
             assertThat(val(c, active, "status || version")).isEqualTo("ACTIVE1");
@@ -364,10 +364,10 @@ class MedicineOrderTableIT extends MedicineSupport {
     @Test
     void item12AnInsertWithAnotherStatusIsRefusedByTheOwnerAndTheApplicationCannotNameTheDatabaseColumns() throws Exception {
         run(true, (c, clinic, adm, o) -> refused(err(c, "insert into ipd.medicine_order (tenant_id, admission_id, client_key, drug_key, "
-                + "frequency_key, ordered_by, status) values (?::uuid, ?::uuid, gen_random_uuid(), 'pcm', 'od', ?::uuid, 'ACTIVE')",
-                clinic.tenantId().toString(), adm.id(), U1.toString()), "must start as pending"));
+                + "frequency_key, ordered_by, status) values (?::uuid, ?::uuid, gen_random_uuid(), 'pcm', 'od', ?::uuid, 'STOPPED')",
+                clinic.tenantId().toString(), adm.id(), U1.toString()))); // SAH-76: ACTIVE is a legal first status now (no verification needed)
         run(false, (c, clinic, adm, o) -> {
-            String[][] named = {{"status", "'PENDING'"}, {"ordered_at", "now()"}, {"version", "0"}, {"verified_by", "gen_random_uuid()"},
+            String[][] named = {{"ordered_at", "now()"}, {"version", "0"}, {"verified_by", "gen_random_uuid()"},
                     {"id", "gen_random_uuid()"}, {"tenant_id", "'" + clinic.tenantId() + "'::uuid"}, {"verified_at", "now()"},
                     {"rejected_by", "gen_random_uuid()"}, {"stopped_by", "gen_random_uuid()"}};
             for (String[] n : named) {
@@ -488,7 +488,13 @@ class MedicineOrderTableIT extends MedicineSupport {
             // SAH-32: ipd.dose_administration now references the order table, so PostgreSQL refuses a TRUNCATE of the order table
             // alone before any trigger runs (0A000). Both tables in one statement (or CASCADE) reach the append-only triggers.
             is(err(c, "truncate ipd.medicine_order"), "0A000", "foreign key");
-            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration"), "42501", "append-only");
+            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration"), "0A000", "foreign key"); // SAH-76: the version table references the head too
+            // DEC-057: ipd.dose_scan_stop also references the order: a list without it is refused by the foreign key (0A000)
+            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration, ipd.medicine_order_version, ipd.order_notice, "
+                    + "ipd.order_hold, ipd.medicine_order_query, ipd.pharmacist_review, ipd.dose_correction"), "0A000", "foreign key");
+            is(err(c, "truncate ipd.medicine_order, ipd.dose_administration, ipd.medicine_order_version, ipd.order_notice, "
+                    + "ipd.order_hold, ipd.medicine_order_query, ipd.pharmacist_review, ipd.dose_correction, ipd.dose_scan_stop"), "42501",
+                    "append-only");
             is(err(c, "truncate ipd.medicine_order cascade"), "42501", "append-only");
             return null;
         });
@@ -571,9 +577,10 @@ class MedicineOrderTableIT extends MedicineSupport {
             assertThat(policies(c, "drug_interaction")).containsExactlyInAnyOrder("p_drug_interaction_select:r:sahaj_app",
                     "p_drug_interaction_migrator:*:sahaj_migrator");
             // grants of the tenant table
-            Set<String> update = Set.of("status", "verified_by", "rejected_by", "reject_reason_key", "stopped_by", "version");
+            Set<String> update = Set.of("status", "verified_by", "rejected_by", "reject_reason_key", "stopped_by", "version",
+                    "current_version", "priority", "stop_reason"); // SAH-76 (docs/database/SAH-76.md 1.4)
             Set<String> insert = Set.of("admission_id", "client_key", "drug_key", "frequency_key", "ordered_by", "override_reason_key",
-                    "warnings");
+                    "warnings", "status", "priority"); // SAH-76: status and priority are insertable
             Set<String> updatable = new HashSet<>();
             Set<String> insertable = new HashSet<>();
             List<String> all = new ArrayList<>();
@@ -727,7 +734,11 @@ class MedicineOrderTableIT extends MedicineSupport {
         Clinic clinic = hospital();
         Adm adm = admitWithAllergy(clinic, "None known");
         try (Connection one = tenantConnection(clinic); Connection two = tenantConnection(clinic)) {
-            DbAccess.text(one, INS_APP, adm.id(), "pcm", U1.toString());
+            String first = DbAccess.text(one, INS_APP, adm.id(), "pcm", U1.toString());
+            // SAH-76: a head is committed only with its version 1 (the deferred head check)
+            DbAccess.execute(one, "insert into ipd.medicine_order_version (order_id, version_no, kind, frequency_key, dose_amount, "
+                    + "dose_unit, route_key, start_at, priority, created_by, verification) values (?::uuid, 1, 'SCHEDULED', 'od', 1, "
+                    + "'TABLET', 'ORAL', now(), 'ROUTINE', ?::uuid, 'REQUIRED')", first, U1.toString());
             CompletableFuture<String> second = CompletableFuture.supplyAsync(() -> {
                 try {
                     DbAccess.text(two, INS_APP, adm.id(), "pcm", U2.toString());
@@ -750,6 +761,9 @@ class MedicineOrderTableIT extends MedicineSupport {
         Adm adm = admitWithAllergy(clinic, "None known");
         String id = orderIdOf(place(clinic.owner(), adm.id(), "pcm"));
         try (Connection one = tenantConnection(clinic); Connection two = tenantConnection(clinic)) {
+            // SAH-76: the version carries the verification, the head follows (the deferred head check)
+            DbAccess.execute(one, "update ipd.medicine_order_version set verified_by = ?::uuid where order_id = ?::uuid and version_no = 1",
+                    U2.toString(), id);
             DbAccess.execute(one, ACT, U2.toString(), id);
             CompletableFuture<Integer> second = CompletableFuture.supplyAsync(() -> {
                 try (PreparedStatement ps = two.prepareStatement(ACT)) {

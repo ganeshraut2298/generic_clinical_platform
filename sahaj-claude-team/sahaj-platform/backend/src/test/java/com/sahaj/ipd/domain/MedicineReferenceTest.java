@@ -17,14 +17,16 @@ class MedicineReferenceTest {
     // ---- frequencies and reasons ----
 
     @Test
-    void theFourFrequenciesHaveTheContractKeysLabelsAndDoseTimes() {
-        assertThat(Frequency.values()).extracting(Frequency::key).containsExactly("od", "bd", "tds", "q8");
+    void theFrequenciesHaveTheContractKeysLabelsAndDoseTimesAndPrnHasNone() {
+        assertThat(Frequency.values()).extracting(Frequency::key).containsExactly("od", "bd", "tds", "q8", "prn");
         assertThat(Frequency.values()).extracting(Frequency::label)
-                .containsExactly("Once daily", "Twice daily", "Three times daily", "8-hourly");
+                .containsExactly("Once daily", "Twice daily", "Three times daily", "8-hourly", "As needed (PRN)");
         assertThat(Frequency.OD.doseTimes()).containsExactly("8:00 AM");
         assertThat(Frequency.BD.doseTimes()).containsExactly("8:00 AM", "8:00 PM");
         assertThat(Frequency.TDS.doseTimes()).containsExactly("8:00 AM", "2:00 PM", "8:00 PM");
         assertThat(Frequency.Q8.doseTimes()).containsExactly("6:00 AM", "2:00 PM", "10:00 PM");
+        assertThat(Frequency.PRN.doseTimes()).isEmpty();
+        assertThat(Frequency.PRN.times()).isEmpty();
         assertThat(Frequency.BD.lowerLabel()).isEqualTo("twice daily");
         assertThat(Frequency.Q8.lowerLabel()).isEqualTo("8-hourly");
     }

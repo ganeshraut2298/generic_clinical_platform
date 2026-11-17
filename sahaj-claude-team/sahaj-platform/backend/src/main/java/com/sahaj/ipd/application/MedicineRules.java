@@ -1,13 +1,20 @@
 package com.sahaj.ipd.application;
 
+import com.sahaj.ipd.application.MedicineViews.ChangeOrderInput;
+import com.sahaj.ipd.application.MedicineViews.HoldOrderInput;
 import com.sahaj.ipd.application.MedicineViews.MedicineOrderInput;
+import com.sahaj.ipd.application.MedicineViews.QueryOrderInput;
+import com.sahaj.ipd.application.MedicineViews.QueryReplyInput;
 import com.sahaj.ipd.application.MedicineViews.RejectOrderInput;
+import com.sahaj.ipd.application.MedicineViews.ResumeOrderInput;
+import com.sahaj.ipd.application.MedicineViews.StopOrderInput;
 import com.sahaj.ipd.application.MedicineViews.VerifyOrderInput;
 import com.sahaj.ipd.domain.Drug;
 import com.sahaj.ipd.domain.DrugCatalogue;
 import com.sahaj.ipd.domain.Frequency;
 import com.sahaj.ipd.domain.OverrideReason;
 import com.sahaj.ipd.domain.RejectReason;
+import com.sahaj.ipd.domain.order.MedicineOrderVersion.Kind;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
 import java.nio.ByteBuffer;
@@ -39,6 +46,8 @@ final class MedicineRules {
     static final String ONLY_DOCTOR = "Only a doctor can do this.";
     static final String EMR_HIDDEN = "Clinical details are hidden for your role.";
     static final String ONLY_PHARMACIST = "Only the pharmacist or the clinic owner can check orders.";
+    static final String SELF_CHANGED_VERIFICATION =
+            "The doctor who changed this order cannot verify it. Ask the pharmacist.";
     static final String SELF_VERIFICATION =
             "The doctor who ordered this cannot verify it. Ask the pharmacist.";
     static final String NOT_ADMITTED =
@@ -56,6 +65,22 @@ final class MedicineRules {
     static final String STOPPED_BY_DOCTOR = "The doctor stopped this order.";
     static final String HARD_STOP_ON_ORDER = "Hard stop on this order. Reject it.";
     static final String CHECKS_CHANGED = "The checks on this order changed. Review them and try again.";
+    static final String ORDER_CHANGED = "This order was changed by someone else. Reload and check the new order.";
+    static final String STOP_REASON_MESSAGE = "Write why you are stopping this medicine.";
+    static final String HOLD_REASON_MESSAGE = "Write why you are holding this medicine.";
+    static final String CHANGE_REASON_MESSAGE = "Write why you are changing this order.";
+    static final String QUESTION_MESSAGE = "Write your question for the doctor.";
+    static final String QUESTION_LENGTH_MESSAGE = "Keep the question to 300 characters.";
+    static final String REPLY_MESSAGE = "Write your reply.";
+    static final String REPLY_LENGTH_MESSAGE = "Keep the reply to 300 characters.";
+    static final String RESUME_FIRST = "Resume this order before changing it.";
+    static final String ORDER_STOPPED = "This order is stopped. Order the medicine again.";
+    static final String NOT_ACTIVE = "This order is not active.";
+    static final String NOT_ON_HOLD = "This order is not on hold.";
+    static final String NOT_WAITING = "This order is not waiting for the pharmacist.";
+    static final String NO_OPEN_QUERY = "This order has no open query.";
+    static final String WAITING_FOR_REPLY = "This order is waiting for the doctor's reply.";
+    static final String NOTHING_CHANGED = "Nothing was changed.";
 
     static final int DEFAULT_LIMIT = 50;
     static final int MAX_LIMIT = 100;
@@ -71,7 +96,13 @@ final class MedicineRules {
     // ---- checked bodies ----
 
     /** The checked body of an order. The reason and the token are optional. */
-    record Order(UUID clientKey, Drug drug, Frequency frequency, OverrideReason reason, String checkToken) {
+    record Order(UUID clientKey, Drug drug, Frequency frequency, OverrideReason reason, String checkToken,
+                 OrderValues values) {
+
+        /** The SAH-31 shape: no SAH-76 values (the port path); the frequency is always one of the four times. */
+        Order(UUID clientKey, Drug drug, Frequency frequency, OverrideReason reason, String checkToken) {
+            this(clientKey, drug, frequency, reason, checkToken, null);
+        }
 
         @Override
         public String toString() {
@@ -80,11 +111,29 @@ final class MedicineRules {
     }
 
     /** The checked body of verify. The PIN is never logged: hidden from {@code toString}. */
-    record Verify(String pin, String checkToken) {
+    record Verify(String pin, String checkToken, Integer orderVersion) {
 
         @Override
         public String toString() {
             return "Verify[redacted]";
+        }
+    }
+
+    /** The checked body of stop, hold, resume, query and reply: the key, the version seen and the clinical text. */
+    record Keyed(UUID clientKey, int orderVersion, String text) {
+
+        @Override
+        public String toString() {
+            return "Keyed[orderVersion=" + orderVersion + "]";
+        }
+    }
+
+    /** The checked body of change. The reason is clinical text. */
+    record Change(UUID clientKey, int orderVersion, String reason, OrderValues values) {
+
+        @Override
+        public String toString() {
+            return "Change[orderVersion=" + orderVersion + "]";
         }
     }
 
@@ -99,7 +148,8 @@ final class MedicineRules {
         if (drug == null) {
             errors.add(new FieldMessage("drugKey", DRUG_MESSAGE));
         }
-        Frequency frequency = input == null ? null : Frequency.ofKey(input.frequencyKey()).orElse(null);
+        Frequency frequency = input == null ? null : Frequency.ofKey(input.frequencyKey())
+                .filter(f -> f != Frequency.PRN).orElse(null);
         if (frequency == null) {
             errors.add(new FieldMessage("frequencyKey", FREQUENCY_MESSAGE));
         }
@@ -118,7 +168,73 @@ final class MedicineRules {
         return new Order(clientKey, drug, frequency, reason, token);
     }
 
-    /** Fields in the order pin, checkToken. */
+    /**
+     * SAH-76: the body of {@code POST /admissions/{id}/medicine-orders}. Every field error together, in the order
+     * clientKey, drugKey, overrideReasonKey, checkToken, then the SAH-76 fields (see {@link OrderValues}). The start is
+     * judged against {@code now} with a 5-minute tolerance; the service stores the start from the database clock.
+     */
+    static Order strictOrder(DrugCatalogue catalogue, MedicineOrderInput input, Instant now) {
+        List<FieldMessage> errors = new ArrayList<>();
+        UUID clientKey = ClientKeys.parse(input == null ? null : input.clientKey());
+        if (clientKey == null) {
+            errors.add(new FieldMessage("clientKey", RELOAD_MESSAGE));
+        }
+        Drug drug = input == null ? null : catalogue.find(input.drugKey()).orElse(null);
+        if (drug == null) {
+            errors.add(new FieldMessage("drugKey", DRUG_MESSAGE));
+        }
+        // The SAH-76 fields are checked first into their own list so that the SAH-31 order of messages is kept:
+        // clientKey, drugKey, frequencyKey, overrideReasonKey, checkToken, then the SAH-76 fields.
+        List<FieldMessage> valueErrors = new ArrayList<>();
+        OrderValues values = null;
+        if (input == null) {
+            valueErrors.add(new FieldMessage("frequencyKey", FREQUENCY_MESSAGE));
+        } else {
+            values = OrderValues.check(drug, rawOf(input), now, true, valueErrors);
+        }
+        for (FieldMessage message : valueErrors) {
+            if ("frequencyKey".equals(message.field())) {
+                errors.add(message);
+            }
+        }
+        OverrideReason reason = null;
+        if (input != null && input.overrideReasonKey() != null) {
+            reason = OverrideReason.ofKey(input.overrideReasonKey()).orElse(null);
+            if (reason == null) {
+                errors.add(new FieldMessage("overrideReasonKey", OVERRIDE_MESSAGE));
+            }
+        }
+        String token = input == null ? null : input.checkToken();
+        if (token != null && !TOKEN.matcher(token).matches()) {
+            errors.add(new FieldMessage("checkToken", RELOAD_MESSAGE));
+        }
+        for (FieldMessage message : valueErrors) {
+            if (!"frequencyKey".equals(message.field())) {
+                errors.add(message);
+            }
+        }
+        fail(errors);
+        Frequency frequency = values.kind() == Kind.PRN ? Frequency.PRN : values.frequency();
+        return new Order(clientKey, drug, frequency, reason, token, values);
+    }
+
+    private static OrderValues.Raw rawOf(MedicineOrderInput input) {
+        return new OrderValues.Raw(blankToNull(input.frequencyKey()), input.doseAmount(), input.doseUnit(),
+                input.routeKey(), input.startAt(), input.durationDays(), input.indication(), input.priority(),
+                input.prnMinIntervalMinutes(), input.prnMaxPer24h());
+    }
+
+    private static OrderValues.Raw rawOf(ChangeOrderInput input) {
+        return new OrderValues.Raw(blankToNull(input.frequencyKey()), input.doseAmount(), input.doseUnit(),
+                input.routeKey(), input.startAt(), input.durationDays(), input.indication(), input.priority(),
+                input.prnMinIntervalMinutes(), input.prnMaxPer24h());
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text;
+    }
+
+    /** Fields in the order pin, checkToken, orderVersion. */
     static Verify verify(VerifyOrderInput input) {
         List<FieldMessage> errors = new ArrayList<>();
         String pin = input == null ? null : input.pin();
@@ -129,8 +245,95 @@ final class MedicineRules {
         if (token == null || !TOKEN.matcher(token).matches()) {
             errors.add(new FieldMessage("checkToken", RELOAD_MESSAGE));
         }
+        Integer version = input == null ? null : input.orderVersion();
+        if (version == null || version < 1) {
+            errors.add(new FieldMessage("orderVersion", RELOAD_MESSAGE));
+        }
         fail(errors);
-        return new Verify(pin, token);
+        return new Verify(pin, token, version);
+    }
+
+    // ---- the SAH-76 action bodies: clientKey, orderVersion, then the clinical text ----
+
+    static Keyed stop(StopOrderInput input) {
+        return keyed(input == null ? null : input.clientKey(), input == null ? null : input.orderVersion(),
+                input == null ? null : input.reason(), 4, 200, "reason", STOP_REASON_MESSAGE, STOP_REASON_MESSAGE,
+                true);
+    }
+
+    static Keyed hold(HoldOrderInput input) {
+        return keyed(input == null ? null : input.clientKey(), input == null ? null : input.orderVersion(),
+                input == null ? null : input.reason(), 4, 200, "reason", HOLD_REASON_MESSAGE, HOLD_REASON_MESSAGE,
+                true);
+    }
+
+    static Keyed resume(ResumeOrderInput input) {
+        return keyed(input == null ? null : input.clientKey(), input == null ? null : input.orderVersion(), null, 0, 0,
+                "reason", null, null, false);
+    }
+
+    static Keyed query(QueryOrderInput input) {
+        return keyed(input == null ? null : input.clientKey(), input == null ? null : input.orderVersion(),
+                input == null ? null : input.question(), 1, 300, "question", QUESTION_MESSAGE,
+                QUESTION_LENGTH_MESSAGE, true);
+    }
+
+    static Keyed reply(QueryReplyInput input) {
+        return keyed(input == null ? null : input.clientKey(), input == null ? null : input.orderVersion(),
+                input == null ? null : input.reply(), 1, 300, "reply", REPLY_MESSAGE, REPLY_LENGTH_MESSAGE, true);
+    }
+
+    private static Keyed keyed(String clientKey, Integer orderVersion, String text, int min, int max, String field,
+                               String message, String tooLongMessage, boolean wantText) {
+        List<FieldMessage> errors = new ArrayList<>();
+        UUID key = ClientKeys.parse(clientKey);
+        if (key == null) {
+            errors.add(new FieldMessage("clientKey", RELOAD_MESSAGE));
+        }
+        if (orderVersion == null || orderVersion < 1) {
+            errors.add(new FieldMessage("orderVersion", RELOAD_MESSAGE));
+        }
+        String clean = wantText ? boundedText(text, min, max, field, message, tooLongMessage, errors) : null;
+        fail(errors);
+        return new Keyed(key, orderVersion, clean);
+    }
+
+    /** Clinical text of {@code min} to {@code max} characters after trimming; an error is added when it is not. */
+    private static String boundedText(String raw, int min, int max, String field, String message,
+                                      String tooLongMessage, List<FieldMessage> errors) {
+        int before = errors.size();
+        String clean = OrderValues.text(raw, max, field, tooLongMessage, errors);
+        if (errors.size() > before) {
+            return null;
+        }
+        if (clean == null || clean.codePointCount(0, clean.length()) < min) {
+            errors.add(new FieldMessage(field, message));
+            return null;
+        }
+        return clean;
+    }
+
+    /** The body of change: the key, the version seen, the reason (4 to 200), then the values of an order. */
+    static Change change(Drug drug, ChangeOrderInput input, Instant now) {
+        List<FieldMessage> errors = new ArrayList<>();
+        UUID key = ClientKeys.parse(input == null ? null : input.clientKey());
+        if (key == null) {
+            errors.add(new FieldMessage("clientKey", RELOAD_MESSAGE));
+        }
+        Integer version = input == null ? null : input.orderVersion();
+        if (version == null || version < 1) {
+            errors.add(new FieldMessage("orderVersion", RELOAD_MESSAGE));
+        }
+        String reason = boundedText(input == null ? null : input.reason(), 4, 200, "reason",
+                CHANGE_REASON_MESSAGE, CHANGE_REASON_MESSAGE, errors);
+        OrderValues values = null;
+        if (input == null) {
+            errors.add(new FieldMessage("frequencyKey", FREQUENCY_MESSAGE));
+        } else {
+            values = OrderValues.check(drug, rawOf(input), now, false, errors);
+        }
+        fail(errors);
+        return new Change(key, version, reason, values);
     }
 
     static RejectReason reject(RejectOrderInput input) {
@@ -193,6 +396,43 @@ final class MedicineRules {
     static String orderedText(Drug drug, Frequency frequency, OverrideReason reason) {
         String text = "Ordered " + drug.name() + " " + frequency.lowerLabel();
         return reason == null ? text : text + " · override: " + reason.label();
+    }
+
+    /** SAH-76: " · STAT" for a one-time order, " · as needed" for PRN, else the SAH-31 text. */
+    static String orderedText(Drug drug, OrderValues values, OverrideReason reason) {
+        String text;
+        if (values.kind() == Kind.ONCE) {
+            text = "Ordered " + drug.name() + " · STAT";
+        } else if (values.kind() == Kind.PRN) {
+            text = "Ordered " + drug.name() + " · as needed";
+        } else {
+            text = "Ordered " + drug.name() + " " + values.frequency().lowerLabel();
+        }
+        return reason == null ? text : text + " · override: " + reason.label();
+    }
+
+    static String changedText(Drug drug, int version) {
+        return "Changed " + drug.name() + " (v" + version + ")";
+    }
+
+    static String heldText(Drug drug) {
+        return "Held " + drug.name();
+    }
+
+    static String resumedText(Drug drug) {
+        return "Resumed " + drug.name();
+    }
+
+    static String queriedText(Drug drug) {
+        return "Queried " + drug.name();
+    }
+
+    static String queryRepliedText(Drug drug) {
+        return "Replied to query on " + drug.name();
+    }
+
+    static String reviewedText(Drug drug) {
+        return "Reviewed the dose of " + drug.name() + " given before the pharmacist check";
     }
 
     static String blockedText(Drug drug, String firstHardStopAsLogged) {

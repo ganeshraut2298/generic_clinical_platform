@@ -56,6 +56,12 @@ abstract class MedicineTestBase {
     AdmissionService admissionService;
     MedicineCatalogue catalogue;
     MedicineAssembler assembler;
+    FakeOrderNotices notices;
+    FakePharmacistReviews reviewRepo;
+    NursingSettingsReader nursingSettings;
+    /** The nursing values the tests run with: the built defaults (verification on); a test may replace them. */
+    com.sahaj.ipd.domain.EffectiveNursingSettings settingsInForce = com.sahaj.ipd.domain.EffectiveNursingSettings.defaults();
+    IpdAudit ipdAudit;
     IpdGate gate;
 
     /** The membership role of each user; a user who is absent has no active membership. */
@@ -86,7 +92,22 @@ abstract class MedicineTestBase {
         catalogue = new MedicineCatalogue(SeedCatalogue.catalogue());
         gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
         doses = new FakeDoses();
-        assembler = new MedicineAssembler(catalogue, fake, doses, patients, patientAccess, actors, admissionService);
+        notices = new FakeOrderNotices();
+        reviewRepo = new FakePharmacistReviews();
+        nursingSettings = new NursingSettingsReader() {
+            @Override
+            public com.sahaj.ipd.domain.EffectiveNursingSettings effectiveFor(UUID tenantId, UUID admissionId) {
+                return settingsInForce;
+            }
+
+            @Override
+            public com.sahaj.ipd.domain.EffectiveNursingSettings clinicDefaults(UUID tenantId) {
+                return settingsInForce;
+            }
+        };
+        ipdAudit = new IpdAudit(auditLog, new AuditDevice());
+        assembler = new MedicineAssembler(catalogue, fake, doses, patients, patientAccess, actors, admissionService,
+                fake, fake, notices, nursingSettings, reviewRepo);
 
         memberRoles.put(DOCTOR, "DOCTOR");
         memberRoles.put(OTHER_DOCTOR, "DOCTOR");
@@ -133,5 +154,59 @@ abstract class MedicineTestBase {
 
     void ipdState(String state) {
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement(state, false, 25));
+    }
+
+    /**
+     * Appends a version written by {@code author} (ADR-027 A9: the author of the current version). The head keeps its
+     * current_version; the checks under test read the timeline.
+     */
+    void appendVersionBy(MedicineOrderRepository.OrderRow order, UUID author) {
+        java.util.List<com.sahaj.ipd.domain.order.MedicineOrderVersion> versions = fake.versionsOf(order.id());
+        com.sahaj.ipd.domain.order.MedicineOrderVersion last = versions.get(versions.size() - 1);
+        versions.add(new com.sahaj.ipd.domain.order.MedicineOrderVersion(order.id(), last.versionNo() + 1, last.kind(),
+                last.frequencyKey(), last.doseAmount(), last.doseUnit(), last.routeKey(), last.startAt(), last.endAt(),
+                last.indication(), last.priority(), last.minIntervalMin(), last.maxPer24h(), "Changed", author,
+                last.createdAt(), null, last.verification(), null, null));
+    }
+
+    /** The order service over the in-memory repositories of this base (the one constructor every test uses). */
+    MedicineOrderService newOrderService() {
+        return new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team, ipdAudit, gate,
+                catalogue, assembler, guard, fake, fake, fake, notices, reviewRepo, nursingSettings);
+    }
+
+    OrderChangeService newChangeService() {
+        return new OrderChangeService(fake, admissions, patients, patientAccess, team, events, ipdAudit, gate, assembler,
+                guard, fake, fake, fake, notices, nursingSettings);
+    }
+
+    PharmacistQueryService newQueryService() {
+        return new PharmacistQueryService(fake, admissions, patients, patientAccess, team, events, ipdAudit, gate,
+                assembler, guard, fake, fake);
+    }
+
+    PharmacistReviewService newReviewService() {
+        return new PharmacistReviewService(reviewRepo, fake, admissions, patients, patientAccess, actors, team, events,
+                ipdAudit, gate, assembler, fake);
+    }
+
+    /**
+     * The SAH-31 order body with the SAH-76 fields filled in as a doctor would on a plain order (1 mg, oral, routine,
+     * until stopped), so the SAH-31 tests keep their meaning: the five arguments are the SAH-31 ones.
+     */
+    static MedicineViews.MedicineOrderInput legacyOrder(String clientKey, String drugKey, String frequencyKey,
+                                                        String overrideReasonKey, String checkToken) {
+        return new MedicineViews.MedicineOrderInput(clientKey, drugKey, frequencyKey, overrideReasonKey, checkToken,
+                java.math.BigDecimal.ONE, "MG", "ORAL", null, null, null, "ROUTINE", null, null);
+    }
+
+    /** The verify body of version 1 (the SAH-76 shape): the PIN, the check token and the version seen. */
+    static MedicineViews.VerifyOrderInput verifyV1(String pin, String checkToken) {
+        return new MedicineViews.VerifyOrderInput(pin, checkToken, 1);
+    }
+
+    /** The stop body of version 1 with a reason of four or more characters. */
+    static MedicineViews.StopOrderInput stopV1() {
+        return new MedicineViews.StopOrderInput(UUID.randomUUID().toString(), 1, "No longer needed");
     }
 }

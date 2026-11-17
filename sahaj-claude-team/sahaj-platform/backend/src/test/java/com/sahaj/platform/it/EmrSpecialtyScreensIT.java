@@ -328,7 +328,7 @@ class EmrSpecialtyScreensIT extends EmrSpecialtySupport {
     void theVisitModeHidesTheSectionsOfTheOtherVisitTypeAndAHiddenSectionIsNeverRequiredButKeepsItsValuesAndFormFStaysVisibleWhileRequired() throws Exception {
         Rec rec = specialtyRec("og");
         assertThat(specialtyOf(rec).get("mode").asText()).as("ANC is the effective mode with none stored").isEqualTo("ANC");
-        assertThat(hiddenKeys(rec.record())).containsExactlyInAnyOrder("gyn_exam", "infertility", "contraception");
+        assertThat(hiddenKeys(rec.record())).containsExactlyInAnyOrder("menstrual", "gyn_exam", "infertility", "contraception");
         assertThat(neededSections(rec.record())).as("the required ANC check is still needed").contains("anc");
         String edd = LocalDate.now(IST).plusDays(140).toString();
         Rec withAnc = save(rec, spSection("anc", "ANC_CHECK", anc(edd, "{\"weightKg\":60.0}", "[]", "[]")));
@@ -349,7 +349,7 @@ class EmrSpecialtyScreensIT extends EmrSpecialtySupport {
         assertThat(hiddenKeys(signed.record())).as("hidden again once marked").contains("pcpndt");
         // the other way and wrong modes
         Rec back = saveScreen(signed, "{\"mode\":\"ANC\"}");
-        assertThat(hiddenKeys(back.record())).containsExactlyInAnyOrder("gyn_exam", "infertility", "contraception");
+        assertThat(hiddenKeys(back.record())).containsExactlyInAnyOrder("menstrual", "gyn_exam", "infertility", "contraception");
         for (String mode : new String[] {"SESSION", "FIRST_VISIT", "NOPE"}) {
             refuseScreen(back, 400, "validation", "{\"mode\":\"" + mode + "\"}");
         }

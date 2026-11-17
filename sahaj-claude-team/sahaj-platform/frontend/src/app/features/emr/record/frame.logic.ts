@@ -102,6 +102,13 @@ export interface ReadyFooterInput {
 
 const READY = 'Ready to complete.';
 
+/** "1 week", "3 weeks": the plain plural of a counted word. */
+export function plural(n: number, word: string, many = `${word}s`): string {
+  return `${n} ${n === 1 ? word : many}`;
+}
+
+// The footer sentences below keep the mockup's fixed wording, including "procedure(s)", "warning(s)" and "vaccine(s)".
+
 /** The green sentence of the sticky footer when nothing is still needed (mockup footer, one per drawn department). */
 export function readyFooterText(i: ReadyFooterInput): string {
   switch (i.profile) {
@@ -115,11 +122,15 @@ export function readyFooterText(i: ReadyFooterInput): string {
       if (warnings > 0) {
         return `${warnings} warning(s) on this visit, reviewed before completing.`;
       }
+      // Only the value the doctor set; the screen never works out a next visit by itself.
+      const next = i.nextAncWeeks;
+      if (next === null) {
+        return READY;
+      }
       const weeks = i.view?.og?.gestationalAge?.weeks ?? null;
-      const next = i.nextAncWeeks ?? (weeks !== null ? weeks + 3 : null);
-      return next !== null && weeks !== null
-        ? `Next ANC visit suggested at ${next} weeks (in ${Math.max(0, next - weeks)} weeks).`
-        : READY;
+      return weeks === null
+        ? `Next ANC visit suggested at ${plural(next, 'week')}.`
+        : `Next ANC visit suggested at ${plural(next, 'week')} (in ${plural(Math.max(0, next - weeks), 'week')}).`;
     }
     case 'paeds':
       return `${i.vaccinesToday} vaccine(s) given today · ${i.medicines} medicine(s) prescribed`;

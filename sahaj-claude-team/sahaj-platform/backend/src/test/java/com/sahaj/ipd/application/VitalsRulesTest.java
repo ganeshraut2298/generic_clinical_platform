@@ -340,9 +340,30 @@ class VitalsRulesTest {
     void vitalsDueIsNullForARoleWithoutVitalsAccess() {
         Instant now = Instant.parse("2026-11-11T05:30:00Z");
 
-        assertThat(VitalsRules.vitalsDue("FRONT_DESK", true, null, now)).isNull();
-        assertThat(VitalsRules.vitalsDue("NURSE", true, null, now)).isTrue();
-        assertThat(VitalsRules.vitalsDue("NURSE", true, now.minusSeconds(60), now)).isFalse();
-        assertThat(VitalsRules.vitalsDue("DOCTOR", false, null, now)).isFalse();
+        assertThat(VitalsRules.vitalsDueOf("FRONT_DESK", true, null, now)).isNull();
+        assertThat(VitalsRules.vitalsDueOf("NURSE", true, null, now)).isTrue();
+        assertThat(VitalsRules.vitalsDueOf("NURSE", true, row(now.minusSeconds(60), null), now)).isFalse();
+        assertThat(VitalsRules.vitalsDueOf("DOCTOR", false, null, now)).isFalse();
+    }
+
+    @Test
+    void theDueFlagOfARecordUsesTheIntervalStampedOnIt() {
+        Instant now = Instant.parse("2026-11-11T05:30:00Z");
+        VitalsRepository.VitalsRow hourly = row(now.minusSeconds(61 * 60), 60);
+        VitalsRepository.VitalsRow unstamped = row(now.minusSeconds(61 * 60), null);
+
+        assertThat(VitalsRules.vitalsDueOf("NURSE", true, hourly, now)).isTrue();
+        assertThat(VitalsRules.vitalsDueOf("NURSE", true, unstamped, now)).as("read as 240 minutes").isFalse();
+        assertThat(VitalsRules.vitalsDueOf("NURSE", true, null, now)).isTrue();
+        assertThat(VitalsRules.vitalsDueOf("NURSE", false, null, now)).isFalse();
+        assertThat(VitalsRules.vitalsDueOf("FRONT_DESK", true, hourly, now)).isNull();
+        assertThat(unstamped.intervalMinutes()).isEqualTo(240);
+        assertThat(hourly.intervalMinutes()).isEqualTo(60);
+    }
+
+    private static VitalsRepository.VitalsRow row(Instant recordedAt, Integer interval) {
+        return new VitalsRepository.VitalsRow(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), 120, 80, 80, 98,
+                new java.math.BigDecimal("37.0"), 16, 0, com.sahaj.ipd.domain.EarlyWarningScore.Risk.LOW, false,
+                recordedAt, java.util.UUID.randomUUID(), interval);
     }
 }

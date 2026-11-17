@@ -44,6 +44,12 @@ class MedicineSafetyCheckTest {
     }
 
     @Test
+    void aNamedAllergyWithNoneKnownOtherwiseIsRecordedNotNone() {
+        assertThat(MedicineSafetyCheck.allergyStatus("Peanuts; none known otherwise"))
+                .isEqualTo(AllergyStatus.RECORDED);
+    }
+
+    @Test
     void noneKnownGivesTheGreenChip() {
         assertThat(MedicineSafetyCheck.allergyStatus("None known")).isEqualTo(AllergyStatus.NONE_KNOWN);
         assertThat(MedicineSafetyCheck.allergyStatus("  NONE KNOWN  ")).isEqualTo(AllergyStatus.NONE_KNOWN);

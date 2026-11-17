@@ -27,7 +27,7 @@ class MedicineRoundTest {
     private static final Instant LONG_AGO = Instant.parse("2026-11-09T05:00:00Z");
 
     private static RoundOrder order(Frequency frequency, String bed, String drug, Instant verifiedAt) {
-        return new RoundOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), bed, drug, null, frequency,
+        return RoundOrders.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), bed, drug, null, frequency,
                 verifiedAt);
     }
 
@@ -223,9 +223,9 @@ class MedicineRoundTest {
         RoundOrder bedAA = od("A1", "Tab. Aspirin 75 mg");
         UUID low = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID high = UUID.fromString("7fffffff-0000-0000-0000-000000000001");
-        RoundOrder sameLow = new RoundOrder(low, UUID.randomUUID(), UUID.randomUUID(), "C3", "Tab. Same", null,
+        RoundOrder sameLow = RoundOrders.of(low, UUID.randomUUID(), UUID.randomUUID(), "C3", "Tab. Same", null,
                 Frequency.OD, LONG_AGO);
-        RoundOrder sameHigh = new RoundOrder(high, UUID.randomUUID(), UUID.randomUUID(), "C3", "Tab. Same", null,
+        RoundOrder sameHigh = RoundOrders.of(high, UUID.randomUUID(), UUID.randomUUID(), "C3", "Tab. Same", null,
                 Frequency.OD, LONG_AGO);
 
         Result result = MedicineRound.compute(List.of(sameHigh, bedB, sameLow, bedAZ, bedAA), List.of(),
@@ -264,7 +264,7 @@ class MedicineRoundTest {
         UUID order = UUID.randomUUID();
         UUID admission = UUID.randomUUID();
         UUID patient = UUID.randomUUID();
-        RoundOrder o = new RoundOrder(order, admission, patient, "101-A", "Inj. Heparin 5,000 IU", "Anticoagulant",
+        RoundOrder o = RoundOrders.of(order, admission, patient, "101-A", "Inj. Heparin 5,000 IU", "Anticoagulant",
                 Frequency.OD, LONG_AGO);
 
         Entry e = at(o, EIGHT_AM.plus(Duration.ofMinutes(130))).rows().get(0);
@@ -352,7 +352,7 @@ class MedicineRoundTest {
     @Test
     void oneTokenLinePerListedSlotWithTheOrderIdInLowerCaseTheEpochSecondsAndTheState() {
         UUID id = UUID.fromString("ABCDEF00-0000-0000-0000-000000000001");
-        RoundOrder o = new RoundOrder(id, UUID.randomUUID(), UUID.randomUUID(), "101", "Tab. X", null, Frequency.TDS,
+        RoundOrder o = RoundOrders.of(id, UUID.randomUUID(), UUID.randomUUID(), "101", "Tab. X", null, Frequency.TDS,
                 LONG_AGO);
 
         Result result = at(o, Instant.parse("2026-11-11T08:45:00Z"));
@@ -364,7 +364,7 @@ class MedicineRoundTest {
 
     @Test
     void theTokenLinesHoldNoNameDrugOrBedAndTheToStringsHideThem() {
-        RoundOrder o = new RoundOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "BED-777",
+        RoundOrder o = RoundOrders.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "BED-777",
                 "Inj. Secret Drug", "Insulin", Frequency.OD, LONG_AGO);
 
         Result result = at(o, EIGHT_AM.plus(Duration.ofMinutes(90)));

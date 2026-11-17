@@ -1,8 +1,10 @@
 package com.sahaj.ipd.web;
 
+import com.sahaj.ipd.application.DoseCorrectionService;
 import com.sahaj.ipd.application.DoseService;
 import com.sahaj.ipd.application.DoseService.DoseResult;
 import com.sahaj.ipd.application.MarService;
+import com.sahaj.ipd.application.MarViews.CorrectionInput;
 import com.sahaj.ipd.application.MarViews.DoseInput;
 import com.sahaj.ipd.application.MarViews.DoseRecorded;
 import com.sahaj.ipd.application.MarViews.Mar;
@@ -19,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * SAH-32 the Medicines (MAR) tab and giving a dose (contract {@code docs/api/ipd.yaml}, ADR-011). The clinic, the
+ * SAH-32 and SAH-76 the Medicines (MAR) tab, giving a dose, undo and recorded in error (contract {@code docs/api/ipd.yaml}, ADR-011). The clinic, the
  * person and the role always come from the signed-in user. Every endpoint is open to any signed-in clinic role here on
  * purpose: the contract gives each refused role its own 403 detail, so the role checks, module-off, read-only and every
  * business answer come from the services, which re-check the token role and the role of the active membership. The
@@ -32,10 +34,12 @@ public class MarController {
 
     private final MarService mar;
     private final DoseService doses;
+    private final DoseCorrectionService corrections;
 
-    public MarController(MarService mar, DoseService doses) {
+    public MarController(MarService mar, DoseService doses, DoseCorrectionService corrections) {
         this.mar = mar;
         this.doses = doses;
+        this.corrections = corrections;
     }
 
     @ScopeGuarded(ScopeGuarded.Kind.ADMISSION)
@@ -54,5 +58,23 @@ public class MarController {
         ClinicUser user = ClinicUser.current();
         DoseResult result = doses.record(user.tenantId(), user.userId(), user.role(), id, request);
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.answer());
+    }
+
+    /** SAH-76-5: undo of a given dose within the window (200, also for a replay). */
+    @ScopeGuarded(ScopeGuarded.Kind.DOSE)
+    @PostMapping("/doses/{id}/undo")
+    @PreAuthorize(MedicineOrderController.CLINIC_ROLES)
+    public DoseRecorded undo(@PathVariable UUID id, @RequestBody CorrectionInput request) {
+        ClinicUser user = ClinicUser.current();
+        return corrections.undo(user.tenantId(), user.userId(), user.role(), id, request);
+    }
+
+    /** SAH-76-5: a given dose marked as recorded in error (200, also for a replay). */
+    @ScopeGuarded(ScopeGuarded.Kind.DOSE)
+    @PostMapping("/doses/{id}/recorded-in-error")
+    @PreAuthorize(MedicineOrderController.CLINIC_ROLES)
+    public DoseRecorded recordedInError(@PathVariable UUID id, @RequestBody CorrectionInput request) {
+        ClinicUser user = ClinicUser.current();
+        return corrections.recordedInError(user.tenantId(), user.userId(), user.role(), id, request);
     }
 }

@@ -190,7 +190,7 @@ class DoseConcurrencyIT extends MarSupport {
         assertThat(doseRowsOfOrder(w.clinic(), f.order())).isOne();
         JsonNode last = sheetRow(emr(w.doctor().auth(), w.adm().id()), f.order()).get("lastDose");
         assertThat(last.get("outcome").asText()).isEqualTo("GIVEN");
-        assertThat(marOrder(mar(w.nurse().auth(), w.adm().id()), f.order())).as("a Stopped order leaves the MAR").isNull();
+        assertThat(marOrder(mar(w.nurse().auth(), w.adm().id()), f.order())).as("a Stopped order stays on the MAR of the day, shown STOPPED (SAH-76, ADR-027 Q12)").isNotNull();
     }
 
     @Test

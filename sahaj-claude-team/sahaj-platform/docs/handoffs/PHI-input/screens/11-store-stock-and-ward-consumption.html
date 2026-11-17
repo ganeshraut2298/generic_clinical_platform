@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Store stock and ward consumption</title>
+<script src="bd02ec8a-f4f3-47c6-85b4-bf7219c4586c"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+ 
+ 
+</helmet>
+<div class="shell {{uspClass}}">
+<aside class="sx-rail" aria-label="Sahaj modules">
+<div class="sx-logo"><span>S</span>Sahaj</div>
+<a class="sx-ri" href="#" title="Opens Sahaj Home (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path></svg><span>Home</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Patients (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg><span>Patients</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj OPD (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M12 8v8M8 12h8"></path></svg><span>OPD</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj IPD (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V8"></path><path d="M3 14h18v4"></path><path d="M7 14v-3h7a4 4 0 0 1 4 4"></path></svg><span>IPD</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Nursing (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"></path></svg><span>Nursing</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Lab (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"></path><path d="M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"></path></svg><span>Lab</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Radiology (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="12" cy="12" r="4"></circle></svg><span>Radiology</span></a>
+<a class="sx-ri on" href="Main.dc.html" aria-current="true"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="5"></rect><path d="M7 12h10"></path></svg><span>Pharmacy &amp; Inventory</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Billing (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg><span>Billing</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Reports (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"></path></svg><span>Reports</span></a>
+<a class="sx-ri" href="#" title="Opens Sahaj Settings (not part of this mockup)"><svg aria-hidden="true" width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"></path></svg><span>Settings</span></a>
+</aside>
+<nav class="sx-panel" aria-label="Pharmacy and inventory">
+<div class="sx-head"><div class="sx-title">Pharmacy &amp; Inventory</div><div class="sx-sub">Sahaj Hospital, Baner</div></div>
+<div class="sx-tabs" role="tablist" aria-label="Sections">
+<a role="tab" class="sx-tab" href="Main.dc.html" aria-selected="false">Pharmacy</a>
+<a role="tab" class="sx-tab on" href="Inventory.dc.html" aria-selected="true">Inventory</a>
+<a role="tab" class="sx-tab" href="Setup.dc.html" aria-selected="false">Inventory setup</a>
+</div>
+<div class="sx-list">
+<a class="sx-li" href="Inventory.dc.html">Batch inventory &amp; expiry</a>
+<a class="sx-li" href="PO.dc.html">Purchase orders</a>
+<a class="sx-li" href="Purchase.dc.html">Receive stock (GRN)</a>
+<a class="sx-li" href="VendorReturn.dc.html">Vendor return</a>
+<a class="sx-li" href="Indent.dc.html">Ward / store indents</a>
+<a class="sx-li on" href="Stock.dc.html" aria-current="page">Store stock &amp; consumption</a>
+<a class="sx-li" href="Transfer.dc.html">Stock transfer</a>
+<a class="sx-li" href="Audit.dc.html">Stock audit</a>
+<a class="sx-li" href="Approvals.dc.html">Approvals inbox</a>
+<a class="sx-li" href="Reports.dc.html">Reports &amp; stock ledger</a>
+</div>
+<div class="sx-foot"><div style="font-weight:600;color:#0F1B2D">Rakesh S. · Pharmacist</div><label style="display:block;margin-top:6px"><span style="position:absolute;left:-9999px">Working store</span><sc-raw-select style="width:100%;font:13px Inter,sans-serif;padding:8px;border:1px solid #CBD3DC;border-radius:8px;background:#fff"><option>Main Pharmacy</option><option>Central Store</option><option>OPD Store</option><option>Ward 3B store</option></sc-raw-select></label></div>
+</nav>
+
+<main class="main">
+<header>
+<div class="muted" style="font-size:13px">Unit: Sahaj Hospital, Baner</div>
+<h1 class="h" style="margin:4px 0 0;font-size:28px">Store stock &amp; consumption</h1>
+</header>
+
+<div style="display:flex;flex-wrap:wrap;gap:10px" role="tablist" aria-label="Stock sections">
+<button type="button" role="tab" class="{{t1}}" aria-selected="{{a1}}" sc-camel-on-click="{{g1}}">Current stock <span>By store, with central store view</span></button>
+<button type="button" role="tab" class="{{t2}}" aria-selected="{{a2}}" sc-camel-on-click="{{g2}}">Ward consumption <span>Patient-wise and ward general</span></button>
+<button type="button" role="tab" class="{{t3}}" aria-selected="{{a3}}" sc-camel-on-click="{{g3}}">Return / damaged <span>3 waiting for action</span></button>
+</div>
+
+<!-- CURRENT STOCK -->
+<sc-if value="{{is1}}" hint-placeholder-val="{{ true }}">
+<section class="card" aria-labelledby="cs">
+<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+<h2 id="cs" class="h" style="margin:0;font-size:18px">Inj. Ceftriaxone 1 g · all stores</h2>
+<div style="display:flex;border-radius:8px;overflow:hidden" role="group" aria-label="View">
+<button type="button" class="seg" style="border-radius:8px 0 0 8px">My store</button>
+<button type="button" class="seg on" style="border-radius:0 8px 8px 0">All stores</button>
+</div>
+</div>
+<div class="tw" style="margin-top:12px">
+<sc-raw-table>
+<sc-raw-thead><sc-raw-tr><sc-raw-th>Store</sc-raw-th><sc-raw-th class="num">Available</sc-raw-th><sc-raw-th class="num">In transit (in)</sc-raw-th><sc-raw-th class="num">Pending return</sc-raw-th><sc-raw-th class="num">Quarantine</sc-raw-th><sc-raw-th class="num">Reorder level</sc-raw-th><sc-raw-th>Status</sc-raw-th></sc-raw-tr></sc-raw-thead>
+<sc-raw-tbody>
+<sc-raw-tr style="background:#F8FAFB"><sc-raw-td><strong>Central Store</strong></sc-raw-td><sc-raw-td class="num"><strong>110</strong></sc-raw-td><sc-raw-td class="num">—</sc-raw-td><sc-raw-td class="num">—</sc-raw-td><sc-raw-td class="num">2</sc-raw-td><sc-raw-td class="num">60</sc-raw-td><sc-raw-td><span class="chip ok">OK</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Main Pharmacy</sc-raw-td><sc-raw-td class="num">40</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">20</sc-raw-td><sc-raw-td><span class="chip ok">OK</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>OPD Store</sc-raw-td><sc-raw-td class="num">14</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">10</sc-raw-td><sc-raw-td><span class="chip ok">OK</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>Ward 3B store</sc-raw-td><sc-raw-td class="num">8</sc-raw-td><sc-raw-td class="num">10</sc-raw-td><sc-raw-td class="num">3</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">12</sc-raw-td><sc-raw-td><span class="chip info">Indent in transit</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>ICU sub-store</sc-raw-td><sc-raw-td class="num">12</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">10</sc-raw-td><sc-raw-td><span class="chip ok">OK</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>OT store</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">0</sc-raw-td><sc-raw-td class="num">4</sc-raw-td><sc-raw-td><span class="chip bad">Below reorder · raise indent</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr style="font-weight:700;border-top:2px solid #E1E6EC"><sc-raw-td>Unit total</sc-raw-td><sc-raw-td class="num">184</sc-raw-td><sc-raw-td class="num">10</sc-raw-td><sc-raw-td class="num">3</sc-raw-td><sc-raw-td class="num">2</sc-raw-td><sc-raw-td class="num">—</sc-raw-td><sc-raw-td></sc-raw-td></sc-raw-tr>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+<p class="muted" style="font-size:12px;margin:8px 0 0">Only Available stock can be issued, sold or consumed. Click a store to see batches and expiry.</p>
+</section>
+</sc-if>
+
+<!-- WARD CONSUMPTION -->
+<sc-if value="{{is2}}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+<section class="card" aria-labelledby="wc" style="flex:999 1 560px">
+<div class="who"><strong>Acting as Sr. Kavita</strong> · nurse mapped to Ward 3B store</div>
+<h2 id="wc" class="h" style="margin:14px 0 10px;font-size:18px">Record consumption</h2>
+<div style="display:flex;border-radius:8px;overflow:hidden;margin-bottom:12px" role="group" aria-label="Consumption type">
+<sc-for list="{{ctypes}}" as="c" hint-placeholder-count="2">
+<button type="button" class="{{c.cls}}" style="{{c.radius}}" sc-camel-on-click="{{c.pick}}" aria-pressed="{{c.sel}}">{{c.label}}</button>
+</sc-for>
+</div>
+<sc-if value="{{isPatient}}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
+<label class="fld">Patient (scan wristband)<input value="Ramesh Patil · IPD-7781 · Bed 12"></label>
+<label class="fld">Ordered by<input value="Dr. A. Mehta"></label>
+</div>
+<p class="muted" style="font-size:12px;margin:0 0 10px">Charged to the IPD running bill and shown in the nursing medication chart.</p>
+</sc-if>
+<sc-if value="{{isGeneral}}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
+<label class="fld">Purpose<sc-raw-select><option>Ward general use</option><option>Procedure (non-billable)</option><option>Cleaning / infection control</option></sc-raw-select></label>
+<label class="fld">Cost booked to<input value="Ward 3B · Medicine dept." readonly=""></label>
+</div>
+<p class="muted" style="font-size:12px;margin:0 0 10px">Not billed to a patient. Cost is booked to the ward for reports.</p>
+</sc-if>
+<div class="tw">
+<sc-raw-table>
+<sc-raw-thead><sc-raw-tr><sc-raw-th>Item</sc-raw-th><sc-raw-th>Batch (FEFO, ward stock)</sc-raw-th><sc-raw-th class="num">Ward available</sc-raw-th><sc-raw-th class="num">Qty used</sc-raw-th></sc-raw-tr></sc-raw-thead>
+<sc-raw-tbody>
+<sc-raw-tr><sc-raw-td><strong>{{item1}}</strong></sc-raw-td><sc-raw-td>{{batch1}}</sc-raw-td><sc-raw-td class="num">{{avail1}}</sc-raw-td><sc-raw-td class="num"><input value="{{qty1}}" aria-label="Quantity used, first item" style="width:60px;font:600 14px Inter,sans-serif;padding:8px;border:1px solid #CBD3DC;border-radius:8px;text-align:center"></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td><strong>{{item2}}</strong></sc-raw-td><sc-raw-td>{{batch2}}</sc-raw-td><sc-raw-td class="num">{{avail2}}</sc-raw-td><sc-raw-td class="num"><input value="{{qty2}}" aria-label="Quantity used, second item" style="width:60px;font:600 14px Inter,sans-serif;padding:8px;border:1px solid #CBD3DC;border-radius:8px;text-align:center"></sc-raw-td></sc-raw-tr>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+<button class="btn" type="button">+ Scan item</button>
+<button class="btn p big" type="button">Save consumption</button>
+</div>
+</section>
+
+<section class="card" aria-labelledby="tc" style="flex:1 1 300px">
+<h2 id="tc" class="h" style="margin:0 0 10px;font-size:16px">Today · Ward 3B</h2>
+<sc-raw-table>
+<sc-raw-thead><sc-raw-tr><sc-raw-th>Time</sc-raw-th><sc-raw-th>Item</sc-raw-th><sc-raw-th class="num">Qty</sc-raw-th><sc-raw-th>Type</sc-raw-th></sc-raw-tr></sc-raw-thead>
+<sc-raw-tbody>
+<sc-raw-tr><sc-raw-td>08:10</sc-raw-td><sc-raw-td>Inj. Ceftriaxone 1 g</sc-raw-td><sc-raw-td class="num">4</sc-raw-td><sc-raw-td><span class="chip info">Patient</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>09:00</sc-raw-td><sc-raw-td>Gloves, size 7.5</sc-raw-td><sc-raw-td class="num">18</sc-raw-td><sc-raw-td><span class="chip gray">General</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>10:20</sc-raw-td><sc-raw-td>IV NS 500 ml</sc-raw-td><sc-raw-td class="num">9</sc-raw-td><sc-raw-td><span class="chip info">Patient</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>10:45</sc-raw-td><sc-raw-td>Cotton roll 500 g</sc-raw-td><sc-raw-td class="num">1</sc-raw-td><sc-raw-td><span class="chip gray">General</span></sc-raw-td></sc-raw-tr>
+</sc-raw-tbody>
+</sc-raw-table>
+<p class="muted" style="font-size:12px;margin:8px 0 0">Average daily use feeds the suggested quantity on the next indent. <span class="chip usp">USP</span></p>
+</section>
+</div>
+</sc-if>
+
+<!-- RETURN / DAMAGED -->
+<sc-if value="{{is3}}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px">
+<section class="card" aria-labelledby="rc">
+<h2 id="rc" class="h" style="margin:0 0 4px;font-size:16px">Return to Central Store</h2>
+<p class="muted" style="font-size:12px;margin:0 0 12px">Excess, near-expiry or no longer needed. No indent needed.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+<label class="fld">Item · batch<sc-raw-select><option>Inj. Ceftriaxone 1 g · CF2207</option></sc-raw-select></label>
+<label class="fld">Quantity<input value="3"></label>
+<label class="fld" style="grid-column:1 / -1">Reason<sc-raw-select><option>Excess stock</option><option>Near expiry</option><option>Not needed (order stopped)</option></sc-raw-select></label>
+</div>
+<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn p" type="button">Send to Central Store</button></div>
+</section>
+
+<section class="card" aria-labelledby="dm">
+<h2 id="dm" class="h" style="margin:0 0 4px;font-size:16px">Report damaged / expired</h2>
+<p class="muted" style="font-size:12px;margin:0 0 12px">Moved to quarantine at once so it cannot be used. HOD approves the next step.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+<label class="fld">Item · batch<sc-raw-select><option>IV NS 500 ml · NS9902</option></sc-raw-select></label>
+<label class="fld">Quantity<input value="2"></label>
+<label class="fld">Reason<sc-raw-select><option>Damaged / leaking</option><option>Expired</option><option>Cold-chain break</option></sc-raw-select></label>
+<label class="fld">After approval<sc-raw-select><option>Write off at store</option><option>Send to Central Store</option></sc-raw-select></label>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" type="button">Add photo</button><button class="btn p" type="button">Submit for HOD approval</button></div>
+</section>
+</div>
+
+<section class="card" aria-labelledby="pl">
+<h2 id="pl" class="h" style="margin:0 0 10px;font-size:16px">Waiting for action</h2>
+<div class="tw">
+<sc-raw-table>
+<sc-raw-thead><sc-raw-tr><sc-raw-th>No.</sc-raw-th><sc-raw-th>Type</sc-raw-th><sc-raw-th>Item · batch</sc-raw-th><sc-raw-th class="num">Qty</sc-raw-th><sc-raw-th>Reason</sc-raw-th><sc-raw-th>Raised by</sc-raw-th><sc-raw-th>Status</sc-raw-th></sc-raw-tr></sc-raw-thead>
+<sc-raw-tbody>
+<sc-raw-tr><sc-raw-td>RET-0311</sc-raw-td><sc-raw-td>Return to CS</sc-raw-td><sc-raw-td>Inj. Ceftriaxone 1 g · CF2207</sc-raw-td><sc-raw-td class="num">3</sc-raw-td><sc-raw-td>Not needed</sc-raw-td><sc-raw-td>Sr. Kavita · 10:20</sc-raw-td><sc-raw-td><span class="chip warn">Waiting for Central Store</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>IND-6012</sc-raw-td><sc-raw-td>Indent rejection</sc-raw-td><sc-raw-td>Inj. Ceftriaxone 1 g · CF2207</sc-raw-td><sc-raw-td class="num">2</sc-raw-td><sc-raw-td>Damaged in transit</sc-raw-td><sc-raw-td>Sneha T. · OPD Store</sc-raw-td><sc-raw-td><span class="chip ok">Accepted by CS · quarantine</span></sc-raw-td></sc-raw-tr>
+<sc-raw-tr><sc-raw-td>DMG-0087</sc-raw-td><sc-raw-td>Damaged</sc-raw-td><sc-raw-td>IV NS 500 ml · NS9902</sc-raw-td><sc-raw-td class="num">2</sc-raw-td><sc-raw-td>Leaking</sc-raw-td><sc-raw-td>Sr. Kavita · 09:05</sc-raw-td><sc-raw-td><span class="chip warn">Waiting for HOD</span></sc-raw-td></sc-raw-tr>
+</sc-raw-tbody>
+</sc-raw-table>
+</div>
+<p class="muted" style="font-size:12px;margin:8px 0 0">Stock is added to Central Store only after Central Store accepts the return. Every step is recorded with user, store, time and reason.</p>
+</section>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;hideUsp&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;section&quot;:&quot;Demo&quot;},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;stock&quot;,&quot;consumption&quot;,&quot;returns&quot;],&quot;default&quot;:&quot;stock&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1100}}">
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const t = st.tab || this.props.startTab || 'stock';
+    const ct = st.ct || 'patient';
+    const c = (k) => 'tab' + (t === k ? ' on' : '');
+    const a = (k) => (t === k ? 'true' : 'false');
+    const ctypes = [
+      { k: 'patient', label: 'Patient-wise (billable)', radius: 'border-radius:8px 0 0 8px' },
+      { k: 'general', label: 'Ward general (non-billable)', radius: 'border-radius:0 8px 8px 0' }
+    ].map((x) => ({ label: x.label, radius: x.radius, cls: 'seg' + (ct === x.k ? ' on' : ''), sel: ct === x.k ? 'true' : 'false', pick: () => this.setState({ ct: x.k }) }));
+    const pat = ct === 'patient';
+    return {
+      uspClass: this.props.hideUsp ? 'hideusp' : '',
+      is1: t === 'stock', is2: t === 'consumption', is3: t === 'returns',
+      t1: c('stock'), t2: c('consumption'), t3: c('returns'),
+      a1: a('stock'), a2: a('consumption'), a3: a('returns'),
+      g1: () => this.setState({ tab: 'stock' }),
+      g2: () => this.setState({ tab: 'consumption' }),
+      g3: () => this.setState({ tab: 'returns' }),
+      ctypes, isPatient: pat, isGeneral: !pat,
+      item1: pat ? 'Inj. Ceftriaxone 1 g' : 'Gloves, size 7.5 (pair)',
+      batch1: pat ? 'CF2207 · Mar 2027' : 'GL7512 · Jan 2029',
+      avail1: pat ? 8 : 32, qty1: pat ? 2 : 6,
+      item2: pat ? 'IV NS 500 ml' : 'Cotton roll 500 g',
+      batch2: pat ? 'NS9902 · Jun 2027' : 'CT0310 · Dec 2028',
+      avail2: pat ? 15 : 4, qty2: pat ? 3 : 1
+    };
+  }
+}
+</script>
+
+
+</body></html>

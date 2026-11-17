@@ -165,6 +165,7 @@ class ScopePlansIT extends ScopeSupport {
                     + "|| jsonb_build_object('id', gen_random_uuid(), 'client_key', gen_random_uuid(), 'admission_id', a.id))).* "
                     + "from ipd.medicine_order m cross join ipd.admission a where m.id = '" + template + "'::uuid and a.tenant_id = '"
                     + tenant + "'::uuid and a.id <> m.admission_id");
+            backfillVersionOne(c, UUID.fromString(tenant)); // SAH-76: the copies need their version 1 (doses point at it)
             DbAccess.execute(c, "alter table ipd.medicine_order enable trigger user");
             DbAccess.execute(c, "alter table ipd.dose_administration disable trigger trg_dose_administration_guard_insert");
             int n;

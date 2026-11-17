@@ -77,8 +77,8 @@ class EmrChemoPinIT extends EmrSpecialtySupport {
         assertThat(again.getStatus()).as("already confirmed by this checker with this fingerprint: no PIN is checked again").isEqualTo(200);
         assertThat(auditRows(s.clinic(), "CHEMO_SECOND_CHECK_CONFIRMED")).hasSize(1);
         assertThat(auditRows(s.clinic(), "CHEMO_SECOND_CHECK_CONFIRMED").get(0).get(2)).contains("PIN").contains(s.checker().userId().toString());
-        assertThat(allAuditText(s.clinic())).as("never audited").doesNotContain(s.pin());
-        assertThat(row(s.clinic(), "select row_to_json(o)::text from opd.chemo_order o").get(0)).as("never stored in the order").doesNotContain(s.pin());
+        assertThat(hasBarePin(allAuditText(s.clinic()), s.pin())).as("never audited (a 4-digit PIN can sit by chance inside a hash, so only a PIN standing alone counts)").isFalse();
+        assertThat(hasBarePin(row(s.clinic(), "select row_to_json(o)::text from opd.chemo_order o").get(0), s.pin())).as("never stored in the order (a PIN standing alone, not a chance run of digits in a hash)").isFalse();
         // send what was confirmed
         Sheet confirmed = reread(s.named());
         JsonNode sent = post(orderUrl(s.rec()) + "/send", s.rec().token(), sendBody(confirmed), 200);

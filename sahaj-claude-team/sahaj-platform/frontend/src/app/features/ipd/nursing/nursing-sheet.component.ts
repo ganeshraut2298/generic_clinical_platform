@@ -21,7 +21,11 @@ import { sheetToast } from '../../../shared/ui/sheet-toast';
 import { isOutsideScope } from '../ipd-refusal';
 import { ScopeRefusals } from '../ipd-scope-refusal';
 import { MarTabComponent } from '../mar/mar-tab.component';
-import { Mar, NursingTab, TAB_MAR, TAB_VITALS, countBadge, marSubtitle, tabAfterKey } from '../mar/mar.model';
+import { Mar, TAB_MAR, TAB_VITALS, countBadge, marSubtitle } from '../mar/mar.model';
+import { OrderNoticesStore } from '../orders/order-notices.store';
+import { NoticeCount } from '../orders/order.model';
+import { OrdersTabComponent } from './orders-tab.component';
+import { VitalsDueLineComponent } from './vitals-due-line.component';
 import { NursingApi } from './nursing.api';
 import {
   FIELD_ORDER,
@@ -33,6 +37,8 @@ import {
   NursingField,
   NursingSheet,
   ROLE_NOTICE,
+  SheetTab,
+  TAB_ORDERS,
   SAME_VALUES_NOTICE,
   SAVE_ERROR,
   VITAL_FIELDS,
@@ -46,11 +52,14 @@ import {
   savedToast,
   subtitleText,
   toVitalsInput,
+  sheetTabAfterKey,
   validateVitals,
 } from './nursing.model';
 
 export interface NursingSheetData {
   admissionId: string;
+  /** The tab to open on (the Safety tab panel "Orders to acknowledge" opens the Orders tab). Default: Vitals and notes. */
+  tab?: SheetTab;
 }
 
 /** Status 0 (no connection), a server error or anything that is not an API answer: the save may have happened. */
@@ -85,7 +94,14 @@ function isLostAnswer(error: unknown): boolean {
 @Component({
   selector: 'app-nursing-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MatButtonModule, IconComponent, MarTabComponent],
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    IconComponent,
+    MarTabComponent,
+    OrdersTabComponent,
+    VitalsDueLineComponent,
+  ],
   styleUrl: './nursing-sheet.component.scss',
   templateUrl: './nursing-sheet.component.html',
 })
@@ -97,6 +113,7 @@ export class NursingSheetComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly data = inject<NursingSheetData>(MAT_DIALOG_DATA);
   private readonly scopeRefusals = inject(ScopeRefusals);
+  private readonly notices = inject(OrderNoticesStore);
 
   protected readonly fields = VITAL_FIELDS;
   protected readonly notePlaceholder = NOTE_PLACEHOLDER;
@@ -131,7 +148,16 @@ export class NursingSheetComponent {
   });
 
   /** SAH-32: the tab shown. "Vitals and notes" when the sheet opens. */
-  protected readonly tab = signal<NursingTab>('vit');
+  protected readonly tab = signal<SheetTab>(this.data.tab ?? 'vit');
+  /** SAH-76-3: the count the Orders tab list last answered with; it wins over the poll and the sheet until they change. */
+  private readonly listedOrders = signal<NoticeCount | null>(null);
+  protected readonly tabOrders = TAB_ORDERS;
+  /** The badge of the tab Orders: red when any open order is STAT, else amber; hidden at 0. */
+  protected readonly ordersBadge = computed(() => {
+    const id = this.data.admissionId;
+    const count = this.listedOrders() ?? this.notices.countFor(id) ?? this.sheet()?.ordersToAcknowledge ?? null;
+    return count !== null && count.count > 0 ? count : null;
+  });
   /** The MAR the tab "Medicines (MAR)" last read; null on the other tab. */
   protected readonly mar = signal<Mar | null>(null);
   protected readonly tabVitals = TAB_VITALS;
@@ -141,6 +167,9 @@ export class NursingSheetComponent {
     const s = this.sheet();
     if (!s) {
       return '';
+    }
+    if (this.tab() === 'ord') {
+      return `Bed ${s.bedCode}`;
     }
     if (this.tab() === 'mar') {
       const mar = this.mar();
@@ -169,7 +198,13 @@ export class NursingSheetComponent {
     // SAH-34 AC 38, 39: 403 outside-scope here, or in the Medicines tab or its Give sheet. What was typed is not kept
     // (OQ-34-15 default); the sheet closes and the page says "Nothing was saved." after a save.
     this.scopeRefusals.watch(this.data.admissionId, this.destroyRef, () => this.leaveOutsideScope());
+    // SAH-76-3: the badge of the Orders tab follows the 30-second counts poll while this sheet is open.
+    this.notices.attach(this.destroyRef);
     this.load();
+  }
+
+  protected ordersCounted(count: NoticeCount): void {
+    this.listedOrders.set(count);
   }
 
   private leaveOutsideScope(): void {
@@ -377,7 +412,7 @@ export class NursingSheetComponent {
 
   // ---- Tabs (SAH-32) ----
 
-  protected selectTab(next: NursingTab): void {
+  protected selectTab(next: SheetTab): void {
     if (next === this.tab()) {
       return;
     }
@@ -390,7 +425,7 @@ export class NursingSheetComponent {
 
   /** Arrow keys move to the other tab and focus it, Home and End jump to the first and last. */
   protected tabKey(event: KeyboardEvent): void {
-    const next = tabAfterKey(event.key, this.tab());
+    const next = sheetTabAfterKey(event.key, this.tab());
     if (next === null) {
       return;
     }

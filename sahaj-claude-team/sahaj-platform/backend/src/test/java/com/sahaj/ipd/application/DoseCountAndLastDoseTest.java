@@ -20,8 +20,7 @@ class DoseCountAndLastDoseTest extends DoseTestBase {
 
     @BeforeEach
     void setUp() {
-        orderService = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team,
-                auditLog, gate, catalogue, assembler, guard);
+        orderService = newOrderService();
     }
 
     private int count(boolean admitted) {
@@ -139,7 +138,7 @@ class DoseCountAndLastDoseTest extends DoseTestBase {
     void aStoppedOrderKeepsItsLastDose() {
         OrderRow order = active("pcm", "od");
         doses.seed(ADMISSION, order.id(), EIGHT_AM, "GIVEN", null, NURSE, null, false);
-        fake.markStopped(TENANT, order.id(), DOCTOR);
+        fake.markStopped(TENANT, order.id(), DOCTOR, "Not needed");
 
         MedicineOrderRow row = row(emr(), order.id());
 

@@ -10,7 +10,9 @@ import com.sahaj.platform.api.TeamMemberPort.TeamMember;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 class VisitBillingAdapter implements VisitBillingPort {
 
     private static final Set<String> MOVE_ANY_ROLES = Set.of("OWNER", "FRONT_DESK");
+    /** The newest this many Billing/Done visits of the earlier days are kept; the rest are cut. */
+    static final int EARLIER_LIMIT = 200;
 
     private final VisitRepository visitRepository;
     private final TeamMemberPort teamMemberPort;
@@ -53,9 +57,21 @@ class VisitBillingAdapter implements VisitBillingPort {
     @Override
     @Transactional(readOnly = true)
     public List<VisitForBilling> today(UUID tenantId) {
-        Instant startOfToday = LocalDate.now(clock.withZone(VisitService.INDIA))
-                .atStartOfDay(VisitService.INDIA).toInstant();
+        LocalDate today = LocalDate.now(clock.withZone(VisitService.INDIA));
+        Instant startOfToday = today.atStartOfDay(VisitService.INDIA).toInstant();
         return visitRepository.findSince(tenantId, startOfToday).stream().map(row -> toView(tenantId, row)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VisitForBilling> earlier(UUID tenantId, int days) {
+        LocalDate today = LocalDate.now(clock.withZone(VisitService.INDIA));
+        Instant startOfToday = today.atStartOfDay(VisitService.INDIA).toInstant();
+        Instant from = today.minusDays(days).atStartOfDay(VisitService.INDIA).toInstant();
+        List<VisitRow> newestFirst = new ArrayList<>(visitRepository.findBetweenInStages(tenantId, from, startOfToday,
+                List.of(VisitService.BILLING, VisitService.DONE), EARLIER_LIMIT));
+        Collections.reverse(newestFirst);
+        return newestFirst.stream().map(row -> toView(tenantId, row)).toList();
     }
 
     @Override

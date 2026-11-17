@@ -116,6 +116,8 @@ abstract class RoundSupport extends MarSupport {
                     }
                 }
             }
+            backfillVersionOne(c, w.clinic().tenantId()); // SAH-76: a head needs its version 1
+            DbAccess.execute(c, "set constraints all immediate");
             DbAccess.execute(c, "alter table ipd.medicine_order enable trigger trg_medicine_order_guard_insert");
             return ids;
         });

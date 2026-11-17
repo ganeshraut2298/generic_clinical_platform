@@ -74,7 +74,19 @@ public final class VitalsViews {
     /** The Nursing sheet. {@code readOnlyReason} is ROLE, IPD_READONLY, NOT_ADMITTED or null. */
     public record Sheet(UUID admissionId, String patientName, String bedCode, String status, String state,
                         boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest,
-                        boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, LatestRound latestRound) {
+                        boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, LatestRound latestRound,
+                        Instant vitalsDueAt, int vitalsIntervalMinutes, MarViews.NoticeCountView ordersToAcknowledge) {
+
+        /**
+         * The sheet before SAH-76-6 (no due time, the built 240 minutes, no orders to acknowledge). For unit tests of
+         * older code.
+         */
+        public Sheet(UUID admissionId, String patientName, String bedCode, String status, String state,
+                     boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest, boolean vitalsDue,
+                     List<NursingNote> recentNotes, int doseCount, LatestRound latestRound) {
+            this(admissionId, patientName, bedCode, status, state, canRecord, readOnlyReason, asOf, latest, vitalsDue,
+                    recentNotes, doseCount, latestRound, null, 240, new MarViews.NoticeCountView(0, 0, 0));
+        }
 
         /** The sheet before the round line (no latest round). */
         public Sheet(UUID admissionId, String patientName, String bedCode, String status, String state,
@@ -107,7 +119,18 @@ public final class VitalsViews {
     public record VitalsSaved(UUID admissionId, String patientName, String bedCode, String status, String state,
                               boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest,
                               boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, Saved saved,
-                              EscalationResult escalation, LatestRound latestRound) {
+                              EscalationResult escalation, LatestRound latestRound, Instant vitalsDueAt,
+                              int vitalsIntervalMinutes, MarViews.NoticeCountView ordersToAcknowledge) {
+
+        /** The answer before SAH-76-6 (no due time, 240 minutes, no orders to acknowledge). */
+        public VitalsSaved(UUID admissionId, String patientName, String bedCode, String status, String state,
+                           boolean canRecord, String readOnlyReason, Instant asOf, LatestVitals latest,
+                           boolean vitalsDue, List<NursingNote> recentNotes, int doseCount, Saved saved,
+                           EscalationResult escalation, LatestRound latestRound) {
+            this(admissionId, patientName, bedCode, status, state, canRecord, readOnlyReason, asOf, latest, vitalsDue,
+                    recentNotes, doseCount, saved, escalation, latestRound, null, 240,
+                    new MarViews.NoticeCountView(0, 0, 0));
+        }
 
         /** The answer before the round line (no latest round). */
         public VitalsSaved(UUID admissionId, String patientName, String bedCode, String status, String state,
@@ -121,7 +144,8 @@ public final class VitalsViews {
         static VitalsSaved of(Sheet sheet, Saved saved, EscalationResult escalation) {
             return new VitalsSaved(sheet.admissionId(), sheet.patientName(), sheet.bedCode(), sheet.status(),
                     sheet.state(), sheet.canRecord(), sheet.readOnlyReason(), sheet.asOf(), sheet.latest(),
-                    sheet.vitalsDue(), sheet.recentNotes(), sheet.doseCount(), saved, escalation, sheet.latestRound());
+                    sheet.vitalsDue(), sheet.recentNotes(), sheet.doseCount(), saved, escalation, sheet.latestRound(),
+                    sheet.vitalsDueAt(), sheet.vitalsIntervalMinutes(), sheet.ordersToAcknowledge());
         }
 
         @Override

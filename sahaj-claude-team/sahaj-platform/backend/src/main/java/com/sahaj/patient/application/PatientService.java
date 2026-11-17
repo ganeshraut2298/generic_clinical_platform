@@ -1,5 +1,6 @@
 package com.sahaj.patient.application;
 
+import com.sahaj.patient.api.AllergyStatus;
 import com.sahaj.patient.api.PatientAge;
 import com.sahaj.patient.application.PatientRepository.PatientPage;
 import com.sahaj.patient.application.PatientRepository.PatientRow;
@@ -42,7 +43,6 @@ public class PatientService {
     private static final String DEFAULT_LANGUAGE = "mr";
     /** The length limit of the allergy and the chronic text (cleanOptional, 400). */
     private static final int CLINICAL_TEXT_MAX = 400;
-    private static final Set<String> PLACEHOLDERS = Set.of("none known", "not recorded", "unknown", "not known", "?");
 
     /** AC4: follow-up due/missed and check-up overdue need visit data that does not exist until SAH-9+. */
     private static final Set<String> FILTERS_NEEDING_VISIT_DATA = Set.of("due", "missed", "overdue", "lapsed");
@@ -283,7 +283,7 @@ public class PatientService {
         for (String part : (kept + ";" + merged).split(";")) {
             String trimmed = part.trim();
             String key = trimmed.toLowerCase(Locale.ROOT);
-            if (!trimmed.isEmpty() && !PLACEHOLDERS.contains(key)) {
+            if (!trimmed.isEmpty() && !AllergyStatus.isPlaceholder(trimmed)) {
                 real.putIfAbsent(key, trimmed);
             }
         }

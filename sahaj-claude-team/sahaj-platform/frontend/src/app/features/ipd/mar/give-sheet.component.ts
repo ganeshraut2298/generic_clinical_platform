@@ -10,11 +10,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { map } from 'rxjs';
 import { newClientKey } from '../../../shared/client-key';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { sheetToast } from '../../../shared/ui/sheet-toast';
@@ -23,40 +24,57 @@ import { isOutsideScope } from '../ipd-refusal';
 import { ScopeRefusals } from '../ipd-scope-refusal';
 import { IdentityBarComponent } from '../emr/identity-bar.component';
 import { MarApi } from './mar.api';
+import { UndoToast } from './undo-toast.component';
 import {
   CHECKED_BY_LABEL,
+  CHECKED_BY_SYSTEM,
   CHOOSE_NURSE,
   CHOOSE_REASON,
+  CODE_LABEL,
+  CODE_PLACEHOLDER,
+  CheckLine,
   DoseInput,
   DoseRecorded,
   GIVE_FIELD_ORDER,
   GiveErrors,
   GiveField,
   HIGH_ALERT_SECOND_CHECK,
+  MISMATCH_LINE,
   Mar,
   MarOrder,
   MarSlot,
+  NO_CODE_LOADED,
+  OTHER_NOTE_LABEL,
+  OTHER_REASON_KEY,
+  OVERRIDE_CANCEL,
+  OVERRIDE_INPUT_KEYS,
+  OVERRIDE_LINE,
+  OVERRIDE_NOTE_LABEL,
+  OVERRIDE_OPEN,
+  OVERRIDE_REASON_LEGEND,
   PIN_PLACEHOLDER,
+  PrnView,
   REASON_LABEL,
   SAID_LABEL,
   SECOND_NURSE_SMALL,
+  STAT_NOTICE,
+  STEP_CODE,
   STEP_ONE,
   THEIR_PIN_LABEL,
   WARD_LINE,
   WRISTBAND_LABEL,
   WRISTBAND_PLACEHOLDER,
+  checkLines,
   classifyGiveError,
   giveSubtitle,
   giveTitle,
   givenInput,
-  givenToast,
   highAlertStepTitle,
   isFourDigitPin,
-  mismatchLine,
-  mismatchToast,
   notGivenInput,
   notGivenToast,
   notGivingStepTitle,
+  prnView,
   requestSignature,
 } from './mar.model';
 
@@ -64,7 +82,8 @@ export interface GiveSheetData {
   /** The MAR the tab holds: the patient, the nurses for the second check and the reasons. */
   mar: Mar;
   order: MarOrder;
-  slot: MarSlot;
+  /** The slot to give; null for a PRN line (no slot: the dose is recorded now). */
+  slot: MarSlot | null;
 }
 
 /** `mar`: a dose was recorded (201 or 200) and this is the MAR now. `reload`: the MAR on screen is out of date. */
@@ -75,37 +94,45 @@ export const GIVE_TITLE_ID = 'sf-gh';
 
 const FIELD_CONTROL: Record<GiveField, string> = {
   wristband: 'sf-id',
+  medicineCode: 'sf-code',
+  overrideReason: 'sf-ov-reason',
+  overrideNote: 'sf-ov-note',
   identityConfirmed: 'sf-said',
   secondNurseId: 'sf-wit',
   secondNursePin: 'sf-pin',
   reasonKey: 'sf-why',
+  note: 'sf-why-note',
 };
 
 /**
- * Give sheet (SAH-32), mockup `sfGive`, `sfgiveok`, `sfnogive`: "Give · <medicine>", the identity
- * bar, step 1 (wristband box and the statement), step 2 for a high-alert medicine (second nurse and
- * their PIN), the last step (reason), and the footer "Record not given" and "Given".
+ * Give sheet (SAH-32, SAH-76-4), mockup `sfGive`, `sfgiveok`, `sfnogive` and the reference give flow:
+ * "Give · <medicine>", the identity bar, step 1 (wristband box and the statement), step 2 (medicine
+ * code), the panel "Checked by the system", step 3 for a high-alert medicine (second nurse and their
+ * PIN), the last step (reason), "Cannot scan the medicine? Manual override" and the footer "Record not given" and
+ * "Given".
  *
  * - There is no "Scan wristband" button (OQ-32-1, DEC-018): the mockup's button copies the patient's
- *   own UHID into the box, so the check would pass by itself. The box takes typing or a keyboard-type
- *   scanner; Enter in it does nothing (the scanner's Enter must not give the dose).
- * - Every check is the server's; the sheet sends what was entered and shows the first refusal. The
- *   ticks are only the nurse's statement. The second nurse and the PIN are sent only for a high-alert
- *   medicine.
+ *   own UHID into the box, so the check would pass by itself. The boxes take typing or a
+ *   keyboard-type scanner; Enter in them does nothing (the scanner's Enter must not give the dose).
+ * - Every check is the server's, in the order of the contract; the sheet sends what was entered and
+ *   shows the first refusal. The patient and the medicine are compared by the server when Given is
+ *   tapped, so the panel does not show a tick for them. A wrong patient or a wrong medicine is a
+ *   red STOP, Given stays off, and the override is not offered for that item until the box is
+ *   changed (OQ-76-17).
+ * - A PRN line opens this sheet without a slot; a STAT dose of an order still waiting for the
+ *   pharmacist shows the STAT notice (B2).
  * - clientKey (ADR-011 D8): made when the sheet opens, kept while the same request is retried, new
  *   when the outcome, the reason or the second nurse differs from the last request sent, and after
  *   409 `client-key-reused`. A slot is shown as given only after the server answered.
  * - Both buttons, the close button and Esc are off while a request runs. The PIN is cleared after
- *   every answer, success or failure. PIN errors (wrong, locked, not set, rate limit) show under
- *   "Their PIN"; the second nurse's `pin-not-set` is never the signed-in user's own PIN state.
- * - A wristband mismatch shows the toast and the line under the box, built from the MAR (the problem
- *   detail carries no name).
- * - After 409 `dose-recorded`, `order-state`, `order-not-verified`, `dose-not-due`,
- *   `dose-before-start`, `not-admitted` and `ipd-readonly` the sheet closes and the MAR is read again.
- * - After a wristband mismatch the box text is selected (not cleared), so the next scan replaces it.
- * - The dialog is opened with autoFocus off: this sheet places the focus (the box when it opens, the
- *   field that needs attention after a refusal).
- * - Names, the scanned text and the PIN are on screen and in form controls only.
+ *   every answer, success or failure.
+ * - After 409 `dose-recorded`, `order-state`, `order-not-verified`, `order-on-hold`, `order-changed`,
+ *   `dose-not-due`, `dose-before-start`, `not-admitted` and `ipd-readonly` the sheet closes and the MAR
+ *   is read again. After `prn-too-soon` and `prn-max-reached` the sheet stays, says when, and Given is off.
+ * - After Given the toast "<medicine> recorded as given" carries Undo for the seconds the server
+ *   sent (UndoToast).
+ * - Names, the scanned text, the medicine code, the override note and the PIN are on screen and in
+ *   form controls only.
  */
 @Component({
   selector: 'app-give-sheet',
@@ -117,6 +144,7 @@ const FIELD_CONTROL: Record<GiveField, string> = {
 export class GiveSheetComponent {
   private readonly api = inject(MarApi);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly undoToast = inject(UndoToast);
   private readonly dialogRef = inject<MatDialogRef<GiveSheetComponent, GiveResult>>(MatDialogRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -126,35 +154,59 @@ export class GiveSheetComponent {
 
   protected readonly titleId = GIVE_TITLE_ID;
   protected readonly order = this.data.order;
+  protected readonly slot = this.data.slot;
   protected readonly patient = this.data.mar.patient;
   protected readonly nurses = this.data.mar.secondNurses;
   protected readonly reasons = this.data.mar.notGivenReasons;
+  // 0.4.3: only the three input reasons are offered; WRISTBAND_DAMAGED is read only (never sent).
+  protected readonly overrideReasons = this.data.mar.overrideReasons.filter((r) =>
+    (OVERRIDE_INPUT_KEYS as readonly string[]).includes(r.key),
+  );
   protected readonly highAlert = !!this.data.order.highAlert;
   protected readonly title = giveTitle(this.data.order);
   protected readonly subtitle = giveSubtitle(this.data.order, this.data.slot);
+  protected readonly prn: PrnView | null =
+    this.data.slot === null && this.data.order.prn ? prnView(this.data.order.prn, this.data.order) : null;
+  protected readonly statNotice = this.data.slot?.beforeVerification ? STAT_NOTICE : null;
+  protected readonly noCodeLine = this.data.order.hasMedicineCode ? null : NO_CODE_LOADED;
   protected readonly stepOne = STEP_ONE;
-  protected readonly stepTwo = highAlertStepTitle(this.data.order);
+  protected readonly stepCode = STEP_CODE;
+  protected readonly stepSecond = highAlertStepTitle(this.data.order);
   protected readonly stepLast = notGivingStepTitle(!!this.data.order.highAlert);
   protected readonly wristbandLabel = WRISTBAND_LABEL;
   protected readonly wristbandPlaceholder = WRISTBAND_PLACEHOLDER;
+  protected readonly codeLabel = CODE_LABEL;
+  protected readonly codePlaceholder = CODE_PLACEHOLDER;
   protected readonly saidLabel = SAID_LABEL;
   protected readonly secondSmall = SECOND_NURSE_SMALL;
   protected readonly checkedByLabel = CHECKED_BY_LABEL;
+  protected readonly checkedBySystem = CHECKED_BY_SYSTEM;
   protected readonly chooseNurse = CHOOSE_NURSE;
   protected readonly pinLabel = THEIR_PIN_LABEL;
   protected readonly pinPlaceholder = PIN_PLACEHOLDER;
   protected readonly reasonLabel = REASON_LABEL;
   protected readonly chooseReason = CHOOSE_REASON;
-  protected readonly mismatchText = mismatchLine(this.data.mar.patient.name);
+  protected readonly otherNoteLabel = OTHER_NOTE_LABEL;
+  protected readonly mismatchText = MISMATCH_LINE;
   protected readonly wardText = WARD_LINE;
+  protected readonly overrideLine = OVERRIDE_LINE;
+  protected readonly overrideNoteLabel = OVERRIDE_NOTE_LABEL;
+  protected readonly overrideLegend = OVERRIDE_REASON_LEGEND;
 
   protected readonly running = signal(false);
   /** Refusals that belong to one control, shown under it. */
   protected readonly errors = signal<GiveErrors>({});
   /** The wristband does not match: the line under the box. */
   protected readonly mismatch = signal(false);
+  /** The medicine code is not the ordered medicine: the server's line under the box. */
+  protected readonly codeMismatch = signal<string | null>(null);
+  /** The PRN rule refused the dose: the line says when the next dose is allowed. */
+  protected readonly prnLock = signal<string | null>(null);
   /** A failure that is not about one control. */
   protected readonly failure = signal<string | null>(null);
+  /** The manual override is open (D4). */
+  protected readonly overrideOpen = signal(false);
+  protected readonly overrideReason = signal('');
   /** The last answer was one after which the ward line (T6) is shown. */
   private readonly wardAnswer = signal(false);
   /**
@@ -169,14 +221,43 @@ export class GiveSheetComponent {
   protected readonly form = new FormGroup({
     wristband: new FormControl('', { nonNullable: true }),
     said: new FormControl(false, { nonNullable: true }),
+    code: new FormControl('', { nonNullable: true }),
+    overrideNote: new FormControl('', { nonNullable: true }),
     nurse: new FormControl('', { nonNullable: true }),
     pin: new FormControl('', { nonNullable: true }),
     reason: new FormControl('', { nonNullable: true }),
+    reasonNote: new FormControl('', { nonNullable: true }),
   });
+
+  private readonly values = toSignal(this.form.valueChanges.pipe(map(() => this.form.getRawValue())), {
+    initialValue: this.form.getRawValue(),
+  });
+
+  /** A STOP on a box: Given stays off and the override is not offered until the box is changed. */
+  protected readonly stopped = computed(() => this.mismatch() || this.codeMismatch() !== null);
+  /** 0.4.3: the override covers the medicine code only, so it is offered only while the code box is empty. */
+  private readonly codeEmpty = computed(() => this.values().code.trim() === '');
+  protected readonly overrideOffered = computed(() => !this.stopped() && this.codeEmpty());
+  /** The override that will be sent: open, and the code box empty. */
+  private readonly overrideActive = computed(() => this.overrideOpen() && this.codeEmpty());
+  protected readonly givenOff = computed(() => this.running() || this.stopped() || this.prnLock() !== null);
+  /** "Checked by the system" shows once both boxes hold something, or the override is complete. */
+  protected readonly checks = computed<CheckLine[] | null>(() => {
+    const v = this.values();
+    // The wristband is always scanned, also with an override (0.4.3).
+    const scanned = v.wristband.trim() !== '' && v.code.trim() !== '';
+    const overridden =
+      v.wristband.trim() !== '' && this.overrideActive() && this.overrideReason() !== '' && v.overrideNote.trim().length >= 4;
+    return scanned || overridden ? checkLines(this.data.mar, this.order, this.slot) : null;
+  });
+  protected readonly reasonIsOther = computed(() => this.values().reason === OTHER_REASON_KEY);
+  protected readonly overrideOpenLabel = computed(() => (this.overrideOpen() ? OVERRIDE_CANCEL : OVERRIDE_OPEN));
 
   private key = newClientKey();
   /** What the last request sent for the server's replay comparison; null before the first request. */
   private sentSignature: string | null = null;
+  /** After a PRN refusal the MAR on screen is out of date: closing the sheet reads it again. */
+  private reloadOnClose = false;
 
   constructor() {
     // SAH-34 AC 38: a refusal for this patient (here, or from the tab behind) closes this sheet; no dose is shown as given.
@@ -203,11 +284,34 @@ export class GiveSheetComponent {
     this.dropError('wristband');
   }
 
-  /** Enter in the box must not give the dose: a barcode scanner ends its scan with Enter. */
+  protected codeEdited(): void {
+    this.codeMismatch.set(null);
+    this.dropError('medicineCode');
+  }
+
+  /** Enter in a scan box must not give the dose: a barcode scanner ends its scan with Enter. */
   protected boxKey(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
       event.preventDefault();
     }
+  }
+
+  /** "Cannot scan the medicine? Manual override" opens the reasons and the note; "Cancel override" closes them. */
+  protected toggleOverride(): void {
+    const open = !this.overrideOpen();
+    this.overrideOpen.set(open);
+    this.overrideReason.set('');
+    this.form.controls.overrideNote.setValue('');
+    this.dropError('overrideReason');
+    this.dropError('overrideNote');
+    if (open) {
+      this.focusLater('sf-ov-reason');
+    }
+  }
+
+  protected pickOverrideReason(key: string): void {
+    this.overrideReason.set(key);
+    this.dropError('overrideReason');
   }
 
   /** Another nurse in "Checked by": the ward line was about the nurse before. */
@@ -242,14 +346,24 @@ export class GiveSheetComponent {
   // ---- Footer ----
 
   protected given(): void {
-    if (this.running()) {
+    if (this.givenOff()) {
       return;
     }
     const entered = this.form.getRawValue();
     if (this.highAlert && !this.secondCheckComplete(entered)) {
       return;
     }
-    this.send((key) => givenInput(key, this.data.slot, this.highAlert, entered));
+    const override = this.overrideActive() ? { reasonKey: this.overrideReason(), note: entered.overrideNote } : null;
+    this.send((key) =>
+      givenInput(key, this.order, this.slot, this.highAlert, {
+        wristband: entered.wristband,
+        said: entered.said,
+        code: entered.code,
+        override,
+        nurse: entered.nurse,
+        pin: entered.pin,
+      }),
+    );
   }
 
   /**
@@ -283,13 +397,13 @@ export class GiveSheetComponent {
     if (this.running()) {
       return;
     }
-    const { reason } = this.form.getRawValue();
-    this.send((key) => notGivenInput(key, this.data.slot, reason));
+    const { reason, reasonNote } = this.form.getRawValue();
+    this.send((key) => notGivenInput(key, this.order, this.slot, reason, reasonNote));
   }
 
   protected cancel(): void {
     if (!this.running()) {
-      this.dialogRef.close();
+      this.dialogRef.close(this.reloadOnClose ? { reload: true } : undefined);
     }
   }
 
@@ -307,6 +421,7 @@ export class GiveSheetComponent {
     this.running.set(true);
     this.errors.set({});
     this.mismatch.set(false);
+    this.codeMismatch.set(null);
     this.failure.set(null);
     this.api
       .give(this.order.orderId, input)
@@ -329,7 +444,12 @@ export class GiveSheetComponent {
   private recorded(answer: DoseRecorded, sent: DoseInput): void {
     const name = this.order.drugName;
     if (sent.outcome === 'GIVEN') {
-      this.toast(givenToast(name, answer.mar.patient.name));
+      this.undoToast.showGiven({
+        admissionId: this.data.mar.admissionId,
+        drugName: name,
+        dose: answer.dose,
+        override: answer.dose.method === 'OVERRIDE',
+      });
     } else {
       const label =
         answer.dose.reason?.label ?? this.reasons.find((r) => r.key === sent.reasonKey)?.label ?? '';
@@ -349,8 +469,27 @@ export class GiveSheetComponent {
     switch (failure.kind) {
       case 'mismatch':
         this.mismatch.set(true);
-        this.toast(mismatchToast(this.patient.name));
+        this.closeOverride();
+        this.toast(MISMATCH_LINE);
         this.focusLater('sf-id', true);
+        return;
+      case 'override-refused':
+        // 409 override-after-mismatch: the sheet stays open, the override closes, the line sits under the code box.
+        this.codeMismatch.set(failure.message);
+        this.closeOverride();
+        this.toast(failure.message);
+        this.focusLater('sf-code', true);
+        return;
+      case 'code-mismatch':
+        this.codeMismatch.set(failure.message);
+        this.closeOverride();
+        this.toast(failure.message);
+        this.focusLater('sf-code', true);
+        return;
+      case 'prn-lock':
+        this.prnLock.set(failure.message);
+        this.reloadOnClose = true;
+        this.toast(failure.message);
         return;
       case 'fields': {
         this.errors.set(failure.errors);
@@ -385,6 +524,13 @@ export class GiveSheetComponent {
         this.toast(failure.message);
         return;
     }
+  }
+
+  /** After a STOP the override is not offered: it closes with what was typed in it. */
+  private closeOverride(): void {
+    this.overrideOpen.set(false);
+    this.overrideReason.set('');
+    this.form.controls.overrideNote.setValue('');
   }
 
   /** The PIN is cleared after every answer, success or failure. */

@@ -210,10 +210,14 @@ final class VitalsRules {
     }
 
     /**
-     * The vitals due flag of an admission; null for a role without vitals access (ADR-006 Q6).
+     * The vitals due flag of an admission, with the interval stamped on the latest record (the ward profile in force
+     * when it was saved; 240 when it carries none); null for a role without vitals access (ADR-006 Q6).
      */
-    static Boolean vitalsDue(String role, boolean admitted, Instant lastVitals, Instant now) {
-        return canRead(role) ? VitalsDue.isDue(admitted, lastVitals, now) : null;
+    static Boolean vitalsDueOf(String role, boolean admitted, VitalsRepository.VitalsRow latest, Instant now) {
+        return canRead(role)
+                ? VitalsDue.isDue(admitted, latest == null ? null : latest.recordedAt(),
+                        latest == null ? VitalsDue.DEFAULT_INTERVAL_MINUTES : latest.intervalMinutes(), now)
+                : null;
     }
 
     static EwsSummary summary(VitalsRepository.VitalsRow row) {

@@ -92,6 +92,12 @@ class CourseSittingActionsTest {
         when(team.findActiveByUserId(TENANT, USER)).thenReturn(Optional.of(doctorMember));
         when(entitlements.forTenant(TENANT)).thenReturn(new ModuleEntitlement("on", false, 25));
         when(provider.getIfAvailable()).thenReturn(admissionSource);
+        when(courses.markDoneByHand(any(), any(), any(), any(), any())).thenReturn(true);
+        when(courses.markMissed(any(), any(), any(), any(), any())).thenReturn(true);
+        when(courses.rebook(any(), any(), any(), any())).thenReturn(true);
+        when(courses.reschedule(any(), any(), any(), any())).thenReturn(true);
+        when(courses.remove(any(), any(), any(), any(), any())).thenReturn(true);
+        when(courses.requestAdmission(any(), any(), any(), any())).thenReturn(true);
         when(admissionSource.admissions(eq(TENANT), any())).thenReturn(Map.of());
         service = new TreatmentCourseService(access, records, courses, visits, emrRecords, team, entitlements,
                 provider, audit, CLOCK);
@@ -352,6 +358,15 @@ class CourseSittingActionsTest {
     }
 
     @Test
+    void markDoneWithoutABodyIs400InvalidFieldsAndWritesNothing() {
+        courseWith(3, todayOpd(S1, 1));
+
+        assertThatThrownBy(() -> service.markDone(DOCTOR, COURSE, S1, null))
+                .isInstanceOf(InvalidFieldsException.class);
+        verify(courses, never()).markDoneByHand(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void markDoneWithTheHostingVisitLinksItFirstAndAuditsTheLinkToo() {
         courseWith(3, todayOpd(S1, 1));
         when(visits.findById(TENANT, VISIT)).thenReturn(Optional.of(visit(VISIT, Instant.parse("2026-11-12T04:00:00Z"))));
@@ -502,6 +517,43 @@ class CourseSittingActionsTest {
                 .containsEntry("plannedDateAfter", "2026-12-24").containsEntry("statusAfter", "PLANNED");
         assertThatThrownBy(() -> service.reschedule(DOCTOR, COURSE, S2, new DateInput(3L, LocalDate.parse("2026-12-24"))))
                 .satisfies(e -> assertProblem(e, 409, "sitting-not-available"));
+    }
+
+    @Test
+    void aDateMoreThanTwoYearsAheadIsRefusedLikeAPastDateAndTwoYearsExactlyIsAccepted() {
+        courseWith(3, plannedOpd(S1, 1));
+        LocalDate limit = TODAY.plusYears(2);
+
+        service.reschedule(DOCTOR, COURSE, S1, new DateInput(3L, limit));
+
+        verify(courses).reschedule(TENANT, S1, limit, USER);
+        assertThatThrownBy(() -> service.reschedule(DOCTOR, COURSE, S1, new DateInput(3L, limit.plusDays(1))))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> {
+                    assertThat(e.errors().get(0).field()).isEqualTo("plannedDate");
+                    assertThat(e.errors().get(0).message()).isEqualTo("Choose a date within the next 2 years.");
+                });
+        assertThatThrownBy(() -> service.rebook(DOCTOR, COURSE, S1, new DateInput(3L, LocalDate.parse("9999-12-31"))))
+                .isInstanceOf(InvalidFieldsException.class);
+        verify(courses, never()).rebook(any(), any(), any(), any());
+    }
+
+    @Test
+    void aGuardedUpdateThatChangesNoRowIs409WritesNoAuditAndDoesNotBumpTheRevision() {
+        courseWith(3, plannedOpd(S1, 1));
+        when(courses.reschedule(any(), any(), any(), any())).thenReturn(false);
+        when(courses.remove(any(), any(), any(), any(), any())).thenReturn(false);
+        when(courses.requestAdmission(any(), any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> service.reschedule(DOCTOR, COURSE, S1, new DateInput(3L, LocalDate.parse("2026-12-24"))))
+                .satisfies(e -> assertProblem(e, 409, "sitting-not-available"));
+        assertThatThrownBy(() -> service.remove(DOCTOR, COURSE, S1, new RevisionInput(3L)))
+                .satisfies(e -> assertProblem(e, 409, "sitting-not-available"));
+        assertThatThrownBy(() -> service.requestAdmission(DOCTOR, COURSE, S1,
+                new AdmissionRequestInput(3L, "DAY_CARE")))
+                .satisfies(e -> assertProblem(e, 409, "sitting-not-available"));
+
+        verify(courses, never()).bumpRevision(any(), any(), any());
+        verify(audit, never()).record(any(), any(), any(), any(), any());
     }
 
     // ---- remove ----

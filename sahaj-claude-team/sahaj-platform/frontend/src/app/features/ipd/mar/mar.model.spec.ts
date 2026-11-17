@@ -1,5 +1,5 @@
 import { ApiError, ProblemDetail } from '../../../core/http/problem-detail';
-import { DoseRow } from './mar.model';
+import { DoseRow, MarDoseRow } from './mar.model';
 import { AT_2PM, AT_8AM, AT_8PM, GIVEN_DOSE, MAR_AS_OF, marOf, orderOf, slotOf } from './mar.fixtures';
 import {
   GIVE_ERROR,
@@ -19,8 +19,9 @@ import {
   lastWord,
   marOrderLine,
   marSubtitle,
-  mismatchLine,
-  mismatchToast,
+  MISMATCH_LINE,
+  inErrorToast,
+  undoneToast,
   notGivenInput,
   notGivenToast,
   notGivingStepTitle,
@@ -115,12 +116,12 @@ describe('MAR model', () => {
     });
 
     it('GIVEN without a second nurse has no "checked by"', () => {
-      const dose: DoseRow = { ...GIVEN_DOSE, secondCheckByName: null };
+      const dose: MarDoseRow = { ...GIVEN_DOSE, secondCheckByName: null };
       expect(slotChip(slotOf({ state: 'GIVEN', dose })).hint).toBe('Given by Sr. Anjali Pawar');
     });
 
     it('HELD: "Not given · <reason>"', () => {
-      const dose: DoseRow = {
+      const dose: MarDoseRow = {
         ...GIVEN_DOSE,
         outcome: 'HELD',
         reason: { key: 'NIL_BY_MOUTH', label: 'Nil by mouth' },
@@ -134,7 +135,7 @@ describe('MAR model', () => {
     });
 
     it('REFUSED: "Refused · <reason>"', () => {
-      const dose: DoseRow = {
+      const dose: MarDoseRow = {
         ...GIVEN_DOSE,
         outcome: 'REFUSED',
         reason: { key: 'PATIENT_REFUSED', label: 'Patient refused' },
@@ -152,6 +153,64 @@ describe('MAR model', () => {
         small: 'Before the order started',
       });
       expect(slotChip(slotOf({ state: 'LATER' }))).toMatchObject({ kind: 'static', tone: 'later', small: 'Later today' });
+    });
+
+    describe('states a nurse cannot act on (contract 0.4.2): the right words and never a button', () => {
+      const doctor = 'Dr. Meera Kulkarni';
+      const cases: { name: string; chip: ReturnType<typeof slotChip>; small: string }[] = [
+        {
+          name: 'ON_HOLD',
+          chip: slotChip(slotOf({ state: 'ON_HOLD', canGive: false, stateBy: doctor })),
+          small: `On hold by ${doctor}`,
+        },
+        {
+          name: 'ON_HOLD without a name',
+          chip: slotChip(slotOf({ state: 'ON_HOLD', canGive: false })),
+          small: 'On hold',
+        },
+        {
+          name: 'QUERIED (a WAITING slot of a queried order)',
+          chip: slotChip(slotOf({ state: 'WAITING', canGive: false }), { status: 'QUERIED' }),
+          small: 'Queried',
+        },
+        {
+          name: 'REPLACED',
+          chip: slotChip(slotOf({ state: 'REPLACED', canGive: false, stateBy: doctor, stateAt: AT_2PM })),
+          small: `Replaced by a change by ${doctor} at 2 PM`,
+        },
+        {
+          name: 'REPLACED without name or time',
+          chip: slotChip(slotOf({ state: 'REPLACED', canGive: false })),
+          small: 'Replaced by a change',
+        },
+        {
+          name: 'STOPPED',
+          chip: slotChip(slotOf({ state: 'STOPPED', canGive: false, stateBy: doctor, stateAt: AT_2PM })),
+          small: `Stopped by ${doctor} at 2 PM`,
+        },
+        {
+          name: 'STOPPED without name or time',
+          chip: slotChip(slotOf({ state: 'STOPPED', canGive: false })),
+          small: 'Stopped',
+        },
+      ];
+      for (const c of cases) {
+        it(`${c.name}: "${c.small}", grey, static, with no hint`, () => {
+          expect(c.chip).toMatchObject({ kind: 'static', tone: 'grey', time: '8 AM', small: c.small, hint: null });
+        });
+      }
+
+      it('a slot with canGive true in one of these states is still not a button (the state wins)', () => {
+        for (const state of ['ON_HOLD', 'REPLACED', 'STOPPED', 'WAITING'] as const) {
+          expect(slotChip(slotOf({ state, canGive: true })).kind).toBe('static');
+        }
+      });
+
+      it('carries no patient name', () => {
+        for (const c of cases) {
+          expect(c.chip.small).not.toContain('Ramesh');
+        }
+      });
     });
 
     it('DUE: amber button "Due now · Give"', () => {
@@ -186,36 +245,39 @@ describe('MAR model', () => {
 
     it('step titles: the high-alert class in lower case, and the last step number', () => {
       expect(highAlertStepTitle({ highAlert: 'Concentrated electrolyte' })).toBe(
-        '2 · Second nurse check · high-alert concentrated electrolyte',
+        '3 · Second nurse check · high-alert concentrated electrolyte',
       );
-      expect(notGivingStepTitle(false)).toBe('2 · If you are not giving it');
-      expect(notGivingStepTitle(true)).toBe('3 · If you are not giving it');
+      expect(notGivingStepTitle(false)).toBe('3 · If you are not giving it');
+      expect(notGivingStepTitle(true)).toBe('4 · If you are not giving it');
     });
 
     it('toasts', () => {
-      expect(givenToast('Tab. Aspirin 75 mg', 'Ramesh Kale')).toBe('Tab. Aspirin 75 mg recorded as given to Ramesh Kale');
+      expect(givenToast('Tab. Aspirin 75 mg')).toBe('Tab. Aspirin 75 mg recorded as given');
+      expect(givenToast('Tab. Aspirin 75 mg', true)).toBe('Tab. Aspirin 75 mg recorded as given (override, reason saved)');
+      expect(undoneToast('Tab. Aspirin 75 mg')).toBe('Undone. Tab. Aspirin 75 mg is due again.');
+      expect(inErrorToast('Duplicate entry')).toBe('Marked as recorded in error: duplicate entry. The original entry is kept.');
       expect(notGivenToast('Tab. Aspirin 75 mg', 'Nil by mouth')).toBe(
         'Recorded: Tab. Aspirin 75 mg not given · Nil by mouth. The doctor sees this on the chart.',
       );
-      expect(mismatchToast('Ramesh Kale')).toBe(
-        'Wristband does not match Ramesh Kale. Stop. Check the patient before giving anything.',
+      expect(MISMATCH_LINE).toBe(
+        'Wrong patient. This band belongs to another patient. Check the patient before giving anything.',
       );
-      expect(mismatchLine('Ramesh Kale')).toBe("Wrong patient. This band is not Ramesh Kale's.");
     });
   });
 
   describe('tabs', () => {
-    it('lists the two tabs in order', () => {
-      expect(NURSING_TABS).toEqual(['vit', 'mar']);
+    it('lists the three tabs in order', () => {
+      expect(NURSING_TABS).toEqual(['vit', 'mar', 'ord']);
     });
 
     it('arrows wrap, Home and End jump, other keys are ignored', () => {
       expect(tabAfterKey('ArrowRight', 'vit')).toBe('mar');
-      expect(tabAfterKey('ArrowRight', 'mar')).toBe('vit');
-      expect(tabAfterKey('ArrowLeft', 'vit')).toBe('mar');
+      expect(tabAfterKey('ArrowRight', 'mar')).toBe('ord');
+      expect(tabAfterKey('ArrowRight', 'ord')).toBe('vit');
+      expect(tabAfterKey('ArrowLeft', 'vit')).toBe('ord');
       expect(tabAfterKey('ArrowLeft', 'mar')).toBe('vit');
       expect(tabAfterKey('Home', 'mar')).toBe('vit');
-      expect(tabAfterKey('End', 'vit')).toBe('mar');
+      expect(tabAfterKey('End', 'vit')).toBe('ord');
       expect(tabAfterKey('Enter', 'vit')).toBeNull();
       expect(tabAfterKey('ArrowDown', 'vit')).toBeNull();
     });
@@ -230,16 +292,20 @@ describe('MAR model', () => {
   });
 
   describe('request bodies', () => {
-    const slot = { slotAt: AT_8AM };
-    const entered = { wristband: ' pt-00042 ', said: true, nurse: 'm-rupali', pin: '4821' };
+    const slot = { slotAt: AT_8AM, orderVersion: 2 };
+    const order = { orderVersion: 2 };
+    const entered = { wristband: ' pt-00042 ', said: true, code: '8901', override: null, nurse: 'm-rupali', pin: '4821' };
 
     it('Given without high-alert sends the box and the statement, no second nurse and no PIN', () => {
-      const body = givenInput('k1', slot, false, entered);
+      const body = givenInput('k1', order, slot, false, entered);
       expect(body).toEqual({
         clientKey: 'k1',
+        orderVersion: 2,
         slotAt: AT_8AM,
         outcome: 'GIVEN',
         wristband: ' pt-00042 ',
+        medicineCode: '8901',
+        override: null,
         identityConfirmed: true,
       });
       expect(Object.keys(body)).not.toContain('secondNursePin');
@@ -247,30 +313,31 @@ describe('MAR model', () => {
     });
 
     it('Given high-alert adds the second nurse and the PIN', () => {
-      expect(givenInput('k1', slot, true, entered)).toMatchObject({ secondNurseId: 'm-rupali', secondNursePin: '4821' });
+      expect(givenInput('k1', order, slot, true, entered)).toMatchObject({ secondNurseId: 'm-rupali', secondNursePin: '4821' });
     });
 
     it('Given high-alert with no nurse chosen sends null (the server answers)', () => {
-      expect(givenInput('k1', slot, true, { ...entered, nurse: '' }).secondNurseId).toBeNull();
+      expect(givenInput('k1', order, slot, true, { ...entered, nurse: '' }).secondNurseId).toBeNull();
     });
 
     it('Record not given sends the reason only: no wristband, statement, nurse or PIN', () => {
-      expect(notGivenInput('k2', slot, 'NIL_BY_MOUTH')).toEqual({
+      expect(notGivenInput('k2', order, slot, 'NIL_BY_MOUTH')).toEqual({
         clientKey: 'k2',
+        orderVersion: 2,
         slotAt: AT_8AM,
         outcome: 'NOT_GIVEN',
         reasonKey: 'NIL_BY_MOUTH',
       });
-      expect(notGivenInput('k2', slot, '').reasonKey).toBeNull();
+      expect(notGivenInput('k2', order, slot, '').reasonKey).toBeNull();
     });
 
     it('the signature holds what the server compares on a repeat', () => {
-      const a = requestSignature(givenInput('k', slot, true, entered));
-      expect(requestSignature(givenInput('k', slot, true, { ...entered, pin: '0000', wristband: 'x' }))).toBe(a);
-      expect(requestSignature(givenInput('k', slot, true, { ...entered, nurse: 'm-nikhil' }))).not.toBe(a);
-      expect(requestSignature(notGivenInput('k', slot, 'NIL_BY_MOUTH'))).not.toBe(a);
-      expect(requestSignature(notGivenInput('k', slot, 'NIL_BY_MOUTH'))).not.toBe(
-        requestSignature(notGivenInput('k', slot, 'HELD_DOCTOR')),
+      const a = requestSignature(givenInput('k', order, slot, true, entered));
+      expect(requestSignature(givenInput('k', order, slot, true, { ...entered, pin: '0000', wristband: 'x' }))).toBe(a);
+      expect(requestSignature(givenInput('k', order, slot, true, { ...entered, nurse: 'm-nikhil' }))).not.toBe(a);
+      expect(requestSignature(notGivenInput('k', order, slot, 'NIL_BY_MOUTH'))).not.toBe(a);
+      expect(requestSignature(notGivenInput('k', order, slot, 'NIL_BY_MOUTH'))).not.toBe(
+        requestSignature(notGivenInput('k', order, slot, 'HELD_DOCTOR')),
       );
     });
   });

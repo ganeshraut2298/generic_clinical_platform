@@ -72,3 +72,83 @@
 .ward-region:empty {
   margin-top: -8px;
 }
+
+// Checked by the system (reference): one line each; a line that only the server can confirm shows no tick.
+.autolist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: color-mix(in srgb, var(--good) 10%, transparent);
+    color: var(--good);
+
+    &.warn {
+      background: color-mix(in srgb, var(--warn) 12%, transparent);
+      color: var(--warn);
+    }
+    &.pending {
+      background: var(--muted-soft);
+      color: var(--ink-2);
+    }
+    small {
+      font-weight: 500;
+    }
+  }
+}
+
+.prn-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+}
+
+// Manual override (reference): reasons as chips, the note under them.
+.sfov {
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+
+  .linkbtn {
+    align-self: flex-start;
+    min-height: 44px;
+    text-decoration: underline;
+    color: var(--ink-2);
+  }
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.on {
+    background: var(--pri);
+    border-color: var(--pri);
+    color: var(--pri-ink);
+  }
+}

@@ -2,7 +2,16 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../../../core/config/api-config';
-import { EmrSheet, MedicineOrderAnswer, MedicineOrderInput } from './emr.model';
+import {
+  ChangeOrderInput,
+  EmrSheet,
+  HoldOrderInput,
+  MedicineOrderAnswer,
+  MedicineOrderInput,
+  QueryReplyInput,
+  ResumeOrderInput,
+  StopOrderInput,
+} from './emr.model';
 
 /**
  * The only place that calls the SAH-31 EMR endpoints (`/ipd/admissions/{id}/emr`,
@@ -30,8 +39,26 @@ export class EmrApi {
     );
   }
 
-  /** OWNER, DOCTOR. No body. 200 with the sheet now. */
-  stop(orderId: string): Observable<EmrSheet> {
-    return this.http.post<EmrSheet>(`${this.baseUrl}/medicine-orders/${orderId}/stop`, null);
+  /** OWNER, DOCTOR. The body names the version the doctor saw and the reason (4 to 200 characters). 200 with the sheet now. */
+  stop(orderId: string, body: StopOrderInput): Observable<EmrSheet> {
+    return this.http.post<EmrSheet>(`${this.baseUrl}/medicine-orders/${orderId}/stop`, body);
+  }
+
+  /** SAH-76-1. A new version of the order; 200 with the sheet now. */
+  change(orderId: string, body: ChangeOrderInput): Observable<EmrSheet> {
+    return this.http.post<EmrSheet>(`${this.baseUrl}/medicine-orders/${orderId}/change`, body);
+  }
+
+  hold(orderId: string, body: HoldOrderInput): Observable<EmrSheet> {
+    return this.http.post<EmrSheet>(`${this.baseUrl}/medicine-orders/${orderId}/hold`, body);
+  }
+
+  resume(orderId: string, body: ResumeOrderInput): Observable<EmrSheet> {
+    return this.http.post<EmrSheet>(`${this.baseUrl}/medicine-orders/${orderId}/resume`, body);
+  }
+
+  /** SAH-76-2. The doctor's reply to the pharmacist's question. */
+  queryReply(orderId: string, body: QueryReplyInput): Observable<EmrSheet> {
+    return this.http.post<EmrSheet>(`${this.baseUrl}/medicine-orders/${orderId}/query-reply`, body);
   }
 }

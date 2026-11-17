@@ -51,6 +51,13 @@
           <b [id]="medsHeadingId" tabindex="-1">{{ medsTitle }}</b>
           <small class="faint">{{ medsSubtitle }}</small>
         </div>
+        @if (actionNotice(); as message) {
+          <div class="notice warn" role="alert" data-testid="emr-action-notice">
+            <app-icon name="alert" [size]="16" />
+            <span>{{ message }}</span>
+            <button type="button" mat-stroked-button data-act="emr-notice-x" (click)="dismissNotice()">Dismiss</button>
+          </div>
+        }
         <div role="list" aria-label="Medicines on chart" aria-live="polite" data-testid="emr-orders">
           @for (o of s.orders; track o.id) {
             @let p = pill(o);
@@ -66,60 +73,103 @@
                 @if (o.highAlert) {
                   <span class="pill p-crit sfha" data-testid="high-alert">High-alert</span>
                 }
+                @for (t of tags(o); track t.key) {
+                  <span [class]="'pill sfha ' + t.css" [attr.data-tag]="t.key">{{ t.text }}</span>
+                }
                 <small class="faint sl" data-testid="order-line">{{ smallLine(o) }}</small>
-                @if (lastDoseOf(o, s.asOf); as ld) {
+                @if (prn(o.details); as line) {
+                  <small class="faint sl" data-testid="order-prn">
+                    As needed for {{ o.details.indication }} · {{ line }}
+                  </small>
+                } @else if (o.details.indication) {
+                  <small class="faint sl" data-testid="order-indication">For: {{ o.details.indication }}</small>
+                }
+                @for (line of changes(o); track $index) {
+                  <small class="faint sl" data-testid="order-change">{{ line }}</small>
+                }
+                @if (o.changeReason) {
+                  <small class="faint sl" data-testid="order-change-reason">Reason for the change: {{ o.changeReason }}</small>
+                }
+                @if (o.hold; as h) {
+                  <small class="faint sl" data-testid="order-hold">{{ holdText(h) }}</small>
+                }
+                @if (o.status === 'STOPPED') {
+                  <small class="faint sl" data-testid="order-stopped">{{ stoppedText(o) }}</small>
+                }
+                @if (o.query; as q) {
+                  <small class="faint sl warnline" data-testid="order-query">Pharmacist query: {{ q.question }}</small>
+                  @if (q.reply) {
+                    <small class="faint sl" data-testid="order-query-reply">Your reply: {{ q.reply }}</small>
+                  }
+                }
+                @for (x of execution(o); track x.key) {
                   <small
                     class="faint sl ldose"
-                    [class.warnline]="ld.warn"
-                    data-testid="order-last-dose"
-                    [attr.data-warn]="ld.warn"
-                    >{{ ld.text }}</small
+                    [class.warnline]="x.warn"
+                    data-testid="order-execution"
+                    [attr.data-line]="x.key"
+                    [attr.data-warn]="x.warn"
+                    >{{ x.text }}</small
                   >
+                }
+                @if (o.canReply) {
+                  <app-query-reply [order]="o" [admissionId]="s.admissionId" (answered)="replied($event)" />
                 }
               </span>
               <span [class]="'pill ' + p.css" data-testid="order-pill">{{ p.text }}</span>
               <b class="acts">
+                @if (o.canChange) {
+                  <button
+                    type="button"
+                    mat-stroked-button
+                    data-act="ordchange"
+                    [id]="'emr-change-' + o.id"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Change ' + o.drugName"
+                    (click)="openChange(o)"
+                  >
+                    Change
+                  </button>
+                }
+                @if (o.canHold) {
+                  <button
+                    type="button"
+                    mat-stroked-button
+                    data-act="ordhold"
+                    [id]="'emr-hold-' + o.id"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Hold ' + o.drugName"
+                    (click)="openHold(o)"
+                  >
+                    Hold
+                  </button>
+                }
+                @if (o.canResume) {
+                  <button
+                    type="button"
+                    mat-stroked-button
+                    data-act="ordresume"
+                    [id]="'emr-resume-' + o.id"
+                    [disabled]="busy()"
+                    [attr.aria-busy]="busy()"
+                    [attr.aria-label]="'Resume ' + o.drugName"
+                    (click)="resume(o)"
+                  >
+                    Resume
+                  </button>
+                }
                 @if (o.canStop) {
-                  @if (stopConfirmId() === o.id) {
-                    <span class="confirm" role="alert" data-testid="stop-confirm">
-                      {{ stopConfirm }}
-                      <button
-                        type="button"
-                        mat-flat-button
-                        class="danger"
-                        data-act="sfstopok"
-                        [id]="'emr-stopok-' + o.id"
-                        [disabled]="busy()"
-                        [attr.aria-busy]="busy()"
-                        [attr.aria-label]="'Stop ' + o.drugName"
-                        (click)="confirmStop(o)"
-                      >
-                        Stop
-                      </button>
-                      <button
-                        type="button"
-                        mat-stroked-button
-                        data-act="sfstopkeep"
-                        [id]="'emr-keep-' + o.id"
-                        [disabled]="busy()"
-                        (click)="keepOrder(o)"
-                      >
-                        Keep
-                      </button>
-                    </span>
-                  } @else {
-                    <button
-                      type="button"
-                      mat-stroked-button
-                      data-act="sfstop"
-                      [id]="'emr-stop-' + o.id"
-                      [disabled]="busy()"
-                      [attr.aria-label]="'Stop ' + o.drugName"
-                      (click)="askStop(o)"
-                    >
-                      Stop
-                    </button>
-                  }
+                  <button
+                    type="button"
+                    mat-stroked-button
+                    data-act="sfstop"
+                    [id]="'emr-stop-' + o.id"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Stop ' + o.drugName"
+                    (click)="openStop(o)"
+                  >
+                    Stop
+                  </button>
                 }
               </b>
             </div>
@@ -142,7 +192,7 @@
                 id="emr-drug"
                 class="input"
                 formControlName="drug"
-                (change)="selectionChanged()"
+                (change)="medicineChanged()"
                 [attr.aria-invalid]="errors().drugKey ? 'true' : null"
                 [attr.aria-describedby]="errors().drugKey ? 'emr-drug-err' : null"
               >
@@ -154,25 +204,18 @@
                 <span class="err-text" role="alert" id="emr-drug-err">{{ message }}</span>
               }
             </div>
-            <div class="field">
-              <label for="emr-freq">How often</label>
-              <select
-                id="emr-freq"
-                class="input"
-                formControlName="freq"
-                (change)="selectionChanged()"
-                [attr.aria-invalid]="errors().frequencyKey ? 'true' : null"
-                [attr.aria-describedby]="errors().frequencyKey ? 'emr-freq-err' : null"
-              >
-                @for (f of s.frequencies; track f.key) {
-                  <option [value]="f.key">{{ f.label }}</option>
-                }
-              </select>
-              @if (errors().frequencyKey; as message) {
-                <span class="err-text" role="alert" id="emr-freq-err">{{ message }}</span>
-              }
-            </div>
           </div>
+          <app-order-fields
+            [form]="form"
+            [errors]="errors()"
+            [frequencies]="s.frequencies"
+            [units]="unitOptions()"
+            [routes]="s.routes"
+            [priorities]="s.priorities"
+            [statWindowMinutes]="s.statWindowMinutes"
+            (selection)="selectionChanged()"
+            (edit)="fieldEdited($event)"
+          />
 
           @if (shown(); as c) {
             @if (c.outcome === 'BLOCKED') {

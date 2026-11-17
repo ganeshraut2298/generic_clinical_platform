@@ -14,10 +14,20 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.sahaj.ipd.application.MedicineRoundRepository.ActiveOrder;
+import com.sahaj.ipd.domain.EffectiveNursingSettings;
 import com.sahaj.ipd.domain.MedicineRound;
 import com.sahaj.ipd.domain.SeedCatalogue;
+import com.sahaj.ipd.domain.order.MedicineOrderVersion;
+import com.sahaj.ipd.domain.order.MedicineOrderVersion.Kind;
+import com.sahaj.ipd.domain.order.MedicineOrderVersion.Verification;
+import com.sahaj.ipd.domain.order.OrderPriority;
+import com.sahaj.ipd.domain.order.OrderStatus;
+import com.sahaj.ipd.domain.order.OrderTimeline;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,8 +35,9 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 /**
- * SAH-35 code review R35-1: one damaged order (a drug missing from the catalogue, an unknown frequency) is left out of
- * the round with a warning that holds the clinic id and the order id only; the rest of the round is still answered.
+ * SAH-35 code review R35-1: one damaged order (a drug missing from the catalogue, no timeline) is left out of the round
+ * with a warning that holds the clinic id and the order id only; the rest of the round is still answered. SAH-76: the
+ * slots come from the order timelines and the settings in force, read once for every patient.
  */
 class MedicineRoundReaderTest {
 
@@ -36,6 +47,9 @@ class MedicineRoundReaderTest {
     private static final String MISSING_DRUG = "no-such-drug-xyz";
 
     private MedicineRoundRepository repository;
+    private final Map<UUID, OrderTimeline> timelineOf = new HashMap<>();
+    private OrderTimelineRepository timelines;
+    private NursingSettingsReader settingsReader;
     private MedicineRoundReader reader;
     private ListAppender<ILoggingEvent> appender;
     private Logger logger;
@@ -43,8 +57,17 @@ class MedicineRoundReaderTest {
     @BeforeEach
     void setUp() {
         repository = mock(MedicineRoundRepository.class);
+        timelines = (tenantId, admissionIds) -> timelineOf;
+        settingsReader = mock(NursingSettingsReader.class);
+        when(settingsReader.effectiveForAll(eq(TENANT), anyCollection())).thenAnswer(call -> {
+            Map<UUID, EffectiveNursingSettings> all = new HashMap<>();
+            for (UUID id : call.<Collection<UUID>>getArgument(1)) {
+                all.put(id, EffectiveNursingSettings.defaults());
+            }
+            return all;
+        });
         reader = new MedicineRoundReader(repository, new MedicineCatalogue(SeedCatalogue.catalogue()),
-                new SkippedOrderWarningsTest.MutableClock());
+                new SkippedOrderWarningsTest.MutableClock(), timelines, settingsReader);
         when(repository.findDosesBetween(eq(TENANT), anyCollection(), any(), any())).thenReturn(List.of());
         logger = (Logger) LoggerFactory.getLogger(MedicineRoundReader.class);
         appender = new ListAppender<>();
@@ -57,9 +80,21 @@ class MedicineRoundReaderTest {
         logger.detachAppender(appender);
     }
 
-    private static ActiveOrder order(String drugKey, String frequencyKey) {
-        return new ActiveOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "204", drugKey, frequencyKey,
-                LONG_AGO);
+    /** An ACTIVE order with a verified version 1 of the frequency (an unknown or null key gives no slot). */
+    private ActiveOrder order(String drugKey, String frequencyKey) {
+        ActiveOrder order = new ActiveOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "204", drugKey,
+                "ACTIVE");
+        MedicineOrderVersion v1 = new MedicineOrderVersion(order.orderId(), 1, Kind.SCHEDULED, frequencyKey, null, null,
+                "ORAL", LONG_AGO, null, null, OrderPriority.ROUTINE, null, null, null, UUID.randomUUID(), LONG_AGO,
+                null, Verification.REQUIRED, UUID.randomUUID(), LONG_AGO);
+        timelineOf.put(order.orderId(), new OrderTimeline(order.orderId(), order.admissionId(), OrderStatus.ACTIVE,
+                List.of(v1), List.of(), null));
+        return order;
+    }
+
+    /** An ACTIVE order whose timeline cannot be found: a damaged row. */
+    private static ActiveOrder orderWithoutTimeline() {
+        return new ActiveOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "204", "hep", "ACTIVE");
     }
 
     private void active(ActiveOrder... orders) {
@@ -81,9 +116,9 @@ class MedicineRoundReaderTest {
     }
 
     @Test
-    void anOrderWithAnUnknownFrequencyIsSkippedAndTheRestOfTheRoundIsStillAnswered() {
+    void anOrderWhoseTimelineIsMissingIsSkippedAndTheRestOfTheRoundIsStillAnswered() {
         ActiveOrder good = order("hep", "tds");
-        ActiveOrder broken = order("hep", "every-fortnight");
+        ActiveOrder broken = orderWithoutTimeline();
         active(good, broken);
 
         MedicineRound.Result result = reader.read(TENANT, AS_OF);
@@ -101,7 +136,7 @@ class MedicineRoundReaderTest {
 
     @Test
     void whenEveryOrderIsDamagedTheRoundIsEmptyAndNoDoseQueryIsMade() {
-        active(order(MISSING_DRUG, "tds"), order("hep", "nope"));
+        active(order(MISSING_DRUG, "tds"), orderWithoutTimeline());
 
         MedicineRound.Result result = reader.read(TENANT, AS_OF);
 
@@ -124,7 +159,7 @@ class MedicineRoundReaderTest {
     @Test
     void theWarningHoldsTheClinicIdAndTheOrderIdOnly() {
         ActiveOrder broken = order(MISSING_DRUG, "tds");
-        ActiveOrder badFrequency = order("hep", "every-fortnight");
+        ActiveOrder badFrequency = orderWithoutTimeline();
         active(broken, badFrequency);
 
         reader.read(TENANT, AS_OF);
@@ -134,7 +169,7 @@ class MedicineRoundReaderTest {
         for (ILoggingEvent event : events) {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage()).contains("tenantId=" + TENANT)
-                    .doesNotContain(MISSING_DRUG).doesNotContain("every-fortnight").doesNotContain("hep");
+                    .doesNotContain(MISSING_DRUG).doesNotContain("hep");
         }
         assertThat(events.get(0).getFormattedMessage()).contains("orderId=" + broken.orderId());
         assertThat(events.get(1).getFormattedMessage()).contains("orderId=" + badFrequency.orderId());
@@ -155,7 +190,7 @@ class MedicineRoundReaderTest {
     void theSameDamagedOrderIsWarnedAboutOncePerTenMinutesNotOnEveryPoll() {
         SkippedOrderWarningsTest.MutableClock clock = new SkippedOrderWarningsTest.MutableClock();
         MedicineRoundReader throttled = new MedicineRoundReader(repository,
-                new MedicineCatalogue(SeedCatalogue.catalogue()), clock);
+                new MedicineCatalogue(SeedCatalogue.catalogue()), clock, timelines, settingsReader);
         ActiveOrder broken = order(MISSING_DRUG, "tds");
         active(broken);
 
@@ -178,13 +213,78 @@ class MedicineRoundReaderTest {
     void twoDamagedOrdersEachGetTheirOwnSingleWarning() {
         SkippedOrderWarningsTest.MutableClock clock = new SkippedOrderWarningsTest.MutableClock();
         MedicineRoundReader throttled = new MedicineRoundReader(repository,
-                new MedicineCatalogue(SeedCatalogue.catalogue()), clock);
-        active(order(MISSING_DRUG, "tds"), order("hep", "every-fortnight"));
+                new MedicineCatalogue(SeedCatalogue.catalogue()), clock, timelines, settingsReader);
+        active(order(MISSING_DRUG, "tds"), orderWithoutTimeline());
 
         throttled.read(TENANT, AS_OF);
         throttled.read(TENANT, AS_OF);
 
         assertThat(appender.list).hasSize(2);
+    }
+
+    // ---- SAH-76 ----
+
+    @Test
+    void anOrderWithAnUnknownFrequencyGivesNoSlotAndTheRestOfTheRoundIsStillAnswered() {
+        ActiveOrder good = order("hep", "tds");
+        active(good, order("hep", "every-fortnight"));
+
+        assertThat(reader.read(TENANT, AS_OF).rows()).isNotEmpty().allMatch(e -> e.orderId().equals(good.orderId()));
+    }
+
+    @Test
+    void theTimelinesAndTheSettingsAreReadOnceForEveryPatient() {
+        active(order("hep", "tds"), order("hep", "bd"), order("hep", "od"));
+        int[] reads = {0, 0};
+        timelines = (tenantId, admissionIds) -> {
+            reads[0]++;
+            return timelineOf;
+        };
+        reader = new MedicineRoundReader(repository, new MedicineCatalogue(SeedCatalogue.catalogue()),
+                new SkippedOrderWarningsTest.MutableClock(), timelines, settingsReader);
+
+        reader.read(TENANT, AS_OF);
+
+        assertThat(reads[0]).isEqualTo(1);
+        verify(settingsReader).effectiveForAll(eq(TENANT), anyCollection());
+    }
+
+    @Test
+    void theWindowOfTheWardProfileDecidesWhatIsDue() {
+        ActiveOrder o = order("hep", "bd");
+        active(o);
+        // 8 PM is 7 hours ahead of AS_OF (1:30 PM IST is 08:00Z): a 30-minute window never makes it due.
+        when(settingsReader.effectiveForAll(eq(TENANT), anyCollection())).thenAnswer(call -> Map.of(o.admissionId(),
+                new EffectiveNursingSettings(true, 30, 30, 15, 30, 5, 10, 240)));
+
+        MedicineRound.Result result = reader.read(TENANT, AS_OF);
+
+        assertThat(result.rows()).extracting(e -> e.slotAt().toString()).containsExactly("2026-11-11T02:30:00Z");
+        assertThat(result.rows().get(0).state().name()).isEqualTo("LATE");
+    }
+
+    @Test
+    void aPendingOrderIsInTheRoundOnlyForItsStatSlotBeforeTheCheck() {
+        ActiveOrder waiting = new ActiveOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "204", "hep",
+                "PENDING");
+        MedicineOrderVersion unverified = new MedicineOrderVersion(waiting.orderId(), 1, Kind.SCHEDULED, "bd", null,
+                null, "ORAL", LONG_AGO, null, null, OrderPriority.ROUTINE, null, null, null, UUID.randomUUID(),
+                LONG_AGO, null, Verification.REQUIRED, null, null);
+        timelineOf.put(waiting.orderId(), new OrderTimeline(waiting.orderId(), waiting.admissionId(),
+                OrderStatus.PENDING, List.of(unverified), List.of(), null));
+        Instant created = Instant.parse("2026-11-11T07:45:20Z");
+        ActiveOrder stat = new ActiveOrder(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "205", "hep",
+                "PENDING");
+        MedicineOrderVersion statVersion = new MedicineOrderVersion(stat.orderId(), 1, Kind.ONCE, null, null, null, "IV",
+                created, null, null, OrderPriority.STAT, null, null, null, UUID.randomUUID(), created, null,
+                Verification.REQUIRED, null, null);
+        timelineOf.put(stat.orderId(), new OrderTimeline(stat.orderId(), stat.admissionId(), OrderStatus.PENDING,
+                List.of(statVersion), List.of(), null));
+        active(waiting, stat);
+
+        MedicineRound.Result result = reader.read(TENANT, AS_OF);
+
+        assertThat(result.rows()).extracting(e -> e.orderId()).containsExactly(stat.orderId());
     }
 
     // ---- SAH-34 patient scope ----

@@ -174,7 +174,15 @@ public final class AdmissionViews {
                                         boolean vitalsDue, CardAllergy allergy,
                                         @JsonInclude(JsonInclude.Include.NON_NULL) String diagnosis,
                                         @JsonInclude(JsonInclude.Include.NON_NULL) Optional<CardLatestVitals> latestVitals,
-                                        boolean roundDoneToday) {
+                                        boolean roundDoneToday, OrderNoticeViews.NoticeCount ordersToAcknowledge) {
+
+        /** SAH-76: no orders to acknowledge (the count is set by {@link #withOrdersToAcknowledge}). */
+        public AdmittedClinicalFlags(CardEscalationFlag escalation, VitalsViews.EwsSummary latestEws, boolean vitalsDue,
+                                     CardAllergy allergy, String diagnosis, Optional<CardLatestVitals> latestVitals,
+                                     boolean roundDoneToday) {
+            this(escalation, latestEws, vitalsDue, allergy, diagnosis, latestVitals, roundDoneToday,
+                    OrderNoticeViews.NoticeCount.NONE);
+        }
 
         /** The SAH-37 facts: no round flag (false). SAH-67-1 (ADR-025 D8) adds {@code roundDoneToday}. */
         public AdmittedClinicalFlags(CardEscalationFlag escalation, VitalsViews.EwsSummary latestEws, boolean vitalsDue,
@@ -190,7 +198,14 @@ public final class AdmissionViews {
 
         /** The same facts with the round flag: a doctor signed today's progress note in the EMR. */
         public AdmittedClinicalFlags withRoundDone(boolean done) {
-            return new AdmittedClinicalFlags(escalation, latestEws, vitalsDue, allergy, diagnosis, latestVitals, done);
+            return new AdmittedClinicalFlags(escalation, latestEws, vitalsDue, allergy, diagnosis, latestVitals, done,
+                    ordersToAcknowledge);
+        }
+
+        /** SAH-76-3: the card badge "n to acknowledge" (ADR-027 D5). */
+        public AdmittedClinicalFlags withOrdersToAcknowledge(OrderNoticeViews.NoticeCount count) {
+            return new AdmittedClinicalFlags(escalation, latestEws, vitalsDue, allergy, diagnosis, latestVitals,
+                    roundDoneToday, count);
         }
 
         @Override

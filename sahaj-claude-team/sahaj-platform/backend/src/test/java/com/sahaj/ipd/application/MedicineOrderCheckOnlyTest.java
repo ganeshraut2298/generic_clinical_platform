@@ -29,8 +29,7 @@ class MedicineOrderCheckOnlyTest extends MedicineTestBase {
 
     @BeforeEach
     void setUp() {
-        service = new MedicineOrderService(fake, admissions, events, patients, patientAccess, actors, team, auditLog, gate,
-                catalogue, assembler, guard);
+        service = newOrderService();
         clientKey = UUID.randomUUID();
     }
 
@@ -83,7 +82,7 @@ class MedicineOrderCheckOnlyTest extends MedicineTestBase {
     @Test
     void aClientKeyAlreadyOrderedAnswersOrderedAndAVisitingDoctorIsRefused() {
         allergyText = "No known allergy";
-        MedicineOrderAnswer placed = service.order(TENANT, DOCTOR, "DOCTOR", ADMISSION, input("pcm", "od"));
+        MedicineOrderAnswer placed = service.order(TENANT, DOCTOR, "DOCTOR", ADMISSION, legacyOrder(clientKey.toString(), "pcm", "od", null, null));
         assertThat(placed.outcome()).isEqualTo("PLACED");
 
         assertThat(check("pcm", "od").outcome()).isEqualTo("ORDERED");

@@ -4,16 +4,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sahaj.ipd.application.DoseRules.Body;
+import com.sahaj.ipd.application.MarViews.CorrectionInput;
 import com.sahaj.ipd.application.MarViews.DoseInput;
+import com.sahaj.ipd.application.MarViews.OverrideInput;
 import com.sahaj.ipd.domain.Drug;
+import com.sahaj.ipd.domain.InErrorReason;
 import com.sahaj.ipd.domain.NotGivenReason;
+import com.sahaj.ipd.domain.ScanOverrideReason;
 import com.sahaj.ipd.domain.SeedCatalogue;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
+import com.sahaj.platform.api.InvalidInputException;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -26,7 +32,14 @@ class DoseRulesTest {
     private static final Instant EIGHT_AM = Instant.parse("2026-11-11T02:30:00Z");
 
     private static DoseInput input(String key, String slot, String outcome) {
-        return new DoseInput(key, slot, outcome, null, null, null, null, null);
+        return di(key, slot, outcome, null, null, null, null, null);
+    }
+
+    /** The eight fields of SAH-32; order version 1, no medicine code, no override, no note. */
+    private static DoseInput di(String key, String slot, String outcome, String wristband, Object confirmed,
+                                String secondNurseId, String pin, String reasonKey) {
+        return new DoseInput(key, slot, 1, outcome, wristband, null, null, null, confirmed, secondNurseId, pin,
+                reasonKey);
     }
 
     // ---- roles ----
@@ -79,7 +92,7 @@ class DoseRulesTest {
     }
 
     @ParameterizedTest
-    @NullAndEmptySource
+    @EmptySource
     @ValueSource(strings = {"yesterday", "2026-11-11", "2026-11-11T02:30:00", "02:30", "1762828200"})
     void aBadSlotIsAFormatErrorOnTheSlot(String slot) {
         assertThatThrownBy(() -> DoseRules.body(input(KEY, slot, "GIVEN"))).isInstanceOfSatisfying(
@@ -94,6 +107,125 @@ class DoseRulesTest {
         assertThatThrownBy(() -> DoseRules.body(input(KEY, "2026-11-11T02:30:00Z", outcome))).isInstanceOfSatisfying(
                 InvalidFieldsException.class, e -> assertThat(e.errors()).containsExactly(new FieldMessage("outcome",
                         "Reload the page and try again.")));
+    }
+
+    @Test
+    void aMissingSlotIsAllowedInTheBodyBecauseAPrnDoseHasNone() {
+        Body body = DoseRules.body(input(KEY, null, "GIVEN"));
+
+        assertThat(body.slotAt()).isNull();
+        assertThat(body.orderVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void theOrderVersionIsAWholeNumberOfOneOrMoreAsANumberOrItsText() {
+        assertThat(DoseRules.orderVersion(1)).isEqualTo(1);
+        assertThat(DoseRules.orderVersion(7L)).isEqualTo(7);
+        assertThat(DoseRules.orderVersion(" 3 ")).isEqualTo(3);
+        assertThat(DoseRules.orderVersion(0)).isNull();
+        assertThat(DoseRules.orderVersion(-2)).isNull();
+        assertThat(DoseRules.orderVersion("two")).isNull();
+        assertThat(DoseRules.orderVersion(1.5)).isNull();
+        assertThat(DoseRules.orderVersion(null)).isNull();
+    }
+
+    @Test
+    void aMissingOrderVersionIsAFormatErrorOnTheVersionTogetherWithTheOthers() {
+        DoseInput noVersion = new DoseInput("x", "yesterday", null, "GIVEN", null, null, null, null, null, null, null,
+                null);
+
+        assertThatThrownBy(() -> DoseRules.body(noVersion)).isInstanceOfSatisfying(InvalidFieldsException.class,
+                e -> assertThat(e.errors()).extracting(FieldMessage::field)
+                        .containsExactly("clientKey", "slotAt", "orderVersion"));
+    }
+
+    // ---- override, note, corrections (SAH-76) ----
+
+    private static DoseInput withOverride(String reasonKey, String note) {
+        return new DoseInput(KEY, "2026-11-11T02:30:00Z", 1, "GIVEN", null, null, new OverrideInput(reasonKey, note),
+                null, Boolean.TRUE, null, null, null);
+    }
+
+    @Test
+    void anOverrideNeedsAReasonFromTheListAndANoteOfFourToTwoHundredCharacters() {
+        assertThat(DoseRules.hasOverride(withOverride("NO_BARCODE", "x"))).isTrue();
+        assertThat(DoseRules.hasOverride(input(KEY, "2026-11-11T02:30:00Z", "GIVEN"))).isFalse();
+        DoseRules.ScanOverride ok = DoseRules.override(withOverride("NO_BARCODE", "  Read the strip label  "));
+        assertThat(ok.reason().key()).isEqualTo("NO_BARCODE");
+        assertThat(ok.note()).isEqualTo("Read the strip label");
+        assertThatThrownBy(() -> DoseRules.override(withOverride(null, "Read the strip label")))
+                .isInstanceOfSatisfying(InvalidInputException.class, e -> {
+                    assertThat(e.field()).isEqualTo("override.reasonKey");
+                    assertThat(e.getMessage()).isEqualTo("Choose why you cannot scan.");
+                });
+        assertThatThrownBy(() -> DoseRules.override(withOverride("LAZY", "Read the strip label")))
+                .isInstanceOf(InvalidInputException.class);
+        assertThatThrownBy(() -> DoseRules.override(withOverride("EMERGENCY", " abc ")))
+                .isInstanceOfSatisfying(InvalidInputException.class, e -> {
+                    assertThat(e.field()).isEqualTo("override.note");
+                    assertThat(e.getMessage()).isEqualTo("Write what you checked instead.");
+                });
+        assertThatThrownBy(() -> DoseRules.override(withOverride("EMERGENCY", "x".repeat(201))))
+                .isInstanceOf(InvalidInputException.class);
+        assertThat(DoseRules.override(withOverride("EMERGENCY", "x".repeat(200))).note()).hasSize(200);
+    }
+
+    @Test
+    void reasonOtherNeedsANoteOfFourToTwoHundredCharacters() {
+        DoseInput other = new DoseInput(KEY, "2026-11-11T02:30:00Z", 1, "NOT_GIVEN", null, null, null, "  Spat it out  ",
+                null, null, null, "OTHER");
+
+        assertThat(DoseRules.otherNote(other)).isEqualTo("Spat it out");
+        assertThatThrownBy(() -> DoseRules.otherNote(new DoseInput(KEY, null, 1, "NOT_GIVEN", null, null, null, "no",
+                null, null, null, "OTHER"))).isInstanceOfSatisfying(InvalidInputException.class, e -> {
+                    assertThat(e.field()).isEqualTo("note");
+                    assertThat(e.getMessage()).isEqualTo("Write what happened.");
+                });
+        assertThatThrownBy(() -> DoseRules.otherNote(new DoseInput(KEY, null, 1, "NOT_GIVEN", null, null, null, null,
+                null, null, null, "OTHER"))).isInstanceOf(InvalidInputException.class);
+        assertThat(NotGivenReason.OTHER.needsNote()).isTrue();
+        assertThat(NotGivenReason.VOMITED.needsNote()).isFalse();
+    }
+
+    @Test
+    void aCorrectionNeedsAKeyAndAnInErrorMarkNeedsAReasonFromTheList() {
+        assertThat(DoseRules.correctionKey(new CorrectionInput(KEY, null))).isEqualTo(UUID.fromString(KEY));
+        assertThatThrownBy(() -> DoseRules.correctionKey(new CorrectionInput("1-1-1-1-1", null)))
+                .isInstanceOfSatisfying(InvalidInputException.class, e -> assertThat(e.field()).isEqualTo("clientKey"));
+        assertThatThrownBy(() -> DoseRules.correctionKey(null)).isInstanceOf(InvalidInputException.class);
+        assertThat(DoseRules.inErrorReason(new CorrectionInput(KEY, "WRONG_TIME")).key()).isEqualTo("WRONG_TIME");
+        assertThatThrownBy(() -> DoseRules.inErrorReason(new CorrectionInput(KEY, null)))
+                .isInstanceOfSatisfying(InvalidInputException.class, e -> {
+                    assertThat(e.field()).isEqualTo("reasonKey");
+                    assertThat(e.getMessage()).isEqualTo("Choose why it is in error.");
+                });
+    }
+
+    @Test
+    void theNewTextsAreTheContractsAndThePrnTimeIsWrittenInIst() {
+        assertThat(DoseRules.ON_HOLD).isEqualTo("This order is on hold. Do not give it.");
+        assertThat(DoseRules.ORDER_CHANGED).isEqualTo("This order was changed. Reload and check the new order.");
+        assertThat(DoseRules.CANNOT_NOW).isEqualTo("This dose cannot be given now. Reload the page.");
+        assertThat(DoseRules.SCAN_MEDICINE).isEqualTo("Scan or type the medicine code.");
+        assertThat(DoseRules.UNDO_EXPIRED).isEqualTo("The time to undo has passed. Mark it as recorded in error instead.");
+        assertThat(DoseRules.ERROR_WINDOW_CLOSED).isEqualTo("This dose is from an earlier day and cannot be changed.");
+        assertThat(DoseRules.clockText(Instant.parse("2026-11-11T09:00:00Z"))).isEqualTo("2:30 PM");
+        assertThat(DoseRules.clockText(Instant.parse("2026-11-10T18:35:00Z"))).isEqualTo("12:05 AM");
+        assertThat(DoseRules.clockText(Instant.parse("2026-11-11T06:30:00Z"))).isEqualTo("12:00 PM");
+    }
+
+    @Test
+    void theGaveEventNamesAnOverrideAndAStatDoseBeforeTheCheck() {
+        assertThat(DoseRules.gaveText(PARACETAMOL, EIGHT_AM, null, ScanOverrideReason.NO_BARCODE, false))
+                .isEqualTo("Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID"
+                        + " · scan override: Medicine has no barcode");
+        assertThat(DoseRules.gaveText(PARACETAMOL, EIGHT_AM, null, null, true))
+                .endsWith(" · before pharmacist check");
+        assertThat(DoseRules.medicineDeniedText("HEP-5000", PARACETAMOL))
+                .isEqualTo("Stopped at the medicine check: entered HEP-5000, expected Tab. Paracetamol 650 mg");
+        assertThat(DoseRules.undoneText(PARACETAMOL)).isEqualTo("Undid the dose of Tab. Paracetamol 650 mg");
+        assertThat(DoseRules.inErrorText(PARACETAMOL, InErrorReason.WRONG_TIME))
+                .isEqualTo("Marked the dose of Tab. Paracetamol 650 mg recorded in error: Wrong time recorded");
     }
 
     // ---- the pieces of the bedside checks ----
@@ -123,29 +255,29 @@ class DoseRulesTest {
     }
 
     private static DoseInput withBox(DoseInput base, Object box) {
-        return new DoseInput(base.clientKey(), base.slotAt(), base.outcome(), null, box, null, null, null);
+        return di(base.clientKey(), base.slotAt(), base.outcome(), null, box, null, null, null);
     }
 
     @Test
     void theSecondNurseIdMustBeACanonicalUuid() {
         DoseInput base = input(KEY, "2026-11-11T02:30:00Z", "GIVEN");
-        assertThat(DoseRules.secondNurse(new DoseInput(KEY, base.slotAt(), "GIVEN", null, null, KEY, null, null)))
+        assertThat(DoseRules.secondNurse(di(KEY, base.slotAt(), "GIVEN", null, null, KEY, null, null)))
                 .isEqualTo(UUID.fromString(KEY));
-        assertThat(DoseRules.secondNurse(new DoseInput(KEY, base.slotAt(), "GIVEN", null, null, "1-1-1-1-1", null,
+        assertThat(DoseRules.secondNurse(di(KEY, base.slotAt(), "GIVEN", null, null, "1-1-1-1-1", null,
                 null))).isNull();
         assertThat(DoseRules.secondNurse(base)).isNull();
         assertThat(DoseRules.secondNurse(null)).isNull();
     }
 
     @Test
-    void theReasonIsOneOfTheFiveKeys() {
+    void theReasonIsOneOfTheSevenKeys() {
         DoseInput base = input(KEY, "2026-11-11T02:30:00Z", "NOT_GIVEN");
         for (NotGivenReason reason : NotGivenReason.values()) {
-            assertThat(DoseRules.reason(new DoseInput(KEY, base.slotAt(), "NOT_GIVEN", null, null, null, null,
+            assertThat(DoseRules.reason(di(KEY, base.slotAt(), "NOT_GIVEN", null, null, null, null,
                     reason.key()))).isEqualTo(reason);
         }
-        assertThat(DoseRules.reason(new DoseInput(KEY, base.slotAt(), "NOT_GIVEN", null, null, null, null,
-                "OTHER"))).isNull();
+        assertThat(DoseRules.reason(di(KEY, base.slotAt(), "NOT_GIVEN", null, null, null, null,
+                "Other"))).isNull();
         assertThat(DoseRules.reason(base)).isNull();
         assertThat(DoseRules.reason(null)).isNull();
     }
@@ -171,8 +303,8 @@ class DoseRulesTest {
         assertThat(DoseRules.NOT_A_DOSE_TIME).isEqualTo(
                 "This is not a dose time of this medicine today. Reload the page and try again.");
         assertThat(DoseRules.BEFORE_START).isEqualTo("This dose time is before the pharmacist checked the order.");
-        assertThat(DoseRules.NOT_DUE).isEqualTo(
-                "This dose is not due yet. It can be given from 1 hour before its time.");
+        assertThat(DoseRules.notDue(60)).isEqualTo(
+                "This dose is not due yet. It can be given from 60 min before its time.");
         assertThat(DoseRules.RECORDED).isEqualTo("This dose is already recorded.");
         assertThat(DoseRules.KEY_REUSED).isEqualTo(
                 "This dose was already recorded with different values. Reload the page.");
@@ -287,7 +419,7 @@ class DoseRulesTest {
     @Test
     void theReasonsKeepTheMockupOrderAndStoreRefusedOnlyForARefusal() {
         assertThat(NotGivenReason.values()).extracting(NotGivenReason::key).containsExactly("PATIENT_REFUSED",
-                "HELD_DOCTOR", "NIL_BY_MOUTH", "NOT_AVAILABLE", "AWAY_FROM_WARD");
+                "HELD_DOCTOR", "NIL_BY_MOUTH", "NOT_AVAILABLE", "AWAY_FROM_WARD", "VOMITED", "OTHER");
         assertThat(NotGivenReason.PATIENT_REFUSED.outcome().name()).isEqualTo("REFUSED");
         for (NotGivenReason reason : NotGivenReason.values()) {
             if (reason != NotGivenReason.PATIENT_REFUSED) {

@@ -297,7 +297,7 @@ class EmrIpdPortsTest {
         MedicineOrderAnswer placed = new MedicineOrderAnswer("PLACED", false, null, row, null);
         OrderCheckView stop = new OrderCheckView("RECORDED", List.of(new MedicineViews.OrderFinding("ALLERGY_PENICILLIN",
                 "HARD_STOP", null, "Documented allergy")), List.of(), "T".repeat(22));
-        when(orderService.order(eq(TENANT), eq(ACTOR), any(), eq(ADMISSION), any(MedicineOrderInput.class)))
+        when(orderService.orderForPort(eq(TENANT), eq(ACTOR), any(), eq(ADMISSION), any(MedicineOrderInput.class)))
                 .thenReturn(placed, new MedicineOrderAnswer("BLOCKED", false, stop, null, null));
         com.sahaj.ipd.domain.DrugCatalogue drugs = mock(com.sahaj.ipd.domain.DrugCatalogue.class);
         when(catalogue.catalogue()).thenReturn(drugs);
@@ -314,7 +314,7 @@ class EmrIpdPortsTest {
         // DEC-051 D3: the refusal row names the drug by its catalogue name and the kind of the first finding
         assertThat(result.notPlaced().get(0).drugName()).isEqualTo("Tab. Paracetamol 650 mg");
         assertThat(result.notPlaced().get(0).checkKind()).isEqualTo("ALLERGY_PENICILLIN");
-        verify(orderService, org.mockito.Mockito.times(2)).order(any(), any(), any(), any(), any());
+        verify(orderService, org.mockito.Mockito.times(2)).orderForPort(any(), any(), any(), any(), any());
     }
 
     @Test

@@ -1,0 +1,569 @@
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+Sahaj Pharmacy & Inventory — Business
+Requirements Document
+
+ Nov 17, 2026 · ​@AARTI PUJARI
+
+1. Purpose, scope and build order
+
+Sahaj gets one Pharmacy & Inventory module, built in three phases (Masters → Inventory
+→ Pharmacy), that runs inside Sahaj with OPD and IPD or on its own for a standalone
+pharmacy or store. This BRD follows the 18-screen mockup (Sahaj Pharmacy & Inventory –
+USP Mockup) but keeps each feature at a basic, buildable level.
+
+In scope: masters and configuration, purchase to stock, store-to-store movement, ward
+consumption, counter sale, OPD/IPD dispensing, returns, registers, approvals and reports.
+
+Out of scope for this release: invoice OCR, distributor B2B connect, ABC/XYZ analytics,
+cold-chain sensors, refill reminders, AI reorder, multi-branch HO purchasing. They stay in
+the mockup as later USPs.
+
+Make it Inventory and Pharmacy agents for development : Rest of agents those who are
+working independlly they do work sepertlly
+
+Deploy the multiple agents to do it ASAP(1 for product owner head , 3 BA-Business
+analyst, 10 full stack developer agents , 5 QA agent)
+
+Deployment modes
+
+Mode        Who                                              What changes
+Integrated  Hospital or clinic on Sahaj OPD/IPD
+                                                             e-Rx, IPD orders, patient, bill and ward
+Standalone  Retail pharmacy, or a hospital using             come from Sahaj; dispensing posts
+            another HMIS                                     back
+
+                                                             Patient typed or picked from a local
+                                                             list; Rx scanned or typed; bills are the
+                                                             pharmacy's own
+
+A unit-level setting Integration mode = Integrated / Standalone decides which. Every
+screen must work in both; only the source of patient, prescription and billing changes.
+
+                                                             Page 1 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+Build order
+
+  1. Phase 1 – Masters (configuration): unit, stores, staff–store mapping, product master,
+     vendors, approval rules, numbering. Nothing else can run without these.
+
+  2. Phase 2 – Inventory: purchase order, GRN, vendor return, batch stock, indents,
+     transfers, ward consumption, returns/damaged, stock audit, approvals inbox, reports.
+
+  3. Phase 3 – Pharmacy: command center, POS billing, OPD/IPD dispensing, sales return,
+     registers and compliance.
+
+Each phase is released and tested before the next starts, because Pharmacy sells from
+the stock that Inventory creates, and Inventory needs the stores and products that
+Masters define.
+
+2. Users, roles and approvals
+
+Access is given per store, not per user: a person mapped to OPD Store as Store user can
+raise and receive for OPD Store only. One person can be mapped to several stores and
+picks the working store after login.
+
+Role            Can do                                       Typical person
+Unit admin      All masters and settings for the unit        IT or admin head
+Store user      Raise indent, receive, consume, return,      Nurse, store assistant
+                report damage
+Approver (HOD)  Approve, reject or change indent             Department HOD, ward in-
+                quantity; approve write-off                  charge
+Delegate        Same as HOD for a date range                 Deputy HOD, night-duty
+approver                                                     doctor
+Central Store   PO, GRN, dispatch, accept returns,           Store keeper
+user            vendor return
+Pharmacist      Sale, dispensing, H1/X registers,            Registered pharmacist
+                Schedule X receipt
+Cashier         Sale and payment, no rate or stock           Counter staff
+                change
+Owner           Approvals above limits, reports              Owner, administrator
+
+                                                             Page 2 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+Configurable approval levels (basic)
+
+Approvals are set per transaction type in Masters, not coded:
+
+Setting    Values
+Levels
+Condition  0, 1 or 2, each tied to a role
+           Store type, amount (₹), item flag (Schedule X, high
+Absence    value), priority
+Limits
+           Delegate with dates; escalate after N hours
+           ₹ limit for PO, write-off, discount, sales return,
+           stock adjustment
+
+Ship three presets: Lean (no HOD step), Standard (one level, HOD) and Strict (HOD then
+owner above a limit). Fixed rules that no setting can switch off: nobody approves their
+own request, Schedule X needs a pharmacist and a second signature, and the stock ledger
+cannot be edited.
+
+3. Phase 1 – Masters (configuration)
+
+Phase 1 delivers seven masters on the mockup's Inventory setup tab; Phase 2 cannot start
+until a unit can define its stores, staff, products and vendors.
+
+#  Master         Basic fields                                  Mockup screen
+                                                                Setup → Stores & staff
+M1 Unit settings  Name, GSTIN, drug licence no. and
+                  expiry, Integration mode (Integrated /        Setup → Stores & staff
+M2 Stores         Standalone), FEFO on/off, negative
+                  stock blocked                                 Setup → Stores & staff
+M3 Staff–store
+         mapping  Name, code, type (Central Store,
+                  Pharmacy, Sub-store, Ward store),
+                  issues-from store, sale allowed,
+                  consumption allowed, HOD, delegate
+
+                  User, store, store role; one user many
+                  stores
+
+                                                                Page 3 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+#  Master          Basic fields                               Mockup screen
+                                                              Setup → Products
+M4 Product master  Global catalogue (read-only) + unit's
+                   own products; salt, strength, form,        Setup → Products
+M5 Product local   manufacturer, HSN, GST %, schedule         Setup → Vendors
+         settings  (H/H1/X), purchase unit, issue unit,       New screen, same
+                   conversion, barcode                        Setup tab
+M6 Vendors
+                   Reorder level per store, rack, preferred
+M7 Approval rules  vendor, MRP/selling rule, returnable
+                   Y/N
+
+                   Name, GSTIN, drug licence and expiry,
+                   contact, credit days, return policy
+                   (days before expiry, credit %)
+
+                   Per transaction type: levels, conditions,
+                   limits, escalation (section 2)
+
+Also in Phase 1: document numbering (PO, GRN, indent, transfer, bill), reason lists (return,
+damage, adjustment) and print templates (invoice, issue slip, debit note).
+
+Product master rules
+
+     A unit adopts a global product and sets only local fields; global fields stay read-only.
+     A unit can create its own product. Before saving, the system checks salt + strength +
+     form + manufacturer and offers the matching global product first.
+     Every product has a purchase-to-issue unit conversion (Box of 10 → vial). All
+     transactions after GRN use the issue unit.
+     In Integrated mode, the same product master feeds OPD/IPD prescribing so doctors
+     pick what pharmacy stocks.
+
+Opening stock
+
+A one-time import (Excel template) loads store, product, batch, expiry, MRP, purchase
+rate and quantity. It posts as an opening-stock line in the ledger and needs owner
+approval.
+
+                                                                                Page 4 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+4. Phase 2 – Inventory
+
+Phase 2 delivers ten screens on the mockup's Inventory tab, at a basic level: every stock
+movement works, with the analytics left for later.
+
+#   Screen            Basic features in this release Later (mockup USP)
+
+I1  Batch inventory & Stock by store, product and            ABC × XYZ, cold-chain log
+
+    expiry            batch; expiry buckets
+
+                      (expired, 30/60/90 days); low
+
+                      stock list
+
+I2 Purchase orders    Reorder list from reorder level;       Consumption-based
+                      PO by vendor; approval above           suggestion, best-vendor
+                      ₹ limit; PDF/WhatsApp;                 ranking
+                      statuses
+
+I3 Receive stock      Against PO or direct; batch,           Photo OCR, distributor e-
+         (GRN)        expiry, MRP, free qty, discount,       invoice
+                      GST; short supply and rate-
+                      change flags; posts to CS
+                      stock and vendor payable
+
+I4 Vendor return      Pick quarantine or near-expiry         Return-window calendar
+                      stock; debit note; track to
+                      credit note
+
+I5 Ward / store       Raise → HOD approve                    Suggested indent qty
+         indents      (configurable) → CS process
+                      (change product/qty with
+                      reason, partial dispatch) →
+                      receive (accept/reject with
+                      reason) → CS accepts return
+
+I6 Store stock &      Store-wise stock by bucket;            —
+         consumption
+                      ward consumption patient-
+
+                      wise or general; return to CS;
+
+                      report damaged
+
+I7 Stock transfer     Store to store; approve,               Branch to branch
+                      dispatch, receive like an
+                      indent
+
+                                                                                        Page 5 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+#  Screen           Basic features in this release           Later (mockup USP)
+                                                             Daily cycle-count plan
+I8 Stock audit      Count sheet (blind), variance
+                    with reason, approval, post              Escalation timers
+I9 Approvals inbox  adjustment
+                                                             Valuation dashboards
+I10 Reports         One list of everything waiting
+                    for the signed-in user;
+                    approve/reject with reason
+
+                    Stock, expiry, stock ledger,
+                    indent and transfer registers,
+                    purchase and GST registers;
+                    Excel/PDF
+
+Indent rules (kept from the validated requirement)
+
+     Approval stays with the HOD or active delegate; receiving is open to every user
+     mapped to the receiving store.
+     Receipt per line: accepted + rejected = dispatched. Reason is required for any
+     rejected quantity: damaged, wrong item, near expiry/expired, excess, short/not
+     received.
+     Accepted quantity enters the receiving store at once. Rejected quantity waits as
+     Pending return and enters Central Store only when CS accepts it, into saleable stock
+     or quarantine.
+     Short / not received is a shortage for CS to investigate, never a physical return.
+     Every step is saved with user, store, time, before/after quantity and reason.
+
+5. Phase 3 – Pharmacy
+
+Phase 3 delivers five screens on the mockup's Pharmacy tab; each sells or issues only
+from stock created in Phase 2.
+
+#  Screen           Basic features in this release           Later (mockup USP)
+
+P1 Command Center Today's sales and bills, near-expiry ₹-ranked action queue
+                                        value, low stock count, pending Rx
+                                        and indents, udhar due
+
+                                                                                     Page 6 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+#  Screen            Basic features in this release          Later (mockup USP)
+                                                             Interaction checks, refill
+P2 POS billing       Search by name, salt or barcode;        reminders
+                     FEFO batch; expired batch
+P3 OPD / IPD         blocked; GST invoice with licence,      Barcode pick check, auto
+         dispensing  HSN, batch, expiry; discount within     supply qty
+                     limit; cash, UPI, card, udhar, split;
+P4 Sales return      print or WhatsApp; hold bill            —
+
+P5 Registers &       OPD queue of prescriptions; IPD         Inspection pack
+         compliance  orders by priority (STAT, urgent,
+                     routine, discharge); pick list by
+                     rack; issue to patient; ward returns
+
+                     Find bill; return same batch within
+                     return window; reason; refund
+                     mode; stock back to saleable or
+                     quarantine
+
+                     Schedule H1 register from sales;
+                     Schedule X/NDPS balance register;
+                     licence expiry list; audit log
+
+Pharmacy rules
+
+     Substitution: only same salt, strength and dosage form; reason saved on the bill.
+     Schedule H1: doctor name and registration, patient and quantity are written to the
+     register at sale; no manual register.
+     Allergy (Integrated mode only): if the EMR has an allergy for a drug's salt, the sale is
+     blocked; a pharmacist override needs a reason.
+     Offline billing (basic): a counter keeps selling during an internet outage and syncs
+     later; stock conflicts go to the pharmacist on sync.
+     Day close: cash tally by payment mode at shift end.
+
+6. OPD and IPD integration, and standalone mode
+
+Integration is limited to eight touch points; Pharmacy & Inventory reads from OPD/IPD and
+posts back, but never changes OPD/IPD screens or workflows.
+
+                                                             Page 7 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+#  Touch point        Integrated mode                        Standalone mode
+
+T1 Patient            Read patient (UHID, name,              Walk-in name and phone, or
+                      age, sex, ABHA) from Sahaj             local customer list
+                      registration
+
+T2 OPD prescription   Signed e-Rx appears in the             Scan or type the Rx; doctor
+                      pharmacy OPD queue                     name and registration typed
+
+T3 Allergy            Read allergy list from EMR at          Not checked; field on
+                      sale                                   customer card
+
+T4 IPD medication     New / changed / stopped                Not used; ward issue by
+         order        orders appear in the IPD               indent only
+                      queue with priority
+
+T5 IPD issue and return Issue posts a charge to the          Not used
+
+                      IPD running bill; ward return
+
+                      posts a credit
+
+T6 Ward indent and    Wards are stores; nurse                Wards as stores,
+         consumption  raises indent and records              consumption without patient
+                      consumption against an                 link
+                      admitted patient
+
+T7 Discharge          Pharmacy clearance before              Not used
+                      final bill; take-home
+                      medicines
+
+T8 OPD billing        Pharmacy bill stands alone, or         Pharmacy bill stands alone
+                      is added to the OPD bill as
+                      configured
+
+Integration rules
+
+     Pharmacy & Inventory owns its own tables (stock, ledger, bills). It reads patient, Rx,
+     order and admission data, and writes only charges, credits and dispense status back.
+     Integration goes through one adapter layer (service or events). Switching Integration
+     mode to Standalone turns the adapter off; no screen code changes.
+     If OPD/IPD is unreachable, pharmacy keeps working in standalone style and links the
+     bill to the patient later.
+
+                                                                                      Page 8 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+Product master is shared, so a doctor's e-Rx line maps to a stocked product without
+free-text matching.
+
+7. UI/UX rules
+
+The existing Sahaj shell stays exactly as it is; only the main content area follows the
+mockup.
+
+     Sidebar and header: use the current Sahaj sidebar, top bar, logo, user menu and
+     theme as they are in the product today. Do not copy the mockup's sidebar styling.
+     Module entry: add one sidebar entry, Pharmacy & Inventory. Inside it, three tabs in
+     this order: Inventory setup, Inventory, Pharmacy, matching the build order. Each tab
+     lists only its own screens.
+     Main content: follow the mockup's layout per screen (header, queue on the left with
+     detail on the right, tables, one main action button), using Sahaj's existing components,
+     fonts, colours and spacing.
+     Speed at the counter: keyboard shortcuts on POS and dispensing (search, hold,
+     save), barcode first, one primary button per screen.
+     Mobile and tablet: approvals, receiving, stock count and ward consumption must
+     work on a tablet or phone.
+     Plain words: "Receive stock", not "GRN" alone; reasons as chips, not free text.
+     Hide what is not configured: if Integration mode is Standalone, OPD/IPD queues and
+     patient-bill links are hidden, not greyed out.
+
+8. Stock rules, non-functional requirements and acceptance
+criteria
+
+Stock is held per store + product + batch in four states, and every movement writes one
+ledger line that cannot be edited.
+
+Stock state     Meaning                                              Usable
+Available       On the shelf                                         Yes
+In transit      Dispatched to this store, not yet received           No
+Pending return  Rejected or returned, waiting for the other side to  No
+                accept
+
+                                                                             Page 9 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+Stock state  Meaning                                         Usable
+Quarantine   Damaged, expired or on hold                     No
+
+     FEFO everywhere; expired batches blocked; stock never goes negative.
+     Ledger line: date/time, transaction, reference, store, state, batch, in, out, balance, user,
+     reason. Corrections are reversing lines.
+
+Non-functional
+
+     Multi-tenant: organization → unit isolation; global product master shared read-only.
+     POS search under 300 ms; bill save under 1 s.
+     Role and store based access on every API, not only on screens.
+     No hard delete of transactions; full audit trail.
+     Data hosted in India; encryption in transit and at rest; daily backup; full export.
+
+Acceptance criteria by phase
+
+ID     Phase      Criterion
+AC-M1  Masters
+AC-M2  Masters    Admin creates stores with type, issues-from store,
+                  HOD and delegate
+AC-M3  Masters
+                  Admin maps a user to several stores with a role;
+AC-M4  Masters    user switches working store
+AC-M5  Masters
+AC-M6  Masters    Unit adopts global products; own products get a
+                  duplicate warning
+AC-M7  Masters
+                  Every product has purchase-to-issue conversion
+AC-I1  Inventory
+                  Vendor with expired licence cannot get a new PO
+                  Approval levels and ₹ limits are set per transaction
+                  type without code changes
+
+                  Integration mode switch hides or shows OPD/IPD
+                  features
+
+                  GRN adds batch stock to Central Store and the bill
+                  to vendor payable
+
+                                                                        Page 10 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+ID     Phase      Criterion
+AC-I2  Inventory
+AC-I3  Inventory  Indent approval follows the configured levels
+AC-I4  Inventory
+                  Any user mapped to the receiving store can
+AC-I5  Inventory  receive
+AC-I6  Inventory
+AC-I7  Inventory  Accepted + rejected = dispatched; reason required
+                  for rejected
+AC-I8  Inventory
+                  Rejected stock reaches CS only after CS accepts it
+AC-P1  Pharmacy
+AC-P2  Pharmacy   Ward consumption works patient-wise
+                  (Integrated) and general (both modes)
+AC-P3  Pharmacy
+                  Stock audit posts approved variances as ledger
+AC-P4  Pharmacy   lines
+AC-P5  Pharmacy
+                  Approvals inbox shows every pending item for the
+AC-P6  Pharmacy   user
+
+                  POS picks FEFO batch and blocks expired stock
+
+                  OPD e-Rx loads into the bill in Integrated mode;
+                  typed Rx in Standalone
+
+                  IPD issue posts to the IPD bill; ward return posts a
+                  credit
+
+                  Sales return only against original bill and batch
+
+                  H1 register fills from sales; Schedule X needs two
+                  signatures
+
+                  Billing continues offline and syncs
+
+9. Prompt for Claude: feasibility check and phased build
+
+Paste the prompt below into Claude Code opened on the Sahaj repository, with this BRD
+and the mockup link attached. It asks for a feasibility report first and writes no code until
+the team approves.
+
+                                                                        Page 11 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+     You are a senior healthcare solution architect and full-stack lead working on
+     the Sahaj HMIS codebase in this repository.
+
+     INPUTS
+     - BRD: "Sahaj Pharmacy & Inventory — Business Requirements Document"
+     (attached).
+     - Mockup: https://claude.ai/artifact/9i2pbu9mctgnYa53x76dmt (18 screens in 3
+     tabs: Inventory setup, Inventory, Pharmacy).
+
+     GOAL
+     Add a Pharmacy & Inventory module that (a) integrates with our existing OPD
+     and IPD flows and (b) also runs standalone for a pharmacy or store with no
+     OPD/IPD.
+
+     STEP 1 — FEASIBILITY REPORT ONLY (no code changes yet)
+     Read the codebase and answer, with file paths as evidence:
+     1. Stack and structure: frontend framework, backend services, databases,
+     messaging, how modules and tenants are organised.
+     2. Existing shell: where the sidebar, top bar, routing and shared UI
+     components live, and how a new module is registered in the sidebar.
+     3. OPD/IPD data we can reuse: patient (UHID, ABHA), OPD prescription, allergy
+     list, IPD admission, medication orders, ward/bed, OPD and IPD billing. For
+     each: table/collection, API or event, and whether it exists, is partial or is
+     missing.
+     4. For each integration touch point T1–T8 in BRD section 6: how to connect
+     (API call, event, shared table), effort (S/M/L), risk, and what is missing on
+     the OPD/IPD side.
+     5. Standalone mode: how one unit-level "Integration mode" flag can switch the
+     adapter off without changing screen code. Name the design (adapter interface,
+     feature flag, events).
+     6. Any existing pharmacy, store, item or inventory code: reuse, refactor or
+     replace?
+     7. Gaps and risks: data model conflicts, multi-tenancy, offline billing,
+     performance, audit, Schedule H1/X compliance.
+     8. Estimate per phase in developer-weeks with a team breakdown (frontend,
+     backend, QA).
+     Output the report as a markdown file docs/pharmacy-inventory-feasibility.md
+     and stop. Ask me to approve before Step 2.
+
+     RULES FOR THE BUILD (after approval)
+     1. UI/UX: keep the existing Sahaj sidebar, top bar, theme and components
+     exactly as they are. Add one sidebar entry "Pharmacy & Inventory" with three
+     tabs in this order: Inventory setup, Inventory, Pharmacy. Only the main
+
+                                                                                                                                                                                                                                                  Page 12 of 13
+Sahaj Pharmacy & Inventory — Business Requirements Document
+
+     content area follows the mockup's layout, built from our existing components.
+     Do not copy the mockup's colours or sidebar.
+     2. Scope: build the "Basic features in this release" column of BRD sections
+     3–5 only. Everything in the "Later" column is out of scope.
+     3. Integration: Pharmacy & Inventory owns its own tables (stock, ledger,
+     bills). It reads patient, prescription, allergy, admission and order data
+     from OPD/IPD and writes back only charges, credits and dispense status,
+     through one adapter layer. Do not change OPD/IPD screens or workflows. Every
+     screen must work with Integration mode = Standalone.
+     4. Build order, one phase at a time, each with migrations, APIs, screens,
+     unit tests and a short demo script, then stop for my review:
+
+          Phase 1 — Masters / configuration: unit settings, stores, staff–store
+     mapping, product master (global + own, UOM conversion), vendors, approval
+     rules, numbering, opening stock import.
+
+          Phase 2 — Inventory: PO, GRN, vendor return, batch stock, indents (HOD
+     approval; any mapped user receives; accepted + rejected = dispatched;
+     rejected stock reaches Central Store only after CS accepts), transfers, ward
+     consumption, returns/damaged, stock audit, approvals inbox, reports.
+
+          Phase 3 — Pharmacy: command center, POS billing, OPD/IPD dispensing, sales
+     return, H1/X registers.
+     5. Non-negotiables: stock per store + product + batch in four states
+     (Available, In transit, Pending return, Quarantine); FEFO; no negative stock;
+     append-only stock ledger; role and store checks on every API; nobody approves
+     their own request; Schedule X needs a pharmacist and a second signature.
+
+     If anything in the BRD conflicts with the existing code, list the conflict
+     and your recommendation in the report instead of guessing.
+
+ 10. Open questions
+
+       Is the pharmacy bill separate from the OPD bill, or added to it, by default?
+       One receipt per dispatch, or several partial receipts per indent?
+       Escalation times for indents and transfers: confirm 2 h (urgent 30 min) and 24 h.
+       More than one Central Store per unit in this release?
+       Who approves promoting a unit's own product to the global master?
+       Sales return window and refund modes: per unit or per organization?
+       Does the product master already exist in OPD prescribing, and can pharmacy share
+       it?
+
+                                                                                                                                                                                                                                                  Page 13 of 13
+

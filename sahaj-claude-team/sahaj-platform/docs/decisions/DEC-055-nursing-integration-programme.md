@@ -37,3 +37,6 @@ Story id for this set: **SAH-76** (Nursing integration, Sprints 1–2). Branch n
 
 ## Answer 2 (human, chat, 15 Nov 2026)
 "For nursing console all requirements are APPROVED." Read as: the SAH-76 requirement and stories are accepted with **all OQ-76-n defaults as written** (including the go-live conditions OQ-76-10, -15, -17, -19, which stay listed as go-live items for clinical sign-off). Recorded as a chat approval. `docs/approvals.md` has no SAH-76 line yet; hooks will block the architect until the human writes `SAH-76 · stories · APPROVED`.
+
+## Answer 3 (human, chat, 15 Nov 2026): branch
+"Do these changes into this branch": SAH-76 work is done on the current branch `feature/SAH-39-home-kinetic-background` (no separate feature/SAH-76 branch). Same precedent as SAH-13 carrying SAH-25..28. Cost: the merge approval then covers SAH-39, the DEC-054 OPD fixes and SAH-76 together.

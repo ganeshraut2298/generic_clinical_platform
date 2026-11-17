@@ -38,6 +38,12 @@ public interface VisitBillingPort {
     List<VisitForBilling> today(UUID tenantId);
 
     /**
+     * Visits created in the {@code days} days before today (Asia/Kolkata), any stage, oldest first: the counter keeps an
+     * unpaid bill of an earlier day under Dues (SAH-10 AC5).
+     */
+    List<VisitForBilling> earlier(UUID tenantId, int days);
+
+    /**
      * Moves a visit from {@code BILLING} to {@code DONE} once its balance reaches zero (SAH-10 AC4).
      * {@code actorRole} must be {@code OWNER} or {@code FRONT_DESK}, the same rule {@code VisitService}
      * uses for a forward move by either of those roles; anyone else throws

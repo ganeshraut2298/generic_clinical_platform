@@ -12,20 +12,19 @@ import java.util.UUID;
 public interface MedicineRoundRepository {
 
     /**
-     * Q1: every ACTIVE order of every ADMITTED admission of the clinic, with the admission's patient and the current
-     * bed code. Unordered.
+     * Q1: every ACTIVE order of every ADMITTED admission of the clinic, and every PENDING STAT order (SAH-76: a STAT
+     * dose may be given before the pharmacist check), with the admission's patient and the current bed code. Unordered.
      */
     List<ActiveOrder> findActiveOfAdmitted(UUID tenantId);
 
     /**
-     * Q2: the dose records of these admissions with {@code from <= slot_at < to} (today, IST). The admission ids are
+     * Q2: the live (not undone, not in error) dose records of these admissions with {@code from <= slot_at < to} (today, IST). The admission ids are
      * the ones Q1 returned; the tenant is still part of the statement so the tenant index prefix is used.
      */
     List<TodayDose> findDosesBetween(UUID tenantId, Collection<UUID> admissionIds, Instant from, Instant to);
 
-    /** An ACTIVE order of an ADMITTED admission. No name of a person. */
-    record ActiveOrder(UUID orderId, UUID admissionId, UUID patientId, String bedCode, String drugKey,
-                       String frequencyKey, Instant verifiedAt) {
+    /** An ACTIVE order (or a PENDING STAT order) of an ADMITTED admission. No name of a person. */
+    record ActiveOrder(UUID orderId, UUID admissionId, UUID patientId, String bedCode, String drugKey, String status) {
 
         @Override
         public String toString() {

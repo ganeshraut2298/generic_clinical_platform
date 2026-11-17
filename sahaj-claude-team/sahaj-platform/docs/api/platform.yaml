@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Sahaj platform API
-  version: 0.1.1
-  description: 0.1.1 (12 Nov 2026, ADR-023 D13.5, SAH-66) adds the menu key secondchecks to GET /me (additive; nothing else changes). Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
+  version: 0.1.2
+  description: 0.1.2 (15 Nov 2026, DEC-054, SAH-39; additive) adds the reusable response components/responses/DatabaseBusy, a 503 with problem type database-busy (title "Sahaj is busy", header Retry-After 5, body field retryAfterSeconds 5) answered when a database lock wait, a statement timeout or no free connection stopped the request; the request was rolled back and nothing was saved by that attempt, so the client may try again after the wait. It is listed on every write and on the audit log read; where an operation already has its own 503 (pin-unavailable on PUT /me/pin and POST /me/pin/code) the two are merged into that 503's description. No path, schema or other problem type changes. 0.1.1 (12 Nov 2026, ADR-023 D13.5, SAH-66) adds the menu key secondchecks to GET /me (additive; nothing else changes). Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
 servers:
   - url: /api/v1/platform
 security:
@@ -36,6 +36,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (public endpoint)' }
         '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/otp/request:
     post:
       tags: [SAH-3]
@@ -49,6 +50,7 @@ paths:
         '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
         '423': { $ref: '#/components/responses/Problem' }
         '429': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/otp/verify:
     post:
       tags: [SAH-3]
@@ -75,6 +77,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
         '423': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/select-clinic:
     post:
       tags: [SAH-3]
@@ -87,6 +90,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/refresh:
     post:
       tags: [SAH-3]
@@ -95,18 +99,21 @@ paths:
       responses:
         '200': { description: New access token, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
         '401': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/logout:
     post:
       tags: [SAH-3]
       responses:
         '204': { description: Logged out on this device }
         '401': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/logout-all:
     post:
       tags: [SAH-3]
       responses:
         '204': { description: Logged out on all devices }
         '401': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /setup:
     get:
       tags: [SAH-4]
@@ -135,6 +142,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /setup/slug-availability:
     get:
       tags: [SAH-4]
@@ -150,6 +158,7 @@ paths:
         '200': { description: Clinic created, content: { application/json: { schema: { type: object, required: [next, brand], properties: { next: { const: APP }, brand: { $ref: '#/components/schemas/Brand' } } } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /setup/overview:
     get:
       tags: [SAH-7]
@@ -178,6 +187,7 @@ paths:
         '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /me/pin:
     get:
       tags: [SAH-31]
@@ -250,12 +260,15 @@ paths:
         '423': { $ref: '#/components/responses/Problem', description: 'otp-locked' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
         '503':
-          description: pin-unavailable
+          description: 'pin-unavailable; or database-busy (0.1.2, DEC-054; as components/responses/DatabaseBusy, with the Retry-After header and retryAfterSeconds, nothing saved)'
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
               examples:
                 unavailable: { value: { type: 'https://sahaj.in/problems/pin-unavailable', title: PIN checks are off, status: 503, detail: PIN checks are not available right now. Try again later. } }
+                busy: { $ref: '#/components/examples/DatabaseBusy' }
   /me/pin/code:
     post:
       tags: [SAH-31]
@@ -281,7 +294,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
         '423': { $ref: '#/components/responses/Problem', description: 'otp-locked' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
-        '503': { $ref: '#/components/responses/Problem', description: 'pin-unavailable' }
+        '503': { $ref: '#/components/responses/Problem', description: 'pin-unavailable; or database-busy (0.1.2, DEC-054; as components/responses/DatabaseBusy, with the Retry-After header and retryAfterSeconds, nothing saved)' }
   /me/pin/colleague-tries:
     get:
       tags: [SAH-38]
@@ -346,6 +359,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /team:
     get:
       tags: [SAH-6]
@@ -372,6 +386,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /team/{id}:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -387,6 +402,7 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
     delete:
       tags: [SAH-6]
       description: Removes access. The record stays so past entries keep their name.
@@ -396,6 +412,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /team/{id}/deactivate:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -407,6 +424,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /team/{id}/reactivate:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -418,6 +436,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /team/{id}/pin/reset:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -461,6 +480,7 @@ paths:
                 notOwner: { value: { type: 'https://sahaj.in/problems/forbidden', title: Not allowed, status: 403, detail: Only the clinic owner can do this. } }
         '404': { $ref: '#/components/responses/Problem', description: 'not-found' }
         '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /team/{id}/pin/colleague-tries:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -525,6 +545,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /clinic/profile:
     get:
       tags: [SAH-7]
@@ -540,6 +561,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /clinic/holidays:
     get:
       tags: [SAH-7]
@@ -556,6 +578,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /clinic/holidays/{id}:
     parameters:
       - { $ref: '#/components/parameters/Id' }
@@ -566,6 +589,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /specialties:
     get:
       tags: [SAH-7]
@@ -582,6 +606,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /privacy:
     get:
       tags: [SAH-17]
@@ -597,6 +622,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /audit-events:
     get:
       tags: [SAH-7]
@@ -605,6 +631,7 @@ paths:
       responses:
         '200': { description: Latest first, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } } } } }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /modules:
     get:
       tags: [SAH-19]
@@ -619,6 +646,7 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ModulesView' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /modules/ipd-trial:
     post:
       tags: [SAH-19]
@@ -629,6 +657,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /modules/hra:
     put:
       tags: [SAH-19]
@@ -641,6 +670,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -665,6 +695,22 @@ components:
           examples:
             signedIn: { value: { type: 'https://sahaj.in/problems/payload-too-large', title: Request too large, status: 413, detail: The request body must be 64 KB or smaller. } }
             notSignedIn: { value: { type: 'https://sahaj.in/problems/payload-too-large', title: Request too large, status: 413, detail: The request body must be 4 KB or smaller. } }
+    DatabaseBusy:
+      description: 'database-busy (0.1.2, DEC-054): the database did not answer in time (a lock that stayed taken, a statement that ran past the statement timeout, or no free connection). The request was rolled back, so nothing was saved by this attempt; the client may try again after Retry-After seconds. Never a 500 and never a hang.'
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            busy: { $ref: '#/components/examples/DatabaseBusy' }
+  headers:
+    RetryAfter:
+      description: Seconds to wait before trying again; the same value as retryAfterSeconds in the body (5).
+      schema: { type: integer, minimum: 1, examples: [5] }
+  examples:
+    DatabaseBusy:
+      value: { type: 'https://sahaj.in/problems/database-busy', title: Sahaj is busy, status: 503, detail: This is taking longer than usual and was stopped. Nothing was saved by this attempt. Wait a moment and try again., retryAfterSeconds: 5 }
   schemas:
     PrivacySettings:
       type: object

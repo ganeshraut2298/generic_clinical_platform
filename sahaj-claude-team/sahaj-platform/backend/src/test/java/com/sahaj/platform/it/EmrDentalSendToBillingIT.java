@@ -283,7 +283,7 @@ class EmrDentalSendToBillingIT extends EmrSignSupport {
         assertThat(course.isNull()).as("the next sitting is in the outcome").isFalse();
         assertThat(course.get("nextSittingId").isNull()).isFalse();
         assertThat(count(clinic, "select count(*) from opd.treatment_course_sitting")).isEqualTo(sittingsBefore + 1);
-        List<String> sitting = row(clinic, "select status, planned_date::text, items::text from opd.treatment_course_sitting where id = ?::uuid",
+        List<String> sitting = row(clinic, "select case when done_at is null and opd_visit_id is null and ipd_admission_id is null then 'PLANNED' else 'STARTED' end, planned_date::text, items::text from opd.treatment_course_sitting where id = ?::uuid",
                 course.get("nextSittingId").asText());
         assertThat(sitting.get(0)).isEqualTo("PLANNED");
         assertThat(sitting.get(1)).isEqualTo(today().plusDays(14).toString());

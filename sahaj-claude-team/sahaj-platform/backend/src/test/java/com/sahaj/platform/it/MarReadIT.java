@@ -32,7 +32,8 @@ class MarReadIT extends MarSupport {
         clockAt(8, 5);
         JsonNode m = mar(w.nurse().auth(), w.adm().id());
         assertThat(keys(m)).containsExactlyInAnyOrder("admissionId", "status", "state", "asOf", "patient", "doseCount", "canGive",
-                "giveLockReason", "orders", "secondNurses", "notGivenReasons");
+                "giveLockReason", "orders", "secondNurses", "notGivenReasons", "counters", "foldedCount", "windows", "overrideReasons",
+                "inErrorReasons", "ordersToAcknowledge"); // SAH-76 (0.4.0)
         assertThat(m.get("admissionId").asText()).isEqualTo(w.adm().id());
         assertThat(m.get("status").asText()).isEqualTo("ADMITTED");
         assertThat(m.get("state").asText()).isIn("trial", "on");
@@ -45,7 +46,8 @@ class MarReadIT extends MarSupport {
         assertThat(m.get("patient").get("allergyStatus").asText()).isEqualTo("NONE_KNOWN");
         JsonNode o = marOrder(m, order);
         assertThat(keys(o)).containsExactlyInAnyOrder("orderId", "drugKey", "drugName", "route", "highAlert", "frequencyKey",
-                "frequencyLabel", "orderedByName", "status", "slots");
+                "frequencyLabel", "orderedByName", "status", "slots",
+                "orderVersion", "changed", "details", "hold", "prn", "hasMedicineCode", "lastGivenAt", "acknowledged", "folded"); // SAH-76
         assertThat(o.get("drugKey").asText()).isEqualTo("pcm");
         assertThat(o.get("drugName").asText()).isEqualTo("Tab. Paracetamol 650 mg");
         assertThat(o.get("route").asText()).isEqualTo("Oral");
@@ -54,7 +56,8 @@ class MarReadIT extends MarSupport {
         assertThat(o.get("frequencyLabel").asText()).isEqualTo("Once daily");
         assertThat(o.get("status").asText()).isEqualTo("ACTIVE");
         assertThat(o.get("orderedByName").asText()).isEqualTo(w.doctor().name());
-        assertThat(keys(o.get("slots").get(0))).containsExactlyInAnyOrder("slotAt", "state", "lateHours", "canGive", "dose");
+        assertThat(keys(o.get("slots").get(0))).containsExactlyInAnyOrder("slotAt", "state", "lateHours", "canGive", "dose",
+                "orderVersion", "lateMinutes", "stateBy", "stateAt", "history", "beforeVerification"); // SAH-76
         assertThat(keys(m.get("secondNurses").get(0))).containsExactlyInAnyOrder("membershipId", "name");
         assertThat(keys(m.get("notGivenReasons").get(0))).containsExactlyInAnyOrder("key", "label");
     }
@@ -78,7 +81,8 @@ class MarReadIT extends MarSupport {
             reasons.add(r.get("key").asText() + "=" + r.get("label").asText());
         }
         assertThat(reasons).containsExactly("PATIENT_REFUSED=Patient refused", "HELD_DOCTOR=Held on doctor's advice",
-                "NIL_BY_MOUTH=Nil by mouth", "NOT_AVAILABLE=Medicine not available", "AWAY_FROM_WARD=Patient away from the ward");
+                "NIL_BY_MOUTH=Nil by mouth", "NOT_AVAILABLE=Medicine not available", "AWAY_FROM_WARD=Patient away from the ward",
+                "VOMITED=Vomited", "OTHER=Other"); // SAH-76: seven reasons
     }
 
     @Test
@@ -88,7 +92,7 @@ class MarReadIT extends MarSupport {
         JsonNode empty = mar(w.nurse().auth(), w.adm().id());
         assertThat(empty.get("orders")).isEmpty();
         assertThat(empty.get("doseCount").asInt()).isZero();
-        assertThat(empty.get("notGivenReasons")).hasSize(5);
+        assertThat(empty.get("notGivenReasons")).hasSize(7);
 
         String pending = pendingOrder(w, "panto", "od");
         String toReject = pendingOrder(w, "ondan", "od");
@@ -98,11 +102,12 @@ class MarReadIT extends MarSupport {
         stopOk(w.doctor().auth(), toStop);
         stopOk(w.doctor().auth(), toStopPending);
         JsonNode m = mar(w.nurse().auth(), w.adm().id());
-        assertThat(m.get("orders")).hasSize(1);
+        // SAH-76 (ADR-027 Q12): orders stopped or rejected today are listed too, with their slots shown STOPPED
+        assertThat(m.get("orders")).hasSize(4);
         assertThat(marOrder(m, pending)).isNotNull();
-        assertThat(marOrder(m, toReject)).isNull();
-        assertThat(marOrder(m, toStop)).isNull();
-        assertThat(marOrder(m, toStopPending)).isNull();
+        assertThat(marOrder(m, toReject)).isNotNull();
+        assertThat(marOrder(m, toStop)).isNotNull();
+        assertThat(marOrder(m, toStopPending)).isNotNull();
     }
 
     @Test
@@ -124,7 +129,8 @@ class MarReadIT extends MarSupport {
         for (JsonNode o : m.get("orders")) {
             ids.add(o.get("orderId").asText());
         }
-        assertThat(ids).containsExactly(od, bd, tds, q8);
+        // SAH-76 (ADR-027 D3 fold rule): blocks with a DUE or LATE slot first, the most late first (q8 is late since 6 AM), then chart order
+        assertThat(ids).containsExactly(q8, od, bd, tds);
         assertThat(instants(m, od)).containsExactly(ist(8, 0));
         assertThat(instants(m, bd)).containsExactly(ist(8, 0), ist(20, 0));
         assertThat(instants(m, tds)).containsExactly(ist(8, 0), ist(14, 0), ist(20, 0));
@@ -195,6 +201,7 @@ class MarReadIT extends MarSupport {
     void aPendingOrderIsListedWithWaitingSlotsThatCannotBeGivenAndDoesNotCount() throws Exception {
         Ward w = ward();
         String pending = pendingOrder(w, "panto", "bd");
+        startedAt(w.clinic(), pending, istOn(day.minusDays(1), 6, 0)); // SAH-76: slots exist from the version start
         clockAt(9, 30);
         JsonNode m = mar(w.nurse().auth(), w.adm().id());
         JsonNode o = marOrder(m, pending);
@@ -217,13 +224,13 @@ class MarReadIT extends MarSupport {
         verifiedAt(w.clinic(), order, ist(9, 30), ist(10, 30));
         clockAt(10, 35);
         JsonNode m = mar(w.nurse().auth(), w.adm().id());
-        assertThat(states(m, order)).containsExactly("BEFORE_START", "LATER");
+        assertThat(states(m, order)).containsExactly("LATER");
         assertThat(m.get("doseCount").asInt()).isZero();
         assertThat(slot(m, order, 0).get("canGive").asBoolean()).isFalse();
         clockAt(19, 30);
-        assertThat(states(mar(w.nurse().auth(), w.adm().id()), order)).containsExactly("BEFORE_START", "DUE");
+        assertThat(states(mar(w.nurse().auth(), w.adm().id()), order)).containsExactly("DUE");
         clockAt(22, 0);
-        assertThat(states(mar(w.nurse().auth(), w.adm().id()), order)).containsExactly("BEFORE_START", "LATE");
+        assertThat(states(mar(w.nurse().auth(), w.adm().id()), order)).containsExactly("LATE");
 
         // verified at 8:45: the 8 AM slot (8:00 is not before 7:45) counts and is due until 9:00, late from 9:01
         verifiedAt(w.clinic(), order, ist(7, 45), ist(8, 45));
@@ -567,7 +574,8 @@ class MarReadIT extends MarSupport {
         clockAt(8, 20);
         JsonNode given = doseOk(w.nurse().auth(), order, given(w, ist(8, 0)));
         stopOk(w.doctor().auth(), order);
-        assertThat(marOrder(mar(w.nurse().auth(), w.adm().id()), order)).isNull();
+        // SAH-76 (ADR-027 Q12): an order stopped today stays on the MAR with its slots shown STOPPED
+        assertThat(marOrder(mar(w.nurse().auth(), w.adm().id()), order)).isNotNull();
         assertThat(doseRowsOfOrder(w.clinic(), order)).isOne();
         JsonNode row = sheetRow(emr(w.doctor().auth(), w.adm().id()), order);
         assertThat(row.get("status").asText()).isEqualTo("STOPPED");
@@ -603,9 +611,9 @@ class MarReadIT extends MarSupport {
 
         // the MAR
         JsonNode m = mar(w.nurse().auth(), w.adm().id());
-        assertThat(m.get("orders")).as("only the live and the waiting orders").hasSize(3);
+        assertThat(m.get("orders")).as("the live, the waiting and (SAH-76, Q12) the stopped and rejected orders of today").hasSize(7);
         for (String gone : new String[] {stoppedLate, stoppedGiven, stoppedWaiting, rejected}) {
-            assertThat(marOrder(m, gone)).as("order " + gone).isNull();
+            assertThat(marOrder(m, gone)).as("order " + gone).isNotNull();
         }
         assertThat(marOrder(m, live)).isNotNull();
         assertThat(marOrder(m, liveBd)).isNotNull();
@@ -618,9 +626,9 @@ class MarReadIT extends MarSupport {
         // the answer of a dose carries the MAR: no stopped or rejected order and the count after the dose
         JsonNode answer = doseOk(w.nurse().auth(), live, given(w, ist(8, 0)));
         JsonNode inAnswer = answer.get("mar");
-        assertThat(inAnswer.get("orders")).hasSize(3);
+        assertThat(inAnswer.get("orders")).hasSize(7);
         for (String gone : new String[] {stoppedLate, stoppedGiven, stoppedWaiting, rejected}) {
-            assertThat(marOrder(inAnswer, gone)).as("order " + gone + " in the dose answer").isNull();
+            assertThat(marOrder(inAnswer, gone)).as("order " + gone + " in the dose answer").isNotNull();
         }
         assertThat(inAnswer.get("doseCount").asInt()).isOne();
         assertThat(mar(w.nurse().auth(), w.adm().id()).get("doseCount").asInt()).isOne();

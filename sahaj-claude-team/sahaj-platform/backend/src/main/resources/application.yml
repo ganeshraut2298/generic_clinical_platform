@@ -36,8 +36,9 @@ spring:
       #   statement_timeout  a statement that runs longer than 30 s is cancelled (57014)
       # Both reach PostgreSQL as start-up parameters of every pooled connection (the pgjdbc "options" property), so no
       # code path, new or old, can forget them, and nothing has to run after the connection is handed out. They apply to
-      # the request pool only (Flyway has its own connection). A statement that needs longer sets its own
-      # "set local statement_timeout" (StaffPin does, JdbcStaffPinRepository). ProblemExceptionHandler answers either one
+      # the request pool only (Flyway has its own connection). Only StaffPin overrides them, and with a SHORTER limit
+      # (its own "set local" 3 s lock and 5 s statement timeout, JdbcStaffPinRepository); no code path sets a longer one,
+      # so a long report query is cut at 30 s. ProblemExceptionHandler answers either one
       # as 503 database-busy. Env: SAHAJ_DB_LOCK_TIMEOUT_MS, SAHAJ_DB_STATEMENT_TIMEOUT_MS.
       data-source-properties:
         options: "-c lock_timeout=${SAHAJ_DB_LOCK_TIMEOUT_MS:10000} -c statement_timeout=${SAHAJ_DB_STATEMENT_TIMEOUT_MS:30000}"

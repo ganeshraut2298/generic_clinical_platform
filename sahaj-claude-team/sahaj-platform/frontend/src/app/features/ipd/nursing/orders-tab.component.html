@@ -1,0 +1,93 @@
+<section class="orders" aria-label="Nursing orders" data-testid="orders-tab">
+  @if (loading() && list() === null) {
+    <p class="muted" role="status" aria-busy="true">Loading the orders</p>
+  } @else if (loadError(); as message) {
+    <div class="notice err" role="alert" data-testid="orders-error">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ message }}</span>
+      <button type="button" mat-stroked-button data-act="orders-retry" (click)="load(true)">Try again</button>
+    </div>
+  } @else if (list(); as l) {
+    <div class="head">
+      <h3>Nursing orders</h3>
+      @if (l.open.count > 0) {
+        <span [class]="'badge ' + (l.open.stat > 0 ? 'crit' : 'warn')" data-testid="orders-open">
+          {{ l.open.count }} to acknowledge
+        </span>
+      }
+    </div>
+
+    @if (refreshFailed() || store.refreshFailed()) {
+      <div class="notice warn" role="status" data-testid="orders-stale">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ staleText() }}</span>
+      </div>
+    }
+
+    @if (l.items.length === 0) {
+      <div class="empty" data-testid="orders-empty">{{ empty }}</div>
+    } @else {
+      <div role="list" aria-label="Order notices">
+        @for (n of l.items; track n.id) {
+          @let st = stat(n);
+          <div
+            role="listitem"
+            [class]="'ord ' + (isOpen(n) ? 'open' : 'done')"
+            [attr.data-notice]="n.id"
+            [attr.data-kind]="n.kind"
+          >
+            <span [class]="'kind k-' + n.kind.toLowerCase()" data-testid="notice-kind">{{ kindLabel[n.kind] }}</span>
+            <div class="body">
+              <b data-testid="notice-title">
+                {{ n.drugName }}
+                @if (n.priority === 'STAT') {
+                  <span class="pill p-crit tag" data-testid="notice-stat-tag">STAT</span>
+                } @else if (n.priority === 'URGENT') {
+                  <span class="pill p-warn tag" data-testid="notice-urgent-tag">Urgent</span>
+                }
+              </b>
+              <small data-testid="notice-line">{{ summaryLine(n) }}</small>
+              <small data-testid="notice-by">
+                {{ kindLabel[n.kind] }} by {{ n.createdByName }} at {{ timeText(n.createdAt) }}
+              </small>
+              @for (c of n.changes; track c.field) {
+                <small data-testid="notice-change">{{ changeText(c) }}</small>
+              }
+              @if (n.reason) {
+                <small data-testid="notice-reason">Reason: {{ n.reason }}</small>
+              }
+              @if (st; as s) {
+                <small [class.late]="s.overdue" class="stat" data-testid="notice-stat">
+                  <app-icon name="clock" [size]="12" /> {{ s.text }}
+                </small>
+              }
+              @if (n.overdue && isOpen(n)) {
+                <small class="late" data-testid="notice-overdue">
+                  <app-icon name="alert" [size]="12" /> {{ waitingText(n.waitingMinutes) }}
+                </small>
+              }
+              @if (n.acknowledgedAt; as at) {
+                <small class="ok" data-testid="notice-ack">
+                  <app-icon name="check" [size]="12" /> Acknowledged by {{ n.acknowledgedByName }} at {{ timeText(at) }}
+                </small>
+              }
+            </div>
+            @if (isOpen(n) && n.canAcknowledge) {
+              <button
+                type="button"
+                mat-flat-button
+                data-act="ordack"
+                [disabled]="acking() !== null"
+                [attr.aria-busy]="acking() === n.id"
+                [attr.aria-label]="'Acknowledge ' + kindLabel[n.kind] + ' order for ' + n.drugName"
+                (click)="acknowledge(n)"
+              >
+                Acknowledge
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+</section>

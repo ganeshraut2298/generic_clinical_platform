@@ -349,7 +349,7 @@ describe('VerifySheetComponent', () => {
     it('sends the PIN and the checkToken of the row, clears the PIN and closes with the answer', async () => {
       await open();
       const req = await submit('4821');
-      expect(req.request.body).toEqual({ pin: '4821', checkToken: 'AAAAAAAAAAAAAAAAAAAAAA' });
+      expect(req.request.body).toEqual({ pin: '4821', checkToken: 'AAAAAAAAAAAAAAAAAAAAAA', orderVersion: 1 });
       const answer = verifiedResult();
       req.flush(answer);
       await settle();
@@ -524,6 +524,17 @@ describe('VerifySheetComponent', () => {
       fail(await submit(), 'self-verification', 403, 'The doctor who ordered this cannot verify it. Ask the pharmacist.');
       await settle();
       expect(squash(q('[data-testid=verify-failure]'))).toBe('The doctor who ordered this cannot verify it. Ask the pharmacist.');
+      expect(verifyButton().disabled).toBe(true);
+      expect(onConflict).not.toHaveBeenCalled();
+    });
+
+    it('self-verification of the author of the current version: shows the contract text and keeps Verify off', async () => {
+      await open();
+      fail(await submit(), 'self-verification', 403, 'The doctor who changed this order cannot verify it. Ask the pharmacist.');
+      await settle();
+      expect(squash(q('[data-testid=verify-failure]'))).toBe(
+        'The doctor who changed this order cannot verify it. Ask the pharmacist.',
+      );
       expect(verifyButton().disabled).toBe(true);
       expect(onConflict).not.toHaveBeenCalled();
     });

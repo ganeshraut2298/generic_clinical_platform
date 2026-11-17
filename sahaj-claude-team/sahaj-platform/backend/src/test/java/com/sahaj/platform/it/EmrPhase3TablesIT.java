@@ -529,9 +529,10 @@ class EmrPhase3TablesIT extends EmrPhase3Support {
     void theColumnGrantsOfTheNewClinicTablesAreExactlyTheWorkingColumnsAndTheAppendOnlyTablesCanNeverBeUpdated() throws Exception {
         assertThat(updatable("opd.emr_form")).containsExactlyInAnyOrder("name", "status", "live_version_no", "draft_version_no", "draft_state", "draft_definition",
                 "sent_back_reason", "submitted_at", "submitted_by", "revision", "updated_at", "updated_by");
-        assertThat(updatable("opd.treatment_course")).containsExactlyInAnyOrder("status", "revision", "updated_at", "updated_by");
+        assertThat(updatable("opd.treatment_course")).containsExactlyInAnyOrder("status", "revision", "updated_at", "updated_by", "estimate_signed");
         assertThat(updatable("opd.treatment_course_sitting")).containsExactlyInAnyOrder("encounter_kind", "add_option_key", "planned_date", "items", "charge_paise", "note",
-                "opd_visit_id", "ipd_admission_id", "admission_requested", "done_at", "updated_at", "updated_by");
+                "opd_visit_id", "ipd_admission_id", "admission_requested", "done_at", "updated_at", "updated_by",
+                "missed_at", "missed_by_membership_id", "removed_at", "removed_by_membership_id", "done_source", "done_by_membership_id", "regimen_key");
         for (String table : new String[] {"opd.emr_form_version", "billing.course_payment", "billing.course_credit_transfer"}) {
             assertThat(updatable(table)).as(table).isEmpty();
             assertThat(globalRows("select has_table_privilege('sahaj_app', '" + table + "', 'UPDATE')").get(0).get(0)).isEqualTo("f");

@@ -768,8 +768,7 @@ public class AdmissionService {
                 ? vitals.findLatest(tenantId, row.id()).orElse(null) : null;
         // The database clock, not the application clock, so "vitals due" agrees with recorded_at (code review M1).
         Instant databaseNow = VitalsRules.canRead(role) && admitted ? vitals.databaseNow() : null;
-        Boolean vitalsDue = VitalsRules.vitalsDue(role, admitted,
-                latestVitals == null ? null : latestVitals.recordedAt(), databaseNow);
+        Boolean vitalsDue = VitalsRules.vitalsDueOf(role, admitted, latestVitals, databaseNow);
         return new Detail(s.id(), s.ipNumber(), s.patientId(), s.patientName(), s.age(), s.sex(), s.doctorName(),
                 s.bedCode(), s.categoryName(), s.wardName(), s.admissionType(), s.payer(), s.dayNumber(),
                 s.depositPaise(), s.minimumDepositPaise(), s.depositState(), s.admittedAt(),

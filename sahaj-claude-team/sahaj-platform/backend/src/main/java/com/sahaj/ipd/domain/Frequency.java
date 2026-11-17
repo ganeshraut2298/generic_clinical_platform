@@ -16,7 +16,9 @@ public enum Frequency {
     TDS("tds", "Three times daily", List.of("8:00 AM", "2:00 PM", "8:00 PM"),
             List.of(LocalTime.of(8, 0), LocalTime.of(14, 0), LocalTime.of(20, 0))),
     Q8("q8", "8-hourly", List.of("6:00 AM", "2:00 PM", "10:00 PM"),
-            List.of(LocalTime.of(6, 0), LocalTime.of(14, 0), LocalTime.of(22, 0)));
+            List.of(LocalTime.of(6, 0), LocalTime.of(14, 0), LocalTime.of(22, 0))),
+    /** SAH-76 (ADR-027 D7): as needed. No dose times: a PRN order has no slots; its limits sit on the order version. */
+    PRN("prn", "As needed (PRN)", List.of(), List.of());
 
     private final String key;
     private final String label;

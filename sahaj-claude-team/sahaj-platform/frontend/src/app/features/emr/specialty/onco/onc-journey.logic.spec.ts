@@ -54,7 +54,7 @@ describe('the Cancer journey snapshot cells (SAH-75-7; tagged)', () => {
 
   it('says which cycle it is, or that it is delayed', () => {
     const cycles = [{ state: 'GIVEN' as const }, { state: 'TODAY' as const }];
-    expect(cycleText({ cycleNo: 4, cycleCount: 8, cycles })).toBe('Cycle 4 of 8 · day 1');
+    expect(cycleText({ cycleNo: 4, cycleCount: 8, cycles })).toBe('Cycle 4 of 8');
     expect(cycleText({ cycleNo: 4, cycleCount: 8, cycles: [{ state: 'DELAYED' }] })).toBe('Cycle 4 delayed');
   });
 

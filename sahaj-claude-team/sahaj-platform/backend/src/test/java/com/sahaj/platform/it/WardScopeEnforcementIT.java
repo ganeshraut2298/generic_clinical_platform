@@ -39,12 +39,12 @@ class WardScopeEnforcementIT extends ScopeSupport {
         list.add(new Endpoint("charge", HttpMethod.POST, ADMISSIONS + "/" + adm.id() + "/charges", "{\"serviceKey\":\"ecg\"}", true));
         list.add(new Endpoint("transfer", HttpMethod.POST, transferUrl(adm.id()), moveBody(freeBed, null), true));
         list.add(new Endpoint("dose", HttpMethod.POST, dosesUrl(orderId), "{\"clientKey\":\"" + newKey() + "\",\"slotAt\":\""
-                + ist(8, 0) + "\",\"outcome\":\"NOT_GIVEN\",\"reasonKey\":\"NIL_BY_MOUTH\"}", true));
+                + ist(8, 0) + "\",\"outcome\":\"NOT_GIVEN\",\"reasonKey\":\"NIL_BY_MOUTH\",\"orderVersion\":1}", true));
         list.add(new Endpoint("call senior", HttpMethod.POST, callUrl(escalationId), "{\"version\":0,\"seniorCalls\":0}", true));
         // endpoints a nurse may not use at all: the role answer comes first, never outside-scope (AC 14)
         list.add(new Endpoint("order", HttpMethod.POST, ordersUrl(adm.id()), js(orderBody(newKey(), "Paracetamol 500 mg", "od", null,
                 null)), false));
-        list.add(new Endpoint("stop", HttpMethod.POST, stopUrl(orderId), null, false));
+        list.add(new Endpoint("stop", HttpMethod.POST, stopUrl(orderId), stopBody(1), false));
         list.add(new Endpoint("discharge", HttpMethod.POST, dischargeUrl(adm.id()), dischargeBody("normal", "general", 1L, 1L, "UPI"),
                 false));
         list.add(new Endpoint("sign off", HttpMethod.PUT, signoffUrl(adm.id()), signBody("normal", "general"), false));
@@ -232,7 +232,7 @@ class WardScopeEnforcementIT extends ScopeSupport {
         problem(call(HttpMethod.GET, ADMISSIONS + "/" + UUID.randomUUID(), nurse.auth(), null), 404);
         problem(call(HttpMethod.GET, ADMISSIONS + "/" + other.inA().id(), nurse.auth(), null), 404);
         problem(call(HttpMethod.POST, vitalsUrl(other.inA().id()), nurse.auth(), js(low())), 404);
-        problem(call(HttpMethod.POST, stopUrl(UUID.randomUUID()), clinicOwner(h), null), 404);
+        problem(call(HttpMethod.POST, stopUrl(UUID.randomUUID()), clinicOwner(h), stopBody(1)), 404);
     }
 
     private RequestPostProcessor clinicOwner(Hosp h) {

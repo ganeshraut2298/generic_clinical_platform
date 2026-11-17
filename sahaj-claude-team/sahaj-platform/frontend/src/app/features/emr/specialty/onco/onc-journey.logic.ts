@@ -81,17 +81,17 @@ export const CYCLE_TIP: Readonly<Record<JourneyCycleState, string>> = {
   GIVEN: 'Given',
   TODAY: 'Today',
   PLANNED: 'Planned',
-  DELAYED: 'Delayed 1 week',
+  DELAYED: 'Delayed',
   MISSED: 'Missed',
 };
 
-/** "Cycle 4 of 8 · day 1", or "Cycle 4 delayed" while today's decision is Delay. */
+/** "Cycle 4 of 8" (the server sends no day of cycle), or "Cycle 4 delayed" while today's decision is Delay. */
 export function cycleText(plan: { cycleNo: number | null; cycleCount: number; cycles: readonly { state: JourneyCycleState }[] }): string {
   const delayed = plan.cycles.some((c) => c.state === 'DELAYED');
   if (plan.cycleNo === null) {
     return `${plan.cycleCount} cycles planned`;
   }
-  return delayed ? `Cycle ${plan.cycleNo} delayed` : `Cycle ${plan.cycleNo} of ${plan.cycleCount} · day 1`;
+  return delayed ? `Cycle ${plan.cycleNo} delayed` : `Cycle ${plan.cycleNo} of ${plan.cycleCount}`;
 }
 
 export type ResponseTone = 'good' | 'warn' | 'crit' | 'ink';

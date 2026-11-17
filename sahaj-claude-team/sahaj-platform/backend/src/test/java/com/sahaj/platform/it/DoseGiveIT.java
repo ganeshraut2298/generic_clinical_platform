@@ -74,7 +74,8 @@ class DoseGiveIT extends MarSupport {
         assertThat(keys(a)).containsExactlyInAnyOrder("replayed", "dose", "mar");
         JsonNode dose = a.get("dose");
         assertThat(keys(dose)).containsExactlyInAnyOrder("id", "slotAt", "outcome", "reason", "recordedAt", "recordedByName",
-                "secondCheckByName");
+                "secondCheckByName", "orderVersion", "method", "overrideReason", "beforeVerification", "correction", "undoSecondsLeft", "canUndo",
+                "canMarkInError"); // SAH-76 (0.4.0): the dose row gains the version, method, correction and undo fields
         assertThat(dose.get("outcome").asText()).isEqualTo("GIVEN");
         assertThat(dose.get("reason").isNull()).isTrue();
         assertThat(Instant.parse(dose.get("slotAt").asText())).isEqualTo(ist(8, 0));
@@ -101,7 +102,7 @@ class DoseGiveIT extends MarSupport {
         assertThat(row.recordedAtIsDbClock()).isTrue();
 
         List<String> events = eventLines(w.clinic(), w.adm().id());
-        assertThat(events).contains("give|Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID");
+        assertThat(events).contains("give|Gave Tab. Paracetamol 650 mg (8 AM dose) · identity checked against UHID · scan override: Medicine has no barcode");
         assertThat(giveEvents(w.clinic(), w.adm().id())).isOne();
         List<String[]> audits = audit(w.clinic(), "IPD_DOSE_GIVEN");
         assertThat(audits).hasSize(1);
@@ -111,7 +112,8 @@ class DoseGiveIT extends MarSupport {
         assertThat(audits.get(0)[4]).isEqualTo(w.nurse().userId().toString());
         JsonNode after = auditAfter(w.clinic(), "IPD_DOSE_GIVEN", 0);
         assertThat(keys(after)).containsExactlyInAnyOrder("doseId", "orderId", "admissionId", "drugKey", "slotAt", "outcome",
-                "highAlert", "secondCheckUserId");
+                "highAlert", "secondCheckUserId", "device", "method", "doseKind", "notePresent", "orderVersion", "overrideReasonKey",
+                "beforeVerification"); // SAH-76 (contract (g), (j))
         assertThat(after.get("doseId").asText()).isEqualTo(row.id());
         assertThat(after.get("orderId").asText()).isEqualTo(f.order());
         assertThat(after.get("admissionId").asText()).isEqualTo(w.adm().id());
@@ -148,9 +150,9 @@ class DoseGiveIT extends MarSupport {
         offset.put("slotAt", day + "T22:00:00+05:30");
         doseOk(w.nurse().auth(), q8, offset);
         List<String> events = eventLines(w.clinic(), w.adm().id());
-        assertThat(events).contains("give|Gave Inj. Ceftriaxone 1 g (6 AM dose) · identity checked against UHID",
+        assertThat(events).contains("give|Gave Inj. Ceftriaxone 1 g (6 AM dose) · identity checked against UHID · scan override: Medicine has no barcode",
                 "give|Did not give Inj. Ceftriaxone 1 g (2 PM dose) · Patient away from the ward",
-                "give|Gave Inj. Ceftriaxone 1 g (10 PM dose) · identity checked against UHID");
+                "give|Gave Inj. Ceftriaxone 1 g (10 PM dose) · identity checked against UHID · scan override: Medicine has no barcode");
         assertThat(doseDb(w.clinic(), q8, ist(22, 0)).outcome()).isEqualTo("GIVEN");
     }
 
@@ -210,7 +212,7 @@ class DoseGiveIT extends MarSupport {
             }
             assertThat(after).as("audit row of " + reason).isNotNull();
             assertThat(keys(after)).containsExactlyInAnyOrder("doseId", "orderId", "admissionId", "drugKey", "slotAt", "outcome",
-                    "reasonKey");
+                    "reasonKey", "device", "doseKind", "notePresent", "orderVersion"); // SAH-76 adds these four
             assertThat(after.get("outcome").asText()).isEqualTo(stored);
             assertThat(after.get("reasonKey").asText()).isEqualTo(reason);
             assertThat(after.get("drugKey").asText()).isEqualTo(drugs[i]);
@@ -254,7 +256,7 @@ class DoseGiveIT extends MarSupport {
         bodies.add(without(base, "reasonKey"));
         bodies.add(set(base, "reasonKey", null));
         bodies.add(set(base, "reasonKey", ""));
-        bodies.add(set(base, "reasonKey", "OTHER"));
+        // SAH-76: OTHER is a valid reason now (it needs a note: "Write what happened.")
         bodies.add(set(base, "reasonKey", "nil_by_mouth"));
         bodies.add(set(base, "reasonKey", "Nil by mouth"));
         bodies.add(set(base, "reasonKey", 7));
@@ -319,8 +321,9 @@ class DoseGiveIT extends MarSupport {
         verifiedAt(w.clinic(), bd, ist(9, 30), ist(10, 30));
         clockAt(10, 35);
         DSnap before = dsnap(w);
-        refused(doseCall(w.nurse().auth(), bd, given(w, ist(8, 0))), 409, "dose-before-start", BEFORE_START);
-        refused(doseCall(w.nurse().auth(), bd, notGiven(ist(8, 0), "NIL_BY_MOUTH")), 409, "dose-before-start", BEFORE_START);
+        // SAH-76 (story 76-1: no slot exists before the start): a slot before the start is no dose time at all
+        refused(doseCall(w.nurse().auth(), bd, given(w, ist(8, 0))), 400, "validation", NOT_A_DOSE_TIME);
+        refused(doseCall(w.nurse().auth(), bd, notGiven(ist(8, 0), "NIL_BY_MOUTH")), 400, "validation", NOT_A_DOSE_TIME);
         refused(doseCall(w.nurse().auth(), bd, given(w, ist(20, 0))), 409, "dose-not-due", NOT_DUE);
         assertThat(dsnap(w)).isEqualTo(before);
         // verified 8:45: the 8 AM slot counts and can be given at 9:01 as a late dose
@@ -350,7 +353,11 @@ class DoseGiveIT extends MarSupport {
                 refused(doseCall(w.nurse().auth(), rejected, body), 409, "order-state", DOSE_REJECTED);
             }
         }
-        assertThat(dsnap(w)).as("no deny entry either: the order is judged before the wristband").isEqualTo(before);
+        // SAH-76 (contract (e)): an order-not-verified refusal is audited as IPD_DOSE_REFUSED and committed: three refusals of the pending order
+        DSnap after = dsnap(w);
+        assertThat(audits(w.clinic(), "IPD_DOSE_REFUSED")).isEqualTo(3);
+        assertThat(after.audits()).isEqualTo(before.audits() + 3);
+        assertThat(new DSnap(after.doses(), after.events(), before.audits(), after.access(), after.pins())).as("nothing else is written, and no deny entry: the order is judged before the wristband").isEqualTo(before);
     }
 
     @Test
@@ -389,10 +396,10 @@ class DoseGiveIT extends MarSupport {
         Fix f = fix("pcm", "od");
         DSnap before = dsnap(f.w());
         JsonNode p = refused(doseRaw(f.w().nurse().auth(), f.order(), "{}"), 400, "validation", RELOAD_TEXT);
-        assertThat(fieldNames(p)).containsExactly("clientKey", "slotAt", "outcome");
+        assertThat(fieldNames(p)).containsExactly("clientKey", "outcome", "orderVersion"); // SAH-76: slotAt is optional (PRN), orderVersion is required
         p = refused(doseCall(f.w().nurse().auth(), f.order(), Map.of("clientKey", "not-a-uuid", "slotAt", "yesterday", "outcome", "give")),
                 400, "validation", RELOAD_TEXT);
-        assertThat(fieldNames(p)).containsExactly("clientKey", "slotAt", "outcome");
+        assertThat(fieldNames(p)).containsExactly("clientKey", "slotAt", "outcome", "orderVersion"); // SAH-76: orderVersion is required
         for (String outcome : new String[] {"given", "GIVE", "Given", "NOT GIVEN", "REFUSED", "HELD", ""}) {
             p = refused(doseCall(f.w().nurse().auth(), f.order(), set(given(f.w(), ist(8, 0)), "outcome", outcome)), 400,
                     "validation", RELOAD_TEXT);
@@ -422,13 +429,13 @@ class DoseGiveIT extends MarSupport {
         empties.add("​‏");
         empties.add(" ");
         for (Object band : empties) {
-            Map<String, Object> body = set(given(ist(8, 0), "x"), "wristband", band);
+            Map<String, Object> body = set(without(given(ist(8, 0), "x"), "override"), "wristband", band); // an override would excuse the scan
             invalid(doseCall(f.w().nurse().auth(), f.order(), body), "wristband", SCAN_FIRST);
             // and before the statement and the second nurse are looked at
             Map<String, Object> worse = set(set(body, "identityConfirmed", false), "clientKey", newKey());
             invalid(doseCall(f.w().nurse().auth(), f.order(), worse), "wristband", SCAN_FIRST);
         }
-        invalid(doseCall(f.w().nurse().auth(), f.order(), without(given(f.w(), ist(8, 0)), "wristband")), "wristband", SCAN_FIRST);
+        invalid(doseCall(f.w().nurse().auth(), f.order(), without(without(given(f.w(), ist(8, 0)), "wristband"), "override")), "wristband", SCAN_FIRST);
         assertThat(dsnap(f.w())).isEqualTo(before);
     }
 
@@ -479,7 +486,7 @@ class DoseGiveIT extends MarSupport {
         assertThat(audits.get(0)[1]).isEqualTo(f.order());
         assertThat(audits.get(0)[4]).isEqualTo(w.nurse().userId().toString());
         JsonNode after = auditAfter(w.clinic(), "IPD_DOSE_WRISTBAND_MISMATCH", 0);
-        assertThat(keys(after)).containsExactlyInAnyOrder("orderId", "admissionId", "drugKey", "slotAt");
+        assertThat(keys(after)).containsExactlyInAnyOrder("orderId", "admissionId", "drugKey", "slotAt", "device");
         assertThat(audits.get(0)[3]).doesNotContain(other).doesNotContain(w.uhid());
         // the slot is still open; each further try writes another entry; the right band then works
         assertThat(slot(mar(w.nurse().auth(), w.adm().id()), f.order(), 0).get("state").asText()).isEqualTo("DUE");
@@ -807,7 +814,8 @@ class DoseGiveIT extends MarSupport {
             assertThat(row.has("lastDose")).as(role).isTrue();
             JsonNode last = row.get("lastDose");
             assertThat(keys(last)).containsExactlyInAnyOrder("id", "slotAt", "outcome", "reason", "recordedAt", "recordedByName",
-                    "secondCheckByName");
+                    "secondCheckByName", "orderVersion", "method", "overrideReason", "beforeVerification", "correction", "undoSecondsLeft",
+                    "canUndo", "canMarkInError"); // SAH-76 (0.4.0)
             assertThat(Instant.parse(last.get("slotAt").asText())).isEqualTo(ist(20, 0));
             assertThat(last.get("outcome").asText()).isEqualTo("REFUSED");
             assertThat(last.get("reason").get("label").asText()).isEqualTo("Patient refused");

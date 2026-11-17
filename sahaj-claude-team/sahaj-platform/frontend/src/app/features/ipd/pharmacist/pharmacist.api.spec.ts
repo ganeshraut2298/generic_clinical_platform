@@ -39,10 +39,10 @@ describe('PharmacistApi', () => {
   });
 
   it('posts the PIN and the checkToken to verify', () => {
-    api.verify('o1', { pin: '4821', checkToken: 'A'.repeat(22) }).subscribe();
+    api.verify('o1', { pin: '4821', checkToken: 'A'.repeat(22), orderVersion: 1 }).subscribe();
     const req = http.expectOne('/api/v1/ipd/medicine-orders/o1/verify');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ pin: '4821', checkToken: 'A'.repeat(22) });
+    expect(req.request.body).toEqual({ pin: '4821', checkToken: 'A'.repeat(22), orderVersion: 1 });
     req.flush({});
   });
 

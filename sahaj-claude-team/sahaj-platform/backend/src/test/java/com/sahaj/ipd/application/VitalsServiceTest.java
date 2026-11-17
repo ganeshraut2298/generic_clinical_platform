@@ -88,6 +88,8 @@ class VitalsServiceTest {
     private Instant dbNow = DB_NOW;
     private AuditLog auditLog;
     private MarAssembler marAssembler;
+    private NursingSettingsReader settingsReader;
+    private com.sahaj.ipd.domain.EffectiveNursingSettings settings = com.sahaj.ipd.domain.EffectiveNursingSettings.defaults();
     private ModuleEntitlementPort entitlements;
     private VitalsService service;
     private ScopeGuard guard;
@@ -123,8 +125,10 @@ class VitalsServiceTest {
         IpdGate gate = new IpdGate(entitlements, Clock.fixed(NOW, ZoneOffset.UTC));
         marAssembler = mock(MarAssembler.class);
         guard = ScopeStubs.unscoped();
+        settingsReader = org.mockito.Mockito.mock(NursingSettingsReader.class);
+        when(settingsReader.effectiveFor(eq(TENANT), any())).thenAnswer(call -> settings);
         service = new VitalsService(admissions, vitals, escalations, events, patients, patientAccess, actors, team,
-                auditLog, gate, marAssembler, guard);
+                auditLog, gate, marAssembler, guard, settingsReader);
         state("on");
     }
 
@@ -826,6 +830,80 @@ class VitalsServiceTest {
         assertThat(service.sheet(TENANT, ACTOR, "OWNER", ADMISSION).vitalsDue()).isTrue();
     }
 
+    // ---- SAH-76-6: the interval of the ward profile ----
+
+    private static com.sahaj.ipd.domain.EffectiveNursingSettings everyMinutes(int vitalsInterval) {
+        return new com.sahaj.ipd.domain.EffectiveNursingSettings(true, 60, 60, 15, 30, 5, 10, vitalsInterval);
+    }
+
+    @Test
+    void aSaveStampsTheIntervalOfTheWardProfileInForceOnTheRecord() {
+        settings = everyMinutes(60);
+
+        VitalsSaved saved = save(normal(UUID.randomUUID()));
+
+        assertThat(vitals.rows.get(0).dueIntervalMin()).isEqualTo(60);
+        assertThat(saved.vitalsIntervalMinutes()).isEqualTo(60);
+        assertThat(saved.vitalsDueAt()).isEqualTo(TX.plusSeconds(60 * 60));
+        assertThat(saved.vitalsDue()).isFalse();
+    }
+
+    @Test
+    void theSheetUsesTheIntervalStampedOnTheLatestRecordNotTheOneInForceNow() {
+        settings = everyMinutes(60);
+        vitals.rows.add(new VitalsRow(UUID.randomUUID(), ADMISSION, 120, 80, 80, 98, new BigDecimal("37.0"), 16, 0,
+                Risk.LOW, false, TICK.minusSeconds(61 * 60), ACTOR, 240));
+
+        Sheet sheet = service.sheet(TENANT, ACTOR, "OWNER", ADMISSION);
+
+        assertThat(sheet.vitalsDue()).as("stamped 240 minutes, so 61 minutes old is not due").isFalse();
+        assertThat(sheet.vitalsDueAt()).isEqualTo(TICK.minusSeconds(61 * 60).plusSeconds(240 * 60));
+        assertThat(sheet.vitalsIntervalMinutes()).as("the next save will stamp the profile in force now").isEqualTo(60);
+    }
+
+    @Test
+    void aRecordWithNoStampedIntervalReadsAsFourHours() {
+        settings = everyMinutes(60);
+        vitals.rows.add(new VitalsRow(UUID.randomUUID(), ADMISSION, 120, 80, 80, 98, new BigDecimal("37.0"), 16, 0,
+                Risk.LOW, false, TICK.minusSeconds(100 * 60), ACTOR));
+
+        Sheet sheet = service.sheet(TENANT, ACTOR, "OWNER", ADMISSION);
+
+        assertThat(sheet.vitalsDue()).isFalse();
+        assertThat(sheet.vitalsDueAt()).isEqualTo(TICK.minusSeconds(100 * 60).plusSeconds(240 * 60));
+    }
+
+    @Test
+    void aShortWardIntervalMakesOlderVitalsDue() {
+        vitals.rows.add(new VitalsRow(UUID.randomUUID(), ADMISSION, 120, 80, 80, 98, new BigDecimal("37.0"), 16, 0,
+                Risk.LOW, false, TICK.minusSeconds(61 * 60), ACTOR, 60));
+
+        assertThat(service.sheet(TENANT, ACTOR, "NURSE", ADMISSION).vitalsDue()).isTrue();
+    }
+
+    @Test
+    void thereIsNoDueTimeWithoutVitalsOrForADischargedAdmission() {
+        assertThat(service.sheet(TENANT, ACTOR, "NURSE", ADMISSION).vitalsDueAt()).isNull();
+
+        vitals.rows.add(new VitalsRow(UUID.randomUUID(), ADMISSION, 120, 80, 80, 98, new BigDecimal("37.0"), 16, 0,
+                Risk.LOW, false, TICK.minusSeconds(10 * 60), ACTOR, 60));
+        status = "DISCHARGED";
+
+        Sheet sheet = service.sheet(TENANT, ACTOR, "NURSE", ADMISSION);
+
+        assertThat(sheet.vitalsDueAt()).isNull();
+        assertThat(sheet.vitalsDue()).isFalse();
+    }
+
+    @Test
+    void theSheetCarriesTheBadgeOfTheOrdersTab() {
+        when(marAssembler.noticeCount(eq(TENANT), eq(ADMISSION), any(), any()))
+                .thenReturn(new com.sahaj.ipd.application.MarViews.NoticeCountView(3, 1, 2));
+
+        assertThat(service.sheet(TENANT, ACTOR, "NURSE", ADMISSION).ordersToAcknowledge().count()).isEqualTo(3);
+        assertThat(service.sheet(TENANT, ACTOR, "NURSE", ADMISSION).ordersToAcknowledge().stat()).isEqualTo(1);
+    }
+
     @Test
     void aDoctorMayReadButNotRecordAndSeesTheRoleReason() {
         Sheet sheet = service.sheet(TENANT, ACTOR, "DOCTOR", ADMISSION);
@@ -1259,7 +1337,7 @@ class VitalsServiceTest {
             calls.add("vitals");
             UUID id = UUID.randomUUID();
             rows.add(new VitalsRow(id, v.admissionId(), v.bpSystolic(), v.bpDiastolic(), v.pulse(), v.spo2(),
-                    v.tempC(), v.rr(), v.ewsScore(), v.ewsRisk(), v.noteAdded(), TX, v.recordedBy()));
+                    v.tempC(), v.rr(), v.ewsScore(), v.ewsRisk(), v.noteAdded(), TX, v.recordedBy(), v.dueIntervalMin()));
             clientKeys.add(v.clientKey());
             return new Stored(id, TX);
         }

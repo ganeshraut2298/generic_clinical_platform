@@ -46,6 +46,8 @@ export class PharmacistStore {
   readonly nextCursor = signal<string | null>(null);
   /** Orders waiting; null until something has been read. */
   readonly waiting = signal<number | null>(null);
+  /** SAH-76-2: open Review after dose items; null until something has been read. Added to the Safety tab number. */
+  readonly reviewsOpen = signal<number | null>(null);
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
   readonly refreshFailed = signal(false);
@@ -100,6 +102,7 @@ export class PharmacistStore {
     this.items.set(checks.items);
     this.nextCursor.set(checks.nextCursor);
     this.waiting.set(checks.waiting);
+    this.reviewsOpen.set(checks.reviewsOpen);
     this.loading.set(false);
     this.loadError.set(null);
     this.refreshFailed.set(false);
@@ -143,6 +146,7 @@ export class PharmacistStore {
         const changed = summaryChanged(this.lastSummary, summary, this.waiting());
         this.lastSummary = summary;
         this.waiting.set(summary.waiting);
+        this.reviewsOpen.set(summary.reviewsOpen);
         if (changed && this.panelShown()) {
           this.load();
         }
@@ -166,6 +170,7 @@ export class PharmacistStore {
     this.items.set([]);
     this.nextCursor.set(null);
     this.waiting.set(null);
+    this.reviewsOpen.set(null);
     this.lastSummary = null;
     this.loading.set(false);
     this.refreshFailed.set(false);

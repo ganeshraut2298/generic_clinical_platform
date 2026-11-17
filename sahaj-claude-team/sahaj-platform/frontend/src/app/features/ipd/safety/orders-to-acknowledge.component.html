@@ -1,0 +1,84 @@
+@if (!refused()) {
+  <section class="panel surf sfp" aria-labelledby="sf-ord-h" data-testid="orders-to-acknowledge">
+    <div class="sfph">
+      <h2 id="sf-ord-h" tabindex="-1"><app-icon name="emr" [size]="18" /> {{ title }}</h2>
+    </div>
+
+    @if (loading()) {
+      <p class="muted" role="status" aria-busy="true">Loading the orders</p>
+    } @else if (loadError(); as message) {
+      <div class="notice err" role="alert" data-testid="ward-orders-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+        <button type="button" mat-stroked-button data-act="ward-orders-retry" (click)="load(true)">Try again</button>
+      </div>
+    } @else if (page(); as pg) {
+      @if (refreshFailed() || store.refreshFailed()) {
+        <div class="notice warn" role="status" data-testid="ward-orders-stale">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ staleText() }}</span>
+        </div>
+      }
+
+      @for (r of overdueRows(); track r.notice.id) {
+        <div class="strip" role="status" data-testid="ward-orders-overdue">
+          <app-icon name="alert" [size]="14" />
+          <b>{{ waitingText(r.notice.waitingMinutes) }}</b>
+          <span>{{ r.patientName }} · bed {{ r.bedCode }}</span>
+        </div>
+      }
+
+      @if (pg.items.length === 0) {
+        <div class="empty" data-testid="ward-orders-empty">{{ empty }}</div>
+      } @else {
+        <div role="list" aria-label="Orders to acknowledge">
+          @for (r of pg.items; track r.notice.id) {
+            @let st = stat(r);
+            <div class="sfrow" role="listitem" [attr.data-notice]="r.notice.id" [attr.data-kind]="r.notice.kind">
+              <span class="sfmn">
+                <b data-testid="ward-order-patient">{{ r.patientName }} · bed {{ r.bedCode }}</b>
+                <small data-testid="ward-order-drug">
+                  {{ kindLabel[r.notice.kind] }} · {{ r.notice.drugName }}
+                  @if (r.notice.priority === 'STAT') {
+                    <span class="pill p-crit sfha">STAT</span>
+                  } @else if (r.notice.priority === 'URGENT') {
+                    <span class="pill p-warn sfha">Urgent</span>
+                  }
+                </small>
+                <small data-testid="ward-order-line">{{ line(r) }}</small>
+                <small data-testid="ward-order-by">by {{ r.notice.createdByName }} at {{ timeText(r.notice.createdAt) }}</small>
+                @if (st; as s) {
+                  <small class="sfstat" [class.late]="s.overdue" data-testid="ward-order-stat">{{ s.text }}</small>
+                }
+              </span>
+              <span class="sfacts">
+                <button
+                  type="button"
+                  mat-flat-button
+                  data-act="ward-order-open"
+                  [attr.aria-label]="'Open orders for ' + r.patientName + ', bed ' + r.bedCode"
+                  (click)="open(r)"
+                >
+                  Open orders
+                </button>
+              </span>
+            </div>
+          }
+        </div>
+        @if (pg.nextCursor !== null) {
+          <div class="more">
+            <button
+              type="button"
+              mat-stroked-button
+              data-act="ward-orders-more"
+              [disabled]="moreLoading()"
+              (click)="loadMore()"
+            >
+              Show more orders
+            </button>
+          </div>
+        }
+      }
+    }
+  </section>
+}

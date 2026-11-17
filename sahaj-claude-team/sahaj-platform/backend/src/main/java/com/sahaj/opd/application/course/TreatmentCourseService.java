@@ -483,8 +483,10 @@ public class TreatmentCourseService {
     /** "Mark <unit> done": TODAY to DONE; the sitting's charge is counted by billing from the DONE state. */
     @Transactional
     public CourseView markDone(ClinicUser user, UUID courseId, UUID sittingId, MarkDoneInput input) {
-        Long revision = input == null ? null : input.revision();
-        Locked locked = lockForAction(user, courseId, sittingId, revision);
+        if (input == null) {
+            throw invalid("revision", "Reload the page and try again.");
+        }
+        Locked locked = lockForAction(user, courseId, sittingId, input.revision());
         UUID tenantId = user.tenantId();
         locked.requireNotDone();
         if (!"TODAY".equals(locked.status)) {
@@ -503,7 +505,9 @@ public class TreatmentCourseService {
             courses.linkVisit(tenantId, sitting.id(), visit.id(), user.userId());
             linkedVisit = visit.id();
         }
-        courses.markDoneByHand(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId());
+        if (!courses.markDoneByHand(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId())) {
+            throw sittingNotAvailable();
+        }
         courses.bumpRevision(tenantId, courseId, user.userId());
         if (linkedVisit != null) {
             Map<String, Object> linked = new LinkedHashMap<>();
@@ -526,7 +530,9 @@ public class TreatmentCourseService {
         if (!"TODAY".equals(locked.status) || sitting.opdVisitId() != null || sitting.admissionId() != null) {
             throw sittingNotAvailable();
         }
-        courses.markMissed(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId());
+        if (!courses.markMissed(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId())) {
+            throw sittingNotAvailable();
+        }
         courses.bumpRevision(tenantId, courseId, user.userId());
         audit("COURSE_SITTING_MISSED", courseId, locked, "MISSED", sitting.plannedDate(), sitting.plannedDate(),
                 sitting.encounterKind(), sitting.encounterKind());
@@ -544,7 +550,9 @@ public class TreatmentCourseService {
         if (!"MISSED".equals(locked.status)) {
             throw sittingNotAvailable();
         }
-        courses.rebook(tenantId, sitting.id(), date, user.userId());
+        if (!courses.rebook(tenantId, sitting.id(), date, user.userId())) {
+            throw sittingNotAvailable();
+        }
         courses.bumpRevision(tenantId, courseId, user.userId());
         audit("COURSE_SITTING_REBOOKED", courseId, locked, plannedOrToday(sitting, date), sitting.plannedDate(), date,
                 sitting.encounterKind(), sitting.encounterKind());
@@ -562,7 +570,9 @@ public class TreatmentCourseService {
         if (!"PLANNED".equals(locked.status)) {
             throw sittingNotAvailable();
         }
-        courses.reschedule(tenantId, sitting.id(), date, user.userId());
+        if (!courses.reschedule(tenantId, sitting.id(), date, user.userId())) {
+            throw sittingNotAvailable();
+        }
         courses.bumpRevision(tenantId, courseId, user.userId());
         audit("COURSE_SITTING_RESCHEDULED", courseId, locked, plannedOrToday(sitting, date), sitting.plannedDate(),
                 date, sitting.encounterKind(), sitting.encounterKind());
@@ -582,7 +592,9 @@ public class TreatmentCourseService {
         if (!"PLANNED".equals(locked.status) || sitting.opdVisitId() != null || sitting.admissionId() != null) {
             throw sittingNotAvailable();
         }
-        courses.remove(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId());
+        if (!courses.remove(tenantId, sitting.id(), clock.instant(), locked.member.membershipId(), user.userId())) {
+            throw sittingNotAvailable();
+        }
         courses.bumpRevision(tenantId, courseId, user.userId());
         audit("COURSE_SITTING_REMOVED", courseId, locked, "REMOVED", sitting.plannedDate(), sitting.plannedDate(),
                 sitting.encounterKind(), sitting.encounterKind());
@@ -616,7 +628,9 @@ public class TreatmentCourseService {
             return view(user, locked.course);
         }
         String kindAfter = admissionKind ? sitting.encounterKind() : chosen;
-        courses.requestAdmission(tenantId, sitting.id(), kindAfter, user.userId());
+        if (!courses.requestAdmission(tenantId, sitting.id(), kindAfter, user.userId())) {
+            throw sittingNotAvailable();
+        }
         courses.bumpRevision(tenantId, courseId, user.userId());
         audit("COURSE_SITTING_ADMISSION_REQUESTED", courseId, locked, "PLANNED", sitting.plannedDate(),
                 sitting.plannedDate(), sitting.encounterKind(), kindAfter);
@@ -664,12 +678,18 @@ public class TreatmentCourseService {
         return new Locked(member, course, sitting, computed.status(sitting), computed.displayNo(sitting));
     }
 
+    /** The furthest a rebook or reschedule date may be from today (SAH-75 security L1). */
+    private static final int MAX_DATE_YEARS = 2;
+
     private LocalDate requireDate(DateInput input) {
         if (input == null || input.plannedDate() == null) {
             throw invalid("plannedDate", "Choose today or a later date.");
         }
         if (input.plannedDate().isBefore(LocalDate.now(clock.withZone(INDIA)))) {
             throw invalid("plannedDate", "Choose today or a later date.");
+        }
+        if (input.plannedDate().isAfter(LocalDate.now(clock.withZone(INDIA)).plusYears(MAX_DATE_YEARS))) {
+            throw invalid("plannedDate", "Choose a date within the next 2 years.");
         }
         return input.plannedDate();
     }
