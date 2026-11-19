@@ -66,6 +66,8 @@ abstract class MarSupport extends MedicineSupport {
     static final String COLLEAGUE_NOT_SET = "The second nurse has not set a PIN yet. Choose another nurse.";
     static final String LOCK_READONLY = "IPD is read-only. Doses cannot be recorded.";
     static final String LOCK_NOT_ADMITTED = "This patient is not admitted any more.";
+    /** The note of the manual override that {@link #given} sends; clinical text that must never reach a log, an audit row or an event. */
+    static final String GIVEN_OVERRIDE_NOTE = "Checked the label against the order";
 
     static final String[][] REASONS = {{"PATIENT_REFUSED", "Patient refused"}, {"HELD_DOCTOR", "Held on doctor's advice"},
             {"NIL_BY_MOUTH", "Nil by mouth"}, {"NOT_AVAILABLE", "Medicine not available"},
@@ -95,6 +97,11 @@ abstract class MarSupport extends MedicineSupport {
 
     /** The instant the database clock answers while a test has set it; null means the real clock. */
     private static volatile Instant fixedNow;
+
+    /** The instant the application clock is fixed at ({@link #clockAt}), or null while it reads the real clock. */
+    protected static Instant fixedClock() {
+        return fixedNow;
+    }
 
     /** The IST date of this test (read once, so a test that runs across midnight still uses one day). */
     protected LocalDate day;
@@ -285,7 +292,7 @@ abstract class MarSupport extends MedicineSupport {
         m.put("identityConfirmed", true);
         m.put("orderVersion", 1);
         // SAH-76: no medicine codes are loaded (ipd.drug_code ships empty), so every GIVEN needs the manual override
-        m.put("override", Map.of("reasonKey", "NO_BARCODE", "note", "Checked the label against the order"));
+        m.put("override", Map.of("reasonKey", "NO_BARCODE", "note", GIVEN_OVERRIDE_NOTE));
         return m;
     }
 
@@ -459,6 +466,38 @@ abstract class MarSupport extends MedicineSupport {
         JsonNode sheet = sheet(w.clinic(), w.adm().id());
         ok(HttpMethod.POST, dischargeUrl(w.adm().id()), w.clinic().owner(),
                 dischargeBody("normal", "general", totalOf(sheet), depositsOf(sheet), "UPI"), 200);
+    }
+
+    /**
+     * Contract 0.4.3: a manual override is refused for 15 minutes after a wristband or medicine mismatch of the same nurse on the
+     * same order and slot. A test that stops at a mismatch and then gives the dose by override moves the stop rows of the order
+     * back in time first (table owner, append-only trigger off inside the transaction).
+     */
+    protected void ageScanStops(String orderId, long minutes) throws SQLException {
+        asOwner(true, new String[] {"ipd.dose_scan_stop", "ipd.admission"}, c -> {
+            DbAccess.execute(c, "alter table ipd.dose_scan_stop disable trigger trg_dose_scan_stop_no_update_delete");
+            DbAccess.execute(c, "update ipd.dose_scan_stop set stopped_at = stopped_at - (? * interval '1 minute') where order_id = ?::uuid",
+                    minutes, orderId);
+            DbAccess.execute(c, "alter table ipd.dose_scan_stop enable trigger trg_dose_scan_stop_no_update_delete");
+            return null;
+        });
+    }
+
+    /**
+     * Sets the age of the scan-stop rows of an order (all slots, or only the slot given) to exactly this many seconds on the database
+     * clock, measured from the moment of this call: {@code stopped_at = clock_timestamp() - seconds} (table owner, append-only trigger
+     * off inside the transaction). The 15 minute rule reads {@code stopped_at > now() - 15 minutes} with the transaction start of the
+     * request, so a stop aged 870 s (a 30 s margin) is inside the window, and 900 s or more is outside.
+     */
+    protected void setScanStopAge(String orderId, Instant slotAt, long seconds) throws SQLException {
+        asOwner(true, new String[] {"ipd.dose_scan_stop", "ipd.admission"}, c -> {
+            DbAccess.execute(c, "alter table ipd.dose_scan_stop disable trigger trg_dose_scan_stop_no_update_delete");
+            DbAccess.execute(c, "update ipd.dose_scan_stop set stopped_at = clock_timestamp() - (? * interval '1 second') "
+                    + "where order_id = ?::uuid and (?::timestamptz is null or slot_at = ?::timestamptz)", seconds, orderId,
+                    slotAt == null ? null : java.sql.Timestamp.from(slotAt), slotAt == null ? null : java.sql.Timestamp.from(slotAt));
+            DbAccess.execute(c, "alter table ipd.dose_scan_stop enable trigger trg_dose_scan_stop_no_update_delete");
+            return null;
+        });
     }
 
     /** Runs a statement as the table owner in a committed transaction on the given tables (row level security off). */

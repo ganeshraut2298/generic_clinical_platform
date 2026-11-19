@@ -586,10 +586,11 @@ class DoseSecondNurseIT extends MarSupport {
         String bad = wrong(w.nurse2Pin());
         DSnap before = dsnap(w);
         // wrong band, wrong statement, not due, not a dose time: each is answered first and no PIN is tried
-        refused(doseCall(w.nurse().auth(), f.hep(), set(givenHighAlert(w, ist(8, 0), w.nurse2(), bad), "wristband", "WRONG-00000")),
-                409, "wristband-mismatch", MISMATCH_TEXT);
+        // (0.4.3 check order: the statement is judged after the override-after-mismatch rule, so it is tried before the mismatch)
         invalid(doseCall(w.nurse().auth(), f.hep(), set(givenHighAlert(w, ist(8, 0), w.nurse2(), bad), "identityConfirmed", false)),
                 "identityConfirmed", CONFIRM_TEXT);
+        refused(doseCall(w.nurse().auth(), f.hep(), set(givenHighAlert(w, ist(8, 0), w.nurse2(), bad), "wristband", "WRONG-00000")),
+                409, "wristband-mismatch", MISMATCH_TEXT);
         invalid(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(9, 0), w.nurse2(), bad)), "slotAt", NOT_A_DOSE_TIME);
         clockAt(6, 0);
         refused(doseCall(w.nurse().auth(), f.hep(), givenHighAlert(w, ist(8, 0), w.nurse2(), bad)), 409, "dose-not-due", NOT_DUE);

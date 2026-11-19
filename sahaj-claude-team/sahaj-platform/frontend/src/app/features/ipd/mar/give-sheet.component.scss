@@ -48,6 +48,15 @@
   font-weight: 600;
 }
 
+// 409 no-code-loaded: nothing was stopped, so the warn colour, not the STOP colour; the icon and the words carry it too.
+.sfwarn {
+  color: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
 .sfchk {
   display: flex;
   gap: 10px;

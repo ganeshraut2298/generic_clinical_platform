@@ -1,12 +1,16 @@
 package com.sahaj.platform.application;
 
+import com.sahaj.platform.api.PharmacyAccessPort;
 import com.sahaj.platform.domain.MembershipRole;
 import com.sahaj.platform.domain.SetupProgress;
 import com.sahaj.platform.domain.TenantProfile;
 import com.sahaj.platform.domain.UserPreference;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,11 +29,25 @@ public class MeService {
     private final UserPreferenceRepository userPreferenceRepository;
     private final ModuleEntitlementRepository moduleEntitlementRepository;
     private final Clock clock;
+    private final ObjectProvider<PharmacyAccessPort> pharmacyAccessPort;
 
+    /** The constructor of before SAH-78: no pharmacy module is wired, so nobody has a store mapping. */
     public MeService(TeamRepository teamRepository, TenantRepository tenantRepository,
                       ClinicProfileRepository clinicProfileRepository, SetupProgressRepository setupProgressRepository,
                       UserPreferenceRepository userPreferenceRepository,
                       ModuleEntitlementRepository moduleEntitlementRepository, Clock clock) {
+        this(teamRepository, tenantRepository, clinicProfileRepository, setupProgressRepository,
+                userPreferenceRepository, moduleEntitlementRepository, clock, null);
+    }
+
+    /** SAH-78: {@code pharmacyAccessPort} is implemented by the pharmacy module; absent means no store mappings. */
+    @Autowired
+    public MeService(TeamRepository teamRepository, TenantRepository tenantRepository,
+                      ClinicProfileRepository clinicProfileRepository, SetupProgressRepository setupProgressRepository,
+                      UserPreferenceRepository userPreferenceRepository,
+                      ModuleEntitlementRepository moduleEntitlementRepository, Clock clock,
+                      ObjectProvider<PharmacyAccessPort> pharmacyAccessPort) {
+        this.pharmacyAccessPort = pharmacyAccessPort;
         this.moduleEntitlementRepository = moduleEntitlementRepository;
         this.teamRepository = teamRepository;
         this.tenantRepository = tenantRepository;
@@ -77,11 +95,34 @@ public class MeService {
 
         MeView.Clinic clinic = new MeView.Clinic(tenantProfile.name(), area, tenantProfile.brand(),
                 brandHex, tenantProfile.plan(), planDaysLeft, setupComplete, setupPercent);
-        NavigationPolicy.ModuleFlags flags = moduleEntitlementRepository.find(tenantId)
+        // one statement: the row carries pharmacy_on too (SAH-78 code review F-6), so Off costs no extra select
+        Optional<ModuleEntitlementRepository.EntitlementRow> entitlement = moduleEntitlementRepository.find(tenantId);
+        NavigationPolicy.ModuleFlags flags = entitlement
                 .map(row -> flagsOf(row, ModuleEntitlements.effectiveIpdState(row, clock.instant())))
                 .orElse(new NavigationPolicy.ModuleFlags(false, false, false));
+        flags = withPharmacy(flags, entitlement.map(ModuleEntitlementRepository.EntitlementRow::pharmacyOn).orElse(false),
+                tenantId, member.id(), role);
         return new MeView(userId, member.id(), member.name(), role.name(), clinic,
                 NavigationPolicy.menuFor(role, preferences.menuMode(), flags, member.hasDoctorProfile()), preferences);
+    }
+
+    /**
+     * SAH-78 (ADR-028 D11): adds the Pharmacy and Inventory switch and, only for a role that is neither OWNER nor
+     * PHARMACIST, the answer of the pharmacy module's port. With the switch off nothing is asked and the flags are
+     * returned as they were.
+     */
+    private NavigationPolicy.ModuleFlags withPharmacy(NavigationPolicy.ModuleFlags flags, boolean pharmacyOn,
+                                                       UUID tenantId, UUID membershipId, MembershipRole role) {
+        if (!pharmacyOn) {
+            return flags;
+        }
+        boolean mapped = false;
+        if (role != MembershipRole.OWNER && role != MembershipRole.PHARMACIST) {
+            PharmacyAccessPort port = pharmacyAccessPort == null ? PharmacyAccessPort.NONE
+                    : pharmacyAccessPort.getIfAvailable(() -> PharmacyAccessPort.NONE);
+            mapped = port.hasActiveMapping(tenantId, membershipId);
+        }
+        return new NavigationPolicy.ModuleFlags(flags.hraOn(), flags.ipdOn(), flags.ipdWritable(), true, mapped);
     }
 
     /** SAH-28: IPD is writable (menu item Emergency) in Trial and On, not in Read-only. */

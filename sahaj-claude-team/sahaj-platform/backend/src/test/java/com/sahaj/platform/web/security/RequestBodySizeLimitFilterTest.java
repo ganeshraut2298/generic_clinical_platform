@@ -350,6 +350,51 @@ class RequestBodySizeLimitFilterTest {
         assertThat(anonymous.getContentAsString()).contains("4 KB or smaller");
     }
 
+    // ---- I21: the goods-receipt and purchase-order write paths take up to 128 KB ----
+
+    private static final String STORE_UUID = "0b1c2d3e-4f50-4162-8394-a5b6c7d8e9f0";
+    private static final String DOC_UUID = "1c2d3e4f-5061-4273-8495-b6c7d8e9fa01";
+
+    @Test
+    void aSignedInReceiptOrPurchaseOrderBodyOf100KbIsAcceptedOnTheirWritePathsAndOneByteOver128KbIs413() throws Exception {
+        signIn();
+        String base = "/api/v1/pharmacy/stores/" + STORE_UUID;
+        for (String path : new String[] {base + "/goods-receipts", base + "/goods-receipts/" + DOC_UUID,
+                base + "/goods-receipts/" + DOC_UUID + "/post", base + "/purchase-orders", base + "/purchase-orders/" + DOC_UUID,
+                base + "/purchase-orders/" + DOC_UUID + "/submit", base + "/purchase-orders/from-suggestions",
+                base + "/indents/" + DOC_UUID + "/dispatches", base + "/dispatches/" + DOC_UUID + "/receipt"}) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            int[] seen = new int[1];
+            filter.doFilter(postOf(path, 100 * 1024), response,
+                    (req, res) -> seen[0] = StreamUtils.copyToByteArray(req.getInputStream()).length);
+            assertThat(response.getStatus()).as(path).isEqualTo(200);
+            assertThat(seen[0]).as(path).isEqualTo(100 * 1024);
+        }
+        MockHttpServletResponse over = new MockHttpServletResponse();
+        filter.doFilter(postOf(base + "/goods-receipts", (int) RequestBodySizeLimitFilter.PHARMACY_BUYING_MAX_BODY_BYTES + 1), over,
+                mustNotRun());
+        assertThat(over.getStatus()).isEqualTo(413);
+        assertThat(over.getContentAsString()).contains("The request body must be 128 KB or smaller.");
+    }
+
+    @Test
+    void theBuyingCapDoesNotApplyToOtherPharmacyPathsOrToACallerWithNoPrincipal() throws Exception {
+        signIn();
+        String base = "/api/v1/pharmacy/stores/" + STORE_UUID;
+        for (String path : new String[] {base + "/stock-adjustments", base + "/debit-notes", base + "/goods-receipts/not-a-uuid",
+                base + "/goods-receipts/" + DOC_UUID + "/x/y", "/api/v1/pharmacy/vendors", base + "/indents/" + DOC_UUID + "/submit",
+                base + "/dispatches/" + DOC_UUID + "/x"}) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(postOf(path, 100 * 1024), response, mustNotRun());
+            assertThat(response.getStatus()).as(path).isEqualTo(413);
+            assertThat(response.getContentAsString()).as(path).contains("64 KB or smaller");
+        }
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        MockHttpServletResponse anonymous = new MockHttpServletResponse();
+        filter.doFilter(postOf(base + "/goods-receipts", 5000), anonymous, mustNotRun());
+        assertThat(anonymous.getStatus()).isEqualTo(413);
+    }
+
     @Test
     void aConfiguredSignedInCapAbove256KbIsKeptOnTheFormSavePaths() throws Exception {
         signIn();

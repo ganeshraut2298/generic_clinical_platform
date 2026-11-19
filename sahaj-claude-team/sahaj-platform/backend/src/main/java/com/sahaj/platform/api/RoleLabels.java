@@ -13,7 +13,8 @@ public final class RoleLabels {
             "FRONT_DESK", "Front desk",
             "BILLING", "Billing",
             "PHARMACIST", "Pharmacist",
-            "COUNSELLOR", "Counsellor");
+            "COUNSELLOR", "Counsellor",
+            "STORE_STAFF", "Store staff");
 
     private RoleLabels() {
     }

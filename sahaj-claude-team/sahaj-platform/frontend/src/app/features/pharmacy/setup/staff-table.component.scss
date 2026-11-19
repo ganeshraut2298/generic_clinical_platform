@@ -1,0 +1,42 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+table {
+  min-width: 720px;
+}
+
+.sub {
+  font-size: 0.76rem;
+  color: var(--ink-3);
+
+  &.warn {
+    color: var(--warn);
+  }
+}
+
+// Yes and No are words, so colour is never the only signal.
+.yes {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.no {
+  color: var(--ink-3);
+}
+
+.acts {
+  white-space: nowrap;
+  text-align: right;
+
+  button + button {
+    margin-left: 6px;
+  }
+}
+
+// Small buttons keep a 44 px hit area (Material's own touch target) on a tablet.
+.sr-only {
+  position: absolute;
+  left: -9999px;
+}

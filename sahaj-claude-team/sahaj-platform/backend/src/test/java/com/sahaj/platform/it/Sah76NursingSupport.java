@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -221,10 +222,25 @@ abstract class Sah76NursingSupport extends ScopeSupport {
         return code;
     }
 
+    /** Before each test: a QAS76 code left behind by a killed run must not leak into this test (code review round 3 #3). */
+    @BeforeEach
+    void sweepMedicineCodesBefore() throws SQLException {
+        codes.clear();
+        sweepQaMedicineCodes(db());
+    }
+
     @AfterEach
     void removeMedicineCodes() throws SQLException {
         codes.clear();
-        try (Connection c = db().migrator()) {
+        sweepQaMedicineCodes(db());
+    }
+
+    /**
+     * Deletes every medicine code with the QA prefix (migrator connection, the immutability trigger off for that one delete and on
+     * again in {@code finally}). Only the prefix {@value #CODE_PREFIX} is swept, so a real code still fails the shipped-empty check.
+     */
+    static void sweepQaMedicineCodes(DbAccess db) throws SQLException {
+        try (Connection c = db.migrator()) {
             c.setAutoCommit(true);
             DbAccess.execute(c, "alter table ipd.drug_code disable trigger trg_drug_code_no_update_delete");
             try {
@@ -404,8 +420,11 @@ abstract class Sah76NursingSupport extends ScopeSupport {
     protected void extendUndo(Clinic clinic, String doseId) throws SQLException {
         asOwner(true, new String[] {"ipd.dose_administration", "ipd.admission"}, c -> {
             DbAccess.execute(c, "alter table ipd.dose_administration disable trigger trg_dose_administration_no_update_delete");
-            DbAccess.execute(c, "update ipd.dose_administration set undo_until = clock_timestamp() + interval '1 hour' "
-                    + "where id = ?::uuid", doseId);
+            // one hour after the later of the database clock and the fixed application clock: a test that runs before the fixed
+            // time of day (the clock is 8:05 AM IST of today) would otherwise read the window as closed (canUndo false)
+            Instant fixed = fixedClock() == null ? Instant.EPOCH : fixedClock();
+            DbAccess.execute(c, "update ipd.dose_administration set undo_until = greatest(clock_timestamp(), ?::timestamptz) + interval '1 hour' "
+                    + "where id = ?::uuid", java.sql.Timestamp.from(fixed), doseId);
             DbAccess.execute(c, "alter table ipd.dose_administration enable trigger trg_dose_administration_no_update_delete");
             return null;
         });

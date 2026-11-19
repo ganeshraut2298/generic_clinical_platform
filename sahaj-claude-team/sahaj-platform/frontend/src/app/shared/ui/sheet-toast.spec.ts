@@ -31,6 +31,18 @@ describe('sheetToast', () => {
     expect(sheetToast(8000, { announce: false })).toEqual({ duration: 8000, verticalPosition: 'bottom', politeness: 'off' });
   });
 
+  it('top: true puts the toast at the top on a wide screen too, and still on a phone', () => {
+    screen(false);
+    expect(sheetToast(8000, { top: true })).toEqual({ duration: 8000, verticalPosition: 'top' });
+    expect(sheetToast(8000, { announce: false, top: true })).toEqual({
+      duration: 8000,
+      verticalPosition: 'top',
+      politeness: 'off',
+    });
+    screen(true);
+    expect(sheetToast(8000, { top: true }).verticalPosition).toBe('top');
+  });
+
   it('stays at the bottom where the browser cannot answer the question', () => {
     (window as { matchMedia?: unknown }).matchMedia = undefined;
     expect(sheetToast(8000).verticalPosition).toBe('bottom');

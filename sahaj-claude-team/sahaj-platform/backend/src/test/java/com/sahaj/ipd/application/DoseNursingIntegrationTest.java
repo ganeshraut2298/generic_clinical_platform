@@ -387,6 +387,231 @@ class DoseNursingIntegrationTest extends DoseTestBase {
         assertThat(doses.stops).singleElement().satisfies(s -> assertThat(s.slotAt()).isEqualTo(CLOCK));
     }
 
+    // ---- a medicine with no code loaded (contract 0.4.4 (B1), (E1), DEC-065 answer A) ----
+
+    private static final String UNKNOWN_BOX = "9876543210";
+    private static final String NO_CODE_DETAIL =
+            "No code is loaded for this medicine. Use Manual override: Medicine has no barcode.";
+
+    private void noCodesLoaded(String drugKey) {
+        when(drugCodes.codesOf(drugKey)).thenReturn(Set.of());
+    }
+
+    private void assertNoCodeLoaded(Throwable e) {
+        assertThat(e).isInstanceOfSatisfying(ConflictException.class, c -> {
+            assertThat(c.problemType()).isEqualTo("no-code-loaded");
+            assertThat(c.title()).isEqualTo("No code loaded");
+            assertThat(c.getMessage()).isEqualTo(NO_CODE_DETAIL);
+        });
+    }
+
+    /** The refusal left no deny entry, no mismatch audit, no stop row, no dose, and exactly one refused audit row. */
+    private void assertOnlyTheRefusedAudit(OrderRow order, String scannedText) {
+        Map<String, Object> after = auditAfter("IPD_DOSE_REFUSED");
+        assertThat(after).containsOnlyKeys("orderId", "admissionId", "refusal", "device")
+                .containsEntry("refusal", "no-code-loaded").containsEntry("orderId", order.id())
+                .containsEntry("admissionId", ADMISSION);
+        assertThat(after.toString()).doesNotContain(scannedText);
+        verify(auditLog, never()).record(eq("IPD_DOSE_MEDICINE_MISMATCH"), anyString(), any(), any(), any());
+        verify(events, never()).insert(any(), any(), anyString(), anyString(), any());
+        assertThat(doses.stops).isEmpty();
+        assertThat(doses.writes).isZero();
+    }
+
+    @Test
+    void aCodeOfTheOrderedDrugIsStillAScanWhenTheDrugHasCodes() {
+        OrderRow order = active("pcm", "od");
+
+        nurseGives(order, withCode(given(EIGHT_AM), CODE));
+
+        assertThat(doses.inserted.get(0).scanMethod()).isEqualTo("SCAN");
+        assertThat(doses.inserted.get(0).medicineScan()).isEqualTo(CODE);
+    }
+
+    @Test
+    void aCodeOfAnotherDrugIsStillAMismatchWhenTheOrderedDrugHasNoCodes() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+        when(drugCodes.drugKeyOf("HEP-5000")).thenReturn(Optional.of("hep"));
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), "hep-5000"))).satisfies(e -> assertConflict(
+                e, "medicine-mismatch", "Wrong medicine. This is Inj. Heparin 5,000 IU, not Tab. Paracetamol 650 mg."));
+
+        verify(events).insert(TENANT, ADMISSION, ClinicalEventRepository.KIND_DENY,
+                "Stopped at the medicine check: entered HEP-5000, expected Tab. Paracetamol 650 mg", NURSE);
+        assertThat(auditAfter("IPD_DOSE_MEDICINE_MISMATCH")).containsEntry("drugKey", "pcm");
+        verify(auditLog, never()).record(eq("IPD_DOSE_REFUSED"), anyString(), any(), any(), any());
+        assertThat(doses.stops).singleElement().satisfies(s -> assertThat(s.checkKind()).isEqualTo("MEDICINE"));
+        assertThat(doses.writes).isZero();
+    }
+
+    @Test
+    void anUnknownCodeForADrugWithNoCodesIsNoCodeLoadedWithoutAStopOrAnEvent() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), UNKNOWN_BOX)))
+                .satisfies(this::assertNoCodeLoaded)
+                .satisfies(e -> assertThat(e.getMessage()).doesNotContain(UNKNOWN_BOX));
+
+        assertOnlyTheRefusedAudit(order, UNKNOWN_BOX);
+    }
+
+    @Test
+    void aBoxOverTheLimitForADrugWithNoCodesIsNoCodeLoadedAndForADrugWithCodesAMismatch() {
+        OrderRow order = active("pcm", "od");
+        String longBox = "8".repeat(101);
+        noCodesLoaded("pcm");
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), longBox))).satisfies(this::assertNoCodeLoaded);
+        assertOnlyTheRefusedAudit(order, longBox);
+
+        org.mockito.Mockito.reset(drugCodes);
+        when(drugCodes.codesOf(anyString())).thenReturn(Set.of(CODE));
+        when(drugCodes.drugKeyOf(any())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), longBox))).satisfies(e -> assertConflict(
+                e, "medicine-mismatch", "Wrong medicine. This is an item not on this order, not Tab. Paracetamol 650 mg."));
+    }
+
+    @Test
+    void anUnknownCodeForADrugThatHasCodesIsStillAMismatchOfAnItemNotOnTheOrder() {
+        OrderRow order = active("pcm", "od");
+        when(drugCodes.codesOf("pcm")).thenReturn(Set.of(CODE));
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), UNKNOWN_BOX))).satisfies(e -> assertConflict(
+                e, "medicine-mismatch", "Wrong medicine. This is an item not on this order, not Tab. Paracetamol 650 mg."));
+
+        assertThat(doses.stops).hasSize(1);
+        verify(auditLog, never()).record(eq("IPD_DOSE_REFUSED"), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void anOverrideSentWithAnUnknownCodeIsIgnoredAndTheCodeIsStillNoCodeLoaded() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+
+        assertThatThrownBy(() -> nurseGives(order, withOverride(withCode(given(EIGHT_AM), UNKNOWN_BOX), "NO_BARCODE",
+                "Read the strip label"))).satisfies(this::assertNoCodeLoaded);
+
+        assertOnlyTheRefusedAudit(order, UNKNOWN_BOX);
+    }
+
+    @Test
+    void theSameNurseCanOverrideAtOnceAfterNoCodeLoadedAndTheStoredDoseHoldsNoScannedText() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), UNKNOWN_BOX)))
+                .satisfies(this::assertNoCodeLoaded);
+
+        DoseResult result = nurseGives(order, overrideOf(EIGHT_AM));
+
+        assertThat(result.created()).isTrue();
+        var stored = doses.inserted.get(0);
+        assertThat(stored.scanMethod()).isEqualTo("OVERRIDE");
+        assertThat(stored.overrideReasonKey()).isEqualTo("NO_BARCODE");
+        assertThat(stored.medicineScan()).isNull();
+        assertThat(doses.stops).isEmpty();
+    }
+
+    @Test
+    void anEmergencyOverrideRightAfterNoCodeLoadedIsAccepted() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), UNKNOWN_BOX)))
+                .satisfies(this::assertNoCodeLoaded);
+
+        assertThat(nurseGives(order, withOverride(withCode(given(EIGHT_AM), null), "EMERGENCY",
+                "Patient unconscious, case file checked")).created()).isTrue();
+    }
+
+    @Test
+    void anOverrideRightAfterARealMismatchIsStillRefused() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+        when(drugCodes.drugKeyOf("HEP-5000")).thenReturn(Optional.of("hep"));
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), "HEP-5000"))).satisfies(e -> assertConflict(
+                e, "medicine-mismatch", "Wrong medicine. This is Inj. Heparin 5,000 IU, not Tab. Paracetamol 650 mg."));
+
+        assertThatThrownBy(() -> nurseGives(order, overrideOf(EIGHT_AM))).satisfies(
+                e -> assertConflict(e, "override-after-mismatch", DoseRules.OVERRIDE_AFTER_MISMATCH));
+    }
+
+    @Test
+    void aPrnDoseWithAnUnknownCodeForADrugWithNoCodesWritesNoStopRow() {
+        OrderRow order = prn();
+        noCodesLoaded("pcm");
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(withoutSlot(given(EIGHT_AM)), UNKNOWN_BOX)))
+                .satisfies(this::assertNoCodeLoaded);
+
+        assertOnlyTheRefusedAudit(order, UNKNOWN_BOX);
+    }
+
+    @Test
+    void theWristbandIsCheckedBeforeTheNoCodeLoadedAnswer() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+
+        assertThatThrownBy(() -> nurseGives(order, with(withCode(given(EIGHT_AM), UNKNOWN_BOX), null, null, null, null,
+                null))).satisfies(e -> assertField(e, "wristband", "Scan the wristband first."));
+        assertThatThrownBy(() -> nurseGives(order, with(withCode(given(EIGHT_AM), UNKNOWN_BOX), "UH-000999", Boolean.TRUE,
+                null, null, null))).satisfies(e -> assertConflict(e, "wristband-mismatch", DoseRules.MISMATCH));
+
+        assertThat(doses.stops).singleElement().satisfies(s -> assertThat(s.checkKind()).isEqualTo("WRISTBAND"));
+        verify(auditLog, never()).record(eq("IPD_DOSE_REFUSED"), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void theNoCodeLoadedAnswerComesBeforeTheOverrideFieldsTheTickBoxAndTheSecondNurse() {
+        OrderRow order = active("hep", "od");
+        noCodesLoaded("hep");
+        // A bad override reason, the box not ticked, and no second nurse for a high-alert medicine: none of it is read.
+        DoseInput bad = withOverride(with(withCode(given(EIGHT_AM), UNKNOWN_BOX), UHID, null, null, null, null), "BROKEN",
+                "x");
+
+        assertThatThrownBy(() -> nurseGives(order, bad)).satisfies(this::assertNoCodeLoaded);
+
+        assertOnlyTheRefusedAudit(order, UNKNOWN_BOX);
+        assertThat(trace).doesNotContain("pin");
+    }
+
+    @Test
+    void anEmptyCodeWithoutAnOverrideIsStill400AndNotNoCodeLoaded() {
+        OrderRow order = active("pcm", "od");
+        noCodesLoaded("pcm");
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(given(EIGHT_AM), " \r\n"))).satisfies(
+                e -> assertField(e, "medicineCode", "Scan or type the medicine code."));
+
+        assertThat(doses.stops).isEmpty();
+        verify(auditLog, never()).record(eq("IPD_DOSE_REFUSED"), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void aHighAlertDoseRefusedAsNoCodeLoadedUnderTheLockIsAnsweredAndAuditedOnceWithNoStopRow() {
+        OrderRow order = active("hep", "od");
+        // The first transaction sees a code of the drug; the locked transaction sees the drug without codes.
+        when(drugCodes.codesOf("hep")).thenReturn(Set.of("HEP-5000"), Set.of());
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(givenHighAlert(EIGHT_AM), "hep-5000")))
+                .satisfies(this::assertNoCodeLoaded);
+
+        assertThat(trace).contains("pin", "lock");
+        assertOnlyTheRefusedAudit(order, "HEP-5000");
+    }
+
+    @Test
+    void aHighAlertUnknownCodeWithNoCodesLoadedIsAnsweredBeforeThePinIsAsked() {
+        OrderRow order = active("hep", "od");
+        noCodesLoaded("hep");
+
+        assertThatThrownBy(() -> nurseGives(order, withCode(givenHighAlert(EIGHT_AM), UNKNOWN_BOX)))
+                .satisfies(this::assertNoCodeLoaded);
+
+        assertThat(trace).doesNotContain("pin");
+        assertOnlyTheRefusedAudit(order, UNKNOWN_BOX);
+    }
+
     // ---- the check order of a GIVEN (contract 0.4.3 (E)) ----
 
     @Test

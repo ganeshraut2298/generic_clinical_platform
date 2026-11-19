@@ -1,0 +1,40 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 92vh;
+  max-height: 92dvh;
+}
+
+.sheet-h,
+.sheet-f {
+  flex: none;
+}
+
+.sheet-b {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+// "Issues from" is set by the server, so it is shown as a fact and not as a control.
+.fixed {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 4px;
+}
+
+.fixedv {
+  font-weight: 600;
+}

@@ -68,6 +68,7 @@ class DosePrivacyIT extends MarSupport {
             doseOk(w.nurse().auth(), hep, givenHighAlert(w, ist(8, 0), w.nurse2(), w.nurse2Pin()));
             // doses, a repeat and a record of the same slot
             Map<String, Object> g = given(w, ist(8, 0));
+            ageScanStops(pcm, 16); // 0.4.3: no override within 15 minutes of the wristband stops above
             doseOk(w.nurse().auth(), pcm, g);
             ok(org.springframework.http.HttpMethod.POST, dosesUrl(pcm), w.nurse().auth(), js(g), 200);
             problems.add(body(doseCall(w.nurse2().auth(), pcm, given(w, ist(8, 0)))));

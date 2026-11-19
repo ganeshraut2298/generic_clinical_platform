@@ -26,4 +26,11 @@ public class ModuleEntitlementAdapter implements ModuleEntitlementPort {
         return new ModuleEntitlement(ModuleEntitlements.effectiveIpdState(row, clock.instant()), row.hraOn(),
                 row.bedLimit());
     }
+
+    /** SAH-78: the Pharmacy and Inventory switch; false until the clinic's row says otherwise. */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean pharmacyOn(UUID tenantId) {
+        return repository.pharmacyOn(tenantId);
+    }
 }

@@ -5,27 +5,27 @@
   "note": "layerFrameMs = JS time inside the layer frame callback (canvas calls on the main thread, not GPU raster) under a 4x CPU throttle. The control is the same page and sweep with the layer switched off.",
   "layerOn": {
     "layer": "on",
-    "seconds": 5.5,
-    "mouseMovesDone": 14,
-    "movesPerSecond": 2.5,
-    "layerFrames": 39,
+    "seconds": 4.7,
+    "mouseMovesDone": 8,
+    "movesPerSecond": 1.7,
+    "layerFrames": 22,
     "layerFrameMs": {
-      "median": 1,
-      "p95": 3.4,
-      "max": 3.6
+      "median": 2.3,
+      "p95": 98.3,
+      "max": 108.2
     },
-    "otherRafCallbacks": 5,
-    "meanMsBetweenLayerFrames": 91.4,
-    "longTasks": 17,
-    "longTasksPerSecond": 3.1,
-    "mainThreadBusyPercent": 65,
-    "scriptPercent": 2
+    "otherRafCallbacks": 4,
+    "meanMsBetweenLayerFrames": 118.3,
+    "longTasks": 14,
+    "longTasksPerSecond": 3,
+    "mainThreadBusyPercent": 94,
+    "scriptPercent": 8
   },
   "layerOff": {
     "layer": "off (control, same page without the layer)",
-    "seconds": 5.4,
-    "mouseMovesDone": 3,
-    "movesPerSecond": 0.6,
+    "seconds": 4.1,
+    "mouseMovesDone": 28,
+    "movesPerSecond": 6.8,
     "layerFrames": 0,
     "layerFrameMs": {
       "median": 0,
@@ -34,9 +34,9 @@
     },
     "otherRafCallbacks": 1,
     "meanMsBetweenLayerFrames": 0,
-    "longTasks": 2,
-    "longTasksPerSecond": 0.4,
-    "mainThreadBusyPercent": 79,
-    "scriptPercent": 0
+    "longTasks": 1,
+    "longTasksPerSecond": 0.2,
+    "mainThreadBusyPercent": 62,
+    "scriptPercent": 1
   }
 }

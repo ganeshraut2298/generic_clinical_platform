@@ -113,3 +113,86 @@ Still not covered: Playwright e2e (no e2e for orders, notices, giving, correctin
 ## Go-live additions (17 Nov 2026)
 
 The whole-flow, dose and order state, race and money cases that this plan listed as gaps or that the go-live review (`docs/reviews/GO-LIVE-ipd-test-gaps.md`) asked for are in `docs/test-plans/IPD-go-live.md`: `IpdJourneyIT` (15 steps on one admission, with the EMR execution line checked against the MAR after undo, attempt 2, recorded in error and not given), `DoseOrderStateIT` (MAR states ON_HOLD, QUERIED, REPLACED, STOPPED, counters, PRN lock reasons, an old order version refused and audited), `DoseOrderRaceIT`, `IpdMoneyStayIT`. Still open from this plan: Read-only and not-admitted for change, hold, resume, query, reply and acknowledge (journey step 14 covers not-admitted for hold, change, stop, verify and the notice list only); the overdue notice flag; the hard-stop-after-dose review row; the PRN start and end window (contract 0.4.3).
+
+## Give sheet e2e: D8 and review round 4 (19 Nov 2026)
+
+Playwright, all API calls mocked in the browser (`frontend/e2e/mar.spec.ts`, `sah32-world.ts`, `layout-matrix.spec.ts`). These prove what the Give sheet and the toasts do with the answers; the server rules stay with the backend integration tests. Build checked before the final run (19 Nov, after the angular fix for defects 3 and 4): `frontend/dist/frontend/browser` (newest file `chunk-jTFy7269.js`, 10:46:31) is newer than every file under `frontend/src` (newest `_tokens.scss`, 10:42:46) and `styles-HYXSSGE3.css` holds `sheet-solid`, so no rebuild was needed. Port 4394. The final runs used `--output` in a scratch folder: the default `frontend/e2e/results` folder is shared with the Pharmacy session's runs, and one of them deleted a trace file under a test of mine (see the repeat batch).
+
+Mock world (older specs do not notice): `MarWorld.undoSeconds` (unset = no Undo), `DoseW.undoSecondsLeft` and `DoseW.canUndo` (default 0 and false). The Undo request is answered by a test-local route held on a gate (`holdUndo` in mar.spec.ts).
+
+### D8 (code review round 3 #1): no toast while the Give sheet is open
+
+| Condition | Test (mar.spec.ts) | Result |
+| --- | --- | --- |
+| A refusal shows only in the sheet; no `.mat-mdc-snack-bar-container` (helper `expectNoToast`) | R11 refusal, R11 failed request, I6, "after an error no toast is shown over the sheet" | pass |
+| Close is not covered after a refusal | "after an error no toast covers the Close button" (phone-360); F1/D8 at 360 px (both projects) | pass (were FAIL before the sticky header; defect 1 closed) |
+| Record not given and reload toasts are announced after the sheet closes | R11 Record not given done; R11 reload after a 409 | pass |
+
+### Review round 4 and security round 4
+
+| Finding | Condition | Test (mar.spec.ts, "SAH-76 round 4: ...") | Result |
+| --- | --- | --- | --- |
+| Code #5 | Given toast without Undo is announced (live region is not `aria-live=off`) | "R11: the success toast of Given without Undo ... is announced" (the old test at :1887 now asserts `not.toHaveAttribute('aria-live','off')`) | pass |
+| Code #5 | "Undone." is announced | "a late done answer ..." (last assertion) | pass |
+| Code #5 | Marked-in-error toast: tap a correctable given dose, choose a reason, the request carries the reason key and a client key, the toast "Marked as recorded in error: duplicate entry. The original entry is kept." shows and is announced, the panel closes, the slot is Due again | "the marked-in-error toast" (new; `DoseW.canMarkInError` added to the mock world, the recorded-in-error request answered by a test-local route) | pass |
+| Code #1, R4-1 | `give-failure` in view below `.sheet-h` and above `.sheet-f` at 360x740, `role=alert`, no `tabindex`, focus not inside; Close on screen and hit at its centre | 5 tests: 500, 403 forbidden, 409 client-key-reused, non-high-alert wrong PIN, lost answer | pass: defect 3 closed. 225 of 225 on phone-360 with `--repeat-each=25` in a clean run (see Counts); before the fix about 1 in 25 failed |
+| Code #1, R4-1 | `give-prn-lock` (PRN too soon) in view below `.sheet-h` and above `.sheet-f`, alert, no tabindex, focus not inside, Given off; Close hit | "give-prn-lock (PRN too soon) ..." | pass |
+| Code #1, R4-1 | `wristband-mismatch`, `code-mismatch`, `no-code-notice`: in view below `.sheet-h` and above `.sheet-f`, polite region, focus on the box; Close hit | 3 tests | pass |
+| R4-2 | Wrong patient, then Record not given fails (500): STOP line stays, Given off; editing the box clears the STOP and turns Given on | "R4-2 wrong patient ..." | pass |
+| R4-2 | Same for wrong medicine (code box) | "R4-2 wrong medicine ..." | pass |
+| Code #2 | 400 with only `secondNurseId` on a non-high-alert sheet: message in `give-failure`, `second-nurse-error` absent | "code #2 ..." | pass |
+| Code #3 | Second `no-code-loaded`: notice removed while pending, drawn again as a new element, Given on | "code #3 ..." | pass |
+| Code #6 | Late Undo "done" answer while the next give sheet is open: no toast, MAR updated at once, "Undone. ..." after all dialogs close | "a late done answer ..." | pass |
+| Code #6 | Late Undo refusal: no toast, MAR read again, server text after all dialogs close | "a late refusal ..." | pass |
+| Code #6 (extra) | Undo answer with no give sheet open: "Undone." shows while the Nursing sheet is open | "an Undo answer with no give sheet open ..." | pass (was FAIL; defect 2 closed) |
+| Defects 1 and 4 | The sticky header at rest at 1440x900: `position: sticky`, nothing scrolled, title and Close hit at their centres, surface opaque (alpha 1); the header colour equals the sheet surface just below it, within 2 levels per channel (pixels read from a screenshot decoded in the test with `node:zlib`); screenshot kept | "header at rest at 1440x900: opaque --sheet-solid, equal to the sheet surface ..." (reworded and strengthened) | **FAIL on both projects by 1 level**: header 242,243,245; body 3 px below 242,242,242 (blue differs by 3); see defect 4 |
+| Defects 1 and 4 | Over scrolled content at 1440x480: the sheet scrolls, the header stays at the same top, opaque, a field or button is scrolled under it (identity bar, name, allergy chip at scrollTop 40), 376 free header points (not text, not Close) on three rows all read the rest colour (worst difference 0); title and Close hit; screenshot kept | "header over scrolled content at 1440x480: ... scrolled fields hidden behind it ..." (reworded and strengthened) | pass |
+| Code #7 | Given: toast shows, sheet detaches within 3 s, toast never covers Close while the sheet is not closing (longest cover at most 100 ms, the exit window) | "after a successful Given ..." | pass |
+| Code #7 | Same for Record not given | "after a successful Record not given ..." | pass |
+| Code #7 | Same for Given at 360x740 (toast at the top) | "at 360x740 the same holds for Given ..." | pass |
+
+Notes on the measures:
+- In-view rule: `line.top >= 0`, `line.top >= head.bottom - 1`, `line.bottom <= viewport` and `line.bottom <= foot.top + 1`, plus Close on screen and the element hit at its centre. The 1 px margin is still needed after `Math.ceil`: with the margin removed, `give-failure` ended 0.20 to 0.36 px under `.sheet-f` in all five paths on both projects, because the browser snaps the scroll offset to a whole pixel while the lines sit at fractional positions. A larger gap fails. The header side is within the margin by a wide margin (the bottom lines sit about 480 px below it), so it is not stressed by these tests.
+- Cover rule (code #7): the app closes the sheet and opens the toast in one task, so for one or two frames the sheet is in the page without its closing class. That window is not "interactive"; a toast that stayed over an interactive sheet would cover Close for seconds. Three runs of these tests passed each time.
+
+### Layout matrix (`layout-matrix.spec.ts`)
+
+19 Nov final run: 84 of 84 passed (12 per layout project, 7 projects). The one stale test updated on 19 Nov (see the earlier note: it measures the wrong-patient state, edits the box, then measures the second-check text) stays as it was; nothing else changed.
+
+### Counts (Playwright 1.64, port 4394, projects phone-360 and desktop-1440 for the five Give-sheet specs, final run 19 Nov, one run of all specs, 4 workers)
+
+| Spec | Tests per project | phone-360 | desktop-1440 |
+| --- | --- | --- | --- |
+| mar.spec.ts | 125 | 124 pass, 1 fail | 124 pass, 1 fail |
+| colleague-pin.spec.ts | 47 | 47 | 47 |
+| medicine-round.spec.ts | 65 | 65 | 65 |
+| refused-refresh.spec.ts | 68 | 68 | 68 |
+| mar-override.spec.ts | 12 | 12 | 12 |
+| Total | 317 | 316 pass, 1 fail | 316 pass, 1 fail |
+| layout-matrix.spec.ts | 12 per layout project | 84 of 84 over 7 layout projects | |
+
+Overall 632 of 634 for the two projects and 84 of 84 for the matrix (716 of 718 in the run). The two failures are the same test, "header at rest at 1440x900 ...", one per project, and they are the residual of defect 4 (1 level over the limit on the blue channel).
+
+Repeat batch for defect 3 (phone-360, `--repeat-each=25`, the nine "lines at the bottom of the give sheet are in view" tests: five `give-failure` paths, `give-prn-lock`, `wristband-mismatch`, `code-mismatch`, `no-code-notice`; 225 runs, 4 workers, about 10 minutes):
+- Batch 1: 224 passed, 1 error (`wristband-mismatch`). The error was `browserContext.close: ENOENT` on a trace file under `frontend/e2e/results/.playwright-artifacts-0/`, not an assertion. The Pharmacy session ran Playwright at the same time, and its run cleans the shared `results` folder. No in-view assertion failed.
+- Batch 2 (rerun with `--output` in a scratch folder, so nothing is shared): **225 passed, 0 failed.**
+- Before the fix about 1 in 25 failed (2 and 4 of 56 in two earlier batches). No `give-failure` run failed in either of the two batches now.
+
+### Defects
+
+Closed (confirmed by the rerun on 19 Nov):
+1. **Close scrolled out of view after a wrong-patient STOP at 360x740: CLOSED.** The header (`.sheet-h`) is sticky. `mar.spec.ts` "after an error no toast covers the Close button" (phone-360) and F1/D8 (both projects) pass, and every refusal path at 360x740 now also checks that Close is on screen and the element hit at its centre.
+2. **"Undone." held until both sheets close: CLOSED.** "an Undo answer with no give sheet open ..." passes on both projects; the two late-answer tests (give sheet open, then closed) still pass.
+
+3. **`--sheet-foot-h` measured too small while the dialog is opening: CLOSED (19 Nov, angular `layout-height.ts`, measure on `animationend` and `transitionend`).** 225 of 225 on phone-360 in a clean repeat batch and no `give-failure` failure in the first batch either (see Counts).
+
+Open (app code, not changed by QA; for the angular-developer, and a decision for the tech lead):
+4. **Defect 4 (visual): mostly closed, one residual level.** The big step is gone: the header is opaque `--sheet-solid` (242,243,245) and the scrolled fields are fully hidden behind it (376 free header points all read 242,243,245 at 1440x480). But the test measures a 1-level miss at rest on the blue channel. Measured on both projects at 1440x900, same column (x 410, the header's and the body's left padding; the points are the bare `.sheet-b`, not a card):
+   - header 242,243,245 (also 242,243,245 in the free stretch at x 819, y 74);
+   - body 3 px under the header (y 118): 242,242,242, a difference of 3 on blue;
+   - body 24 px under the header (y 139): 243,243,243, a difference of 2 (within the limit).
+   The body is a neutral grey (242 to 244 on all channels; angular measured 244,244,244 far from the header), and `--sheet-solid` `#f2f3f5` is about 2 to 3 levels bluer. This is not visible to the eye. The test keeps the 2-level limit as the tech lead set it, and fails. Options: change `--sheet-solid` light to a neutral near `#f3f3f3` (the body is 242 to 244 and moves a little with what is behind the dialog), or the tech lead widens the limit to 3 with a reason. File `frontend/src/styles/_tokens.scss` line 24. Dark theme still not measured. Human visual sign-off stays open.
+
+### Header at rest and over scrolled content (checked by screenshot, 19 Nov)
+
+Tests "header at rest at 1440x900" and "header over scrolled content at 1440x480" keep PNGs of the sheet (attached to the report; a passing test's files are removed by the next run). The pixels are read in the test: it decodes a page screenshot with `node:zlib` (no library) and compares the colour in the header with the colour in the body in the same column. At rest the title, subtitle and Close are crisp and in the mockup order; the band is gone (header 242,243,245 against body 242 to 243, residual of 1 level, see defect 4); the footer buttons were not compared pixel by pixel with the mockup (the mockup give sheet cannot be opened by the existing tests). Scrolled (1440x480, scrollTop 40, the identity bar, name and allergy chip under the header): the header stays at the same place, is opaque (alpha 1), and the 376 sampled free points read 242,243,245 as at rest (worst difference 0); the title, subtitle and Close stay readable; the footer shows faint blurred text behind it, as the mockup's sticky footer does (the footer is still `--glass-hi` plus blur, not solid). The last failing run keeps its screenshots under the scratch folder of this run (`give-sheet-at-rest-1440-page.png`).

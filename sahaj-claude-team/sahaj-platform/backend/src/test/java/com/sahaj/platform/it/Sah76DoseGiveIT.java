@@ -117,6 +117,9 @@ class Sah76DoseGiveIT extends Sah76NursingSupport {
     void aCodeThatIsNotInTheDrugMasterIsAnItemNotOnThisOrderAndTheTypedTextIsNeverLogged() throws Exception {
         Fx f = pcm();
         Ward w = f.w();
+        // 0.4.4 (DEC-065): an unknown code is a mismatch only while the ordered drug has codes loaded; with none it is
+        // no-code-loaded (Sah76NoCodeLoadedIT), so this drug gets one code first
+        codeOf("pcm");
         String typed = "ZZ99XX77AB";
         refused(doseCall(w.nurse().auth(), f.order(), scanGiven(w, ist(8, 0), 1, typed)), 409, "medicine-mismatch",
                 "Wrong medicine. This is an item not on this order, not Tab. Paracetamol 650 mg.");

@@ -1,0 +1,60 @@
+package com.sahaj.pharmacy.domain;
+
+import java.time.LocalDate;
+
+/**
+ * The store-role rules of ADR-028 D4, in one place and free of I/O: which role really counts today, whether a mapping
+ * needs review, and the access columns derived from them (mockup 16). A switched-off member or a removed mapping has no
+ * access: callers pass {@link StoreAccess#NONE} for those instead of calling {@link #access}.
+ */
+public final class StoreRules {
+
+    private StoreRules() {
+    }
+
+    /** True when the stored store role is no longer allowed for the member's current team role. */
+    public static boolean needsReview(String teamRole, StoreRole stored) {
+        return !TeamRoles.allowedStoreRoles(teamRole).contains(stored);
+    }
+
+    /**
+     * The role that counts today: a mapping that needs review counts as STORE_USER, and so does a DELEGATE outside its
+     * dates ("Delegate · ended 30 Nov").
+     */
+    public static StoreRole effectiveRole(String teamRole, StoreRole stored, LocalDate from, LocalDate to,
+                                          LocalDate today) {
+        if (needsReview(teamRole, stored)) {
+            return StoreRole.STORE_USER;
+        }
+        if (stored == StoreRole.DELEGATE && (from == null || to == null
+                || DelegateState.of(from, to, today) != DelegateState.CURRENT)) {
+            return StoreRole.STORE_USER;
+        }
+        return stored;
+    }
+
+    /**
+     * The capability table of ADR-028 D4. OWNER has every capability in every store with no mapping, except Schedule X
+     * (pharmacist-only actions stay out of the owner's reach). For the others, {@code effective} comes from
+     * {@link #effectiveRole}; {@code consumptionAllowed} is the store's Consumption entry flag.
+     *
+     * <p>Receive Schedule X is receive AND team role PHARMACIST, so STORE_STAFF and OWNER never get it, and no store role
+     * can give it to a person who is not a pharmacist.
+     */
+    public static StoreAccess access(String teamRole, StoreRole effective, boolean consumptionAllowed) {
+        if (TeamRoles.OWNER.equals(teamRole)) {
+            return new StoreAccess(true, true, true, false, true, true, true, true, true);
+        }
+        boolean pharmacist = TeamRoles.PHARMACIST.equals(teamRole);
+        switch (effective) {
+            case APPROVER:
+            case DELEGATE:
+                return new StoreAccess(true, true, true, pharmacist, true, pharmacist, true, pharmacist, true);
+            case CENTRAL_STORE_USER:
+                return new StoreAccess(false, false, true, pharmacist, consumptionAllowed, true, true, true, true);
+            case STORE_USER:
+            default:
+                return new StoreAccess(true, false, true, pharmacist, consumptionAllowed, pharmacist, true, pharmacist, pharmacist);
+        }
+    }
+}

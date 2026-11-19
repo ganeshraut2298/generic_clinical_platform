@@ -435,7 +435,7 @@ describe('GiveSheetComponent', () => {
       expect(why().getAttribute('aria-invalid')).toBe('true');
       expect(why().getAttribute('aria-describedby')).toBe('sf-why-err');
       expect(document.activeElement).toBe(why());
-      expect(snack).toHaveBeenCalledWith('Choose why the dose is not given.', 'Close', expect.anything());
+      expect(snack).not.toHaveBeenCalled();
       expect(ref.close).not.toHaveBeenCalled();
     });
 
@@ -502,13 +502,9 @@ describe('GiveSheetComponent', () => {
       await tick();
     }
 
-    it('shows the toast and the STOP line under the box, with no name', async () => {
+    it('shows the STOP line under the box, with no name and no toast (QA D8)', async () => {
       await mismatch();
-      expect(snack).toHaveBeenCalledWith(
-        'Wrong patient. This band belongs to another patient. Check the patient before giving anything.',
-        'Close',
-        expect.anything(),
-      );
+      expect(snack).not.toHaveBeenCalled();
       expect(squash(q('#sf-idok'))).toBe(
         'Wrong patient. This band belongs to another patient. Check the patient before giving anything.',
       );
@@ -563,18 +559,33 @@ describe('GiveSheetComponent', () => {
       expect(box().getAttribute('maxlength')).toBe('200');
     });
 
-    it('the toast is shown but not announced: the field alert or the live line already says it', async () => {
+    it('a refusal while the sheet is open makes no toast: the field alert and the live line carry it (QA D8)', async () => {
       await open();
       fail400(await clickGiven(), 'Scan the wristband first.', [{ field: 'wristband', message: 'Scan the wristband first.' }]);
       await settle();
       await tick();
-      expect(snack).toHaveBeenCalledWith(
-        'Scan the wristband first.',
-        'Close',
-        expect.objectContaining({ duration: 8000, politeness: 'off' }),
-      );
+      expect(snack).not.toHaveBeenCalled();
+      expect(squash(q('#sf-id-err'))).toBe('Scan the wristband first.');
       expect(q('#sf-id-err')!.getAttribute('role')).toBe('alert');
       expect(q('#sf-idok')!.getAttribute('aria-live')).toBe('polite');
+    });
+
+    it('the toast that remains (Record not given done) is announced and at the top on every width (QA D1)', async () => {
+      await open();
+      await choose(why(), 'NIL_BY_MOUTH');
+      (await clickNotGiven()).flush(recorded('HELD', 'NIL_BY_MOUTH'), { status: 201, statusText: 'Created' });
+      expect(snack).toHaveBeenCalledTimes(1);
+      const config = snack.mock.calls[0][2] as Record<string, unknown>;
+      expect(config).toEqual(expect.objectContaining({ duration: 8000, verticalPosition: 'top' }));
+      expect(config['politeness']).toBeUndefined();
+    });
+
+    it('the footer with Given and Record not given is sticky at the bottom of the sheet (opt-in class)', async () => {
+      await open();
+      const sheet = q('[data-testid="give-sheet"]')!;
+      expect(sheet.classList.contains('sticky-foot')).toBe(true);
+      expect(sheet.querySelector(':scope > .sheet-f [data-act="sfgiveok"]')).not.toBeNull();
+      expect(sheet.querySelector(':scope > .sheet-f [data-act="sfnogive"]')).not.toBeNull();
     });
   });
 
@@ -587,7 +598,7 @@ describe('GiveSheetComponent', () => {
       expect(squash(q('#sf-id-err'))).toBe('Scan the wristband first.');
       expect(box().getAttribute('aria-invalid')).toBe('true');
       expect(document.activeElement).toBe(box());
-      expect(snack).toHaveBeenCalledWith('Scan the wristband first.', 'Close', expect.anything());
+      expect(snack).not.toHaveBeenCalled();
     });
 
     it('statement not ticked: under the checkbox, focus on it', async () => {
@@ -666,7 +677,7 @@ describe('GiveSheetComponent', () => {
       expect(nurse().value).toBe('m-rupali');
       expect(box().value).toBe('PT-00042');
       expect(ref.close).not.toHaveBeenCalled();
-      expect(snack).toHaveBeenCalledWith('That PIN is not right.', 'Close', expect.anything());
+      expect(snack).not.toHaveBeenCalled();
     });
 
     it('locked: the text with the time under the field, the PIN cleared, the focus on the nurse list', async () => {
@@ -867,7 +878,7 @@ describe('GiveSheetComponent', () => {
         await fillIdentity();
         fail(await clickGiven(), slug, 409, detail);
         await settle();
-        expect(snack).toHaveBeenCalledWith(detail, 'Close', expect.anything());
+        expect(snack).toHaveBeenCalledWith(detail, 'Close', expect.objectContaining({ verticalPosition: 'top' }));
         expect(ref.close).toHaveBeenCalledWith({ reload: true });
       });
     }
@@ -897,6 +908,7 @@ describe('GiveSheetComponent', () => {
       fail(await clickGiven(), 'forbidden', 403, 'Only nurses and the clinic owner can give medicines.');
       await settle();
       expect(squash(q('[data-testid=give-failure]'))).toBe('Only nurses and the clinic owner can give medicines.');
+      expect(snack).not.toHaveBeenCalled();
       expect(q('[data-testid=give-failure]')!.getAttribute('role')).toBe('alert');
       expect(box().value).toBe('PT-00042');
       expect(ref.close).not.toHaveBeenCalled();
@@ -909,7 +921,7 @@ describe('GiveSheetComponent', () => {
       await settle();
       const message = 'We could not record the dose. What you entered is kept, except the PIN. Try again.';
       expect(squash(q('[data-testid=give-failure]'))).toBe(message);
-      expect(snack).toHaveBeenCalledWith(message, 'Close', expect.anything());
+      expect(snack).not.toHaveBeenCalled();
       expect(box().value).toBe('PT-00042');
       expect(said().checked).toBe(true);
       expect(nurse().value).toBe('m-rupali');

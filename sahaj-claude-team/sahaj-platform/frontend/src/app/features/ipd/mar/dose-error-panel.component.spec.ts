@@ -124,8 +124,10 @@ describe('DoseErrorPanelComponent (recorded in error, SAH-76-5 D6)', () => {
       expect(snack).toHaveBeenCalledWith(
         'Marked as recorded in error: duplicate entry. The original entry is kept.',
         'Close',
-        expect.objectContaining({ politeness: 'off' }),
+        expect.anything(),
       );
+      // DEC-068: nothing else on the MAR page says it, so the toast is announced (live region not switched off).
+      expect((snack.mock.calls[0][2] as { politeness?: string }).politeness).not.toBe('off');
     });
 
     it('disables the reasons and Close while the answer is awaited', async () => {

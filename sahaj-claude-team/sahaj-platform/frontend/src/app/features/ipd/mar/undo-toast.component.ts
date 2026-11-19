@@ -6,6 +6,7 @@ import { sheetToast } from '../../../shared/ui/sheet-toast';
 import { problemMessage } from '../../config/config-format';
 import { isOutsideScope } from '../ipd-refusal';
 import { ScopeRefusals } from '../ipd-scope-refusal';
+import { GiveSheetPresence } from './give-sheet-presence';
 import { MarApi } from './mar.api';
 import { Mar, MarDoseRow, UNDO_ERROR, givenToast, isLostAnswer, undoneToast } from './mar.model';
 
@@ -37,13 +38,14 @@ export class UndoToast {
   private readonly snackBar = inject(MatSnackBar);
   private readonly api = inject(MarApi);
   private readonly scopeRefusals = inject(ScopeRefusals);
+  private readonly giveSheets = inject(GiveSheetPresence);
 
   readonly corrected = new Subject<DoseCorrected>();
 
   /** Shows the undo toast when the server allows an undo, otherwise the plain "recorded as given" toast. */
   showGiven(data: UndoToastData): void {
     if (!data.dose.canUndo || data.dose.undoSecondsLeft <= 0) {
-      this.snackBar.open(givenToast(data.drugName, data.override), 'Close', sheetToast(8000, { announce: false }));
+      this.snackBar.open(givenToast(data.drugName, data.override), 'Close', sheetToast(8000));
       return;
     }
     this.snackBar.openFromComponent(UndoToastComponent, {
@@ -58,8 +60,18 @@ export class UndoToast {
   }
 
   done(data: UndoToastData, mar: Mar): void {
-    this.snackBar.open(undoneToast(data.drugName), 'Close', sheetToast(6000, { announce: false }));
+    this.whenNoDialog(() => this.snackBar.open(undoneToast(data.drugName), 'Close', sheetToast(6000)));
     this.corrected.next({ admissionId: data.admissionId, mar });
+  }
+
+  /**
+   * Rule (DEC-068): no toast while a give sheet is open. An Undo answer can arrive after the nurse opened the next
+   * give sheet; its toast waits until the last give sheet has closed and is then shown (never dropped). Other
+   * dialogs (the Nursing sheet and the admission sheet that hold the MAR) do not hold it back. The MAR is updated
+   * at once.
+   */
+  private whenNoDialog(show: () => void): void {
+    this.giveSheets.whenNoneOpen(show);
   }
 
   /** The server refused or the dose changed: say why and have the screen read the MAR again. */
@@ -68,7 +80,7 @@ export class UndoToast {
       this.scopeRefusals.report(data.admissionId, true);
       return;
     }
-    this.snackBar.open(problemMessage(error, UNDO_ERROR), 'Close', sheetToast(8000));
+    this.whenNoDialog(() => this.snackBar.open(problemMessage(error, UNDO_ERROR), 'Close', sheetToast(8000)));
     this.corrected.next({ admissionId: data.admissionId, mar: null });
   }
 }

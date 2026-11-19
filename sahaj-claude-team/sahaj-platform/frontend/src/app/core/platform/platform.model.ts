@@ -11,7 +11,9 @@ export type Role =
   | 'FRONT_DESK'
   | 'BILLING'
   | 'PHARMACIST'
-  | 'COUNSELLOR';
+  | 'COUNSELLOR'
+  /** platform.yaml 0.2.0 (SAH-78): reaches only Pharmacy & Inventory, through store mappings. */
+  | 'STORE_STAFF';
 
 export type Brand = 'blue' | 'teal' | 'green' | 'maroon' | 'custom';
 
@@ -26,6 +28,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   BILLING: 'Billing',
   PHARMACIST: 'Pharmacist',
   COUNSELLOR: 'Counsellor',
+  STORE_STAFF: 'Store staff',
 };
 
 export const BRAND_SWATCHES: readonly { value: Brand; label: string; hex: string }[] = [

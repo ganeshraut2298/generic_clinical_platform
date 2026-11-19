@@ -20,6 +20,8 @@
   --surface-2: #f4f7fb;
   --glass: rgba(255, 255, 255, 0.6);
   --glass-hi: rgba(255, 255, 255, 0.88);
+  // Opaque look of a sheet (.sheet-panel) at rest: --glass-hi over the dimmed page. For a sticky sheet header that must hide what scrolls under it without adding a second glass layer.
+  --sheet-solid: #f2f3f5;
   --glass-edge: rgba(255, 255, 255, 0.9);
   --line: rgba(16, 42, 84, 0.12);
   --line-2: rgba(16, 42, 84, 0.06);
@@ -74,6 +76,7 @@
   --surface-2: #0d1727;
   --glass: rgba(16, 28, 50, 0.58);
   --glass-hi: rgba(22, 38, 66, 0.92);
+  --sheet-solid: #15243e;
   --glass-edge: rgba(170, 200, 245, 0.14);
   --line: rgba(190, 210, 245, 0.13);
   --line-2: rgba(190, 210, 245, 0.06);

@@ -1,6 +1,7 @@
 package com.sahaj.ipd.domain;
 
 import java.util.Collection;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -26,21 +27,35 @@ public final class MedicineCodeCheck {
     }
 
     /** What the check made of the box. */
-    public enum Result { EMPTY, MISMATCH, MATCH }
+    public enum Result {
+        EMPTY, MISMATCH, MATCH,
+        /** DEC-065: the ordered drug has no code loaded and the box is not a code of any drug: not a mismatch, no stop. */
+        NO_CODE_LOADED
+    }
 
-    /** Null or empty after normalisation is EMPTY; over the limit is MISMATCH; otherwise compared with the drug's codes. */
-    public static Result check(String box, Collection<String> codesOfOrderedDrug) {
+    /**
+     * Null or empty after normalisation is EMPTY. A code of the ordered drug is MATCH. When the ordered drug has no codes
+     * loaded and the box is not a code of any drug ({@code knownToAnyDrug}; asked only then, and never for a box over the
+     * limit) the result is NO_CODE_LOADED; every other box is a MISMATCH.
+     */
+    public static Result check(String box, Collection<String> codesOfOrderedDrug, Predicate<String> knownToAnyDrug) {
         if (box == null) {
             return Result.EMPTY;
         }
         if (box.length() > MAX_BOX) {
-            return Result.MISMATCH;
+            return codesOfOrderedDrug.isEmpty() ? Result.NO_CODE_LOADED : Result.MISMATCH;
         }
         String code = normalise(box);
         if (code.isEmpty()) {
             return Result.EMPTY;
         }
-        return codesOfOrderedDrug.contains(code) ? Result.MATCH : Result.MISMATCH;
+        if (codesOfOrderedDrug.contains(code)) {
+            return Result.MATCH;
+        }
+        if (codesOfOrderedDrug.isEmpty() && !knownToAnyDrug.test(code)) {
+            return Result.NO_CODE_LOADED;
+        }
+        return Result.MISMATCH;
     }
 
     /** The same normalisation as the wristband. */

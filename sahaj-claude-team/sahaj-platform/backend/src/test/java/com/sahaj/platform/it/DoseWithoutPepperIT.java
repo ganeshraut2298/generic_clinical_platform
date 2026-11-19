@@ -76,12 +76,14 @@ class DoseWithoutPepperIT extends MarSupport {
         assertThat(slot(mar(nurse.auth(), adm.id()), hep, 0).get("state").asText()).isEqualTo("DUE");
 
         // the checks that come before the PIN still answer first
-        refused(doseCall(nurse.auth(), hep, set(givenHighAlert(w, ist(8, 0), nurse2, "4827"), "wristband", "WRONG-00000")), 409,
-                "wristband-mismatch", MISMATCH_TEXT);
         invalid(doseCall(nurse.auth(), hep, set(givenHighAlert(w, ist(8, 0), nurse2, "4827"), "identityConfirmed", false)),
                 "identityConfirmed", CONFIRM_TEXT);
         invalid(doseCall(nurse.auth(), hep, givenHighAlert(w, ist(8, 0), nurse, "4827")), "secondNurseId", DIFFERENT_NURSE);
         refused(doseCall(nurse.auth(), hep, givenHighAlert(w, ist(8, 0), nurse2, "12a4")), 400, "validation", HIGH_ALERT_TEXT);
+        // the wrong band comes last: since contract 0.4.3 a mismatch is on record for 15 minutes and the override-based bodies of
+        // this class are then refused before the statement and second-nurse checks
+        refused(doseCall(nurse.auth(), hep, set(givenHighAlert(w, ist(8, 0), nurse2, "4827"), "wristband", "WRONG-00000")), 409,
+                "wristband-mismatch", MISMATCH_TEXT);
 
         // what needs no second nurse's PIN keeps working
         doseOk(nurse.auth(), pcm, given(w, ist(8, 0)));

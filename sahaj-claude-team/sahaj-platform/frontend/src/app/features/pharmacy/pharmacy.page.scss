@@ -1,0 +1,58 @@
+:host {
+  min-width: 0;
+}
+
+// Module tabs on the left, the working-store select on the right; wraps on a tablet or phone.
+.modhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.wstore {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.who {
+  margin-right: 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.wsel {
+  width: 260px;
+  max-width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+// The module links are navigation (nav + aria-current), drawn like the shared `.tabs` buttons.
+.tabs a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: var(--ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+
+  &[aria-current='page'] {
+    background: var(--glass-hi);
+    color: var(--pri-text);
+    box-shadow: 0 3px 10px -6px var(--pri);
+  }
+}

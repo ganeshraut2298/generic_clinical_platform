@@ -105,7 +105,14 @@ export class TeamPage implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
 
-  protected readonly roles = TEAM_ROLES;
+  /**
+   * The role list. "Store staff" (SAH-78, DEC-062 Q3) is offered only while Pharmacy & Inventory is on
+   * for the clinic. `/me.menu` has the key `pharmacy` exactly then for an owner (the only person who
+   * sees this list), so with the module off the list is exactly as before.
+   */
+  protected readonly roles = computed<readonly Role[]>(() =>
+    this.store.me()?.menu?.includes('pharmacy') ? [...TEAM_ROLES, 'STORE_STAFF'] : TEAM_ROLES,
+  );
   protected readonly roleLabels = ROLE_LABELS;
   protected readonly permissionRows = PERMISSION_ROWS;
   protected readonly permissionColumns = PERMISSION_COLUMNS;
@@ -180,6 +187,12 @@ export class TeamPage implements OnInit {
           this.messageOf(error, 'We could not load who can do what. Try again.'),
         ),
     });
+  }
+
+  /** The list for one person's select: it always holds the person's current role, even if hidden above. */
+  protected rolesFor(current: Role): readonly Role[] {
+    const list = this.roles();
+    return list.includes(current) ? list : [...list, current];
   }
 
   protected isAllowed(role: Role, permission: PermissionKey): boolean {

@@ -118,7 +118,7 @@
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>Role</mat-label>
           <mat-select formControlName="role">
-            @for (role of roles; track role) {
+            @for (role of roles(); track role) {
               <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
             }
           </mat-select>
@@ -194,7 +194,7 @@
                       [disabled]="!canSwitch(member) || busyId() === member.id"
                       (selectionChange)="changeRole(member, $event.value)"
                     >
-                      @for (role of roles; track role) {
+                      @for (role of rolesFor(member.role); track role) {
                         <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
                       }
                     </mat-select>

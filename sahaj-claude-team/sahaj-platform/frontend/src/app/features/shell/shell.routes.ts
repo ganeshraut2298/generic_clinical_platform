@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { menuGuard } from '../../core/shell/menu.guard';
+import { storeStaffLandingGuard } from '../pharmacy/pharmacy-landing';
 
 /**
  * Everything behind the app shell (SAH-5). `today` has no menu guard: `/me.menu` always
@@ -15,6 +16,8 @@ export const SHELL_ROUTES: Routes = [
       {
         path: 'today',
         title: 'Today · Sahaj',
+        // SAH-78: only a Store staff member (menu has `pharmacy`, no `today`) is sent on to Pharmacy & Inventory.
+        canActivate: [storeStaffLandingGuard],
         loadComponent: () => import('./today/today.page').then((m) => m.TodayPage),
       },
       {
@@ -68,6 +71,13 @@ export const SHELL_ROUTES: Routes = [
         path: 'emergency',
         canActivate: [menuGuard('emergency')],
         loadChildren: () => import('../ipd/ipd.routes').then((m) => m.EMERGENCY_ROUTES),
+      },
+      {
+        // SAH-78 (ADR-028 D11). No menu guard: the page asks the server (GET /context) and says
+        // "You do not have access to Pharmacy & Inventory. Ask your owner." itself.
+        path: 'pharmacy',
+        title: 'Pharmacy & Inventory · Sahaj',
+        loadChildren: () => import('../pharmacy/pharmacy.routes').then((m) => m.PHARMACY_ROUTES),
       },
       {
         path: 'reports',

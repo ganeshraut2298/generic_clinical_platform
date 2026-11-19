@@ -16,6 +16,9 @@ spring:
     user: sahaj_migrator
     password: ${SAHAJ_DB_MIGRATOR_PASSWORD}
     clean-disabled: false
+    placeholders:
+      # SAH-78: the pharmacy SAMPLE catalogue (V2026_12_17_1030) is inserted in test only.
+      sahajSampleData: true
 
 sahaj:
   modules:

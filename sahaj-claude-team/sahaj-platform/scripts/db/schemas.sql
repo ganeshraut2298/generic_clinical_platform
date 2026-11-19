@@ -5,7 +5,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 DO $$
 DECLARE s text;
 BEGIN
-  FOREACH s IN ARRAY ARRAY['platform','patient','opd','ipd','hra','billing'] LOOP
+  FOREACH s IN ARRAY ARRAY['platform','patient','opd','ipd','hra','billing','pharmacy'] LOOP
     EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION sahaj_migrator', s);
     EXECUTE format('GRANT USAGE ON SCHEMA %I TO sahaj_app', s);
     EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE sahaj_migrator IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sahaj_app', s);

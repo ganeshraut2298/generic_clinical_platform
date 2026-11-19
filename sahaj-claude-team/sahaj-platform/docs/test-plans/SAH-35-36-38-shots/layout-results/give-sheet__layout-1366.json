@@ -17,10 +17,7 @@
     "box": "640x738 at 363,15",
     "footerProblems": []
   },
-  "toastOverFooter": [
-    "[data-act=\"sfgiveok\"] is covered at its centre by div.mat-mdc-snack-bar-label.mdc-snackbar__label \"Wristband does not match Venkataraghavan\"",
-    "[data-act=\"sfnogive\"] is covered at its centre by div.mat-mdc-snack-bar-label.mdc-snackbar__label \"Wristband does not match Venkataraghavan\""
-  ],
+  "toastOverFooter": [],
   "doseCalls": 1,
   "calls": {
     "POST platform/auth/refresh": 1,
@@ -32,8 +29,10 @@
     "GET ipd/board": 1,
     "GET ipd/safety": 1,
     "GET ipd/clinical-events?limit=14": 1,
+    "GET ipd/order-notices/summary": 1,
+    "GET ipd/order-notices?limit=50": 1,
     "GET ipd/admissions/a1/mar": 1,
     "POST ipd/medicine-orders/o2/doses": 1,
-    "GET e2e/ping": 1
+    "GET e2e/ping": 2
   }
 }

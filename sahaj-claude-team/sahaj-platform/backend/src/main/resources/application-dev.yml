@@ -17,6 +17,9 @@ spring:
     url: ${SAHAJ_DB_URL:jdbc:postgresql://localhost:5432/sahaj_dev}
     user: sahaj_migrator
     password: ${SAHAJ_DB_MIGRATOR_PASSWORD}
+    placeholders:
+      # SAH-78: the pharmacy SAMPLE catalogue (V2026_12_17_1030) is inserted in dev only.
+      sahajSampleData: true
 
 sahaj:
   modules:

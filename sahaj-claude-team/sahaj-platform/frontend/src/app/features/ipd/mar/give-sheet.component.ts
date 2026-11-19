@@ -23,6 +23,8 @@ import { digitsOnly } from '../../pin/pin.model';
 import { isOutsideScope } from '../ipd-refusal';
 import { ScopeRefusals } from '../ipd-scope-refusal';
 import { IdentityBarComponent } from '../emr/identity-bar.component';
+import { GiveSheetPresence } from './give-sheet-presence';
+import { layoutHeight } from './layout-height';
 import { MarApi } from './mar.api';
 import { UndoToast } from './undo-toast.component';
 import {
@@ -129,8 +131,20 @@ const FIELD_CONTROL: Record<GiveField, string> = {
  * - After 409 `dose-recorded`, `order-state`, `order-not-verified`, `order-on-hold`, `order-changed`,
  *   `dose-not-due`, `dose-before-start`, `not-admitted` and `ipd-readonly` the sheet closes and the MAR
  *   is read again. After `prn-too-soon` and `prn-max-reached` the sheet stays, says when, and Given is off.
+ * - After 409 `no-code-loaded` (ipd.yaml 0.4.4 H1, DEC-065 A) the sheet stays and nothing is read again: the
+ *   server's line shows under the code box in the polite region, in the warn style (not a STOP), the code box
+ *   is cleared and the manual override is offered at once, closed and empty.
  * - After Given the toast "<medicine> recorded as given" carries Undo for the seconds the server
  *   sent (UndoToast).
+ * - Rule (DEC-068): no toast while this sheet is open; refusals show in the sheet. Every refusal shows in the
+ *   sheet (the field's own line, the line under the wristband or code box, `give-prn-lock` or `give-failure`),
+ *   because a toast covered the sheet's Close button on a phone (QA D8). A toast is shown only after the sheet
+ *   has closed, and the sheet closes first. This is a deliberate deviation from the mockup, which toasts the
+ *   validation refusals (accepted by the human, DEC-068).
+ * - `give-prn-lock` and `give-failure` sit at the bottom of the scrolling sheet and are alerts, read when they
+ *   show. They are not focused (that would read them twice); they are scrolled into view, clear of the sticky
+ *   footer (the sheet's `scroll-padding-bottom` is the footer's height). The lines under a box are polite
+ *   live regions, and the focus goes to their box.
  * - Names, the scanned text, the medicine code, the override note and the PIN are on screen and in
  *   form controls only.
  */
@@ -200,6 +214,14 @@ export class GiveSheetComponent {
   protected readonly mismatch = signal(false);
   /** The medicine code is not the ordered medicine: the server's line under the box. */
   protected readonly codeMismatch = signal<string | null>(null);
+  /**
+   * 409 `no-code-loaded` (0.4.4 H1): the server's line under the code box, warn style. Not a STOP: it sets
+   * neither `stopped` nor `codeMismatch`, so Given and the override stay on. It leaves when the nurse types or
+   * scans in the code box again, or when another answer arrives.
+   */
+  protected readonly noCodeNotice = signal<string | null>(null);
+  /** The hint is not shown a second time while the notice carries the same words. */
+  protected readonly showNoCodeHint = computed(() => this.noCodeLine !== null && this.noCodeNotice() !== this.noCodeLine);
   /** The PRN rule refused the dose: the line says when the next dose is allowed. */
   protected readonly prnLock = signal<string | null>(null);
   /** A failure that is not about one control. */
@@ -260,6 +282,8 @@ export class GiveSheetComponent {
   private reloadOnClose = false;
 
   constructor() {
+    // DEC-068: a late Undo answer shows no toast while this sheet is open; it waits for the sheet to go.
+    this.destroyRef.onDestroy(inject(GiveSheetPresence).enter());
     // SAH-34 AC 38: a refusal for this patient (here, or from the tab behind) closes this sheet; no dose is shown as given.
     this.scopeRefusals.watch(this.data.mar.admissionId, this.destroyRef, () => {
       this.clearPin();
@@ -272,7 +296,15 @@ export class GiveSheetComponent {
     this.dialogRef
       .afterOpened()
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => afterNextRender(() => this.focus('sf-id'), { injector: this.injector }));
+      .subscribe(() =>
+        afterNextRender(
+          () => {
+            this.watchFooter();
+            this.focus('sf-id');
+          },
+          { injector: this.injector },
+        ),
+      );
     this.destroyRef.onDestroy(() => this.form.reset());
   }
 
@@ -286,6 +318,7 @@ export class GiveSheetComponent {
 
   protected codeEdited(): void {
     this.codeMismatch.set(null);
+    this.noCodeNotice.set(null);
     this.dropError('medicineCode');
   }
 
@@ -354,15 +387,17 @@ export class GiveSheetComponent {
       return;
     }
     const override = this.overrideActive() ? { reasonKey: this.overrideReason(), note: entered.overrideNote } : null;
-    this.send((key) =>
-      givenInput(key, this.order, this.slot, this.highAlert, {
-        wristband: entered.wristband,
-        said: entered.said,
-        code: entered.code,
-        override,
-        nurse: entered.nurse,
-        pin: entered.pin,
-      }),
+    this.send(
+      (key) =>
+        givenInput(key, this.order, this.slot, this.highAlert, {
+          wristband: entered.wristband,
+          said: entered.said,
+          code: entered.code,
+          override,
+          nurse: entered.nurse,
+          pin: entered.pin,
+        }),
+      true,
     );
   }
 
@@ -398,7 +433,7 @@ export class GiveSheetComponent {
       return;
     }
     const { reason, reasonNote } = this.form.getRawValue();
-    this.send((key) => notGivenInput(key, this.order, this.slot, reason, reasonNote));
+    this.send((key) => notGivenInput(key, this.order, this.slot, reason, reasonNote), false);
   }
 
   protected cancel(): void {
@@ -409,7 +444,11 @@ export class GiveSheetComponent {
 
   // ---- Request ----
 
-  private send(build: (clientKey: string) => DoseInput): void {
+  /**
+   * `clearStops`: the request is a GIVEN one. A STOP on a box stays through a Record not given (that request says
+   * nothing about the wristband or the code); it leaves when the box is edited or a GIVEN request is sent.
+   */
+  private send(build: (clientKey: string) => DoseInput, clearStops: boolean): void {
     let input = build(this.key);
     const signature = requestSignature(input);
     if (this.sentSignature !== null && this.sentSignature !== signature) {
@@ -420,8 +459,12 @@ export class GiveSheetComponent {
     this.sentSignature = signature;
     this.running.set(true);
     this.errors.set({});
-    this.mismatch.set(false);
-    this.codeMismatch.set(null);
+    if (clearStops) {
+      this.mismatch.set(false);
+      this.codeMismatch.set(null);
+    }
+    // Not a STOP, so it goes on every request: a repeat `no-code-loaded` then draws again and is announced again.
+    this.noCodeNotice.set(null);
     this.failure.set(null);
     this.api
       .give(this.order.orderId, input)
@@ -443,6 +486,8 @@ export class GiveSheetComponent {
   /** 201, or 200 for a repeat of the clientKey: the dose is on record; the sheet closes with the MAR now. */
   private recorded(answer: DoseRecorded, sent: DoseInput): void {
     const name = this.order.drugName;
+    // The sheet closes first, then the toast: no toast is shown while the sheet is open (DEC-068).
+    this.dialogRef.close({ mar: answer.mar });
     if (sent.outcome === 'GIVEN') {
       this.undoToast.showGiven({
         admissionId: this.data.mar.admissionId,
@@ -455,7 +500,6 @@ export class GiveSheetComponent {
         answer.dose.reason?.label ?? this.reasons.find((r) => r.key === sent.reasonKey)?.label ?? '';
       this.toast(notGivenToast(name, label));
     }
-    this.dialogRef.close({ mar: answer.mar });
   }
 
   private failed(error: unknown): void {
@@ -470,34 +514,49 @@ export class GiveSheetComponent {
       case 'mismatch':
         this.mismatch.set(true);
         this.closeOverride();
-        this.toast(MISMATCH_LINE);
         this.focusLater('sf-id', true);
+        this.reveal('wristband-line');
         return;
       case 'override-refused':
         // 409 override-after-mismatch: the sheet stays open, the override closes, the line sits under the code box.
         this.codeMismatch.set(failure.message);
         this.closeOverride();
-        this.toast(failure.message);
         this.focusLater('sf-code', true);
+        this.reveal('code-line');
         return;
       case 'code-mismatch':
         this.codeMismatch.set(failure.message);
         this.closeOverride();
-        this.toast(failure.message);
         this.focusLater('sf-code', true);
+        this.reveal('code-line');
+        return;
+      case 'no-code-loaded':
+        // 0.4.4 (H1): the sheet stays open, the MAR is not read again, no STOP and no toast (the line under the box
+        // is the one place the text shows). The code box is cleared (an override is read only with an empty code) and
+        // the toggle is offered at once; it is neither opened nor filled in. Wristband, identity and second nurse
+        // stay, the PIN is already cleared, and the clientKey is kept (nothing was recorded).
+        this.form.controls.code.setValue('');
+        this.closeOverride();
+        this.noCodeNotice.set(failure.message);
+        this.focusLater('sf-code');
+        this.reveal('code-line');
         return;
       case 'prn-lock':
         this.prnLock.set(failure.message);
         this.reloadOnClose = true;
-        this.toast(failure.message);
+        this.reveal('give-prn-lock');
         return;
       case 'fields': {
-        this.errors.set(failure.errors);
-        this.toast(failure.message);
-        const first = GIVE_FIELD_ORDER.find((f) => failure.errors[f]);
-        if (first) {
-          this.focusLater(FIELD_CONTROL[first]);
+        // A key whose control is not drawn (a second nurse on a sheet that does not need one, a stale MAR) shows
+        // nowhere: when no key has a control, the message goes to the line at the bottom.
+        const drawn = GIVE_FIELD_ORDER.filter((f) => failure.errors[f] && this.controlDrawn(f));
+        if (drawn.length === 0) {
+          this.failure.set(failure.message);
+          this.reveal('give-failure');
+          return;
         }
+        this.errors.set(failure.errors);
+        this.focusLater(FIELD_CONTROL[drawn[0]]);
         return;
       }
       case 'pin':
@@ -506,24 +565,99 @@ export class GiveSheetComponent {
           this.focusLater(failure.focus === 'pin' ? 'sf-pin' : 'sf-wit');
         } else {
           this.failure.set(failure.message);
+          this.reveal('give-failure');
         }
-        this.toast(failure.message);
         return;
       case 'reload':
-        this.toast(failure.message);
+        // The sheet closes, so there is no line in it: this is the one error that is said by a toast.
         this.dialogRef.close({ reload: true });
+        this.toast(failure.message);
         return;
       case 'key-reused':
         this.key = newClientKey();
         this.sentSignature = null;
         this.failure.set(failure.message);
-        this.toast(failure.message);
+        this.reveal('give-failure');
         return;
       case 'notice':
         this.failure.set(failure.message);
-        this.toast(failure.message);
+        this.reveal('give-failure');
         return;
     }
+  }
+
+  /** Whether the template draws this field's control (and so its line); mirrors the `@if`s of the sheet. */
+  private controlDrawn(field: GiveField): boolean {
+    switch (field) {
+      case 'secondNurseId':
+      case 'secondNursePin':
+        return this.highAlert;
+      case 'overrideReason':
+      case 'overrideNote':
+        return this.overrideOffered() && this.overrideOpen();
+      case 'note':
+        return this.reasonIsOther();
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Brings a line into view once it is drawn, without moving the focus: `give-prn-lock` and `give-failure` are
+   * alerts at the bottom of the scrolling sheet, and focusing them would make a screen reader read them twice.
+   * `nearest` scrolls only as far as needed, and the sheet's `scroll-padding-bottom` keeps the line above the
+   * sticky footer.
+   */
+  private reveal(testId: string): void {
+    afterNextRender(
+      () => {
+        this.host.nativeElement.querySelector<HTMLElement>(`[data-testid="${testId}"]`)?.scrollIntoView?.({ block: 'nearest' });
+      },
+      { injector: this.injector },
+    );
+  }
+
+  /**
+   * The header and the footer are sticky, and both can wrap on a phone, so their heights are measured: the sheet
+   * keeps them as `--sheet-head-h` and `--sheet-foot-h`, which `scroll-padding-top` and `scroll-padding-bottom`
+   * read (`_console.scss`). Without them a scroll to a line or a box could park it under the footer, or push the
+   * title and the Close button off the screen. The height is the layout height, rounded up: the dialog opens with a
+   * scale animation, and `getBoundingClientRect` returns the scaled size while it runs (QA saw 67 px for a 77 px
+   * footer, and the observer does not fire again because the layout size never changed). A whole number that rounds
+   * down would leave a line a fraction of a pixel under the footer. The bars are measured again when the open
+   * animation or transition ends.
+   */
+  private watchFooter(): void {
+    const sheet = this.host.nativeElement.querySelector<HTMLElement>('.sheet');
+    const head = sheet?.querySelector<HTMLElement>('.sheet-h');
+    const foot = sheet?.querySelector<HTMLElement>('.sheet-f');
+    if (!sheet || !foot || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const measure = (name: string, bar: HTMLElement | null | undefined) => {
+      if (bar) {
+        sheet.style.setProperty(name, `${Math.ceil(layoutHeight(bar))}px`);
+      }
+    };
+    const sync = () => {
+      measure('--sheet-head-h', head);
+      measure('--sheet-foot-h', foot);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(foot);
+    if (head) {
+      observer.observe(head);
+    }
+    // animationend and transitionend bubble: the dialog's pane (or the sheet itself) hears the open animation end.
+    const pane = sheet.closest<HTMLElement>('.cdk-overlay-pane') ?? sheet;
+    pane.addEventListener('animationend', sync);
+    pane.addEventListener('transitionend', sync);
+    this.destroyRef.onDestroy(() => {
+      observer.disconnect();
+      pane.removeEventListener('animationend', sync);
+      pane.removeEventListener('transitionend', sync);
+    });
   }
 
   /** After a STOP the override is not offered: it closes with what was typed in it. */
@@ -539,9 +673,13 @@ export class GiveSheetComponent {
   }
 
   private toast(message: string): void {
-    // On a phone the toast goes to the top: at the bottom it would sit over Given and Record not given.
-    // It is not announced: the field alert or the live line in the sheet already says the same thing.
-    this.snackBar.open(message, 'Close', sheetToast(8000, { announce: false }));
+    // Rule: no toast while the sheet is open; refusals show in the sheet (DEC-068). So this runs only after
+    // `dialogRef.close(...)` (Record not given done; a reload answer). While the sheet is open every refusal
+    // shows in the sheet itself (field alert, give-failure, PRN lock, or the line under the box): a toast there
+    // covered the sheet's Close button on a phone (QA D8).
+    // On the MAR page it goes to the top on any width, clear of the bottom of the screen (QA D1). Nothing in
+    // a closed sheet says it, so it is announced.
+    this.snackBar.open(message, 'Close', sheetToast(8000, { top: true }));
   }
 
   private focusLater(id: string, select = false): void {

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -40,17 +41,6 @@ class Sah76ReviewRoundIT extends Sah76NursingSupport {
     private List<List<String>> stops(Ward w, String order) throws SQLException {
         return table(w.clinic(), "select check_kind, actor::text, to_char(slot_at at time zone 'Asia/Kolkata', 'HH24:MI') "
                 + "from ipd.dose_scan_stop where order_id = ?::uuid order by stopped_at, id", order);
-    }
-
-    /** Moves every scan-stop row of the order back in time (table owner, append-only trigger off inside the transaction). */
-    private void ageStops(String order, long minutes) throws SQLException {
-        asOwner(true, new String[] {"ipd.dose_scan_stop", "ipd.admission"}, c -> {
-            DbAccess.execute(c, "alter table ipd.dose_scan_stop disable trigger trg_dose_scan_stop_no_update_delete");
-            DbAccess.execute(c, "update ipd.dose_scan_stop set stopped_at = stopped_at - (? * interval '1 minute') "
-                    + "where order_id = ?::uuid", minutes, order);
-            DbAccess.execute(c, "alter table ipd.dose_scan_stop enable trigger trg_dose_scan_stop_no_update_delete");
-            return null;
-        });
     }
 
     /** Runs one statement as the application with the clinic bound; returns its error (fails when it is accepted). */
@@ -120,14 +110,17 @@ class Sah76ReviewRoundIT extends Sah76NursingSupport {
         assertThat(stops(w, order)).extracting(r -> r.get(0)).containsExactly("WRISTBAND", "MEDICINE");
         refused(doseCall(w.nurse().auth(), order, overrideGiven(w, ist(14, 0), 1, "NO_BARCODE", NOTE)), 409,
                 "override-after-mismatch", AFTER_MISMATCH);
-        ageStops(order, 14);
+        ageScanStops(order, 14);
         refused(doseCall(w.nurse().auth(), order, overrideGiven(w, ist(14, 0), 1, "NO_BARCODE", NOTE)), 409,
                 "override-after-mismatch", AFTER_MISMATCH);
-        ageStops(order, 2);
+        ageScanStops(order, 2);
         JsonNode late = doseOk(w.nurse().auth(), order, overrideGiven(w, ist(14, 0), 1, "NO_BARCODE", NOTE));
         assertThat(late.get("dose").get("method").asText()).isEqualTo("OVERRIDE");
         assertThat(audit(w.clinic(), "IPD_DOSE_REFUSED")).hasSize(3);
         assertThat(doseRowsOfOrder(w.clinic(), order)).isEqualTo(3);
+        // security L-3 (a): the check is repeated at the end, after the mismatch and every override audit (3 refusals, 3 gives)
+        assertThat(allAuditTexts(w.clinic(), "IPD\\_%").toString()).as("no note and no medicine code in any audit row")
+                .doesNotContain(NOTE).doesNotContain(code).doesNotContain(heparin).doesNotContain(codeOf("hep"));
     }
 
     @Test
@@ -172,6 +165,17 @@ class Sah76ReviewRoundIT extends Sah76NursingSupport {
         assertThat(stmtErr(w.clinic(), "insert into ipd.dose_scan_stop (admission_id, order_id, slot_at, check_kind, actor) "
                 + "values (?::uuid, ?::uuid, now(), 'OTHER', ?::uuid)", w.adm().id(), order, w.nurse().userId().toString()).state())
                 .as("check_kind is WRISTBAND or MEDICINE").isEqualTo("23514");
+        // security L-3 (b): the insert grant is limited to five columns; naming the tenant, the time or the id is refused (42501)
+        String tenant = w.clinic().tenantId().toString();
+        assertThat(stmtErr(w.clinic(), "insert into ipd.dose_scan_stop (tenant_id, admission_id, order_id, slot_at, check_kind, actor) "
+                + "values (?::uuid, ?::uuid, ?::uuid, now(), 'WRISTBAND', ?::uuid)", tenant, w.adm().id(), order,
+                w.nurse().userId().toString()).state()).as("tenant_id is not insertable").isEqualTo("42501");
+        assertThat(stmtErr(w.clinic(), "insert into ipd.dose_scan_stop (stopped_at, admission_id, order_id, slot_at, check_kind, actor) "
+                + "values (now() - interval '30 minutes', ?::uuid, ?::uuid, now(), 'WRISTBAND', ?::uuid)", w.adm().id(), order,
+                w.nurse().userId().toString()).state()).as("stopped_at is not insertable").isEqualTo("42501");
+        assertThat(stmtErr(w.clinic(), "insert into ipd.dose_scan_stop (id, admission_id, order_id, slot_at, check_kind, actor) "
+                + "values (gen_random_uuid(), ?::uuid, ?::uuid, now(), 'WRISTBAND', ?::uuid)", w.adm().id(), order,
+                w.nurse().userId().toString()).state()).as("id is not insertable").isEqualTo("42501");
         assertThat(stops(w, order)).hasSize(1);
     }
 
@@ -393,6 +397,218 @@ class Sah76ReviewRoundIT extends Sah76NursingSupport {
                 "override-after-mismatch", AFTER_MISMATCH);
         // the right code is still accepted
         doseOk(w.nurse().auth(), f.order(), scanGiven(w, ist(8, 0), 1, codeOf("pcm")));
+    }
+
+    // ---------------- code review round 2 #4: the exact boundaries ----------------
+
+    @Test
+    void aStopThirtySecondsInsideTheWindowStillCountsAndFromFifteenMinutesOnItDoesNot() throws Exception {
+        Ward w = ward();
+        String order = activeScheduled(w, "ceft", "q8", "MG", "IV");
+        clockAt(22, 10);
+        String code = codeOf("ceft");
+        Instant s1 = ist(6, 0);
+        Instant s2 = ist(14, 0);
+        Instant s3 = ist(22, 0);
+        // one wristband mismatch on each of three slots: three stop rows, stamped by the database at its real clock
+        for (Instant s : List.of(s1, s2, s3)) {
+            refused(doseCall(w.nurse().auth(), order, badBand(w, s, code)), 409, "wristband-mismatch", MISMATCH_TEXT);
+        }
+        assertThat(stops(w, order)).hasSize(3);
+
+        // 14 min 30 s old (a 30 s margin, so a slow request cannot push it over the edge): inside the window
+        setScanStopAge(order, s1, 870);
+        refused(doseCall(w.nurse().auth(), order, overrideGiven(w, s1, 1, "NO_BARCODE", NOTE)), 409, "override-after-mismatch",
+                AFTER_MISMATCH);
+        assertThat(doseRowsOfOrder(w.clinic(), order)).isZero();
+
+        // 15 min 00 s old: outside from 15:00 (the rule is "newer than 15 minutes"). The request runs a little after the age is set,
+        // so the stop is at least 900 s old when read; whether the database compares with > or >= at exactly 900.000 s cannot be
+        // told apart by a test and is not claimed here.
+        setScanStopAge(order, s1, 900);
+        assertThat(doseOk(w.nurse().auth(), order, overrideGiven(w, s1, 1, "NO_BARCODE", NOTE)).get("dose").get("method").asText())
+                .isEqualTo("OVERRIDE");
+
+        // 15 min 01 s old (another slot, its own stop row): outside as well
+        setScanStopAge(order, s2, 901);
+        assertThat(doseOk(w.nurse().auth(), order, overrideGiven(w, s2, 1, "NO_BARCODE", NOTE)).get("dose").get("method").asText())
+                .isEqualTo("OVERRIDE");
+
+        // the third slot was never aged: it is still refused (the ages set on the other slots did not leak)
+        refused(doseCall(w.nurse().auth(), order, overrideGiven(w, s3, 1, "NO_BARCODE", NOTE)), 409, "override-after-mismatch",
+                AFTER_MISMATCH);
+        assertThat(doseRowsOfOrder(w.clinic(), order)).isEqualTo(2);
+        assertThat(audit(w.clinic(), "IPD_DOSE_REFUSED")).as("the 14:30 refusal and the third slot's").hasSize(2);
+        assertThat(allAuditTexts(w.clinic(), "IPD\\_%").toString()).doesNotContain(NOTE).doesNotContain(code);
+    }
+
+    @Test
+    void aPrnDoseIsRefusedOneSecondBeforeItsStartAndRecordedAtItsStart() throws Exception {
+        Ward w = ward();
+        String order = placeOrder(w.doctor().auth(), w.adm().id(), prnOrder("pcm", "TABLET", "ORAL", 60, 3));
+        verifyNow(w, order);
+        Instant start = ist(10, 0);
+        backdate(w.clinic(), order, start, start.minusSeconds(7200), start.minusSeconds(3600));
+        String code = codeOf("pcm");
+
+        clockAt(start.minusSeconds(1));
+        DSnap before = dsnap(w);
+        refused(doseCall(w.nurse().auth(), order, scanGiven(w, null, 1, code)), 409, "dose-not-due", CANNOT_NOW);
+        refused(doseCall(w.nurse().auth(), order, notGivenBody(null, 1, "NIL_BY_MOUTH", null)), 409, "dose-not-due", CANNOT_NOW);
+        assertThat(dsnap(w)).as("nothing is written, not even an audit row").isEqualTo(before);
+        JsonNode locked = marOrder(mar(w.nurse().auth(), w.adm().id()), order).get("prn");
+        assertThat(locked.get("lockReason").asText()).isEqualTo("NOT_STARTED");
+        assertThat(locked.get("canGive").asBoolean()).isFalse();
+
+        clockAt(start);
+        JsonNode open = marOrder(mar(w.nurse().auth(), w.adm().id()), order).get("prn");
+        assertThat(open.get("lockReason").isNull()).as("at the start the line is open").isTrue();
+        assertThat(open.get("canGive").asBoolean()).isTrue();
+        JsonNode given = doseOk(w.nurse().auth(), order, scanGiven(w, null, 1, code));
+        assertThat(given.get("dose").get("method").asText()).isEqualTo("SCAN");
+        assertThat(values(w.clinic(), "select to_char(slot_at at time zone 'Asia/Kolkata', 'HH24:MI') from ipd.dose_administration "
+                + "where order_id = ?::uuid", order)).containsExactly("10:00");
+    }
+
+    @Test
+    void aPrnDoseIsRecordedOneSecondBeforeItsEndAndRefusedAtItsEnd() throws Exception {
+        Ward w = ward();
+        Map<String, Object> body = prnOrder("pcm", "TABLET", "ORAL", 60, 3);
+        body.put("durationDays", 1);
+        String order = placeOrder(w.doctor().auth(), w.adm().id(), body);
+        verifyNow(w, order);
+        Instant start = istOn(day.minusDays(1), 10, 0);
+        Instant end = istOn(day, 10, 0);
+        backdate(w.clinic(), order, start, start.minusSeconds(7200), start.minusSeconds(3600));
+        endAt(order, end);
+        String code = codeOf("pcm");
+
+        clockAt(end.minusSeconds(1));
+        JsonNode open = marOrder(mar(w.nurse().auth(), w.adm().id()), order).get("prn");
+        assertThat(open.get("lockReason").isNull()).as("one second before the end the line is open").isTrue();
+        assertThat(open.get("canGive").asBoolean()).isTrue();
+        assertThat(doseOk(w.nurse().auth(), order, scanGiven(w, null, 1, code)).get("dose").get("method").asText()).isEqualTo("SCAN");
+
+        for (Instant at : List.of(end, end.plusSeconds(1))) {
+            clockAt(at);
+            DSnap before = dsnap(w);
+            refused(doseCall(w.nurse().auth(), order, scanGiven(w, null, 1, code)), 409, "dose-not-due", CANNOT_NOW);
+            refused(doseCall(w.nurse().auth(), order, notGivenBody(null, 1, "NIL_BY_MOUTH", null)), 409, "dose-not-due", CANNOT_NOW);
+            assertThat(dsnap(w)).as("at or after the end nothing is written, not even an audit row").isEqualTo(before);
+        }
+        clockAt(end);
+        JsonNode ended = marOrder(mar(w.nurse().auth(), w.adm().id()), order).get("prn");
+        assertThat(ended.get("lockReason").asText()).isEqualTo("ENDED");
+        assertThat(ended.get("canGive").asBoolean()).isFalse();
+        assertThat(doseRowsOfOrder(w.clinic(), order)).isOne();
+    }
+
+    /** Sets the end of version 1 (table owner, committed, the version guard off inside the one transaction). */
+    private void endAt(String order, Instant end) throws SQLException {
+        asOwner(true, new String[] {"ipd.medicine_order_version", "ipd.medicine_order", "ipd.admission"}, c -> {
+            DbAccess.execute(c, "alter table ipd.medicine_order_version disable trigger trg_medicine_order_version_guard_update");
+            DbAccess.execute(c, "update ipd.medicine_order_version set end_at = ? where order_id = ?::uuid and version_no = 1",
+                    java.sql.Timestamp.from(end), order);
+            DbAccess.execute(c, "alter table ipd.medicine_order_version enable trigger trg_medicine_order_version_guard_update");
+            DbAccess.execute(c, "set constraints all immediate");
+            return null;
+        });
+    }
+
+    // ---------------- SELF_CHANGED and SELF on the pharmacist review rows ----------------
+
+    @Test
+    void aReviewRowOfAnOrderTheOwnerChangedOrPlacedCannotBeQueriedByThatOwnerButByThePharmacist() throws Exception {
+        Ward w = ward();
+        realClock();
+        String adm = w.adm().id();
+        // two STAT orders, each given before the pharmacist check: each leaves one review row
+        String changed = placeOrder(w.doctor().auth(), adm, statOrder("pcm", "TABLET", "ORAL"));
+        String own = placeOrder(w.clinic().owner(), adm, statOrder("ibu", "TABLET", "ORAL"));
+        for (String o : List.of(changed, own)) {
+            Instant slot = slotOf(mar(w.nurse().auth(), adm), o, 0);
+            JsonNode a = doseOk(w.nurse().auth(), o, overrideGiven(w, slot, 1, "NO_BARCODE", NOTE));
+            assertThat(a.get("dose").get("beforeVerification").asBoolean()).isTrue();
+        }
+        // the owner changes the first order (version 2 is the owner's text, the orderer is the doctor)
+        Map<String, Object> change = new LinkedHashMap<>();
+        change.put("clientKey", newKey());
+        change.put("orderVersion", 1);
+        change.put("reason", "Dose raised");
+        change.put("doseAmount", 2);
+        change.put("doseUnit", "TABLET");
+        change.put("routeKey", "ORAL");
+        change.put("priority", "STAT");
+        ok(HttpMethod.POST, Sah76Support.changeUrl(changed), w.clinic().owner(), js(change), 200);
+        assertThat(count(w.clinic(), "select count(*) from ipd.medicine_order_version where order_id = ?::uuid", changed)).isEqualTo(2);
+
+        String reviews = IPD + "/pharmacist-reviews";
+        JsonNode ownerList = ok(HttpMethod.GET, reviews, w.clinic().owner(), null, 200);
+        JsonNode pharmacistList = ok(HttpMethod.GET, reviews, w.pharmacist().auth(), null, 200);
+        JsonNode ownerChanged = reviewRow(ownerList, changed);
+        JsonNode ownerOwn = reviewRow(ownerList, own);
+        assertThat(ownerChanged).as("the review row of the changed order is listed").isNotNull();
+        assertThat(ownerOwn).as("the review row of the owner's own order is listed").isNotNull();
+        assertThat(ownerChanged.get("canQuery").asBoolean()).as("SELF_CHANGED: the owner wrote the current version").isFalse();
+        assertThat(ownerOwn.get("canQuery").asBoolean()).as("SELF: the owner placed it").isFalse();
+        assertThat(reviewRow(pharmacistList, changed).get("canQuery").asBoolean()).isTrue();
+        assertThat(reviewRow(pharmacistList, own).get("canQuery").asBoolean()).isTrue();
+    }
+
+    private static JsonNode reviewRow(JsonNode page, String orderId) {
+        for (JsonNode r : page.get("items")) {
+            if (orderId.equals(r.get("orderId").asText())) {
+                return r;
+            }
+        }
+        return null;
+    }
+
+    // ---------------- read-only and not admitted: query, reply, acknowledge ----------------
+
+    @Test
+    void queryIsAllowedInReadOnlyReplyAndAcknowledgeAreRefusedAndAllThreeAreRefusedForADischargedPatient() throws Exception {
+        Ward w = ward();
+        String adm = w.adm().id();
+        String toQuery = orderIdOf(place(w.doctor().auth(), adm, "pcm"));            // PENDING: the pharmacist will query it
+        String queried = orderIdOf(place(w.doctor().auth(), adm, "ibu"));            // QUERIED: waits for the doctor's reply
+        ok(HttpMethod.POST, Sah76Support.queryUrl(queried), w.pharmacist().auth(),
+                js(Sah76Support.actBody(1, "question", "Is the dose right for this patient?")), 200);
+        String active = activeScheduled(w, "ceft", "q8", "MG", "IV");                // ACTIVE with a NEW notice for the nurse
+        String notice = null;
+        for (JsonNode n : ok(HttpMethod.GET, Sah76Support.noticesUrl(adm), w.nurse().auth(), null, 200).get("items")) {
+            if ("NEW".equals(n.get("kind").asText()) && n.get("acknowledgedAt").isNull()) {
+                notice = n.get("id").asText();
+            }
+        }
+        assertThat(notice).as("an open NEW notice of the active order " + active).isNotNull();
+        String queryBody = js(Sah76Support.actBody(1, "question", "Check the dose and the route"));
+        String replyBody = js(Sah76Support.actBody(1, "reply", "The dose is right, checked the chart"));
+
+        // Read-only: the pharmacist's query is allowed (it is a check, not a change of the clinic's work); reply and acknowledge are not
+        setIpdState(w.clinic(), "readonly");
+        long audits = allAudits(w.clinic());
+        refused(call(HttpMethod.POST, Sah76Support.replyUrl(queried), w.doctor().auth(), replyBody), 409, "ipd-readonly", READONLY_TEXT);
+        refused(call(HttpMethod.POST, Sah76Support.noticeAckUrl(notice), w.nurse().auth(), null), 409, "ipd-readonly", READONLY_TEXT);
+        assertThat(allAudits(w.clinic())).as("a refused reply or acknowledge writes nothing").isEqualTo(audits);
+        assertThat(values(w.clinic(), "select status from ipd.medicine_order where id = ?::uuid", queried)).containsExactly("QUERIED");
+        assertThat(count(w.clinic(), "select count(*) from ipd.order_notice where acknowledged_at is not null")).isZero();
+        JsonNode q = ok(HttpMethod.POST, Sah76Support.queryUrl(toQuery), w.pharmacist().auth(), queryBody, 200);
+        assertThat(q.get("result").get("outcome").asText()).isEqualTo("QUERIED");
+        assertThat(values(w.clinic(), "select status from ipd.medicine_order where id = ?::uuid", toQuery)).containsExactly("QUERIED");
+        assertThat(allAudits(w.clinic())).as("the query wrote its audit row").isEqualTo(audits + 1);
+        setIpdState(w.clinic(), "on");
+
+        // discharged: every one of the three is 409 not-admitted, nothing written
+        discharge(w);
+        audits = allAudits(w.clinic());
+        long queries = count(w.clinic(), "select count(*) from ipd.medicine_order_query");
+        refused(call(HttpMethod.POST, Sah76Support.queryUrl(active), w.pharmacist().auth(), queryBody), 409, "not-admitted", NOT_ADMITTED_TEXT);
+        refused(call(HttpMethod.POST, Sah76Support.replyUrl(toQuery), w.doctor().auth(), replyBody), 409, "not-admitted", NOT_ADMITTED_TEXT);
+        refused(call(HttpMethod.POST, Sah76Support.noticeAckUrl(notice), w.nurse().auth(), null), 409, "not-admitted", NOT_ADMITTED_TEXT);
+        assertThat(allAudits(w.clinic())).isEqualTo(audits);
+        assertThat(count(w.clinic(), "select count(*) from ipd.medicine_order_query")).isEqualTo(queries);
+        assertThat(count(w.clinic(), "select count(*) from ipd.order_notice where acknowledged_at is not null")).isZero();
     }
 
     // ---------------- fixture ----------------

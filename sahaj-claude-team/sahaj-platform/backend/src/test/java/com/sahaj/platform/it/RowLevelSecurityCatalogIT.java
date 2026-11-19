@@ -21,7 +21,9 @@ import org.junit.jupiter.api.Test;
 @OnTestDatabase
 class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
 
-    private static final String SCHEMAS = "('platform','patient','opd','ipd','hra','billing')";
+    // SAH-78 WP-A: the pharmacy schema (docs/database/SAH-78-pharmacy-masters.md): 20 tenant tables and 3 global ones, all with
+    // enabled and forced row level security, so none of the three global ones is on the no-RLS list below.
+    private static final String SCHEMAS = "('platform','patient','opd','ipd','hra','billing','pharmacy')";
 
     /**
      * Tables that are on purpose without row level security: no tenant_id, global/reference data or
@@ -176,7 +178,9 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
      * the tenant rule below skips them.
      */
     private static final Set<String> GLOBAL_CATALOGUE_TABLES = Set.of("ipd.drug", "ipd.drug_interaction",
-            "ipd.nursing_profile_template", "ipd.drug_code");
+            "ipd.nursing_profile_template", "ipd.drug_code",
+            // SAH-78 (design note section 4): the global product catalogue, its barcodes and the seeded reason defaults, same pattern
+            "pharmacy.catalogue_product", "pharmacy.catalogue_barcode", "pharmacy.reason_default");
 
     @Test
     void everyPolicyAppliesToSahajAppOnlyAndIsBuiltOnTheBoundTenantWithNoEscape() throws Exception {
@@ -249,6 +253,13 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
         expectedPolicies.put("ipd.nursing_profile_template", Set.of("p_nursing_profile_template_select|r|sahaj_app|true|",
                 "p_nursing_profile_template_migrator|*|sahaj_migrator|true|true"));
         expectedPolicies.put("ipd.drug_code", Set.of("p_drug_code_select|r|sahaj_app|true|", "p_drug_code_migrator|*|sahaj_migrator|true|true"));
+        // SAH-78 (docs/database/SAH-78-pharmacy-masters.md section 4): the three global pharmacy tables, same pattern
+        expectedPolicies.put("pharmacy.catalogue_product", Set.of("p_catalogue_product_select|r|sahaj_app|true|",
+                "p_catalogue_product_migrator|*|sahaj_migrator|true|true"));
+        expectedPolicies.put("pharmacy.catalogue_barcode", Set.of("p_catalogue_barcode_select|r|sahaj_app|true|",
+                "p_catalogue_barcode_migrator|*|sahaj_migrator|true|true"));
+        expectedPolicies.put("pharmacy.reason_default", Set.of("p_reason_default_select|r|sahaj_app|true|",
+                "p_reason_default_migrator|*|sahaj_migrator|true|true"));
         assertThat(expectedPolicies.keySet()).containsExactlyInAnyOrderElementsOf(GLOBAL_CATALOGUE_TABLES);
         db().asApp(c -> {
             for (var entry : expectedPolicies.entrySet()) {
@@ -301,6 +312,76 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
             assertThat(DbAccess.count(c, "select count(*) from ipd.drug_interaction")).isEqualTo(3);
             return null;
         });
+    }
+
+    /**
+     * SAH-78 (docs/database/SAH-78-pharmacy-masters.md sections 2 and 4): the twenty pharmacy tenant tables each have a NOT NULL
+     * tenant_id that defaults to the bound tenant, enabled and forced row level security, and exactly one policy per command for
+     * sahaj_app: select, insert and update (no delete policy anywhere); the three immutable approval-rule tables only select and
+     * insert. The three global tables are proved by the exact-policy test above.
+     */
+    @Test
+    void everyPharmacyTenantTableHasANotNullTenantIdAndExactlyTheSelectInsertAndUpdatePolicyAndTheImmutableOnesOnlySelectAndInsert() throws Exception {
+        // SAH-79 WP-D (docs/database/SAH-79-inventory.md section 4): the insert-only set widens by the append-only and insert-only tables and every ledger partition
+        Set<String> immutable = Set.of("approval_rule_version", "approval_rule", "approval_rule_level", "client_request", "document_event",
+                "approval_request_level", "approval_decision", "stock_ledger",
+                // SAH-79 WP-E to WP-H (migrations 1400 to 1700; their own test plans follow with those work packages): the lines, notes and entries
+                // that are never updated
+                "consumption", "consumption_line", "debit_note_credit", "dispatch_line", "dispatch_receipt_line", "return_item_note", "store_return", "transfer_line",
+                "vendor_payable_entry");
+        java.util.regex.Pattern ledgerPartition = java.util.regex.Pattern.compile("^stock_ledger_y[0-9]{4}m(0[1-9]|1[0-2])$");
+        Map<String, List<String>> commands = new LinkedHashMap<>();
+        List<String> problems = new ArrayList<>();
+        db().asApp(c -> {
+            try (var st = c.createStatement(); var rs = st.executeQuery("""
+                    select cl.relname,
+                           coalesce((select string_agg(p.polcmd::text, ',' order by p.polcmd::text) from pg_policy p where p.polrelid = cl.oid), '') as cmds,
+                           cl.relrowsecurity, cl.relforcerowsecurity,
+                           (select a.attnotnull from pg_attribute a where a.attrelid = cl.oid and a.attname = 'tenant_id' and not a.attisdropped) as not_null,
+                           (select pg_get_expr(d.adbin, d.adrelid) from pg_attrdef d join pg_attribute a on a.attrelid = d.adrelid and a.attnum = d.adnum
+                             where d.adrelid = cl.oid and a.attname = 'tenant_id') as def
+                    from pg_class cl join pg_namespace n on n.oid = cl.relnamespace
+                    where n.nspname = 'pharmacy' and cl.relkind in ('r', 'p')
+                      and exists (select 1 from pg_attribute a where a.attrelid = cl.oid and a.attname = 'tenant_id' and not a.attisdropped)
+                    order by 1
+                    """)) {
+                while (rs.next()) {
+                    String table = rs.getString("relname");
+                    commands.put(table, List.of(rs.getString("cmds")));
+                    String expected = immutable.contains(table) || ledgerPartition.matcher(table).matches() ? "a,r" : "a,r,w";
+                    if (!expected.equals(rs.getString("cmds"))) {
+                        problems.add(table + " policy commands " + rs.getString("cmds") + " expected " + expected);
+                    }
+                    if (!rs.getBoolean("relrowsecurity") || !rs.getBoolean("relforcerowsecurity")) {
+                        problems.add(table + " is not enabled and forced");
+                    }
+                    if (!rs.getBoolean("not_null")) {
+                        problems.add(table + ".tenant_id is nullable");
+                    }
+                    String def = rs.getString("def");
+                    if (def == null || !def.contains("current_tenant")) {
+                        problems.add(table + ".tenant_id has no default of the bound tenant: " + def);
+                    }
+                }
+            }
+            return null;
+        });
+        assertThat(problems).isEmpty();
+        java.util.List<String> partitions = commands.keySet().stream().filter(t -> ledgerPartition.matcher(t).matches()).toList();
+        assertThat(partitions).as("the 41 monthly partitions of the stock ledger (Nov 2026 to Mar 2030) each have their own policies").hasSizeGreaterThanOrEqualTo(41)
+                .contains("stock_ledger_y2026m11", "stock_ledger_y2030m03");
+        assertThat(commands.keySet().stream().filter(t -> !ledgerPartition.matcher(t).matches()).toList())
+                .as("the pharmacy tenant tables: twenty of SAH-78, nine of SAH-79 WP-D (the nine include the partitioned ledger parent) and 25 of WP-E to WP-H").containsExactlyInAnyOrder(
+                "unit", "store", "store_staff", "staff_preference", "product", "product_store_setting", "opening_stock_import",
+                "opening_stock_line", "opening_stock_line_issue", "vendor", "vendor_store", "approval_rule_version", "approval_rule",
+                "approval_rule_level", "approval_rule_set", "document_series", "document_counter", "reason", "reason_default_state",
+                "print_template_setting",
+                "client_request", "document_event", "batch", "stock_balance", "stock_ledger", "approval_request", "approval_request_level", "approval_decision",
+                "stock_adjustment",
+                // SAH-79 WP-E to WP-H, migrations 1400 to 1700
+                "purchase_order", "purchase_order_line", "goods_receipt", "goods_receipt_line", "debit_note", "debit_note_credit", "debit_note_line", "vendor_payable",
+                "vendor_payable_entry", "indent", "indent_line", "dispatch", "dispatch_line", "dispatch_receipt_line", "return_item", "return_item_note", "shortage",
+                "store_return", "damage_report", "transfer", "transfer_line", "consumption", "consumption_line", "stock_audit", "stock_audit_line");
     }
 
     // ---- grants ----

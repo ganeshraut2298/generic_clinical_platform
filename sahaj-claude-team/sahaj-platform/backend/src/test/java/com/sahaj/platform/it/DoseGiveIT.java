@@ -493,6 +493,8 @@ class DoseGiveIT extends MarSupport {
         refused(doseCall(w.nurse().auth(), f.order(), given(ist(8, 0), other)), 409, "wristband-mismatch", MISMATCH_TEXT);
         assertThat(denyEvents(w.clinic(), w.adm().id())).isEqualTo(2);
         assertThat(audits(w.clinic(), "IPD_DOSE_WRISTBAND_MISMATCH")).isEqualTo(2);
+        // 0.4.3: the override of the same nurse is refused for 15 minutes after a mismatch; the stop rows are 16 minutes old now
+        ageScanStops(f.order(), 16);
         doseOk(w.nurse().auth(), f.order(), given(w, ist(8, 0)));
     }
 
@@ -504,6 +506,7 @@ class DoseGiveIT extends MarSupport {
         refused(doseCall(w.nurse().auth(), f.order(), wrong), 409, "wristband-mismatch", MISMATCH_TEXT);
         // the same key with the right band and the statement
         Map<String, Object> fixed = set(set(wrong, "wristband", w.uhid()), "identityConfirmed", true);
+        ageScanStops(f.order(), 16); // 0.4.3: no override within 15 minutes of a mismatch
         JsonNode a = doseOk(w.nurse().auth(), f.order(), fixed);
         assertThat(a.get("dose").get("outcome").asText()).isEqualTo("GIVEN");
         assertThat(doseRowsOfOrder(w.clinic(), f.order())).isOne();
@@ -542,6 +545,7 @@ class DoseGiveIT extends MarSupport {
         assertThat(eventLines(w.clinic(), w.adm().id())).contains("deny|Stopped at the identity check: entered text that is not a "
                 + "UHID, expected " + w.uhid() + " (Tab. Paracetamol 650 mg)");
         String padded200 = w.uhid() + " ".repeat(200 - w.uhid().length());
+        ageScanStops(f.order(), 16); // 0.4.3: no override within 15 minutes of a mismatch
         doseOk(w.nurse().auth(), f.order(), given(ist(8, 0), padded200));
         assertThat(doseDb(w.clinic(), f.order(), ist(8, 0)).scan()).isEqualTo(w.uhid());
     }

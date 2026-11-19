@@ -56,6 +56,11 @@ spring:
     default-schema: platform
     create-schemas: false
     clean-disabled: true
+    # SAH-78 (design note SAH-78-pharmacy-masters 5.1): V2026_12_17_1030 inserts the 30 SAMPLE catalogue products only when this
+    # placeholder is exactly 'true'. false here (every environment, production included); application-dev.yml and
+    # application-test.yml set true. Flyway fails on an unresolved placeholder, so it must stay defined. Never true in production.
+    placeholders:
+      sahajSampleData: false
 
 logging:
   level:

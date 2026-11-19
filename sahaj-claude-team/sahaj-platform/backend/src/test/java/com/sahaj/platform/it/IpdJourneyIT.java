@@ -35,6 +35,8 @@ import org.springframework.http.HttpMethod;
 class IpdJourneyIT extends IpdJourneySupport {
 
     private static final String PLAN = "Oxygen up to 6 L, repeat vitals in 30 minutes " + MARK;
+    private static final String QUESTION = "Is this paracetamol dose right for the weight " + MARK;
+    private static final String REPLY = "The dose is right, the weight is on the chart " + MARK;
     private static final long NURSING_PAISE = 40_000L;
     /** The extra services are priced at the base price times the multiplier of the bed category (Semi-private 1.25). */
     private static final long XRAY = 56_250L;
@@ -283,6 +285,12 @@ class IpdJourneyIT extends IpdJourneySupport {
         // the orderer cannot verify his own order; a nurse cannot verify
         refused(call(HttpMethod.POST, verifyUrl(j.pcm), j.nurseA.auth(), verifyJson(j.pharmacistPin, 1)), 403, "forbidden", ONLY_PHARMACIST);
 
+        // the pharmacist queries the PRN order and the doctor answers: two more free texts that must never reach a log, an audit row
+        // or an event (security L-3 (c)); the order is back with the pharmacist afterwards and is verified below
+        audited(c, "IPD_MED_QUERIED", 1, () -> queryOk(ph, j.pcm, 1, QUESTION));
+        assertThat(statusOf(j.pcm)).isEqualTo("QUERIED");
+        audited(c, "IPD_MED_QUERY_REPLIED", 1, () -> replyOk(j.doctor, j.pcm, 1, REPLY));
+        assertThat(statusOf(j.pcm)).isEqualTo("PENDING");
         for (String id : List.of(j.pcm, j.panto, j.stat)) {
             verifyVersionOk(ph, j.pharmacistPin, id, 1);
             assertThat(statusOf(id)).isEqualTo("ACTIVE");
@@ -335,6 +343,9 @@ class IpdJourneyIT extends IpdJourneySupport {
         assertThat(dsnap(w).doses()).isEqualTo(snap.doses());
         assertThat(denyEvents(c, adm)).isEqualTo(denies + 1);
         assertThat(audit(c, "IPD_DOSE_WRISTBAND_MISMATCH")).hasSize(1);
+        // contract 0.4.3: the override of the same nurse is refused for 15 minutes after a mismatch (and before the second-nurse check);
+        // the journey gives by override because no medicine code is loaded, so the stop row is moved 16 minutes back
+        ageScanStops(j.hep, 16);
         // a high-alert medicine without its second nurse is refused before anything is written
         invalid(doseCall(j.nurseA.auth(), j.hep, given(w, ist(8, 0))), "secondNurseId", HIGH_ALERT_TEXT);
         assertThat(doseRowsOfOrder(c, j.hep)).isZero();
@@ -812,6 +823,16 @@ class IpdJourneyIT extends IpdJourneySupport {
         String adm = j.adm.id();
         String auditText = allAuditText(c);
         String events = eventText(c, adm);
+        // security L-3 (c): every free text the journey typed. The override note of the give calls (the only fixed text), and, each
+        // with MARK in it: the indication of the PRN order, the hold reasons, the change reason, the pharmacist's question and the
+        // doctor's reply. (The journey types no not-given OTHER note and no stop reason; Sah76DoseGiveIT and Sah76OrderActionsIT do.)
+        String[] typed = {GIVEN_OVERRIDE_NOTE, "Fever above 38 C", "Nil by mouth for the scan", "Hold the PRN dose for now",
+            "Dose raised after the review", QUESTION, REPLY};
+        for (String text : typed) {
+            assertThat(logText).as("the log never holds the typed text: " + text).doesNotContain(text);
+            assertThat(auditText).as("the audit rows never hold the typed text: " + text).doesNotContain(text);
+            assertThat(events).as("the clinical events never hold the typed text: " + text).doesNotContain(text);
+        }
         String[] never = {j.adm.name(), j.adm.mobile(), MARK, j.adm.name().split(" ")[0] + " " + j.adm.name().split(" ")[1]};
         for (String text : never) {
             assertThat(logText).as("the log never holds: " + text).doesNotContain(text);

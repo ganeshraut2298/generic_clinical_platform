@@ -1,8 +1,20 @@
 openapi: 3.1.0
 info:
   title: Sahaj admin portal API
-  version: 0.5.0
+  version: 0.6.0
   description: >-
+    Version 0.6.0 (17 Nov 2026, SAH-78, ADR-028 D11, DEC-062 Q3, DEC-063 OQ-PHI-4; additive, no existing field,
+    path or behaviour changes): the Pharmacy & Inventory module switch. ModulesChange gains the optional field
+    pharmacyOn and ClinicModules gains the optional field pharmacyOn (platform.module_entitlement.pharmacy_on,
+    default false; no entitlement row reads false). PATCH /clinics/{id}/modules applies it in the same
+    all-or-nothing transaction as the other fields; a value equal to the current one is ignored; an applied
+    change writes one ACTION MODULES_CHANGED row "Pharmacy & Inventory switched on" or "Pharmacy & Inventory
+    switched off" with reason "Module entitlement" and before and after values, like HRA. Switching it off
+    never deletes pharmacy data; the clinic then gets 403 module-off on /api/v1/pharmacy/** and loses the menu
+    entry at its next request. There is no refusal rule (no 409) for this field in 0.6.0. Requests without
+    pharmacyOn behave exactly as in 0.5.0. Implementation of this field touches files outside the additive list
+    of DEC-061 Answer 2 (the admin modules service, platform.admin_set_modules and the admin Modules tab), so it
+    is built only after the tech lead or the human allows it (x-needs-human below).
     Version 0.5.0 (SAH-42, ADR-018, DEC-034): adds the dev-only bootstrap registration of the first platform admin,
     POST /bootstrap/unlock and POST /bootstrap/register (x-dev-only). Like /dev, it is absent from every jar built
     without the Maven profile dev-tools, and every path under /bootstrap answers an empty 404 unless all its build,
@@ -264,6 +276,7 @@ paths:
       x-needs-human:
         - 'DEC-029 NH-6 (patient safety): "admitted" counts ipd.admission rows with status ADMITTED only (interim).'
         - 'DEC-029 NH-7 (patient safety): until the ipd admit transaction reads the entitlement FOR SHARE, an admission in the same second as a switch-off can still succeed.'
+        - 'SAH-78 (0.6.0): the field pharmacyOn and its Modules tab control are outside the additive file list of DEC-061 Answer 2; built only when the tech lead or the human allows it. Until then test fixtures switch pharmacy_on (ADR-028 D11).'
       description: >-
         Story ADM-3a. Changes one or more module entitlements of a clinic, all or nothing, in one transaction
         (ADR-016 D4: lock the entitlement row, count admitted patients, write). The "current" value is the effective
@@ -997,6 +1010,7 @@ components:
         hraOn: { type: boolean }
         bedLimit: { type: integer, minimum: 5, maximum: 300, multipleOf: 5 }
         admittedNow: { type: integer, minimum: 0, description: 'Patients admitted now (count only). "{n} patients admitted now" or "No admissions".' }
+        pharmacyOn: { type: boolean, description: '0.6.0 (SAH-78, ADR-028 D11), optional: the Pharmacy & Inventory module switch (platform.module_entitlement.pharmacy_on). false when no entitlement row exists. Shown on the Modules tab as "Pharmacy & Inventory: On or Off" (NEW, not in the admin mockup; x-needs-human on PATCH /clinics/{id}/modules).' }
     ClinicDetail:
       type: object
       required: [id, name, code, city, specialty, specialtyLabel, status, health, ownerName, ownerMobileLast5, joinedAt, lastActiveAt, plan, planLabel, setupComplete, modules]
@@ -1026,6 +1040,7 @@ components:
         ipdState: { $ref: '#/components/schemas/IpdState' }
         hraOn: { type: boolean }
         bedLimit: { type: integer, minimum: 5, maximum: 300, multipleOf: 5 }
+        pharmacyOn: { type: boolean, description: '0.6.0 (SAH-78), optional: switch Pharmacy & Inventory on or off. Audit "Pharmacy & Inventory switched on" / "Pharmacy & Inventory switched off". Never deletes data. Not a boolean 400 validation.' }
     PlanChange:
       type: object
       additionalProperties: false

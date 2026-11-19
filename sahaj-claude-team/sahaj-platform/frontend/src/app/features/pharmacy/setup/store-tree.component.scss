@@ -1,0 +1,63 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.nodes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kids {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 18px;
+  margin-left: 10px;
+  border-left: 2px solid var(--line-2);
+}
+
+// A node is a button: at least 44 px tall for a tablet.
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--glass-hi);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+
+  &.sel {
+    border: 2px solid var(--pri);
+    padding: 7px 11px;
+    background: var(--pri-soft);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 2px;
+  }
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.line {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+
+  &.warn {
+    color: var(--warn);
+  }
+}

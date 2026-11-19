@@ -43,6 +43,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { key: 'billing', icon: 'receipt', route: 'billing', group: 'money', labelKey: 'nav.billing' },
   { key: 'revenue', icon: 'wallet', route: 'revenue', group: 'money', labelKey: 'nav.revenue' },
+  // SAH-78 (ADR-028 D11): one entry, shown only when /me.menu has the key (module on and mapped).
+  { key: 'pharmacy', icon: 'pill', route: 'pharmacy', group: 'clinic', labelKey: 'nav.pharmacy' },
   { key: 'staff', icon: 'users', route: 'staff', group: 'clinic', labelKey: 'nav.staff' },
   { key: 'reports', icon: 'chart', route: 'reports', group: 'clinic', labelKey: 'nav.reports' },
   { key: 'config', icon: 'sliders', route: 'config', group: 'clinic', labelKey: 'nav.config' },
@@ -57,6 +59,7 @@ export const SIMPLE_MENU_KEYS: readonly string[] = [
   'ipd',
   'patients',
   'billing',
+  'pharmacy',
   'config',
 ];
 

@@ -38,7 +38,7 @@ public class RolePermissionService {
     /** Any signed-in clinic user may read the matrix (non-owners see it view-only). */
     @Transactional(readOnly = true)
     public List<Cell> get() {
-        return rolePermissionRepository.effective();
+        return listedRoles();
     }
 
     @Transactional
@@ -52,6 +52,10 @@ public class RolePermissionService {
         for (Cell cell : requested) {
             if (!PERMISSIONS.contains(cell.permission())) {
                 throw new TeamInputInvalidException("Choose a valid permission");
+            }
+            if (cell.role() == MembershipRole.STORE_STAFF) {
+                // SAH-78 (ADR-028 D4): the seven permissions do not apply to Store staff, so no row for it is accepted.
+                throw new TeamInputInvalidException("Store staff does not use these permissions.");
             }
             if (cell.role() == MembershipRole.OWNER && !cell.allowed()) {
                 throw new TeamInputInvalidException("The owner always keeps every permission.");
@@ -82,7 +86,14 @@ public class RolePermissionService {
             auditLog.record("ROLE_PERMISSIONS_UPDATED", "ROLE_PERMISSION", null,
                     Map.of("cells", before), Map.of("cells", after));
         }
-        return rolePermissionRepository.effective();
+        return listedRoles();
+    }
+
+    /** SAH-78: the matrix never lists STORE_STAFF (it has no defaults row either; this keeps it out whatever the data). */
+    private List<Cell> listedRoles() {
+        return rolePermissionRepository.effective().stream()
+                .filter(cell -> cell.role() != MembershipRole.STORE_STAFF)
+                .toList();
     }
 
     private static String key(MembershipRole role, String permission) {

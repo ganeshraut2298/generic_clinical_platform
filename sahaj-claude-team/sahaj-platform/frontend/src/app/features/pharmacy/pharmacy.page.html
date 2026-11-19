@@ -1,0 +1,98 @@
+@switch (store.state()) {
+  @case ('loading') {
+    <app-page-head title="Pharmacy & Inventory" />
+    <section class="panel surf" aria-busy="true" data-testid="pharmacy-loading">
+      <p class="loading" role="status">Loading Pharmacy & Inventory</p>
+    </section>
+  }
+  @case ('error') {
+    <app-page-head title="Pharmacy & Inventory" />
+    <section class="panel surf" data-testid="pharmacy-error">
+      <div class="notice err" role="alert">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ store.message() }}</span>
+      </div>
+      <div class="row">
+        <button mat-stroked-button type="button" (click)="retry()">Try again</button>
+      </div>
+    </section>
+  }
+  @case ('no-access') {
+    <app-page-head title="Pharmacy & Inventory" />
+    <section class="panel surf" data-testid="pharmacy-no-access">
+      <div class="notice warn" role="alert">
+        <app-icon name="lock" [size]="16" />
+        <span>{{ store.message() }}</span>
+      </div>
+    </section>
+  }
+  @case ('ready') {
+    <div class="modhead">
+      @if (store.canViewSetup() || store.canInventory()) {
+        <nav class="tabs" aria-label="Pharmacy and inventory">
+          @if (store.canViewSetup()) {
+            <a
+              routerLink="setup"
+              routerLinkActive="active"
+              ariaCurrentWhenActive="page"
+              data-testid="tab-inventory-setup"
+            >
+              Inventory setup
+            </a>
+          }
+          @if (store.canInventory()) {
+            <a
+              routerLink="inventory"
+              routerLinkActive="active"
+              ariaCurrentWhenActive="page"
+              data-testid="tab-inventory"
+            >
+              Inventory
+            </a>
+          }
+        </nav>
+      } @else {
+        <span></span>
+      }
+
+      <div class="wstore" data-testid="working-store">
+        @if (store.callerLabel(); as who) {
+          <span class="who" data-testid="caller-label">{{ who }}</span>
+        }
+        @if (store.notMapped()) {
+          <p class="note" data-testid="not-mapped">You are not mapped to a store. Ask your owner.</p>
+        } @else {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="wsel">
+            <mat-label>Working store</mat-label>
+            <mat-select
+              [value]="store.workingStoreId()"
+              [disabled]="store.picking()"
+              placeholder="Pick a store"
+              (selectionChange)="pick($event.value)"
+              data-testid="working-store-select"
+            >
+              @for (s of store.stores(); track s.storeId) {
+                <mat-option [value]="s.storeId">{{ s.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+      </div>
+    </div>
+
+    @if (store.mustPickWorkingStore()) {
+      <div class="notice teal" role="status" data-testid="must-pick">
+        <app-icon name="alert" [size]="16" />
+        <span>Pick your working store. Every store screen shows the store you choose.</span>
+      </div>
+    }
+    @if (store.pickError(); as message) {
+      <div class="notice err" role="alert" data-testid="pick-error">
+        <app-icon name="alert" [size]="16" />
+        <span>{{ message }}</span>
+      </div>
+    }
+
+    <router-outlet />
+  }
+}

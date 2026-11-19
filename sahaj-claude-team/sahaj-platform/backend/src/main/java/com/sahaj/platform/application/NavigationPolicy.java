@@ -105,7 +105,19 @@ public final class NavigationPolicy {
             int queue = menu.indexOf("queue");
             menu.add(queue < 0 ? menu.size() : queue + 1, "secondchecks");
         }
-        if (flags.hraOn() && !menu.contains("staff")) {
+        // SAH-78 (ADR-028 D11): Pharmacy & Inventory, only while the clinic's pharmacy_on is true, for OWNER, PHARMACIST
+        // or a member with an active store mapping. Before staff and config (at the end when the role has neither), in
+        // both menu modes. STORE_STAFF has no base keys, so its menu is [pharmacy] or empty. With pharmacy_on false
+        // nothing here runs and every menu is exactly as before.
+        boolean pharmacyAllowed = role == MembershipRole.OWNER || role == MembershipRole.PHARMACIST
+                || flags.pharmacyMapped();
+        if (flags.pharmacyOn() && pharmacyAllowed && !menu.contains("pharmacy")) {
+            int at = menu.indexOf("config");
+            menu.add(at < 0 ? menu.size() : at, "pharmacy");
+        }
+        // SAH-78 security L6, DEC-068 Q2 A: the Store staff role gives nothing outside Pharmacy and Inventory, and every HRA
+        // endpoint refuses it, so it never gets the staff menu key even when HRA is on.
+        if (flags.hraOn() && role != MembershipRole.STORE_STAFF && !menu.contains("staff")) {
             int at = menu.indexOf("config");
             menu.add(at < 0 ? menu.size() : at, "staff");
         }
@@ -114,8 +126,19 @@ public final class NavigationPolicy {
 
     /**
      * Which add-on modules are switched on for the clinic; {@code ipdOn} is true for trial, on and read-only,
-     * {@code ipdWritable} (SAH-28) only for trial and on.
+     * {@code ipdWritable} (SAH-28) only for trial and on. SAH-78: {@code pharmacyOn} is the clinic's Pharmacy and
+     * Inventory switch and {@code pharmacyMapped} is the answer of {@code PharmacyAccessPort} for this member (an active
+     * store mapping); the three-argument constructor leaves both false.
      */
-    public record ModuleFlags(boolean hraOn, boolean ipdOn, boolean ipdWritable) {
+    public record ModuleFlags(boolean hraOn, boolean ipdOn, boolean ipdWritable, boolean pharmacyOn,
+                              boolean pharmacyMapped) {
+
+        /**
+         * The flags as they were before SAH-78: Pharmacy and Inventory off. Every existing caller keeps using this
+         * constructor, so its menu is unchanged.
+         */
+        public ModuleFlags(boolean hraOn, boolean ipdOn, boolean ipdWritable) {
+            this(hraOn, ipdOn, ipdWritable, false, false);
+        }
     }
 }

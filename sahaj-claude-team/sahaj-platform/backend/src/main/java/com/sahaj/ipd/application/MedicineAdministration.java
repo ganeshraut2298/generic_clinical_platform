@@ -373,10 +373,16 @@ public class MedicineAdministration {
             return decision;
         }
         decision.scan = WristbandCheck.normalise(input.wristband());
-        MedicineCodeCheck.Result code = MedicineCodeCheck.check(input.medicineCode(), drugCodes.codesOf(drug.key()));
+        MedicineCodeCheck.Result code = MedicineCodeCheck.check(input.medicineCode(), drugCodes.codesOf(drug.key()),
+                scanned -> MedicineCodeCheck.looksLikeCode(scanned) && drugCodes.drugKeyOf(scanned).isPresent());
         boolean override = DoseRules.hasOverride(input);
         if (code == MedicineCodeCheck.Result.EMPTY && !override) {
             throw new InvalidInputException("medicineCode", DoseRules.SCAN_MEDICINE);
+        }
+        if (code == MedicineCodeCheck.Result.NO_CODE_LOADED) {
+            // DEC-065: not a mismatch. One IPD_DOSE_REFUSED audit, no deny entry, no scan-stop record, nothing typed stored.
+            return refuse(decision, tenantId, actor, order, admission, DoseRules.NO_CODE_LOADED_PROBLEM,
+                    DoseRules.NO_CODE_LOADED_TITLE, DoseRules.NO_CODE_LOADED, asOf);
         }
         if (code == MedicineCodeCheck.Result.MISMATCH) {
             denyAtMedicine(tenantId, actor, order, admission, drug, decision.slotAt, input);

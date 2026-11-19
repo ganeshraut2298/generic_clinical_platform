@@ -125,8 +125,8 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
     protected void stampVersion(Clinic clinic, String orderId, int versionNo, Instant createdAt, Instant startAt, Instant verifiedAt,
                                 Instant supersededAt) throws SQLException {
         asOwner(true, new String[] {"ipd.medicine_order_version", "ipd.medicine_order", "ipd.admission"}, c -> {
-            DbAccess.execute(c, "alter table ipd.medicine_order_version disable trigger user");
-            DbAccess.execute(c, "alter table ipd.medicine_order disable trigger user");
+            DbAccess.execute(c, "alter table ipd.medicine_order_version disable trigger trg_medicine_order_version_guard_update");
+            DbAccess.execute(c, "alter table ipd.medicine_order disable trigger trg_medicine_order_guard_update");
             try (PreparedStatement ps = c.prepareStatement("update ipd.medicine_order_version set created_at = ?, start_at = ?, "
                     + "verified_at = case when verified_by is null then null else ?::timestamptz end, "
                     + "superseded_at = case when superseded_at is null then null else ?::timestamptz end "
@@ -145,8 +145,8 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
                     + "where o.id = ?::uuid and o.verified_at is not null and exists (select 1 from ipd.medicine_order_version v "
                     + "where v.order_id = o.id and v.version_no = o.current_version and v.verified_at is not null)", orderId);
             DbAccess.execute(c, "set constraints all immediate");
-            DbAccess.execute(c, "alter table ipd.medicine_order enable trigger user");
-            DbAccess.execute(c, "alter table ipd.medicine_order_version enable trigger user");
+            DbAccess.execute(c, "alter table ipd.medicine_order enable trigger trg_medicine_order_guard_update");
+            DbAccess.execute(c, "alter table ipd.medicine_order_version enable trigger trg_medicine_order_version_guard_update");
             return null;
         });
     }
@@ -154,7 +154,7 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
     /** Moves the newest hold of the order: held_at, and resumed_at when it was resumed (owner, guards off, committed). */
     protected void stampHold(Clinic clinic, String orderId, Instant heldAt, Instant resumedAt) throws SQLException {
         asOwner(true, new String[] {"ipd.order_hold", "ipd.medicine_order", "ipd.admission"}, c -> {
-            DbAccess.execute(c, "alter table ipd.order_hold disable trigger user");
+            DbAccess.execute(c, "alter table ipd.order_hold disable trigger trg_order_hold_guard_update");
             try (PreparedStatement ps = c.prepareStatement("update ipd.order_hold set held_at = ?, "
                     + "resumed_at = case when resumed_at is null then null else ?::timestamptz end where id = "
                     + "(select id from ipd.order_hold where medicine_order_id = ?::uuid order by held_at desc limit 1)")) {
@@ -163,7 +163,7 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
                 ps.setString(3, orderId);
                 assertThat(ps.executeUpdate()).as("hold restamped").isOne();
             }
-            DbAccess.execute(c, "alter table ipd.order_hold enable trigger user");
+            DbAccess.execute(c, "alter table ipd.order_hold enable trigger trg_order_hold_guard_update");
             return null;
         });
     }
@@ -171,7 +171,7 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
     /** Moves the stop time of a stopped order to this instant (owner, guard off, committed). */
     protected void stampStop(Clinic clinic, String orderId, Instant stoppedAt) throws SQLException {
         asOwner(true, new String[] {"ipd.medicine_order", "ipd.admission"}, c -> {
-            DbAccess.execute(c, "alter table ipd.medicine_order disable trigger user");
+            DbAccess.execute(c, "alter table ipd.medicine_order disable trigger trg_medicine_order_guard_update");
             try (PreparedStatement ps = c.prepareStatement("update ipd.medicine_order set stopped_at = ? where id = ?::uuid "
                     + "and stopped_at is not null")) {
                 ps.setTimestamp(1, stamp(stoppedAt));
@@ -179,7 +179,7 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
                 assertThat(ps.executeUpdate()).as("stop restamped").isOne();
             }
             DbAccess.execute(c, "set constraints all immediate");
-            DbAccess.execute(c, "alter table ipd.medicine_order enable trigger user");
+            DbAccess.execute(c, "alter table ipd.medicine_order enable trigger trg_medicine_order_guard_update");
             return null;
         });
     }
@@ -187,13 +187,13 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
     /** Makes the undo window of a dose end at this instant (owner, append-only trigger off inside the transaction). */
     protected void undoUntil(Clinic clinic, String doseId, Instant until) throws SQLException {
         asOwner(true, new String[] {"ipd.dose_administration", "ipd.admission"}, c -> {
-            DbAccess.execute(c, "alter table ipd.dose_administration disable trigger user");
+            DbAccess.execute(c, "alter table ipd.dose_administration disable trigger trg_dose_administration_no_update_delete");
             try (PreparedStatement ps = c.prepareStatement("update ipd.dose_administration set undo_until = ? where id = ?::uuid")) {
                 ps.setTimestamp(1, stamp(until));
                 ps.setString(2, doseId);
                 assertThat(ps.executeUpdate()).isOne();
             }
-            DbAccess.execute(c, "alter table ipd.dose_administration enable trigger user");
+            DbAccess.execute(c, "alter table ipd.dose_administration enable trigger trg_dose_administration_no_update_delete");
             return null;
         });
     }
@@ -201,7 +201,7 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
     /** Moves a break-glass grant back in time so that it has expired {@code minutes} minutes ago plus its 30 (owner). */
     protected void ageGrant(Clinic clinic, String grantId, int minutes) throws SQLException {
         asOwner(true, new String[] {"ipd.emergency_access_grant", "ipd.admission", "ipd.bed", "ipd.clinical_event"}, c -> {
-            DbAccess.execute(c, "alter table ipd.emergency_access_grant disable trigger user");
+            DbAccess.execute(c, "alter table ipd.emergency_access_grant disable trigger trg_emergency_access_grant_guard_update");
             try (PreparedStatement ps = c.prepareStatement("update ipd.emergency_access_grant set opened_at = opened_at - (? * interval '1 minute'), "
                     + "expires_at = expires_at - (? * interval '1 minute') where id = ?::uuid")) {
                 ps.setInt(1, minutes);
@@ -209,7 +209,7 @@ abstract class IpdJourneySupport extends Sah76NursingSupport {
                 ps.setString(3, grantId);
                 assertThat(ps.executeUpdate()).isOne();
             }
-            DbAccess.execute(c, "alter table ipd.emergency_access_grant enable trigger user");
+            DbAccess.execute(c, "alter table ipd.emergency_access_grant enable trigger trg_emergency_access_grant_guard_update");
             return null;
         });
     }

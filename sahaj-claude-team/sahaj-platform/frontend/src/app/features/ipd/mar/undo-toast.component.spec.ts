@@ -1,10 +1,12 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { MAT_SNACK_BAR_DATA, MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { problem } from '../emr/emr.fixtures';
 import { ScopeRefusals } from '../ipd-scope-refusal';
+import { GiveSheetPresence } from './give-sheet-presence';
 import { doseOf, marOf } from './mar.fixtures';
 import { DoseCorrected, UndoToast, UndoToastComponent, UndoToastData } from './undo-toast.component';
 
@@ -21,6 +23,9 @@ describe('UndoToast service', () => {
   let service: UndoToast;
   let snack: { open: ReturnType<typeof vi.fn>; openFromComponent: ReturnType<typeof vi.fn> };
   let http: HttpTestingController;
+  let presence: GiveSheetPresence;
+  /** The Nursing sheet and the admission sheet that hold the MAR: open all the time, and never hold a toast back. */
+  const otherDialogs = { openDialogs: [{}, {}] as unknown[] };
 
   beforeEach(() => {
     snack = { open: vi.fn(), openFromComponent: vi.fn() };
@@ -29,8 +34,10 @@ describe('UndoToast service', () => {
         provideHttpClient(withInterceptors([problemDetailInterceptor])),
         provideHttpClientTesting(),
         { provide: MatSnackBar, useValue: snack },
+        { provide: MatDialog, useValue: otherDialogs },
       ],
     });
+    presence = TestBed.inject(GiveSheetPresence);
     service = TestBed.inject(UndoToast);
     http = TestBed.inject(HttpTestingController);
   });
@@ -81,10 +88,10 @@ describe('UndoToast service', () => {
       expect(snack.open).toHaveBeenCalledTimes(1);
     });
 
-    it('the plain toast is not announced twice (the sheet and the list already say it)', () => {
+    it('the plain toast is announced too (DEC-068: the sheet has closed, nothing else says it)', () => {
       service.showGiven(data({ canUndo: false, undoSecondsLeft: 0 }));
       const config = snack.open.mock.calls[0][2];
-      expect(config.politeness).toBe('off');
+      expect(config.politeness).not.toBe('off');
     });
 
     it('the undo toast is announced to a screen reader (live region is not switched off)', () => {
@@ -137,6 +144,76 @@ describe('UndoToast service', () => {
       expect.anything(),
     );
     expect(seen).toEqual([{ admissionId: 'a1', mar: null }]);
+  });
+
+  describe('no toast while a give sheet is open (DEC-068, code review R4 #6)', () => {
+    const refuse = () => {
+      service.undo(data(), 'k').subscribe({ error: (e: unknown) => service.refused(data(), e) });
+      http
+        .expectOne(UNDO)
+        .flush(problem('undo-expired', 409, 'The time to undo has passed. Mark it as recorded in error instead.'), {
+          status: 409,
+          statusText: 'x',
+        });
+    };
+
+    it('a late done answer waits for the give sheet to close, then shows the toast; the MAR is passed on at once', () => {
+      const seen: DoseCorrected[] = [];
+      service.corrected.subscribe((c) => seen.push(c));
+      const leave = presence.enter();
+      const mar = marOf();
+      service.done(data(), mar);
+      expect(snack.open).not.toHaveBeenCalled();
+      expect(seen).toEqual([{ admissionId: 'a1', mar }]);
+      leave();
+      expect(snack.open).toHaveBeenCalledTimes(1);
+      expect(snack.open).toHaveBeenCalledWith('Undone. Tab. Paracetamol 650 mg is due again.', 'Close', expect.anything());
+      leave();
+      expect(snack.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('a late refused answer waits for the give sheet to close, then shows the server text; the MAR is read again at once', () => {
+      const seen: DoseCorrected[] = [];
+      service.corrected.subscribe((c) => seen.push(c));
+      const leave = presence.enter();
+      refuse();
+      expect(snack.open).not.toHaveBeenCalled();
+      expect(seen).toEqual([{ admissionId: 'a1', mar: null }]);
+      leave();
+      expect(snack.open).toHaveBeenCalledWith(
+        'The time to undo has passed. Mark it as recorded in error instead.',
+        'Close',
+        expect.anything(),
+      );
+    });
+
+    it('with no give sheet open the toast shows at once, even while the Nursing and admission sheets are open (QA D2)', () => {
+      expect(otherDialogs.openDialogs.length).toBe(2);
+      service.done(data(), marOf());
+      expect(snack.open).toHaveBeenCalledTimes(1);
+      service.refused(data(), { status: 409 });
+      expect(snack.open).toHaveBeenCalledTimes(2);
+    });
+
+    it('waits until the last of two give sheets has closed, and shows the toast exactly once', () => {
+      const first = presence.enter();
+      const second = presence.enter();
+      service.done(data(), marOf());
+      first();
+      expect(snack.open).not.toHaveBeenCalled();
+      second();
+      expect(snack.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('a toast held for one give sheet is not shown over the next one that opens before it was released', () => {
+      const first = presence.enter();
+      service.done(data(), marOf());
+      const next = presence.enter();
+      first();
+      expect(snack.open).not.toHaveBeenCalled();
+      next();
+      expect(snack.open).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('refused outside the nurse scope reports the refusal and shows no toast', () => {
@@ -314,7 +391,7 @@ describe('UndoToastComponent', () => {
       expect(squash(alert)).toBe('We could not undo the dose. Try again.');
     });
 
-    it('a refusal is announced by its toast and the undone toast is not read twice', async () => {
+    it('a refusal and the undone toast are both announced (DEC-068)', async () => {
       await open();
       button()!.click();
       http
@@ -326,7 +403,7 @@ describe('UndoToastComponent', () => {
       expect(snack.open.mock.calls[0][2].politeness).not.toBe('off');
       snack.open.mockClear();
       service.done(data(), marOf());
-      expect(snack.open.mock.calls[0][2].politeness).toBe('off');
+      expect(snack.open.mock.calls[0][2].politeness).not.toBe('off');
     });
   });
 

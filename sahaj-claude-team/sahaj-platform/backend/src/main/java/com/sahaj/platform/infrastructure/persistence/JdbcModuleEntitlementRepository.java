@@ -15,10 +15,13 @@ import org.springframework.stereotype.Repository;
 public class JdbcModuleEntitlementRepository implements ModuleEntitlementRepository {
 
     private static final String FIND = """
-            select ipd_state, ipd_trial_ends_at, hra_on, bed_limit, ipd_requested_at
+            select ipd_state, ipd_trial_ends_at, hra_on, bed_limit, ipd_requested_at, pharmacy_on
             from platform.module_entitlement
             where tenant_id = :tenantId
             """;
+    /** SAH-78: the pharmacy gate asks for this one column only; GET /me reads it with the row above. */
+    private static final String PHARMACY_ON =
+            "select pharmacy_on from platform.module_entitlement where tenant_id = :tenantId";
     private static final String INSERT_DEFAULTS = """
             insert into platform.module_entitlement
                 (tenant_id, ipd_state, ipd_trial_ends_at, hra_on, bed_limit, ipd_requested_at, updated_at, updated_by)
@@ -56,6 +59,11 @@ public class JdbcModuleEntitlementRepository implements ModuleEntitlementReposit
     }
 
     @Override
+    public boolean pharmacyOn(UUID tenantId) {
+        return jdbc.sql(PHARMACY_ON).param("tenantId", tenantId).query(Boolean.class).optional().orElse(false);
+    }
+
+    @Override
     public void lockForWrite(UUID tenantId, EntitlementRow defaults, UUID actorUserId) {
         jdbc.sql(INSERT_DEFAULTS)
                 .param("tenantId", tenantId)
@@ -90,6 +98,7 @@ public class JdbcModuleEntitlementRepository implements ModuleEntitlementReposit
 
     private static EntitlementRow map(ResultSet rs, int rowNum) throws SQLException {
         return new EntitlementRow(rs.getString("ipd_state"), instant(rs, "ipd_trial_ends_at"),
-                rs.getBoolean("hra_on"), rs.getInt("bed_limit"), instant(rs, "ipd_requested_at"));
+                rs.getBoolean("hra_on"), rs.getInt("bed_limit"), instant(rs, "ipd_requested_at"),
+                rs.getBoolean("pharmacy_on"));
     }
 }

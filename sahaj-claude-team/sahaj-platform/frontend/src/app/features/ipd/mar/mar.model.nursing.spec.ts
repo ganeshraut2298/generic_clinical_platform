@@ -2,6 +2,7 @@ import { ApiError, ProblemDetail } from '../../../core/http/problem-detail';
 import { AT_8AM, MAR_AS_OF, ORDER_PRN, PRN_LINE, doseOf, marOf, orderOf, slotOf } from './mar.fixtures';
 import {
   MISMATCH_LINE,
+  NO_CODE_LOADED,
   OVERRIDE_AFTER_MISMATCH,
   changedMarker,
   checkLines,
@@ -280,6 +281,22 @@ describe('MAR model, SAH-76 nursing integration', () => {
       const f = classifyGiveError(apiError(409, 'override-after-mismatch', ''));
       expect(f.kind).toBe('override-refused');
       expect(OVERRIDE_AFTER_MISMATCH).toContain('did not match in the last 15 minutes');
+    });
+
+    const NO_CODE_DETAIL = 'No code is loaded for this medicine. Use Manual override: Medicine has no barcode.';
+
+    it('409 no-code-loaded is its own kind (not a STOP, not a reload) with the contract detail', () => {
+      expect(
+        classifyGiveError(apiError(409, 'no-code-loaded', NO_CODE_DETAIL, { title: 'No code loaded' })),
+      ).toEqual({ kind: 'no-code-loaded', message: NO_CODE_DETAIL });
+    });
+
+    it('409 no-code-loaded without a detail uses the contract detail', () => {
+      expect(classifyGiveError(apiError(409, 'no-code-loaded', ''))).toEqual({
+        kind: 'no-code-loaded',
+        message: NO_CODE_DETAIL,
+      });
+      expect(NO_CODE_LOADED).toBe(NO_CODE_DETAIL);
     });
 
     it('409 dose-not-due reloads the MAR (also for a PRN dose outside its start and end)', () => {

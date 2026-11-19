@@ -23,8 +23,14 @@ class NavigationPolicyTest {
     }
 
     @Test
-    void hraOnAddsStaffForEveryRoleInBothModes() {
+    void hraOnAddsStaffForEveryRoleInBothModesExceptStoreStaff() {
         for (MembershipRole role : MembershipRole.values()) {
+            if (role == MembershipRole.STORE_STAFF) {
+                // SAH-78 security L6, DEC-068 Q2 A: every HRA endpoint refuses Store staff, so it gets no staff menu key
+                assertThat(NavigationPolicy.menuFor(role, "advanced", true)).as(role.name()).doesNotContain("staff");
+                assertThat(NavigationPolicy.menuFor(role, "simple", true)).as(role.name()).doesNotContain("staff");
+                continue;
+            }
             assertThat(NavigationPolicy.menuFor(role, "advanced", true)).as(role.name()).contains("staff");
             assertThat(NavigationPolicy.menuFor(role, "simple", true)).as(role.name()).contains("staff");
         }

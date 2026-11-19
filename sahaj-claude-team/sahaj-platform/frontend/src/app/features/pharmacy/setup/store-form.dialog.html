@@ -1,0 +1,166 @@
+<div class="sheet-h">
+  <div>
+    <h2 id="store-form-title">{{ editing ? 'Edit store' : 'Add a store' }}</h2>
+    <p>
+      @if (!editing && !data.hasCentral) {
+        Create the Central Store first. Every other store issues from it.
+      } @else {
+        Stores buy from the Central Store and issue to patients or wards.
+      }
+    </p>
+  </div>
+  <button mat-icon-button type="button" (click)="close()" aria-label="Close">
+    <app-icon name="x" />
+  </button>
+</div>
+
+<form class="sheet-b" [formGroup]="form" (ngSubmit)="save()" novalidate aria-labelledby="store-form-title">
+  <div class="grid">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" maxlength="60" autocomplete="off" data-testid="f-name" />
+      @if (message(form.controls.name, nameMessages); as text) {
+        <mat-error>{{ text }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Code</mat-label>
+      <input matInput formControlName="code" maxlength="10" autocomplete="off" data-testid="f-code" />
+      @if (message(form.controls.code, codeMessages); as text) {
+        <mat-error>{{ text }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Store type</mat-label>
+      <mat-select placeholder="Choose an option" formControlName="type" data-testid="f-type">
+        @for (type of typeOptions; track type) {
+          <mat-option [value]="type">{{ typeLabels[type] }}</mat-option>
+        }
+        @if (editing && data.store && !typeOptions.includes(data.store.type)) {
+          <mat-option [value]="data.store.type" disabled>{{ typeLabels[data.store.type] }}</mat-option>
+        }
+      </mat-select>
+      @if (message(form.controls.type, messages); as text) {
+        <mat-error>{{ text }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="fixed">
+      <span class="field-label">Issues from</span>
+      <span class="fixedv" data-testid="f-issues">{{ issuesFrom() }}</span>
+    </div>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Approver (HOD)</mat-label>
+      <mat-select placeholder="Choose an option" formControlName="hodMembershipId" data-testid="f-hod">
+        <mat-option value="">No approver</mat-option>
+        @for (c of hodOptions(); track c.membershipId) {
+          <mat-option [value]="c.membershipId">{{ c.name }} · {{ c.roleLabel }}</mat-option>
+        }
+      </mat-select>
+      @if (message(form.controls.hodMembershipId, messages); as text) {
+        <mat-error>{{ text }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Delegate approver</mat-label>
+      <mat-select placeholder="Choose an option" formControlName="delegateMembershipId" data-testid="f-delegate">
+        <mat-option value="">No delegate</mat-option>
+        @for (c of delegateOptions(); track c.membershipId) {
+          <mat-option [value]="c.membershipId">{{ c.name }} · {{ c.roleLabel }}</mat-option>
+        }
+      </mat-select>
+      @if (message(form.controls.delegateMembershipId, messages); as text) {
+        <mat-error>{{ text }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (delegateChosen()) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Delegate from</mat-label>
+        <input
+          matInput
+          [matDatepicker]="fromPicker"
+          formControlName="delegateFrom"
+          placeholder="24 Oct 2026"
+          autocomplete="off"
+          data-testid="f-delegate-from"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker" aria-label="Choose the start date" />
+        <mat-datepicker #fromPicker />
+        @if (message(form.controls.delegateFrom, messages); as text) {
+          <mat-error>{{ text }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Delegate until</mat-label>
+        <input
+          matInput
+          [matDatepicker]="toPicker"
+          formControlName="delegateTo"
+          [min]="today"
+          placeholder="24 Oct 2026"
+          autocomplete="off"
+          data-testid="f-delegate-to"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker" aria-label="Choose the end date" />
+        <mat-datepicker #toPicker />
+        @if (message(form.controls.delegateTo, messages); as text) {
+          <mat-error>{{ text }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Sale to patients</mat-label>
+      <mat-select placeholder="Choose an option" formControlName="saleAllowed" data-testid="f-sale">
+        <mat-option [value]="true">Yes</mat-option>
+        <mat-option [value]="false">No</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Consumption entry</mat-label>
+      <mat-select placeholder="Choose an option" formControlName="consumptionAllowed" data-testid="f-consumption">
+        <mat-option [value]="true">Yes</mat-option>
+        <mat-option [value]="false">No</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (candidatesLoading()) {
+    <p class="loading" role="status">Loading team members</p>
+  }
+  @if (candidatesError(); as text) {
+    <div class="notice err" role="alert">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ text }}</span>
+      <button mat-stroked-button type="button" (click)="loadCandidates()">Try again</button>
+    </div>
+  }
+  @if (data.store && data.store.lockedFields.length > 0) {
+    <div class="notice teal" data-testid="form-locked-note">
+      <app-icon name="lock" [size]="16" />
+      <span>Type, Issues from and code are locked because this store has stock.</span>
+    </div>
+  }
+  @for (text of extraErrors(); track text) {
+    <div class="notice err" role="alert"><app-icon name="alert" [size]="16" /><span>{{ text }}</span></div>
+  }
+  @if (formError(); as text) {
+    <div class="notice err" role="alert" data-testid="store-form-error">
+      <app-icon name="alert" [size]="16" />
+      <span>{{ text }}</span>
+    </div>
+  }
+</form>
+
+<div class="sheet-f">
+  <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+  <button mat-flat-button type="button" data-testid="save-store" [disabled]="saving()" (click)="save()">
+    {{ editing ? 'Save changes' : 'Create store' }}
+  </button>
+</div>

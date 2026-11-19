@@ -231,6 +231,10 @@ export const CHECKED_BY_LABEL = 'Checked by';
 export const CHOOSE_NURSE = 'Choose a nurse';
 export const THEIR_PIN_LABEL = 'Their PIN';
 export const PIN_PLACEHOLDER = '4 digits';
+/**
+ * The hasMedicineCode hint under the code box, and the contract's detail of 409 `no-code-loaded` (ipd.yaml 0.4.4):
+ * the same words, so it is also the fallback when the answer carries no detail. The problem title "No code loaded" is not shown.
+ */
 export const NO_CODE_LOADED =
   'No code is loaded for this medicine. Use Manual override: Medicine has no barcode.';
 export const STAT_NOTICE =
@@ -770,6 +774,7 @@ export type GiveFailure =
   | { kind: 'mismatch' }
   | { kind: 'code-mismatch'; message: string }
   | { kind: 'override-refused'; message: string }
+  | { kind: 'no-code-loaded'; message: string }
   | { kind: 'prn-lock'; message: string }
   | { kind: 'fields'; errors: GiveErrors; message: string }
   | { kind: 'pin'; message: string; focus: 'nurse' | 'pin'; ward: boolean }
@@ -864,6 +869,10 @@ export function classifyGiveError(error: unknown): GiveFailure {
       }
       if (slug === 'override-after-mismatch') {
         return { kind: 'override-refused', message: error.problem.detail || OVERRIDE_AFTER_MISMATCH };
+      }
+      if (slug === 'no-code-loaded') {
+        // 0.4.4 (H1, DEC-065 A): not a STOP. Nothing was stopped or recorded; the override is open to the nurse at once.
+        return { kind: 'no-code-loaded', message: error.problem.detail || NO_CODE_LOADED };
       }
       if (slug === 'prn-too-soon' || slug === 'prn-max-reached') {
         return { kind: 'prn-lock', message };

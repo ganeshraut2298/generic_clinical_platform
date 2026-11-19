@@ -58,6 +58,19 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
     private static final java.util.regex.Pattern FORM_SAVE_PATH = java.util.regex.Pattern.compile(
             "^/api/v1/opd/emr/forms(/f_[a-z2-7]{10}/draft)?$");
 
+    /**
+     * I21 (SAH-79 review round 5): 200 receipt lines are about 66 KB, over the 64 KB default, so the goods-receipt and the
+     * purchase-order write paths of the Pharmacy module (a create, a save, a post or a submit of one document, and the purchase
+     * orders made from the reorder list: from-suggestions) take up to 128 KB; so do the dispatch of an indent (200 lines) and the receipt of a
+     * dispatch (400 lines), SAH-79 WP-F. The path list is additive; every other path keeps its cap.
+     */
+    static final long PHARMACY_BUYING_MAX_BODY_BYTES = 128 * 1024;
+    private static final java.util.regex.Pattern PHARMACY_BUYING_PATH = java.util.regex.Pattern.compile(
+            "^/api/v1/pharmacy/stores/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/"
+                    + "(?:(?:goods-receipts|purchase-orders)(?:/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                    + "(?:/[a-z-]+)?|/from-suggestions)?"
+                    + "|indents/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/dispatches|dispatches/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/receipt)$");
+
     private final ProblemJsonWriter problemWriter;
     private final long signedInMaxBytes;
 
@@ -89,6 +102,9 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
         }
         if (FORM_SAVE_PATH.matcher(PATH_HELPER.getLookupPathForRequest(request)).matches()) {
             return Math.max(signedInMaxBytes, FORM_SAVE_MAX_BODY_BYTES);
+        }
+        if (PHARMACY_BUYING_PATH.matcher(PATH_HELPER.getLookupPathForRequest(request)).matches()) {
+            return Math.max(signedInMaxBytes, PHARMACY_BUYING_MAX_BODY_BYTES);
         }
         return signedInMaxBytes;
     }

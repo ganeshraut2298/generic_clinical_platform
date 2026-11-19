@@ -162,7 +162,7 @@ export class DoseErrorPanelComponent {
       .subscribe({
         next: (answer) => {
           this.running.set(false);
-          this.snackBar.open(inErrorToast(label), 'Close', sheetToast(8000, { announce: false }));
+          this.snackBar.open(inErrorToast(label), 'Close', sheetToast(8000));
           this.corrected.emit(answer.mar);
         },
         error: (error: unknown) => {

@@ -1,4 +1,4 @@
-<div class="sheet" [formGroup]="form" data-testid="give-sheet">
+<div class="sheet sticky-foot" [formGroup]="form" data-testid="give-sheet">
   <div class="sheet-h">
     <div>
       <h2 [id]="titleId">{{ title }}</h2>
@@ -111,8 +111,13 @@
             <app-icon name="alert" [size]="13" /> {{ message }}
           </span>
         }
+        @if (noCodeNotice(); as message) {
+          <span class="sfwarn" data-testid="no-code-notice">
+            <app-icon name="alert" [size]="13" /> {{ message }}
+          </span>
+        }
       </div>
-      @if (noCodeLine; as text) {
+      @if (showNoCodeHint() && noCodeLine; as text) {
         <small class="muted" data-testid="no-code-line">{{ text }}</small>
       }
     </div>

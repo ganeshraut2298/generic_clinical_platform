@@ -796,13 +796,44 @@ select.input {
 }
 
 // Mockup `.sheet.wide`: the footer stays at the bottom edge while the body scrolls (used by the
-// Medicines tab of the Nursing sheet, mockup `sfMar`).
-.sheet.wide .sheet-f {
+// Medicines tab of the Nursing sheet, mockup `sfMar`). `.sheet.sticky-foot` is the same rule for a
+// sheet that is not wide but can grow taller than the screen (the give sheet, SAH-76): the footer
+// buttons stay reachable. It is opt-in, so no other sheet changes.
+.sheet.wide .sheet-f,
+.sheet.sticky-foot .sheet-f {
   position: sticky;
   bottom: 0;
   background: var(--glass-hi);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
+}
+
+// A scroll to a box or a line (focus, scrollIntoView) must stop above the sticky footer, not under it.
+// The give sheet measures its footer (it wraps on a phone) into `--sheet-foot-h`; 5rem is one row of buttons.
+.sheet.sticky-foot {
+  scroll-padding-bottom: var(--sheet-foot-h, 5rem);
+}
+
+// The give sheet's header (title and Close) stays at the top of the scroll container: a focus scroll or a
+// scrollIntoView can not push Close off a phone screen, where there is no Esc. `--sheet-head-h` is measured by the give
+// sheet; 5rem is a one-line title.
+// The header must hide the fields that scroll under it, so it needs a surface that is not see-through. But the sheet
+// already is `--glass-hi`, and a second `--glass-hi` layer on top of it shows as a whiter band above the body (QA
+// defect 4). So the header paints `--sheet-solid` (_tokens.scss): the opaque colour that the sheet's own surface has at
+// rest, `--glass-hi` laid over the dimmed page behind the dialog. No translucent layer is added, so at rest it reads
+// as the mockup `.sheet-h`, which has no background of its own. The blur stays: on an opaque colour it changes nothing
+// you can see, and it keeps the header the same kind of layer as the sticky footer.
+.sheet.sticky-foot .sheet-h {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--sheet-solid);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.sheet.sticky-foot {
+  scroll-padding-top: var(--sheet-head-h, 5rem);
 }
 
 .sheet-h {

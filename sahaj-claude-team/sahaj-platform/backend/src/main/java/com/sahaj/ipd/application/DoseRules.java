@@ -58,7 +58,11 @@ final class DoseRules {
     static final String OVERRIDE_AFTER_MISMATCH_TITLE = "Override not allowed";
     static final String OVERRIDE_AFTER_MISMATCH =
             "A scan for this dose did not match in the last 15 minutes. Check the patient and the medicine, then scan the medicine code.";
-    static final String WRITE_WHAT_HAPPENED = "Write what happened.";
+    static final String NO_CODE_LOADED_PROBLEM = "no-code-loaded";
+    static final String NO_CODE_LOADED_TITLE = "No code loaded";
+    static final String NO_CODE_LOADED =
+            "No code is loaded for this medicine. Use Manual override: Medicine has no barcode.";
+    static final String WRITE_WHAT_HAPPENED ="Write what happened.";
     static final String CHOOSE_IN_ERROR = "Choose why it is in error.";
     static final String ONLY_CORRECTORS = "Only nurses and the clinic owner can correct a dose.";
     static final String ONLY_RECORDER = "Only the nurse who recorded this dose can undo it.";

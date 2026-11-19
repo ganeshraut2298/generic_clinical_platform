@@ -192,6 +192,8 @@ class Sah76MigrationIT extends BaseIntegrationTest {
 
     @Test
     void theGlobalReferenceDataIsSeededAndTheCodeListShipsEmpty() throws Exception {
+        // a QA code left by a killed run of another class is swept first (only the QAS76 prefix: a real code still fails the check)
+        Sah76NursingSupport.sweepQaMedicineCodes(db());
         db().asApp(c -> {
             assertThat(DbAccess.count(c, "select count(*) from ipd.drug where route_key is null or cardinality(dose_units) = 0")).isZero();
             assertThat(DbAccess.count(c, "select count(*) from ipd.drug")).isEqualTo(14);

@@ -6,6 +6,8 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
@@ -62,6 +64,39 @@ class ModularityTests {
                 .should().dependOnClassesThat().resideInAnyPackage("com.sahaj.billing..", "com.sahaj.ipd..");
         rule.check(productionClasses());
     }
+
+    /** ADR-028 D1 (a), SAH-78: nothing depends on {@code pharmacy}; it sits on top of the module graph. */
+    @Test
+    void noClassOutsidePharmacyDependsOnPharmacy() {
+        ArchRule rule = ArchRuleDefinition.noClasses().that().resideOutsideOfPackage("com.sahaj.pharmacy..")
+                .should().dependOnClassesThat().resideInAPackage("com.sahaj.pharmacy..");
+        rule.check(productionClasses());
+    }
+
+    /**
+     * ADR-028 D1 (b), SAH-78: {@code pharmacy} reaches every other module only through its {@code api} package (Phase 1
+     * uses {@code platform.api} only).
+     */
+    @Test
+    void pharmacyReachesOtherModulesOnlyThroughTheirApi() {
+        String[] internals = {"platform", "patient", "opd", "ipd", "hra", "billing"};
+        List<String> packages = new ArrayList<>();
+        for (String module : internals) {
+            for (String layer : new String[] {"application", "web", "domain", "infrastructure"}) {
+                packages.add("com.sahaj." + module + "." + layer + "..");
+            }
+        }
+        ArchRule rule = ArchRuleDefinition.noClasses().that().resideInAPackage("com.sahaj.pharmacy..")
+                .should().dependOnClassesThat().resideInAnyPackage(packages.toArray(new String[0]));
+        rule.check(productionClasses());
+    }
+
+    /*
+     * ADR-028 D1 (c), SAH-78 (code review F-15): the former rule "every @Table of com.sahaj.pharmacy names the schema pharmacy"
+     * passed trivially, because the module uses JDBC and has no entities. It is replaced by the SQL schema-prefix rule of
+     * PharmacySqlGuardrailsTest.onlyPharmacyAndPlatformTablesAreTouched: every table named in a pharmacy statement is written
+     * with the pharmacy schema.
+     */
 
     /** ADR-022 D1: the one new edge is {@code ipd -> billing.api}; ipd never reaches billing's internals. */
     @Test
