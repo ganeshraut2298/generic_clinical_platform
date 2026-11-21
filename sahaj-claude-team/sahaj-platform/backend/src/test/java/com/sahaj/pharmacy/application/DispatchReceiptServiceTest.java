@@ -75,16 +75,18 @@ class DispatchReceiptServiceTest {
     private final ReturnItemRepository returns = mock(ReturnItemRepository.class);
     private final ShortageRepository shortages = mock(ShortageRepository.class);
     private final StockRepository stock = mock(StockRepository.class);
+    private final ProductRepository products = mock(ProductRepository.class);
     private final StockPosting posting = mock(StockPosting.class);
     private final ScheduleXSignature signature = mock(ScheduleXSignature.class);
     private final ClientRequestRepository clients = mock(ClientRequestRepository.class);
     private final DocumentEventRepository events = mock(DocumentEventRepository.class);
     private final ActiveReasonService reasons = mock(ActiveReasonService.class);
     private final DispatchAssembler assembler = mock(DispatchAssembler.class);
+    private final TransferRepository transfers = mock(TransferRepository.class);
     private final AuditLog audit = mock(AuditLog.class);
     private final DispatchReceiptService service = new DispatchReceiptService(gate, guard, stores, indents, dispatches, returns,
-            shortages, stock, posting, signature, clients, events, reasons, assembler, audit,
-            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)));
+            shortages, stock, products, posting, signature, clients, events, reasons, assembler, audit,
+            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), transfers);
     private PharmacyCaller caller = new PharmacyCaller(TENANT, USER, ME, "Test Ward Nurse", "NURSE", List.of());
     private final Store ward = new Store(WARD, UNIT, "Test Ward 3B", "W3B", StoreType.WARD, CENTRAL, false, true, true, true, 0);
     private final DispatchViews.Dispatch view = new DispatchViews.Dispatch(DISPATCH, "IND-0012 / 1", "INDENT", INDENT, "IND-0012",
@@ -276,9 +278,9 @@ class DispatchReceiptServiceTest {
                         .extracting(f -> f.field() + ":" + f.message()).containsExactly(
                                 "lines[0].accepted:" + DispatchReceiptService.EXPIRED_MESSAGE));
 
-        when(reasons.isActive(TENANT, ReasonList.RECEIPT_REJECT, "receipt-reject.wrong-item")).thenReturn(true);
+        when(reasons.isActive(TENANT, ReasonList.RECEIPT_REJECT, "receipt-reject.near-expiry")).thenReturn(true);
 
-        run(body(1, input(LINE, "0", "18", "receipt-reject.wrong-item", false)), null);
+        run(body(1, input(LINE, "0", "18", "receipt-reject.near-expiry", false)), null);
 
         ArgumentCaptor<ReturnItemRepository.NewItem> item = ArgumentCaptor.forClass(ReturnItemRepository.NewItem.class);
         verify(returns).insert(eq(TENANT), item.capture());
@@ -286,7 +288,7 @@ class DispatchReceiptServiceTest {
     }
 
     @Test
-    void anOldDispatchVersionOrAReceivedDispatchIs409ChangedAndAReceivedLineSentAgainIs409DocState() {
+    void anOldDispatchVersionOrAReceivedDispatchIs409ChangedAndAReceivedLineSentAgainIs400Lines() {
         assertThatThrownBy(() -> run(body(0, input(LINE, "18", "0", null, false)), null))
                 .isInstanceOfSatisfying(PharmacyProblemException.class, e -> assertThat(e.slug()).isEqualTo("changed"));
         when(dispatches.findById(TENANT, DISPATCH)).thenAnswer(i -> Optional.of(row("RECEIVED", 2)));
@@ -299,7 +301,8 @@ class DispatchReceiptServiceTest {
         when(dispatches.unreceivedLines(TENANT, DISPATCH)).thenReturn(List.of(line(LINE_X, INDENT_LINE_X, PRODUCT_X, BATCH_X, 5,
                 true)));
         assertThatThrownBy(() -> run(body(2, input(LINE, "18", "0", null, false), input(LINE_X, "0", "0", null, true)), null))
-                .isInstanceOfSatisfying(PharmacyProblemException.class, e -> assertThat(e.slug()).isEqualTo("doc-state"));
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("lines:Send every line not yet received, once."));
         verify(posting, never()).post(any(), any());
     }
 
@@ -314,6 +317,63 @@ class DispatchReceiptServiceTest {
         assertThatThrownBy(() -> run(body(1, input(LINE, "0", "0", null, true)), null))
                 .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
                         .extracting(f -> f.field()).contains("lines[0].skipped"));
+    }
+
+    @Test
+    void anExpiredBatchRejectedWithAnyReasonButNearExpiryIs400OnTheReasonKey() {
+        when(stock.findBatch(eq(TENANT), any())).thenAnswer(i -> Optional.of(batch(i.getArgument(1), LocalDate.of(2026, 10, 31))));
+        for (String key : List.of(DAMAGED, SHORT, "receipt-reject.wrong-item", "receipt-reject.other")) {
+            when(reasons.isActive(TENANT, ReasonList.RECEIPT_REJECT, key)).thenReturn(true);
+            assertThatThrownBy(() -> run(body(1, input(LINE, "0", "18", key, false)), null))
+                    .as(key)
+                    .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                            .extracting(f -> f.field() + ":" + f.message()).containsExactly(
+                                    "lines[0].rejectReasonKey:" + DispatchReceiptService.EXPIRED_REASON_MESSAGE));
+        }
+        when(reasons.isActive(TENANT, ReasonList.RECEIPT_REJECT, "receipt-reject.near-expiry")).thenReturn(true);
+
+        run(body(1, input(LINE, "0", "18", "receipt-reject.near-expiry", false)), null);
+
+        verify(returns).insert(eq(TENANT), any());
+    }
+
+    @Test
+    void aLineSentTwiceOrMissingIsOneLinesErrorAndAMissingBatchIsNotFound() {
+        assertThatThrownBy(() -> run(body(1, input(LINE, "18", "0", null, false), input(LINE, "18", "0", null, false)), null))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("lines:" + DispatchReceiptService.LIST_EVERY));
+        withScheduleXLine();
+        assertThatThrownBy(() -> run(body(1, input(LINE, "18", "0", null, false)), null))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("lines:" + DispatchReceiptService.LIST_EVERY));
+        when(stock.findBatch(eq(TENANT), any())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> run(body(1, input(LINE, "18", "0", null, false)), null)).isInstanceOf(NotFoundException.class);
+        verify(posting, never()).post(any(), any());
+    }
+
+    @Test
+    void everyLineSkippedSaysThereIsNothingToReceive() {
+        withScheduleXLine();
+        when(dispatches.unreceivedLines(TENANT, DISPATCH)).thenReturn(List.of(line(LINE_X, INDENT_LINE_X, PRODUCT_X, BATCH_X, 5,
+                true)));
+        when(dispatches.lines(TENANT, DISPATCH)).thenReturn(List.of(line(LINE_X, INDENT_LINE_X, PRODUCT_X, BATCH_X, 5, true)));
+        assertThatThrownBy(() -> run(body(1, input(LINE_X, "0", "0", null, true)), null))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("lines:There is nothing to receive."));
+    }
+
+    @Test
+    void aLineIsScheduleXWhenOnlyTheProductIsAndANonPharmacistMustSkipIt() {
+        ProductRepository.Row x = mock(ProductRepository.Row.class);
+        when(x.schedule()).thenReturn("X");
+        ProductRepository.Full full = mock(ProductRepository.Full.class);
+        when(full.row()).thenReturn(x);
+        when(products.find(TENANT, PRODUCT)).thenReturn(Optional.of(full));
+
+        assertThatThrownBy(() -> run(body(1, input(LINE, "18", "0", null, false)), null))
+                .isInstanceOfSatisfying(com.sahaj.platform.api.ForbiddenException.class,
+                        e -> assertThat(e.getMessage()).isNotNull());
+        verify(posting, never()).post(any(), any());
     }
 
     // ---- replay ----

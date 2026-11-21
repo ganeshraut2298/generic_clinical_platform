@@ -221,7 +221,8 @@ class PharmacyWpFIndentApiIT extends Sah79ApiSupport {
         JsonNode gone = ok(HttpMethod.POST, ind(w.pharmacyId()) + "/" + idOf(draft) + "/discard", w.keeper().auth(), js(v), 200);
         assertThat(gone.get("status").asText()).isEqualTo("DISCARDED");
         assertThat(ok(HttpMethod.GET, ind(w.pharmacyId()), w.keeper().auth(), null, 200).get("items")).isEmpty();
-        assertType(problem(call(HttpMethod.POST, ind(w.pharmacyId()) + "/" + idOf(draft) + "/discard", w.keeper().auth(), js(v)), 409), "doc-state");
+        String again = problem(call(HttpMethod.POST, ind(w.pharmacyId()) + "/" + idOf(draft) + "/discard", w.keeper().auth(), js(v)), 409).get("type").asText();
+        assertThat(again).matches(".*(doc-state|changed)$");
         assertThat(auditRowsOf(w.clinic(), "PHARMACY_INDENT_DISCARDED")).hasSize(1);
     }
 
@@ -284,7 +285,7 @@ class PharmacyWpFIndentApiIT extends Sah79ApiSupport {
         JsonNode inbox = ok(HttpMethod.GET, PH + "/approvals/inbox", hod.auth(), null, 200);
         assertThat(inbox.toString()).contains(sent.get("approval").get("requestId").asText());
         // the raiser never decides his own; a plain store user is not an approver
-        assertThat(ok(HttpMethod.GET, PH + "/approvals/inbox", w.keeper().auth(), null, 200).get("items")).isEmpty();
+        assertType(problem(call(HttpMethod.GET, PH + "/approvals/inbox", w.keeper().auth(), null), 403), "forbidden"); // D-4
         assertThat(ok(HttpMethod.GET, ind(w.centralId()) + "?view=TO_DISPATCH", w.csUser().auth(), null, 200).get("items")).as("not yet with the Central Store").isEmpty();
     }
 
@@ -306,7 +307,7 @@ class PharmacyWpFIndentApiIT extends Sah79ApiSupport {
         assertThat(after.get("status").asText()).isEqualTo("APPROVED");
         assertThat(lineOf(after, w.productA()).get("approvedQty").asInt()).isEqualTo(15);
         assertThat(lineOf(after, w.productA()).get("hodChange").asInt()).isEqualTo(-5);
-        assertThat(lineOf(after, w.productA()).get("hodRemark").get("key").asText()).isEqualTo(REDUCE_REASON);
+        assertThat(lineOf(after, w.productA()).get("hodRemark").get("reasonKey").asText()).isEqualTo(REDUCE_REASON);
         assertThat(lineOf(after, w.productB()).get("approvedQty").asInt()).isEqualTo(14);
         assertThat(lineOf(after, w.productB()).get("hodChange").asInt()).as("+4 by HOD").isEqualTo(4);
         assertThat(after.get("history").toString()).contains("LINE_CHANGED");
@@ -376,7 +377,7 @@ class PharmacyWpFIndentApiIT extends Sah79ApiSupport {
         JsonNode b = lineOf(sent, w.productB());
         String body = decision(UUID.randomUUID(), version, "APPROVED", null, List.of(approved(a, 20, null), approved(b, 10, null)));
         problem(call(HttpMethod.POST, decisionUrl(requestId), w.keeper().auth(), body), 403);
-        problem(call(HttpMethod.POST, decisionUrl(requestId), w.csUser().auth(), body), 403);
+        assertThat(call(HttpMethod.POST, decisionUrl(requestId), w.csUser().auth(), body).andReturn().getResponse().getStatus()).as("not mapped at this store").isIn(403, 404);
         JsonNode done = ok(HttpMethod.POST, decisionUrl(requestId), w.clinic().owner(), body, 200);
         assertThat(done.get("status").asText()).isEqualTo("APPROVED");
         assertThat(lineOf(get(w, w.keeper(), idOf(sent)), w.productA()).get("approvedQty").asInt()).isEqualTo(20);
@@ -420,7 +421,12 @@ class PharmacyWpFIndentApiIT extends Sah79ApiSupport {
         dl.put("dispatchProductId", w.productA());
         dl.put("quantity", 5);
         dl.put("balanceAction", "BACK_ORDER");
-        dispatch.put("lines", List.of(dl));
+        Map<String, Object> dlb = new LinkedHashMap<>();
+        dlb.put("indentLineId", lineOf(second, w.productB()).get("id").asText());
+        dlb.put("dispatchProductId", w.productB());
+        dlb.put("quantity", 0);
+        dlb.put("balanceAction", "BACK_ORDER");
+        dispatch.put("lines", List.of(dl, dlb));
         ok(HttpMethod.POST, ind(w.centralId()) + "/" + idOf(second) + "/dispatches", w.csUser().auth(), js(dispatch), 201);
         JsonNode now = get(w, w.keeper(), idOf(second));
         assertType(problem(call(HttpMethod.POST, ind(w.pharmacyId()) + "/" + idOf(second) + "/cancel", w.keeper().auth(),

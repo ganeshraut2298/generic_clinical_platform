@@ -18,16 +18,17 @@ class StoreRulesTest {
     @Test
     void ownerDoctorNurseAndPharmacistMayHoldEveryStoreRole() {
         for (String role : List.of("OWNER", "DOCTOR", "NURSE", "PHARMACIST")) {
-            assertThat(TeamRoles.allowedStoreRoles(role)).as(role).containsExactlyInAnyOrder(StoreRole.values());
+            assertThat(TeamRoles.allowedStoreRoles(role)).as(role).containsExactlyInAnyOrder(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER,
+                    StoreRole.APPROVER, StoreRole.DELEGATE);
             assertThat(TeamRoles.mayApprove(role)).as(role).isTrue();
         }
     }
 
     @Test
-    void billingAndStoreStaffMayBeStoreUserOrCentralStoreUserOnly() {
+    void billingAndStoreStaffMayBeStoreUserCentralStoreUserOrCashierOnly() {
         for (String role : List.of("BILLING", "STORE_STAFF")) {
             assertThat(TeamRoles.allowedStoreRoles(role)).as(role)
-                    .containsExactlyInAnyOrder(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER);
+                    .containsExactlyInAnyOrder(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER, StoreRole.CASHIER);
             assertThat(TeamRoles.mayApprove(role)).as(role).isFalse();
         }
     }
@@ -48,7 +49,7 @@ class StoreRulesTest {
     @Test
     void thereIsNoPharmacistStoreRoleSoNobodyCanBeMappedAsAPharmacistWhoIsNotOne() {
         assertThat(StoreRole.values()).extracting(Enum::name)
-                .containsExactly("STORE_USER", "CENTRAL_STORE_USER", "APPROVER", "DELEGATE");
+                .containsExactly("STORE_USER", "CENTRAL_STORE_USER", "APPROVER", "DELEGATE", "CASHIER");
         for (String role : TEAM_ROLES) {
             for (StoreRole stored : StoreRole.values()) {
                 for (boolean consumption : new boolean[] {true, false}) {
@@ -77,33 +78,33 @@ class StoreRulesTest {
     void approverAndCurrentDelegateCanDoEverythingExceptUploadWhichIsPharmacistOnly() {
         for (StoreRole role : List.of(StoreRole.APPROVER, StoreRole.DELEGATE)) {
             StoreAccess nurse = StoreRules.access("NURSE", role, false);
-            assertThat(nurse).isEqualTo(new StoreAccess(true, true, true, false, true, false, true, false, true));
+            assertThat(nurse).isEqualTo(new StoreAccess(true, true, true, false, true, false, true, false, true, true, true, true, true, true, true, false));
             StoreAccess pharmacist = StoreRules.access("PHARMACIST", role, false);
-            assertThat(pharmacist).isEqualTo(new StoreAccess(true, true, true, true, true, true, true, true, true));
+            assertThat(pharmacist).isEqualTo(new StoreAccess(true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true));
         }
     }
 
     @Test
     void storeUserRaisesAndReceivesButDoesNotApproveAndConsumesOnlyWhereTheStoreAllowsIt() {
         assertThat(StoreRules.access("STORE_STAFF", StoreRole.STORE_USER, true))
-                .isEqualTo(new StoreAccess(true, false, true, false, true, false, true, false, false));
+                .isEqualTo(new StoreAccess(true, false, true, false, true, false, true, false, false, true, true, true, false, true, false, false));
         assertThat(StoreRules.access("STORE_STAFF", StoreRole.STORE_USER, false))
-                .isEqualTo(new StoreAccess(true, false, true, false, false, false, true, false, false));
+                .isEqualTo(new StoreAccess(true, false, true, false, false, false, true, false, false, true, true, false, false, true, false, false));
         assertThat(StoreRules.access("PHARMACIST", StoreRole.STORE_USER, false))
-                .isEqualTo(new StoreAccess(true, false, true, true, false, true, true, true, true));
+                .isEqualTo(new StoreAccess(true, false, true, true, false, true, true, true, true, true, true, false, true, true, false, true));
     }
 
     @Test
     void centralStoreUserReceivesAndUploadsButCannotRaiseAnIndentOrApprove() {
         assertThat(StoreRules.access("STORE_STAFF", StoreRole.CENTRAL_STORE_USER, false))
-                .isEqualTo(new StoreAccess(false, false, true, false, false, true, true, true, true));
+                .isEqualTo(new StoreAccess(false, false, true, false, false, true, true, true, true, true, true, false, true, true, false, false));
         assertThat(StoreRules.access("STORE_STAFF", StoreRole.CENTRAL_STORE_USER, true).consumeReturn()).isTrue();
     }
 
     @Test
     void theOwnerHasEveryCapabilityInEveryStoreExceptScheduleXWhateverTheMapping() {
         for (StoreRole stored : StoreRole.values()) {
-            assertThat(StoreRules.access("OWNER", stored, false)).isEqualTo(new StoreAccess(true, true, true, false, true, true, true, true, true));
+            assertThat(StoreRules.access("OWNER", stored, false)).isEqualTo(new StoreAccess(true, true, true, false, true, true, true, true, true, true, true, true, true, true, true, false));
         }
     }
 
@@ -117,6 +118,30 @@ class StoreRulesTest {
         assertThat(access.has(StoreCapability.CONSUME_RETURN)).isTrue();
         assertThat(access.has(StoreCapability.UPLOAD_OPENING_STOCK)).isFalse();
         assertThat(StoreAccess.NONE.has(StoreCapability.RECEIVE)).isFalse();
+    }
+
+    @Test
+    void theSevenAccessFlagsOf036FollowTheContractRules() {
+        StoreAccess owner = StoreRules.access("OWNER", StoreRole.APPROVER, false);
+        assertThat(owner.has(StoreCapability.START_COUNT)).isTrue();
+        assertThat(owner.has(StoreCapability.REVIEW_COUNT)).isTrue();
+        assertThat(owner.has(StoreCapability.HANDLE_SCHEDULE_X)).isFalse();
+        StoreAccess hod = StoreRules.access("PHARMACIST", StoreRole.APPROVER, true);
+        assertThat(hod.has(StoreCapability.REVIEW_COUNT)).isTrue();
+        assertThat(hod.has(StoreCapability.HANDLE_SCHEDULE_X)).isTrue();
+        StoreAccess user = StoreRules.access("NURSE", StoreRole.STORE_USER, true);
+        assertThat(user.has(StoreCapability.RETURN_DAMAGE)).isTrue();
+        assertThat(user.has(StoreCapability.DISPATCH_TRANSFER)).isTrue();
+        assertThat(user.has(StoreCapability.COUNT)).isTrue();
+        assertThat(user.has(StoreCapability.CONSUME)).isEqualTo(user.consumeReturn());
+        assertThat(user.has(StoreCapability.START_COUNT)).isFalse();
+        assertThat(user.has(StoreCapability.REVIEW_COUNT)).isFalse();
+        assertThat(user.has(StoreCapability.HANDLE_SCHEDULE_X)).isFalse();
+        assertThat(StoreRules.access("NURSE", StoreRole.STORE_USER, false).has(StoreCapability.CONSUME)).isFalse();
+        assertThat(StoreRules.access("STORE_STAFF", StoreRole.CENTRAL_STORE_USER, false).has(StoreCapability.START_COUNT)).isTrue();
+        assertThat(StoreRules.access("PHARMACIST", StoreRole.STORE_USER, false).has(StoreCapability.START_COUNT)).isTrue();
+        assertThat(StoreAccess.NONE.has(StoreCapability.COUNT)).isFalse();
+        assertThat(StoreAccess.NONE.has(StoreCapability.DISPATCH_TRANSFER)).isFalse();
     }
 
     // ---- the role that counts today ----

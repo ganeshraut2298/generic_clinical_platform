@@ -15,6 +15,17 @@ public interface AdmittedPatientsReader {
     record Admitted(UUID admissionId, String admissionNo, String patientName, String bed) {
     }
 
+    /** One IPD ward a ward store can be linked to. */
+    record Ward(UUID wardId, String name) {
+    }
+
+    /**
+     * The IPD wards of the unit (SAH-79-16, GET /ipd-wards).
+     *
+     * @throws IntegrationOffException while no reader is connected (the no-op)
+     */
+    List<Ward> wards(UUID tenantId);
+
     /**
      * The patients admitted to the ward now.
      *

@@ -125,15 +125,16 @@ class PharmacyFunctionGuardrailIT extends Sah79Support {
         Map<String, String> texts = new TreeMap<>();
         Map<String, List<String>> definers = definers(texts);
         // the winner is the highest file that defines the function
-        assertThat(definers.get("pharmacy.guard_stock_ledger_schedule_x")).hasSize(2);
-        assertThat(definers.get("pharmacy.guard_stock_ledger_schedule_x").get(1)).startsWith("V2026_12_17_1730");
+        // SAH-80 migration 1800 replaces it once more (six new types in the array)
+        assertThat(definers.get("pharmacy.guard_stock_ledger_schedule_x")).hasSize(3);
+        assertThat(definers.get("pharmacy.guard_stock_ledger_schedule_x").get(2)).startsWith("V2026_12_17_1800");
         assertThat(definers.get("pharmacy.guard_stock_audit_write")).hasSize(2);
         assertThat(definers.get("pharmacy.guard_stock_audit_write").get(1)).startsWith("V2026_12_17_1730");
         assertThat(definers.get("pharmacy.guard_opening_stock_import_update").get(definers.get("pharmacy.guard_opening_stock_import_update").size() - 1))
                 .startsWith("V2026_12_17_1710");
-        assertThat(definers.get("pharmacy.next_document_no").get(definers.get("pharmacy.next_document_no").size() - 1)).startsWith("V2026_12_17_1720");
+        assertThat(definers.get("pharmacy.next_document_no").get(definers.get("pharmacy.next_document_no").size() - 1)).startsWith("V2026_12_17_1800");
         for (String winner : List.of("pharmacy.guard_stock_ledger_schedule_x", "pharmacy.guard_stock_audit_write")) {
-            assertThat(bodyIn(texts.get(definers.get(winner).get(1)), winner)).as(winner).contains("second signer");
+            assertThat(bodyIn(texts.get(definers.get(winner).get(definers.get(winner).size() - 1)), winner)).as(winner).contains("second signer");
         }
     }
 

@@ -37,8 +37,10 @@ describe('InventoryPage', () => {
       'Batch inventory & expiry',
       'Store stock',
       'Stock adjustments',
+      'Stock transfer',
       'Approvals inbox',
       'Stock ledger',
+      'Reports',
     ]);
     expect(el.querySelector('[data-testid="inv-section-batches"]')?.getAttribute('aria-selected')).toBe('true');
     expect(el.querySelector('app-batch-inventory')).toBeTruthy();
@@ -47,7 +49,7 @@ describe('InventoryPage', () => {
 
   it('hides, not greys out, what a person who can only read stock cannot use', async () => {
     const el = await open(READ_ONLY_CONTEXT);
-    expect(tabs(el)).toEqual(['Batch inventory & expiry', 'Store stock']);
+    expect(tabs(el)).toEqual(['Batch inventory & expiry', 'Store stock', 'Stock transfer']);
     expect(el.querySelector('[data-testid="inv-section-approvals"]')).toBeNull();
     expect(el.querySelector('[data-testid="inv-section-adjustments"]')).toBeNull();
     expect(el.querySelector('[data-testid="inv-section-ledger"]')).toBeNull();

@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { newClientKey } from '../../../shared/client-key';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { loadErrorMessage, saveErrorMessage } from '../pharmacy-display.util';
-import { ActiveReason, ApprovalRequest } from '../pharmacy-inventory.model';
+import { ActiveReason, ApprovalSummary } from '../pharmacy-inventory.model';
 import { Indent, IndentLine } from '../pharmacy-indent.model';
 import { PharmacyApi } from '../pharmacy.api';
 import { SHEET_COLUMN_STYLES } from '../shared/sheet-column.styles';
@@ -358,7 +358,6 @@ export class IndentDetailDialog implements OnInit {
   protected readonly data = inject<IndentDetailData>(MAT_DIALOG_DATA);
 
   protected readonly indent = signal<Indent | null>(null);
-  private readonly request = signal<ApprovalRequest | null>(null);
   protected readonly reasons = signal<ActiveReason[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly formError = signal<string | null>(null);
@@ -396,13 +395,6 @@ export class IndentDetailDialog implements OnInit {
     this.indent.set(indent);
     this.approved.set(indent.lines.map((l) => String(l.approvedQty ?? l.requestedQty)));
     this.lineError.set(indent.lines.map(() => null));
-    const approval = indent.approval;
-    if (indent.status === 'WAITING_APPROVAL' && approval?.canDecide) {
-      this.api.approvalRequest(approval.requestId).subscribe({
-        next: (request) => this.request.set(request),
-        error: (error: unknown) => this.loadError.set(loadErrorMessage(error)),
-      });
-    }
   }
 
   protected chips(indent: Indent) {
@@ -475,8 +467,8 @@ export class IndentDetailDialog implements OnInit {
 
   protected approve(): void {
     const indent = this.indent();
-    const request = this.request();
-    if (this.saving() || !indent || !request || request.currentLevel === null) {
+    const request = this.indent()?.approval ?? null;
+    if (this.saving() || !indent || !request || request.levelNo === null) {
       return;
     }
     this.formError.set(null);
@@ -506,8 +498,8 @@ export class IndentDetailDialog implements OnInit {
 
   protected reject(): void {
     const indent = this.indent();
-    const request = this.request();
-    if (this.saving() || !indent || !request || request.currentLevel === null) {
+    const request = this.indent()?.approval ?? null;
+    if (this.saving() || !indent || !request || request.levelNo === null) {
       return;
     }
     this.formError.set(null);
@@ -519,22 +511,32 @@ export class IndentDetailDialog implements OnInit {
     this.decide(request, 'REJECTED', null, indent);
   }
 
-  private decide(request: ApprovalRequest, decision: 'APPROVED' | 'REJECTED', quantities: number[] | null, indent: Indent): void {
-    if (request.currentLevel === null) {
+  private decide(request: ApprovalSummary, decision: 'APPROVED' | 'REJECTED', quantities: number[] | null, indent: Indent): void {
+    if (request.levelNo === null) {
       return;
     }
     const note = this.note().trim();
     this.saving.set(true);
     this.api
-      .decideApproval(request.id, {
+      .decideApproval(request.requestId, {
         clientKey: this.clientKey,
-        level: request.currentLevel,
-        requestVersion: request.version,
+        level: request.levelNo,
+        requestVersion: request.requestVersion,
         decision,
         reasonKey: this.reasonKey(),
         note: note === '' ? null : note,
         ...(quantities
-          ? { indentLines: indent.lines.map((l, i) => ({ indentLineId: l.id, approvedQty: quantities[i] })) }
+          ? {
+              indentLines: indent.lines.map((l, i) => {
+                const remarked = quantities[i] < l.requestedQty;
+                return {
+                  indentLineId: l.id,
+                  approvedQty: quantities[i],
+                  remarkReasonKey: remarked ? this.reasonKey() : null,
+                  remarkNote: remarked && note !== '' ? note : null,
+                };
+              }),
+            }
           : {}),
       })
       .subscribe({

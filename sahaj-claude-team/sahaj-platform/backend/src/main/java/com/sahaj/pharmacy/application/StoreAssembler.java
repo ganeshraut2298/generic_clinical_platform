@@ -35,8 +35,11 @@ class StoreAssembler {
     private final StoreStaffRepository staff;
     private final TeamMemberPort team;
     private final PharmacyTime time;
+    private final AdmittedPatientsReader wardReader;
 
-    StoreAssembler(StoreRepository stores, StoreStaffRepository staff, TeamMemberPort team, PharmacyTime time) {
+    StoreAssembler(StoreRepository stores, StoreStaffRepository staff, TeamMemberPort team, PharmacyTime time,
+                   AdmittedPatientsReader wardReader) {
+        this.wardReader = wardReader;
         this.stores = stores;
         this.staff = staff;
         this.team = team;
@@ -62,12 +65,25 @@ class StoreAssembler {
         Set<UUID> memberIds = new HashSet<>();
         mappings.values().forEach(rows -> rows.forEach(row -> memberIds.add(row.membershipId())));
         Map<UUID, TeamMember> members = memberIds.isEmpty() ? Map.of() : team.findAll(tenantId, memberIds);
-        return every.stream().map(store -> view(store, byId, mappings.getOrDefault(store.id(), List.of()), members))
+        Map<UUID, UUID> linked = stores.linkedWards(tenantId);
+        Map<UUID, String> wardNames = linked.isEmpty() ? Map.of() : wardNames(tenantId);
+        return every.stream().map(store -> view(store, byId, mappings.getOrDefault(store.id(), List.of()), members,
+                        linked.get(store.id()), wardNames))
                 .toList();
     }
 
+    /** Ward names come from the IPD reader; while no reader is connected (phase 1) the name is a plain "Linked ward". */
+    private Map<UUID, String> wardNames(UUID tenantId) {
+        try {
+            return wardReader.wards(tenantId).stream()
+                    .collect(Collectors.toMap(AdmittedPatientsReader.Ward::wardId, AdmittedPatientsReader.Ward::name, (a, b) -> a));
+        } catch (IntegrationOffException off) {
+            return Map.of();
+        }
+    }
+
     private PharmacyViews.Store view(Store store, Map<UUID, Store> byId, List<StoreStaff> active,
-                                     Map<UUID, TeamMember> members) {
+                                     Map<UUID, TeamMember> members, UUID wardId, Map<UUID, String> wardNames) {
         StoreStaff hodRow = active.stream().filter(row -> row.storeRole() == StoreRole.APPROVER).findFirst().orElse(null);
         StoreStaff delegateRow = active.stream().filter(row -> row.storeRole() == StoreRole.DELEGATE).findFirst()
                 .orElse(null);
@@ -81,7 +97,8 @@ class StoreAssembler {
         return new PharmacyViews.Store(store.id(), store.name(), store.code(), store.type(),
                 store.issuesFromStoreId(), issuesFrom == null ? null : issuesFrom.name(), store.saleAllowed(),
                 store.consumptionAllowed(), hod, delegate, store.active() && hod != null && hod.canSignIn() ? "SET" : "NONE", staffCount,
-                store.active() ? "ACTIVE" : "INACTIVE", store.hasStock(), locked, store.version());
+                store.active() ? "ACTIVE" : "INACTIVE", store.hasStock(), locked, store.version(),
+                wardId == null ? null : new PharmacyViews.WardRef(wardId, wardNames.getOrDefault(wardId, "Linked ward")));
     }
 
     private static StorePerson person(StoreStaff row, Map<UUID, TeamMember> members) {

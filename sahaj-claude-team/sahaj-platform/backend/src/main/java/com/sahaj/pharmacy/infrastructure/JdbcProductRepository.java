@@ -32,7 +32,7 @@ public class JdbcProductRepository implements ProductRepository {
             coalesce(g.form, p.form) as form, coalesce(g.purchase_unit, p.purchase_unit) as purchase_unit,
             coalesce(g.issue_unit, p.issue_unit) as issue_unit, coalesce(g.conversion, p.conversion) as conversion,
             coalesce(g.hsn, p.hsn) as hsn, coalesce(g.gst_rate, p.gst_rate) as gst_rate,
-            coalesce(g.schedule, p.schedule) as schedule, coalesce(g.ndps, p.ndps) as ndps,
+            coalesce(p.schedule, g.schedule) as schedule, coalesce(g.ndps, p.ndps) as ndps,
             coalesce(g.sample, false) as sample, p.alias, p.barcode, p.returnable, p.preferred_vendor_id, p.has_stock,
             p.version, p.created_by,
             case when p.kind = 'OWN' then (case when p.status = 'ACTIVE' then 'ACTIVE' else 'INACTIVE' end)
@@ -44,6 +44,8 @@ public class JdbcProductRepository implements ProductRepository {
             """;
     private static final String FIND = "select " + PRODUCT_COLUMNS + PRODUCT_FROM
             + " where p.tenant_id = :tenantId and p.id = :id";
+    private static final String FIND_MANY = "select " + PRODUCT_COLUMNS + PRODUCT_FROM
+            + " where p.tenant_id = :tenantId and p.id in (:ids)";
     private static final String FIND_FOR_UPDATE = FIND + " for update of p";
     private static final String FIND_ADOPTED = "select " + PRODUCT_COLUMNS + PRODUCT_FROM
             + " where p.tenant_id = :tenantId and p.catalogue_product_id = :catalogueId";
@@ -217,6 +219,17 @@ public class JdbcProductRepository implements ProductRepository {
                 .optional();
     }
 
+
+    @Override
+    public java.util.Map<UUID, Full> findAll(UUID tenantId, java.util.Collection<UUID> productIds) {
+        java.util.Map<UUID, Full> out = new java.util.HashMap<>();
+        if (productIds.isEmpty()) {
+            return out;
+        }
+        jdbc.sql(FIND_MANY).param("tenantId", tenantId).param("ids", productIds).query(JdbcProductRepository::mapFull).list()
+                .forEach(f -> out.put(f.row().productId(), f));
+        return out;
+    }
     @Override
     public Optional<Full> findAdopted(UUID tenantId, UUID catalogueProductId) {
         return jdbc.sql(FIND_ADOPTED).param("tenantId", tenantId).param("catalogueId", catalogueProductId)

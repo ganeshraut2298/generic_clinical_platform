@@ -1498,3 +1498,215 @@ Status: DONE. pharmacy.yaml 0.3.5 (additive or wording; no path or status remove
 4. The two new receive rules (all lines skipped; an expired batch rejected with another reason): accepted.
 5. Java (WP-F, running): sends `requestVersion` and `levelNo` on every document that embeds the approval summary; fills `creditDays` from the vendor; allows a receipt of a PARTLY_RECEIVED dispatch with the remaining lines; `ruleVersionNo` 0 for a null rule version; the key `receipt-reject.near-expiry`.
 6. QA: the receive tests (a second receipt with the remaining lines; every line skipped; a non-pharmacist with `skipped: false`), the zero-quantity approval, `ruleVersionNo` 0.
+
+## 19 Nov 2026, 23:05 · Restart after the interrupted session: the human approved all stories and asked to finish end to end
+- The previous session ended while the java-developer (WP-F: dispatch, receipt, returns and shortages) and the qa-engineer were running. Their agents never reported. The tree has: the WP-F controllers (`IndentController`, `DispatchController`, `ReturnShortageController`) and services; `BUILT_SUB_STORIES` lists 79-11 to 79-13; new QA ITs (`PharmacyWpFIndentApiIT`, `PharmacyWpEReceiptApiIT`, `PharmacyWpEDebitNoteApiIT`, `PharmacyRound6ApiIT`, `PharmacyRound5DbIT`, `Sah79BuySupport`) and the e2e spec `pharmacy-indents-wpf.spec.ts`. None of it has been through a gate. The gate that was waiting was stopped with the session.
+- **Locks:** java frees about 00:15, angular about 23:20, QA about 23:45; db, architect and BA are free.
+- **Started now:** db-engineer (SAH-80 migrations 18xx to 23xx), code-reviewer and security-reviewer (round 6: the round 6 fixes and the unreported WP-F backend).
+- **Next, as the locks free:** angular (the WP-F fixes, then the WP-G and WP-H screens), QA (a gate on the whole tree, then the new ITs and e2e), java (check and finish WP-F, then WP-G 79-14 to 79-16, WP-H 79-17 to 79-19, then SAH-80 WP-I to WP-N).
+
+## Handoff SAH-80 migrations WP-I to WP-N - db-engineer to java-developer and qa-engineer - 19 Nov 2026, 23:30
+Status: DONE, 17 files written (V2026_12_17_1800 to 2300), NOT run against a database. Design note docs/database/SAH-80-sales.md (new); SAH-78-pharmacy-masters.md section 11 updated.
+- WP-I 1800 to 1850: touch-ups (CASHIER store role; unit return window, refund modes and Schedule X licence; CREDIT_NOTE and IPD_ISSUE_SLIP numbering; 9 new reason lists with 34 seed rows; 6 new ledger types), store bill series and counter, customer, held bill, bill, bill line, bill payment, credit note, refund and udhar ledger.
+- WP-J 1900 to 1920: discount request, H1 register (entries and reversals), Schedule X balance register.
+- WP-L 2000 and 2010: sales return and lines, pharmacist registration, an index for the activity feed.
+- WP-K 2100 and 2110: OPD dispense queue state, product links.
+- WP-M 2200 to 2220: IPD order supply and issue slip, ward return, discharge clearance, consumption charge columns.
+- WP-N 2300: day close. No report indexes (a to-do list with EXPLAIN reasons).
+- Two functions replaced from their latest bodies: next_document_no and guard_stock_ledger_schedule_x (winner 1800 for both). The java guardrail test entries change winners accordingly.
+Tech lead review: ACCEPTED, validation owed (decisions, auto, DEC-073):
+1. COUNTER_SALE_CANCELLED is taken OFF the Schedule X signer list. An owner may cancel any bill (OQ-80-37) and the owner cannot be a Schedule X signer actor, so the trigger would block a lawful cancellation; the cancel writes a reversal row in the registers. The other five SAH-80 ledger types stay on the list (WARD_RETURN_WASTAGE included). Since 1800 has not been applied anywhere, the db-engineer corrects the array in 1800 itself in its next run.
+2. The credit_note table (one number source for cancel refunds and sales returns): accepted. Allergy, substitution and H1 override records on bill_line: accepted.
+3. Restart each year for CREDIT_NOTE as for BILL: accepted (go-live G-22).
+4. Partitioning of bill and bill_line at scale: recorded for later (not now).
+5. The bill and line maths identities are database checks tied to ADR-030 S4; if the accountant changes rounding they change too.
+
+## Handoff - angular fixes, SAH-79 WP-G and WP-H screens, SAH-80 WP-I screens - angular-developer to qa-engineer - 20 Nov 2026, 00:10
+Status: DONE. Lint pass; pharmacy specs 77 files, 856 tests (tech lead re-run: see the line above); agent full run 376 files, 5,627 pass; build ok; validate frontend fails only on DEC-002. All new screens run on contract-shaped fixtures; the WP-G, WP-H and WP-I backends are not built yet.
+- Part 1 done: M-3 (receipt-reject.near-expiry), m-2 (partly received rows and banner), blocked vendors on the vendor return form with the warning, To (issuing store) from issuesFrom, requestVersion and levelNo, the indent chips.
+- Part 2: new Inventory tabs: Ward consumption, Return / damaged, Stock transfer, Stock audit (blind count sheet with no book quantity for any role; the variance review shows it to a reviewer; second signer for Schedule X), Reports (catalogue, CSV, print; the stock ledger wired). Not built: the audit plan table (no endpoint), valuation, non-moving, vendor performance and rate history reports (OQ-79-33).
+- Part 3: the Pharmacy tab with Command Center (a new-bill button and today bills; tiles wait for the WP-N endpoint) and POS billing (buyer types, FEFO cart priced by quote, bill discount, split payments, hold and resume, save and print, Schedule X signer, H1/X prescription card). Not built: WP-J screens to clear the checks (discount approval, substitution, allergy and H1 override), WP-K to WP-O, bill cancel and refund, customer create, the OPD and IPD queues (Not connected placeholder).
+Tech lead review: ACCEPTED, decisions (auto, DEC-073):
+1. Contract gaps for the architect (0.3.6): a read of the unit other stores for a transfer (non-owner); the sale-changed 409 member that carries the new quote; the unit hint and batch stock on the sale product read; a held bill cart carries product names; confirm the audit version equals the count sheet version; a report catalogue label for Sales and compliance and a vendor filter list; export-too-large as a blob error.
+2. The stray frontend/src/app/features/pharmacy/ed.tmp.mjs is a temp edit script of an earlier agent: the angular-developer deletes it in its next run.
+3. Next angular run: WP-J to WP-O screens for SAH-80 (discount approval, substitution, allergy and H1 override, sales return, registers, OPD and IPD dispensing, reports, day close) after the SAH-80 backend exists.
+
+## Java handoff · round 7 · 20 Nov 2026, 01:50 (PARTLY DONE)
+- Part 0 and Part 1 done (M-1, M-2, m-1, m-3, N-1, N-2, M4, L20, L21, I23, I24, I26, guardrail winners to 1800, inbox cap and batched reads for inbox and indent view). Not batched: adjustment view, receipt view, DispatchAssembler (bounded by document lines).
+- Part 2: only 79-14 built (store return, damage report: 4 operations). Not built: 79-15 transfers, 79-16 consumption, 79-17 stock audit with rule 24, 79-18/19 reports.
+- Part 3 (SAH-80 backend WP-I..N): not started.
+- Validation: no Maven run (QA's verify held the tree). Unit tests run with javac and JUnit: pharmacy 931/931 pass; all non-IT 6,524/6,529 (3 runner artifacts). A real mvn -o test is owed.
+- Asks: architect adds moreWaiting to ApprovalInboxPage, DamageReport.outcome wording, StoreAccess flags in server response; QA checks damage_report.approval_request_id attach with version bump, new ITs for round 7 items; a second report for the same batch is not blocked (409 at posting).
+- Next: java run 2 (79-15..79-19 with rule 24, then SAH-80 WP-I..N); QA gate on whole tree.
+
+## Architect handoff · contract 0.3.6 · 20 Nov 2026
+- pharmacy.yaml 0.3.6, pharmacy-sales.yaml 0.3.6, ADR-029 note N5. Added: moreWaiting, DamageReport.outcome wording, 7 StoreAccess flags (required), M4/L20/L21/I23 text, quantity 400 message, new read pharmacyListTransferStores, HeldBill.products, sale-changed quote payload, CountSheetPage.version = StockAudit.version, ReportCatalogue SALES_COMPLIANCE + label, ExportTooLarge problem+json, blocked vendors on vendor return.
+- Architect decisions: blind caller quantity messages carry no number; M4 binds transfer dispatch; new read rather than loosening pharmacyListStores.
+- For java: build pharmacyListTransferStores, HeldBill.products, ReportCatalogue.label; StoreAccess 7 flags; blind messages in StoreReturnService/DamageReportService; CSV errors as problem+json; IndentService.ALL_ZERO text; ReturnShortageService.settle guard (acceptReturn vs PURCHASE).
+- For angular: transfer form new read, export blob error parse, report group label, POS held products and sale-changed quote.
+- Open for human: moreWaiting screen text, damage-report outcome wording (not in mockup).
+- Note: java run 2 started before 0.3.6 landed; relay these items to it in the next brief.
+
+## QA handoff · rounds 6 and 7 · 20 Nov 2026 (gate NOT green)
+- Migrations 1740, 1750 and all 17 SAH-80 migrations (1800-2300) apply cleanly on sahaj_test.
+- `validate db` cannot pass: scripts/validate.mjs line 38 regex cuts pharmacy.h1_register_row at `h` (humans own scripts/). QA ran mvn verify directly.
+- Last full run: unit 6,504 (1 error), IT 3,620 (26 failures, 12 errors in 13 classes); after test fixes 9 classes pass; still failing: WpFDispatchReceipt 22/23, WpEDebitNote 11/14, WpEReceipt 16/18, ProductCatalogue 16/17, unit ReturnShortageServiceTest 1.
+- Defects D-QA-1..7 and D-QA-9 triaged in DEC-086. e2e: 199 pass, 9 fail in 4 tests (angular).
+- Not written: e2e for post-to-stock, Schedule X signer step, receiving/vendor-return screens.
+- Next: java run 2 (waiting on backend lock), then QA rerun; angular fixes; human asked to fix validate.mjs regex.
+
+## Angular handoff · 20 Nov 2026 (partly done)
+- Done: stray file deleted; HOD remarkReasonKey; vendor return uses row defaultCreditPercent; transfer-stores read; blob problem+json parsing in the interceptor; report group label; POS held-bill products and sale-changed quote; 7 StoreAccess flags (receipt posting uses receiveScheduleX); blind counter text; moreWaiting field (nothing shown).
+- SAH-80 screens built on fixtures: sales return (80-18), registers and compliance (80-9, 80-10, 80-19).
+- Not built: WP-J POS checks (discount approval, substitution, allergy, H1 override), WP-K OPD queue and Rx bill, WP-M IPD queue/pick list/ward returns/discharge clearance, WP-L (pharmacist return list, role card, audit card, export buttons), WP-N tiles and sales reports, bill cancel/refund, customer create. Day close (80-22) and WP-O have NO mockup screen: needs a human decision (DEC-061 rule 1).
+- Gate: lint pass, 5,639 unit tests pass, build ok; `validate frontend` fails only on the known DEC-002 flag (`--browsers=ChromeHeadless`, humans own scripts/).
+- Spec faults for QA: pharmacy-indents-wpf fefo-pick mock has the wrong shape (must be FefoPick {productId, requested, availableQty, shortBy, batches[]}); after Back-order the dialog needs the cs-change reason click.
+- Money note: sales return sends one refund; QA to test rounding (payment-mismatch) against real backend.
+
+## DB handoff · 20 Nov 2026
+- Migration 1800 corrected in place: COUNTER_SALE_CANCELLED removed from the Schedule X signer list (five SAH-80 types). Flyway checksum changed: sahaj_test and sahaj_dev must be recreated (create-database.mjs) before the next gate. MigrationFunctionGuardrailTest run owed.
+- Renaming pharmacy.h1_register_row not trivial (58 occurrences, 4 owners); cleaner fix is the validate.mjs line 38 regex `[a-z0-9_]+\.[a-z0-9_]+` (human).
+- stock_audit and damage_report guards allow the version bump and approval_request_id attach while WAITING_APPROVAL; stock_audit_line guard not reviewed (QA confirm).
+- For java: drop COUNTER_SALE_CANCELLED from ScheduleXSignature list if present; architect: ADR-029 P7 list.
+
+## Java handoff · round 8 (run 3) · 20 Nov 2026 (PARTLY DONE)
+- Done: QA defects D-QA-1,2 (derived PARTLY_DISPATCHED view; stored transition forbidden by trigger 1720), 4, 7; 7 StoreAccess flags; ALL_ZERO text; ReturnShortageService guards (sending store of a transfer can accept/settle); 79-15 transfers (6 ops incl. transfer-stores) and transfer receiving; 79-16 consumption 5 of 7 ops (ledger gains admission_id; patient entry answers integration-off in phase 1).
+- Not done: 79-16 listIpdWards/setLinkedWard; 79-17 audit + rule 24 blind count (gap: audited quantities visible to all), blind messages; 79-18/19 reports, label, CSV problem+json; HeldBill.products; SAH-80 WP-I..N (nothing built, no port beans).
+- Validation: targeted unit runs only (59 and 179 tests pass); no IT, new SQL unexecuted; no validate run.
+- Notes: notReceivedHours fixed 24 h; transfer value = qty x purchase rate no GST; transfer approval chip TRANSFER, actions APPROVE/REJECT.
+- Next: QA ITs for 79-15/16 with recreated databases; java run 4 for the remainder.
+
+## Java handoff · run 4 · 20 Nov 2026 (PARTLY DONE)
+- Built: 79-16 remainder (pharmacyListIpdWards, pharmacySetLinkedWard, Store.linkedWard, reader wards()); SAH-79-16 added to BUILT_SUB_STORIES. Stock audit repository (port + Jdbc, unrun SQL) only; no service/controller, so no blind-count leak yet (no audit can be opened).
+- Not built: 79-17 service/controller, rule 24 (BlindCount plan in handoff), 79-18/19 reports, SAH-80 WP-I..N, HeldBill.products. Day close and WP-O stay unbuilt.
+- Validation: javac+JUnit loop only (45 and 30 tests green); no ITs, no mvn verify.
+- Throughput note: each java run ends with its backend lock still held, so the next java run waits up to 2 h for staleness. Human could clear .claude/locks/backend.lock after a run, or change the hook to release on agent finish.
+
+## Java handoff · run 5 · 20 Nov 2026 (PARTLY DONE)
+- Built: 79-17 stock audit, all 10 operations (StockAuditService/Views/Controller, STOCK_AUDIT approval handler, approve-and-post, recount, stockMoved, consumption stockAuditLineId); rule 24 BlindCount applied to stock reads, transfer availableAtSender, adjustment view, insufficient-stock scrub in return/damage/transfer dispatch/consumption; numberless blind messages.
+- Not built: 79-18/79-19 reports (5 ops), ReportCatalogue.label, CSV problem+json; rule 24 not yet on indent view fields, replacement options, reorder suggestions, vendor-return eligible, indent dispatch/GRN/debit note insufficient-stock scrub; SAH-80; HeldBill.products.
+- Validation: javac+JUnit, pharmacy unit 995/995; no mvn, no ITs; all new SQL unexecuted.
+- Tech lead decision (architect question): a Schedule X audit variance needs a pharmacist at submit and at approve-and-post; an owner who is not a pharmacist cannot post it directly (second signer is another pharmacist). Accepted as consistent with Schedule X rules (go-live check for a pharmacist).
+- Next: java run 6 (reports, remaining rule 24 spots, SAH-80), QA run (ITs + gate) once the human answers the database question.
+
+## Java run 6 · BLOCKED (backend lock held by finished a48217; nothing built). Read-only plan for reports kept in its report: ReportDef enum, ReportRepository/Jdbc, ReportService, ReportController, CSV writer (BOM, formula neutralising); report access tiers; add export-too-large / range-too-long problem factories. Minor gap: stock-ledger label (use "Stock ledger (per product)"). Relaunch when the lock is stale.
+
+## Java handoff · run 7 · 20 Nov 2026 (PARTLY DONE)
+- Built: 79-18/79-19 reports (5 ops: ReportDef, Repository/Jdbc, Service, Csv, Controller; catalogue tiers; 50,000 cap; 12-month limit; CSV rules; audit); rule 24 on indent view, replacement csAvailable, reorder csStock, vendor-return eligible and insufficient-stock scrubs; TP-2/4/5/6 no-op port beans; SaleMath (GST, discount spread, round off). SAH-79-18/19 in BUILT_SUB_STORIES. Unit tests green (targeted). No IT; report SQL unexecuted (purchase discount derived; returns report from return_item + ledger; transfer register from dispatch tables).
+- Not built: all SAH-80 operations WP-I..N (stopped: capability layer missing, CASHIER/sell/StoreAccess change needs its own run). Day close, WP-O unbuilt.
+- Decisions: DEC-087 (round-off ties round down; capability layer is already designed in ADR-030, build first).
+- Next: java run 8 (capability layer, then WP-I..N); QA with databases.
+
+## Human answers · 20 Nov 2026 (go-live focus: next week, IPD + pharmacy + inventory)
+- QA may recreate sahaj_test and sahaj_dev and run mvn verify directly (QA uses a snapshot copy of backend/ so java can keep editing).
+- Day close (80-22) and WP-O: left out of go-live.
+- Backend lock: the human clears .claude/locks/backend.lock after each java run ends.
+- Plan: QA gate (running) | java run 8 = SAH-80 capability layer then WP-I..N | angular remaining SAH-80 screens | reviews round 7 | go-live checklist (G-items) for accountant/pharmacist.
+
+## QA handoff · 20 Nov 2026 (gate NOT run: two blockers)
+- Blocker 1 (human): the permission system refused database recreation by QA (create-database.mjs and psql drop). Also create-database.mjs does not drop existing databases, so a human must drop sahaj_test and sahaj_dev, then run the script (or Flyway repair as migrator). Every IT currently stops at Flyway checksum mismatch on 1800.
+- Blocker 2 (defect, java): the app does not start. ConflictingBeanDefinitionException: bean 'jdbcTransferRepository' in com.sahaj.pharmacy.infrastructure and com.sahaj.ipd.infrastructure.persistence. Fix: @Repository("pharmacyJdbcTransferRepository") in the pharmacy class. Check other same-named beans.
+- Test side done: DEC-086 items 3, 4; e2e indents spec fixed; new ITs written, not run: PharmacyWpGStoreUseApiIT (23), PharmacyWpHAuditReportsApiIT (18), Sah79StoreUseSupport; test plan sections 9, 10.
+- Next: human drops/recreates databases and clears backend.lock; java fixes bean name (first thing in run 8); QA reruns targeted classes then full verify on a fresh snapshot.
+
+## Java handoff · run 8 · 20 Nov 2026 (PARTLY DONE)
+- Fixed the startup defect (bean name pharmacyJdbcTransferRepository); no other clashes; new BeanNameUniquenessTest passes.
+- Capability layer built: StoreRole.CASHIER, 12 sale capabilities/flags, StoreRules/StoreAccessGuard.requireSale (404, 409 sale-not-allowed, 403), context capabilities, staff mapping CASHIER rule; tests StoreRulesSaleTest 10, StoreAccessGuardSaleTest 7.
+- SAH-80 operations built: 3 of 70 (list and put store bill series; role read-out). SAH-80-1 in BUILT_SUB_STORIES.
+- Not built: 67 operations (customers, patients, quote, create bill, bills, held bills, cancel, refund, discount, substitution, H1/Schedule X registers, sales return, licences, OPD/IPD queues, ward returns, command centre, sales reports). The sale transaction is the large piece.
+- Validation: pharmacy unit 1,053/1,061 (8 are runner artifacts); no DB, no IT.
+- Open for architect: does the owner's discount fall under his own SALE_DISCOUNT rule? (role read-out)
+- Next: java run 9 (customers, quote, create bill, bills), QA gate after the human recreates the databases.
+
+## Java run 9 · BLOCKED (backend lock held by finished aaca7826566bb6ae0; 0 of 20 operations built)
+- Findings for the next run: (1) patient.api has no search port; build pharmacySearchSalePatients on a pharmacy-owned no-op port answering 503 patients-unreachable (walk-in fallback) for now; a patient.api.PatientSearchPort is a patient-module change and stays a follow-up (not for this go-live). (2) DocType needs CREDIT_NOTE and IPD_ISSUE_SLIP (update MasterRulesTest line 139 and NumberingServiceTest line 243 to 12); ReasonList lacks the new lists. (3) add bill/cancel-refund services to LockOrderGuardTest.NUMBER_ISSUERS. (4) BUILT_SUB_STORIES needs 80-2..80-5 and a not-yet-built exclusion list for 80-20. (5) discount needing approval answers 409 discount-approval-needed until WP-J exists. (6) lock balances, pick FEFO in memory, then StockPosting.post. (7) quote and product search run the expiry sweep so use plain @Transactional.
+
+## Java handoff · run 10 (sale core) · 20 Nov 2026 (scope done)
+- Built 20 operations: customers (7), patients (2), product search and quote (2), held bills (4), create/list/get bill (3), cancel bill and refund (2). SAH-80 now 23 of 70 operations built (WP-I 22 of 23; link-bill-to-patient missing).
+- Also: DocType 12, ReasonList 20 lists, LockOrderGuardTest issuers, coverage test with UNBUILT_OPERATIONS list, rule 24 in sales, sale transaction order tested, 124 new unit tests (pharmacy package 1,182 of 1,186; 4 are runner artifacts). No ITs; new SQL unrun.
+- Not built (47): WP-J discount requests, substitute options, H1 and Schedule X registers; WP-K OPD queue and Rx; WP-L sales return, licences, pharmacist registrations, activity feed; WP-M IPD; WP-N command centre, reports, day close (out).
+- Decisions: DEC-088. Stray folder D:\c (class files outside repo; java's rm was denied): human can delete. QA: PharmacyReasonsTemplatesIT line 188 expects 20 lists now.
+
+## Java run 11 · BLOCKED (backend lock held by a07d6d66cd94aa96c, which has now finished; nothing built)
+- Cause: run 11 was launched while run 10 was still closing down. The lock goes stale 2 h after its last write or the human clears it.
+- Plan for the relaunch (27 ops, SAH-80 to 50 of 70): WP-J (discount requests 3, substitute options, H1 register 2, Schedule X register 3), WP-L (sales return 7, licences, pharmacist registrations 2, activity feed, link bill to patient), WP-N (command centre, SALES_COMPLIANCE reports), WP-K (6 ops answering 409 not-connected).
+- Design notes from the agent: createBill must load the discount request (status APPROVED, same store/cart digest/approved percent; else discount-approval-needed or discount-approval-void), store bill.discount_request_id; SALE_DISCOUNT and SALES_RETURN need ApprovalSubjectHandler beans; inbox skip of sales types stays until a Chip.SALES step (cross-cutting, own step); SaleRegisterRepository needs read/page methods and a RETURNED reversal.
+- The Stop hook's backend validation failed on the other agent's tree (output only access-log lines); treat the backend gate as unverified.
+
+## Java handoff · run 12 (WP-J, WP-L, WP-N, WP-K) · 21 Nov 2026 (PARTLY DONE)
+- SAH-80 is 51 of 70 operations built (28 new): WP-J 9, WP-L 12, WP-K 6 (queue 200 not connected; others 409 not-connected), WP-N command centre + SALES_COMPLIANCE report group (6 keys). Not built: WP-M (15, IPD side) and day close (4, out).
+- Approval handlers SALE_DISCOUNT and SALES_RETURN; Chip.SALES in inbox; createBill honours an approved discount request; cashier return O-8; return completion in one transaction; rule 24 in sales fields.
+- Tests: ~65 new unit tests; pharmacy package 1,251 of 1,259 pass (8 runner artifacts). No ITs, all new SQL unrun, no gate.
+- Decisions: DEC-089 (H1 report masking and record-access entries, command centre card isolation, held-bill discard withdraws request, others accepted).
+- Next: angular screens for WP-J/L/N/K; java run 13 fixes from DEC-089 and WP-M pharmacy side (no-op ports); human recreates databases; QA gate; reviews.
+
+## Angular handoff · SAH-80 screens · 21 Nov 2026 (DONE except listed)
+- Built: POS checks (discount approval card, substitute card, allergy and H1 override), customer create and receive payment, pharmacist return list and Accept return, role read-out and audit log cards, Command Center, bill cancel and refund, OPD queue (not-connected state), sales & compliance reports (catalogue-driven).
+- Gate: lint pass; 5,675 unit tests pass (37 new); build ok; `validate frontend` fails only on the known DEC-002 flag.
+- Not built: header buttons Export GST and Download inspection pack (stories say not built; GST register is the CSV report); pharmacist registration add/edit screens (not on the list: next run); live-prescription and expiry-bar links.
+- Contract gaps for architect: report groupBy and activity person filter; customer-phone-exists candidates in ProblemDetail; no pharmacist list read for the audit filter.
+- Next: QA (testids listed in handoff), architect contract touch-ups, java run 13 (DEC-089 fixes), angular small run (pharmacist registrations).
+
+## Architect handoff · contract 0.3.7 · 21 Nov 2026
+- pharmacy-sales.yaml and pharmacy.yaml 0.3.7: SetProductLink 409 not-connected; BillLineReasonInput (200); signed account amounts; creditLimitPaise 0; cancelled-bill refund 400 until modes ticked; sales-margin by day and store only; no activity person filter for go-live; customerCandidates documented; H1 report masking and record-access entries, export owner/pharmacist only; held-bill discard withdraws pending discount request.
+- Conflict found: mockup 05 shows the owner as Allow for the discount rule. DEC-090: the mockup wins (owner exempt); architect to correct item 7, java to change createBill, quote and read-out, QA to test.
+- Open: validate docs not run by the architect (I ran it: see below); register screen masking left as designed.
+
+## Architect correction (DEC-090) · BLOCKED by architecture lock held by finished aa2941c3e47cbca67
+- Edits ready (wording only) for pharmacy-sales.yaml 0.3.7: changelog item (g) rewritten (owner exempt; add correction sentence); pharmacyRoleReadout description and RoleReadout cells (owner always ALLOW, ruleText null); pharmacyCreateBill (owner discount saved without discountRequestId, any id sent by the owner ignored); pharmacyQuoteSale and SaleQuote.discount.approvalNeeded (always false for the owner); pharmacyRequestDiscountApproval (owner gets required false, no request); DiscountRequest.selfApprovalOnly (always false). pharmacy.yaml: one pointer line in changelog.
+- Java run 13 must implement DEC-090 from this list even before the contract text is corrected.
+- Relaunch the architect when the architecture lock frees.
+
+## Java handoff · run 13 · 21 Nov 2026 (DONE; SAH-80 backend 66 of 70)
+- DEC-090 done (owner exempt in quote, createBill, read-out; request answers required:false). DEC-089 done: H1 report masking per store pharmacist, record-access entries, export owner/pharmacist (PHARMACY_REGISTER_EXPORTED), held-bill discard withdraws pending discount request, command-centre cards in NESTED transactions (savepoints unverified on real manager).
+- WP-M 15 ops built as pharmacy-side no-ops (queue/lists 200 empty connected:false; writes 409 not-connected; get 404; pharmacyReturnsWaiting real for counter returns). Gaps: write bodies not validated (no-op answers first); chargesWaiting counts.consumption always 0.
+- Remaining 4 operations: day close (80-22), out of go-live scope. 
+- Tests: pharmacy package 1,269 of 1,277 (8 runner artifacts); no ITs; new SQL unrun; no gate.
+- Next: QA gate (needs human to drop/recreate sahaj_test and sahaj_dev), then code and security review round 7. Architect DEC-090 contract wording still pending (architecture lock).
+
+## Architect handoff · DEC-090 correction · 21 Nov 2026 (DONE; the earlier BLOCKED entry is resolved)
+- pharmacy-sales.yaml and pharmacy.yaml 0.3.7 corrected: owner exempt from SALE_DISCOUNT (read-out ALLOW, quote approvalNeeded false, createBill ignores owner discountRequestId, request returns required:false, selfApprovalOnly false). All "open for the human" flags removed. Wording only.
+- Recorded: H1 register screen stays unmasked for the HOD (legal record); only the report path masks (DEC-089/090); "pharmacist" = PHARMACIST member of that store (security to confirm).
+- QA tests: owner exempt on read-out, quote, createBill, request.
+
+## Angular handoff · small run · 21 Nov 2026 (PARTLY DONE)
+- Built: Command Center live-prescription row links (Bill/Issue, testid live-rx-open-<id>, only with OPD_QUEUE/IPD_QUEUE), 2 specs. Gate: lint pass, 5,677 tests pass, build ok; validate frontend fails only on the known DEC-002 flag.
+- NOT built (rule 1): pharmacist registration add/edit form. Mockup 05 Licences card is read-only (no add/edit control). Backend operations exist (owner only). Needs a human-approved design, or registrations are entered another way for go-live. Expiry-bar links not added (not in mockup 01).
+
+## QA handoff · SAH-80 · 21 Nov 2026 (PARTLY DONE; integration tests blocked on database)
+- DB check: `mvn verify` on a snapshot stops at Flyway checksum mismatch for 1800; a human must drop sahaj_test and sahaj_dev and run create-database.mjs.
+- Unit tests on a fresh snapshot: 6,875 run, 6 failures: 5 snapshot artifacts (docs/api read from repo root), 1 real (D-1). BeanNameUniquenessTest and ModularityTests pass.
+- ITs written and compiled, not run: Sah80SalesSupport, PharmacySalesCoreApiIT (14), PharmacySalesDiscountApiIT (7), PharmacySalesReturnApiIT (7), PharmacySalesRegistersApiIT (8), PharmacySalesCommandApiIT (7); PharmacyReasonsTemplatesIT now 20 lists. Not written: day close, link bill to patient, customer payments/udhar, substitution, allergy block, OPD Rx billing, IPD issue/ward returns, pharmacist registrations, store-path H1/X CSV exports.
+- e2e pharmacy-sales-wpl.spec.ts: 19 pass, 1 fail. Test plan SAH-79.md section 11 added.
+- Defects: D-1 java (CommandCentreService NESTED transactions break arch rule noPharmacyClassUsesRequiresNew); D-2 angular (POS invoice view overflows 387 px at 360 px width); D-3 cancel-not-allowed sentence shown for any reason (angular/architect align); D-4 MigrationFunctionGuardrailTest owed.
+- Next: java D-1, angular D-2/D-3, reviewers round 7, QA gate after human recreates databases.
+
+## Angular D-2/D-3 · BLOCKED by frontend lock (held by finished af7192c48545e69a7); plan kept
+- D-2: global table min-width 720px applies to the saved invoice table in pos.section.ts (not in .tbl-wrap). Fix: wrap in `.tbl-wrap` (data-testid invoice-table), add `#invoice { min-width: 0; overflow-wrap: anywhere; }`, print media rule; spec.
+- D-3: bill-detail.section.ts lines 317-319 hard-code the cancel sentence; use saveErrorMessage(e) (problem.detail); new bill-detail.section.spec.ts.
+- Relaunch when the frontend lock is free.
+
+## Code review round 7 · 21 Nov 2026: CHANGES REQUIRED (2 Major, 6 Minor, 3 Nit). Saved to docs/reviews/SAH-80-code.md; triage DEC-091 (discount approval single use + IST day, unique index via new additive migration; rule 24 probes; prefix cross-check). Unreviewed areas listed in the report: second pass after the gate.
+
+## Java handoff · D-1 fixed · 21 Nov 2026
+- CommandCentreService no longer uses TransactionTemplate/PROPAGATION_NESTED; each card runs in a JDBC savepoint via new port CardIsolation (application) and SavepointRunner (infrastructure, DataSourceUtils connection, release/rollback). Tests: CommandCentreServiceTest updated, SavepointRunnerTest new; targeted run incl. StoreAccessGuardConventionTest exited 0. Not run against PostgreSQL: QA to add an IT (failing card does not break the rest).
+
+## Security review round 7 · 21 Nov 2026: PASS WITH FINDINGS (0 Critical, 0 High, 2 Medium: M5 discount approval reuse, M6 Schedule X cancel signer record; 6 Low; 6 Info). Saved to docs/reviews/SAH-80-security.md; triage DEC-092. A java run 14 is queued for DEC-091 and DEC-092 items (backend lock).
+
+## DB handoff · single-use discount index · 21 Nov 2026
+- New migration V2026_12_17_2310__pharmacy_bill_discount_request_unique.sql: unique partial index uq_bill_discount_request on pharmacy.bill (tenant_id, discount_request_id) where not null, with a pre-check that raises on duplicates; no function (guardrail untouched). docs/database/SAH-80-sales.md updated. validate db not run (classifier denied; it rebuilds sahaj_test).
+- Approval time: use max approval_decision.decided_at of APPROVED rows for a request with status APPROVED, compared as IST date (approval_request has no decided_at; do not use updated_at).
+- For java: map SQLSTATE 23505 on uq_bill_discount_request to the discount-approval-void problem. Cancelled bills still count against the index. Old ix_bill_discount_request is redundant (drop later).
+
+## Code review round 7, second pass · 21 Nov 2026: CHANGES REQUIRED (6 Major, 12 Minor, 3 Nit). Saved to docs/reviews/SAH-80-code-pass2.md; triage DEC-093 (M4: db-engineer restores COUNTER_SALE_CANCELLED to the signer list in 1800; java queue now includes M1-M6 and the Minors).
+
+## Architect handoff · contract and ADR 0.3.8 · 21 Nov 2026 (DONE; open points in DEC-093 addendum)
+- pharmacy-sales.yaml and pharmacy.yaml 0.3.8; ADR-030 S2, S3, S5, S6, S7, S10, S14, new S15 (owner and Schedule X) and S16 (blind count on sale reads), go-live checklist GL-1..GL-4 (discount limit, DPDP notice, refund modes, Schedule X cancel fix).
+- Decisions: discount approval valid only if raised by the seller, on the IST day of approval, unused (void otherwise; quote status VOID, save 409 discount-approval-void); blind caller = readStock and not reviewCount (CASHIER stays blind, count false); blind quote names only the first FEFO batch; owner cancel of Schedule X bill 403 pharmacist-required, canceller and signer recorded plus SECOND_SIGNATURE event; bulk exports write record-access entries before any CSV byte.
+- Open for human: cashier cell 'Discount above 10%' (mockup Deny vs OQ-80-8); DPDP notice wording; discount-approval-void sentence not stated.
+- Java must use READ_STOCK (not COUNT) in BlindCount and the explicit CASHIER case.
+
+## BA handoff · go-live checklist · 21 Nov 2026 (DONE)
+- docs/requirements/SAH-80.md has a GO-LIVE CHECKLIST: A setup steps S1-S12, B rules as built CL-1..CL-27 (who confirms, yes/no question), C engineering gates (Schedule X cancel signer, H1 masking, single-use discount approval, prefix collision, pass-2 Majors M1/M2/M3/M5/M6, blind-count leaks, card isolation, third review pass, database run of the ITs), D mockup deviations D-1..D-11, E not in this release, F sign-off. Pointers added to SAH-78.md and SAH-79.md.
+- Open for human: pharmacist registration number printing without a registration form (BR-9, BR-28); keep "Save to customers" before the DPDP wording is approved; fix mockup 05 cashier cell; OQ-78-8 (who may read masters).
+- Tech lead: mark each section C gate closed as it is fixed and tested.

@@ -10,5 +10,10 @@ public enum StoreRole {
     /** The store's HOD; at most one ACTIVE per store. */
     APPROVER,
     /** Dates required (at most 90 days); at most one ACTIVE per store. */
-    DELEGATE
+    DELEGATE,
+    /**
+     * SAH-80 (DEC-074 OQ-80-36): team roles BILLING and STORE_STAFF only, at an ACTIVE sale-allowed store that is not the
+     * Central Store.
+     */
+    CASHIER
 }

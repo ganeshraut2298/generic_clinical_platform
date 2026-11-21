@@ -77,9 +77,10 @@ class StockAdjustmentServiceTest {
     private final ScheduleXSignature signature = mock(ScheduleXSignature.class);
     private final TeamMemberPort team = mock(TeamMemberPort.class);
     private final AuditLog audit = mock(AuditLog.class);
+    private final StockAuditRepository auditRows = mock(StockAuditRepository.class);
     private final StockAdjustmentService service = new StockAdjustmentService(gate, guard, stores, products, stock, posting,
             adjustments, engine, approvals, series, numbers, clients, events, reasons, signature, team, audit,
-            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)));
+            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), new BlindCount(auditRows));
     private final Store store = new Store(STORE_ID, UNIT, "Test Ward 3B", "W3B", StoreType.WARD, UUID.randomUUID(), false, true,
             true, true, 0);
     private PharmacyCaller caller = new PharmacyCaller(TENANT, USER, ME, "Test Pharmacist One", "PHARMACIST", List.of());
@@ -124,6 +125,34 @@ class StockAdjustmentServiceTest {
 
     private PharmacyViews.Outcome<StockViews.StockAdjustment> create(PharmacyInputs.StockAdjustmentCreate in, UUID signer) {
         return service.create(TENANT, USER, STORE_ID.toString(), PharmacyInputs.Body.of(in), signer);
+    }
+
+    @Test
+    void aBlindCallerReadsNoBookOrPhysicalQuantityOfAnAuditedProductButStillTheDifferenceAndValue() {
+        com.sahaj.pharmacy.domain.StoreRole role = com.sahaj.pharmacy.domain.StoreRole.STORE_USER;
+        caller = new PharmacyCaller(TENANT, USER, ME, "Test Store User", "STORE_STAFF", List.of(new PharmacyCaller.Mapping(store,
+                null, role, com.sahaj.pharmacy.domain.StoreRules.access("STORE_STAFF", role, false))));
+        when(auditRows.openAuditProducts(TENANT, STORE_ID)).thenReturn(java.util.Set.of(PRODUCT));
+
+        StockViews.StockAdjustment view = service.get(TENANT, USER, STORE_ID.toString(), UUID.randomUUID().toString());
+
+        assertThat(view.bookQty()).isNull();
+        assertThat(view.physicalQty()).isNull();
+        assertThat(view.difference()).isEqualTo(-2);
+        assertThat(view.valuePaise()).isEqualTo(900L);
+    }
+
+    @Test
+    void aBlindCallerWhoseBookQuantitySeenIsStaleIsAnsweredChangedWithNoCurrentValue() {
+        com.sahaj.pharmacy.domain.StoreRole role = com.sahaj.pharmacy.domain.StoreRole.STORE_USER;
+        caller = new PharmacyCaller(TENANT, USER, ME, "Test Store User", "STORE_STAFF", List.of(new PharmacyCaller.Mapping(store,
+                null, role, com.sahaj.pharmacy.domain.StoreRules.access("STORE_STAFF", role, false))));
+        when(auditRows.openAuditProducts(TENANT, STORE_ID)).thenReturn(java.util.Set.of(PRODUCT));
+
+        assertThatThrownBy(() -> create(input(39, 38, null), null)).isInstanceOfSatisfying(PharmacyProblemException.class, e -> {
+            assertThat(e.slug()).isEqualTo("changed");
+            assertThat(e.extensions()).doesNotContainKey("current");
+        });
     }
 
     @Test

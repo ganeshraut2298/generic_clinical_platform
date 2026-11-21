@@ -68,6 +68,8 @@ describe('StockAdjustmentsSection', () => {
         status: 'REJECTED',
         approval: {
           requestId: 'r',
+          requestVersion: 1,
+          levelNo: null,
           status: 'REJECTED',
           currentLevel: null,
           ruleText: 'x',

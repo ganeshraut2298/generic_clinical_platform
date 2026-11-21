@@ -90,4 +90,15 @@ describe('problemDetailInterceptor', () => {
     controller.expectOne('/x').flush({ ok: true });
     expect(result).toEqual({ ok: true });
   });
+
+  it('parses a blob error body as problem+json (CSV export errors, contract 0.3.6)', async () => {
+    let caught: unknown;
+    http.get('/csv', { responseType: 'blob' }).subscribe({ error: (e: unknown) => (caught = e) });
+    const body = JSON.stringify({ type: 'https://sahaj.in/problems/export-too-large', title: 'Too large', status: 409, detail: 'Narrow the date range.' });
+    controller.expectOne('/csv').flush(new Blob([body], { type: 'application/problem+json' }), { status: 409, statusText: 'Conflict' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(caught).toBeInstanceOf(ApiError);
+    expect((caught as ApiError).problem.detail).toBe('Narrow the date range.');
+    expect((caught as ApiError).status).toBe(409);
+  });
 });

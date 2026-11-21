@@ -112,10 +112,9 @@ export function indentChips(indent: Indent): Chip[] {
     allDispatchesReceived: allReceived && !rejectedOrShort,
     backOrderProduct: open ? open.product.name : null,
   });
-  const list: Chip[] = [main];
-  if (indent.status === 'RECEIVED') {
-    list[0] = main;
-  }
+  // The rejected and short chips win over the back-order label (mockup 10): "Received" plus the chip.
+  const winsOver = rejectedOrShort && allReceived && indent.status === 'PARTLY_DISPATCHED';
+  const list: Chip[] = [winsOver ? { text: 'Received', css: 'p-good' } : main];
   if (chips.rejectedWaitingCs > 0) {
     list.push({ text: `· ${chips.rejectedWaitingCs} rejected, waiting for CS`, css: 'p-warn' });
   }

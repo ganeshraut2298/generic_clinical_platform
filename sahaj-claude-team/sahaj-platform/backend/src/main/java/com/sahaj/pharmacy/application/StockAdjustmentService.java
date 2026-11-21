@@ -72,13 +72,14 @@ public class StockAdjustmentService implements ApprovalSubjectHandler {
     private final TeamMemberPort team;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final BlindCount blind;
 
     public StockAdjustmentService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, ProductRepository products,
                                   StockRepository stock, StockPosting posting, StockAdjustmentRepository adjustments,
                                   ApprovalEngine engine, ApprovalRepository approvals, DocumentSeriesRepository series,
                                   DocumentNumberPort numbers, ClientRequestRepository clients, DocumentEventRepository events,
                                   ActiveReasonService reasons, ScheduleXSignature signature, TeamMemberPort team,
-                                  AuditLog auditLog, PharmacyTime time) {
+                                  AuditLog auditLog, PharmacyTime time, BlindCount blind) {
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -97,6 +98,7 @@ public class StockAdjustmentService implements ApprovalSubjectHandler {
         this.team = team;
         this.auditLog = auditLog;
         this.time = time;
+        this.blind = blind;
     }
 
     // ---- reads ----
@@ -238,7 +240,7 @@ public class StockAdjustmentService implements ApprovalSubjectHandler {
             throw new InvalidFieldsException(errors);
         }
         if (seen.intValue() != book.intValue()) {
-            throw PharmacyProblemException.changed(currentBook(batch, book));
+            throw PharmacyProblemException.changed(blind.hides(caller, storeId, batch.productId()) ? null : currentBook(batch, book));
         }
         if (adjustments.waitingFor(tenantId, storeId, batch.id())) {
             throw PharmacyProblemException.adjustmentWaiting();
@@ -264,7 +266,7 @@ public class StockAdjustmentService implements ApprovalSubjectHandler {
                 .filter(b -> b.batchId().equals(batch.id()) && b.state() == StockState.AVAILABLE).mapToInt(b -> b.qty())
                 .findFirst().orElse(0);
         if (lockedBook != seen.intValue()) {
-            throw PharmacyProblemException.changed(currentBook(batch, lockedBook));
+            throw PharmacyProblemException.changed(blind.hides(caller, storeId, batch.productId()) ? null : currentBook(batch, lockedBook));
         }
 
         int difference = physical - lockedBook;
@@ -288,8 +290,12 @@ public class StockAdjustmentService implements ApprovalSubjectHandler {
             adjustments.attachRequest(tenantId, id, requestId, me);
             events.insert(tenantId, store.unitId(), DOC_TYPE, id, "SUBMITTED", storeId, me, null, null, null, null, null);
         } else {
-            postMovement(tenantId, store.unitId(), me, signer, null, id, docNo, storeId, batch, difference, in.reasonKey(),
-                    in.correctsLedgerId());
+            try {
+                postMovement(tenantId, store.unitId(), me, signer, null, id, docNo, storeId, batch, difference, in.reasonKey(),
+                        in.correctsLedgerId());
+            } catch (PharmacyProblemException refused) {
+                throw blind.scrub(caller, storeId, refused);
+            }
             events.insert(tenantId, store.unitId(), DOC_TYPE, id, "POSTED", storeId, me, null, null, lockedBook, physical,
                     in.reasonKey());
             auditLog.record("PHARMACY_STOCK_ADJUSTMENT_POSTED", ENTITY_TYPE, id, null, values(storeId, batch.id(), lockedBook,
@@ -413,19 +419,22 @@ public class StockAdjustmentService implements ApprovalSubjectHandler {
         Store store = storeById.get(row.storeId());
         ProductRepository.Row p = products.find(tenantId, row.productId()).map(ProductRepository.Full::row).orElseThrow();
         BatchRow batch = stock.findBatch(tenantId, row.batchId()).orElseThrow();
+        // rule 24: a blind caller gets no book or physical quantity of an audited product, nor the history quantities;
+        // the difference and the value record the movement and stay
+        boolean hidden = blind.hides(caller, row.storeId(), row.productId());
         List<StockViews.HistoryEvent> historyViews = new ArrayList<>();
         for (DocumentEventRepository.Event e : history) {
             Store eventStore = storeById.get(e.storeId());
             historyViews.add(new StockViews.HistoryEvent(e.event(), e.occurredAt(),
                     e.actorMembershipId() == null ? null : person(e.actorMembershipId(), members), e.actingAs(),
-                    eventStore == null ? null : OpeningStockPostService.storeRef(eventStore), null, e.qtyBefore(),
-                    e.qtyAfter(), engine.reasonRef(tenantId, e.reasonKey(), null)));
+                    eventStore == null ? null : OpeningStockPostService.storeRef(eventStore), null,
+                    hidden ? null : e.qtyBefore(), hidden ? null : e.qtyAfter(), engine.reasonRef(tenantId, e.reasonKey(), null)));
         }
         return new StockViews.StockAdjustment(row.id(), row.docNo(), store == null ? null : OpeningStockPostService.storeRef(store),
                 new StockViews.ProductRef(p.productId(), p.code(), p.name(), p.strength(), p.form(), p.schedule(),
                         p.purchaseUnit(), p.issueUnit(), p.conversion(), PurchaseMath.percentText(p.gstRate())),
-                new StockViews.BatchRef(batch.id(), batch.batchNo(), batch.expiryDate()), row.bookQty(), row.physicalQty(),
-                row.difference(), row.valuePaise(), engine.reasonRef(tenantId, row.reasonKey(), row.note()),
+                new StockViews.BatchRef(batch.id(), batch.batchNo(), batch.expiryDate()), hidden ? null : row.bookQty(),
+                hidden ? null : row.physicalQty(), row.difference(), row.valuePaise(), engine.reasonRef(tenantId, row.reasonKey(), row.note()),
                 person(row.createdBy(), members), row.createdAt(),
                 row.secondSignerMembershipId() == null ? null : person(row.secondSignerMembershipId(), members), row.status(),
                 engine.summary(caller, DOC_TYPE, row.id()), historyViews, row.version());

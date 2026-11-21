@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { MonoTypeOperatorFunction, Observable, throwError, timeout } from 'rxjs';
+import { EMR_REQUEST_TIMEOUT_MS, noAnswerError } from './emr-errors';
 import {
   EmrAllergyClass,
   EmrCasePaperContext,
@@ -84,6 +85,14 @@ export interface ServiceHit {
 }
 
 /**
+ * A draft save, finish check or sign that has not answered after EMR_REQUEST_TIMEOUT_MS ends with
+ * "We could not reach the server. Try again." instead of leaving the screen waiting for ever.
+ */
+function answerInTime<T>(): MonoTypeOperatorFunction<T> {
+  return timeout<T, Observable<never>>({ first: EMR_REQUEST_TIMEOUT_MS, with: () => throwError(() => noAnswerError()) });
+}
+
+/**
  * The only place that calls the Doctor EMR endpoints (`/api/v1/opd/emr/**`, opd.yaml 0.3.0) and the
  * lookups the Search list field uses. Visit type change (`PATCH /visits/{id}/visit-type`) lives here
  * too, because only the EMR header uses it.
@@ -149,7 +158,7 @@ export class EmrApi {
   }
 
   saveRecordDraft(recordId: string, body: EmrRecordDraftInput): Observable<EmrRecordView> {
-    return this.http.put<EmrRecordView>(`${this.emr}/records/${recordId}/draft`, body);
+    return this.http.put<EmrRecordView>(`${this.emr}/records/${recordId}/draft`, body).pipe(answerInTime());
   }
 
   switchDepartment(recordId: string, body: EmrSwitchDepartmentInput): Observable<EmrRecordView> {
@@ -178,14 +187,16 @@ export class EmrApi {
 
   /** SAH-51-1. "Check before completing": readiness and the effects of the sign. */
   finishCheck(recordId: string, choices: EmrFinishChoices): Observable<EmrFinishCheck> {
-    return this.http.post<EmrFinishCheck>(`${this.emr}/records/${recordId}/finish-check`, choices);
+    return this.http.post<EmrFinishCheck>(`${this.emr}/records/${recordId}/finish-check`, choices).pipe(answerInTime());
   }
 
   /** SAH-51-2. One action; the same Idempotency-Key with the same body answers the first result. */
   sign(recordId: string, body: EmrSignInput, idempotencyKey: string): Observable<EmrSignResult> {
-    return this.http.post<EmrSignResult>(`${this.emr}/records/${recordId}/sign`, body, {
-      headers: { 'Idempotency-Key': idempotencyKey },
-    });
+    return this.http
+      .post<EmrSignResult>(`${this.emr}/records/${recordId}/sign`, body, {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      })
+      .pipe(answerInTime());
   }
 
   takeEditHold(recordId: string, takeOver: boolean): Observable<EmrEditHold> {

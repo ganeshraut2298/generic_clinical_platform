@@ -26,13 +26,35 @@ export interface StoreAccess {
   readStock?: boolean;
   postOpeningStock?: boolean;
   adjustStock?: boolean;
-  startCount?: boolean;
-  handleScheduleX?: boolean;
+  startCount: boolean;
+  handleScheduleX: boolean;
   /** 0.3.3 (work package F): what the server lets this person do at the store. */
   purchase?: boolean;
-  dispatchTransfer?: boolean;
+  dispatchTransfer: boolean;
   acceptReturn?: boolean;
-  returnDamage?: boolean;
+  returnDamage: boolean;
+  /** 0.2.0: the store's Consumption entry is Yes and the person may record it. */
+  consume: boolean;
+  /** 0.2.0: any ACTIVE mapping; OWNER. May count (blind). */
+  count: boolean;
+  /** 0.2.0: HOD, current delegate, OWNER. Sees the book quantity after submit. */
+  reviewCount: boolean;
+  /** 0.3.0 (SAH-80): saleAllowed store and a mapped PHARMACIST member, a CASHIER, or OWNER. */
+  sell?: boolean;
+  /** 0.3.0: sell and team role PHARMACIST mapped here (lines of schedule H, H1, X). */
+  sellScheduled?: boolean;
+  /** 0.3.0: sell (a cashier starts a sales return, a pharmacist or the owner finishes it). */
+  salesReturn?: boolean;
+  /** 0.3.0: owner, a mapped pharmacist, or the store approver or delegate (H1 and Schedule X registers). */
+  readRegisters?: boolean;
+  /** 0.3.0: equals sellScheduled (pharmacist only). */
+  substitute?: boolean;
+  /** 0.3.0: equals sellScheduled (allergy and H1 overrides; never the owner). */
+  overrideBlock?: boolean;
+  /** 0.3.0: the owner; a pharmacist the same IST day (checked per bill); never a cashier. */
+  cancelBill?: boolean;
+  /** 0.3.0: a pharmacist, the store approver or delegate, or the owner. */
+  acceptSalesReturn?: boolean;
 }
 
 export interface MyStore {
@@ -43,6 +65,8 @@ export interface MyStore {
   storeRole: StoreRole;
   effectiveStoreRole: StoreRole;
   access: StoreAccess;
+  /** The store this store's indents go to (null for the Central Store). */
+  issuesFrom?: { id: string; name: string } | null;
 }
 
 export interface PharmacyContext {

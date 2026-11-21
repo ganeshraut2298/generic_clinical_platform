@@ -231,7 +231,7 @@ class PharmacyStockApiTest {
     @Test
     void theInboxAndOneRequestPassTheirRawValues() throws Exception {
         when(approvals.inbox(any(), any(), any(), any(), any())).thenReturn(new StockViews.InboxPage(List.of(), 0, 0, 20,
-                new StockViews.InboxCounts(0, 0, 0, 0), "Owner"));
+                new StockViews.InboxCounts(0, 0, 0, 0), "Owner", false));
 
         mockMvc.perform(get(URL + "/approvals/inbox?type=STOCK&page=0&size=20").with(as("OWNER"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.signedInAs").value("Owner"));

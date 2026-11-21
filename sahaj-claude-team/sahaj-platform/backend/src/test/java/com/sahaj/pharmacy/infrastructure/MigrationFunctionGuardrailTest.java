@@ -44,6 +44,10 @@ class MigrationFunctionGuardrailTest {
         Known(String winnerFilePrefix, String first, String second) {
             this(winnerFilePrefix, List.of(first, second));
         }
+
+        Known(String winnerFilePrefix, String first, String second, String third) {
+            this(winnerFilePrefix, List.of(first, second, third));
+        }
     }
 
     /**
@@ -55,9 +59,9 @@ class MigrationFunctionGuardrailTest {
             Map.entry("pharmacy.guard_opening_stock_import_update",
                     new Known("V2026_12_17_1710", "line counter cannot go down")),
             // 1280 last_issued_at and 1720 the unit row FOR SHARE (L11) must both be in the winning body
-            Map.entry("pharmacy.next_document_no", new Known("V2026_12_17_1720", "last_issued_at", "for share")),
+            Map.entry("pharmacy.next_document_no", new Known("V2026_12_17_1800", "last_issued_at", "for share", "CREDIT_NOTE")),
             // 1730: the final person-driven list and the stock audit signer rules (L14, ADR-029 P7)
-            Map.entry("pharmacy.guard_stock_ledger_schedule_x", new Known("V2026_12_17_1730", "second signer")),
+            Map.entry("pharmacy.guard_stock_ledger_schedule_x", new Known("V2026_12_17_1800", "second signer", "WARD_RETURN_WASTAGE")),
             Map.entry("pharmacy.guard_stock_audit_write", new Known("V2026_12_17_1730", "second signer")),
             // 1740 (round 5): each keeps the whole earlier body and adds one move (short-supply-only debit note, approved receipt discard)
             Map.entry("pharmacy.guard_debit_note_write",

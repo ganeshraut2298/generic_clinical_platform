@@ -62,7 +62,7 @@ class PharmacyRound6ApiIT extends Sah79BuySupport {
         assertThat(one.get("status").asText()).isEqualTo("PENDING");
         assertThat(one.get("ruleVersionNo").asInt()).as("raised before any save: version 0").isZero();
         ok(HttpMethod.GET, PH + "/approvals/" + request, w.csUser().auth(), null, 200);
-        ok(HttpMethod.GET, PH + "/approvals/inbox", w.csUser().auth(), null, 200);
+        assertType(problem(call(HttpMethod.GET, PH + "/approvals/inbox", w.csUser().auth(), null), 403), "forbidden"); // D-4: the inbox is for an owner, a HOD or a delegate
         // the engine wrote no version row, and the owner's rules still read version 0
         assertThat(count(w.clinic(), "select count(*) from pharmacy.approval_rule_version")).as("no version row is written for the default").isZero();
         assertThat(rulesVersion(w)).isZero();
@@ -284,7 +284,7 @@ class PharmacyRound6ApiIT extends Sah79BuySupport {
         Pn plain = crew(w.clinic(), "STORE_STAFF", "Pat Plain");
         mapStaff(w.clinic(), w.centralId(), plain, "STORE_USER");
         assertType(problem(call(HttpMethod.GET, PH + "/approvals/" + poRequest, plain.auth(), null), 404), "not-found");
-        assertThat(ok(HttpMethod.GET, PH + "/approvals/inbox", plain.auth(), null, 200).get("items")).isEmpty();
+        assertType(problem(call(HttpMethod.GET, PH + "/approvals/inbox", plain.auth(), null), 403), "forbidden");
         // a person not mapped at all: 404
         assertType(problem(call(HttpMethod.GET, PH + "/approvals/" + poRequest, w.keeper().auth(), null), 404), "not-found");
         // the raiser, a Central Store user with the capability and the owner: 200

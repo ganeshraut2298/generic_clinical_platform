@@ -31,3 +31,21 @@ export const IPD_READ_ONLY_TEXT = 'IPD is read-only. Nothing can be changed.';
 export function detailOr(error: unknown, fallback: string): string {
   return error instanceof ApiError ? (error.problem.detail ?? fallback) : fallback;
 }
+
+/**
+ * The client gives up on a draft save, a finish check or a sign that has not answered after 30 seconds:
+ * the server's own statement_timeout (DEC-054), so a request the server is still working on is not cut short.
+ */
+export const EMR_REQUEST_TIMEOUT_MS = 30_000;
+/** What the doctor is told when the server did not answer in time. */
+export const NO_ANSWER_TEXT = 'We could not reach the server. Try again.';
+const CLIENT_TIMEOUT = 'client-timeout';
+
+/** The error a request that did not answer in time ends with (status 0, like a lost connection). */
+export function noAnswerError(): ApiError {
+  return new ApiError({ type: CLIENT_TIMEOUT, title: 'The server did not answer', status: 0, detail: NO_ANSWER_TEXT });
+}
+
+export function isNoAnswer(error: unknown): boolean {
+  return problemSlug(error) === CLIENT_TIMEOUT;
+}

@@ -306,7 +306,7 @@ class PharmacyWpEDebitNoteApiIT extends Sah79BuySupport {
         assertThat(stockOf(w, "DN1", "PENDING_RETURN")).as("not held before approval").isZero();
         String request = waiting.get("approval").get("requestId").asText();
         long version = ok(HttpMethod.GET, PH + "/approvals/" + request, w.clinic().owner(), null, 200).get("version").asLong();
-        assertThat(ok(HttpMethod.GET, PH + "/approvals/inbox", w.csUser().auth(), null, 200).get("items")).as("the raiser never sees it to decide").isEmpty();
+        assertType(problem(call(HttpMethod.GET, PH + "/approvals/inbox", w.csUser().auth(), null), 403), "forbidden"); // D-4: no inbox for a plain Central Store pharmacist
         ok(HttpMethod.POST, decisionUrl(request), w.clinic().owner(), decisionBody(UUID.randomUUID(), 1, version, "APPROVED", null), 200);
         assertThat(getDn(w, idOf(waiting)).get("status").asText()).isEqualTo("CREATED");
         assertThat(stockOf(w, "DN1", "PENDING_RETURN")).isEqualTo(20);
@@ -458,7 +458,7 @@ class PharmacyWpEDebitNoteApiIT extends Sah79BuySupport {
         String vendor = buyVendor(w, "SxRet Vendor (fake)");
         Map<String, Object> body = ownBody("Test controlled return item (fake)");
         body.put("schedule", "X");
-        String x = idOf(createOwn(w.clinic(), body));
+        String x = createOwn(w.clinic(), body).get("productId").asText();
         String pin = goodPin(w.second());
         setPin(w.second(), pin);
         JsonNode draft = draftReceipt(w, vendor, "INV-SXR", List.of(gline(x, "SXR1", thisMonth(), 5, "50.00", "6.00")));

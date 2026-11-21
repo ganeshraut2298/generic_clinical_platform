@@ -61,3 +61,30 @@ Reviewer: code-reviewer (read-only; Maven, lint and tests not run).
 4. m-10 fixed now or moved to a WP-E follow-up note.
 5. Gate re-run (`validate backend` and the pharmacy frontend specs) after the fixes.
 6. The templates of the WP-E and WP-D screens against mockups 07, 08, 09, 11, 13 and 14 were not compared line by line in this round: do that in a short follow-up review, or accept the QA e2e coverage.
+
+---
+
+# Round 6 · round 6 fixes and the WP-F backend (79-9 to 79-13) · 19 Nov 2026
+
+Reviewer: code-reviewer (read-only; Maven not run). **Verdict: CHANGES REQUIRED.** Three Major, all in the receipt path of story 79-12 (small, local fixes). No Blocker; no breach of tenant, role, lock-order or Schedule X rules.
+
+**WP-F completeness:** all 19 `x-work-package: F` operations of pharmacy.yaml 0.3.5 have a handler at the contract path and verb (indents 7, dispatch 5, returns and shortages 7). The services, repositories and assemblers exist; the approval handlers for the indent (79-10) and the shortage write-off are implemented; nothing is stubbed or interrupted.
+
+**Round 5 findings fixed (spot-checked):** m-6 (precheck by document state), n-3, n-4, L15 (`ClientKeys.claim` used by indent create and submit, dispatch, receipt, accept, reply and settle), m-2 (`BatchLockOrder`, unsigned uuid text order, used by `StockPosting`), D-5 (migration 1750 correct and minimal). Not individually re-verified: M-1, D-4, M-2 (beyond the places above), L17, M3, L18, m-1, m-5, m-9, m-4, D-7, I21 (no regression found).
+
+**Checked and right:** the dispatch posting (one movement per pick with two lines, AVAILABLE down at the Central Store and IN_TRANSIT up at the requesting store, FEFO, lock order); the Schedule X signer on INDENT_DISPATCH, INDENT_RECEIPT_ACCEPTED, INDENT_RECEIPT_REJECTED and SHORTAGE_FOUND (the pharmacist check first, then the PIN, then `recheck`; a wrong-state call never burns a PIN attempt); the receipt posting (accepted to AVAILABLE, rejected to PENDING_RETURN with a return item, short stays IN_TRANSIT with an open shortage; each dispatch line received once); the indent never moves backwards; return item and shortage moves stay inside the trigger moves of section 21.2; actor ids from `caller.actorId()`; ids and counts only in logs and audit; no storage, console or `HttpClient` in `features/pharmacy/indent`.
+
+| # | Severity | File:line | Finding | Fix | Owner |
+|---|---|---|---|---|---|
+| M-1 | Major | `DispatchReceiptService.checkLines:363-366, 417-423` | Contract 0.3.5: a line missing, sent twice or already received is **400 `lines`** "Send every line not yet received, once." The code answers an already-received line with 409 `doc-state`, a duplicate on `lines[i].dispatchLineId`, and a different missing-line text. | One `lines` error with the contract text for all three; drop the `alreadyReceived` 409. | java |
+| M-2 | Major | `DispatchReceiptService.checkLines:407-413` | An expired batch rejected with a reason other than `receipt-reject.near-expiry` passes (only accepting an expired batch is refused). `ReturnRouting` then routes by the wrong reason. | After the reason check, if `expired && rejected > 0` and the key is not `receipt-reject.near-expiry`, add `lines[i].rejectReasonKey`; a test per other reason. | java |
+| M-3 | Major | `receipt.dialog.ts:33, 409`; `receipt.dialog.spec.ts:20, 154` | `EXPIRED_KEY` is `receipt-reject.near-expiry-expired`, never seeded (the seeded key is `receipt-reject.near-expiry`). The spec fixture repeats the wrong key, hiding the fault. | Use `receipt-reject.near-expiry` in the dialog, the fixture and the assertion. | angular |
+| m-1 | Minor | `DispatchReceiptService:423` | The all-lines-skipped text differs from the contract's "There is nothing to receive." | Use the contract text. | java |
+| m-2 | Minor | `receipt.dialog.ts:511-526` | After a PARTLY_RECEIVED answer every row shows as done and the banner says the receipt is confirmed; the skipped Schedule X lines should show as waiting for a pharmacist (mockup 10 step 4). | Rebuild the rows from the answer; show "Schedule X lines are still waiting for a pharmacist". | angular |
+| m-3 | Minor | `ReturnShortageService.waiting:113-119` | `accepting` is computed before the side is validated. | Validate the side first. | java |
+| N-1 | Nit | `IndentDispatchService.replacementOptions:119` and other reads | `posting.sweepStore` inside a read-write `@Transactional` GET (allowed by P4). | One line in the class comment. | java |
+| N-2 | Nit | `DispatchReceiptService.checkLines:407-408` | A missing batch falls back to `today`, silently non-expired. | `orElseThrow`. | java |
+
+**Not checked:** Maven and the tests; the Jdbc repositories for indent, dispatch and return item, `IndentViews`, `DispatchViews`, `DispatchAssembler` (contract field parity); `IndentService` reads; most frontend files other than `receipt.dialog.ts` and part of `indent-dispatch.dialog.ts`; the denial audit in `PharmacyGate`; WP-H. The N+1 reads and the inbox cap are queued.
+
+**Conditions for APPROVE:** M-1, M-2, M-3 fixed with tests; m-2 fixed or accepted; QA's IT run passes (the three QA-test failures resolved); a short pass over the unchecked frontend and repository files before merge.

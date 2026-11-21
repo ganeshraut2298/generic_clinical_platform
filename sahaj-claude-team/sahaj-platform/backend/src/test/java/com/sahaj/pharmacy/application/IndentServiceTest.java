@@ -78,12 +78,13 @@ class IndentServiceTest {
     private final IndentFlow flow = mock(IndentFlow.class);
     private final IndentService service = new IndentService(gate, guard, stores, products, indents, stock, engine, approvals,
             series, numbers, clients, events, reasons, new DocumentViews(events, stores, team, engine), team, audit,
-            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), flow);
+            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), flow, new BlindCount(mock(StockAuditRepository.class)));
     private PharmacyCaller caller = new PharmacyCaller(TENANT, USER, ME, "Test Ward Nurse", "NURSE", List.of());
     private Store ward = new Store(WARD, UNIT, "Test Ward 3B", "W3B", StoreType.WARD, CENTRAL, false, true, true, true, 0);
     private final Store central = new Store(CENTRAL, UNIT, "Test Central Store", "CS", StoreType.CENTRAL, null, false, false,
             true, true, 0);
 
+    @SuppressWarnings("unchecked")
     @BeforeEach
     void ready() {
         when(gate.require(TENANT, USER, AccessLevel.PHARMACY_ACCESS)).thenAnswer(i -> caller);
@@ -93,6 +94,11 @@ class IndentServiceTest {
         when(stores.find(TENANT, WARD)).thenAnswer(i -> Optional.of(ward));
         when(stores.find(TENANT, CENTRAL)).thenReturn(Optional.of(central));
         when(products.find(eq(TENANT), any())).thenAnswer(i -> Optional.of(product((UUID) i.getArgument(1), "NONE")));
+        when(products.findAll(eq(TENANT), any())).thenAnswer(i -> {
+            java.util.Map<UUID, ProductRepository.Full> byId = new java.util.HashMap<>();
+            ((java.util.Collection<UUID>) i.getArgument(1)).forEach(id -> byId.put(id, product(id, "NONE")));
+            return byId;
+        });
         when(clients.take(any(), any(), any(), any(), any(), any())).thenReturn(true);
         when(reasons.isActive(TENANT, ReasonList.APPROVAL_REJECT, REDUCED)).thenReturn(true);
         when(numbers.next(TENANT, DocType.INDENT)).thenReturn(12L);
@@ -441,6 +447,41 @@ class IndentServiceTest {
     }
 
     // ---- the approval handler (79-10) ----
+
+    @Test
+    void anIncreaseAboveTheRequestedQuantityNeedsTheLastLevelOrAnOwner() {
+        List<ApprovalRepository.Level> twoLevels = List.of(
+                new ApprovalRepository.Level(1, com.sahaj.pharmacy.domain.ApproverKind.STORE_APPROVER,
+                        com.sahaj.pharmacy.domain.ConditionKind.ALWAYS, true, "Store HOD approval"),
+                new ApprovalRepository.Level(2, com.sahaj.pharmacy.domain.ApproverKind.OWNER,
+                        com.sahaj.pharmacy.domain.ConditionKind.ALWAYS, true, "Owner approval"));
+        when(approvals.levels(any(), any())).thenReturn(twoLevels);
+        ApprovalSubjectHandler.Decision atLevelOne = decision("APPROVED",
+                List.of(change(LINE, "24", null, null), change(LINE_2, "10", null, null)));
+        when(atLevelOne.request().currentLevel()).thenReturn(1);
+
+        assertThatThrownBy(() -> service.validateDecision(atLevelOne)).isInstanceOfSatisfying(InvalidFieldsException.class,
+                e -> assertThat(e.errors()).extracting(f -> f.field() + ":" + f.message())
+                        .containsExactly("indentLines:This increase needs the next approver."));
+
+        // a reduction at level 1 is fine
+        service.validateDecision(decision("APPROVED", List.of(change(LINE, "15", REDUCED, null), change(LINE_2, "10", null, null))));
+
+        // the last level may raise it
+        ApprovalSubjectHandler.Decision atLevelTwo = decision("APPROVED",
+                List.of(change(LINE, "24", null, null), change(LINE_2, "10", null, null)));
+        when(atLevelTwo.request().currentLevel()).thenReturn(2);
+        service.validateDecision(atLevelTwo);
+
+        // an owner may raise it at level 1
+        ApprovalSubjectHandler.Decision owner = decision("APPROVED",
+                List.of(change(LINE, "24", null, null), change(LINE_2, "10", null, null)));
+        when(owner.request().currentLevel()).thenReturn(1);
+        ApprovalSubjectHandler.Decision asOwner = new ApprovalSubjectHandler.Decision(TENANT,
+                new PharmacyCaller(TENANT, UUID.randomUUID(), UUID.randomUUID(), "Test Owner", "OWNER", List.of()),
+                owner.request(), "OWNER", owner.input());
+        service.validateDecision(asOwner);
+    }
 
     @Test
     void anApprovalWithNoQuantitiesNeedsNothingMoreAndAFullListMayChangeQuantities() {

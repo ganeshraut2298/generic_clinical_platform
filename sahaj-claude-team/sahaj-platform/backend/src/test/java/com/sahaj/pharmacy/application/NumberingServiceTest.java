@@ -45,15 +45,15 @@ class NumberingServiceTest {
     }
 
     @Test
-    void tenRowsWithTheDefaultsAreServedBeforeAnythingIsSaved() {
+    void twelveRowsWithTheDefaultsAreServedBeforeAnythingIsSaved() {
         PharmacyMasterViews.DocumentSeriesList list = m.numberingService.list(TENANT, f.pharmacist.userId());
 
         assertThat(list.items()).extracting(PharmacyMasterViews.DocumentSeries::docType).containsExactly("PURCHASE_ORDER",
                 "GRN", "INDENT", "TRANSFER", "BILL", "DEBIT_NOTE", "STOCK_AUDIT", "STORE_RETURN", "DAMAGE_REPORT",
-                "STOCK_ADJUSTMENT");
+                "STOCK_ADJUSTMENT", "CREDIT_NOTE", "IPD_ISSUE_SLIP");
         assertThat(list.items()).extracting(PharmacyMasterViews.DocumentSeries::example).containsExactly("PO-0001",
                 "GRN-0001", "IND-0001", "TRF-0001", "SB/26-27/000001", "DN-0001", "AUD-0001", "RET-0001", "DMG-0001",
-                "ADJ-0001");
+                "ADJ-0001", "CN/26-27/000001", "IS-0001");
         PharmacyMasterViews.DocumentSeries bill = row("BILL");
         assertThat(bill.prefix()).isEqualTo("SB/");
         assertThat(bill.financialYearPart()).isTrue();
@@ -240,7 +240,7 @@ class NumberingServiceTest {
             throw new IllegalStateException("the body must not be read before the gate");
         };
 
-        assertThat(m.numberingService.list(TENANT, f.pharmacist.userId()).items()).hasSize(10);
+        assertThat(m.numberingService.list(TENANT, f.pharmacist.userId()).items()).hasSize(12);
         assertThatThrownBy(() -> m.numberingService.save(TENANT, f.pharmacist.userId(), "GRN", unreadable))
                 .isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> m.numberingService.list(TENANT, f.frontDesk.userId())).isInstanceOf(ForbiddenException.class);

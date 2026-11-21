@@ -355,7 +355,7 @@ export class IndentsSection implements OnInit {
       storeId,
       storeName: ctx.name,
       actingAs: `Acting as ${caller?.name ?? ''} · mapped to ${ctx.name} · can raise indents for ${ctx.name}`,
-      toStoreName: indent?.toStore.name ?? null,
+      toStoreName: ctx.issuesFrom?.name ?? indent?.toStore.name ?? null,
       indent,
     };
     this.dialog

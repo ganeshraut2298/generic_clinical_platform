@@ -48,7 +48,7 @@ public class ApprovalService {
     static final String SECOND_LEVEL = "Another person must approve the second level.";
     static final String CHOOSE_REASON = "Choose a reason";
     private static final Logger log = LoggerFactory.getLogger(ApprovalService.class);
-    private static final Set<TransactionType> SALES = Set.of(TransactionType.SALE_DISCOUNT, TransactionType.SALES_RETURN);
+    static final int SCAN_CAP = 2000;
     private static final Set<TransactionType> PURCHASE = Set.of(TransactionType.PURCHASE_ORDER,
             TransactionType.GRN_RATE_RISE, TransactionType.VENDOR_RETURN);
     private static final Set<TransactionType> STOCK = Set.of(TransactionType.WRITE_OFF, TransactionType.STOCK_ADJUSTMENT,
@@ -97,14 +97,23 @@ public class ApprovalService {
         int page = PharmacyParams.intValue("page", rawPage, 0, 0, 1000);
         int size = PharmacyParams.intValue("size", rawSize, 20, 1, 50);
 
+        // L19: the query keeps to the stores the caller may decide at (an owner: every store) and stops at SCAN_CAP rows;
+        // m-8: the owners load once and the levels and decisions come in one statement each
+        Set<UUID> approverStores = caller.isOwner() ? null : caller.mappings().stream()
+                .filter(m -> m.effective() == StoreRole.APPROVER || m.effective() == StoreRole.DELEGATE)
+                .map(m -> m.store().id()).collect(Collectors.toSet());
+        List<Request> scanned = requests.pendingFor(tenantId, approverStores, SCAN_CAP + 1);
+        boolean moreWaiting = scanned.size() > SCAN_CAP;
+        List<Request> pending = moreWaiting ? scanned.subList(0, SCAN_CAP) : scanned;
+        List<UUID> pendingIds = pending.stream().map(Request::id).toList();
+        Map<UUID, List<Level>> levelsOf = requests.levelsOf(tenantId, pendingIds);
+        Map<UUID, List<Decision>> decisionsOf = requests.decisionsOf(tenantId, pendingIds);
+        List<UUID> owners = pending.isEmpty() ? List.of() : engine.owners(tenantId);
         List<Row> mine = new ArrayList<>();
-        for (Request request : requests.pending(tenantId)) {
-            if (SALES.contains(request.type())) {
-                continue;
-            }
-            List<Level> levels = requests.levels(tenantId, request.id());
-            List<Decision> decisions = requests.decisions(tenantId, request.id());
-            ApproverResolver.Result approvers = engine.approvers(tenantId, request, levels, decisions);
+        for (Request request : pending) {
+            List<Level> levels = levelsOf.getOrDefault(request.id(), List.of());
+            List<Decision> decisions = decisionsOf.getOrDefault(request.id(), List.of());
+            ApproverResolver.Result approvers = engine.approvers(tenantId, request, levels, decisions, owners);
             if (approvers.canDecide(caller.actorId())) {
                 mine.add(new Row(request, levels, approvers));
             }
@@ -128,7 +137,8 @@ public class ApprovalService {
             items.add(inboxRow(tenantId, row, members, storeById, now));
         }
         return new StockViews.InboxPage(items, filtered.size(), page, size,
-                new StockViews.InboxCounts(indents + purchase + stock, indents, purchase, stock), signedInAs(caller));
+                new StockViews.InboxCounts(indents + purchase + stock, indents, purchase, stock), signedInAs(caller),
+                moreWaiting);
     }
 
     private StockViews.InboxRow inboxRow(UUID tenantId, Row row, Map<UUID, TeamMemberPort.TeamMember> members,
@@ -180,7 +190,7 @@ public class ApprovalService {
     // ---- decision ----
 
     /** Approves or rejects the current level; a replay of the same key answers the request as it is now. */
-    @Transactional
+    @Transactional(noRollbackFor = PharmacyProblemException.StockShort.class)
     public StockViews.ApprovalRequest decide(UUID tenantId, UUID userId, String rawRequestId,
                                              PharmacyInputs.Body<PharmacyInputs.ApprovalDecisionInput> body) {
         PharmacyCaller caller = gate.require(tenantId, userId, AccessLevel.PHARMACY_ACCESS);
@@ -395,7 +405,8 @@ public class ApprovalService {
 
     /** The inbox chips: ALL, INDENTS, PURCHASE, STOCK. */
     enum Chip {
-        ALL(null), INDENTS(Set.of(TransactionType.INDENT)), PURCHASE(PURCHASE_TYPES()), STOCK(STOCK_TYPES());
+        ALL(null), INDENTS(Set.of(TransactionType.INDENT)), PURCHASE(PURCHASE_TYPES()), STOCK(STOCK_TYPES()),
+        SALES(Set.of(TransactionType.SALE_DISCOUNT, TransactionType.SALES_RETURN));
 
         private final Set<TransactionType> types;
 

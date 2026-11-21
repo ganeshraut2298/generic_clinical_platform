@@ -6,6 +6,7 @@ import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { loadErrorMessage } from '../pharmacy-display.util';
 import { ApprovalInboxPage, ApprovalInboxRow, ApprovalRequest, InboxFilter } from '../pharmacy-inventory.model';
 import { PharmacyApi } from '../pharmacy.api';
+import { VARIANCE_CONFIG, VarianceData, VarianceDialog, VarianceResult } from '../audit/variance.dialog';
 import { INDENT_DETAIL_CONFIG, IndentDetailData, IndentDetailDialog } from '../indent/indent-detail.dialog';
 import { APPROVAL_REJECT_CONFIG, ApprovalRejectData, ApprovalRejectDialog } from './approval-reject.dialog';
 import { APPROVAL_REVIEW_CONFIG, ApprovalReviewData, ApprovalReviewDialog } from './approval-review.dialog';
@@ -296,12 +297,30 @@ export class ApprovalsInboxSection implements OnInit {
       this.reviewIndent(row);
       return;
     }
+    if (row.subjectType === 'STOCK_AUDIT') {
+      this.reviewAudit(row);
+      return;
+    }
     const data: ApprovalReviewData = { row };
     this.dialog
       .open(ApprovalReviewDialog, { ...APPROVAL_REVIEW_CONFIG, data })
       .afterClosed()
       .subscribe((changed: boolean | undefined) => {
         if (changed) {
+          this.actionNote.set('Your decision was saved.');
+          this.load(this.page());
+        }
+      });
+  }
+
+  /** A stock audit opens on its variance review (story 79-17): reasons, Recount, and Approve & post adjustment. */
+  private reviewAudit(row: ApprovalInboxRow): void {
+    const data: VarianceData = { storeId: row.subjectStoreId, auditId: row.subjectId };
+    this.dialog
+      .open(VarianceDialog, { ...VARIANCE_CONFIG, data })
+      .afterClosed()
+      .subscribe((result: VarianceResult | undefined) => {
+        if (result && 'audit' in result) {
           this.actionNote.set('Your decision was saved.');
           this.load(this.page());
         }

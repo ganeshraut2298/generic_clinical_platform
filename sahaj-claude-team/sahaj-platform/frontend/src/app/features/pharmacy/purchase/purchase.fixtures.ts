@@ -19,14 +19,14 @@ export const BUYER_CONTEXT: PharmacyContext = {
   capabilities: [...INVENTORY_OWNER_CONTEXT.capabilities, 'PURCHASE'],
   stores: INVENTORY_OWNER_CONTEXT.stores.map((s) => ({
     ...s,
-    access: { ...s.access, handleScheduleX: s.type === 'CENTRAL' },
+    access: { ...s.access, handleScheduleX: s.type === 'CENTRAL', receiveScheduleX: s.type === 'CENTRAL' },
   })),
 };
 
 /** The same person with a pharmacist who may not handle Schedule X. */
 export const BUYER_NO_X_CONTEXT: PharmacyContext = {
   ...BUYER_CONTEXT,
-  stores: BUYER_CONTEXT.stores.map((s) => ({ ...s, access: { ...s.access, handleScheduleX: false } })),
+  stores: BUYER_CONTEXT.stores.map((s) => ({ ...s, access: { ...s.access, handleScheduleX: false, receiveScheduleX: false } })),
 };
 
 export const VENDOR_REF: VendorRef = {
@@ -202,7 +202,7 @@ export function eligible(over: Partial<VendorReturnEligible> = {}): VendorReturn
         receiptNo: null,
         availableQty: 20,
         rate: '70.5000',
-        defaultCreditPercent: '100.00',
+        defaultCreditPercent: '50.00',
         daysToExpiry: -19,
       },
       {

@@ -320,5 +320,8 @@ class PharmacyWpDStockReadsApiIT extends Sah79ApiSupport {
         // the Central Store user is not mapped at the pharmacy: that store is not in the list, or has no capability
         JsonNode cs = contextOf(w.csUser().auth());
         assertThat(cs.toString()).doesNotContain(w.pharmacyId());
+        java.util.List<String> csCaps = new java.util.ArrayList<>();
+        cs.get("capabilities").forEach(k -> csCaps.add(k.asText()));
+        assertThat(csCaps).contains("PURCHASE");
     }
 }

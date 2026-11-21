@@ -14,6 +14,7 @@ import { PharmacyContextStore } from '../pharmacy-context.store';
 import { loadErrorMessage } from '../pharmacy-display.util';
 import { STOCK_STATE_LABELS, StockLedgerPage } from '../pharmacy-inventory.model';
 import { PharmacyApi } from '../pharmacy.api';
+import { exportErrorMessage, saveBlob } from '../stockuse/stockuse.util';
 import { expiryMonthYear, ledgerTransactionText } from './inventory.util';
 import { PickedProduct, ProductPickerComponent } from './product-picker.component';
 
@@ -106,7 +107,11 @@ const MAX_DAYS = 366;
             <mat-datepicker #toPicker />
           </mat-form-field>
           <button mat-flat-button type="submit" data-testid="ledger-show" [disabled]="loading()">Show</button>
+          <button mat-stroked-button type="button" data-testid="ledger-csv" [disabled]="loading() || data() === null" (click)="exportCsv()">Download CSV</button>
         </form>
+        @if (exportError(); as text) {
+          <p class="note" role="alert" data-testid="ledger-csv-error">{{ text }}</p>
+        }
         @if (rangeError(); as text) {
           <p class="note" role="alert" data-testid="ledger-range-error">{{ text }}</p>
         }
@@ -154,9 +159,9 @@ const MAX_DAYS = 366;
                         {{ line.batch.batchNo }}
                         <div class="sub">{{ month(line.batch.expiryDate) }}</div>
                       </td>
-                      <td class="num">{{ line.qtyIn === 0 ? '—' : line.qtyIn }}</td>
-                      <td class="num">{{ line.qtyOut === 0 ? '—' : line.qtyOut }}</td>
-                      <td class="num">{{ line.balance }}</td>
+                      <td class="num">{{ line.qtyIn ? line.qtyIn : '—' }}</td>
+                      <td class="num">{{ line.qtyOut ? line.qtyOut : '—' }}</td>
+                      <td class="num">{{ line.balance ?? '—' }}</td>
                       <td>
                         {{ line.user?.name ?? 'System' }}
                         @if (line.secondSigner; as signer) {
@@ -205,6 +210,7 @@ export class StockLedgerSection {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly rangeError = signal<string | null>(null);
+  protected readonly exportError = signal<string | null>(null);
 
   protected readonly form = new FormGroup({
     storeId: new FormControl('', { nonNullable: true }),
@@ -223,6 +229,19 @@ export class StockLedgerSection {
     this.product.set(product);
     this.data.set(null);
     this.show();
+  }
+
+  protected exportCsv(): void {
+    const product = this.product();
+    const { storeId, from, to } = this.form.getRawValue();
+    if (!product || !from || !to) {
+      return;
+    }
+    this.exportError.set(null);
+    this.api.exportStockLedger({ productId: product.productId, storeId: storeId === '' ? undefined : storeId, from, to }).subscribe({
+      next: (blob) => saveBlob(blob, `sahaj-stock-ledger-${from}-${to}.csv`),
+      error: (error: unknown) => this.exportError.set(exportErrorMessage(error)),
+    });
   }
 
   protected show(): void {

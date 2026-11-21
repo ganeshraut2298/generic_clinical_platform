@@ -27,7 +27,7 @@ describe('Inventory tabs of work package F', () => {
   }
 
   it('lists Ward / store indents and Waiting for action for a ward user who raises and receives', async () => {
-    expect(await tabs(WARD_CONTEXT)).toEqual(['Batch inventory & expiry', 'Store stock', 'Ward / store indents', 'Waiting for action']);
+    expect(await tabs(WARD_CONTEXT)).toEqual(['Batch inventory & expiry', 'Store stock', 'Ward / store indents', 'Waiting for action', 'Stock transfer']);
   });
 
   it('lists the indent tabs and the purchase tabs for a Central Store user, and the approvals inbox for an HOD', async () => {
@@ -40,6 +40,7 @@ describe('Inventory tabs of work package F', () => {
       'Vendor return & debit note',
       'Ward / store indents',
       'Waiting for action',
+      'Stock transfer',
     ]);
   });
 

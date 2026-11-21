@@ -53,6 +53,16 @@ public class PharmacyProblemException extends RuntimeException {
                 "The request could not be understood. Check it and try again.");
     }
 
+    /** 400 {@code range-too-long} (OQ-79-35): a report asked for more than 366 days. */
+    public static PharmacyProblemException rangeTooLong() {
+        return new PharmacyProblemException(400, "range-too-long", "Date range too long", "Choose at most 12 months.");
+    }
+
+    /** 409 {@code export-too-large} (OQ-79-35): a CSV would hold more than 50,000 rows. Nothing is sent. */
+    public static PharmacyProblemException exportTooLarge() {
+        return new PharmacyProblemException(409, "export-too-large", "Export too large", "Narrow the date range.");
+    }
+
     /** 409 {@code settings-changed}: someone else saved first. {@code current} is the record as its GET returns it. */
     public static PharmacyProblemException settingsChanged(Object current) {
         return new PharmacyProblemException(409, "settings-changed", "Changed by someone else",
@@ -108,7 +118,7 @@ public class PharmacyProblemException extends RuntimeException {
     }
 
     /** 409 {@code insufficient-stock}: nothing was written. {@code available} is the usable quantity of the first failing line. */
-    public static PharmacyProblemException insufficientStock(int available, java.util.List<FailingLine> lines) {
+    public static PharmacyProblemException insufficientStock(Integer available, java.util.List<FailingLine> lines) {
         return new PharmacyProblemException(409, "insufficient-stock", "Not enough stock",
                 "There is not enough stock for this. Nothing was changed.").with("available", available)
                 .with("lines", lines);
@@ -139,8 +149,22 @@ public class PharmacyProblemException extends RuntimeException {
 
     /** 409 {@code changed}: the document or the quantity moved since the screen read it; {@code current} is what it is now. */
     public static PharmacyProblemException changed(Object current) {
-        return new PharmacyProblemException(409, "changed", "Changed by someone else",
-                "This changed a moment ago. Check the current values and try again.").with("current", current);
+        PharmacyProblemException problem = new PharmacyProblemException(409, "changed", "Changed by someone else",
+                "This changed a moment ago. Check the current values and try again.");
+        // rule 24: a blind caller is answered without a current value (a null answers the bare problem)
+        return current == null ? problem : problem.with("current", current);
+    }
+
+    /** 409 {@code stock-moved} (79-17): the lines whose stock moved after the count; the sentence of the contract. */
+    public static PharmacyProblemException stockMoved(java.util.List<FailingLine> lines) {
+        return new PharmacyProblemException(409, "stock-moved", "Stock moved since the count",
+                "Stock moved since the count. Recount.").with("lines", lines.size() > 100 ? lines.subList(0, 100) : lines);
+    }
+
+    /** 409 {@code audit-open} (79-17): another audit of this store is still open. */
+    public static PharmacyProblemException auditOpen() {
+        return new PharmacyProblemException(409, "audit-open", "A stock count is open",
+                "A stock count is already open for this store.");
     }
 
     /** 409 {@code already-decided} (BR-15): the request was decided or is at another level; {@code current} is the request. */
@@ -184,6 +208,23 @@ public class PharmacyProblemException extends RuntimeException {
     }
 
     /**
+     * 409 {@code insufficient-stock} on a count variance (79-17): a decrease is above what the batch holds now. The lines were
+     * sent back for recount in the same transaction, and that change must be kept, so the services that throw it list this
+     * class in {@code noRollbackFor}. Only a reviewer posts a variance, so the numbers are never blind.
+     */
+    public static final class StockShort extends PharmacyProblemException {
+
+        private static final long serialVersionUID = 1L;
+
+        public StockShort(int available, java.util.List<FailingLine> lines) {
+            super(409, "insufficient-stock", "Not enough stock",
+                    "There is not enough stock for some lines. They were sent back for recount.");
+            with("available", available);
+            with("lines", lines);
+        }
+    }
+
+    /**
      * 422 {@code opening-stock-invalid}: the file failed its checks and the import is now NOT_ACCEPTED. The status change must
      * be kept, so the service that throws it lists this class in {@code noRollbackFor}.
      */
@@ -197,5 +238,39 @@ public class PharmacyProblemException extends RuntimeException {
             with("errorCount", errorCount);
             with("rowIssues", rowIssues);
         }
+    }
+
+    // ---- SAH-80 (docs/api/pharmacy-sales.yaml 0.3.6) ----
+
+    /** 409 {@code sale-not-allowed} (rule 24): the store does not allow sale. Checked after the store guard, before the body. */
+    public static PharmacyProblemException saleNotAllowed() {
+        return new PharmacyProblemException(409, "sale-not-allowed", "Sale is not allowed", "Sale is not allowed in this store.");
+    }
+
+    /** 403 {@code pharmacist-required} (rule 25): the sentence is the one the operation names. Never the owner or a cashier. */
+    public static PharmacyProblemException pharmacistRequired(String detail) {
+        return new PharmacyProblemException(403, "pharmacist-required", "Pharmacist needed", detail);
+    }
+
+    /** 409 {@code sale-changed}: the price or stock moved since the quote; {@code quote} is the new quote. Nothing was written. */
+    public static PharmacyProblemException saleChanged(Object quote) {
+        return new PharmacyProblemException(409, "sale-changed", "The bill changed",
+                "Prices or batches changed. Check the bill and save again.").with("quote", quote);
+    }
+
+    /** A 409 with a fixed sentence for the sale problem types that carry nothing else. */
+    public static PharmacyProblemException saleConflict(String slug, String title, String detail) {
+        return new PharmacyProblemException(409, slug, title, detail);
+    }
+
+    /** 503 {@code patients-unreachable}: the patient port failed; the sale may continue as a walk-in (BR-3). */
+    public static PharmacyProblemException patientsUnreachable() {
+        return new PharmacyProblemException(503, "patients-unreachable", "Patient records not reachable",
+                "Patient records are not reachable. You can continue as a walk-in and link the patient later.");
+    }
+
+    /** 409 {@code not-connected}: the touch point behind the part of the request is not connected in this release. */
+    public static PharmacyProblemException notConnected(String detail) {
+        return new PharmacyProblemException(409, "not-connected", "Not connected", detail);
     }
 }

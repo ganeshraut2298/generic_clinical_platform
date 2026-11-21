@@ -144,6 +144,8 @@ export interface ApprovalInboxPage extends PageMeta {
   items: ApprovalInboxRow[];
   counts: { all: number; indents: number; purchase: number; stock: number };
   signedInAs: string;
+  /** 0.3.6: true when the scan stopped at its cap. The screen text is not in the mockup; nothing extra is shown until it is approved. */
+  moreWaiting?: boolean;
 }
 
 export interface ApprovalLevel {
@@ -193,7 +195,7 @@ export interface ApprovalDecisionInput {
   reasonKey?: string | null;
   note?: string | null;
   /** Story 79-10: an indent decision lists every line once with its approved quantity. */
-  indentLines?: { indentLineId: string; approvedQty: number }[];
+  indentLines?: { indentLineId: string; approvedQty: number; remarkReasonKey?: string | null; remarkNote?: string | null }[];
 }
 
 // ---- 79-3 and 79-4 stock
@@ -313,6 +315,10 @@ export interface StockAdjustmentCreate {
 
 export interface ApprovalSummary {
   requestId: string;
+  /** 0.3.5: sent as requestVersion of the decision, so no read of the request comes first. */
+  requestVersion: number;
+  /** 0.3.5: the level a decision is for now (equals currentLevel); sent as level of the decision. */
+  levelNo: 1 | 2 | null;
   status: ApprovalStatus;
   currentLevel: 1 | 2 | null;
   ruleText: string;
@@ -361,7 +367,22 @@ export interface StockAdjustmentPage extends PageMeta {
 
 // ---- reasons of Phase 2 screens (GET /reasons)
 
-export type ReasonListKey = 'approval-reject' | 'stock-adjustment' | 'cs-change' | 'receipt-reject' | 'dispute';
+export type ReasonListKey =
+  | 'approval-reject'
+  | 'stock-adjustment'
+  | 'cs-change'
+  | 'receipt-reject'
+  | 'dispute'
+  | 'store-return'
+  | 'damage'
+  | 'transfer'
+  | 'consumption-purpose'
+  | 'sales-return'
+  | 'return-condition'
+  | 'substitution'
+  | 'allergy-override'
+  | 'h1-override'
+  | 'cancel-bill';
 
 export interface ActiveReason {
   reasonKey: string;
@@ -416,9 +437,10 @@ export interface StockLedgerLine {
   store: StoreRef;
   state: StockState;
   batch: BatchRef;
-  qtyIn: number;
-  qtyOut: number;
-  balance: number;
+  /** null on the lines of a store where the caller is blind and the product is on its open audit (rule 24). */
+  qtyIn: number | null;
+  qtyOut: number | null;
+  balance: number | null;
   /** null = System. */
   user: PersonRef | null;
   secondSigner: PersonRef | null;

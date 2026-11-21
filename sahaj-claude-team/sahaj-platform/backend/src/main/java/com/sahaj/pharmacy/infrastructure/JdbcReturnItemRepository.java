@@ -30,13 +30,18 @@ public class JdbcReturnItemRepository implements ReturnItemRepository {
             """;
     private static final String FIND = "select " + COLUMNS
             + " from pharmacy.return_item r where r.tenant_id = :tenantId and r.id = :id";
+    private static final String BY_STORE_RETURN = "select " + COLUMNS
+            + " from pharmacy.return_item r where r.tenant_id = :tenantId and r.store_return_id = :id";
+    private static final String BY_DAMAGE_REPORT = "select " + COLUMNS
+            + " from pharmacy.return_item r where r.tenant_id = :tenantId and r.damage_report_id = :id";
     private static final String BY_LINE = "select " + COLUMNS
             + " from pharmacy.return_item r where r.tenant_id = :tenantId and r.dispatch_line_id = :lineId";
     private static final String INSERT = """
-            insert into pharmacy.return_item (id, tenant_id, unit_id, doc_no, item_type, dispatch_line_id, holding_store_id,
+            insert into pharmacy.return_item (id, tenant_id, unit_id, doc_no, item_type, dispatch_line_id, store_return_id,
+                   damage_report_id, holding_store_id,
                    accepting_store_id, product_id, batch_id, qty, reason_key, default_put_back_into, schedule_x, raised_by,
                    created_by)
-            values (:id, :tenantId, :unitId, :docNo, :type, :lineId, :holding, :accepting, :productId, :batchId, :qty, :reason,
+            values (:id, :tenantId, :unitId, :docNo, :type, :lineId, :storeReturnId, :damageReportId, :holding, :accepting, :productId, :batchId, :qty, :reason,
                    :putBack, :scheduleX, :by, :by)
             """;
     private static final String NOTES = """
@@ -99,9 +104,22 @@ public class JdbcReturnItemRepository implements ReturnItemRepository {
     }
 
     @Override
+    public Optional<Row> findByStoreReturn(UUID tenantId, UUID storeReturnId) {
+        return jdbc.sql(BY_STORE_RETURN).param("tenantId", tenantId).param("id", storeReturnId)
+                .query(JdbcReturnItemRepository::map).optional();
+    }
+
+    @Override
+    public Optional<Row> findByDamageReport(UUID tenantId, UUID damageReportId) {
+        return jdbc.sql(BY_DAMAGE_REPORT).param("tenantId", tenantId).param("id", damageReportId)
+                .query(JdbcReturnItemRepository::map).optional();
+    }
+
+    @Override
     public void insert(UUID tenantId, NewItem i) {
         jdbc.sql(INSERT).param("id", i.id()).param("tenantId", tenantId).param("unitId", i.unitId()).param("docNo", i.docNo())
-                .param("type", i.itemType()).param("lineId", i.dispatchLineId()).param("holding", i.holdingStoreId())
+                .param("type", i.itemType()).param("lineId", i.dispatchLineId()).param("storeReturnId", i.storeReturnId())
+                .param("damageReportId", i.damageReportId()).param("holding", i.holdingStoreId())
                 .param("accepting", i.acceptingStoreId()).param("productId", i.productId()).param("batchId", i.batchId())
                 .param("qty", i.qty()).param("reason", i.reasonKey()).param("putBack", i.defaultPutBackInto())
                 .param("scheduleX", i.scheduleX()).param("by", i.raisedBy()).update();

@@ -59,8 +59,17 @@ public class JdbcStoreRepository implements StoreRepository {
     private static final String UPDATE = """
             update pharmacy.store
             set name = :name, code = :code, type = :type, issues_from_store_id = cast(:issuesFrom as uuid),
+                ipd_ward_id = case when :type = 'WARD' then ipd_ward_id else null end,
                 sale_allowed = :sale, consumption_allowed = :consumption, updated_at = now(), updated_by = :actor,
                 version = version + 1
+            where tenant_id = :tenantId and id = :id and version = :version
+            """;
+    private static final String LINKED_WARDS = """
+            select id, ipd_ward_id from pharmacy.store where tenant_id = :tenantId and ipd_ward_id is not null
+            """;
+    private static final String SET_LINKED_WARD = """
+            update pharmacy.store
+            set ipd_ward_id = cast(:ward as uuid), updated_at = now(), updated_by = :actor, version = version + 1
             where tenant_id = :tenantId and id = :id and version = :version
             """;
     private static final String SWITCH_OFF = """
@@ -143,6 +152,22 @@ public class JdbcStoreRepository implements StoreRepository {
                 .param("name", name).param("code", code).param("type", type.name())
                 .param("issuesFrom", issuesFromStoreId).param("sale", saleAllowed)
                 .param("consumption", consumptionAllowed).param("actor", actorUserId).update() == 1;
+    }
+
+    @Override
+    public java.util.Map<UUID, UUID> linkedWards(UUID tenantId) {
+        java.util.Map<UUID, UUID> out = new java.util.HashMap<>();
+        jdbc.sql(LINKED_WARDS).param("tenantId", tenantId).query((rs, n) -> {
+            out.put(rs.getObject("id", UUID.class), rs.getObject("ipd_ward_id", UUID.class));
+            return 1;
+        }).list();
+        return out;
+    }
+
+    @Override
+    public boolean setLinkedWard(UUID tenantId, UUID id, long version, UUID wardId, UUID actorUserId) {
+        return jdbc.sql(SET_LINKED_WARD).param("tenantId", tenantId).param("id", id).param("version", version)
+                .param("ward", wardId).param("actor", actorUserId).update() == 1;
     }
 
     @Override

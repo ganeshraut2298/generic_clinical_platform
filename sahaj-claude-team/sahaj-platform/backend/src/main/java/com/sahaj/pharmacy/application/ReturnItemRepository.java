@@ -24,9 +24,17 @@ public interface ReturnItemRepository {
     record Note(UUID returnItemId, String note, UUID createdBy, Instant createdAt) {
     }
 
-    record NewItem(UUID id, UUID unitId, String docNo, String itemType, UUID dispatchLineId, UUID holdingStoreId,
-                   UUID acceptingStoreId, UUID productId, UUID batchId, int qty, String reasonKey, String defaultPutBackInto,
-                   boolean scheduleX, UUID raisedBy) {
+    record NewItem(UUID id, UUID unitId, String docNo, String itemType, UUID dispatchLineId, UUID storeReturnId,
+                   UUID damageReportId, UUID holdingStoreId, UUID acceptingStoreId, UUID productId, UUID batchId, int qty,
+                   String reasonKey, String defaultPutBackInto, boolean scheduleX, UUID raisedBy) {
+
+        /** A rejected dispatch line (WP-F): no store return and no damage report. */
+        public NewItem(UUID id, UUID unitId, String docNo, String itemType, UUID dispatchLineId, UUID holdingStoreId,
+                       UUID acceptingStoreId, UUID productId, UUID batchId, int qty, String reasonKey, String defaultPutBackInto,
+                       boolean scheduleX, UUID raisedBy) {
+            this(id, unitId, docNo, itemType, dispatchLineId, null, null, holdingStoreId, acceptingStoreId, productId, batchId, qty,
+                    reasonKey, defaultPutBackInto, scheduleX, raisedBy);
+        }
     }
 
     record Slice(List<Row> items, long total) {
@@ -36,6 +44,12 @@ public interface ReturnItemRepository {
 
     /** The item locked {@code FOR UPDATE} (lock order step 3b). */
     Optional<Row> findForUpdate(UUID tenantId, UUID id);
+
+    /** The item of a store return (one per return, SAH-79-14). */
+    Optional<Row> findByStoreReturn(UUID tenantId, UUID storeReturnId);
+
+    /** The item of a damage report that was sent to the Central Store (one per report, SAH-79-14). */
+    Optional<Row> findByDamageReport(UUID tenantId, UUID damageReportId);
 
     /** The item made from a dispatch line, if the line was rejected. */
     Optional<Row> findByDispatchLine(UUID tenantId, UUID dispatchLineId);

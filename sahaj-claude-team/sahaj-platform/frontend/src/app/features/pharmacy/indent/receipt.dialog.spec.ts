@@ -17,7 +17,7 @@ const REJECT_REASONS = {
       reasons: [
         { reasonKey: 'receipt-reject.damaged-in-transit', label: 'Damaged in transit', needsNote: false, fixed: true },
         { reasonKey: 'receipt-reject.short', label: 'Short / not received', needsNote: false, fixed: true },
-        { reasonKey: 'receipt-reject.near-expiry-expired', label: 'Near expiry / expired', needsNote: false, fixed: true },
+        { reasonKey: 'receipt-reject.near-expiry', label: 'Near expiry / expired', needsNote: false, fixed: true },
       ],
     },
   ],
@@ -151,7 +151,7 @@ describe('ReceiptDialog', () => {
     });
     expect(text(el, 'receipt-accepted-0')).toBe('0');
     expect((q(el, 'receipt-plus-0') as HTMLButtonElement).disabled).toBe(true);
-    expect(q(el, 'receipt-reason-0-receipt-reject.near-expiry-expired')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q(el, 'receipt-reason-0-receipt-reject.near-expiry')?.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('leaves a Schedule X line for a pharmacist and sends it as skipped, with the other lines received', async () => {
@@ -168,9 +168,20 @@ describe('ReceiptDialog', () => {
     const req = http.expectOne(`${S}/dispatches/disp-1/receipt`);
     expect(req.request.body.lines[0]).toEqual({ dispatchLineId: 'dline-1', accepted: 0, rejected: 0, rejectReasonKey: null, note: null, skipped: true });
     expect(req.request.body.lines[1].skipped).toBe(false);
-    req.flush(dispatch({ status: 'PARTLY_RECEIVED' }));
+    req.flush(
+      dispatch({
+        status: 'PARTLY_RECEIVED',
+        lines: [
+          dispatchLine({ product: SCHEDULE_X_PRODUCT, scheduleX: true, dispatched: 5, received: false }),
+          dispatchLine({ id: 'dline-2', dispatched: 10, received: true, accepted: 10, rejected: 0 }),
+        ],
+      }),
+    );
     await settle();
     expect(text(el, 'receipt-status')).toBe('Partly received');
+    expect(text(el, 'receipt-skipped-0')).toBe('Waits for a pharmacist. It stays in transit.');
+    expect(text(el, 'receipt-partly')).toContain('Schedule X lines are still waiting for a pharmacist');
+    expect(el.textContent).not.toContain('Receipt confirmed. The accepted units');
   });
 
   it('asks a pharmacist for the second signer and PIN on a Schedule X line, and clears the PIN after the send', async () => {

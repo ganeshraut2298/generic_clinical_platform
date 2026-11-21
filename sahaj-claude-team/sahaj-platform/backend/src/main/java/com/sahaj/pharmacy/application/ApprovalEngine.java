@@ -140,6 +140,12 @@ public class ApprovalEngine {
 
     /** The people who can decide the request now, in the capacity they would decide in. */
     public ApproverResolver.Result approvers(UUID tenantId, Request request, List<Level> levels, List<Decision> decisions) {
+        return approvers(tenantId, request, levels, decisions, null);
+    }
+
+    /** As above with the owners already loaded (m-8: the inbox loads them once per call); null loads them here. */
+    public ApproverResolver.Result approvers(UUID tenantId, Request request, List<Level> levels, List<Decision> decisions,
+                                             List<UUID> loadedOwners) {
         if (!request.pending()) {
             return new ApproverResolver.Result(Map.of(), false, false);
         }
@@ -157,7 +163,7 @@ public class ApprovalEngine {
                     staff.activeWithRole(tenantId, request.ruleStoreId(), StoreRole.DELEGATE).orElse(null));
         }
         return ApproverResolver.resolve(kind, request.raisedBy(), level1Decider, level, escalated, hod, delegate,
-                owners(tenantId));
+                loadedOwners == null ? owners(tenantId) : loadedOwners);
     }
 
     /** Every owner who can sign in. */

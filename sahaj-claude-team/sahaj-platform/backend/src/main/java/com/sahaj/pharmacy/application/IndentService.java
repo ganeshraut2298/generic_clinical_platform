@@ -58,7 +58,8 @@ public class IndentService implements ApprovalSubjectHandler {
     static final String CENTRAL_BUYS = "The Central Store buys by purchase order.";
     static final String NOT_EDITABLE = "A submitted indent cannot be edited.";
     static final String MAX_LINES_MESSAGE = "Add 1 to 200 items";
-    static final String ALL_ZERO = "Every quantity is 0. Reject the indent with a reason instead.";
+    static final String NEXT_APPROVER = "This increase needs the next approver.";
+    static final String ALL_ZERO = "Reject the indent with a reason instead";
     private static final Logger log = LoggerFactory.getLogger(IndentService.class);
     private static final String ENTITY_TYPE = "PHARMACY_INDENT";
     private static final int MAX_LINES = 200;
@@ -85,12 +86,14 @@ public class IndentService implements ApprovalSubjectHandler {
     private final AuditLog auditLog;
     private final PharmacyTime time;
     private final IndentFlow flow;
+    private final BlindCount blind;
 
     public IndentService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, ProductRepository products,
                          IndentRepository indents, StockRepository stock, ApprovalEngine engine, ApprovalRepository approvals,
                          DocumentSeriesRepository series, DocumentNumberPort numbers, ClientRequestRepository clients,
                          DocumentEventRepository events, ActiveReasonService reasons, DocumentViews documentViews,
-                         TeamMemberPort team, AuditLog auditLog, PharmacyTime time, IndentFlow flow) {
+                         TeamMemberPort team, AuditLog auditLog, PharmacyTime time, IndentFlow flow,
+                         BlindCount blind) {
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -109,6 +112,7 @@ public class IndentService implements ApprovalSubjectHandler {
         this.auditLog = auditLog;
         this.time = time;
         this.flow = flow;
+        this.blind = blind;
     }
 
     // ---- list ----
@@ -480,6 +484,10 @@ public class IndentService implements ApprovalSubjectHandler {
         List<FieldMessage> errors = new ArrayList<>();
         Set<UUID> seen = new LinkedHashSet<>();
         boolean anyAbove = false;
+        boolean increaseRefused = false;
+        // L20: only the last configured level (or an owner) may raise a quantity above the requested one
+        boolean laterLevel = approvals.levels(tenantId, decision.request().id()).stream()
+                .anyMatch(l -> l.levelNo() > decision.request().currentLevel() && l.applies());
         for (int i = 0; i < given.size(); i++) {
             PharmacyInputs.IndentLineDecision d = given.get(i);
             String at = "indentLines[" + i + "]";
@@ -498,6 +506,10 @@ public class IndentService implements ApprovalSubjectHandler {
                 continue;
             }
             anyAbove |= qty > 0;
+            if (qty > line.requestedQty() && !increaseRefused && !decision.approver().isOwner() && laterLevel) {
+                increaseRefused = true; // L20: one error for the whole list
+                errors.add(new FieldMessage("indentLines", NEXT_APPROVER));
+            }
             String note = d.remarkNote() == null || d.remarkNote().isBlank() ? null : d.remarkNote().trim();
             if (note != null && note.length() > 300) {
                 errors.add(new FieldMessage(at + ".remarkNote", "Keep the note to 300 characters"));
@@ -776,13 +788,18 @@ public class IndentService implements ApprovalSubjectHandler {
                 productIds.add(l.replacementProductId());
             }
         });
-        productIds.forEach(id -> products.find(tenantId, id).ifPresent(f -> productOf.put(id, f.row())));
+        // m-8: one statement for the products and one for the stock states of every line
+        products.findAll(tenantId, productIds).forEach((id, f) -> productOf.put(id, f.row()));
+        Map<UUID, List<StockRepository.StateRow>> statesOf = stock.statesOfProducts(tenantId,
+                lines.stream().map(Line::productId).collect(java.util.stream.Collectors.toSet()), List.of(from.id(), to.id()));
         List<IndentViews.Line> lineViews = new ArrayList<>();
+        BlindCount.Mask maskFrom = blind.at(caller, from.id());
+        BlindCount.Mask maskTo = blind.at(caller, to.id());
         boolean backOrder = false;
         for (Line l : lines) {
             StockRepository.StateRow fromState = null;
             StockRepository.StateRow toState = null;
-            for (StockRepository.StateRow s : stock.statesOfProduct(tenantId, l.productId(), List.of(from.id(), to.id()))) {
+            for (StockRepository.StateRow s : statesOf.getOrDefault(l.productId(), List.of())) {
                 if (s.storeId().equals(from.id())) {
                     fromState = s;
                 } else if (s.storeId().equals(to.id())) {
@@ -794,8 +811,11 @@ public class IndentService implements ApprovalSubjectHandler {
             boolean open = "BACK_ORDER".equals(l.balanceAction()) && remaining > 0;
             backOrder |= open;
             int inTransit = Math.max(0, l.dispatchedQty() - l.receivedQty() - l.rejectedQty() - l.shortQty());
-            IndentViews.StockImpact impact = new IndentViews.StockImpact(toState == null ? 0 : toState.available(), inTransit,
-                    fromState == null ? 0 : fromState.available(), fromState == null ? 0 : fromState.pendingReturn(),
+            // rule 24: the figures of a store where the caller is blind and the product is on its open audit are null
+            Integer toAvailable = maskTo.qty(l.productId(), toState == null ? 0 : toState.available());
+            Integer fromAvailable = maskFrom.qty(l.productId(), fromState == null ? 0 : fromState.available());
+            IndentViews.StockImpact impact = new IndentViews.StockImpact(toAvailable, inTransit, fromAvailable,
+                    maskFrom.qty(l.productId(), fromState == null ? 0 : fromState.pendingReturn()),
                     open ? remaining : 0, l.shortQty());
             Integer hodChange = l.approvedQty() == null || l.approvedQty() == l.requestedQty() ? null
                     : l.approvedQty() - l.requestedQty();
@@ -806,13 +826,17 @@ public class IndentService implements ApprovalSubjectHandler {
                     l.approvedQty(), hodChange, engine.reasonRef(tenantId, l.hodRemarkReasonKey(), null), remaining,
                     l.dispatchedQty(), l.receivedQty(), l.rejectedQty(), l.shortQty(), l.balanceAction(),
                     engine.reasonRef(tenantId, l.closeReasonKey(), null), replacement,
-                    fromState == null ? 0 : fromState.available(), toState == null ? 0 : toState.available(), impact));
+                    fromAvailable, toAvailable, impact));
         }
         DocumentViews.Loaded loaded = documentViews.load(tenantId, DOC_TYPE, row.id(), List.of(row.createdBy()));
         boolean waiting = IndentStatus.PARTLY_DISPATCHED.name().equals(row.status()) && backOrder;
+        int sxWaiting = flow.scheduleXWaiting(tenantId, row.id());
         IndentViews.Chips chips = new IndentViews.Chips(flow.rejectedWaitingCs(tenantId, row.id()),
-                flow.shortInvestigating(tenantId, row.id()), waiting, flow.scheduleXWaiting(tenantId, row.id()));
-        return new IndentViews.Indent(row.id(), row.docNo(), storeRef(from), storeRef(to), row.priority(), row.status(), chips,
+                flow.shortInvestigating(tenantId, row.id()), waiting, sxWaiting);
+        // D-QA-2 (0.3.4): while a Schedule X line waits for a pharmacist the indent reads PARTLY_DISPATCHED (the stored DISPATCHED cannot go back)
+        String shownStatus = sxWaiting > 0 && IndentStatus.DISPATCHED.name().equals(row.status())
+                ? IndentStatus.PARTLY_DISPATCHED.name() : row.status();
+        return new IndentViews.Indent(row.id(), row.docNo(), storeRef(from), storeRef(to), row.priority(), shownStatus, chips,
                 loaded.person(row.createdBy()), row.raisedAt(),
                 "Acting as " + caller.name() + " · " + capacity(caller, acting) + " · " + acting.name(), lineViews,
                 engine.summary(caller, DOC_TYPE, row.id()), flow.dispatchRefs(tenantId, row.id()),

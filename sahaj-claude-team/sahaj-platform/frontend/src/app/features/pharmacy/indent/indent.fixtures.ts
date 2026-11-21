@@ -200,7 +200,7 @@ export const WARD_CONTEXT: PharmacyContext = {
   ...OWNER_CONTEXT,
   caller: NURSE_CALLER,
   capabilities: ['INVENTORY'],
-  stores: [store({ storeId: 'store-ward', name: 'Test Ward 3B store', access: access({ raiseIndent: true, receive: true }) })],
+  stores: [store({ storeId: 'store-ward', name: 'Test Ward 3B store', access: access({ raiseIndent: true, receive: true }), issuesFrom: { id: 'store-central', name: 'Test Central Store' } })],
   workingStoreId: 'store-ward',
 };
 

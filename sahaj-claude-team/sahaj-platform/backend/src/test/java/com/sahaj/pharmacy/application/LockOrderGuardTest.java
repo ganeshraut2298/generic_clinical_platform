@@ -31,7 +31,8 @@ class LockOrderGuardTest {
 
     /** The classes that call {@code DocumentNumberPort.next}: each takes a number in the document's own transaction. */
     private static final List<String> NUMBER_ISSUERS = List.of("PurchaseOrderService", "StockAdjustmentService",
-            "GoodsReceiptService", "DebitNoteService", "IndentService");
+            "GoodsReceiptService", "DebitNoteService", "IndentService", "StoreReturnService", "DamageReportService", "TransferService", "StockAuditService",
+            "SaleBillService", "BillCancelService", "SalesReturnService");
 
     /** The postings that must lock the store first and read its status again. */
     private static final List<String> STORE_LOCKING_POSTINGS = List.of("OpeningStockPostService", "StockAdjustmentService",

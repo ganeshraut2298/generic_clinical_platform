@@ -49,7 +49,11 @@ public class StockPosting {
     }
 
     /** The document behind a line; null for a system move. */
-    public record Doc(String type, UUID id, String no, UUID lineId) {
+    public record Doc(String type, UUID id, String no, UUID lineId, UUID admissionId) {
+
+        public Doc(String type, UUID id, String no, UUID lineId) {
+            this(type, id, no, lineId, null);
+        }
     }
 
     /**
@@ -168,7 +172,7 @@ public class StockPosting {
                     line.secondSignerMembershipId() != null ? line.secondSignerMembershipId()
                             : actor.secondSignerMembershipId(),
                     actor.approvedByMembershipId(), line.reasonKey(),
-                    line.reversesLedgerId()));
+                    line.reversesLedgerId(), line.doc() == null ? null : line.doc().admissionId()));
             applied.add(new Applied(line.storeId(), line.productId(), line.batchId(), line.state(), after));
         }
         if (!refused.isEmpty()) {

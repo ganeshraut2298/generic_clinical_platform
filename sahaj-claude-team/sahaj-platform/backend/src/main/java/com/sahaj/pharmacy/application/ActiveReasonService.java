@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ActiveReasonService {
 
     static final String UNKNOWN_LIST = "Choose a valid list";
-    private static final int MAX_LISTS = 11;
+    private static final int MAX_LISTS = 20;
 
     private final PharmacyGate gate;
     private final ReasonRepository reasons;

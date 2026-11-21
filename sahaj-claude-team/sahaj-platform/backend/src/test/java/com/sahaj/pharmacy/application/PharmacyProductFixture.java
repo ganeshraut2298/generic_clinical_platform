@@ -174,6 +174,13 @@ final class PharmacyProductFixture {
         }
 
         @Override
+        public java.util.Map<UUID, Full> findAll(UUID tenantId, java.util.Collection<UUID> productIds) {
+            java.util.Map<UUID, Full> out = new java.util.HashMap<>();
+            productIds.forEach(id -> find(tenantId, id).ifPresent(f -> out.put(id, f)));
+            return out;
+        }
+
+        @Override
         public Optional<Full> findForUpdate(UUID tenantId, UUID productId) {
             f.locks.add("product");
             return find(tenantId, productId);

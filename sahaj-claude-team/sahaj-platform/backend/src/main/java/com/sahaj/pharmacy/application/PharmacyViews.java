@@ -72,7 +72,14 @@ public final class PharmacyViews {
     public record Store(UUID id, String name, String code, StoreType type, UUID issuesFromStoreId,
                         String issuesFromName, boolean saleAllowed, boolean consumptionAllowed, StorePerson hod,
                         StoreDelegate delegate, String approverState, int staffCount, String status, boolean hasStock,
-                        List<String> lockedFields, long version) {
+                        List<String> lockedFields, long version, WardRef linkedWard) {
+    }
+
+    /** The IPD ward a ward store is linked to (null when not linked). */
+    public record WardRef(UUID wardId, String name) {
+    }
+
+    public record WardList(List<WardRef> items) {
     }
 
     public record StoreList(List<Store> items, UUID centralStoreId) {

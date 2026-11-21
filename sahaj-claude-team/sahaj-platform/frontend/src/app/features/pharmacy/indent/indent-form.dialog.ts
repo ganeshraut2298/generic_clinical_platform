@@ -18,7 +18,7 @@ export interface IndentFormData {
   storeName: string;
   /** "Acting as <name> · mapped to <store> · can raise indents for <store>". */
   actingAs: string;
-  /** The issuing store, when it is known (a saved draft). */
+  /** The issuing store: MyStore.issuesFrom of the working store, else the saved draft's. */
   toStoreName: string | null;
   /** A saved draft of the caller to change; absent for "+ New indent". */
   indent?: Indent | null;
@@ -127,7 +127,7 @@ interface FormLine {
         </div>
         <div class="ro">
           <dt>To (issuing store)</dt>
-          <dd data-testid="indent-to">{{ data.toStoreName ?? 'Shown after you save the draft' }}</dd>
+          <dd data-testid="indent-to">{{ data.toStoreName ?? '—' }}</dd>
         </div>
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>Priority</mat-label>

@@ -48,7 +48,9 @@ class ContextServiceTest {
         assertThat(c.caller().roleLabel()).isEqualTo("Owner");
         assertThat(c.caller().setupAccess()).isEqualTo("EDIT");
         assertThat(c.capabilities()).containsExactly("SETUP_VIEW", "SETUP_EDIT", "OPENING_STOCK_UPLOAD",
-                "OPENING_STOCK_APPROVE", "INVENTORY", "APPROVALS_INBOX", "PURCHASE", "STOCK_REPORTS");
+                "OPENING_STOCK_APPROVE", "INVENTORY", "APPROVALS_INBOX", "PURCHASE", "STOCK_REPORTS", "PHARMACY", "POS",
+                "SALES_RETURN", "REGISTERS", "COMPLIANCE", "COMMAND_CENTRE", "SALES_REPORTS", "PATIENT_LINK", "ALLERGY_CHECK",
+                "OPD_QUEUE");
         assertThat(c.stores()).isEmpty(); // the owner's select lists mapped stores only
         assertThat(c.workingStoreId()).isNull();
         assertThat(c.mustPickWorkingStore()).isFalse();
@@ -67,7 +69,7 @@ class ContextServiceTest {
     void aPharmacistWithNoMappingHasViewAccessAndNoStoresAndNoUploadCapability() {
         Context c = get(f.pharmacist);
         assertThat(c.caller().setupAccess()).isEqualTo("VIEW");
-        assertThat(c.capabilities()).containsExactly("SETUP_VIEW");
+        assertThat(c.capabilities()).containsExactly("SETUP_VIEW", "COMPLIANCE");
         assertThat(c.stores()).isEmpty();
         assertThat(c.mustPickWorkingStore()).isFalse();
     }
@@ -79,7 +81,9 @@ class ContextServiceTest {
 
         Context c = get(f.pharmacist);
 
-        assertThat(c.capabilities()).containsExactly("SETUP_VIEW", "OPENING_STOCK_UPLOAD", "INVENTORY", "STOCK_REPORTS");
+        assertThat(c.capabilities()).containsExactly("SETUP_VIEW", "OPENING_STOCK_UPLOAD", "INVENTORY", "STOCK_REPORTS",
+                "PHARMACY", "POS", "SALES_RETURN", "REGISTERS", "COMPLIANCE", "COMMAND_CENTRE", "SALES_REPORTS", "PATIENT_LINK",
+                "ALLERGY_CHECK", "OPD_QUEUE");
         assertThat(c.stores()).extracting(PharmacyViews.MyStore::name).containsExactly("Test Main Pharmacy", "Test OPD Store");
         assertThat(c.stores().get(0).access().receiveScheduleX()).isTrue();
         assertThat(c.stores().get(0).access().consumeReturn()).isFalse();
@@ -121,8 +125,8 @@ class ContextServiceTest {
         f.map(pharmacy, f.nurse, StoreRole.APPROVER);
 
         assertThat(get(f.nurse).capabilities()).containsExactly("INVENTORY",
-                "APPROVALS_INBOX", "STOCK_REPORTS");
-        assertThat(get(f.pharmacist).capabilities()).containsExactly("SETUP_VIEW");
+                "APPROVALS_INBOX", "STOCK_REPORTS", "PHARMACY", "REGISTERS", "COMMAND_CENTRE", "SALES_REPORTS");
+        assertThat(get(f.pharmacist).capabilities()).containsExactly("SETUP_VIEW", "COMPLIANCE");
     }
 
     @Test

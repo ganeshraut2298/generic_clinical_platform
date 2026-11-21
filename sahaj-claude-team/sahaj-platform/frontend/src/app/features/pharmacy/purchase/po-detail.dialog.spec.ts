@@ -89,6 +89,8 @@ describe('PoDetailDialog', () => {
         status: 'WAITING_APPROVAL',
         approval: {
           requestId: 'req-1',
+          requestVersion: 1,
+          levelNo: 1,
           status: 'PENDING',
           currentLevel: 1,
           ruleText: 'PO above ₹ 50,000',
@@ -149,6 +151,8 @@ describe('PoDetailDialog', () => {
       purchaseOrder({
         status: 'REJECTED',
         approval: {
+          requestVersion: 1,
+          levelNo: null,
           requestId: 'req-1',
           status: 'REJECTED',
           currentLevel: null,

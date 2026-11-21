@@ -97,6 +97,10 @@ public final class PharmacyInputs {
         }
     }
 
+    /** PUT /stores/{storeId}/linked-ward (SAH-79-16): wardId is required and may be null (clears the link). */
+    public record LinkedWard(Long version, Sent<UUID> wardId) {
+    }
+
     public record MapStaff(UUID membershipId, StoreRole storeRole, LocalDate delegateFrom, LocalDate delegateTo) {
     }
 
@@ -178,6 +182,35 @@ public final class PharmacyInputs {
     public record StockAdjustmentCreate(UUID clientKey, UUID batchId, BigDecimal bookQtySeen, BigDecimal physicalQty,
                                         String reasonKey, String note, UUID correctsLedgerId,
                                         SecondSignerInput secondSigner) {
+    }
+
+    // ---- SAH-79 WP-G, store use (docs/api/pharmacy.yaml 0.3.5) ----
+
+    /** POST .../store-returns. */
+    public record StoreReturnCreate(UUID clientKey, UUID batchId, BigDecimal quantity, String reasonKey, String note,
+                                    SecondSignerInput secondSigner) {
+    }
+
+    /** POST .../damage-reports. */
+    public record DamageReportCreate(UUID clientKey, UUID batchId, String fromState, BigDecimal quantity, String reasonKey,
+                                     String note, String afterApproval, SecondSignerInput secondSigner) {
+    }
+
+    /** POST .../consumptions (ConsumptionCreate). */
+    public record ConsumptionCreate(UUID clientKey, String type, String purposeKey, String note, UUID admissionId,
+                                    OrderedByInput orderedBy, UUID stockAuditLineId, List<TransferLineInput> lines,
+                                    SecondSignerInput secondSigner) {
+    }
+
+    public record OrderedByInput(UUID membershipId, String otherName) {
+    }
+
+    /** POST .../transfers (TransferCreate). */
+    public record TransferCreate(UUID clientKey, UUID fromStoreId, UUID toStoreId, String reasonKey, String note,
+                                 List<TransferLineInput> lines) {
+    }
+
+    public record TransferLineInput(UUID productId, BigDecimal quantity) {
     }
 
     // ---- SAH-79 WP-F, indents (docs/api/pharmacy.yaml 0.3.4) ----
@@ -289,6 +322,32 @@ public final class PharmacyInputs {
 
     /** PostWithSignerInput. */
     public record PostWithSigner(UUID clientKey, BigDecimal version, SecondSignerInput secondSigner) {
+    }
+
+    // ---- SAH-79 WP-H, stock audit (docs/api/pharmacy.yaml 0.3.6) ----
+
+    /** POST .../stock-audits: scope ALL_AVAILABLE or PRODUCTS (productIds 1 to 200). */
+    public record StockAuditCreate(UUID clientKey, String scope, List<UUID> productIds) {
+    }
+
+    /** One counted line of PUT .../counts. */
+    public record CountLineInput(UUID auditLineId, BigDecimal counted, Boolean notCounted, String notCountedReasonKey) {
+    }
+
+    /** PUT .../counts. */
+    public record CountsInput(BigDecimal version, List<CountLineInput> lines) {
+    }
+
+    /** One line of PUT .../variance. */
+    public record VarianceReasonLineInput(UUID auditLineId, String reasonKey, String note) {
+    }
+
+    /** PUT .../variance. */
+    public record VarianceReasonsInput(BigDecimal version, List<VarianceReasonLineInput> lines) {
+    }
+
+    /** POST .../recount. */
+    public record RecountInput(BigDecimal version, List<UUID> auditLineIds) {
     }
 
     /** DebitNoteLineInput. */

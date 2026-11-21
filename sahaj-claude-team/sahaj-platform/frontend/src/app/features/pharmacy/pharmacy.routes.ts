@@ -15,6 +15,11 @@ export const PHARMACY_ROUTES: Routes = [
         loadComponent: () => import('./module-home.page').then((m) => m.ModuleHomePage),
       },
       {
+        path: 'pharmacy',
+        title: 'Pharmacy · Sahaj',
+        loadComponent: () => import('./sale/pharmacy-sale.page').then((m) => m.PharmacySalePage),
+      },
+      {
         path: 'setup',
         title: 'Inventory setup · Sahaj',
         loadComponent: () => import('./setup/setup.page').then((m) => m.SetupPage),

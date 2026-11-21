@@ -220,6 +220,7 @@ None of these blocks development, test or demo. All must be confirmed before rea
 - G-19. Vendor payable in the pharmacy module and the absence of payment recording (OQ-79-5). Accountant.
 - G-20. Batch expiry as month and year, valid through the last day (OQ-79-7). Pharmacist.
 - G-21. Rate-rise percentage and ₹ limits are the owner's entry; none shipped (OQ-79-10, SAH-78 G-4).
+- The programme-wide list (setup steps, rule confirmations, deviations, what is not in the release) is the "GO-LIVE CHECKLIST" in `docs/requirements/SAH-80.md` (21 Nov 2026, DEC-061).
 
 ## Change log
 - 18 Nov 2026 (wording, no scope change): added open question OQ-79-37 (batch numbers that differ only in case when opening stock is posted to batches; the SAH-78-7 import already treats them as one batch, ADR-028 R4). Open item only; nothing decided; no rule or acceptance criterion changed.

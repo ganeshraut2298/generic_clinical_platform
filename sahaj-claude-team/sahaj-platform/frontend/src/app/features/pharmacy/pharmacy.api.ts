@@ -20,6 +20,7 @@ import {
   OpeningStockLinePage,
   OwnProductInput,
   OwnProductUpdate,
+  PersonRef,
   PharmacyContext,
   PresetInput,
   PrintDocType,
@@ -71,6 +72,7 @@ import {
   StockLedgerQuery,
   StockOverview,
   StockView,
+  StoreRef,
 } from './pharmacy-inventory.model';
 import {
   ClientKeyInput,
@@ -124,6 +126,76 @@ import {
   ShortageStatus,
   WaitingForActionPage,
 } from './pharmacy-indent.model';
+import {
+  AcceptSalesReturnInput,
+  ActivityPage,
+  ActivityQuery,
+  CommandCentre,
+  H1RegisterPage,
+  H1RegisterQuery,
+  Licences,
+  OpdQueuePage,
+  RoleReadout,
+  SalesReturnPage,
+  SalesReturnStatus,
+  ReturnableBill,
+  ReturnableBillRow,
+  SalesReturn,
+  SalesReturnCreate,
+  ScheduleXRegister,
+} from './pharmacy-compliance.model';
+import {
+  Bill,
+  BillCreate,
+  BillPage,
+  BillRefundInput,
+  CancelBillInput,
+  CartInput,
+  Customer,
+  CustomerAccount,
+  CustomerCreate,
+  CustomerPage,
+  CustomerPaymentInput,
+  CustomerPaymentReceipt,
+  DiscountRequest,
+  DiscountRequestInput,
+  SubstituteOptions,
+  HeldBill,
+  HeldBillRow,
+  HoldInput,
+  SalePatientRow,
+  SaleProductRow,
+  SaleQuote,
+} from './pharmacy-sale.model';
+import {
+  AdmittedPatient,
+  Consumption,
+  ConsumptionCreate,
+  ConsumptionPage,
+  DamageReport,
+  DamageReportCreate,
+  StoreReturn,
+  StoreReturnCreate,
+  Transfer,
+  TransferCreate,
+  TransferDispatchInput,
+  TransferPage,
+} from './pharmacy-stockuse.model';
+import {
+  AuditPostInput,
+  CountSheetPage,
+  CountsInput,
+  RecountInput,
+  ReportCatalogue,
+  ReportPage,
+  ReportQuery,
+  StockAudit,
+  StockAuditCreate,
+  StockAuditPage,
+  StockAuditStatus,
+  VarianceReasonsInput,
+  VarianceReview,
+} from './pharmacy-stockcount.model';
 
 /**
  * The only place that calls the Pharmacy & Inventory API (`docs/api/pharmacy.yaml` 0.2.0, the SAH-78 operations):
@@ -957,4 +1029,350 @@ export class PharmacyApi {
   settleShortage(storeId: string, shortageId: string, input: SettleShortageInput): Observable<Shortage> {
     return this.http.post<Shortage>(`${this.baseUrl}/stores/${storeId}/shortages/${shortageId}/settle`, input);
   }
+
+  // ---- SAH-79 work package G: return to Central Store and damage (79-14), transfers (79-15), consumption (79-16)
+
+  createStoreReturn(storeId: string, input: StoreReturnCreate): Observable<StoreReturn> {
+    return this.http.post<StoreReturn>(`${this.baseUrl}/stores/${storeId}/store-returns`, input);
+  }
+
+  createDamageReport(storeId: string, input: DamageReportCreate): Observable<DamageReport> {
+    return this.http.post<DamageReport>(`${this.baseUrl}/stores/${storeId}/damage-reports`, input);
+  }
+
+  damageReport(storeId: string, id: string): Observable<DamageReport> {
+    return this.http.get<DamageReport>(`${this.baseUrl}/stores/${storeId}/damage-reports/${id}`);
+  }
+
+  transfers(storeId: string, query: { open?: boolean; page?: number; size?: number } = {}): Observable<TransferPage> {
+    let params = new HttpParams().set('open', query.open ?? true);
+    if (query.page !== undefined) {
+      params = params.set('page', query.page);
+    }
+    if (query.size !== undefined) {
+      params = params.set('size', query.size);
+    }
+    return this.http.get<TransferPage>(`${this.baseUrl}/stores/${storeId}/transfers`, { params });
+  }
+
+  /** The other stores of the unit a transfer from or to this store may name (SAH-79-15, contract 0.3.6). */
+  transferStores(storeId: string): Observable<{ items: StoreRef[] }> {
+    return this.http.get<{ items: StoreRef[] }>(`${this.baseUrl}/stores/${storeId}/transfer-stores`);
+  }
+
+  createTransfer(storeId: string, input: TransferCreate): Observable<Transfer> {
+    return this.http.post<Transfer>(`${this.baseUrl}/stores/${storeId}/transfers`, input);
+  }
+
+  transfer(storeId: string, transferId: string): Observable<Transfer> {
+    return this.http.get<Transfer>(`${this.baseUrl}/stores/${storeId}/transfers/${transferId}`);
+  }
+
+  dispatchTransfer(storeId: string, transferId: string, input: TransferDispatchInput): Observable<Transfer> {
+    return this.http.post<Transfer>(`${this.baseUrl}/stores/${storeId}/transfers/${transferId}/dispatch`, input);
+  }
+
+  cancelTransfer(storeId: string, transferId: string, input: VersionReasonInput): Observable<Transfer> {
+    return this.http.post<Transfer>(`${this.baseUrl}/stores/${storeId}/transfers/${transferId}/cancel`, input);
+  }
+
+  admittedPatients(storeId: string, q?: string): Observable<AdmittedPatient[]> {
+    let params = new HttpParams();
+    if (q) {
+      params = params.set('q', q);
+    }
+    return this.http
+      .get<{ items: AdmittedPatient[] }>(`${this.baseUrl}/stores/${storeId}/consumption/admitted-patients`, { params })
+      .pipe(map((answer) => answer.items));
+  }
+
+  orderedByOptions(): Observable<PersonRef[]> {
+    return this.http
+      .get<{ items: PersonRef[] }>(`${this.baseUrl}/consumption/ordered-by-options`)
+      .pipe(map((answer) => answer.items));
+  }
+
+  consumptions(storeId: string, query: { date?: string; page?: number; size?: number } = {}): Observable<ConsumptionPage> {
+    let params = new HttpParams();
+    if (query.date) {
+      params = params.set('date', query.date);
+    }
+    if (query.page !== undefined) {
+      params = params.set('page', query.page);
+    }
+    if (query.size !== undefined) {
+      params = params.set('size', query.size);
+    }
+    return this.http.get<ConsumptionPage>(`${this.baseUrl}/stores/${storeId}/consumptions`, { params });
+  }
+
+  createConsumption(storeId: string, input: ConsumptionCreate): Observable<Consumption> {
+    return this.http.post<Consumption>(`${this.baseUrl}/stores/${storeId}/consumptions`, input);
+  }
+
+  // ---- SAH-79 work package H: stock count and audit (79-17), reports (79-18, 79-19)
+
+  stockAudits(
+    storeId: string,
+    query: { status?: StockAuditStatus; page?: number; size?: number } = {},
+  ): Observable<StockAuditPage> {
+    let params = new HttpParams();
+    if (query.status) {
+      params = params.set('status', query.status);
+    }
+    if (query.page !== undefined) {
+      params = params.set('page', query.page);
+    }
+    if (query.size !== undefined) {
+      params = params.set('size', query.size);
+    }
+    return this.http.get<StockAuditPage>(`${this.baseUrl}/stores/${storeId}/stock-audits`, { params });
+  }
+
+  startStockAudit(storeId: string, input: StockAuditCreate): Observable<StockAudit> {
+    return this.http.post<StockAudit>(`${this.baseUrl}/stores/${storeId}/stock-audits`, input);
+  }
+
+  stockAudit(storeId: string, auditId: string): Observable<StockAudit> {
+    return this.http.get<StockAudit>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}`);
+  }
+
+  countSheet(storeId: string, auditId: string, page = 0, size = 200): Observable<CountSheetPage> {
+    const params = new HttpParams().set('page', page).set('size', size);
+    return this.http.get<CountSheetPage>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/count-sheet`, {
+      params,
+    });
+  }
+
+  saveCounts(storeId: string, auditId: string, input: CountsInput): Observable<CountSheetPage> {
+    return this.http.put<CountSheetPage>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/counts`, input);
+  }
+
+  submitCount(storeId: string, auditId: string, input: AuditPostInput): Observable<StockAudit> {
+    return this.http.post<StockAudit>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/submit`, input);
+  }
+
+  varianceReview(storeId: string, auditId: string): Observable<VarianceReview> {
+    return this.http.get<VarianceReview>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/variance`);
+  }
+
+  saveVarianceReasons(storeId: string, auditId: string, input: VarianceReasonsInput): Observable<VarianceReview> {
+    return this.http.put<VarianceReview>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/variance`, input);
+  }
+
+  requestRecount(storeId: string, auditId: string, input: RecountInput): Observable<StockAudit> {
+    return this.http.post<StockAudit>(`${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/recount`, input);
+  }
+
+  approveAndPostAudit(storeId: string, auditId: string, input: AuditPostInput): Observable<StockAudit> {
+    return this.http.post<StockAudit>(
+      `${this.baseUrl}/stores/${storeId}/stock-audits/${auditId}/approve-and-post`,
+      input,
+    );
+  }
+
+  reportCatalogue(): Observable<ReportCatalogue> {
+    return this.http.get<ReportCatalogue>(`${this.baseUrl}/reports`);
+  }
+
+  runReport(reportKey: string, query: ReportQuery = {}): Observable<ReportPage> {
+    return this.http.get<ReportPage>(`${this.baseUrl}/reports/${reportKey}`, { params: reportParams(query) });
+  }
+
+  /** The CSV of one report (UTF-8 with a byte order mark); the server answers 409 export-too-large above 50,000 rows. */
+  exportReport(reportKey: string, query: ReportQuery = {}): Observable<Blob> {
+    const filters: ReportQuery = { ...query, page: undefined, size: undefined };
+    return this.http.get(`${this.baseUrl}/reports/${reportKey}/export`, {
+      params: reportParams(filters),
+      responseType: 'blob',
+    });
+  }
+
+  exportStockLedger(query: { productId: string; storeId?: string; from: string; to: string }): Observable<Blob> {
+    let params = new HttpParams().set('productId', query.productId).set('from', query.from).set('to', query.to);
+    if (query.storeId) {
+      params = params.set('storeId', query.storeId);
+    }
+    return this.http.get(`${this.baseUrl}/reports/stock-ledger/export`, { params, responseType: 'blob' });
+  }
+
+  // ---- SAH-80 work package I: sale core (pharmacy-sales.yaml 0.3.1): patient and customer pick, POS, bills, hold
+
+  saleProducts(storeId: string, search: { q?: string; barcode?: string }): Observable<SaleProductRow[]> {
+    let params = new HttpParams();
+    if (search.q) {
+      params = params.set('q', search.q);
+    }
+    if (search.barcode) {
+      params = params.set('barcode', search.barcode);
+    }
+    return this.http
+      .get<{ items: SaleProductRow[] }>(`${this.baseUrl}/stores/${storeId}/sale/products`, { params })
+      .pipe(map((answer) => answer.items));
+  }
+
+  quoteSale(storeId: string, cart: CartInput): Observable<SaleQuote> {
+    return this.http.post<SaleQuote>(`${this.baseUrl}/stores/${storeId}/sale/quote`, cart);
+  }
+
+  createBill(storeId: string, input: BillCreate): Observable<Bill> {
+    return this.http.post<Bill>(`${this.baseUrl}/stores/${storeId}/bills`, input);
+  }
+
+  bills(storeId: string, query: { date?: string; number?: string; page?: number; size?: number } = {}): Observable<BillPage> {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== '') {
+        params = params.set(key, String(value));
+      }
+    }
+    return this.http.get<BillPage>(`${this.baseUrl}/stores/${storeId}/bills`, { params });
+  }
+
+  bill(storeId: string, billId: string): Observable<Bill> {
+    return this.http.get<Bill>(`${this.baseUrl}/stores/${storeId}/bills/${billId}`);
+  }
+
+  heldBills(storeId: string): Observable<HeldBillRow[]> {
+    return this.http
+      .get<{ items: HeldBillRow[] }>(`${this.baseUrl}/stores/${storeId}/held-bills`)
+      .pipe(map((answer) => answer.items));
+  }
+
+  holdBill(storeId: string, input: HoldInput): Observable<HeldBill> {
+    return this.http.post<HeldBill>(`${this.baseUrl}/stores/${storeId}/held-bills`, input);
+  }
+
+  heldBill(storeId: string, heldBillId: string): Observable<HeldBill> {
+    return this.http.get<HeldBill>(`${this.baseUrl}/stores/${storeId}/held-bills/${heldBillId}`);
+  }
+
+  discardHeldBill(storeId: string, heldBillId: string, input: VersionInput): Observable<HeldBill> {
+    return this.http.post<HeldBill>(`${this.baseUrl}/stores/${storeId}/held-bills/${heldBillId}/discard`, input);
+  }
+
+  // ---- SAH-80 work packages J and L: sales return, registers and compliance (contract 0.3.6)
+
+  findReturnableBills(storeId: string, query: { number?: string; customer?: string }): Observable<ReturnableBillRow[]> {
+    let params = new HttpParams();
+    if (query.number) {
+      params = params.set('number', query.number);
+    }
+    if (query.customer) {
+      params = params.set('customer', query.customer);
+    }
+    return this.http
+      .get<{ items: ReturnableBillRow[] }>(`${this.baseUrl}/stores/${storeId}/sales-returns/bills`, { params })
+      .pipe(map((answer) => answer.items));
+  }
+
+  returnableBill(storeId: string, billId: string): Observable<ReturnableBill> {
+    return this.http.get<ReturnableBill>(`${this.baseUrl}/stores/${storeId}/sales-returns/bills/${billId}`);
+  }
+
+  createSalesReturn(storeId: string, input: SalesReturnCreate): Observable<SalesReturn> {
+    return this.http.post<SalesReturn>(`${this.baseUrl}/stores/${storeId}/sales-returns`, input);
+  }
+
+  h1Register(storeId: string, query: H1RegisterQuery): Observable<H1RegisterPage> {
+    return this.http.get<H1RegisterPage>(`${this.baseUrl}/stores/${storeId}/registers/h1`, { params: reportParams(query) });
+  }
+
+  scheduleXRegister(storeId: string, query: { from?: string; to?: string }): Observable<ScheduleXRegister> {
+    return this.http.get<ScheduleXRegister>(`${this.baseUrl}/stores/${storeId}/registers/schedule-x`, { params: reportParams(query) });
+  }
+
+  licences(): Observable<Licences> {
+    return this.http.get<Licences>(`${this.baseUrl}/compliance/licences`);
+  }
+
+  searchSalePatients(storeId: string, q: string): Observable<SalePatientRow[]> {
+    const params = new HttpParams().set('q', q);
+    return this.http
+      .get<{ items: SalePatientRow[] }>(`${this.baseUrl}/stores/${storeId}/sale/patients`, { params })
+      .pipe(map((answer) => answer.items));
+  }
+
+  searchCustomers(storeId: string, q: string, page = 0, size = 10): Observable<CustomerPage> {
+    const params = new HttpParams().set('q', q).set('page', page).set('size', size);
+    return this.http.get<CustomerPage>(`${this.baseUrl}/stores/${storeId}/customers`, { params });
+  }
+
+  createCustomer(storeId: string, input: CustomerCreate): Observable<Customer> {
+    return this.http.post<Customer>(`${this.baseUrl}/stores/${storeId}/customers`, input);
+  }
+
+  // ---- SAH-80 work packages I, J, K, L and N: the remaining sale operations (contract 0.3.6)
+
+  customerAccount(storeId: string, customerId: string, page = 0, size = 10): Observable<CustomerAccount> {
+    const params = new HttpParams().set('page', page).set('size', size);
+    return this.http.get<CustomerAccount>(`${this.baseUrl}/stores/${storeId}/customers/${customerId}/account`, { params });
+  }
+
+  receiveCustomerPayment(storeId: string, customerId: string, input: CustomerPaymentInput): Observable<CustomerPaymentReceipt> {
+    return this.http.post<CustomerPaymentReceipt>(`${this.baseUrl}/stores/${storeId}/customers/${customerId}/payments`, input);
+  }
+
+  cancelBill(storeId: string, billId: string, input: CancelBillInput): Observable<Bill> {
+    return this.http.post<Bill>(`${this.baseUrl}/stores/${storeId}/bills/${billId}/cancel`, input);
+  }
+
+  recordCancelledBillRefund(storeId: string, billId: string, input: BillRefundInput): Observable<Bill> {
+    return this.http.post<Bill>(`${this.baseUrl}/stores/${storeId}/bills/${billId}/refund`, input);
+  }
+
+  requestDiscountApproval(storeId: string, input: DiscountRequestInput): Observable<DiscountRequest> {
+    return this.http.post<DiscountRequest>(`${this.baseUrl}/stores/${storeId}/sale/discount-requests`, input);
+  }
+
+  discountRequest(storeId: string, requestId: string): Observable<DiscountRequest> {
+    return this.http.get<DiscountRequest>(`${this.baseUrl}/stores/${storeId}/sale/discount-requests/${requestId}`);
+  }
+
+  withdrawDiscountRequest(storeId: string, requestId: string): Observable<DiscountRequest> {
+    return this.http.post<DiscountRequest>(`${this.baseUrl}/stores/${storeId}/sale/discount-requests/${requestId}/withdraw`, {});
+  }
+
+  substituteOptions(storeId: string, productId: string): Observable<SubstituteOptions> {
+    return this.http.get<SubstituteOptions>(`${this.baseUrl}/stores/${storeId}/sale/products/${productId}/substitutes`);
+  }
+
+  salesReturns(storeId: string, query: { status?: SalesReturnStatus; page?: number; size?: number } = {}): Observable<SalesReturnPage> {
+    return this.http.get<SalesReturnPage>(`${this.baseUrl}/stores/${storeId}/sales-returns`, { params: reportParams(query) });
+  }
+
+  salesReturn(storeId: string, returnId: string): Observable<SalesReturn> {
+    return this.http.get<SalesReturn>(`${this.baseUrl}/stores/${storeId}/sales-returns/${returnId}`);
+  }
+
+  acceptSalesReturn(storeId: string, returnId: string, input: AcceptSalesReturnInput): Observable<SalesReturn> {
+    return this.http.post<SalesReturn>(`${this.baseUrl}/stores/${storeId}/sales-returns/${returnId}/accept`, input);
+  }
+
+  roleReadout(): Observable<RoleReadout> {
+    return this.http.get<RoleReadout>(`${this.baseUrl}/compliance/role-readout`);
+  }
+
+  activityFeed(query: ActivityQuery): Observable<ActivityPage> {
+    return this.http.get<ActivityPage>(`${this.baseUrl}/activity`, { params: reportParams(query) });
+  }
+
+  /** The owner may leave storeId out for all selling stores. */
+  commandCentre(storeId?: string): Observable<CommandCentre> {
+    return this.http.get<CommandCentre>(`${this.baseUrl}/command-centre`, { params: reportParams({ storeId }) });
+  }
+
+  opdQueue(storeId: string): Observable<OpdQueuePage> {
+    return this.http.get<OpdQueuePage>(`${this.baseUrl}/stores/${storeId}/opd-queue`);
+  }
+}
+
+function reportParams(query: ReportQuery): HttpParams {
+  let params = new HttpParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== '') {
+      params = params.set(key, String(value));
+    }
+  }
+  return params;
 }

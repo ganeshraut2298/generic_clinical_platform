@@ -327,8 +327,12 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
                 "approval_request_level", "approval_decision", "stock_ledger",
                 // SAH-79 WP-E to WP-H (migrations 1400 to 1700; their own test plans follow with those work packages): the lines, notes and entries
                 // that are never updated
-                "consumption", "consumption_line", "debit_note_credit", "dispatch_line", "dispatch_receipt_line", "return_item_note", "store_return", "transfer_line",
-                "vendor_payable_entry");
+                "consumption_line", "debit_note_credit", "dispatch_line", "dispatch_receipt_line", "return_item_note", "store_return", "transfer_line",
+                "vendor_payable_entry",
+                // SAH-80 (migrations 1800 to 2300): the insert-only tables of the sale, the register, the day close and the IPD supply; "consumption" gained an
+                // update policy in migration 2220 and left this set
+                "bill_payment", "credit_note", "customer_account_entry", "day_close", "discharge_clearance", "h1_register_row", "ipd_issue", "product_link_history",
+                "refund", "sale_discount_request", "schedule_x_register_row");
         java.util.regex.Pattern ledgerPartition = java.util.regex.Pattern.compile("^stock_ledger_y[0-9]{4}m(0[1-9]|1[0-2])$");
         Map<String, List<String>> commands = new LinkedHashMap<>();
         List<String> problems = new ArrayList<>();
@@ -381,7 +385,12 @@ class RowLevelSecurityCatalogIT extends BaseIntegrationTest {
                 // SAH-79 WP-E to WP-H, migrations 1400 to 1700
                 "purchase_order", "purchase_order_line", "goods_receipt", "goods_receipt_line", "debit_note", "debit_note_credit", "debit_note_line", "vendor_payable",
                 "vendor_payable_entry", "indent", "indent_line", "dispatch", "dispatch_line", "dispatch_receipt_line", "return_item", "return_item_note", "shortage",
-                "store_return", "damage_report", "transfer", "transfer_line", "consumption", "consumption_line", "stock_audit", "stock_audit_line");
+                "store_return", "damage_report", "transfer", "transfer_line", "consumption", "consumption_line", "stock_audit", "stock_audit_line",
+                // SAH-80 (migrations 1800 to 2300): 26 more
+                "bill", "bill_line", "bill_payment", "credit_note", "customer", "customer_account_entry", "day_close", "discharge_clearance", "h1_register_row",
+                "held_bill", "ipd_issue", "ipd_issue_line", "ipd_order_supply", "pharmacist_registration", "product_link", "product_link_history", "refund",
+                "rx_dispense", "rx_dispense_line", "sale_discount_request", "sales_return", "sales_return_line", "schedule_x_register_row", "store_bill_counter",
+                "store_bill_series", "ward_return");
     }
 
     // ---- grants ----

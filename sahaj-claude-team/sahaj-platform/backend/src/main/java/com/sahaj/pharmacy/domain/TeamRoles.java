@@ -14,9 +14,10 @@ public final class TeamRoles {
     public static final String PHARMACIST = "PHARMACIST";
     public static final String STORE_STAFF = "STORE_STAFF";
 
-    private static final Set<StoreRole> ALL = Collections.unmodifiableSet(EnumSet.allOf(StoreRole.class));
+    private static final Set<StoreRole> ALL = Collections
+            .unmodifiableSet(EnumSet.complementOf(EnumSet.of(StoreRole.CASHIER)));
     private static final Set<StoreRole> USER_ROLES = Collections
-            .unmodifiableSet(EnumSet.of(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER));
+            .unmodifiableSet(EnumSet.of(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER, StoreRole.CASHIER));
     private static final Set<StoreRole> STORE_USER_ONLY = Collections.unmodifiableSet(EnumSet.of(StoreRole.STORE_USER));
 
     private TeamRoles() {
@@ -24,7 +25,7 @@ public final class TeamRoles {
 
     /**
      * The store roles this team role may hold. OWNER, DOCTOR, NURSE and PHARMACIST: all four. BILLING and STORE_STAFF:
-     * Store user and Central Store user only. VISITING_DOCTOR, FRONT_DESK and COUNSELLOR: Store user only. An unknown
+     * Store user, Central Store user and Cashier (SAH-80, only at a sale-allowed store that is not the Central Store). VISITING_DOCTOR, FRONT_DESK and COUNSELLOR: Store user only. An unknown
      * role (a future one) gets the narrowest set.
      */
     public static Set<StoreRole> allowedStoreRoles(String teamRole) {

@@ -33,6 +33,9 @@ public class JdbcApprovalRepository implements ApprovalRepository {
             + " and r.subject_type = :subjectType and r.subject_id = :subjectId order by r.raised_at desc, r.id limit 1";
     private static final String PENDING = "select " + REQUEST_COLUMNS + REQUEST_FROM
             + " and r.status = 'PENDING' order by r.level_entered_at, r.id";
+    private static final String PENDING_FOR = "select " + REQUEST_COLUMNS + REQUEST_FROM
+            + " and r.status = 'PENDING'"
+            + " and (:allStores or r.rule_store_id in (:storeIds)) order by r.level_entered_at, r.id limit :limit";
     private static final String LEVELS = """
             select level_no, approver_kind, condition_kind, applies, rule_text from pharmacy.approval_request_level
              where tenant_id = :tenantId and request_id = :requestId order by level_no
@@ -40,6 +43,15 @@ public class JdbcApprovalRepository implements ApprovalRepository {
     private static final String DECISIONS = """
             select level_no, decision, decided_by, acting_as, reason_key, note, decided_at from pharmacy.approval_decision
              where tenant_id = :tenantId and request_id = :requestId order by level_no
+            """;
+
+    private static final String LEVELS_OF = """
+            select request_id, level_no, approver_kind, condition_kind, applies, rule_text from pharmacy.approval_request_level
+             where tenant_id = :tenantId and request_id in (:ids) order by request_id, level_no
+            """;
+    private static final String DECISIONS_OF = """
+            select request_id, level_no, decision, decided_by, acting_as, reason_key, note, decided_at
+              from pharmacy.approval_decision where tenant_id = :tenantId and request_id in (:ids) order by request_id, level_no
             """;
     private static final String VERSION_NO = """
             select version_no from pharmacy.approval_rule_version where tenant_id = :tenantId and id = :id
@@ -103,6 +115,45 @@ public class JdbcApprovalRepository implements ApprovalRepository {
     @Override
     public List<Request> pending(UUID tenantId) {
         return jdbc.sql(PENDING).param("tenantId", tenantId).query(JdbcApprovalRepository::map).list();
+    }
+
+    @Override
+    public List<Request> pendingFor(UUID tenantId, java.util.Collection<UUID> storeIds, int limit) {
+        boolean all = storeIds == null;
+        java.util.Collection<UUID> ids = all || storeIds.isEmpty() ? List.of(new UUID(0, 0)) : storeIds;
+        return jdbc.sql(PENDING_FOR).param("tenantId", tenantId).param("allStores", all).param("storeIds", ids)
+                .param("limit", limit).query(JdbcApprovalRepository::map).list();
+    }
+
+    @Override
+    public java.util.Map<UUID, List<Level>> levelsOf(UUID tenantId, java.util.Collection<UUID> requestIds) {
+        java.util.Map<UUID, List<Level>> out = new java.util.HashMap<>();
+        if (requestIds.isEmpty()) {
+            return out;
+        }
+        jdbc.sql(LEVELS_OF).param("tenantId", tenantId).param("ids", requestIds).query((rs, n) -> {
+            out.computeIfAbsent(rs.getObject("request_id", UUID.class), k -> new java.util.ArrayList<>()).add(new Level(
+                    rs.getInt("level_no"), ApproverKind.valueOf(rs.getString("approver_kind")),
+                    ConditionKind.valueOf(rs.getString("condition_kind")), rs.getBoolean("applies"), rs.getString("rule_text")));
+            return null;
+        }).list();
+        return out;
+    }
+
+    @Override
+    public java.util.Map<UUID, List<Decision>> decisionsOf(UUID tenantId, java.util.Collection<UUID> requestIds) {
+        java.util.Map<UUID, List<Decision>> out = new java.util.HashMap<>();
+        if (requestIds.isEmpty()) {
+            return out;
+        }
+        jdbc.sql(DECISIONS_OF).param("tenantId", tenantId).param("ids", requestIds).query((rs, n) -> {
+            out.computeIfAbsent(rs.getObject("request_id", UUID.class), k -> new java.util.ArrayList<>()).add(new Decision(
+                    rs.getInt("level_no"), rs.getString("decision"), rs.getObject("decided_by", UUID.class),
+                    rs.getString("acting_as"), rs.getString("reason_key"), rs.getString("note"),
+                    rs.getTimestamp("decided_at").toInstant()));
+            return null;
+        }).list();
+        return out;
     }
 
     @Override

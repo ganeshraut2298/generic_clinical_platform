@@ -78,7 +78,7 @@ class PurchaseOrderServiceTest {
     private final AuditLog audit = mock(AuditLog.class);
     private final PurchaseOrderService service = new PurchaseOrderService(gate, guard, stores, products, vendors, orders, engine,
             approvals, series, numbers, clients, events, reasons, unitRows, templates, team, audit,
-            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)));
+            new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), new BlindCount(mock(StockAuditRepository.class)));
     private final PharmacyCaller caller = new PharmacyCaller(TENANT, USER, ME, "Test Central Store User", "PHARMACIST",
             List.of());
     private Store store = new Store(STORE_ID, UNIT, "Test Central Store", "CS", StoreType.CENTRAL, null, false, false, true, true,

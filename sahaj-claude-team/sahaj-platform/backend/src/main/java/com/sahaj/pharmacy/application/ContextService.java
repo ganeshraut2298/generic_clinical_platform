@@ -6,6 +6,7 @@ import com.sahaj.pharmacy.application.PharmacyViews.FixedRules;
 import com.sahaj.pharmacy.application.PharmacyViews.MyStore;
 import com.sahaj.pharmacy.domain.AccessLevel;
 import com.sahaj.pharmacy.domain.StoreRole;
+import com.sahaj.pharmacy.domain.TeamRoles;
 import com.sahaj.pharmacy.domain.Unit;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
@@ -106,7 +107,13 @@ public class ContextService {
         return new Context(units.header(caller.tenantId(), unit),
                 new CallerView(caller.membershipId(), caller.name(), caller.teamRole(),
                         RoleLabels.of(caller.teamRole()), setupAccess(caller)),
-                capabilities(caller), stores, working, mustPick, FixedRules.ON);
+                capabilities(caller, ownerHasSaleStore(caller), unit == null || unit.integrationMode() == com.sahaj.pharmacy.domain.IntegrationMode.INTEGRATED), stores,
+                working, mustPick, FixedRules.ON);
+    }
+
+    /** The owner reaches every ACTIVE store, so the sale tabs show for the owner when at least one of them allows sale. */
+    private boolean ownerHasSaleStore(PharmacyCaller caller) {
+        return caller.isOwner() && storeRows.list(caller.tenantId(), false).stream().anyMatch(st -> st.active() && st.saleAllowed());
     }
 
     private static String setupAccess(PharmacyCaller caller) {
@@ -121,6 +128,55 @@ public class ContextService {
      * owner); OPENING_STOCK_APPROVE for the owner only (a different owner approves, ADR-028 D7). Later phases add values.
      */
     static List<String> capabilities(PharmacyCaller caller) {
+        return capabilities(caller, false, false);
+    }
+
+    /**
+     * The SAH-79 values, then the SAH-80 values (contract 0.3.0): PHARMACY, POS, SALES_RETURN, REGISTERS, COMPLIANCE,
+     * COMMAND_CENTRE, SALES_REPORTS, and in Integrated mode PATIENT_LINK, ALLERGY_CHECK and OPD_QUEUE (the queue tab shows
+     * "Not connected" while the port is a no-op). IPD_QUEUE, IPD_CHARGES and DISCHARGE_CLEARANCE need an IPD feed that is not
+     * connected in this release, so they are not listed. DAY_CLOSE is not built (WP-O and 80-22 are left out).
+     */
+    static List<String> capabilities(PharmacyCaller caller, boolean ownerHasSaleStore, boolean integrated) {
+        List<String> values = new ArrayList<>(base(caller));
+        boolean owner = caller.isOwner();
+        boolean sells = ownerHasSaleStore || caller.mappings().stream().anyMatch(m -> m.access().sell());
+        boolean registers = ownerHasSaleStore || caller.mappings().stream().anyMatch(m -> m.access().readRegisters());
+        boolean returns = ownerHasSaleStore || caller.mappings().stream().anyMatch(m -> m.access().salesReturn());
+        boolean pharmacist = TeamRoles.PHARMACIST.equals(caller.teamRole());
+        boolean cashier = caller.mappings().stream().anyMatch(m -> m.effective() == StoreRole.CASHIER && m.access().sell());
+        boolean hod = caller.mappings().stream().anyMatch(m -> m.access().readRegisters()
+                && (m.effective() == StoreRole.APPROVER || m.effective() == StoreRole.DELEGATE));
+        if (owner || sells || registers) {
+            values.add("PHARMACY");
+        }
+        if (sells) {
+            values.add("POS");
+        }
+        if (returns) {
+            values.add("SALES_RETURN");
+        }
+        if (registers) {
+            values.add("REGISTERS");
+        }
+        if (owner || pharmacist) {
+            values.add("COMPLIANCE");
+        }
+        if (owner || (pharmacist && sells) || hod || cashier) {
+            values.add("COMMAND_CENTRE");
+        }
+        if (owner || (pharmacist && sells) || hod) {
+            values.add("SALES_REPORTS");
+        }
+        if (integrated && sells) {
+            values.add("PATIENT_LINK");
+            values.add("ALLERGY_CHECK");
+            values.add("OPD_QUEUE");
+        }
+        return values;
+    }
+
+    private static List<String> base(PharmacyCaller caller) {
         List<String> values = new ArrayList<>();
         if (caller.meets(AccessLevel.SETUP_VIEW)) {
             values.add(SETUP_VIEW);

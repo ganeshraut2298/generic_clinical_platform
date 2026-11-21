@@ -88,6 +88,7 @@ class ReturnShortageServiceTest {
         when(guard.require(any(), eq(WARD), eq(StoreCapability.RECEIVE))).thenReturn(ward);
         when(guard.require(any(), eq(CENTRAL), eq(StoreCapability.RECEIVE))).thenReturn(central);
         when(stores.list(TENANT, true)).thenReturn(List.of(central, ward));
+        when(stores.find(TENANT, CENTRAL)).thenReturn(Optional.of(central));
         when(stores.findForUpdate(TENANT, CENTRAL)).thenReturn(Optional.of(central));
         when(clients.take(any(), any(), any(), any(), any(), any())).thenReturn(true);
         when(products.find(eq(TENANT), any())).thenAnswer(i -> Optional.of(product(i.getArgument(1), "NONE")));
@@ -307,6 +308,8 @@ class ReturnShortageServiceTest {
                 .isInstanceOf(InvalidFieldsException.class);
         assertThatThrownBy(() -> service.waiting(TENANT, USER, CENTRAL.toString(), "ACCEPTING", "SOON", null, null))
                 .isInstanceOf(InvalidFieldsException.class);
+        when(returns.page(eq(TENANT), eq(WARD), eq(false), any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt())).thenReturn(new ReturnItemRepository.Slice(List.of(), 0));
         service.waiting(TENANT, USER, WARD.toString(), "RETURNING", null, null, null);
         verify(guard).require(any(), eq(WARD), eq(StoreCapability.RECEIVE));
     }
@@ -358,6 +361,21 @@ class ReturnShortageServiceTest {
 
         verify(signature).recheck(TENANT, ME, SIGNER);
         assertThat(posted()).extracting(StockPosting.Line::secondSignerMembershipId).containsOnly(SIGNER);
+    }
+
+    @Test
+    void atLevelZeroOnlyAPharmacistWritesOffScheduleXUnitsAsATransitLoss() {
+        when(products.find(eq(TENANT), any())).thenAnswer(i -> Optional.of(product(i.getArgument(1), "X")));
+        when(engine.plan(eq(TENANT), any())).thenReturn(null);
+
+        assertThatThrownBy(() -> settle("TRANSIT_LOSS", 0, null)).isInstanceOfSatisfying(ForbiddenException.class,
+                e -> assertThat(e.problemType()).isEqualTo("schedule-x-pharmacist"));
+        verify(posting, never()).post(any(), any());
+
+        caller = new PharmacyCaller(TENANT, USER, ME, "Test Pharmacist", "PHARMACIST", List.of());
+        settle("TRANSIT_LOSS", 0, null);
+
+        assertThat(posted()).singleElement().satisfies(m -> assertThat(m.secondSignerMembershipId()).isNull());
     }
 
     @Test

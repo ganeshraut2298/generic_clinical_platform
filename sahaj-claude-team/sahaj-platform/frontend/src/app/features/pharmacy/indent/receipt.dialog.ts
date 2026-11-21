@@ -30,7 +30,7 @@ export const RECEIPT_CONFIG = {
 } as const;
 
 const SHORT_KEY = 'receipt-reject.short';
-const EXPIRED_KEY = 'receipt-reject.near-expiry-expired';
+const EXPIRED_KEY = 'receipt-reject.near-expiry';
 
 interface Row {
   line: DispatchLine;
@@ -142,7 +142,13 @@ interface Row {
         @if (isDone()) {
           <div class="notice good" role="status" data-testid="receipt-done">
             <app-icon name="check" [size]="16" />
-            <span>Receipt confirmed. The accepted units are now in {{ d.toStore.name }}.</span>
+            @if (waitingCount() > 0) {
+              <span data-testid="receipt-partly">
+                Receipt confirmed for the lines you could receive. Schedule X lines are still waiting for a pharmacist.
+              </span>
+            } @else {
+              <span>Receipt confirmed. The accepted units are now in {{ d.toStore.name }}.</span>
+            }
           </div>
         }
         <div class="scroll">
@@ -352,6 +358,7 @@ export class ReceiptDialog implements OnInit {
   protected readonly needsSigner = computed(
     () => this.data.isPharmacist && this.rows().some((r) => r.line.scheduleX && !r.line.received && !r.skipped),
   );
+  protected readonly waitingCount = computed(() => this.rows().filter((r) => !r.line.received).length);
   protected readonly nothingToReceive = computed(() => this.rows().every((r) => r.line.received || r.skipped));
   protected readonly notes = computed(() => {
     const d = this.dispatch();
@@ -519,7 +526,7 @@ export class ReceiptDialog implements OnInit {
               reasonKey: line.rejectReason?.reasonKey ?? null,
               note: '',
               expired: false,
-              skipped: false,
+              skipped: !line.received,
               error: null,
             })),
           );

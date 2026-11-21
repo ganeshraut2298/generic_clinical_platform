@@ -70,6 +70,22 @@ public interface DispatchRepository {
 
     void insertLine(UUID tenantId, NewLine line);
 
+    /** A transfer dispatch: source TRANSFER, no sequence, the reference is the transfer number. */
+    record NewTransferDispatch(UUID id, UUID unitId, UUID transferId, String reference, UUID fromStoreId, UUID toStoreId,
+                               UUID dispatchedBy, UUID secondSignerMembershipId) {
+    }
+
+    record NewTransferLine(UUID id, UUID unitId, UUID dispatchId, UUID transferLineId, UUID productId, UUID batchId,
+                           int dispatchedQty, boolean scheduleX, UUID createdBy) {
+    }
+
+    /** The one dispatch of a transfer, when it has been dispatched. */
+    Optional<Row> byTransfer(UUID tenantId, UUID transferId);
+
+    void insertTransfer(UUID tenantId, NewTransferDispatch dispatch);
+
+    void insertTransferLine(UUID tenantId, NewTransferLine line);
+
     void insertReceipt(UUID tenantId, NewReceipt receipt);
 
     /** The receipt columns and the new status of a locked dispatch, when its version is current. */

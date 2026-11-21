@@ -52,7 +52,8 @@ public class StoreAccessGuard {
         }
         StoreAccess access;
         if (caller.isOwner()) {
-            access = StoreRules.access(caller.teamRole(), StoreRole.APPROVER, store.consumptionAllowed());
+            access = StoreRules.access(caller.teamRole(), StoreRole.APPROVER, store.consumptionAllowed(), store.saleAllowed(),
+                    store.type().isCentral());
         } else {
             access = caller.mappingFor(storeId).orElseThrow(StoreAccessGuard::notFound).access();
         }
@@ -60,6 +61,22 @@ public class StoreAccessGuard {
             throw refuse(caller, storeId, capability);
         }
         return store;
+    }
+
+    /**
+     * SAH-80 rules 24 and 25: the guard for an operation marked x-sale-store. The store is found and the caller must reach it
+     * (404 as {@link #require}); a store that does not allow sale then answers 409 {@code sale-not-allowed}, before the capability
+     * and the body are looked at; then the capability is checked as in {@link #require} (403 {@code store-permission-denied}).
+     */
+    public Store requireSale(PharmacyCaller caller, UUID storeId, StoreCapability capability) {
+        Store store = stores.find(caller.tenantId(), storeId).filter(Store::active).orElseThrow(StoreAccessGuard::notFound);
+        if (!caller.isOwner()) {
+            caller.mappingFor(storeId).orElseThrow(StoreAccessGuard::notFound);
+        }
+        if (!store.saleAllowed()) {
+            throw PharmacyProblemException.saleNotAllowed();
+        }
+        return require(caller, storeId, capability);
     }
 
     /**
@@ -77,7 +94,7 @@ public class StoreAccessGuard {
                     .orElse(false);
         }
         if (caller.isOwner()) {
-            return StoreRules.access(caller.teamRole(), StoreRole.APPROVER, false).has(capability);
+            return StoreRules.access(caller.teamRole(), StoreRole.APPROVER, false, true, false).has(capability);
         }
         return caller.mappingFor(storeId).map(m -> m.access().has(capability)).orElse(false);
     }

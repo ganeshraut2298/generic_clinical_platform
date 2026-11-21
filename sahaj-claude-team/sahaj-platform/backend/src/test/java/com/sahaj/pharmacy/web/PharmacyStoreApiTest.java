@@ -78,7 +78,7 @@ class PharmacyStoreApiTest {
                 new PharmacyViews.StorePerson(MEMBER_ID, "Test Doctor One", "Doctor", true),
                 new PharmacyViews.StoreDelegate(UUID.randomUUID(), "Test Nurse One", "Nurse", true,
                         LocalDate.of(2026, 11, 17), LocalDate.of(2026, 11, 30), DelegateState.CURRENT),
-                "SET", 5, "ACTIVE", false, List.of(), 4L);
+                "SET", 5, "ACTIVE", false, List.of(), 4L, null);
     }
 
     private static StaffMapping mapping() {

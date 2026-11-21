@@ -69,8 +69,10 @@ class ScheduleXSignatureTest {
                             .extracting(f -> f.field() + ":" + f.message()).containsExactly("secondSigner.pin:Enter a 4-digit PIN."));
         }
         assertThatThrownBy(() -> signature.verify(TENANT, CALLER_USER, null, "1234"))
+                .as("L21: a missing membership id is the field secondSigner")
                 .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
-                        .extracting(InvalidFieldsException.FieldMessage::field).containsExactly("secondSigner.pin"));
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly(
+                                "secondSigner:A second signature is needed for Schedule X items."));
         verify(pins, never()).checkColleague(any(), any(), any(), any(), any());
     }
 

@@ -26,6 +26,8 @@ const REASONS = {
 const APPROVER_VIEW: Partial<Indent> = {
   approval: {
     requestId: 'req-1',
+    requestVersion: 4,
+    levelNo: 1,
     status: 'PENDING',
     currentLevel: 1,
     ruleText: 'HOD approves every indent',
@@ -56,9 +58,6 @@ describe('IndentDetailDialog', () => {
     fixture.detectChanges();
     http.expectOne(`${S}/indents/ind-1`).flush(indent(decider ? { ...APPROVER_VIEW, ...over } : over));
     http.expectOne((r) => r.url === `${BASE}/reasons`).flush(REASONS);
-    if (decider) {
-      http.expectOne(`${BASE}/approvals/req-1`).flush(approvalRequest({ id: 'req-1', currentLevel: 1, version: 4 }));
-    }
     await settle();
     return fixture.nativeElement as HTMLElement;
   }
@@ -159,8 +158,8 @@ describe('IndentDetailDialog', () => {
       decision: 'APPROVED',
       reasonKey: 'approval-reject.too-much',
       indentLines: [
-        { indentLineId: 'line-1', approvedQty: 15 },
-        { indentLineId: 'line-2', approvedQty: 10 },
+        { indentLineId: 'line-1', approvedQty: 15, remarkReasonKey: 'approval-reject.too-much' },
+        { indentLineId: 'line-2', approvedQty: 10, remarkReasonKey: null },
       ],
     });
     req.flush(approvalRequest({ id: 'req-1', status: 'APPROVED' }));

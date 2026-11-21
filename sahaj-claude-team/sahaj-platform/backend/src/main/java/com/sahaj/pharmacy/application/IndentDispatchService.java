@@ -42,6 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
  * stores sorted by store id (inside {@link StockPosting}); the new rows are inserted last. A Schedule X line needs a pharmacist and
  * the verified second signer; {@link #precheck} says whether the controller must check a PIN before this transaction starts. The
  * actor of every writer is the caller's membership id. Logs and audit rows hold ids and counts only.
+ *
+ * <p>The replacement-options GET is a read-write transaction on purpose: it sweeps expired batches out of AVAILABLE first
+ * ({@code posting.sweepStore}, ADR-029 P4), so what it shows is what a dispatch would pick.
  */
 @Service
 public class IndentDispatchService {
@@ -53,6 +56,8 @@ public class IndentDispatchService {
     private static final String ENTITY_TYPE = "PHARMACY_DISPATCH";
     private static final String DOC_TYPE = IndentService.DOC_TYPE;
     private static final int MAX_LINES = 200;
+    static final int MAX_DISPATCH_LINES = 400;
+    static final String SPLIT_MESSAGE = "Split this dispatch into smaller ones.";
     private static final int MAX_QTY = 999_999;
     private static final int MAX_OPTIONS = 50;
 
@@ -72,12 +77,13 @@ public class IndentDispatchService {
     private final IndentService indentService;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final BlindCount blind;
 
     public IndentDispatchService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, ProductRepository products,
                                  IndentRepository indents, DispatchRepository dispatches, StockRepository stock,
                                  StockPosting posting, ScheduleXSignature signature, ClientRequestRepository clients,
                                  DocumentEventRepository events, ActiveReasonService reasons, DispatchAssembler assembler,
-                                 IndentService indentService, AuditLog auditLog, PharmacyTime time) {
+                                 IndentService indentService, AuditLog auditLog, PharmacyTime time, BlindCount blind) {
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -94,6 +100,7 @@ public class IndentDispatchService {
         this.indentService = indentService;
         this.auditLog = auditLog;
         this.time = time;
+        this.blind = blind;
     }
 
     /** One line of the dispatch after the checks. {@code action} is null when the whole remaining quantity goes. */
@@ -126,7 +133,7 @@ public class IndentDispatchService {
             }
             int available = stock.availableOfProduct(tenantId, storeId, candidate).stream()
                     .filter(b -> !b.expiryDate().isBefore(today)).mapToInt(Bal::qty).sum();
-            items.add(new DispatchViews.ReplacementOption(IndentService.productRef(product), available));
+            items.add(new DispatchViews.ReplacementOption(IndentService.productRef(product), blind.available(caller, storeId, candidate, available)));
         }
         return new DispatchViews.ReplacementOptions(items);
     }
@@ -238,7 +245,10 @@ public class IndentDispatchService {
             signer = verifiedSignerMembershipId;
         }
 
-        Map<Checked, List<Fefo.Pick>> picks = pick(tenantId, storeId, checked);
+        Map<Checked, List<Fefo.Pick>> picks = pick(caller, tenantId, storeId, checked);
+        if (picks.values().stream().mapToInt(List::size).sum() > MAX_DISPATCH_LINES) {
+            throw new InvalidFieldsException(List.of(new FieldMessage("lines", SPLIT_MESSAGE)));
+        }
         int seq = dispatches.nextSeq(tenantId, indentId);
         String reference = row.docNo() + " / " + seq;
         List<StockPosting.Line> moves = new ArrayList<>();
@@ -263,7 +273,11 @@ public class IndentDispatchService {
                 first = false;
             }
         }
-        posting.post(new StockPosting.Actor(tenantId, store.unitId(), me, null, null), moves);
+        try {
+            posting.post(new StockPosting.Actor(tenantId, store.unitId(), me, null, null), moves);
+        } catch (PharmacyProblemException refused) {
+            throw blind.scrub(caller, storeId, refused);
+        }
 
         dispatches.insert(tenantId, new DispatchRepository.NewDispatch(dispatchId, store.unitId(), indentId, seq, reference,
                 storeId, row.fromStoreId(), me, signer));
@@ -449,7 +463,7 @@ public class IndentDispatchService {
      * and checks again under the locks, so a row that has changed answers 409 insufficient-stock). Lines of one product share what
      * is there. Above what is usable: 409 insufficient-stock with the first line's available quantity and the failing lines.
      */
-    private Map<Checked, List<Fefo.Pick>> pick(UUID tenantId, UUID storeId, List<Checked> checked) {
+    private Map<Checked, List<Fefo.Pick>> pick(PharmacyCaller caller, UUID tenantId, UUID storeId, List<Checked> checked) {
         Map<UUID, Integer> taken = new HashMap<>();
         Map<Checked, List<Fefo.Pick>> picks = new LinkedHashMap<>();
         List<FailingLine> failing = new ArrayList<>();
@@ -472,7 +486,7 @@ public class IndentDispatchService {
             picks.put(c, result.picks());
         }
         if (!failing.isEmpty()) {
-            throw PharmacyProblemException.insufficientStock(failing.get(0).available(), failing);
+            throw blind.scrub(caller, storeId, PharmacyProblemException.insufficientStock(failing.get(0).available(), failing));
         }
         return picks;
     }

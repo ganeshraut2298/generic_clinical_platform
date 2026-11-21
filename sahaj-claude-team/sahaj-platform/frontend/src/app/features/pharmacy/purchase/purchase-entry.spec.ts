@@ -40,8 +40,10 @@ describe('Inventory sections of work package E', () => {
       'Purchase orders',
       'Receive stock (GRN)',
       'Vendor return & debit note',
+      'Stock transfer',
       'Approvals inbox',
       'Stock ledger',
+      'Reports',
     ]);
     http.match(() => true);
   });

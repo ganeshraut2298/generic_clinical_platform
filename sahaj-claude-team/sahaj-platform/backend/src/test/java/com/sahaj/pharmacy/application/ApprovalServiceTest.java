@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -327,6 +328,57 @@ class ApprovalServiceTest {
         setUp(as(UUID.randomUUID(), "NURSE"), request(1, 0), List.of(level(1, true)), List.of(), approvers(HOD));
 
         assertThatThrownBy(() -> service.inbox(TENANT, USER, null, null, null)).isInstanceOf(ForbiddenException.class);
+    }
+
+    private List<Request> pending(int count) {
+        List<Request> list = new java.util.ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            list.add(new Request(UUID.randomUUID(), UNIT, TransactionType.STOCK_ADJUSTMENT, "STOCK_ADJUSTMENT", UUID.randomUUID(),
+                    "ADJ-" + i, STORE_ID, RAISER, NOW, UUID.randomUUID(), 500_000L, false, false, false, null, null, 1, NOW,
+                    "PENDING", 0));
+        }
+        return list;
+    }
+
+    @Test
+    void theInboxOfFiftyPendingRequestsUsesOneStatementEachForLevelsDecisionsAndOwners() {
+        setUp(as(OWNER, "OWNER"), request(1, 0), List.of(level(1, true)), List.of(), approvers(OWNER));
+        List<Request> fifty = pending(50);
+        when(requests.pendingFor(eq(TENANT), org.mockito.ArgumentMatchers.isNull(), anyInt())).thenReturn(fifty);
+        when(requests.levelsOf(any(), any())).thenReturn(Map.of());
+        when(requests.decisionsOf(any(), any())).thenReturn(Map.of());
+        when(engine.owners(TENANT)).thenReturn(List.of(OWNER));
+        when(engine.approvers(any(), any(), any(), any(), any())).thenReturn(new ApproverResolver.Result(approvers(OWNER), false,
+                false));
+
+        StockViews.InboxPage page = service.inbox(TENANT, USER, null, null, "50");
+
+        assertThat(page.total()).isEqualTo(50);
+        assertThat(page.moreWaiting()).isFalse();
+        verify(requests, times(1)).levelsOf(any(), any());
+        verify(requests, times(1)).decisionsOf(any(), any());
+        verify(engine, times(1)).owners(TENANT);
+        verify(requests, never()).levels(any(), any());
+        verify(requests, never()).decisions(any(), any());
+        verify(requests, never()).pending(any());
+    }
+
+    @Test
+    void theInboxScanStopsAtTheCapAndSaysMoreAreWaiting() {
+        setUp(as(OWNER, "OWNER"), request(1, 0), List.of(level(1, true)), List.of(), approvers(OWNER));
+        when(requests.pendingFor(eq(TENANT), org.mockito.ArgumentMatchers.isNull(), anyInt()))
+                .thenReturn(pending(ApprovalService.SCAN_CAP + 1));
+        when(requests.levelsOf(any(), any())).thenReturn(Map.of());
+        when(requests.decisionsOf(any(), any())).thenReturn(Map.of());
+        when(engine.owners(TENANT)).thenReturn(List.of(OWNER));
+        when(engine.approvers(any(), any(), any(), any(), any())).thenReturn(new ApproverResolver.Result(approvers(OWNER), false,
+                false));
+
+        StockViews.InboxPage page = service.inbox(TENANT, USER, null, null, "10");
+
+        assertThat(page.moreWaiting()).isTrue();
+        assertThat(page.total()).isEqualTo(ApprovalService.SCAN_CAP);
+        verify(requests).pendingFor(TENANT, null, ApprovalService.SCAN_CAP + 1);
     }
 
     @Test

@@ -134,14 +134,14 @@ class MasterRulesTest {
             assertThat(DocumentNumbers.PREFIX.matcher(type.defaultPrefix()).matches()).as(type.name()).isTrue();
             assertThat(DocumentNumbers.renderedLength(type.defaultPrefix(), type.defaultFinancialYearPart(),
                     type.defaultSequenceLength())).isLessThanOrEqualTo(DocumentNumbers.MAX_LENGTH);
-            assertThat(type.defaultRestarts()).isEqualTo(type == DocType.BILL);
+            assertThat(type.defaultRestarts()).isEqualTo(type == DocType.BILL || type == DocType.CREDIT_NOTE);
         }
-        assertThat(DocType.values()).hasSize(10);
+        assertThat(DocType.values()).hasSize(12);
     }
 
     @Test
     void theElevenReasonListsAreFoundByTheirKey() {
-        assertThat(ReasonList.values()).hasSize(11);
+        assertThat(ReasonList.values()).hasSize(20);
         assertThat(ReasonList.fromKey("cs-change")).contains(ReasonList.CS_CHANGE);
         assertThat(ReasonList.fromKey("Damage")).isEmpty();
         assertThat(ReasonList.fromKey(null)).isEmpty();

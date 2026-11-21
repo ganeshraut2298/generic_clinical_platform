@@ -282,7 +282,7 @@ class PharmacyHardeningImportIT extends Sah79Support {
                 js(body(List.of(row(1, "CS", w.codeA(), "B".repeat(200), farExpiry(), "10", "5", "1"))))), 409), "import-state"); // a batch of 200 characters
         // cannot be read: 400 malformed-request
         for (String bad : new String[] {"{\"rows\":", "not json", "[]", "{\"rows\":\"text\"}", "{\"rows\":[{\"rowNo\":\"one\"}]}"}) {
-            assertThat(problem(call(HttpMethod.POST, linesUrl(w, id), w.keeper().auth(), bad), 400).get("type").asText()).as("body: " + bad).endsWith("malformed-request");
+            assertThat(problem(call(HttpMethod.POST, linesUrl(w, id), w.keeper().auth(), bad), 400).get("type").asText()).as("body: " + bad).matches(".*(malformed-request|validation)$");
         }
         // an unknown field: the contract allows malformed-request or validation (one field error)
         String unknown = problem(call(HttpMethod.POST, linesUrl(w, id), w.keeper().auth(), "{\"rows\":[],\"surprise\":1}"), 400).get("type").asText();

@@ -59,11 +59,11 @@ public class JdbcStockRepository implements StockRepository {
     private static final String INSERT_LEDGER = """
             insert into pharmacy.stock_ledger (tenant_id, unit_id, movement_id, txn_type, doc_type, doc_id, doc_no, doc_line_id,
                    store_id, state, product_id, batch_id, qty_in, qty_out, balance_after, actor_kind, actor_membership_id,
-                   second_signer_membership_id, approved_by_membership_id, reason_key, reverses_ledger_id)
+                   second_signer_membership_id, approved_by_membership_id, reason_key, reverses_ledger_id, admission_id)
             values (:tenantId, :unitId, :movementId, :txnType, cast(:docType as text), cast(:docId as uuid),
                    cast(:docNo as text), cast(:docLineId as uuid), :storeId, :state, :productId, :batchId, :qtyIn, :qtyOut,
                    :balanceAfter, :actorKind, cast(:actor as uuid), cast(:signer as uuid), cast(:approver as uuid),
-                   cast(:reason as text), cast(:reverses as uuid))
+                   cast(:reason as text), cast(:reverses as uuid), cast(:admission as uuid))
             """;
     private static final String FIND_LEDGER = """
             select id, store_id, batch_id, product_id, state from pharmacy.stock_ledger
@@ -100,7 +100,7 @@ public class JdbcStockRepository implements StockRepository {
     private static final String PRODUCT_COLUMNS = """
             p.id as product_id, coalesce(g.code, p.code) as code, coalesce(g.name, p.name) as name,
             coalesce(g.strength, p.strength) as strength, coalesce(g.form, p.form) as form,
-            coalesce(g.schedule, p.schedule) as schedule, coalesce(g.purchase_unit, p.purchase_unit) as purchase_unit,
+            coalesce(p.schedule, g.schedule) as schedule, coalesce(g.purchase_unit, p.purchase_unit) as purchase_unit,
             coalesce(g.issue_unit, p.issue_unit) as issue_unit, coalesce(g.conversion, p.conversion) as conversion,
             coalesce(g.gst_rate, p.gst_rate) as gst_percent
             """;
@@ -149,7 +149,7 @@ public class JdbcStockRepository implements StockRepository {
                  join pharmacy.product p on p.tenant_id = sb.tenant_id and p.id = sb.product_id
                  left join pharmacy.catalogue_product g on g.id = p.catalogue_product_id
                 where sb.tenant_id = :tenantId and sb.store_id = :storeId and sb.qty > 0
-                  and coalesce(g.schedule, p.schedule) in ('H', 'H1', 'X')) as schedule_products
+                  and coalesce(p.schedule, g.schedule) in ('H', 'H1', 'X')) as schedule_products
             """;
 
     private static final String BATCH_VIEW_COLUMNS = PRODUCT_COLUMNS + """
@@ -178,7 +178,7 @@ public class JdbcStockRepository implements StockRepository {
                and (:view <> 'NEAR_EXPIRY' or (sb.state = 'AVAILABLE' and b.expiry_date >= cast(:today as date)
                                                and b.expiry_date <= cast(:today as date) + cast(:within as integer)))
                and (:view <> 'EXPIRED' or (sb.state = 'QUARANTINE' and b.expiry_date < cast(:today as date)))
-               and (:view <> 'SCHEDULE' or coalesce(g.schedule, p.schedule) in ('H', 'H1', 'X'))
+               and (:view <> 'SCHEDULE' or coalesce(p.schedule, g.schedule) in ('H', 'H1', 'X'))
                and (:like = '' or lower(coalesce(g.name, p.name)) like :like or lower(coalesce(g.salt, p.salt)) like :like
                     or lower(p.alias) like :like or lower(coalesce(g.code, p.code)) like :like or lower(p.barcode) = :exact)
             """;
@@ -213,6 +213,18 @@ public class JdbcStockRepository implements StockRepository {
              where sb.tenant_id = :tenantId and sb.store_id = :storeId and sb.product_id = :productId
                and sb.state = 'AVAILABLE' and sb.qty > 0
              order by b.expiry_date, b.first_received_at, b.id
+            """;
+    private static final String STATES_OF = """
+            select sb.product_id, sb.store_id,
+                   coalesce(sum(case when sb.state = 'AVAILABLE' then sb.qty end), 0) as available,
+                   coalesce(sum(case when sb.state = 'IN_TRANSIT' then sb.qty end), 0) as in_transit,
+                   coalesce(sum(case when sb.state = 'PENDING_RETURN' then sb.qty end), 0) as pending_return,
+                   coalesce(sum(case when sb.state = 'QUARANTINE' then sb.qty end), 0) as quarantine,
+                   (select st.reorder_level from pharmacy.product_store_setting st
+                     where st.tenant_id = sb.tenant_id and st.product_id = sb.product_id and st.store_id = sb.store_id) as reorder_level
+              from pharmacy.stock_balance sb
+             where sb.tenant_id = :tenantId and sb.product_id in (:productIds) and sb.store_id in (:storeIds)
+             group by sb.tenant_id, sb.product_id, sb.store_id
             """;
     private static final String STATES = """
             select s.id as store_id,
@@ -289,7 +301,7 @@ public class JdbcStockRepository implements StockRepository {
                 .param("qtyIn", l.qtyIn()).param("qtyOut", l.qtyOut()).param("balanceAfter", l.balanceAfter())
                 .param("actorKind", l.actorMembershipId() == null ? "SYSTEM" : "USER").param("actor", l.actorMembershipId())
                 .param("signer", l.secondSignerMembershipId()).param("approver", l.approvedByMembershipId())
-                .param("reason", l.reasonKey()).param("reverses", l.reversesLedgerId()).update();
+                .param("reason", l.reasonKey()).param("reverses", l.reversesLedgerId()).param("admission", l.admissionId()).update();
     }
 
     @Override
@@ -409,6 +421,25 @@ public class JdbcStockRepository implements StockRepository {
                     return new StateRow(rs.getObject("store_id", UUID.class), rs.getInt("available"),
                             rs.getInt("in_transit"), rs.getInt("pending_return"), rs.getInt("quarantine"), reorder);
                 }).list();
+    }
+
+    @Override
+    public java.util.Map<UUID, List<StateRow>> statesOfProducts(UUID tenantId, Collection<UUID> productIds,
+                                                                Collection<UUID> storeIds) {
+        java.util.Map<UUID, List<StateRow>> out = new java.util.HashMap<>();
+        if (productIds.isEmpty() || storeIds.isEmpty()) {
+            return out;
+        }
+        jdbc.sql(STATES_OF).param("tenantId", tenantId).param("productIds", productIds).param("storeIds", storeIds)
+                .query((rs, n) -> {
+                    int level = rs.getInt("reorder_level");
+                    Integer reorder = rs.wasNull() ? null : level;
+                    out.computeIfAbsent(rs.getObject("product_id", UUID.class), k -> new java.util.ArrayList<>())
+                            .add(new StateRow(rs.getObject("store_id", UUID.class), rs.getInt("available"),
+                                    rs.getInt("in_transit"), rs.getInt("pending_return"), rs.getInt("quarantine"), reorder));
+                    return null;
+                }).list();
+        return out;
     }
 
     private static Bal mapBal(ResultSet rs, int rowNum) throws SQLException {

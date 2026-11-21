@@ -101,7 +101,7 @@ class DebitNoteServiceTest {
     private final DocumentViews views = new DocumentViews(events, stores, team, engine);
     private final DebitNoteService service = new DebitNoteService(gate, guard, stores, products, vendors, receipts, notes,
             payables, engine, approvals, series, numbers, clients, events, stock, posting, signature, reasons, views, templates,
-            unitRows, audit, new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)));
+            unitRows, audit, new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), new BlindCount(mock(StockAuditRepository.class)));
     private final PharmacyCaller pharmacist = new PharmacyCaller(TENANT, USER, ME, "Test Central Store Pharmacist", "PHARMACIST",
             List.of());
     private final PharmacyCaller clerk = new PharmacyCaller(TENANT, USER, ME, "Test Central Store Clerk", "STORE_STAFF",

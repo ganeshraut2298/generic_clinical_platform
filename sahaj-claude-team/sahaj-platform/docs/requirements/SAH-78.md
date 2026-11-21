@@ -221,6 +221,7 @@ Accepted as written by the human on 17 Nov 2026 (DEC-062 Q4 A, Q2 A; DEC-063 Q1 
 - G-10. The sample catalogue is sample data, "not clinically validated", never in production (OQ-78-16, BR-33). Before real use the human names a licensed catalogue source and a pharmacist reviews it.
 - G-11. Compliance check before Phase 3: register retention, GST invoice series rules, licence types, NDPS versus Schedule X register (ADR-028 OQ-PHI-19). Nothing is deleted meanwhile.
 - G-12. Items still open that touch money or law and need the same confirmation when answered: OQ-78-25, 27, 32, 35, 37.
+- The programme-wide list (setup steps, rule confirmations, deviations, what is not in the release) is the "GO-LIVE CHECKLIST" in `docs/requirements/SAH-80.md` (21 Nov 2026, DEC-061).
 
 ## Change log
 - 19 Nov 2026 (DEC-078 item 5 amended; wording, no scope change): a return line that is both damaged on receipt and expired starts from the lower of the two vendor credit levels (BR-20; used in SAH-79-8; go-live G-18, accountant); the new vendor fields sit after the Return policy fields on the vendor sheet.

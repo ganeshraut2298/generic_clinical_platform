@@ -56,7 +56,19 @@ public interface ApprovalRepository {
     /** Every PENDING request of the clinic, oldest first. */
     List<Request> pending(UUID tenantId);
 
+    /**
+     * Pending requests the caller could decide (L19): {@code storeIds} are the stores where the caller is an approver or a
+     * delegate, or null for an owner (every store); sales requests are left out; oldest first, at most {@code limit} rows.
+     */
+    List<Request> pendingFor(UUID tenantId, java.util.Collection<UUID> storeIds, int limit);
+
     List<Level> levels(UUID tenantId, UUID requestId);
+
+    /** The levels of many requests in one statement (m-8); a request with none is absent from the map. */
+    java.util.Map<UUID, List<Level>> levelsOf(UUID tenantId, java.util.Collection<UUID> requestIds);
+
+    /** The decisions of many requests in one statement (m-8). */
+    java.util.Map<UUID, List<Decision>> decisionsOf(UUID tenantId, java.util.Collection<UUID> requestIds);
 
     List<Decision> decisions(UUID tenantId, UUID requestId);
 

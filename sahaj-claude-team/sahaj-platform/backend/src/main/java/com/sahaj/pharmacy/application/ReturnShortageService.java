@@ -110,13 +110,17 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
                                                 String rawPage, String rawSize) {
         PharmacyCaller caller = gate.require(tenantId, userId, AccessLevel.PHARMACY_ACCESS);
         UUID storeId = PharmacyParams.pathId(rawStoreId);
-        boolean accepting = !"RETURNING".equals(rawSide);
         if (rawSide == null || !"ACCEPTING".equals(rawSide) && !"RETURNING".equals(rawSide)) {
             // the store guard first (contract rule 2): the side decides the capability, so an unknown side is read as the least
             guard.require(caller, storeId, StoreCapability.RECEIVE);
             throw new InvalidFieldsException(List.of(new FieldMessage("side", "Choose accepting or returning")));
         }
-        guard.require(caller, storeId, accepting ? StoreCapability.PURCHASE : StoreCapability.RECEIVE);
+        boolean accepting = "ACCEPTING".equals(rawSide);
+        if (accepting) {
+            acceptor(caller, storeId);
+        } else {
+            guard.require(caller, storeId, StoreCapability.RECEIVE);
+        }
         ReturnItemStatus status = PharmacyParams.optionalEnum("status", rawStatus, ReturnItemStatus.class);
         int page = PharmacyParams.intValue("page", rawPage, 0, 0, 1000);
         int size = PharmacyParams.intValue("size", rawSize, 20, 1, 50);
@@ -141,7 +145,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
         UUID itemId = PharmacyParams.pathId(rawItemId);
         ReturnItemRepository.Row row = returns.findById(tenantId, itemId).orElse(null);
         if (row != null && row.acceptingStoreId().equals(storeId)) {
-            guard.require(caller, storeId, StoreCapability.PURCHASE);
+            acceptor(caller, storeId);
         } else {
             guard.require(caller, storeId, StoreCapability.RECEIVE);
             if (row == null || !row.holdingStoreId().equals(storeId)) {
@@ -161,7 +165,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
         UUID storeId = PharmacyParams.pathId(rawStoreId);
         UUID itemId = PharmacyParams.pathId(rawItemId);
         PharmacyInputs.AcceptReturn in = body.read();
-        guard.require(caller, storeId, StoreCapability.PURCHASE);
+        acceptor(caller, storeId);
         ReturnItemRepository.Row peek = returns.findById(tenantId, itemId).filter(r -> r.acceptingStoreId().equals(storeId))
                 .orElseThrow(ReturnShortageService::notFound);
         if (in.clientKey() != null && clients.own(tenantId, caller.actorId(), in.clientKey()).isPresent()) {
@@ -185,7 +189,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
         UUID storeId = PharmacyParams.pathId(rawStoreId);
         UUID itemId = PharmacyParams.pathId(rawItemId);
         PharmacyInputs.AcceptReturn in = body.read();
-        Store store = guard.require(caller, storeId, StoreCapability.PURCHASE);
+        Store store = acceptor(caller, storeId);
         UUID me = caller.actorId();
         ReturnItemRepository.Row peek = returns.findById(tenantId, itemId).filter(r -> r.acceptingStoreId().equals(storeId))
                 .orElseThrow(ReturnShortageService::notFound);
@@ -270,7 +274,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
         UUID storeId = PharmacyParams.pathId(rawStoreId);
         UUID itemId = PharmacyParams.pathId(rawItemId);
         PharmacyInputs.VersionReasonInput in = body.read();
-        Store store = guard.require(caller, storeId, StoreCapability.PURCHASE);
+        Store store = acceptor(caller, storeId);
         UUID me = caller.actorId();
         ReturnItemRepository.Row peek = returns.findById(tenantId, itemId).filter(r -> r.acceptingStoreId().equals(storeId))
                 .orElseThrow(ReturnShortageService::notFound);
@@ -366,7 +370,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
                                                     String rawPage, String rawSize) {
         PharmacyCaller caller = gate.require(tenantId, userId, AccessLevel.PHARMACY_ACCESS);
         UUID storeId = PharmacyParams.pathId(rawStoreId);
-        guard.require(caller, storeId, StoreCapability.PURCHASE);
+        acceptor(caller, storeId);
         ShortageStatus status = PharmacyParams.optionalEnum("status", rawStatus, ShortageStatus.class);
         int page = PharmacyParams.intValue("page", rawPage, 0, 0, 1000);
         int size = PharmacyParams.intValue("size", rawSize, 20, 1, 50);
@@ -384,7 +388,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
         UUID storeId = PharmacyParams.pathId(rawStoreId);
         UUID shortageId = PharmacyParams.pathId(rawShortageId);
         PharmacyInputs.SettleShortage in = body.read();
-        guard.require(caller, storeId, StoreCapability.PURCHASE);
+        acceptor(caller, storeId);
         ShortageRepository.Row peek = shortages.findById(tenantId, shortageId).filter(s -> s.settlingStoreId().equals(storeId))
                 .orElseThrow(ReturnShortageService::notFound);
         if (in.clientKey() != null && clients.own(tenantId, caller.actorId(), in.clientKey()).isPresent()) {
@@ -408,7 +412,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
         UUID storeId = PharmacyParams.pathId(rawStoreId);
         UUID shortageId = PharmacyParams.pathId(rawShortageId);
         PharmacyInputs.SettleShortage in = body.read();
-        Store store = guard.require(caller, storeId, StoreCapability.PURCHASE);
+        Store store = acceptor(caller, storeId);
         UUID me = caller.actorId();
         ShortageRepository.Row peek = shortages.findById(tenantId, shortageId).filter(s -> s.settlingStoreId().equals(storeId))
                 .orElseThrow(ReturnShortageService::notFound);
@@ -523,6 +527,9 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
                 row.dispatchReference(), store.id(), amount, x, amount, false, null);
         ApprovalEngine.Plan plan = engine.plan(tenantId, subject);
         if (plan == null) {
+            if (x && !caller.isPharmacist()) { // I23: level 0 writes off at once, so only a pharmacist may write off Schedule X units
+                throw ScheduleXSignature.onlyPharmacist();
+            }
             writeOff(tenantId, store.unitId(), row, me, null);
             return;
         }
@@ -560,7 +567,19 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
 
     @Override
     public boolean canRead(PharmacyCaller caller, ApprovalRepository.Request request) {
-        return StoreAccessGuard.holds(caller, request.ruleStoreId(), StoreCapability.PURCHASE);
+        UUID ruleStore = request.ruleStoreId();
+        boolean transferSide = ruleStore != null && stores.find(caller.tenantId(), ruleStore).map(s -> !s.type().isCentral()).orElse(false);
+        return StoreAccessGuard.holds(caller, ruleStore, transferSide ? StoreCapability.DISPATCH_TRANSFER : StoreCapability.PURCHASE);
+    }
+
+    /**
+     * The capability that accepts returns and settles shortages (0.3.6, acceptReturn): purchase at the Central Store (indent
+     * returns and shortages), dispatchTransfer at a store that sent a transfer. Unknown or switched-off store: 404 as the guard.
+     */
+    private Store acceptor(PharmacyCaller caller, UUID storeId) {
+        Store known = stores.find(caller.tenantId(), storeId).filter(Store::active).orElse(null);
+        StoreCapability capability = known != null && !known.type().isCentral() ? StoreCapability.DISPATCH_TRANSFER : StoreCapability.PURCHASE;
+        return guard.require(caller, storeId, capability);
     }
 
     /**
@@ -602,7 +621,7 @@ public class ReturnShortageService implements ApprovalSubjectHandler {
 
     // ---- views ----
 
-    private DispatchViews.ReturnItem returnView(UUID tenantId, ReturnItemRepository.Row row) {
+    DispatchViews.ReturnItem returnView(UUID tenantId, ReturnItemRepository.Row row) {
         List<ReturnItemRepository.Note> notes = returns.notes(tenantId, row.id());
         Set<UUID> people = new LinkedHashSet<>();
         collectPeople(people, row, notes);

@@ -9,6 +9,11 @@ import { WaitingForActionSection } from '../indent/waiting-for-action.section';
 import { PurchaseOrdersSection } from '../purchase/purchase-orders.section';
 import { ReceivingSection } from '../purchase/receiving.section';
 import { VendorReturnsSection } from '../purchase/vendor-returns.section';
+import { StockAuditSection } from '../audit/stock-audit.section';
+import { ReportsSection } from '../reports/reports.section';
+import { ConsumptionSection } from '../stockuse/consumption.section';
+import { ReturnsDamageSection } from '../stockuse/returns-damage.section';
+import { TransfersSection } from '../transfer/transfers.section';
 import { StockAdjustmentsSection } from './stock-adjustments.section';
 import { StockLedgerSection } from './stock-ledger.section';
 import { StoreStockSection } from './store-stock.section';
@@ -22,8 +27,13 @@ export type InventorySectionKey =
   | 'purchase-orders'
   | 'receiving'
   | 'vendor-returns'
+  | 'consumption'
+  | 'returns'
+  | 'transfers'
+  | 'audit'
   | 'approvals'
-  | 'ledger';
+  | 'ledger'
+  | 'reports';
 
 interface InventorySection {
   key: InventorySectionKey;
@@ -54,6 +64,11 @@ interface InventorySection {
     VendorReturnsSection,
     IndentsSection,
     WaitingForActionSection,
+    ConsumptionSection,
+    ReturnsDamageSection,
+    TransfersSection,
+    StockAuditSection,
+    ReportsSection,
   ],
   styles: `
     :host {
@@ -131,6 +146,21 @@ interface InventorySection {
               @case ('waiting') {
                 <app-waiting-for-action />
               }
+              @case ('consumption') {
+                <app-consumption [stockAuditLineId]="auditLineId()" />
+              }
+              @case ('returns') {
+                <app-returns-damage />
+              }
+              @case ('transfers') {
+                <app-transfers />
+              }
+              @case ('audit') {
+                <app-stock-audit (consumptionRequested)="postAsConsumption($event)" />
+              }
+              @case ('reports') {
+                <app-reports />
+              }
               @case ('approvals') {
                 <app-approvals-inbox />
               }
@@ -161,12 +191,24 @@ export class InventoryPage {
     ...(this.store.canAcceptReturn() || this.store.canReceive()
       ? [{ key: 'waiting' as const, label: 'Waiting for action' }]
       : []),
+    ...(this.store.canConsume() ? [{ key: 'consumption' as const, label: 'Ward consumption' }] : []),
+    ...(this.store.canReturnDamage() ? [{ key: 'returns' as const, label: 'Return / damaged' }] : []),
+    ...(this.store.canReadStock() ? [{ key: 'transfers' as const, label: 'Stock transfer' }] : []),
+    ...(this.store.canCount() ? [{ key: 'audit' as const, label: 'Stock audit' }] : []),
     ...(this.store.canApprovalsInbox() ? [{ key: 'approvals' as const, label: 'Approvals inbox' }] : []),
     ...(this.store.canStockReports() ? [{ key: 'ledger' as const, label: 'Stock ledger' }] : []),
+    ...(this.store.canReports() ? [{ key: 'reports' as const, label: 'Reports' }] : []),
   ]);
 
   protected readonly focus = signal<BatchFocus | null>(null);
   protected readonly picked = signal<InventorySectionKey | null>(null);
+  /** The audit line a reviewer chose with "Post as consumption instead" (79-17); the consumption entry links to it. */
+  protected readonly auditLineId = signal<string | null>(null);
+
+  protected postAsConsumption(lineId: string): void {
+    this.auditLineId.set(lineId);
+    this.picked.set('consumption');
+  }
 
   /** The first listed section until the person picks one; a person with no stock access lands on the inbox. */
   protected readonly active = computed<InventorySectionKey>(

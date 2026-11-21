@@ -52,6 +52,8 @@ export class ModuleHomePage implements OnInit {
       void this.router.navigate(['setup'], { relativeTo: this.route, replaceUrl: true });
     } else if (this.store.canInventory()) {
       void this.router.navigate(['inventory'], { relativeTo: this.route, replaceUrl: true });
+    } else if (this.store.canPharmacyTab()) {
+      void this.router.navigate(['pharmacy'], { relativeTo: this.route, replaceUrl: true });
     }
   }
 }

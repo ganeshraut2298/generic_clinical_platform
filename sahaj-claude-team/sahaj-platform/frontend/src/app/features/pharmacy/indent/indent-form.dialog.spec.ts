@@ -75,7 +75,7 @@ describe('IndentFormDialog', () => {
     expect(el.querySelector('#indent-form-title')?.textContent).toContain('Raise indent');
     expect(text(el, 'indent-acting-as')).toContain('Acting as Test Ward Nurse · mapped to Test Ward 3B store');
     expect(text(el, 'indent-from')).toBe('Test Ward 3B store');
-    expect(text(el, 'indent-to')).toBe('Shown after you save the draft');
+    expect(text(el, 'indent-to')).toBe('—');
     expect(q(el, 'indent-no-lines')?.textContent).toContain('No items yet');
   });
 

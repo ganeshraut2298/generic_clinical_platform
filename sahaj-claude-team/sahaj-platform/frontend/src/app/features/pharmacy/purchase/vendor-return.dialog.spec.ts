@@ -59,6 +59,39 @@ describe('VendorReturnDialog', () => {
 
   afterEach(() => http.verify());
 
+  it('offers a blocked vendor with the warning "Vendor licence expired" and not an inactive one', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([problemDetailInterceptor])),
+        provideHttpClientTesting(),
+        { provide: MAT_DIALOG_DATA, useValue: { storeId: 'store-central' } },
+        { provide: MatDialogRef, useValue: { close: vi.fn() } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(VendorReturnDialog);
+    fixture.detectChanges();
+    const req = http.expectOne((r) => r.url === `${BASE}/vendors`);
+    expect(req.request.params.get('status')).toBe('ALL');
+    req.flush({
+      items: [
+        LEVEL_VENDOR,
+        { ...LEVEL_VENDOR, id: 'vendor-b', name: 'Blocked Vendor', status: 'BLOCKED', blocked: true },
+        { ...LEVEL_VENDOR, id: 'vendor-i', name: 'Inactive Vendor', status: 'INACTIVE', blocked: false },
+      ],
+      total: 3,
+      page: 0,
+      size: 100,
+    });
+    await settle();
+    const comp = fixture.componentInstance as unknown as { vendors(): { id: string }[]; chooseVendor(id: string): void };
+    expect(comp.vendors().map((v) => v.id)).toEqual(['vendor-1', 'vendor-b']);
+    comp.chooseVendor('vendor-b');
+    http.expectOne((r) => r.url === `${S}/vendor-returns/eligible`);
+    await settle();
+    expect(text(fixture.nativeElement, 'vr-blocked-warning')).toBe('Vendor licence expired');
+  });
+
   it('shows the policy line with the two credit levels and the eligible rows with their source chips', async () => {
     const el = await open();
     expect(VENDOR_RETURN_CONFIG.ariaLabelledBy).toBe('vr-title');

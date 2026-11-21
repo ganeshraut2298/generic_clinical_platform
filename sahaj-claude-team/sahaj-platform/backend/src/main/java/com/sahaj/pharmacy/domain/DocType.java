@@ -16,7 +16,9 @@ public enum DocType {
     STOCK_AUDIT("AUD-", false, 4, false),
     STORE_RETURN("RET-", false, 4, false),
     DAMAGE_REPORT("DMG-", false, 4, false),
-    STOCK_ADJUSTMENT("ADJ-", false, 4, false);
+    STOCK_ADJUSTMENT("ADJ-", false, 4, false),
+    CREDIT_NOTE("CN/", true, 6, true),
+    IPD_ISSUE_SLIP("IS-", false, 4, false);
 
     private final String defaultPrefix;
     private final boolean defaultFinancialYearPart;

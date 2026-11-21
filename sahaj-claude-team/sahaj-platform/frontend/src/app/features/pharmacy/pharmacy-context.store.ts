@@ -77,6 +77,33 @@ export class PharmacyContextStore {
     () => this.workingStore()?.type === 'CENTRAL' && this.workingStore()?.access.purchase === true,
   );
   readonly canAcceptReturn = computed(() => this.workingStore()?.access.acceptReturn === true);
+  /** Work packages G and H: capabilities of the working store and of the unit. */
+  readonly canReturnDamage = computed(() => this.workingStore()?.access.returnDamage === true);
+  readonly canDispatchTransfer = computed(() => this.workingStore()?.access.dispatchTransfer === true);
+  readonly canConsume = computed(() => this.workingStore()?.access.consume === true);
+  /** The Patient-wise tab: only when the context lists CONSUMPTION_PATIENT (Integrated, IPD reader connected, linked ward). */
+  readonly canConsumePatient = computed(() => this.capabilities().has('CONSUMPTION_PATIENT'));
+  readonly canCount = computed(() => this.workingStore()?.access.count === true);
+  readonly canReviewCount = computed(() => this.workingStore()?.access.reviewCount === true);
+  /** Reports: the catalogue decides what each person may run. */
+  readonly canReports = computed(
+    () => this.capabilities().has('STOCK_REPORTS') || this.capabilities().has('PURCHASE_REPORTS'),
+  );
+  /** SAH-80 work package I: the Pharmacy tab and POS billing; the sell capability of the working store. */
+  readonly canPharmacyTab = computed(() => this.capabilities().has('PHARMACY'));
+  readonly canPos = computed(() => this.capabilities().has('POS'));
+  readonly canSalesReturn = computed(() => this.capabilities().has('SALES_RETURN') && this.workingStore()?.access.salesReturn === true);
+  readonly canRegisters = computed(() => this.capabilities().has('REGISTERS') && this.workingStore()?.access.readRegisters === true);
+  /** The licences card: the owner or a pharmacist (capability COMPLIANCE). */
+  readonly canCompliance = computed(() => this.capabilities().has('COMPLIANCE'));
+  /** The Command Center tiles (the owner, a pharmacist, an approver or a cashier; the server leaves out what a person may not see). */
+  readonly canCommandCentre = computed(() => this.capabilities().has('COMMAND_CENTRE'));
+  readonly canSell = computed(() => this.workingStore()?.access.sell === true);
+  /** Patient pick at the counter: Integrated only, when the context lists the patient port as available. */
+  readonly canPatientLink = computed(() => this.capabilities().has('PATIENT_LINK'));
+  /** The OPD and IPD dispensing queues: listed only in Integrated mode (they say "Not connected" until TP-2 and TP-4 are). */
+  readonly canOpdQueue = computed(() => this.capabilities().has('OPD_QUEUE'));
+  readonly canIpdQueue = computed(() => this.capabilities().has('IPD_QUEUE'));
   /** Raises an indent / buys: only the links of the low stock list need them (79-3). */
   readonly isCentralStore = computed(() => this.workingStore()?.type === 'CENTRAL');
 

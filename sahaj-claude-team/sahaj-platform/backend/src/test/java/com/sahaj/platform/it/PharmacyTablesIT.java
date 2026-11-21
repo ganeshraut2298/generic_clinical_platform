@@ -491,7 +491,7 @@ class PharmacyTablesIT extends Sah78Support {
             assertThat(DbAccess.count(c, "select count(*) from pharmacy.catalogue_product where dup_key <> lower(dup_key) or dup_key !~ '^[^|]+[|][^|]+[|][^|]+$'"))
                     .as("duplicate key format salt|strength|form, lower case").isZero();
             assertThat(DbAccess.text(c, "select dup_key from pharmacy.catalogue_product where code = 'G-000101'")).isEqualTo("ceftriaxone|1000mg|injection");
-            assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default")).as("36 seeded reasons in every environment (13 of SAH-78 and 23 of SAH-79 migration 1380)").isEqualTo(36);
+            assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default")).as("70 seeded reasons: 36 of SAH-78 and SAH-79 and 34 of SAH-80").isEqualTo(70);
             return null;
         });
     }

@@ -118,6 +118,7 @@ describe('IndentsSection', () => {
         data: expect.objectContaining({
           storeId: 'store-ward',
           storeName: 'Test Ward 3B store',
+          toStoreName: 'Test Central Store',
           actingAs: 'Acting as Test Ward Nurse · mapped to Test Ward 3B store · can raise indents for Test Ward 3B store',
         }),
       }),

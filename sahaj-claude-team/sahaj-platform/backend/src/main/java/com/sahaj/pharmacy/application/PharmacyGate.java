@@ -71,9 +71,11 @@ public class PharmacyGate {
                 .stream()
                 .map(mapped -> {
                     StoreRole effective = StoreRules.effectiveRole(member.role(), mapped.staff().storeRole(),
-                            mapped.staff().delegateFrom(), mapped.staff().delegateTo(), today);
+                            mapped.staff().delegateFrom(), mapped.staff().delegateTo(), today,
+                            StoreRules.cashierStore(mapped.store().saleAllowed(), mapped.store().type()));
                     StoreAccess access = StoreRules.access(member.role(), effective,
-                            mapped.store().consumptionAllowed());
+                            mapped.store().consumptionAllowed(), mapped.store().saleAllowed(),
+                            mapped.store().type().isCentral());
                     return new PharmacyCaller.Mapping(mapped.store(), mapped.staff(), effective, access);
                 })
                 .toList();

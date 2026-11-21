@@ -146,7 +146,7 @@ class PharmacyProductCatalogueIT extends Sah78BSupport {
     @Test
     void aBadQueryValueIs400WithAFieldMessageAndAnyReaderOfSetupMaySearch() throws Exception {
         Clinic clinic = pharmacyClinic();
-        assertFieldMessage(problem(call(HttpMethod.GET, PRODUCTS + "?q=" + "x".repeat(61), clinic.owner(), null), 400), "q", "Keep the search to 60 characters");
+        assertFieldMessage(problem(call(HttpMethod.GET, PRODUCTS + "?q=" + "x".repeat(61), clinic.owner(), null), 400), "q", "Type at most 60 characters.");
         assertThat(search(clinic, "?q=" + "x".repeat(60)).get("total").asLong()).isZero();
         assertFieldMessage(problem(call(HttpMethod.GET, PRODUCTS + "?source=BOTH", clinic.owner(), null), 400), "source", "Choose a valid option");
         assertFieldMessage(problem(call(HttpMethod.GET, PRODUCTS + "?page=-1", clinic.owner(), null), 400), "page", "Enter a whole number from 0 to 2000");

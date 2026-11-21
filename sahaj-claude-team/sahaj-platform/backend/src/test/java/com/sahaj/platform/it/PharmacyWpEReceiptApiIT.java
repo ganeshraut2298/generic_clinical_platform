@@ -59,7 +59,8 @@ class PharmacyWpEReceiptApiIT extends Sah79BuySupport {
         // the order: received quantities and status (A is short by 2 with a balance to come)
         JsonNode order = getOrder(w, idOf(po));
         assertThat(order.get("status").asText()).isEqualTo("PARTLY_RECEIVED");
-        assertThat(order.get("lines").get(0).get("receivedQty").asInt()).isEqualTo(10);
+        // DEC-086 item 3: the order line counts billed (paid) units received only; the 2 free units are not added: 8, not 10
+        assertThat(order.get("lines").get(0).get("receivedQty").asInt()).as("received 8 plus 2 free counts 8").isEqualTo(8);
         assertThat(order.get("lines").get(1).get("receivedQty").asInt()).isEqualTo(5);
         // the prepared debit note for the line billed above what was received (here billed 10, received 8)
         assertThat(posted.get("debitNoteDraft").isNull()).isFalse();
@@ -94,7 +95,7 @@ class PharmacyWpEReceiptApiIT extends Sah79BuySupport {
         strip.put("purchaseUnit", "Strip");
         strip.put("issueUnit", "tablet");
         strip.put("conversion", 15);
-        String product = idOf(createOwn(w.clinic(), strip));
+        String product = createOwn(w.clinic(), strip).get("productId").asText();
         // billed 1001 strips, received 1: 1,000 strips short
         JsonNode draft = draftReceipt(w, null, vendor, "INV-3001", todayIst().toString(), 30,
                 List.of(gline(product, "ST1", farMonth(), 1, 1001, 0, "100.00", "8.00", null, null, false)));
@@ -269,7 +270,7 @@ class PharmacyWpEReceiptApiIT extends Sah79BuySupport {
     private String scheduleXProduct(Sw w) throws Exception {
         Map<String, Object> body = ownBody("Test controlled receipt item (fake)");
         body.put("schedule", "X");
-        return idOf(createOwn(w.clinic(), body));
+        return createOwn(w.clinic(), body).get("productId").asText();
     }
 
     @Test

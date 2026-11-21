@@ -139,7 +139,7 @@ class PharmacyRound4DbIT extends Sah79ApiSupport {
     void nextDocumentNoRefusesAnUnknownTypeNoTenantAndNoUnitAndRestartsOnlyWhereTheSeriesSaysSo() throws Exception {
         Db w = dbWorld();
         asTenant(w, c -> {
-            for (String bad : new String[] {"", "grn", "CREDIT_NOTE", "FOO"}) {
+            for (String bad : new String[] {"", "grn", "FOO"}) {
                 mustRefuse(c, "22023", "unknown document type", "select pharmacy.next_document_no(?)", bad);
             }
             mustRefuse(c, "22023", "unknown document type", "select pharmacy.next_document_no(null)");

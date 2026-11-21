@@ -1,10 +1,10 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { Observable, Subject, catchError, map, of, switchMap } from 'rxjs';
+import { Observable, Subject, catchError, finalize, map, of, switchMap } from 'rxjs';
 import { ApiError } from '../../../core/http/problem-detail';
 import { newClientKey } from '../../../shared/client-key';
 import { EmrApi } from '../emr.api';
-import { IPD_READ_ONLY_TEXT, PHYSIO_SLOT_FIELD, detailOr, isOffline, problemSlug } from '../emr-errors';
+import { IPD_READ_ONLY_TEXT, NO_ANSWER_TEXT, PHYSIO_SLOT_FIELD, detailOr, isNoAnswer, isOffline, problemSlug } from '../emr-errors';
 import {
   EmrDentalNextInterval,
   EmrErOutcome,
@@ -17,7 +17,7 @@ import {
   EmrSignOutcome,
 } from '../emr-finish.model';
 import { EmrRecordView } from '../emr.model';
-import { EmrRecordStore } from '../record/emr-record.store';
+import { EmrRecordStore, SaveStop } from '../record/emr-record.store';
 import { ErOutcomeDialogComponent } from './er-outcome-dialog.component';
 import { FinishDialogComponent } from './finish-dialog.component';
 import { OFFLINE_SIGN, SIGN_ERROR, blockerMessage, dentalAllDone, firstBlockedSection } from './finish.logic';
@@ -28,7 +28,11 @@ export const PICK_TREATMENTS = 'Pick the treatments given today first';
 export type FinishEvent =
   | { kind: 'blocked'; message: string; sectionKey: string | null }
   | { kind: 'signed'; outcome: EmrSignOutcome; choices: EmrFinishChoices; record: EmrRecordView; sessionNo: number | null; profile: EmrFinishProfileEffects | null }
-  | { kind: 'reload' };
+  | { kind: 'reload' }
+  /** The save before the check did not go through: the page says why and opens the field marked in red. */
+  | { kind: 'save-stopped'; stop: SaveStop };
+
+const SAVE_STOPPED: SaveStop = { message: 'We could not save. Your entries are still on screen.', sectionKey: null, fieldKey: null, reload: false };
 
 const BLOCKS_THAT_STILL_OPEN: ReadonlySet<string> = new Set(['IPD_ORDER_BLOCKED', 'IPD_ORDER_NEEDS_REASON']);
 
@@ -168,7 +172,12 @@ export class EmrFinishFlow {
 
   begin(): void {
     const record = this.store.record();
-    if (!record || this.starting() || record.readOnly || this.store.readOnly()) {
+    // A second tap while the first is still saving or checking: the first one carries on and answers.
+    if (!record || this.starting()) {
+      return;
+    }
+    if (record.readOnly || this.store.readOnly()) {
+      this.events.next({ kind: 'blocked', message: this.store.readOnlyMessage(), sectionKey: null });
       return;
     }
     if (!this.store.ready()) {
@@ -209,11 +218,23 @@ export class EmrFinishFlow {
       .pipe(map((r) => r ?? null));
   }
 
+  /**
+   * Unsaved entries are saved first (AUTO; a save already running is waited for). A save that does not go
+   * through says why (the field marked in red, Reload, no answer) and nothing is checked or signed;
+   * `starting` is always reset, so Complete can be tapped again.
+   */
   private saveThenCheck(): void {
-    const saved$ = this.store.dirty() ? this.store.save('AUTO') : of(true);
+    const saved$ = this.store.dirty() || this.store.saving() ? this.store.save('AUTO') : of(true);
     saved$
       .pipe(
-        switchMap((ok) => (ok ? this.finishCheck() : of(null))),
+        switchMap((ok) => {
+          if (!ok) {
+            this.events.next({ kind: 'save-stopped', stop: this.store.lastStop() ?? SAVE_STOPPED });
+            return of(null);
+          }
+          return this.finishCheck();
+        }),
+        finalize(() => this.starting.set(false)),
       )
       .subscribe((check) => {
         this.starting.set(false);
@@ -312,6 +333,12 @@ export class EmrFinishFlow {
 
   private signFailed(error: unknown, onClosed: () => void): void {
     const slug = problemSlug(error);
+    if (isNoAnswer(error)) {
+      // No answer in time: the sign may still finish on the server. The key is kept, so Confirm again
+      // returns that first result instead of signing twice.
+      this.signError.set(NO_ANSWER_TEXT);
+      return;
+    }
     if (isOffline(error)) {
       this.signError.set(OFFLINE_SIGN);
       return;

@@ -464,7 +464,8 @@ class StaffMappingServiceTest {
             assertThat(items).extracting(PharmacyViews.StaffCandidate::alreadyMappedHere).containsOnly(false);
             var staff = items.stream().filter(c -> c.role().equals("STORE_STAFF")).findFirst().orElseThrow();
             // no store type is known, so the Central Store role is offered where the team role allows it
-            assertThat(staff.allowedStoreRoles()).containsExactly(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER);
+            assertThat(staff.allowedStoreRoles()).containsExactly(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER,
+                    StoreRole.CASHIER);
             var nurse = items.stream().filter(c -> c.role().equals("NURSE")).findFirst().orElseThrow();
             assertThat(nurse.allowedStoreRoles()).containsExactly(StoreRole.STORE_USER, StoreRole.CENTRAL_STORE_USER,
                     StoreRole.APPROVER, StoreRole.DELEGATE);

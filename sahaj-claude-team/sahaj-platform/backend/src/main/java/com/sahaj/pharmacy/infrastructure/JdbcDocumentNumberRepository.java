@@ -20,4 +20,9 @@ public class JdbcDocumentNumberRepository implements DocumentNumberPort {
     public long next(UUID tenantId, DocType type) {
         return jdbc.sql("select pharmacy.next_document_no(:type)").param("type", type.name()).query(Long.class).single();
     }
+
+    @Override
+    public long nextStoreBill(UUID tenantId, UUID storeId) {
+        return jdbc.sql("select pharmacy.next_store_bill_no(:storeId)").param("storeId", storeId).query(Long.class).single();
+    }
 }

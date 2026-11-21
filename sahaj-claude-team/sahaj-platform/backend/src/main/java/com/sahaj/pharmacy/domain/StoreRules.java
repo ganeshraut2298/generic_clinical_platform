@@ -17,6 +17,25 @@ public final class StoreRules {
         return !TeamRoles.allowedStoreRoles(teamRole).contains(stored);
     }
 
+    /** CASHIER needs an ACTIVE store that allows sale and is not the Central Store (DEC-074 OQ-80-36). */
+    public static boolean cashierStore(boolean saleAllowed, StoreType type) {
+        return saleAllowed && type != null && !type.isCentral();
+    }
+
+    /** As {@link #needsReview(String, StoreRole)}; a CASHIER mapping also needs review when the store no longer takes a cashier. */
+    public static boolean needsReview(String teamRole, StoreRole stored, boolean cashierStore) {
+        return needsReview(teamRole, stored) || (stored == StoreRole.CASHIER && !cashierStore);
+    }
+
+    /** As {@link #effectiveRole(String, StoreRole, LocalDate, LocalDate, LocalDate)} with the store known. */
+    public static StoreRole effectiveRole(String teamRole, StoreRole stored, LocalDate from, LocalDate to, LocalDate today,
+                                          boolean cashierStore) {
+        if (stored == StoreRole.CASHIER && !cashierStore) {
+            return StoreRole.STORE_USER;
+        }
+        return effectiveRole(teamRole, stored, from, to, today);
+    }
+
     /**
      * The role that counts today: a mapping that needs review counts as STORE_USER, and so does a DELEGATE outside its
      * dates ("Delegate · ended 30 Nov").
@@ -41,20 +60,40 @@ public final class StoreRules {
      * <p>Receive Schedule X is receive AND team role PHARMACIST, so STORE_STAFF and OWNER never get it, and no store role
      * can give it to a person who is not a pharmacist.
      */
+    public static StoreAccess access(String teamRole, StoreRole effective, boolean consumptionAllowed, boolean saleAllowed,
+                                     boolean central) {
+        StoreAccess base = access(teamRole, effective, consumptionAllowed);
+        if (!saleAllowed) {
+            return base;
+        }
+        boolean owner = TeamRoles.OWNER.equals(teamRole);
+        boolean pharmacist = TeamRoles.PHARMACIST.equals(teamRole);
+        boolean cashier = effective == StoreRole.CASHIER && !central;
+        boolean hod = effective == StoreRole.APPROVER || effective == StoreRole.DELEGATE;
+        boolean sell = owner || pharmacist || cashier;
+        return base.withSale(sell, sell && pharmacist, owner || (pharmacist && sell), sell,
+                owner || pharmacist || hod, pharmacist, pharmacist || effective == StoreRole.STORE_USER,
+                owner || pharmacist || hod, sell);
+    }
+
+    /** The SAH-79 table; sale capabilities stay false (use the five-argument form when the store is known). */
     public static StoreAccess access(String teamRole, StoreRole effective, boolean consumptionAllowed) {
         if (TeamRoles.OWNER.equals(teamRole)) {
-            return new StoreAccess(true, true, true, false, true, true, true, true, true);
+            return new StoreAccess(true, true, true, false, true, true, true, true, true, true, true, true, true, true, true, false);
         }
         boolean pharmacist = TeamRoles.PHARMACIST.equals(teamRole);
         switch (effective) {
             case APPROVER:
             case DELEGATE:
-                return new StoreAccess(true, true, true, pharmacist, true, pharmacist, true, pharmacist, true);
+                return new StoreAccess(true, true, true, pharmacist, true, pharmacist, true, pharmacist, true, true, true, true,
+                        true, true, true, pharmacist);
             case CENTRAL_STORE_USER:
-                return new StoreAccess(false, false, true, pharmacist, consumptionAllowed, true, true, true, true);
+                return new StoreAccess(false, false, true, pharmacist, consumptionAllowed, true, true, true, true, true, true,
+                        consumptionAllowed, true, true, false, pharmacist);
             case STORE_USER:
             default:
-                return new StoreAccess(true, false, true, pharmacist, consumptionAllowed, pharmacist, true, pharmacist, pharmacist);
+                return new StoreAccess(true, false, true, pharmacist, consumptionAllowed, pharmacist, true, pharmacist, pharmacist,
+                        true, true, consumptionAllowed, pharmacist, true, false, pharmacist);
         }
     }
 }

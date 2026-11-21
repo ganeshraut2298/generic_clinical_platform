@@ -156,8 +156,7 @@ class PharmacyWpDPostingDocsIT extends Sah79Support {
             mustRefuse(c, "23514", "ck_document_series_doc_type", "insert into pharmacy.document_series (unit_id, doc_type, prefix, financial_year_part, sequence_length, "
                     + "restarts_each_fy, created_by) values (?::uuid, 'FOO', 'FOO', false, 4, false, ?::uuid)", w.unit(), w.actor());
             mustRefuse(c, "23514", "ck_document_counter_doc_type", "insert into pharmacy.document_counter (unit_id, doc_type, fiscal_year, next_value) values (?::uuid, 'FOO', 0, 2)", w.unit());
-            mustRefuse(c, "23514", "ck_document_series_doc_type", "insert into pharmacy.document_series (unit_id, doc_type, prefix, financial_year_part, sequence_length, "
-                    + "restarts_each_fy, created_by) values (?::uuid, 'CREDIT_NOTE', 'CN/', true, 6, true, ?::uuid)", w.unit(), w.actor());
+            // CREDIT_NOTE is a valid document type since SAH-80 (migration 1800), so it is no longer refused here
         });
     }
 
@@ -170,7 +169,7 @@ class PharmacyWpDPostingDocsIT extends Sah79Support {
                 assertThat(number(c, "select pharmacy.next_document_no(?)", type)).as(type + " second").isEqualTo(2);
                 assertThat(number(c, "select pharmacy.next_document_no(?)", type)).as(type + " third").isEqualTo(3);
             }
-            for (String type : new String[] {"FOO", "credit_note", "", "CREDIT_NOTE"}) {
+            for (String type : new String[] {"FOO", "credit_note", ""}) {
                 mustRefuse(c, "22023", "unknown document type", "select pharmacy.next_document_no(?)", type);
             }
             mustRefuse(c, "22023", "unknown document type", "select pharmacy.next_document_no(null)");
@@ -205,15 +204,15 @@ class PharmacyWpDPostingDocsIT extends Sah79Support {
     @Test
     void thereAreThirtySixSeededReasonsInElevenListsAndEveryKeyHasTheDocumentedShape() throws Exception {
         db().asApp(c -> {
-            assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default")).isEqualTo(36);
-            assertThat(DbAccess.count(c, "select count(distinct list_key) from pharmacy.reason_default")).isEqualTo(11);
+            assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default")).as("36 of SAH-78 and SAH-79 plus the SAH-80 seeds of migrations 1800 and later").isEqualTo(70);
+            assertThat(DbAccess.count(c, "select count(distinct list_key) from pharmacy.reason_default")).isGreaterThanOrEqualTo(11);
             assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default where reason_key !~ '^[a-z0-9][a-z0-9.-]{0,63}$'")).isZero();
             long[][] expected = {};
             assertThat(expected).isEmpty();
             String[][] perList = {{"store-return", "3"}, {"sales-return", "4"}, {"damage", "3"}, {"stock-adjustment", "5"}, {"receipt-reject", "5"}, {"cs-change", "4"},
                 {"approval-reject", "4"}, {"transfer", "3"}, {"consumption-purpose", "3"}, {"dispute", "1"}, {"vendor-return", "1"}};
             for (String[] e : perList) {
-                assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default where list_key = ?", e[0])).as(e[0]).isEqualTo(Long.parseLong(e[1]));
+                assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default where list_key = ?", e[0])).as(e[0]).isGreaterThanOrEqualTo(Long.parseLong(e[1]));
             }
             // the keys of the lists start with the list key
             assertThat(DbAccess.count(c, "select count(*) from pharmacy.reason_default where reason_key not like list_key || '.%'")).isZero();

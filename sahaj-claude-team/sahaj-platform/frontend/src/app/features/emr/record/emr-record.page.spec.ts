@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { Observable, Subject, of } from 'rxjs';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { ScrollTo } from '../../../core/scroll/scroll-to.service';
 import { AdmitDialogComponent } from '../../ipd/admit/admit-dialog.component';
@@ -14,6 +14,7 @@ import { FinishDialogComponent } from '../finish/finish-dialog.component';
 import { AdmitAdviceDialogComponent } from './admit-advice-dialog.component';
 import { EmrAdmitRequestDialogComponent } from './emr-admit-request-dialog.component';
 import { EmrRecordPage } from './emr-record.page';
+import { EmrRecordStore } from './emr-record.store';
 
 const EMR = '/api/v1/opd/emr/records';
 
@@ -22,13 +23,15 @@ describe('EmrRecordPage', () => {
   let http: HttpTestingController;
   let el: HTMLElement;
   let snack: ReturnType<typeof vi.fn>;
+  let snackAction: Subject<void>;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let dialogResult: unknown;
   let scroll: { section: ReturnType<typeof vi.fn> };
   let router: { currentNavigation: () => unknown; navigateByUrl: ReturnType<typeof vi.fn> };
 
   async function boot(view: EmrRecordView = record(), navState: unknown = null): Promise<void> {
-    snack = vi.fn();
+    snackAction = new Subject<void>();
+    snack = vi.fn(() => ({ onAction: () => snackAction }));
     dialogResult = undefined;
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(dialogResult) }));
     scroll = { section: vi.fn() };
@@ -601,6 +604,95 @@ describe('EmrRecordPage', () => {
       await settle();
       http.expectNone(`${EMR}/r1/draft`);
       expect(q('#sec-vitals .err-text')!.textContent).toContain('Enter a number from');
+    });
+  });
+
+  describe('a save or Complete that stops always says why (BUG-emr-finish-no-call)', () => {
+    const FIX = 'Fix the fields marked in red, then save again.';
+
+    function readyView(): EmrRecordView {
+      const view = record();
+      view.layout.sections = view.layout.sections.map((s) => ({ ...s, required: false }));
+      return view;
+    }
+
+    it('Save draft with a field marked in red in a collapsed section: a message, the section opened and the field in view', async () => {
+      await boot();
+      await type(q<HTMLInputElement>('#f-vitals-pulse')!, '9999999');
+      const store = fixture.debugElement.injector.get(EmrRecordStore);
+      store.setPart('TREATMENT');
+      store.toggleCollapsed('vitals');
+      await settle();
+      act('save-draft').click();
+      await settle();
+      http.expectNone(`${EMR}/r1/draft`);
+      expect(snack).toHaveBeenCalledWith(FIX, 'Close', expect.anything());
+      expect(tab('Assessment').getAttribute('aria-selected')).toBe('true');
+      expect(store.isCollapsed('vitals')).toBe(false);
+      expect(scroll.section).toHaveBeenCalledWith('sec-vitals');
+      expect(scroll.section).toHaveBeenLastCalledWith('f-vitals-pulse');
+      expect(q('#f-vitals-pulse')).not.toBeNull();
+    });
+
+    it('Save draft on a record changed elsewhere: the conflict message with Reload, which reloads', async () => {
+      await boot();
+      await type(q<HTMLInputElement>('#f-vitals-pulse')!, '72');
+      act('save-draft').click();
+      http.expectOne(`${EMR}/r1/draft`).flush(
+        { type: 'https://sahaj.in/problems/emr-record-changed', title: 'x', status: 409 },
+        { status: 409, statusText: 'Conflict' },
+      );
+      await settle();
+      expect(snack).toHaveBeenCalledWith('This EMR was changed elsewhere. Reload to see the latest.', 'Reload', expect.anything());
+      snackAction.next();
+      http.expectOne(`${EMR}/r1`).flush(record({ revision: 9 }));
+      await settle();
+    });
+
+    it('Save draft that fails at the server: the server words where the doctor is looking', async () => {
+      await boot();
+      await type(q<HTMLInputElement>('#f-vitals-pulse')!, '72');
+      act('save-draft').click();
+      http.expectOne(`${EMR}/r1/draft`).flush(
+        { type: 'https://sahaj.in/problems/database-busy', title: 'x', status: 503, detail: 'The system is busy. Try again in a few seconds.' },
+        { status: 503, statusText: 'Busy' },
+      );
+      await settle();
+      expect(snack).toHaveBeenCalledWith('The system is busy. Try again in a few seconds.', 'Close', expect.anything());
+      expect(act('save-draft').disabled).toBe(false);
+    });
+
+    it('Complete with a field marked in red: no check, a message and the field opened', async () => {
+      await boot(readyView());
+      await type(q<HTMLInputElement>('#f-vitals-pulse')!, '9999999');
+      fixture.debugElement.injector.get(EmrRecordStore).toggleCollapsed('vitals');
+      await settle();
+      act('complete').click();
+      await settle();
+      http.expectNone(`${EMR}/r1/draft`);
+      http.expectNone(`${EMR}/r1/finish-check`);
+      expect(snack).toHaveBeenCalledWith(FIX, 'Close', expect.anything());
+      expect(scroll.section).toHaveBeenLastCalledWith('f-vitals-pulse');
+      expect(act('complete').disabled).toBe(false);
+    });
+
+    it('Complete saves what is typed, checks, and opens "Check before completing"', async () => {
+      await boot(readyView());
+      await type(q<HTMLInputElement>('#f-vitals-pulse')!, '72');
+      act('complete').click();
+      const save = http.expectOne(`${EMR}/r1/draft`);
+      expect(save.request.body.saveKind).toBe('AUTO');
+      save.flush(readyView());
+      http.expectOne(`${EMR}/r1/finish-check`).flush({
+        ready: true,
+        blockers: [],
+        encounterType: 'OPD_VISIT',
+        effects: {},
+        info: [],
+        share: { whatsapp: { available: false, reason: 'x' }, abha: { available: false, reason: 'y' } },
+      });
+      await settle();
+      expect(dialogOpen).toHaveBeenCalledWith(FinishDialogComponent, expect.anything());
     });
   });
 

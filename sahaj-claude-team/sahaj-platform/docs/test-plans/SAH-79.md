@@ -261,5 +261,160 @@ Not reachable through the API, so not tested here: a vendor-return row that is b
 Unit passed; integration 3,527 run, 3 failures, 0 errors, 25 skipped; no code defect. Migration 1740 applied cleanly. The 3 failures were QA tests, fixed first in this run: `PharmacyHardeningImportIT` (unknown field), `PharmacyScheduleXLedgerAndAuditSignerDbIT` (a SYSTEM `GRN` line is now refused by `ck_stock_ledger_system_types`) and `PharmacyWpDStockReadsApiIT` (APPROVALS_INBOX is for the owner, a HOD or a current delegate).
 
 ### 8.3 This run (round 7)
-Written 19 Nov 2026 15:30 to 16:30: `PharmacyRound5DbIT`, `PharmacyRound6ApiIT`, `PharmacyWpEReceiptApiIT`, `PharmacyWpEDebitNoteApiIT`, `PharmacyWpFIndentApiIT`, `Sah79BuySupport`, the three fixes above and the e2e spec. The gate numbers are added below when the gate has run.
+Written 19 Nov 2026 15:30 to 16:30: `PharmacyRound5DbIT`, `PharmacyRound6ApiIT`, `PharmacyWpEReceiptApiIT`, `PharmacyWpEDebitNoteApiIT`, `PharmacyWpFIndentApiIT`, `Sah79BuySupport`, the three fixes above and the e2e spec. Gate results (19 to 20 Nov 2026, one Maven only):
 
+- **`node scripts/validate.mjs db` cannot pass.** It stops before Maven with `V2026_12_17_1910__pharmacy_h1_register_row.sql: pharmacy.h has tenant_id but no row level security`. The check in `scripts/validate.mjs` line 38 reads table names with the pattern `[a-z_]+.[a-z_]+`, which has no digit, so it cuts `pharmacy.h1_register_row` at `h` and then looks for the wrong table. The migration is correct (it enables and forces row level security at lines 84 and 85). Owner: humans (`scripts/`); or the db-engineer renames the table. The full `mvn verify` was run directly instead.
+- **Migrations:** 1740 and 1750 applied cleanly (earlier runs). The SAH-80 migrations `V2026_12_17_1800` to `2300` (17 files) applied cleanly to `sahaj_test` from the Flyway log: "Successfully applied 17 migrations to schema platform, now at version v2026.12.17.2300".
+- **`mvn verify` (first full run, java developer's edits compiled in):** unit 6,504 run, 1 error (`ReturnShortageServiceTest.theWaitingListNeedsASideAndTheCapabilityOfThatSide`, NullPointerException at `ReturnShortageService.java:125`, a mock that returns null); integration 3,620 run, 26 failures, 12 errors, 25 skipped. 13 classes had failures; 11 of them were test faults caused by the java round 6 and the SAH-80 migrations and were fixed here (see below).
+- **Fixed in the tests:** `PharmacyFunctionGuardrailIT` (migration 1800 is a third definer of `guard_stock_ledger_schedule_x` and the winner of `next_document_no`); `PharmacyRound4DbIT` and `PharmacyWpDPostingDocsIT` (CREDIT_NOTE and BILL are valid document types since 1800); `PharmacyWpDPostingDocsIT` and `PharmacyTablesIT` (70 seeded reasons, not 36); `RowLevelSecurityCatalogIT` (26 SAH-80 tenant tables, 11 of them insert-only, and `consumption` now has an update policy); `PharmacyHardeningImportIT` (`{"rows":"text"}` is `validation` or `malformed-request`); `PharmacyRound6ApiIT`, `PharmacyWpFIndentApiIT`, `PharmacyWpEDebitNoteApiIT` (a plain pharmacist gets 403 on the approvals inbox, D-4); and in the new class the product id is `productId`, a reason is `reasonKey`, a dispatch must list every item that still has a quantity, the import takes 200 rows a request, a Schedule X test needs `@WithPinPepper` and the signer's real PIN.
+- **After the fixes (targeted reruns):** `PharmacyFunctionGuardrailIT` 3, `PharmacyHardeningImportIT` 23, `PharmacyRound4DbIT` 18, `PharmacyRound6ApiIT` 9, `PharmacyTablesIT` 15, `PharmacyWpDPostingDocsIT` 11, `PharmacyWpDStockReadsApiIT` 19, `PharmacyWpFIndentApiIT` 17, `RowLevelSecurityCatalogIT` 15: all pass. `PharmacyWpFDispatchReceiptApiIT` 23, 22 pass (D-QA-2 fails). `PharmacyWpEDebitNoteApiIT` 14 (11 pass) and `PharmacyWpEReceiptApiIT` 18 (16 pass): the 5 failures are defects D-QA-3 to D-QA-5 below (not changed). `PharmacyProductCatalogueIT` 17 (16 pass): D-QA-6.
+- **Per class (new in rounds 6 and 7):** `PharmacyRound5DbIT` 12, `PharmacyRound6ApiIT` 9, `PharmacyWpEReceiptApiIT` 18, `PharmacyWpEDebitNoteApiIT` 14, `PharmacyWpFIndentApiIT` 17, `PharmacyWpFDispatchReceiptApiIT` 23.
+
+**Defects found (not fixed by QA; main code is not QA's).**
+
+| ID | Where | Expected | Actual | Owner |
+| --- | --- | --- | --- | --- |
+| D-QA-1 | `ReturnShortageServiceTest` line 310 / `ReturnShortageService.java:125` | the waiting list answers with the mocked slice | NullPointerException: the mocked repository returns null (a new repository call that the unit test does not stub) | java-developer |
+| D-QA-2 | `DispatchReceiptService`, indent status after a receipt that skips a Schedule X line | pharmacy.yaml 0.3.4: the indent stays PARTLY_DISPATCHED with `chips.scheduleXWaiting` above 0 | the indent is DISPATCHED (test `aNonPharmacistSkipsTheScheduleXLine...` line 471) | java-developer |
+| D-QA-3 | debit note create (short supply) | credit = qty x rate x credit %, and the test sends 100 | credit worked at the vendor's 80 % (6,400 not 8,000 paise; 8,000,000 not 10,000,000 in the strip case); either the sent `creditPercent` of a SHORT_SUPPLY line is ignored, or the 80 % default of the prepared draft is intended: decide | java-developer, architect |
+| D-QA-4 | debit note create | 400 `validation` for an unknown vendor and for a batch that is not an eligible row (pharmacy.yaml pharmacyCreateDebitNote) | unknown vendor 404; a non-eligible batch 201 | java-developer |
+| D-QA-5 | receipt against an order | the order line's `receivedQty` equals the billed quantity 10 of a line received 8 with 2 free (the test's reading) | 8 (the received quantity without the free units); read the contract and decide | architect |
+| D-QA-6 | product catalogue search `q` of 61 characters | the SAH-78 test expects "Keep the search to 60 characters" | "Type at most 60 characters." (ProductSearchService line 60, the same sentence as the stock read) | java-developer or the SAH-78 test owner to choose one sentence |
+| D-QA-7 | receipt with a missing line | pharmacy.yaml 0.3.5: field `lines` "Send every line not yet received, once." | "List every line of this dispatch that is not yet received" | java-developer |
+| D-QA-8 | (closed) queued decisions of DEC-083 | M4, L20, L21 and I23 tests of section 8.4 | all four fail on the first full run and **pass** on the last targeted run: the java developer built the fixes in between | none |
+| D-QA-9 | `scripts/validate.mjs` line 38 | the table name `pharmacy.h1_register_row` is read whole | read as `pharmacy.h` | humans (scripts) |
+
+**e2e (mocked API, `frontend/e2e`, `playwright test pharmacy-`, built app).** Run after the frontend lock had been quiet for two hours (23:50). 199 passed, 2 skipped, 9 failed in 4 tests: (1) `pharmacy-indents-wpf` raise an indent on phone-360: the create call is not seen by the mock; (2) the HOD approval: the body carries `approvedQty: 6` but no `remarkReasonKey` for the reduced line; (3) the partial dispatch: `dispatch-backorder-0` is never found (desktop), the body is not found (phone); (4) "Return" opens the vendor return with the credit field at 80, the spec expects the eligible row's 70 (`vr-credit-percent-0`); and the older `pharmacy-products-opening-stock` test at line 785 (`local-G-000103` is not found, phone and desktop; it passed in earlier runs). Items 1 to 4 are the new WP-F spec against the angular developer's current build and need a look by both owners. Not written: separate specs for Post to stock, the Schedule X signer step of receiving and the vendor return of receiving (the screens exist: `grn-*`, `f-grn-signer`, `vr-*`; the existing specs of those screens were not extended in this run).
+
+
+### 8.4 New in this run: dispatch, receipt, return items, shortages and the DEC-083 decisions (`PharmacyWpFDispatchReceiptApiIT`, 22 tests)
+
+| Test | Rule | Test method |
+| --- | --- | --- |
+| T79-11-01 | Full dispatch: FEFO batch (TESTB001 first), Central AVAILABLE to the requesting store IN_TRANSIT in one movement, reference "<IND no> / 1", indent DISPATCHED, audit, payable untouched, ledger equals balances | `aFullDispatchTakesFefoBatches...` |
+| T79-11-02 | One dispatch line per batch in FEFO order (102 units: 100 + 2) | `aDispatchOfMoreThanOneBatchSplits...` |
+| T79-11-03 | Partial dispatch needs BACK_ORDER or CLOSE (with reason); all zero is "Nothing to dispatch"; above remaining 400; stale indent version 409 `changed`; second dispatch completes it | `aPartialDispatchNeedsABalanceAction...` |
+| T79-11-04 | CLOSE with reason stops counting; the same clientKey replays (200) with no double dispatch | `aClosedBalanceNeedsAReason...` |
+| T79-11-05 | Above Central stock: 409 `insufficient-stock`, nothing moves | `aDispatchAboveTheCentralStoreStock...` |
+| T79-11-06 | Replacement of the same salt: options listed, reason needed, "replaced by Central Store" and the reason | `aReplacementOfTheSameSalt...` |
+| T79-11-07 | Schedule X dispatch: owner 403 `schedule-x-pharmacist`, missing signer 400 `secondSigner`, wrong PIN 403, good PIN 201 and the signer on the ledger, PIN never echoed | `aScheduleXDispatchNeedsAPharmacist...` |
+| T79-11-08 | Role and tenant: store user 403 or 404, front desk 403, another clinic 404, unknown field 400 | `dispatchPathsAreRefused...` |
+| T79-12-01 | Receipt of accepted, rejected and short lines: states AVAILABLE, PENDING_RETURN, IN_TRANSIT (short); reason and sum rules 400; a missing line 400 "Send every line not yet received, once."; chips; RECEIVED then 409 `changed`; audit | `aReceiptOfAcceptedRejectedAndShortLines...` |
+| T79-12-02 | Expired batch: accept 400; reject with another reason 400 `rejectReasonKey`; reject as `receipt-reject.near-expiry` 200 (the batch is expired in the test through a committed update) | `anExpiredBatchCannotBeAccepted...` |
+| T79-12-03 | Non-pharmacist: Schedule X with skipped false 403; skipped on a non-Schedule-X line 400; PARTLY_RECEIVED with `chips.scheduleXWaiting`; the indent stays PARTLY_DISPATCHED; a re-send of only skipped lines 400 "There is nothing to receive."; pharmacist receives the one line (missing signer 400, older dispatch version 409); indent RECEIVED; no indent ever PARTLY_RECEIVED | `aNonPharmacistSkipsTheScheduleXLine...` |
+| T79-12-04 | A back-order keeps the indent PARTLY_DISPATCHED after the first receipt; it never moves backwards; RECEIVED when all is dispatched and received | `anIndentWithABackOrderStays...` |
+| T79-12-05 | Role and tenant: Central Store user 403 or 404 at the receiving store, front desk 403, wrong path store 404, another clinic 404, 401 lines 400, the incoming list and its bad status 400 | `theReceiptPathsAreRefused...` |
+| T79-13-01 | Accept a rejected item into QUARANTINE: default chip, the holding store cannot accept, no balance moves before accept (BR-25), result note, second accept 409, audit, chip cleared | `theCentralStoreAcceptsARejectedItem...` |
+| T79-13-02 | Dispute (reason `dispute.other`), units stay at the holding store, reply (note under 4 characters 400), accept SALEABLE afterwards | `aDisputedItemShowsTheReason...` |
+| T79-13-03 | An expired item: default QUARANTINE, SALEABLE 409 `batch-expired` | `anExpiredItemCannotBeAcceptedAsSaleable` |
+| T79-13-04 | Shortage settled FOUND: units back to Central AVAILABLE; a second settle 409; audit | `aShortageFoundInTheCentralStore...` |
+| T79-13-05 | CARRIER_CLAIM keeps IN_TRANSIT (CLAIM_OPEN); TRANSIT_LOSS at level 0 writes off, no stock added back | `aCarrierClaimKeepsTheUnits...` |
+| T79-13-06 | Shortage list: store user 403 or 404, another clinic empty and 404 on settle, an unknown outcome 400 | `theShortageListIsRefused...` |
+| T79-Q-M4 | **Queued, expected to fail until built.** A dispatch that picks 401 dispatch lines (one line, 401 batches of 1 unit) is 400 `lines` "Split this dispatch into smaller ones."; 400 lines still pass | `m4aDispatchThatPicksMoreThan400...` |
+| T79-Q-L20 | **Queued.** Two levels: the store approver raising above the requested quantity is 400 `indentLines` "This increase needs the next approver."; the owner at the last level may | `l20AnApproverBelowTheLastLevel...` |
+| T79-Q-I23 | **Queued.** A transit loss of Schedule X units at level 0 by an owner (not a pharmacist) is 403 `schedule-x-pharmacist`, nothing written off; the Central Store pharmacist may | `i23ANonPharmacistCannotWriteOff...` |
+| T79-Q-L21 | **Queued.** A missing signer `membershipId` is field `secondSigner` with "A second signature is needed for Schedule X items."; a bad PIN is `secondSigner.pin` | `l21AMissingSignerMembership...` |
+
+Not covered by an automated test: the line-count refusal after FEFO is tested with 401 batches of one line; a dispatch rule that depends on a delegate is not. The expiry of a batch is set by a committed update through a tenant-bound connection in `expire()`; if the application role may not update `pharmacy.batch`, T79-12-02 and T79-13-03 fail on that update and the helper must change.
+
+## 9. WP-G and WP-H tests (written 20 Nov 2026; NOT YET RUN: see section 10)
+
+Support: `Sah79StoreUseSupport` (the buy world plus the clean opening-stock file posted into the Main Pharmacy and a Ward 3B store, the pharmacist mapped at both). Classes in `backend/src/test/java/com/sahaj/platform/it/`.
+
+| Test group | Class | What it proves |
+| --- | --- | --- |
+| T79-14-01..04 store return | `PharmacyWpGStoreUseApiIT` | AVAILABLE to PENDING_RETURN, item WAITING, nothing enters the Central Store, audit row; replay by clientKey; 400 bad input (quantity 0, above stock "Enter a whole number from 1 to 100", bad reason, unknown batch, unknown field, missing clientKey); Central Store, other clinic (404) and front desk (403) refused |
+| T79-14-05..09 damage report | same | level 0 WRITE_OFF, level 0 SEND_TO_CS, waiting then approved as write-off, approved as send to CS, rejected with RELEASE_TO_AVAILABLE and KEEP_IN_QUARANTINE, reporter cannot approve, `approval_request_id` attached with a version bump, outcome wording, bad input and Central Store SEND_TO_CS refused |
+| T79-15-01..07 transfers | same | create at level 0 (nothing moves), dispatch then receipt with ledger equal to balances, waiting approval blocks dispatch, cancel keeps the number, 400 rules (same store, to Central, quantity, duplicate, reason, no lines), dispatch after stock was taken is 409 insufficient-stock, transfer-stores read, other clinic 404, front desk 403 |
+| T79-16-01..05 consumption and ward link | same | general consumption FEFO and replay, 400 and 409 rules, patient entry and admitted-patients answer integration-off, ward link owner-only and integration-off, ordered-by options, tenant and role |
+| T79-17-01..09 stock audit | `PharmacyWpHAuditReportsApiIT` | full lifecycle to CLOSED with ledger equal to balances; count sheet has exactly the nine blind keys for counter and owner; counter sees no variance figure and gets 403 on the variance read; count validation and stale version; recount returns the line blind; stock moved gives 409 stock-moved; submitter cannot approve (403 self-approval); StockShort refusal commits the recount state and a replay posts nothing; scope, tenant and role refusals |
+| T79-17-10 rule 24 | same | no quantity of the audited product reaches a blind counter through overview, batches, product, low stock, FEFO pick, states, all-stores, reorder suggestions, adjustments, three stock reports, the stock ledger report and its CSV; messages carry no number (return, damage, transfer dispatch, consumption); the owner sees quantities (the check has teeth) |
+| T79-17-11 guard | same | `stock_audit_line` guard: counts after submit, raising the book quantity, identity change, final after close; lowering the book quantity is accepted |
+| T79-18-01..05, T79-19-01 reports | same | catalogue tiers and labels; ten reports run with typed columns, paging, filters and bad input; range over 366 days 400 range-too-long on screen and as CSV problem+json; CSV with BOM, filename and audit rows; every CSV error is application/problem+json with Accept text/csv; 50,001 rows give 409 export-too-large and nothing is sent |
+| T79-H-01 inbox | same | type filter, counts ignore the type, 400 on bad type, size and page, plain pharmacist 403, other clinic empty |
+| DEC-086 items 3, 4 | `PharmacyWpEReceiptApiIT`, `PharmacyProductCatalogueIT` (changed) | order line receivedQty is 8 (free units not counted); "Type at most 60 characters." |
+| e2e | `pharmacy-indents-wpf.spec.ts` (changed) | fefo-pick mock has the FefoPick shape; the cs-change.out-of-stock chip is clicked after Back-order |
+
+Not testable here: the inbox 2,000 request cap (needs 2,001 pending requests), a patient-wise consumption with a real admission (IPD reader is a no-op in phase 1), a Schedule X audit with a second signer (not written yet).
+
+## 10. Results of the 20 Nov 2026 gate run
+
+Not run. `mvn verify` on a snapshot compiled, but every integration test stopped at Flyway validation: "Migration checksum mismatch for migration version 2026.12.17.1800". The recreation of sahaj_test and sahaj_dev (`node scripts/setup/create-database.mjs`, which also does not drop a database that exists) was refused by the permission system, so the databases still hold the old migration 1800. A separate defect stops the application from starting at all (see the handoff).
+
+## 11. SAH-80 Pharmacy sales tests (written 21 Nov 2026, qa-engineer; integration tests COMPILED, NOT RUN)
+
+Contract: `docs/api/pharmacy-sales.yaml` 0.3.7 (DEC-088, DEC-089, DEC-090). Support: `Sah80SalesSupport` (the buy world, a cashier mapped at the Main Pharmacy, a Ward 3B store where sale is not allowed, opening stock of product A, product B, an own Schedule H1 product and an own Schedule X product posted into the pharmacy). Classes in `backend/src/test/java/com/sahaj/platform/it/`. The integration tests have not run: `PharmacyRound5DbIT` on a snapshot stopped again at "Migration checksum mismatch for migration version 2026.12.17.1800" (21 Nov). A human must drop `sahaj_test` and `sahaj_dev` and run `node scripts/setup/create-database.mjs`. The first run will also find wrong guesses of this plan (an exact problem type, a field name); those are test faults to fix, not defects, unless the contract says otherwise.
+
+### 11.1 Criterion to test to result
+
+| Criterion (story) | Test (class, method) | Result |
+| --- | --- | --- |
+| 80-4 create customer, replay, same phone needs confirmation, candidates masked | `PharmacySalesCoreApiIT.aWalkInCustomerIsCreatedReplayedAndTheSamePhoneNeedsConfirmation` | written, not run |
+| 80-4 phone masked for a cashier, input limits, unknown field 400 | `PharmacySalesCoreApiIT.aCustomerPhoneIsMaskedForACashierAndInputIsChecked` | written, not run |
+| tenant isolation and role 403 (customers) | `PharmacySalesCoreApiIT.customersOfAnotherClinicAreInvisibleAndARoleWithoutSellingIsRefused` | written, not run |
+| 80-3 product search (stock, no cost fields, 400 rules) | `PharmacySalesCoreApiIT.theProductSearchFindsAnActiveProductWithItsStockAndRefusesBadInput` | written, not run |
+| 80-3 quote FEFO split over two batches, totals, short line cannot save, a quote writes nothing | `PharmacySalesCoreApiIT.aQuoteSplitsALineByFefoAndWorksTheTotalsAndAShortLineCannotBeSaved` | written, not run |
+| 80-3 quote 400 (quantity, empty, 101 lines), unknown product 404, ward store 409 sale-not-allowed | `PharmacySalesCoreApiIT.aQuoteRefusesAMalformedCartWithAProblemBody` | written, not run |
+| 80-3 save bill moves stock, ledger COUNTER_SALE, gapless numbers (a failed save takes none) | `PharmacySalesCoreApiIT.aSavedBillMovesStockWritesTheLedgerAndTakesTheNextNumberWithNoGap` | written, not run |
+| 80-3 split bill takes both batches; double tap saves once | `PharmacySalesCoreApiIT.aSplitBillTakesBothBatchesAndTheDoubleTapSavesOnce` | written, not run |
+| 80-3 sale-changed carries the new quote; payment and key checks | `PharmacySalesCoreApiIT.aChangedCartIsRefusedWithTheNewQuoteAndInputIsChecked` | written, not run |
+| tenant isolation and role 403 (bills) | `PharmacySalesCoreApiIT.aBillOfAnotherClinicIsInvisibleAndTheListShowsOnlyThisStore`, `theSaleOfAnotherClinicsStoreIsNotFoundAndTheWardStoreRefusesASale` | written, not run |
+| 80-5 hold, read, discard, 20 held bills limit | `PharmacySalesCoreApiIT.aHeldBillIsListedReadAndDiscardedAndTheTwentyFirstIsRefused` | written, not run |
+| 80-5 cancel into QUARANTINE, number kept, cashier 403, already-cancelled | `PharmacySalesCoreApiIT.aCancelledBillGoesToQuarantineKeepsItsNumberAndCannotBeCancelledTwice` | written, not run |
+| 80-5 cancel back on the shelf, reason other needs a note | `PharmacySalesCoreApiIT.aBillCancelledBackOnTheShelfReturnsToAvailableAndAReasonOtherNeedsANote` | written, not run |
+| 80-5 refund after cancel (no modes 400, recorded once, live bill 409) | `PharmacySalesCoreApiIT.aRefundOfACancelledBillWaitsForTheOwnersRefundModesAndIsRecordedOnce` | written, not run |
+| 80-6 within the limit saves, above needs approval, 409 discount-approval-needed | `PharmacySalesDiscountApiIT.aDiscountWithinTheLimitSavesAtOnceAndAboveItNeedsApproval` | written, not run |
+| 80-6 request pending, read, inbox row, withdraw twice, audit once | `PharmacySalesDiscountApiIT.aRequestIsPendingReadWithdrawnAndWithdrawingTwiceChangesNothing` | written, not run |
+| 80-6 approved request saves; a bigger cart is VOID, 409 discount-approval-void | `PharmacySalesDiscountApiIT.anApprovedRequestLetsTheCashierSaveAndAChangedCartVoidsIt` | written, not run |
+| 80-6 reject with reason; a pharmacist cannot decide | `PharmacySalesDiscountApiIT.aRejectedRequestIsShownWithItsReasonAndTheRaiserCannotApproveHisOwn` | written, not run |
+| DEC-090 owner exempt: quote, request (required false, no request, no audit), createBill (any id ignored), role read-out ALLOW | `PharmacySalesDiscountApiIT.theOwnerIsExemptFromTheDiscountRuleEverywhere` | written, not run |
+| DEC-089 discarding a held bill withdraws its pending request | `PharmacySalesDiscountApiIT.discardingAHeldBillWithdrawsItsPendingRequest` | written, not run |
+| 80-6 a new request withdraws the old one; percent 400; other clinic 404; front desk refused | `PharmacySalesDiscountApiIT.aNewRequestOfTheSameSellerWithdrawsTheEarlierOneAndInputIsChecked` | written, not run |
+| 80-18 pharmacist return completes at once, credit note CN/, stock back, ledger SALES_RETURN | `PharmacySalesReturnApiIT.aPharmacistReturnOfSealedItemsCompletesAtOnceWithACreditNoteAndStockComesBack` | written, not run |
+| 80-18 over-return, wrong refund sum, zero, bad condition, unknown field: 400, nothing moves | `PharmacySalesReturnApiIT.aReturnAboveWhatWasSoldOrWithAWrongRefundIsRefusedAndMovesNothing` | written, not run |
+| 80-18 no return window: 409 return-window-not-set with the sentence | `PharmacySalesReturnApiIT.withoutAReturnWindowTheReturnIsRefused` | written, not run |
+| 80-18 O-8 cashier return waits, cashier cannot accept, pharmacist accepts and finishes | `PharmacySalesReturnApiIT.aCashierReturnWaitsForThePharmacistWhoAcceptsAndFinishesIt` | written, not run |
+| 80-18 opened item to QUARANTINE | `PharmacySalesReturnApiIT.aPharmacistCanSendAnOpenedItemToQuarantineAndRefuseAnother` | written, not run |
+| 80-18 SALES_RETURN rule: waits for the owner, approval, completes | `PharmacySalesReturnApiIT.aReturnRuleThatNeedsTheOwnerWaitsForApprovalThenCompletes` | written, not run |
+| tenant isolation and role 403 (returns) | `PharmacySalesReturnApiIT.aReturnOfAnotherClinicIsInvisibleAndAnUnmappedRoleIsRefused` | written, not run |
+| 80-9 H1 bill needs a prescription and a pharmacist; register row with the patient name; cashier 403 | `PharmacySalesRegistersApiIT.anH1BillNeedsAPrescriptionAndAPharmacistAndWritesARegisterRowWithThePatientName` | written, not run |
+| 80-9 missing prescriber blocks until a pharmacist overrides; override in the register | `PharmacySalesRegistersApiIT.aMissingPrescriberBlocksTheBillUntilAPharmacistOverridesWithAReason` | written, not run |
+| 80-9 cancel adds a Cancelled reversal, register append only | `PharmacySalesRegistersApiIT.cancellingAnH1BillAddsACancelledReversalToTheRegister` | written, not run |
+| 80-9 range-too-long, bad date 400, other clinic 404, filter | `PharmacySalesRegistersApiIT.theH1RegisterRangeIsCheckedAndAnotherClinicSeesNothing` | written, not run |
+| 80-10 Schedule X needs the second signer (400 field, same person 403, cashier 403); ledger carries second_signer; register and entries carry both | `PharmacySalesRegistersApiIT.aScheduleXBillNeedsTheSecondSignerAndTheLedgerAndRegisterCarryBothSigners` | written, not run |
+| 80-10 cancel of an X bill: reversal and stock back | `PharmacySalesRegistersApiIT.cancellingAScheduleXBillAddsAReversalAndPutsTheStockBack` | written, not run |
+| DEC-089 h1-register report masked per store (owner and pharmacist member full; HOD masked; pharmacist of another store none) | `PharmacySalesRegistersApiIT.theH1ReportShowsTheNameInFullOnlyToTheOwnerAndAPharmacistMemberAndMasksItForOthers` | written, not run |
+| DEC-089 h1 export owner and pharmacist only, audited | `PharmacySalesRegistersApiIT.theH1ReportExportIsForTheOwnerAndAPharmacistMemberOnlyAndIsAudited` | written, not run |
+| 80-20 command centre card isolation per store, all stores for the owner, cashier gets today's sales only, no gross margin | `PharmacySalesCommandApiIT.theCardsOfOneStoreNeverCountTheBillsOfAnotherStoreAndACashierGetsTodaysSalesOnly` | written, not run |
+| 80-20 cancelled not counted; 400 without a store; 404 other clinic; 403 front desk | `PharmacySalesCommandApiIT.aCancelledBillIsNotCountedAndTheStoreAndRoleRulesApply` | written, not run |
+| 80-19 role read-out, activity feed text without a patient name, type filter, 403 cashier, other clinic empty | `PharmacySalesCommandApiIT.theRoleReadoutAndTheActivityFeedAreForTheOwnerAndAPharmacistAndBuiltFromIdsOnly` | written, not run |
+| 80-11, 80-13, 80-15 OPD and IPD queues answer connected false; a write answers 409 not-connected | `PharmacySalesCommandApiIT.theOpdAndIpdQueuesAnswerNotConnectedAndTheirWritesAnswerNotConnected` | written, not run |
+| 80-21 SALES_COMPLIANCE group and label, six reports run, range 400, unknown key 400, cashier 403, other clinic | `PharmacySalesCommandApiIT.theSalesAndComplianceGroupIsInTheCatalogueAndEachReportRunsWithItsColumns` | written, not run |
+| 80-21 margin cells empty for a non-pharmacist HOD | `PharmacySalesCommandApiIT.theMarginCellsAreEmptyForAHeadOfDepartmentWhoIsNotAPharmacist` | written, not run |
+| inbox rows of sales (chip DISCOUNT, subject SALE_DISCOUNT, action APPROVE) | `PharmacySalesCommandApiIT.aDiscountRequestIsAnInboxRowWithTheApproveAction` | written, not run |
+| rule 24 in sale fields: blind seller gets null quantities, own cart stays, owner still sees | `PharmacySalesCommandApiIT.whileAProductIsOnAnOpenAuditABlindSellerSeesNoQuantityAndAnOwnerStillDoes` | written, not run |
+| 80-1 twenty reason lists, 70 seeded reasons; `PharmacyReasonsTemplatesIT` line 188 expects 20; `ck_reason_list` takes every list | `PharmacyReasonsTemplatesIT`, `PharmacyWpDPostingDocsIT`, `Sah78CSupport.LIST_KEYS` (changed) | written, not run |
+| Schedule X ledger signer on COUNTER_SALE | `PharmacySalesRegistersApiIT.aScheduleXBillNeedsTheSecondSignerAndTheLedgerAndRegisterCarryBothSigners` (API); the DB guard stays in `PharmacyScheduleXLedgerAndAuditSignerDbIT` (not extended) | written, not run |
+
+Not written (endpoint not built, or no screen): day close (80-22, out of go-live), link bill to patient, customer payments and the udhar flow (`pharmacyReceiveCustomerPayment`, udhar sale, `credit-limit-exceeded`), substitution options and the substitution line (80-7), the allergy block (patient port is a no-op), OPD Rx billing, IPD issue and ward returns (no-op ports), pharmacist registrations add and update, the store-path H1 and Schedule X CSV exports (the report export is covered), and the activity types SECOND_SIGNATURE and STOCK_ADJUSTED. This is the next QA backlog for SAH-80.
+
+### 11.2 e2e (`frontend/e2e/pharmacy-sales-wpl.spec.ts`, mocked API, phone-360 and desktop-1440, app built from the current tree)
+
+| Criterion | Test | phone-360 | desktop-1440 |
+| --- | --- | --- | --- |
+| 80-3 POS: search, cart, save, invoice | a cashier finds a medicine, prices it and saves the bill | FAIL (invoice page 387 px wider than the screen) | pass |
+| 80-3 error: sale-changed | the prices changed while the cashier was saving | pass | pass |
+| 80-6 discount above the limit blocks save, send for approval | a discount above the limit cannot be saved until it is sent for approval | pass | pass |
+| 80-5 cancel with reason and shelf No, refund | the Command Center shows the cards and today bills; a bill is cancelled | pass | pass |
+| 80-5 error: cancel not allowed | a cashier cannot cancel; the bill stays saved | pass | pass |
+| 80-18 return of one unit and credit note | a return of one unit finds the bill, sends the refund and shows the credit note | pass | pass |
+| 80-18 error: window over | the return window is over | pass | pass |
+| 80-9, 80-10, 80-19 registers and licences | the H1 register, the Schedule X balance register and the licences show | pass | pass |
+| 80-9 error: H1 register 503 | the H1 register cannot load | pass | pass |
+| 80-11, 80-13 not connected | both queues answer Not connected | pass | pass |
+
+Result: 19 passed, 1 failed (`playwright test pharmacy-sales-wpl`, 21 Nov 2026). The failing assertion is the page overflow check, not a spec fault: at 360 px the POS invoice makes the document 387 px wider than the screen (owner: angular-developer). The screen shows the cancel-not-allowed sentence "Only the owner can cancel a bill from an earlier day." whatever the server detail says; the spec follows the screen.
+
+### 11.3 Unit and architecture checks (snapshot copy of `backend/`, `mvn -o test`)
+
+6,875 tests, 6 failures. Five were artifacts of the snapshot (the coverage tests read `docs/api/*.yaml` from the repo root; with `docs/api` copied next to the snapshot, `PharmacyStoreAccessCoverageTest` 7/7 and `IpdScopeCoverageTest` 5/5 pass). One is real: `StoreAccessGuardConventionTest.noPharmacyClassUsesRequiresNew` (`CommandCentreService` calls `TransactionTemplate.setPropagationBehavior`). `BeanNameUniquenessTest` 1/1 and `ModularityTests` 6/6 pass.

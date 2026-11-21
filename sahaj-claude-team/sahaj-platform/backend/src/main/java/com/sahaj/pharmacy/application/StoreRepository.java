@@ -35,6 +35,12 @@ public interface StoreRepository {
     boolean update(UUID tenantId, UUID id, long version, String name, String code, StoreType type,
                    UUID issuesFromStoreId, boolean saleAllowed, boolean consumptionAllowed, UUID actorUserId);
 
+    /** The linked IPD ward of every store of the unit that has one (store id to ward id). */
+    java.util.Map<UUID, UUID> linkedWards(UUID tenantId);
+
+    /** Sets or clears the linked ward when the store version is still {@code version}; false when it is not. */
+    boolean setLinkedWard(UUID tenantId, UUID id, long version, UUID wardId, UUID actorUserId);
+
     /** Status INACTIVE, version plus one. */
     void switchOff(UUID tenantId, UUID id, UUID actorUserId);
 

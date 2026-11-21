@@ -1,9 +1,74 @@
 openapi: 3.1.0
 info:
   title: Sahaj Pharmacy & Inventory API
-  version: 0.3.5
+  version: 0.3.8
   description: >-
-    Changelog. 0.3.5 (19 Nov 2026, SAH-79 WP-F contract gaps: the tech lead's decisions of 19 Nov 13:40 (angular
+    Changelog. 0.3.8 (21 Nov 2026, SAH-80 review round 7: DEC-091 item 3, DEC-092 items 3 and 4; programme
+    DEC-061; ADR-030 S2 and S16). The version moves with pharmacy-sales.yaml 0.3.8 (one API; the discount
+    approval, Schedule X cancel, role read-out and record-access changes are in that file's changelog). Additive
+    or wording only: no path, parameter, status code, schema member or enum value is added or removed; new
+    problem codes: none. (a) Rule 24 (blind count) is tightened by DEC-091 item 3: a blind caller is one whose
+    StoreAccess has readStock true and reviewCount false (was count; the same people for every SAH-79 role, and
+    it keeps a CASHIER blind); for a product on the open audit, StoreStateRow.status is null and the
+    StockOverview lowStock pill leaves it out (they were said to stay); pharmacyFefoPick answers only the first
+    batch FEFO would pick, with no quantity. (b) StoreAccess for a CASHIER (DEC-092 item 4, security L25): readStock
+    and the sale capabilities sell, salesReturn and dayClose only; every SAH-79 inventory capability (count
+    included) is false. A CASHIER used to fall into the Store user branch. (c) pharmacyExportReport h1-register
+    writes one record-access entry per distinct registered patient exported, and the activity-log report leaves
+    quantities of audited products out for a blind caller (DEC-092 item 3).
+
+    0.3.7 (21 Nov 2026, SAH-80 touch-ups, DEC-089 items 2 and 3; programme DEC-061). The version moves
+    with pharmacy-sales.yaml 0.3.7 (one API; the rest of 0.3.7 is in that file's changelog). Wording only: no
+    path, parameter, status code, schema member or enum value changes. pharmacyRunReport and pharmacyExportReport
+    no longer say that no row ever carries a patient name: the h1-register report (SAH-80-21) carries the patient
+    name and address by law, in full only for the OWNER and a PHARMACIST member, masked ("R*** S***", address
+    null) for every other caller on the run, and its export is OWNER or PHARMACIST member only; both paths write
+    the register audit and record-access entries as pharmacy-sales.yaml WP-N 0.3.7 says. Every other report still
+    carries no patient name. The sales-margin report groups by IST day and store only for go-live, and
+    activity-log has no person filter for go-live (pharmacy-sales.yaml WP-N 0.3.7). New problem codes: none.
+    DEC-090 (owner exempt from the SALE_DISCOUNT rule, mockup 05): see pharmacy-sales.yaml 0.3.7 item (g).
+
+    0.3.6 (20 Nov 2026, SAH-79 review round 6 and the round 7 asks; DEC-083 items 1 to 4, the java
+    handoff of 20 Nov 01:50, the tech lead's decisions of 19 Nov 16:10 item 2 and 20 Nov 00:10 item 1; programme
+    DEC-061; ADR-029 N5). Additive or wording only: no path, status code, required request field or enum value is
+    removed; one new read operation; response members are added or made required where the server always sends
+    them. (a) ApprovalInboxPage gains moreWaiting (required boolean; security L19): the inbox scan stopped at its
+    cap of 2,000 pending requests, so items, total and counts cover only the 2,000 scanned (longest at their
+    current level first);
+    the screen text for this state is not in the mockup and is an open point for the BA (OQ, not decided here).
+    (b) DamageReport.outcome has fixed wording: "Written off at
+    <store name>", "Sent to the Central Store", "Released to Available", "Kept in quarantine"; null while
+    WAITING_APPROVAL. (c) StoreAccess: returnDamage, dispatchTransfer, consume, startCount, count, reviewCount and
+    handleScheduleX become required response members (the server builds and sends them on every read); their
+    meaning is unchanged. (d) DEC-083 item 1 (security M4): pharmacyDispatchIndent and pharmacyDispatchTransfer
+    refuse a dispatch whose FEFO picks come to more than 400 dispatch lines (the receipt's cap), 400 validation
+    field lines "Split this dispatch into smaller ones.", nothing dispatched. DEC-083 item 2 (security L20):
+    pharmacyDecideApproval, an INDENT approvedQty above the requested quantity is allowed only to the decider at
+    the last level that applies to the request, or to an OWNER; otherwise 400 validation field indentLines "This
+    increase needs the next approver." (one message for the whole list). DEC-083 item 3 (security L21): rule 19
+    and SecondSigner say exactly which field answers: a secondSigner object without membershipId is field
+    secondSigner, a missing or malformed pin is field secondSigner.pin. DEC-083 item 4 (security I23):
+    pharmacySettleShortage with outcome TRANSIT_LOSS on a shortage of Schedule X units, when the WRITE_OFF rule
+    answers level 0, needs a caller with handleScheduleX at the settling store, else 403 schedule-x-pharmacist; no
+    second signature (SHORTAGE_WRITE_OFF stays off the ADR-029 P7 list). pharmacyCreateStoreReturn and
+    pharmacyCreateDamageReport: a quantity above what the batch holds in that state is 400 validation field
+    quantity "Enter a whole number from 1 to <n>." with the number held; for a caller blind at the store on a
+    product of its open audit (rule 24) the message has no number: "This is more than the quantity in stock.".
+    (e) New operation pharmacyListTransferStores GET /stores/{storeId}/transfer-stores (SAH-79-15): the ACTIVE
+    stores of the unit a transfer from or to this store may name, for a caller who is not the owner (the setup
+    store list needs SETUP_VIEW). (f) CountSheetPage.version is the stock audit's version (StockAudit.version),
+    one counter per audit. (g) ReportCatalogue: group gains SALES_COMPLIANCE and every group carries label
+    ("Stock", "Movement", "Purchase", "Sales & compliance", mockup 15); the vendor filter of the purchase reports
+    is filled from pharmacyListVendors with suppliesStoreId (the Central Store) and status ALL. (h) The CSV export
+    operations answer every error as application/problem+json, never text/csv, so a client that reads the body as
+    a blob parses it as JSON (409 export-too-large included). (i) Vendor return and a blocked vendor (OQ-79-39,
+    tech lead decision of 19 Nov 16:10 item 2): the vendor-return form offers BLOCKED vendors with the warning
+    "Vendor licence expired"; pharmacyVendorReturnEligible and pharmacyCreateDebitNote accept them (the 0.3.5 text
+    that said the vendor-return form does not offer them is corrected). (j) pharmacyReportCatalogue: a caller
+    with no report gets groups [] (the 0.2.0 "items []" named a member that does not exist). New problem codes:
+    none; a shared response ExportTooLarge is added for the existing export-too-large.
+
+    0.3.5 (19 Nov 2026, SAH-79 WP-F contract gaps: the tech lead's decisions of 19 Nov 13:40 (angular
     WP-F) and 13:55 (java round 6) under DEC-073 and DEC-082; programme DEC-061; ADR-029 N4). Additive or
     wording only: no path or status code is removed; one required request field becomes optional; response
     members are added. (a) PurchaseOrderCreate and PurchaseOrderUpdate: creditDays is optional and nullable;
@@ -209,7 +274,9 @@ info:
     (19) Schedule X (ADR-029 P7, BR-32, OQ-79-8). Handling a Schedule X line needs a caller whose team role is
     PHARMACIST and who is mapped to the store (never OWNER), else 403 schedule-x-pharmacist; and secondSigner
     (another ACTIVE pharmacist or owner, checked with the colleague PIN before the transaction): missing 400
-    validation field secondSigner "A second signature is needed for Schedule X items."; not eligible 403
+    validation field secondSigner "A second signature is needed for Schedule X items." (0.3.6, DEC-083 item 3:
+    also a secondSigner object whose membershipId is missing; a missing pin or one that is not four digits is
+    field secondSigner.pin "Enter a 4-digit PIN."); not eligible 403
     second-signer-invalid; the platform PIN outcomes wrong-pin (403), pin-locked (403), pin-not-set (409),
     rate-limit (429), colleague-pin-limit (429), pin-unavailable (503), pin-check-failed (503). The PIN is never
     stored, logged, audited or echoed. 0.3.2: the client offers the people of GET
@@ -237,7 +304,9 @@ info:
       |                                        |            | pharmacyCreateConsumption, pharmacySubmitCount,                      |
       |                                        |            | pharmacySubmitVarianceForApproval; pharmacySaveCounts needs the flag |
       |                                        |            | but no second signature                                              |
-    Every row except pharmacySaveCounts also needs secondSigner as above. The signers read: as built it
+    0.3.6 (DEC-083 item 4): pharmacySettleShortage with outcome TRANSIT_LOSS written off at once (WRITE_OFF
+    rule level 0) also needs handleScheduleX, without a second signature, as pharmacySaveCounts.
+    Every row except pharmacySaveCounts (and that TRANSIT_LOSS case) also needs secondSigner as above. The signers read: as built it
     requires RECEIVE_SCHEDULE_X (receiveScheduleX); because the handling operations need a second signer too,
     the contract allows it to a caller with receiveScheduleX or handleScheduleX at the store. Today the two
     sets are equal, so the built check is correct; if the flags ever differ, the read must accept either.
@@ -291,7 +360,18 @@ info:
     pendingReturn, each by the caller's access at the store that holds the stock), pharmacyIndentReplacementOptions
     (csAvailable), pharmacyGetTransfer (availableAtSender), and the insufficient-stock answer of every movement. A
     caller blind at one store sees another store's quantities as usual. pharmacy-sales.yaml follows the same
-    rule for its stock fields when SAH-80 is built (ADR-029 note N3). A QA
+    rule for its stock fields when SAH-80 is built (ADR-029 note N3).
+    0.3.8 (DEC-091 item 3, code review round 7 findings 3 and 4; ADR-030 S16). Three changes for a blind caller,
+    which override the sentences above where they differ. (i) Blind is readStock true and reviewCount false
+    (never the OWNER): the same people as "count true" for every SAH-79 role, and it also covers a CASHIER, who
+    has readStock but no count (StoreAccess 0.3.8). (ii) A status worked from a hidden quantity is hidden too:
+    StoreStateRow.status of a store row (and the total row) is null for a product on that store's open audit,
+    and the StockOverview pill lowStock does not count the audited products of the store. statusChip and expiry
+    stay (they do not depend on a quantity). (iii) pharmacyFefoPick names only the first batch FEFO would pick
+    for an audited product (batches has at most one item, quantity null; availableQty and shortBy null), because
+    the number of batches picked for a given quantity tells how many units the first batch holds. The
+    low-stock list (pharmacyListLowStock) and pharmacyReorderSuggestions are unchanged by this decision (open
+    point, ADR-030 O-20). A QA
     test asserts that no quantity of an audited product reaches a blind caller through any endpoint.
 
     0.1.3 (18 Nov 2026, SAH-78 review round 2, DEC-071; ADR-028 revision 5): additive only. (a) New
@@ -1606,12 +1686,15 @@ paths:
         filters, order, paging and total are the same for both views (q matches the name only).
         0.3.5 (SAH-79-6, tech lead decision of 19 Nov 13:40, item 2; wording): for a Central Store user the
         list (default filter ACTIVE and BLOCKED) shows BLOCKED vendors with the mark "Blocked · licence
-        expired"; they are listed, never hidden. A BLOCKED vendor cannot be chosen on a purchase order, a goods
-        receipt or a vendor return (debit note): the client does not offer it in those forms' vendor select (it
-        filters blocked true out of the suppliesStoreId list). The server rules are unchanged: a purchase order
-        (create, update, submit) and a direct receipt answer 409 vendor-blocked; a receipt against a purchase
-        order of a vendor that became Blocked is allowed with the warning VENDOR_LICENCE_EXPIRED (it takes the
-        order's vendor, not the select); pharmacyCreateDebitNote does not check blocked (no change in 0.3.5).
+        expired"; they are listed, never hidden. A BLOCKED vendor cannot be chosen on a purchase order or a goods
+        receipt: the client does not offer it in those forms' vendor select (it filters blocked true out of the
+        suppliesStoreId list). 0.3.6 (OQ-79-39, tech lead decision of 19 Nov 16:10 item 2; corrects the 0.3.5
+        text that also named the vendor return): the vendor-return form offers BLOCKED vendors, with the warning
+        "Vendor licence expired" when one is chosen, so goods bought before the licence lapsed can go back. The
+        server rules are unchanged: a purchase order (create, update, submit) and a direct receipt answer 409
+        vendor-blocked; a receipt against a purchase order of a vendor that became Blocked is allowed with the
+        warning VENDOR_LICENCE_EXPIRED (it takes the order's vendor, not the select); pharmacyVendorReturnEligible
+        and pharmacyCreateDebitNote (and the debit note's submit and hand-over) do not check blocked.
       parameters:
         - { name: q, in: query, required: false, schema: { type: string, maxLength: 60 }, description: 'Name contains, ignoring case' }
         - { name: suppliesStoreId, in: query, required: false, schema: { type: string, format: uuid }, description: '0.3.3: only vendors that supply this store (the store is in the vendor''s suppliesTo).' }
@@ -2241,7 +2324,9 @@ paths:
         variances, STOCK_TRANSFER); counts are for the caller and ignore type; no Sales chip in 0.2.0 (SAH-80).
         Escalation is computed now (no job, no notification, OQ-79-29). Empty: items [] and the screen says
         "Nothing is waiting for your decision.". The response answers signedInAs (the caller's role label).
-        Writes nothing.
+        0.3.6 (DEC-082 L19): the server reads at most 2,000 PENDING requests (filtered in SQL to the stores the
+        caller may decide at; an OWNER every store; longest at their current level first) and answers moreWaiting
+        true when more exist; the order, filters, counts and paging then apply to those 2,000. Writes nothing.
       parameters:
         - { name: type, in: query, required: false, schema: { type: string, enum: [ALL, INDENTS, PURCHASE, STOCK], default: ALL } }
         - { name: page, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 1000, default: 0 } }
@@ -2306,7 +2391,13 @@ paths:
         item 2; replaces the 0.2.0 text "all lines 0 is a rejection"): decision APPROVED with every approvedQty 0
         answers 400 validation, field indentLines "Reject the indent with a reason instead", nothing decided; the
         approver rejects the whole indent with decision REJECTED and reasonKey. At least one line above 0 is an
-        approval (the 0 lines need their remark). The client sends level and requestVersion from the
+        approval (the 0 lines need their remark). 0.3.6 (DEC-083 item 2, security L20): the levels are fixed at
+        submit from the requested value, so an increase could skip a value-based level. An approvedQty above the
+        line's requested quantity is allowed only when the decider is deciding the last level that applies to
+        this request (no later level with applies true in ApprovalRequest.levels) or is an OWNER; otherwise 400
+        validation, one message for the whole list, field indentLines "This increase needs the next approver.",
+        nothing decided. The approver then approves without the increase (the next level may raise it), or
+        rejects. A reduction is always allowed. The client sends level and requestVersion from the
         document's ApprovalSummary (levelNo and requestVersion, 0.3.5), with no extra read. Effects: level 1 approved and a level 2 applies: current level 2 (the level-2 approver sees
         it); final approval: the document proceeds through its handler in the same transaction (indent
         "Approved · with Central Store"; PO "Approved"; receipt APPROVED, ready to post; debit note units held;
@@ -2356,7 +2447,8 @@ paths:
         /context; the owner reaches every store). Blind count (rule 24, 0.3.2): while the store has an open audit
         and the caller is blind there, stockValuePaise is null (it is worked from the audited products'
         quantities); skuCount, batchCount and the pill counts stay (they count products and batches, not units;
-        lowStock says only "at or below the reorder level").
+        lowStock says only "at or below the reorder level"). 0.3.8 (DEC-091 item 3, rule 24 (ii)): for a blind
+        caller, lowStock does not count the products on the store's open audit; the other pills stay.
       responses:
         '200': { description: Overview, content: { application/json: { schema: { $ref: '#/components/schemas/StockOverview' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -2477,7 +2569,9 @@ paths:
         happened. quantity 1 to 999999. Writes nothing except the expiry move of rule 17. Blind count (rule 24,
         0.3.2): for a product on the store's open audit and a blind caller, availableQty, shortBy and each batch
         quantity are null (the batches FEFO would pick are still named), so the pick cannot be used to probe the
-        balance.
+        balance. 0.3.8 (DEC-091 item 3, rule 24 (iii)): for that caller and product only the first batch FEFO would
+        pick is named (batches has at most one item, with quantity null; none when nothing is usable); the
+        number of batches is not shown, since it tells how many units the first batch holds.
       parameters:
         - { name: productId, in: query, required: true, schema: { type: string, format: uuid } }
         - { name: quantity, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 999999 } }
@@ -2510,7 +2604,8 @@ paths:
         yet."). Expired AVAILABLE stock of the listed stores is first moved to QUARANTINE (rule 17). Blind count
         (rule 24, 0.3.2): a row of a store where the caller is blind and the product is on the open audit answers
         available, inTransit, pendingReturn and quarantine null (reorderLevel and status stay), and the total row
-        then answers those four null too.
+        then answers those four null too. 0.3.8 (DEC-091 item 3, rule 24 (ii); replaces "and status stay"): status
+        is null on that row as well; reorderLevel stays.
       responses:
         '200': { description: By store, content: { application/json: { schema: { $ref: '#/components/schemas/ProductStockByStore' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -2534,7 +2629,7 @@ paths:
         The same row as pharmacyProductStockAllStores for this store only (status by the same "at or below"
         rule). Expired AVAILABLE stock is first moved to QUARANTINE (rule 17). Blind count (rule 24, 0.3.2): for
         a blind caller and a product on the store's open audit, available, inTransit, pendingReturn and quarantine
-        are null on the row and on the total.
+        are null on the row and on the total. 0.3.8 (DEC-091 item 3): status is null on the row as well.
       responses:
         '200': { description: One store, content: { application/json: { schema: { $ref: '#/components/schemas/ProductStockByStore' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -3239,6 +3334,8 @@ paths:
         when the vendor has no returnCreditPercent and no level applies (the user types the credit). The debit
         note line marks creditPercentChanged when the saved creditPercent differs from this starting credit.
         Blind count (rule 24, 0.3.2): availableQty is null for a blind caller on an audited product.
+        0.3.6 (OQ-79-39): a BLOCKED vendor (licence expired) is answered as any other; the vendor-return form
+        shows the warning "Vendor licence expired" from the vendor's blocked flag (pharmacyListVendors).
       parameters:
         - { name: vendorId, in: query, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3289,7 +3386,9 @@ paths:
         0 to 100 (default the vendor's; a changed value is marked creditPercentChanged and kept in the history);
         the same batch and state, or the same receipt line, twice. Credit = qty x rate x credit % rounded half up;
         GST reversal per line at the product's GST % on the credit, round half up (OQ-79-13, G-14). reasonKey
-        optional, list vendor-return. Audit PHARMACY_DEBIT_NOTE_CREATED. 201.
+        optional, list vendor-return. Audit PHARMACY_DEBIT_NOTE_CREATED. 201. 0.3.6 (OQ-79-39, tech lead decision
+        of 19 Nov 16:10 item 1): a BLOCKED vendor (licence expired) is accepted, here and on submit and hand-over;
+        the form shows "Vendor licence expired" (go-live check for the pharmacist).
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DebitNoteCreate' } } } }
       responses:
         '201': { description: Draft, content: { application/json: { schema: { $ref: '#/components/schemas/DebitNote' } } } }
@@ -3715,7 +3814,12 @@ paths:
         no> / <n>"); a dispatch record (one receipt per dispatch, OQ-79-2); line before and after quantities and
         reasons in the history; status DISPATCHED or PARTLY_DISPATCHED when a back-order is open (CLOSED lines
         stop counting). The issue slip is printed from GET .../dispatches/{dispatchId} (ISSUE_SLIP template).
-        Audit PHARMACY_INDENT_DISPATCHED.
+        Audit PHARMACY_INDENT_DISPATCHED. 0.3.6 (DEC-083 item 1, security M4): a dispatch is received in one
+        body of at most 400 lines (DispatchReceiptInput), so after the FEFO pick under the locks (and after
+        insufficient-stock), picks that come to more than 400 dispatch lines (one per product and batch) answer
+        400 validation field lines "Split this dispatch into smaller ones.", nothing dispatched and the indent
+        unchanged; the user dispatches part of the lines now (balanceAction BACK_ORDER) and the rest later. A
+        Schedule X signature verified before the transaction is not used by a refused dispatch.
       requestBody:
         required: true
         content:
@@ -4012,6 +4116,13 @@ paths:
         resultNote "Shortage settled. <n> units written off as transit loss. No stock added back.".
         CARRIER_CLAIM: status CLAIM_OPEN, units stay IN_TRANSIT; it must later be settled as FOUND or
         TRANSIT_LOSS; no claim amount. A shortage is never a physical return. Audit PHARMACY_SHORTAGE_SETTLED.
+        0.3.6 (DEC-083 item 4, security I23): TRANSIT_LOSS of a Schedule X product when the WRITE_OFF rule
+        answers level 0 (the write-off happens now, with no
+        approver): the caller needs handleScheduleX at this store (a mapped PHARMACIST), else 403
+        schedule-x-pharmacist "Only a pharmacist can handle Schedule X items, with a second signature.", nothing
+        written. No second signature is asked for it (SHORTAGE_WRITE_OFF is not on the ADR-029 P7 list); a
+        secondSigner sent is ignored and no PIN is checked. When the rule answers level 1 or 2, any caller with
+        acceptReturn may settle it as before (the approver decides; approvers need no second signature).
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SettleShortageInput' } } } }
       responses:
         '200': { description: Settled or waiting (or a replay), content: { application/json: { schema: { $ref: '#/components/schemas/Shortage' } } } }
@@ -4036,7 +4147,12 @@ paths:
       x-work-package: WP-G
       description: >-
         400 validation: batchId an AVAILABLE, unexpired batch of this store; quantity whole 1 to its AVAILABLE
-        quantity (above it 400 with available, nothing moves); reasonKey list store-return (rule 21). One
+        quantity (above it 400 with available, nothing moves; 0.3.6: field quantity "Enter a whole number from 1
+        to <n>." where n is the batch's AVAILABLE quantity in this store, also when quantity is not a whole number
+        in range; for a caller blind at this store on a product of its open audit, rule 24, no message carries the
+        stock number: a quantity that is not a whole number 1 to 999999 is "Enter a whole number from 1 to
+        999999." and one above the stock is "This is more than the quantity in stock."); reasonKey list
+        store-return (rule 21). One
         transaction: RET number (OQ-79-14); AVAILABLE → PENDING_RETURN at this store (ledger STORE_RETURN,
         reference the RET number); a return item to the Central Store with status WAITING ("Waiting for Central
         Store"). Nothing enters the Central Store until it accepts (BR-29). Audit PHARMACY_STORE_RETURN_CREATED.
@@ -4086,7 +4202,10 @@ paths:
       description: >-
         400 validation: batchId of this store and fromState AVAILABLE or QUARANTINE (an expired batch found by the
         system is already in QUARANTINE and is reported from there, reason damage.expired); quantity whole 1 to
-        the quantity in that state; reasonKey list damage (rule 21); afterApproval WRITE_OFF or SEND_TO_CS (at
+        the quantity in that state (0.3.6: above it, checked under the balance lock, 400 validation field quantity
+        "Enter a whole number from 1 to <n>." with n the batch's quantity in fromState; for a caller blind at this
+        store on a product of its open audit, rule 24, "This is more than the quantity in stock." with no number);
+        reasonKey list damage (rule 21); afterApproval WRITE_OFF or SEND_TO_CS (at
         the Central Store only WRITE_OFF, else 400). One transaction: DMG number; AVAILABLE → QUARANTINE at once
         (ledger DAMAGE_QUARANTINE; no move from QUARANTINE). The WRITE_OFF rule decides (rule store this store;
         amount BR-17): level 0 applies afterApproval now; otherwise WAITING_APPROVAL ("Waiting for HOD"). On
@@ -4183,6 +4302,39 @@ paths:
         '409': { $ref: '#/components/responses/Conflict', description: client-key-reused }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /stores/{storeId}/transfer-stores:
+    parameters:
+      - $ref: '#/components/parameters/StoreId'
+    get:
+      tags: [SAH-79-15]
+      operationId: pharmacyListTransferStores
+      summary: The stores a new transfer from or to this store may name ("From store" and "To store" selects, mockup 12)
+      x-required-role: PHARMACY_ACCESS
+      x-store-access: 'OPERATION (capability raiseIndent at the path store, as pharmacyCreateTransfer)'
+      x-sub-story: SAH-79-15
+      x-work-package: WP-G
+      description: >-
+        0.3.6 (tech lead decision of 20 Nov 00:10 item 1; additive). The setup store list (pharmacyListStores)
+        needs SETUP_VIEW, so a store user, HOD or pharmacist could only choose among their own mapped stores.
+        This read answers every ACTIVE store of the unit except the path store, as StoreRef (storeId, name,
+        type: no HOD, staff, codes or counts), the Central Store first, then by name. The client offers them as
+        the other end of the transfer, with the path store as the fixed end: a store of type CENTRAL is offered
+        only as From (toStoreId is never the Central Store, pharmacyCreateTransfer). Small and complete (rule
+        13, not paged; at most 500). Empty when the unit has only this store: items []. Store names are
+        unit data, not patient data. Writes nothing.
+      responses:
+        '200':
+          description: Stores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferStoreList' }
+              examples:
+                twoStores: { value: { items: [ { storeId: 00000000-0000-4000-8000-0000000000a1, name: Test Central Store, type: CENTRAL }, { storeId: 00000000-0000-4000-8000-0000000000a4, name: Test OT Store, type: SUB_STORE } ] } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/StoreForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /stores/{storeId}/transfers/{transferId}:
     parameters:
       - $ref: '#/components/parameters/StoreId'
@@ -4222,7 +4374,10 @@ paths:
         out of the sending store AVAILABLE and in to the receiving store IN_TRANSIT; a dispatch record (received
         with pharmacyReceiveDispatch at the receiving store; rejected units return to the sending store, which
         accepts them with pharmacyAcceptReturnItem; shortages are settled by the sending store). Status
-        IN_TRANSIT. Audit PHARMACY_TRANSFER_DISPATCHED.
+        IN_TRANSIT. Audit PHARMACY_TRANSFER_DISPATCHED. 0.3.6 (DEC-083 item 1, security M4, the same rule as
+        pharmacyDispatchIndent): FEFO picks that come to more than 400 dispatch lines answer 400 validation field
+        lines "Split this dispatch into smaller ones.", nothing moved (a transfer has at most 200 lines, so only
+        lines split over many batches reach it; the user cancels and raises smaller transfers).
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PostWithSignerInput' } } } }
       responses:
         '200': { description: Dispatched (or a replay), content: { application/json: { schema: { $ref: '#/components/schemas/Transfer' } } } }
@@ -4698,7 +4853,13 @@ paths:
         DELEGATE, PHARMACIST member and Central Store user: Stock and Movement for their stores; STORE_USER only
         store-stock and below-reorder for their stores; Purchase only OWNER and the Central Store user. Not built:
         stock valuation, non-moving, vendor performance, rate history (OQ-79-33), Sales & compliance (SAH-80). A
-        caller with no report gets items []. Writes nothing.
+        caller with no report gets groups [] (the 0.2.0 wording "items []" is corrected). Writes nothing.
+        0.3.6 (tech lead decision of 20 Nov 00:10 item 1): every group carries label, the mockup 15 card title
+        ("Stock", "Movement", "Purchase", "Sales & compliance"). The group SALES_COMPLIANCE ("Sales & compliance")
+        with the keys sales-margin, sales-returns, gst-sales-register, h1-register, schedule-x-register and
+        activity-log is answered once SAH-80 WP-N is built, to the callers pharmacy-sales.yaml WP-N names (never
+        a CASHIER); until then it is not answered. A group is answered only when it has at least one report for
+        the caller.
       responses:
         '200': { description: Catalogue, content: { application/json: { schema: { $ref: '#/components/schemas/ReportCatalogue' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -4754,7 +4915,12 @@ paths:
         dates as 24 Oct 2026, times 11:05 AM IST. Every text cell starting with =, +, -, @, tab or carriage return
         is prefixed with a single quote (ADR-028 R5-7). Content-Disposition attachment;
         filename="sahaj-stock-ledger-<from>-<to>.csv". No patient name, mobile or ABHA number. Audit
-        PHARMACY_REPORT_EXPORTED (report key, filter ids, row count).
+        PHARMACY_REPORT_EXPORTED (report key, filter ids, row count). 0.3.6 (tech lead decision of 20 Nov 00:10
+        item 1), errors of a CSV download: only 200 is text/csv. Every other answer (400, 401, 403, 404, 409
+        export-too-large, 503) is a problem with Content-Type application/problem+json and a JSON body, whatever
+        the Accept header; no CSV byte is sent before the row count is known. A client that asks for the body as a
+        blob reads an error blob as text and parses it as the Problem, then shows its detail ("Narrow the date
+        range." for export-too-large).
       parameters:
         - { name: productId, in: query, required: true, schema: { type: string, format: uuid } }
         - { name: storeId, in: query, required: false, schema: { type: string, format: uuid } }
@@ -4766,7 +4932,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict', description: export-too-large }
+        '409': { $ref: '#/components/responses/ExportTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /reports/{reportKey}:
     parameters:
@@ -4797,10 +4963,24 @@ paths:
         gstPaise, discountPaise, totalPaise, with totals per vendor and per GST % (layout an accountant's
         confirmation, OQ-79-13, G-14); debit-notes-pending: dnNo, vendor, amountPaise, step, ageDays, olderThan30.
         Money cells are paise integers; the client shows ₹ 1,25,000.50. Paged (size up to 200). Page 0 audited
-        PHARMACY_REPORT_VIEWED. No row ever carries a patient name. Blind count (rule 24, 0.3.2): in store-stock,
+        PHARMACY_REPORT_VIEWED. No row ever carries a patient name, except h1-register (0.3.7, DEC-089 item 3):
+        patientName in full and patientAddress only for the OWNER and a PHARMACIST member, the masked name and a
+        null address for every other caller, and each page writes PHARMACY_REGISTER_VIEWED and a record-access
+        entry per registered patient on the page (pharmacy-sales.yaml WP-N 0.3.7). The Sales & compliance columns
+        and the go-live limits (sales-margin by IST day and store only, no groupBy; activity-log without a person
+        filter) are in pharmacy-sales.yaml WP-N. Blind count (rule 24, 0.3.2): in store-stock,
         batch-expiry and below-reorder, a row of a product on the open audit of a store where the caller is blind
         answers null in available, inTransit, pendingReturn, quarantine, value and qty (an empty cell in the CSV);
-        the row is still listed. The movement and purchase reports record movements and are unchanged.
+        the row is still listed. The movement and purchase reports record movements and are unchanged. 0.3.8
+        (DEC-092 item 3): activity-log rows about an audited product of a store where the caller is blind leave
+        the quantities out of the sentence (pharmacy-sales.yaml pharmacyActivityFeed).
+        0.3.6 (tech lead decision of 20 Nov 00:10 item 1), the vendor filter of the purchase reports: the client
+        fills it from pharmacyListVendors with suppliesStoreId = the Central Store's id and status ALL (so
+        INACTIVE and BLOCKED vendors with past purchases can be chosen); the reduced vendor view (id, name,
+        status) is enough, and the Central Store user may call it through the purchase capability (0.3.3). A
+        vendorId that is unknown or of another clinic answers 200 with no rows (RLS; no existence leak). A
+        vendor that no longer lists the Central Store in "Supplies to" is not offered (known limit; its rows
+        still appear without the filter).
       parameters:
         - { name: storeId, in: query, required: false, schema: { type: string, format: uuid } }
         - { name: from, in: query, required: false, schema: { type: string, format: date } }
@@ -4828,7 +5008,7 @@ paths:
       x-store-access: 'SCOPED (rule 15)'
       x-sub-story: 'SAH-79-18, SAH-79-19'
       x-work-package: WP-H
-      description: 'Same filters and columns as pharmacyRunReport without paging; the CSV rules of pharmacyExportStockLedger (row cap 50,000 → 409 export-too-large, nothing partial; UTF-8 with BOM; formula prefixes neutralised; no patient name). filename="sahaj-<reportKey>-<date>.csv". "Print" is the browser print view of the JSON page (the browser can save a PDF, OQ-79-4). Audit PHARMACY_REPORT_EXPORTED.'
+      description: 'Same filters and columns as pharmacyRunReport without paging; the CSV rules of pharmacyExportStockLedger (row cap 50,000 → 409 export-too-large, nothing partial; UTF-8 with BOM; formula prefixes neutralised; no patient name, except h1-register: 0.3.7, DEC-089 item 3, OWNER or PHARMACIST member only, others 403 forbidden; full name and address; audit PHARMACY_REGISTER_EXPORTED as well, as pharmacyExportH1Register in pharmacy-sales.yaml; 0.3.8, DEC-092 item 3: and one record-access entry per distinct registered patient id exported, written before any CSV byte, fails closed). filename="sahaj-<reportKey>-<date>.csv". "Print" is the browser print view of the JSON page (the browser can save a PDF, OQ-79-4). Audit PHARMACY_REPORT_EXPORTED. 0.3.6: errors as pharmacyExportStockLedger (only 200 is text/csv; every error is application/problem+json, which a client reading a blob parses as the Problem).'
       parameters:
         - { name: storeId, in: query, required: false, schema: { type: string, format: uuid } }
         - { name: from, in: query, required: false, schema: { type: string, format: date } }
@@ -4842,7 +5022,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict', description: export-too-large }
+        '409': { $ref: '#/components/responses/ExportTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   # ================================================================ SAH-79 paths end
 components:
@@ -4909,6 +5089,13 @@ components:
             changed: { value: { type: 'https://sahaj.in/problems/settings-changed', title: Changed by someone else, status: 409, detail: Someone else saved this a moment ago. Check the current values and save again., current: {} } }
             nameInUse: { value: { type: 'https://sahaj.in/problems/store-name-in-use', title: Name already used, status: 409, detail: That store name is already used } }
             openImport: { summary: '0.1.3, general rule 14 (the title is not fixed by the contract; clients show detail)', value: { type: 'https://sahaj.in/problems/open-import', title: Opening stock file open, status: 409, detail: Finish or reject the opening stock file of this store first. } }
+    ExportTooLarge:
+      description: '0.3.6: export-too-large on a CSV download (more than 50,000 rows; nothing sent). Always application/problem+json, never text/csv, so a client that asked for a blob parses the blob text as this Problem. The title is not fixed by the contract; clients show detail.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            tooLarge: { value: { type: 'https://sahaj.in/problems/export-too-large', title: Too many rows, status: 409, detail: Narrow the date range. } }
     IntegrationOff:
       description: 'integration-off (ADR-028 D5): the operation exists only in Integrated mode and the unit is Standalone. Nothing written. No 0.1.x operation answers it; it is defined here so that SAH-79 and SAH-80 operations reuse it unchanged (one shared server error for every Integrated-only operation, ADR-028 revision 3).'
       content:
@@ -4985,8 +5172,8 @@ components:
       description: 'Labels Store user, Central Store user, Approver, Delegate approver, Cashier (DEC-062 Q3). APPROVER is the store''s HOD (at most one ACTIVE); DELEGATE has dates (at most one ACTIVE). 0.3.0 adds CASHIER (SAH-80-1, DEC-074 OQ-80-36): offered only for a member whose team role is BILLING or STORE_STAFF, at a store with saleAllowed true that is not the Central Store; any other case 400 validation field storeRole "This person cannot be a Cashier." A CASHIER mapping whose store later has saleAllowed false needs review (as SAH-78 BR-11) and gives no sale capability; nothing is deleted.'
     StoreAccess:
       type: object
-      description: 'Derived by the server on every read (ADR-028 D4 capability table); never stored per person, never accepted from a client.'
-      required: [raiseIndent, approve, receive, receiveScheduleX, consumeReturn, uploadOpeningStock]
+      description: 'Derived by the server on every read (ADR-028 D4 capability table); never stored per person, never accepted from a client. 0.3.6 (java round 7 ask): returnDamage, dispatchTransfer, consume, startCount, count, reviewCount and handleScheduleX are required: the server builds each from the rule in its description and sends it on every MyStore (the Return / damaged, Stock transfer, Ward consumption and Stock audit screens read them; the server still checks each operation). The other optional flags are sent as the server builds them; a client treats a missing flag as false. 0.3.8 (DEC-092 item 4, security L25; ADR-030 S2): an ACTIVE CASHIER mapping at a sale store gives readStock, sell, salesReturn and dayClose true and every other flag false (raiseIndent, approve, receive, receiveScheduleX, consumeReturn, uploadOpeningStock, postOpeningStock, adjustStock, purchase, dispatchTransfer, acceptReturn, consume, returnDamage, startCount, count, reviewCount, handleScheduleX, sellScheduled, substitute, overrideBlock, cancelBill, acceptSalesReturn, dispense, recordWardReturn, acceptWardReturn, readRegisters). A CASHIER mapping that needs review gives no sale capability (0.3.0). A CASHIER is blind under rule 24 (readStock true, reviewCount false).'
+      required: [raiseIndent, approve, receive, receiveScheduleX, consumeReturn, uploadOpeningStock, returnDamage, dispatchTransfer, consume, startCount, count, reviewCount, handleScheduleX]
       properties:
         raiseIndent: { type: boolean }
         approve: { type: boolean }
@@ -4994,7 +5181,7 @@ components:
         receiveScheduleX: { type: boolean, description: 'receive and the member''s team role is PHARMACIST ("Yes · incl. Schedule X"). Never for STORE_STAFF or OWNER.' }
         consumeReturn: { type: boolean, description: '0.2.0: equals consume (kept for 0.1.x clients).' }
         uploadOpeningStock: { type: boolean }
-        readStock: { type: boolean, description: '0.2.0 (ADR-029 P8): any ACTIVE mapping; OWNER.' }
+        readStock: { type: boolean, description: '0.2.0 (ADR-029 P8): any ACTIVE mapping; OWNER. 0.3.8: a CASHIER included (DEC-092 item 4).' }
         postOpeningStock: { type: boolean, description: '0.2.0: same as uploadOpeningStock (OQ-79-30).' }
         adjustStock: { type: boolean, description: '0.2.0: HOD, current delegate, PHARMACIST member, Central Store user, OWNER (OQ-79-27).' }
         purchase: { type: boolean, description: '0.2.0: Central Store only; Central Store user, OWNER.' }
@@ -5003,14 +5190,14 @@ components:
         consume: { type: boolean, description: '0.2.0: the store''s Consumption entry is Yes; HOD, current delegate, store user, Central Store user, OWNER (OQ-79-22).' }
         returnDamage: { type: boolean, description: '0.2.0: non-central stores: HOD, current delegate, store user, PHARMACIST member, OWNER; Central Store: damage report only, Central Store user, OWNER (OQ-79-22).' }
         startCount: { type: boolean, description: '0.2.0: HOD, current delegate, PHARMACIST member, Central Store user, OWNER (OQ-79-26e).' }
-        count: { type: boolean, description: '0.2.0: any ACTIVE mapping; OWNER.' }
+        count: { type: boolean, description: '0.2.0: any ACTIVE mapping; OWNER. 0.3.8: never a CASHIER (DEC-092 item 4); the blind rule 24 uses readStock, so a CASHIER is still blind.' }
         reviewCount: { type: boolean, description: '0.2.0: HOD, current delegate, OWNER.' }
         handleScheduleX: { type: boolean, description: '0.2.0: team role PHARMACIST and mapped here; never OWNER or STORE_STAFF (rule 19). 0.3.3: an operation guarded by "the Schedule X handling capability" checks receiveScheduleX (the server''s RECEIVE_SCHEDULE_X); for a mapped PHARMACIST the two flags are the same set. 0.3.5: which operation needs which flag is the table in rule 19 (receiveScheduleX for receiving, handleScheduleX for dispatch, accepting a return, settling a shortage, the vendor-return hand-over and the other movements).' }
         sell: { type: boolean, description: '0.3.0 (SAH-80, ADR-030 S2): saleAllowed store and a mapped PHARMACIST member, a CASHIER, or OWNER. Search, quote, bill, hold, customers, udhar receipts.' }
         sellScheduled: { type: boolean, description: '0.3.0: sell and team role PHARMACIST mapped here (lines of schedule H, H1, X; DEC-074 OQ-80-20). Never OWNER or a CASHIER.' }
         substitute: { type: boolean, description: '0.3.0: equals sellScheduled (pharmacist only, OQ-80-23).' }
         overrideBlock: { type: boolean, description: '0.3.0: equals sellScheduled (allergy and H1 overrides; never OWNER, OQ-80-37).' }
-        cancelBill: { type: boolean, description: '0.3.0: OWNER (any day); a PHARMACIST member with sell (the IST day of the bill only, checked per bill); never a CASHIER (BR-12).' }
+        cancelBill: { type: boolean, description: '0.3.0: OWNER (any day); a PHARMACIST member with sell (the IST day of the bill only, checked per bill); never a CASHIER (BR-12). 0.3.8 (DEC-092 item 6): a bill with a Schedule X line only by a PHARMACIST member with a second signer, never the OWNER (checked per bill; pharmacy-sales.yaml pharmacyCancelBill).' }
         salesReturn: { type: boolean, description: '0.3.0: sell (a CASHIER starts, a pharmacist or OWNER may finish).' }
         acceptSalesReturn: { type: boolean, description: '0.3.0: saleAllowed store and a PHARMACIST member mapped, the store''s APPROVER or current DELEGATE, or OWNER (80-18).' }
         dispense: { type: boolean, description: '0.3.0: saleAllowed store and a PHARMACIST member mapped (IPD issue, OPD queue completion of scheduled lines). The OWNER may read the queues but not dispense (80-13, 80-14).' }
@@ -5945,7 +6132,7 @@ components:
       description: 'Schedule X second signature (rule 19, ADR-029 P7): another ACTIVE pharmacist or owner of the clinic, never the caller (0.3.2: the client offers the people of GET /stores/{storeId}/second-signers). pin is the colleague''s own staff PIN as typed; checked by platform.api.StaffPinPort.checkColleague before the transaction; never stored, logged, audited or echoed.'
       properties:
         membershipId: { type: string, format: uuid }
-        pin: { type: string, pattern: '^[0-9]{4}$', minLength: 4, maxLength: 4, writeOnly: true, description: '0.3.4 (security L17): exactly four digits. A missing membershipId answers 400 validation field secondSigner "A second signature is needed for Schedule X items." (the rule 19 sentence); a missing pin or one that is not four digits answers 400 validation field secondSigner.pin "Enter a 4-digit PIN.". Both are checked with the other body rules, before the second-signer eligibility check and before any PIN check, so no try is counted against the colleague or the caller. The value is never echoed in the problem.' }
+        pin: { type: string, pattern: '^[0-9]{4}$', minLength: 4, maxLength: 4, writeOnly: true, description: '0.3.4 (security L17): exactly four digits. A missing membershipId answers 400 validation field secondSigner "A second signature is needed for Schedule X items." (the rule 19 sentence; 0.3.6, DEC-083 item 3 / security L21: field secondSigner, never secondSigner.pin, for a missing membershipId whatever the pin); a missing pin or one that is not four digits answers 400 validation field secondSigner.pin "Enter a 4-digit PIN.". Both are checked with the other body rules, before the second-signer eligibility check and before any PIN check, so no try is counted against the colleague or the caller. The value is never echoed in the problem.' }
     SecondSignerCandidates:
       type: object
       required: [items]
@@ -6053,11 +6240,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageMeta'
         - type: object
-          required: [items, counts, signedInAs]
+          required: [items, counts, signedInAs, moreWaiting]
           properties:
             items: { type: array, items: { $ref: '#/components/schemas/ApprovalInboxRow' } }
             counts: { type: object, required: [all, indents, purchase, stock], properties: { all: { type: integer }, indents: { type: integer }, purchase: { type: integer }, stock: { type: integer } } }
             signedInAs: { type: string, examples: [Owner, HOD · Ward 3B] }
+            moreWaiting: { type: boolean, description: '0.3.6 (DEC-082 L19, java round 7): true when the scan of PENDING requests stopped at its cap of 2,000 (the requests of the stores the caller may decide at, an OWNER every store, longest at their current level first). total, counts and the pages then cover only the scanned requests; the rest appear as these are decided. false otherwise. The screen text for true is not in the mockup (open point for the BA); until it is approved the client shows nothing extra.' }
     ApprovalRequest:
       type: object
       required: [id, transactionType, subjectType, subjectId, subjectNo, subjectStoreId, ruleStore, raisedBy, raisedAt, amountPaise, ruleVersionNo, status, currentLevel, levels, decisions, escalated, needsAnotherApprover, canDecide, decideLockReason, version]
@@ -6136,7 +6324,7 @@ components:
         skuCount: { type: integer, minimum: 0 }
         batchCount: { type: integer, minimum: 0 }
         stockValuePaise: { oneOf: [ { $ref: '#/components/schemas/Paise' }, { type: 'null' } ], description: '0.3.2: null for a blind caller while the store has an open audit (rule 24).' }
-        pills: { type: object, required: [nearExpiry30, nearExpiry60, nearExpiry90, expiredQuarantined, lowStock, scheduleProducts], properties: { nearExpiry30: { type: integer }, nearExpiry60: { type: integer }, nearExpiry90: { type: integer }, expiredQuarantined: { type: integer }, lowStock: { type: integer }, scheduleProducts: { type: integer } } }
+        pills: { type: object, required: [nearExpiry30, nearExpiry60, nearExpiry90, expiredQuarantined, lowStock, scheduleProducts], properties: { nearExpiry30: { type: integer }, nearExpiry60: { type: integer }, nearExpiry90: { type: integer }, expiredQuarantined: { type: integer }, lowStock: { type: integer, description: '0.3.8 (DEC-091 item 3, rule 24 (ii)): for a blind caller the products on the store''s open audit are not counted.' }, scheduleProducts: { type: integer } } }
         empty: { type: boolean }
     StockStatusChip:
       type: string
@@ -6202,7 +6390,7 @@ components:
         requested: { type: integer }
         availableQty: { type: [integer, 'null'], minimum: 0, description: '0.3.2: null for a blind caller when the product is on the store''s open audit (rule 24).' }
         shortBy: { type: [integer, 'null'], minimum: 0, description: '0.3.2: null under the same rule as availableQty.' }
-        batches: { type: array, description: '0.3.2: quantity is null under the same rule as availableQty.', items: { type: object, required: [batch, quantity, purchaseRate], properties: { batch: { $ref: '#/components/schemas/BatchRef' }, quantity: { type: [integer, 'null'], minimum: 1 }, purchaseRate: { oneOf: [ { $ref: '#/components/schemas/Rate' }, { type: 'null' } ] } } } }
+        batches: { type: array, description: '0.3.2: quantity is null under the same rule as availableQty. 0.3.8 (DEC-091 item 3): under that rule only the first batch FEFO would pick is listed (at most one item).', items: { type: object, required: [batch, quantity, purchaseRate], properties: { batch: { $ref: '#/components/schemas/BatchRef' }, quantity: { type: [integer, 'null'], minimum: 1 }, purchaseRate: { oneOf: [ { $ref: '#/components/schemas/Rate' }, { type: 'null' } ] } } } }
     StoreStateRow:
       type: object
       required: [store, available, inTransit, pendingReturn, quarantine, reorderLevel, status]
@@ -6213,7 +6401,7 @@ components:
         pendingReturn: { type: [integer, 'null'] }
         quarantine: { type: [integer, 'null'] }
         reorderLevel: { type: [integer, 'null'] }
-        status: { type: [string, 'null'], enum: [OK, BELOW_REORDER, INDENT_IN_TRANSIT, null], description: 'OK above the reorder level or with no level; BELOW_REORDER when AVAILABLE unexpired is at or below the level (0.3.2: the one rule, as pharmacyListLowStock); INDENT_IN_TRANSIT the same with units in transit to this store; null on the total row. Stays for a blind caller.' }
+        status: { type: [string, 'null'], enum: [OK, BELOW_REORDER, INDENT_IN_TRANSIT, null], description: 'OK above the reorder level or with no level; BELOW_REORDER when AVAILABLE unexpired is at or below the level (0.3.2: the one rule, as pharmacyListLowStock); INDENT_IN_TRANSIT the same with units in transit to this store; null on the total row. 0.3.8 (DEC-091 item 3, rule 24 (ii)): null on the row of a store where the caller is blind and the product is on the open audit (it was said to stay).' }
     ProductStockByStore:
       type: object
       required: [product, rows, total, empty]
@@ -6990,7 +7178,7 @@ components:
         reason: { $ref: '#/components/schemas/ReasonRef' }
         afterApproval: { type: string, enum: [WRITE_OFF, SEND_TO_CS] }
         status: { type: string, enum: [WAITING_APPROVAL, WRITTEN_OFF, SENT_TO_CS, RELEASED, KEPT_IN_QUARANTINE] }
-        outcome: { type: [string, 'null'] }
+        outcome: { type: [string, 'null'], examples: ['Written off at Ward 3B', 'Sent to the Central Store', 'Released to Available', 'Kept in quarantine'], description: '0.3.6 (java round 7 ask), fixed wording by status: WRITTEN_OFF "Written off at <store name>" (the reporting store''s name); SENT_TO_CS "Sent to the Central Store"; RELEASED "Released to Available"; KEPT_IN_QUARANTINE "Kept in quarantine"; null while WAITING_APPROVAL. The client shows it as given.' }
         approval: { oneOf: [ { $ref: '#/components/schemas/ApprovalSummary' }, { type: 'null' } ] }
         history: { type: array, items: { $ref: '#/components/schemas/HistoryEvent' } }
         version: { type: integer, minimum: 0 }
@@ -7028,6 +7216,12 @@ components:
         raisedAt: { type: string, format: date-time }
         history: { type: array, items: { $ref: '#/components/schemas/HistoryEvent' } }
         version: { type: integer, minimum: 0 }
+    TransferStoreList:
+      type: object
+      required: [items]
+      description: '0.3.6, pharmacyListTransferStores: the ACTIVE stores of the unit except the path store; the Central Store first, then by name.'
+      properties:
+        items: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/StoreRef' } }
     TransferPage:
       allOf:
         - $ref: '#/components/schemas/PageMeta'
@@ -7151,7 +7345,7 @@ components:
             status: { $ref: '#/components/schemas/StockAuditStatus' }
             counted: { type: integer }
             itemsInCount: { type: integer }
-            version: { type: integer, minimum: 0 }
+            version: { type: integer, minimum: 0, description: '0.3.6 (tech lead decision of 20 Nov 00:10 item 1, confirmed): the stock audit''s own version, the same number as StockAudit.version of the same audit at the same moment; there is no separate count-sheet version. Every write to the audit (pharmacySaveCounts, pharmacySubmitCount, the recount, the variance reasons and the variance submit) checks it (409 changed with an old value) and raises it by one; the client sends the latest value it got from any of those answers or from GET .../count-sheet or GET .../stock-audits/{auditId}.' }
             items: { type: array, items: { $ref: '#/components/schemas/CountSheetLine' } }
     CountsInput:
       type: object
@@ -7223,9 +7417,10 @@ components:
           type: array
           items:
             type: object
-            required: [group, reports]
+            required: [group, label, reports]
             properties:
-              group: { type: string, enum: [STOCK, MOVEMENT, PURCHASE] }
+              group: { type: string, enum: [STOCK, MOVEMENT, PURCHASE, SALES_COMPLIANCE], description: '0.3.6 adds SALES_COMPLIANCE (SAH-80-21; the six keys of ReportKey 0.3.0, access in pharmacy-sales.yaml WP-N). Answered only once the SAH-80 WP-N reports are built; a group with no report for the caller is left out.' }
+              label: { type: string, enum: [Stock, Movement, Purchase, 'Sales & compliance'], description: '0.3.6: the card title of mockup 15 for the group; the client shows it as given.' }
               reports: { type: array, items: { type: object, required: [key, label], properties: { key: { type: string }, label: { type: string } } } }
     StockLedgerPage:
       allOf:

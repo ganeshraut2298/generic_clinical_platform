@@ -82,13 +82,14 @@ public class PurchaseOrderService implements ApprovalSubjectHandler {
     private final TeamMemberPort team;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final BlindCount blind;
 
     public PurchaseOrderService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, ProductRepository products,
                                 VendorRepository vendors, PurchaseOrderRepository orders, ApprovalEngine engine,
                                 ApprovalRepository approvals, DocumentSeriesRepository series, DocumentNumberPort numbers,
                                 ClientRequestRepository clients, DocumentEventRepository events, ActiveReasonService reasons,
                                 UnitRepository unitRows, PrintTemplateRepository templates, TeamMemberPort team,
-                                AuditLog auditLog, PharmacyTime time) {
+                                AuditLog auditLog, PharmacyTime time, BlindCount blind) {
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -107,6 +108,7 @@ public class PurchaseOrderService implements ApprovalSubjectHandler {
         this.team = team;
         this.auditLog = auditLog;
         this.time = time;
+        this.blind = blind;
     }
 
     // ---- reads ----
@@ -158,6 +160,7 @@ public class PurchaseOrderService implements ApprovalSubjectHandler {
         int size = PharmacyParams.intValue("size", rawSize, 50, 1, 100);
         LocalDate today = time.today();
         List<PurchaseViews.ReorderRow> items = new ArrayList<>();
+        BlindCount.Mask mask = blind.at(caller, storeId); // rule 24: the Central Store figure of an audited product
         for (PurchaseOrderRepository.ReorderRow r : orders.reorder(tenantId, storeId, today, size, page * size)) {
             ProductRepository.Full full = products.find(tenantId, r.productId()).orElse(null);
             if (full == null) {
@@ -173,7 +176,7 @@ public class PurchaseOrderService implements ApprovalSubjectHandler {
             int suggested = need <= 0 ? (r.openPoNo() != null ? 0 : 1)
                     : Math.max(1, (need + p.conversion() - 1) / p.conversion());
             Integer all = caller.isOwner() ? allStores(tenantId, r.productId()) : null;
-            items.add(new PurchaseViews.ReorderRow(productRef(p), r.csStock(), all, r.openPurchaseUnits(), r.openPoNo(),
+            items.add(new PurchaseViews.ReorderRow(productRef(p), mask.qty(r.productId(), r.csStock()), all, r.openPurchaseUnits(), r.openPoNo(),
                     r.reorderLevel(), suggested, vendor, lastRate));
         }
         return new PurchaseViews.ReorderPage(items, orders.reorderTotal(tenantId, storeId, today), page, size);

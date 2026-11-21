@@ -29,7 +29,16 @@ public interface StockRepository {
     record LedgerIn(UUID movementId, String txnType, String docType, UUID docId, String docNo, UUID docLineId, UUID storeId,
                     StockState state, UUID productId, UUID batchId, int qtyIn, int qtyOut, int balanceAfter,
                     UUID actorMembershipId, UUID secondSignerMembershipId, UUID approvedByMembershipId, String reasonKey,
-                    UUID reversesLedgerId) {
+                    UUID reversesLedgerId, UUID admissionId) {
+
+        public LedgerIn(UUID movementId, String txnType, String docType, UUID docId, String docNo, UUID docLineId, UUID storeId,
+                        StockState state, UUID productId, UUID batchId, int qtyIn, int qtyOut, int balanceAfter,
+                        UUID actorMembershipId, UUID secondSignerMembershipId, UUID approvedByMembershipId, String reasonKey,
+                        UUID reversesLedgerId) {
+            this(movementId, txnType, docType, docId, docNo, docLineId, storeId, state, productId, batchId, qtyIn, qtyOut,
+                    balanceAfter, actorMembershipId, secondSignerMembershipId, approvedByMembershipId, reasonKey, reversesLedgerId,
+                    null);
+        }
     }
 
     /** One ledger line as read back (the line a correction points at). */
@@ -135,4 +144,7 @@ public interface StockRepository {
 
     /** The sums per state of one product in these stores; a store with no rows is answered with zeros. */
     List<StateRow> statesOfProduct(UUID tenantId, UUID productId, Collection<UUID> storeIds);
+
+    /** {@link #statesOfProduct} for many products in one statement (m-8); only stores with a balance row appear. */
+    java.util.Map<UUID, List<StateRow>> statesOfProducts(UUID tenantId, Collection<UUID> productIds, Collection<UUID> storeIds);
 }

@@ -1,9 +1,92 @@
 openapi: 3.1.0
 info:
   title: Sahaj Pharmacy & Inventory API, Phase 3 (Pharmacy sales and dispensing)
-  version: 0.3.1
+  version: 0.3.8
   description: >-
-    Changelog. 0.3.1 (19 Nov 2026, touch-up, programme DEC-061; DEC-080 L12, DEC-081; the tech lead's decision 5 of
+    Changelog. 0.3.8 (21 Nov 2026, SAH-80 review round 7: DEC-091 items 2 and 3, DEC-092 items 1 to 6; reports
+    docs/reviews/SAH-80-code.md and SAH-80-security.md; programme DEC-061; ADR-030 S2, S5, S14 to S16). The version
+    moves to 0.3.8 with pharmacy.yaml 0.3.8 (one API). Additive or wording only: no path, status code, required
+    request field, response member or enum value is removed or added; new problem codes: none. Where a rule
+    becomes stricter it is by decision DEC-091 or DEC-092, and the problem a client gets is one it already
+    handles (409 discount-approval-void, null for a blind caller). (a) Discount approval validity (DEC-091
+    item 2, DEC-092 item 1; ADR-030 S14): an APPROVED SALE_DISCOUNT request lifts the approval need only when
+    (1) no bill, SAVED or CANCELLED, carries it yet (single use), (2) the caller is the seller who raised it,
+    (3) the save names the same held bill the request was raised for (or, for a request raised on a live cart,
+    no held bill or the held bill that carries this request), (4) the cart is the one approved (as before) and
+    (5) it is the same IST day as the approval, the approval time being the latest decided_at of its APPROVED
+    decision rows. Otherwise the request reads VOID: pharmacyQuoteSale answers discount.approval.status VOID,
+    pharmacyCreateBill answers 409 discount-approval-void, pharmacyGetDiscountRequest answers VOID once the
+    request is used or its day is over. A save that loses a race for the same request also answers 409
+    discount-approval-void (the database backstop). The OWNER exemption (DEC-090) is unchanged. (b) Blind count
+    (DEC-091 item 3, DEC-092 item 3; rule 32 amended): for a blind caller on an audited product the quote answers
+    one line per cart line naming only the first FEFO batch, with no stock quantity; the activity feed, the
+    activity-log report and the Command Center hide the quantities and counts that come from audited products.
+    (c) CASHIER capabilities (DEC-092 item 4): read stock and the sale capabilities sell, salesReturn and dayClose
+    only; the role read-out CASHIER column follows; a CASHIER is blind under rule 32 (pharmacy.yaml rule 24
+    0.3.8). (d) Schedule X bill cancel (DEC-092 items 2 and 6): the OWNER never handles Schedule X, so a bill with
+    a Schedule X line is cancelled only by a PHARMACIST member with a second signer, on the bill's IST day; the
+    reversal records the canceller and the second signer (register reversal rows and ledger lines) and writes a
+    SECOND_SIGNATURE document event. Rule 25 states the corrected reading of DEC-074 OQ-80-37. (e) Role read-out
+    (DEC-092 item 5): with no SALE_DISCOUNT rule the DISCOUNT_ABOVE_LIMIT cell of a selling column other than
+    OWNER is ALLOW with ruleText "No limit set". (f) Record access and audit (DEC-092 item 3): an export that
+    carries patient rows (pharmacyExportH1Register, and pharmacyExportReport for h1-register) writes one
+    record-access entry per distinct registered patient exported; pharmacyUpdateCustomer audits the names of the
+    changed fields (never their values). Go-live checklist items (ADR-030 "Go-live checklist"): the owner sets
+    a SALE_DISCOUNT limit before selling; a DPDP consent notice for saved customers; refund modes ticked.
+
+    0.3.7 (21 Nov 2026, SAH-80 touch-ups after java runs 10 and 12 and the angular SAH-80 handoff;
+    DEC-088, DEC-089; programme DEC-061). The version moves to 0.3.7 with pharmacy.yaml 0.3.7 (one API). Additive
+    or wording only: no path, status code, required request field, response member or enum value is removed. One
+    limit is lowered, by decision DEC-088 item 1 and matching what the server already enforces: the notes of a
+    bill line (substitution, allergy override and H1 override) take at most 200 characters, not 300 (the stored
+    columns are varchar(200)); a client that sent 201 to 300 characters was already refused with 400 validation.
+    (a) pharmacySetProductLink documents 409 not-connected (DEC-089 item 1): in phase 1 no OPD or IPD port is
+    connected, so in Integrated mode it answers not-connected and saves nothing (Standalone still answers
+    integration-off first). (b) DEC-088 wording: new schema BillLineReasonInput (note at most 200) for
+    CartLineInput allergyOverride and h1Override, SubstitutionInput note at most 200; CustomerAccount entry
+    amountPaise is signed (CREDIT_BILL and CREDIT_NOTE_ISSUED plus, every other kind minus); CreditLine
+    creditLimitPaise answers 0 (never null) when the customer has no credit; pharmacyRecordCancelledBillRefund is
+    refused with 400 validation field refunds "This refund mode is not allowed. Ask your owner." while the unit has
+    no refund mode ticked (a go-live setup step). (c) Reports (DEC-089 item 2): the sales-margin report groups by
+    IST day and store only for go-live (no groupBy parameter; grouping by product or by user is later, with the
+    gross margin card, G-13); cost and margin cells are null for callers other than the OWNER and a PHARMACIST
+    member (they were "omitted"; the column stays). The activity feed and the activity-log report offer no person
+    filter for go-live (later); pharmacyActivityFeed keeps accepting membershipId, but the screen does not send it.
+    (d) customer-phone-exists: SalesProblem.customerCandidates (optional, already in the schema) is documented as
+    sent by pharmacyCreateCustomer and pharmacyUpdateCustomer; a client that does not use it shows the detail
+    sentence only. (e) h1-register on the report path (DEC-089 item 3, security): pharmacyRunReport answers the
+    patient name in full and the address only to the OWNER and a PHARMACIST member; every other caller gets the
+    masked name ("R*** S***") and a null address; each page read writes PHARMACY_REGISTER_VIEWED and a
+    record-access entry per registered patient on the page, like pharmacyH1Register; pharmacyExportReport for
+    h1-register is OWNER or PHARMACIST member only (403 forbidden for others) and also writes
+    PHARMACY_REGISTER_EXPORTED, like pharmacyExportH1Register. (f) Discarding a held bill withdraws its PENDING
+    discount request (status WITHDRAWN; DEC-089 item 4), stated on DiscountRequest.status as well. (g) Owner and
+    the sale discount rule (DEC-090, mockup 05 row "Discount above 10%", Owner "Allow"): the OWNER is exempt from
+    the unit's SALE_DISCOUNT rule. In pharmacyRoleReadout the OWNER cell of DISCOUNT_ABOVE_LIMIT is always ALLOW
+    with ruleText null; pharmacyCreateBill saves the owner's discount at any percent without discountRequestId and
+    ignores any discountRequestId the owner sends; pharmacyQuoteSale answers discount.approvalNeeded false for the
+    owner; pharmacyRequestDiscountApproval answers the owner required false and creates no request; so
+    DiscountRequest.selfApprovalOnly is always false. Every other seller follows the rule as before. Correction:
+    an earlier 0.3.7 text of this item said the owner was not exempt and sent his discount to the approval engine;
+    that text was withdrawn by DEC-090 (the mockup wins, CLAUDE.md rule 1) before any client relied on it, and the
+    server (java run 13) is built as written here. New problem codes: none.
+
+    0.3.6 (20 Nov 2026, the SAH-80 WP-I screen gaps, tech lead decision of 20 Nov 00:10 item 1;
+    programme DEC-061). The version moves to 0.3.6 with pharmacy.yaml 0.3.6 (both files are one API; 0.3.2 to
+    0.3.5 changed only pharmacy.yaml). Additive or wording only: no path, status code, required request field or
+    enum value is removed. (a) HeldBill gains products (required response member): the ProductRef of every product
+    named by the held cart (lines[].productId and prescribedProductId), so the resumed cart shows names before the
+    client quotes it again. (b) sale-changed (pharmacyCreateBill) always carries quote, the cart priced now under
+    the locks (SalesProblem.quote; it was already in the schema and the example): the client replaces its quote
+    with it, shows "Prices or batches changed. Check the bill and save again." and saves again with the new
+    quoteVersion and expectedNetPaise; nothing was saved. (c) Rule 30: every CSV download of this file (the
+    register exports and the Sales & compliance reports through pharmacyExportReport) answers its errors as
+    application/problem+json, never text/csv, as pharmacy.yaml 0.3.6 says for pharmacyExportStockLedger, so a
+    client reading a blob parses the error as the Problem (409 export-too-large "Narrow the date range."). (d)
+    The report catalogue answers the group SALES_COMPLIANCE with the label "Sales & compliance" (pharmacy.yaml
+    ReportCatalogue 0.3.6) once WP-N is built. New problem codes: none.
+
+    0.3.1 (19 Nov 2026, touch-up, programme DEC-061; DEC-080 L12, DEC-081; the tech lead's decision 5 of
     19 Nov 07:55). Additive or wording only. The blind-count rule 24 of pharmacy.yaml 0.3.2 now applies to the stock
     fields of this file (new general rule 32): the quantity fields concerned become nullable
     (SaleProductRow.availableQty, QuoteLine.shortBy and availableQty, SubstituteOptions items[].availableQty, the
@@ -34,7 +117,12 @@ info:
     sellScheduled, substitute, overrideBlock, cancelBill, salesReturn, acceptSalesReturn, dispense,
     recordWardReturn, acceptWardReturn, readRegisters, dayClose), derived on every request (ADR-030 S2).
     Pharmacist-only actions answer 403 pharmacist-required with the sentence the operation names; they are never
-    available to OWNER or a CASHIER (DEC-074 OQ-80-20, OQ-80-37).
+    available to OWNER or a CASHIER (DEC-074 OQ-80-20, OQ-80-37). 0.3.8 (DEC-092 item 6): the OWNER never handles
+    Schedule X, and that includes cancelling a bill with a Schedule X line. DEC-074 OQ-80-37 "the owner may
+    cancel any bill" is read as "the owner may cancel any bill that has no Schedule X line, on any day"; a bill
+    with a Schedule X line is cancelled only by a PHARMACIST member with a second signer (pharmacyCancelBill).
+    0.3.8 (DEC-092 item 4): a CASHIER holds sell, salesReturn and dayClose of the sale capabilities and readStock
+    of the stock ones, nothing else (ADR-030 S2; pharmacy.yaml StoreAccess).
     (26) Modes and ports (ADR-030 S12, DEC-072 Q2). An operation marked x-integrated-only answers 409
     integration-off in Standalone. Each touch point is a pharmacy-owned port whose default implementation is a
     no-op ("not connected"). A queue read whose port is not connected answers 200 with connected false and no
@@ -59,6 +147,9 @@ info:
     (30) Limits (DEC-074 OQ-80-40): at most 100 lines per bill (400 validation lines "A bill can have at most 100
     items."), 20 held bills per store (409 held-limit), 100 lines per IPD issue, 25 rows per queue page, register
     and report ranges at most 12 months (400 range-too-long), export cap 50,000 rows (409 export-too-large).
+    0.3.6: only the 200 answer of a CSV download is text/csv; every error (409 export-too-large included) is
+    application/problem+json with a JSON body, whatever the Accept header, and no CSV byte is sent before the
+    row count is known.
     (31) Activity (DEC-074 OQ-80-35). Every sale write also appends a pharmacy.document_event row (ADR-029 P9); the
     audit log card and the activity-log report read those rows (no platform read method).
     (32) Blind count (0.3.1; pharmacy.yaml rule 24, DEC-080 L12, BR-30). While the store has an open stock audit, a
@@ -68,6 +159,17 @@ info:
     (availableQty, shortBy, a value of stock); rows, chips and states (outOfStock, IN_STOCK, SHORT, OUT_OF_STOCK)
     and the quantities of the caller's own cart, bill, issue or return stay, and the problems insufficient-stock
     and changed follow rule 24.
+    0.3.8 (DEC-091 item 3, DEC-092 item 3; ADR-030 S16). Blind is worked as pharmacy.yaml rule 24 0.3.8 says
+    (readStock true and reviewCount false, never the OWNER), so a CASHIER stays blind although it has no count
+    capability. In addition: (i) the quote does not show how the server splits a line of an audited product over
+    batches: that cart line is answered as one QuoteLine naming only the first FEFO batch, with qty the quantity
+    asked (the caller's own number) and shortBy and availableQty null (pharmacyQuoteSale); (ii) the activity
+    feed and the activity-log report leave the quantities out of a row about an audited product of a store where
+    the caller is blind ("adjusted <batch> · Breakage", not "adjusted <batch> 60 to 58 · Breakage"); (iii) the
+    Command Center reorder card and the Schedule X / NDPS review count of the compliance card leave out the
+    audited products of a store where the caller is blind. The saved bill (the caller's own) shows its batches
+    and quantities as before. The rule is worked out on every request from the audit status at that moment and
+    ends when the audit is CLOSED.
     Problem types added by this file: pharmacist-required, cancel-not-allowed, second-signer-same (403);
     sale-not-allowed, sale-changed, held-limit, discount-approval-needed, discount-approval-void, has-returns,
     already-cancelled, not-cancelled, refund-already-recorded, customer-phone-exists, customer-inactive,
@@ -272,7 +374,10 @@ paths:
         (a cashier sending a non-null value 403 forbidden "Only the owner or a pharmacist can set a credit limit.").
         Phone already used by another customer and confirmSamePhone not true: 409 customer-phone-exists "A customer
         with this phone already exists. Use them?" with candidates (id, name, masked phone); confirmSamePhone true
-        saves anyway (it does not block). Audit PHARMACY_CUSTOMER_CREATED (ids, whether a limit was set; never the
+        saves anyway (it does not block). 0.3.7: the candidates are the problem member customerCandidates
+        (SalesProblem; at most 10 customers with that phone, ACTIVE or INACTIVE, phone masked for every caller); it
+        is optional, and a client that does not use it shows the detail sentence and "Save anyway"
+        (confirmSamePhone true) only. Audit PHARMACY_CUSTOMER_CREATED (ids, whether a limit was set; never the
         name or phone). 201.
       requestBody:
         required: true
@@ -333,7 +438,9 @@ paths:
         one 403 forbidden "Only the owner or a pharmacist can set a credit limit." (the field is read-only for
         them). A limit below the current due is accepted (new udhar is then refused). A patient account carries
         no name, phone or note (400 validation on them). Audit PHARMACY_CUSTOMER_CHANGED (ids; the credit limit
-        before and after; never the name, phone or note).
+        before and after; never the name, phone or note). 0.3.8 (DEC-092 item 3, security L27): the audit also
+        names every field that changed, from the list name, phone, allergyNote, creditLimitPaise (for example
+        changedFields "name, phone"), never the old or new value of name, phone or allergyNote.
       requestBody:
         required: true
         content:
@@ -345,7 +452,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/StoreForbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/SalesConflict', description: 'sale-not-allowed, settings-changed (with current), customer-phone-exists' }
+        '409': { $ref: '#/components/responses/SalesConflict', description: 'sale-not-allowed, settings-changed (with current), customer-phone-exists (0.3.7: with customerCandidates, the customer being changed left out; optional as on create)' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /stores/{storeId}/customers/{customerId}/switch-off:
@@ -391,7 +498,10 @@ paths:
         udhar part of a cancelled bill), RETURN_TO_UDHAR (- due, credit note number), CREDIT_NOTE_ISSUED (+ credit-note
         balance), CREDIT_NOTE_USED (- credit-note balance, bill number), with the running due and running credit-note
         balance after each. over60DaysPaise (owner and pharmacist only): the part of the due from credit bills saved
-        more than 60 days ago (IST), oldest bills paid first (FIFO; ADR-030 S5). Paged. Writes nothing.
+        more than 60 days ago (IST), oldest bills paid first (FIFO; ADR-030 S5). Paged. Writes nothing. 0.3.7
+        (DEC-088 item 4): amountPaise is signed as listed: CREDIT_BILL and CREDIT_NOTE_ISSUED are positive, PAYMENT,
+        CANCELLED_BILL, RETURN_TO_UDHAR and CREDIT_NOTE_USED negative; the client shows the sign as given.
+        credit.creditLimitPaise is 0 when the customer has no credit (DEC-088 item 6).
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/QueueSize'
@@ -495,11 +605,28 @@ paths:
         substitution and Rx marks. Summary by rule 27, with taxByRate. discount: limit read from the unit's
         SALE_DISCOUNT rule (approvalNeeded, limitPercent, limitNotSet "The discount limit is not set. Ask your
         owner.", lean); a discountRequestId sent is checked against this cart (approval APPROVED, VOID or PENDING).
+        For the OWNER (DEC-090) discount.approvalNeeded is always false: the owner is exempt from the SALE_DISCOUNT
+        rule and saves any percent at once. 0.3.8 (DEC-091 item 2, DEC-092 item 1; ADR-030 S14): an APPROVED
+        request is answered APPROVED only when it is valid for this quote: not yet carried by any bill (SAVED or
+        CANCELLED), raised by the caller, for this cart and percent, and approved on today's IST day (the latest
+        decided_at of its APPROVED decision rows). The binding to the held bill is checked by pharmacyCreateBill
+        only (CartInput carries no heldBillId; the quote takes none). Otherwise discount.approval.status is VOID and,
+        when the percent is above the limit, approvalNeeded stays true and blockers has DISCOUNT_APPROVAL; the
+        client shows the discount as not approved and offers "Send for approval" again.
         quoteVersion is a digest of the priced cart (lines, batches, MRPs, percent); the bill save sends it back.
         Writes nothing else. 400 for a malformed cart (rule 30 limits, quantity not a whole number 1 to 999999).
         Blind count (rule 32, 0.3.1): for a blind caller, shortBy and availableQty of a line of an audited product
         are null; the batches picked and their quantities (the caller's own cart) stay, so a short line is one
-        whose picked quantities add up to less than the quantity asked.
+        whose picked quantities add up to less than the quantity asked. 0.3.8 (DEC-091 item 3; replaces the
+        previous sentence for a blind caller): the number of batches FEFO takes and the quantity from each would
+        let a blind caller probe a batch's quantity, so each cart line of an audited product is answered as one
+        QuoteLine: batch = the first batch FEFO would pick (null when none is available), qty = the quantity
+        asked, shortBy and availableQty null, mrp = that batch's MRP; amountPaise, discountSharePaise, netPaise,
+        taxablePaise and taxPaise are the sums over the batches the save would take, so the bill total is right
+        (when the batches carry different MRPs the amount can differ from qty x mrp; see ADR-030 S16). A short
+        line keeps the SHORT blocker and canSave false (the state stays, rule 32); its money is then worked as
+        qty x the first batch's MRP, so it tells nothing about the units available. quoteVersion still digests
+        the real pick, so pharmacyCreateBill compares like with like. The saved bill shows its real batch lines.
       requestBody:
         required: true
         content:
@@ -573,7 +700,19 @@ paths:
         pharmacist-required "A pharmacist must complete this bill." (X: "Only a pharmacist can sell a Schedule X
         medicine."); an override or a substitution by anyone but a pharmacist 403 pharmacist-required. A discount
         above the limit needs discountRequestId APPROVED for this cart: missing 409 discount-approval-needed "This
-        discount needs approval.", pending or for another cart 409 discount-approval-void. A customer switched off
+        discount needs approval.", pending or for another cart 409 discount-approval-void. The OWNER is exempt
+        (DEC-090, mockup 05 Owner "Allow"): the owner's discount is saved at any percent without discountRequestId,
+        and any discountRequestId the owner sends is ignored. 0.3.8 (DEC-091 item 2, DEC-092 item 1; ADR-030
+        S14): a discount approval is single use, bound to the seller who raised it and to its held bill, and valid
+        only on the IST day it was approved. Under the lock of the request (ADR-030 S3 step 2) the save answers 409
+        discount-approval-void (the same code and detail as a changed cart; nothing saved, no number taken) when
+        any of these holds: a bill, SAVED or CANCELLED, already carries the request;
+        the caller is not the seller who raised it; the request was raised for a held bill and heldBillId is
+        missing or names another held bill, or it was raised on a live cart and heldBillId names a held bill that
+        does not carry this request; the cart or percent differs from the one approved (as before); or today's IST
+        date is not the IST date of the approval time (the latest decided_at of its APPROVED decision rows). Two
+        saves racing with the same request: the second fails on the database backstop (one bill per discount
+        request) and also answers 409 discount-approval-void, nothing saved. A customer switched off
         409 customer-inactive (udhar only). Then: the bill number (rule 28), bill, lines, payments, ledger lines
         COUNTER_SALE (reference = bill number), customer account entries, H1 and Schedule X register rows, Rx line
         supply status (80-12), the held bill closed when heldBillId is sent, document_event rows, audit
@@ -683,7 +822,20 @@ paths:
         Body: clientKey, version, reasonKey (list cancel-bill; .other needs a note of 4 to 300), backOnShelf (true:
         units to AVAILABLE; false: to QUARANTINE), secondSigner (required when a line is Schedule X; a pharmacist
         then cancels, ADR-029 P7). A pharmacist on a later day, a cashier or anyone else 403 cancel-not-allowed "Only
-        the owner can cancel a bill from an earlier day." A bill with a sales return 409 has-returns; already
+        the owner can cancel a bill from an earlier day." 0.3.8 (DEC-092 items 2 and 6; ADR-030 S5): the OWNER never
+        handles Schedule X, so the OWNER cancelling a bill with a Schedule X line answers 403 pharmacist-required
+        "Only a pharmacist can sell a Schedule X medicine." (fails closed, as built); such a bill is cancelled only
+        by a PHARMACIST member, on the bill's IST day, with a second signer verified outside the transaction
+        (secondSigner missing 400 "A second signature is needed for Schedule X items."; second-signer-same,
+        second-signer-invalid and the PIN problems as pharmacyCreateBill). DEC-074 OQ-80-37 "the owner may cancel
+        any bill" reads "any bill without a Schedule X line" (rule 25). The reversal records who cancelled and who
+        signed: each reversing Schedule X register row has the canceller as first signer and the verified second
+        signer as second signer (never the original sale's signers), each reversing ledger line of a Schedule X
+        line carries the second signer, and a document_event SECOND_SIGNATURE (bill number, canceller, signer, no
+        name) is written with BILL_CANCELLED; the audit PHARMACY_BILL_CANCELLED also names the second signer's
+        membership id. So a bill with a Schedule X line from an earlier IST day cannot be cancelled by anyone; the
+        sales return (pharmacyCreateSalesReturn) is the way back for its units (open point O-19 of ADR-030). A
+        bill with a sales return 409 has-returns; already
         cancelled 409 already-cancelled; old version 409 changed. No approval engine (DEC-074 OQ-80-13). In one
         transaction: reversing ledger lines COUNTER_SALE_CANCELLED pointing to the originals (an expired batch goes
         to QUARANTINE whatever backOnShelf says), reversing H1 and Schedule X register rows ("Cancelled"), the udhar
@@ -724,7 +876,11 @@ paths:
         must add up to refundDuePaise (400 payment-mismatch "Refunds must add up to ₹<amount>."). Not cancelled 409
         not-cancelled; already settled 409 refund-already-recorded. Takes a CREDIT_NOTE number (rule 28), records
         the refund rows (they count in the person's shift, 80-22) and a CREDIT_NOTE_ISSUED account entry when the
-        mode is CREDIT_NOTE. Audit PHARMACY_BILL_REFUND_RECORDED (ids, credit note number, amounts).
+        mode is CREDIT_NOTE. Audit PHARMACY_BILL_REFUND_RECORDED (ids, credit note number, amounts). 0.3.7
+        (DEC-088 item 3): while the unit has no refund mode ticked (Inventory setup, refund modes empty), every
+        refund line is refused with 400 validation field refunds "This refund mode is not allowed. Ask your owner."
+        and nothing is written; the bill keeps "Refund due" until the owner ticks the modes (a go-live setup step).
+        The same sentence answers a mode the unit does not allow, or ORIGINAL_MODE above what that mode paid.
       requestBody:
         required: true
         content:
@@ -806,7 +962,7 @@ paths:
       x-sale-store: true
       x-sub-story: SAH-80-5
       x-work-package: WP-I
-      description: 'The stored cart. Batches and prices are not kept; the client calls pharmacyQuoteSale and shows "Prices or batches changed. Check the bill and save again." when the quote differs from heldNetPaise. Another store''s held bill 404. Writes nothing.'
+      description: 'The stored cart, with products (0.3.6: the names of the products it names). Batches and prices are not kept; the client calls pharmacyQuoteSale and shows "Prices or batches changed. Check the bill and save again." when the quote differs from heldNetPaise. Another store''s held bill 404. Writes nothing.'
       responses:
         '200': { description: Held bill, content: { application/json: { schema: { $ref: '#/components/schemas/HeldBill' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -828,7 +984,7 @@ paths:
       x-sale-store: true
       x-sub-story: SAH-80-5
       x-work-package: WP-I
-      description: 'Body version. Status DISCARDED (kept, hidden); a pending discount request on it is WITHDRAWN. Not OPEN 409 changed. Audit PHARMACY_HELD_BILL_DISCARDED (ids).'
+      description: 'Body version. Status DISCARDED (kept, hidden); a pending discount request on it is WITHDRAWN. Not OPEN 409 changed. Audit PHARMACY_HELD_BILL_DISCARDED (ids). 0.3.7 (DEC-089 item 4): in the same transaction, a PENDING discount request of this held bill becomes WITHDRAWN (as pharmacyWithdrawDiscountRequest: no decision row, it leaves the inbox, audit PHARMACY_DISCOUNT_WITHDRAWN with ids); an APPROVED, REJECTED or already WITHDRAWN request is left as it is. pharmacyGetDiscountRequest then answers WITHDRAWN.'
       requestBody:
         required: true
         content:
@@ -865,18 +1021,21 @@ paths:
         percent makes it VOID (80-6). It is listed in the inbox under the chip Sales with ruleText "Discount above
         <limit>%" (the limit read from the rule version) and the APPROVE, REJECT and REVIEW actions; decisions use
         pharmacyDecideApproval (pharmacy.yaml; rejection reason list approval-reject, .other with a note). The raiser
-        never sees it as an approver (403 self-approval on a direct decision; "Needs another approver" as OQ-79-28);
-        in a one-owner clinic whose owner asks, decideLockReason SELF_APPROVAL and the seller sees "Ask another
-        approver, or set the discount rule to Lean." A new request for the same seller and store withdraws that
+        never sees it as an approver (403 self-approval on a direct decision; "Needs another approver" as OQ-79-28).
+        The OWNER is exempt from the SALE_DISCOUNT rule (DEC-090, mockup 05 Owner "Allow"): an owner who asks gets
+        required false and no request is created, at any percent, so selfApprovalOnly is always false. A new request for the same seller and store withdraws that
         seller's earlier PENDING discount request of the same held bill or cart. Audit
-        PHARMACY_DISCOUNT_REQUESTED (ids, percent, amount). 201.
+        PHARMACY_DISCOUNT_REQUESTED (ids, percent, amount). 201. 0.3.8 (DEC-091 item 2, DEC-092 item 1; ADR-030
+        S14): an approval is good for one bill, by the seller who raised it, for the heldBillId sent here (null: a
+        live cart), on the IST day it is approved; pharmacyCreateBill states the checks. A seller who resumes
+        another person's held cart, or who sells the same cart again, or on a later day, sends a new request.
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/DiscountRequestInput' }
       responses:
-        '201': { description: 'Sent, or not needed (level 0)', content: { application/json: { schema: { $ref: '#/components/schemas/DiscountRequest' } } } }
+        '201': { description: 'Sent, or not needed (level 0, or the OWNER asks: DEC-090)', content: { application/json: { schema: { $ref: '#/components/schemas/DiscountRequest' } } } }
         '200': { description: Replay, content: { application/json: { schema: { $ref: '#/components/schemas/DiscountRequest' } } } }
         '400': { $ref: '#/components/responses/Problem', description: 'validation (discountPercent missing, below 0 or above 100); or bad-request' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -898,7 +1057,7 @@ paths:
       x-sale-store: true
       x-sub-story: SAH-80-6
       x-work-package: WP-J
-      description: 'Any seller of the store may read it (a held cart may be resumed by another person). Status PENDING, APPROVED, REJECTED (with the reason), WITHDRAWN; escalated and needsAnotherApprover as computed now (no timer). Writes nothing.'
+      description: 'Any seller of the store may read it (a held cart may be resumed by another person). Status PENDING, APPROVED, REJECTED (with the reason), WITHDRAWN; escalated and needsAnotherApprover as computed now (no timer). Writes nothing. 0.3.8 (DEC-091 item 2, DEC-092 item 1): an approved request reads VOID once a bill (SAVED or CANCELLED) carries it or once the IST day of its approval is over; it also reads VOID for a caller other than the seller who raised it (it cannot be used by them). The cart check is made by pharmacyQuoteSale and the held-bill check by pharmacyCreateBill.'
       responses:
         '200': { description: Request, content: { application/json: { schema: { $ref: '#/components/schemas/DiscountRequest' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -1006,7 +1165,7 @@ paths:
       x-store-access: 'OPERATION (capability readRegisters; OWNER or a PHARMACIST member only, not the HOD)'
       x-sub-story: 'SAH-80-9, SAH-80-21'
       x-work-package: WP-J
-      description: 'Same filters as the register (from and to required). text/csv UTF-8 with BOM; the CSV escaping of ADR-029 P13; cap 50,000 rows (409 export-too-large "Narrow the date range."). The legal content includes the patient name and address (DEC-074 OQ-80-21). Audit PHARMACY_REGISTER_EXPORTED (ids, filter, row count).'
+      description: 'Same filters as the register (from and to required). text/csv UTF-8 with BOM; the CSV escaping of ADR-029 P13; cap 50,000 rows (409 export-too-large "Narrow the date range."). The legal content includes the patient name and address (DEC-074 OQ-80-21). Audit PHARMACY_REGISTER_EXPORTED (ids, filter, row count). 0.3.8 (DEC-092 item 3, security L24): the export also writes one record-access entry through patient.api.PatientAccessPort per distinct registered patient id among the exported rows (walk-in rows have none), in the export''s transaction before any CSV byte is sent; if those entries cannot be written the export fails (503 database-busy, no CSV), as record access fails closed everywhere.'
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date } }
@@ -1018,7 +1177,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/StoreForbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict', description: export-too-large }
+        '409': { $ref: './pharmacy.yaml#/components/responses/ExportTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /stores/{storeId}/registers/schedule-x:
     parameters:
@@ -1089,7 +1248,7 @@ paths:
       x-store-access: 'OPERATION (capability readRegisters)'
       x-sub-story: 'SAH-80-10, SAH-80-21'
       x-work-package: WP-J
-      description: 'The balance table only (product names and quantities; no patient). Same filters; CSV rules of ADR-029 P13. Audit PHARMACY_REGISTER_EXPORTED.'
+      description: 'The balance table only (product names and quantities; no patient). Same filters; CSV rules of ADR-029 P13. Audit PHARMACY_REGISTER_EXPORTED. 0.3.8 (DEC-092 item 3): it carries no patient row, so it writes no record-access entry; any later Schedule X export that carries patient rows (the sale entries) writes one per distinct registered patient, as pharmacyExportH1Register.'
       parameters:
         - { name: from, in: query, required: true, schema: { type: string, format: date } }
         - { name: to, in: query, required: true, schema: { type: string, format: date } }
@@ -1100,7 +1259,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/StoreForbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict', description: export-too-large }
+        '409': { $ref: './pharmacy.yaml#/components/responses/ExportTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   # ================================================================ WP-K · OPD dispensing (80-11, 80-12) · TP-2 port, no-op until approved
   /stores/{storeId}/opd-queue:
@@ -1290,7 +1449,12 @@ paths:
         BR-25, DEC-074 OQ-80-34: a pharmacy-owned link (opaque ids, no foreign key) from sourceKind OPD_MEDICINE or
         IPD_DRUG and sourceItemId to an ACTIVE product of the unit; saved for the unit (every store uses it); a later
         PUT changes it (the old link is kept in history). A suggestion by name is not offered (architect choice:
-        exact text match is unreliable). Audit PHARMACY_PRODUCT_LINK_SET (ids, before and after product id).
+        exact text match is unreliable). Audit PHARMACY_PRODUCT_LINK_SET (ids, before and after product id). 0.3.7
+        (DEC-089 item 1): phase 1 has no OPD or IPD port connected (rule 26), so in Integrated mode this operation
+        answers 409 not-connected "Prescriptions are not connected. Bill the items typed in." (the sentence of the
+        other WP-K writes; clients show detail) after the store guard and the mode check, before body checks, and
+        saves nothing; Standalone answers integration-off first. The
+        link is saved as described above once a port is connected.
       requestBody:
         required: true
         content:
@@ -1302,7 +1466,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/StoreForbidden' }
         '404': { $ref: '#/components/responses/NotFound', description: 'not-found (store or product)' }
-        '409': { $ref: '#/components/responses/Conflict', description: 'integration-off, settings-changed (with current), product-withdrawn' }
+        '409': { $ref: '#/components/responses/Conflict', description: 'integration-off, not-connected (0.3.7: always in phase 1, Integrated mode), settings-changed (with current), product-withdrawn' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   # ================================================================ WP-L · Sales return and compliance (80-18, 80-19)
   /stores/{storeId}/sales-returns/bills:
@@ -1599,7 +1763,20 @@ paths:
         text, for example "Needs approval above 10%"), DENY, SAME_DAY_ONLY (the pharmacist's cancel). Built by the
         same capability and approval-rule code that enforces them (ADR-030 S2), never stored, so the screen cannot
         disagree with the server. Not answered: "Change MRP / sale rate", "+ Custom role". Sentence "These are the
-        rules in force. The owner changes them in Inventory setup." Writes nothing.
+        rules in force. The owner changes them in Inventory setup." Writes nothing. 0.3.7 (DEC-090, mockup 05 row
+        "Discount above 10%", Owner "Allow"): the OWNER is exempt from the unit's SALE_DISCOUNT rule, so the OWNER
+        cell of DISCOUNT_ABOVE_LIMIT is always ALLOW with ruleText null, whatever the rule; this matches
+        pharmacyCreateBill, pharmacyQuoteSale and pharmacyRequestDiscountApproval, which never ask the owner for
+        approval. For every other column that can sell, the cell is NEEDS_APPROVAL with the rule text when the rule
+        has a level, and ALLOW with no rule or a Lean rule; a column that cannot sell is DENY. 0.3.8 (DEC-092
+        item 5, security L26): when the unit has no SALE_DISCOUNT rule at all, the DISCOUNT_ABOVE_LIMIT cell of
+        every column that can sell other than OWNER is ALLOW with ruleText "No limit set" (any seller may give any
+        discount until the owner sets a limit, a go-live checklist item, ADR-030); a Lean rule the owner chose
+        stays ALLOW with ruleText null. No default rule is seeded (the owner's pricing decision). 0.3.8 (DEC-092
+        item 4): the CASHIER column is computed from the explicit CASHIER capabilities (readStock, sell,
+        salesReturn, dayClose and nothing else), so CANCEL_SAVED_BILL, STOCK_ADJUSTMENT, OVERRIDE_ALLERGY_H1 and
+        RAISE_WARD_INDENT are DENY (as mockup 05); DISCOUNT_ABOVE_LIMIT and SALES_RETURN are worked by the same code
+        as before.
       responses:
         '200': { description: Read-out, content: { application/json: { schema: { $ref: '#/components/schemas/RoleReadout' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1622,12 +1799,20 @@ paths:
         reason labels ("overrode allergy block on bill SB/26-27/018422 · reason: Prescriber confirmed · Main
         Pharmacy", "requested 15% discount · sent for approval · approved by <name>", "adjusted <batch> 60 to 58 ·
         Breakage"), and the store. No patient name, no free-text note, no allergy text, no photo. Titled "Audit log"
-        (append-only; "tamper-evident" is not claimed). No export here (report activity-log). Writes nothing.
+        (append-only; "tamper-evident" is not claimed). No export here (report activity-log). Writes nothing. 0.3.7
+        (go-live scope): the audit log card offers no person filter for go-live, because no read lists the
+        pharmacists and staff to choose from; the client does not send membershipId. The server keeps accepting
+        membershipId (rows of that member only; an id of another clinic or unknown gives no rows) so that a later
+        person picker needs no contract change. Person filter on the card: later. 0.3.8 (DEC-092 item 3, security
+        L22; rule 32): for a row about an audited product of a store where the caller is blind now (a pharmacist
+        who is not the store's HOD or delegate, while the store has an open stock audit), the sentence leaves out
+        every quantity ("adjusted <batch> · Breakage", not "adjusted <batch> 60 to 58 · Breakage"); the row, the
+        person, the document number and the reason stay. Worked per store of the page, after the store scope.
       parameters:
         - { name: storeId, in: query, required: false, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/From'
         - $ref: '#/components/parameters/To'
-        - { name: membershipId, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: membershipId, in: query, required: false, schema: { type: string, format: uuid }, description: '0.3.7: not offered on the screen for go-live (no member list read; later). Accepted and honoured if sent.' }
         - { name: type, in: query, required: false, schema: { $ref: '#/components/schemas/ActivityType' } }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/QueueSize'
@@ -2096,6 +2281,32 @@ paths:
   # pharmacyActivityFeed. Access: OWNER all selling stores; PHARMACIST member, APPROVER and current DELEGATE of a
   # selling store for their stores; a CASHIER none (catalogue answers no Sales & compliance group). Filters, 12-month
   # range, paging, 50,000-row cap and CSV rules as SAH-79-18.
+  # 0.3.7 (DEC-089 items 2 and 3; replaces the groupBy wording above for go-live):
+  # - sales-margin: one row per IST day and store, columns date, store, bills, qty, salesPaise, discountPaise,
+  #   taxPaise, costPaise, marginPercent; oldest day first, then store name; productId narrows the figures to that
+  #   product's bill lines. There is no groupBy parameter; grouping by product or by
+  #   user is later, together with the Command Center gross margin card, which stays absent (go-live G-13). costPaise
+  #   and marginPercent are null (an empty CSV cell) for every caller other than the OWNER and a PHARMACIST member;
+  #   the columns stay in the answer.
+  # - activity-log: filters storeId, from and to only (productId, vendorId and status are ignored); no person
+  #   filter for go-live (later), the same as the audit log card (pharmacyActivityFeed).
+  # - h1-register on pharmacyRunReport (security, a High if left): patientName in full and patientAddress only to
+  #   the OWNER and a PHARMACIST member; every other caller allowed the report (APPROVER, current DELEGATE) gets
+  #   patientName masked (each word its first letter then "***", for example "R*** S***") and patientAddress null;
+  #   patientAge, prescriber and the other columns stay. Each page read writes PHARMACY_REGISTER_VIEWED (store ids,
+  #   register H1, filter, row count; never a name) and, for every row with a registered patient id, one
+  #   record-access entry per patient on the page through patient.api.PatientAccessPort, exactly as
+  #   pharmacyH1Register; this is in addition to PHARMACY_REPORT_VIEWED of page 0.
+  # - h1-register on pharmacyExportReport: OWNER or a PHARMACIST member only (others 403 forbidden, nothing
+  #   written), the same rule as pharmacyExportH1Register; full name and address; audit
+  #   PHARMACY_REGISTER_EXPORTED (store ids, register H1, filter, row count) as well as PHARMACY_REPORT_EXPORTED.
+  #   0.3.8 (DEC-092 item 3, security L24): and one record-access entry per distinct registered patient id among
+  #   the exported rows, in the export's transaction before any CSV byte (fails closed: no entries, no CSV), as
+  #   pharmacyExportH1Register.
+  # - activity-log (0.3.8, DEC-092 item 3): quantities left out of rows about audited products of a store where
+  #   the caller is blind, as pharmacyActivityFeed.
+  # - Every other Sales & compliance report carries no patient name (gst-sales-register and sales-returns show no
+  #   buyer name; schedule-x-register is per product).
   /command-centre:
     get:
       tags: [SAH-80-20]
@@ -2111,7 +2322,8 @@ paths:
         asOf (shown "As of <time> IST"). Cards (DEC-074 OQ-80-4): todaysSales (net payable of bills saved today minus
         sales returns completed today; bill count; average per bill; cancelled bills not counted); grossMargin (OWNER
         and pharmacists only, and only when the unit's landed rates are confirmed (go-live G-13): otherwise absent;
-        "On landed cost, not PTR"); nearExpiry90 (value at purchase rate and batch count of AVAILABLE batches expiring
+        "On landed cost, not PTR"; 0.3.7, DEC-089 item 2: not for go-live, grossMargin is always null or left out and
+        the card is not shown; later with G-13); nearExpiry90 (value at purchase rate and batch count of AVAILABLE batches expiring
         within 90 days; returnablePaise only when the vendor return policy gives it); reorder (products at or below
         the reorder level, "below reorder level"); rxWaiting (Integrated only: OPD prescriptions and IPD orders
         waiting, null counts with connected false while a port is not connected; indents of this store waiting to
@@ -2122,7 +2334,12 @@ paths:
         todaysSales only. No figure that built data cannot give. Writes nothing except the store sweep of ADR-029 P4.
         Blind count (rule 32, 0.3.1): for a blind caller at a store with an open audit, nearExpiry90.valuePaise
         and each expiryRisk bar valuePaise are null when they include an audited product of that store (batch
-        counts and the reorder count stay); with storeId omitted (OWNER only) nobody is blind.
+        counts and the reorder count stay); with storeId omitted (OWNER only) nobody is blind. 0.3.8 (DEC-092
+        item 3, security L23; replaces "and the reorder count stay"): for a blind caller the reorder card counts
+        only products that are not on the store's open audit, and the compliance card's Schedule X / NDPS state
+        and its review count leave the audited products out (an audited product is neither "balanced" nor "to
+        review" for that caller); the batch counts of nearExpiry90 and expiryRisk stay (they count batches, which
+        the count sheet lists anyway).
       parameters:
         - { name: storeId, in: query, required: false, schema: { type: string, format: uuid } }
       responses:
@@ -2306,11 +2523,11 @@ components:
         - $ref: './pharmacy.yaml#/components/schemas/Problem'
         - type: object
           properties:
-            quote: { $ref: '#/components/schemas/SaleQuote', description: 'sale-changed only: the cart priced now.' }
+            quote: { $ref: '#/components/schemas/SaleQuote', description: 'sale-changed only, and always sent with it: the cart as sent, priced now under the balance locks (the same shape pharmacyQuoteSale answers; rule 32 applies). 0.3.6: the client replaces its quote with this one and saves again with this quoteVersion and summary.netPayablePaise as expectedNetPaise; nothing was saved by the refused request.' }
             customerCandidates:
               type: array
               maxItems: 10
-              description: customer-phone-exists only.
+              description: 'customer-phone-exists only (pharmacyCreateCustomer, pharmacyUpdateCustomer). 0.3.7: optional; the walk-in customers (ACTIVE or INACTIVE) with that phone, oldest first, at most 10, the customer being changed left out; maskedPhone for every caller, never the full phone. A client may offer them ("Use them?") or show the detail sentence only.'
               items: { type: object, required: [customerId, name, maskedPhone], properties: { customerId: { type: string, format: uuid }, name: { type: string }, maskedPhone: { type: string } } }
             claimedBy: { $ref: './pharmacy.yaml#/components/schemas/PersonRef', description: 'rx-claimed and changed on a queue item: who has it ("Already being billed by <name>.").' }
     Money: { $ref: './pharmacy.yaml#/components/schemas/Paise' }
@@ -2325,6 +2542,14 @@ components:
       properties:
         reasonKey: { type: string, maxLength: 80, description: 'An active reason of the list the field names (rule 21).' }
         note: { type: [string, 'null'], maxLength: 300, description: 'Required (4 to 300) for a key ending in .other. Kept on the record only; never in audit text.' }
+    BillLineReasonInput:
+      type: object
+      additionalProperties: false
+      required: [reasonKey]
+      description: '0.3.7 (DEC-088 item 1): the reason of an override on a bill line (CartLineInput allergyOverride and h1Override; also in a held cart and a discount request, which carry the same cart). ReasonInput with the note limited to 200 characters, the width of the stored columns. ReasonInput itself is unchanged for its other uses.'
+      properties:
+        reasonKey: { type: string, maxLength: 80, description: 'An active reason of the list the field names (rule 21).' }
+        note: { type: [string, 'null'], maxLength: 200, description: 'Required (4 to 200) for a key ending in .other. Kept on the record only; never in audit text. Above 200: 400 validation on the line.' }
     # ---------------------------------------------------------------- WP-I
     StoreBillSeries:
       type: object
@@ -2385,7 +2610,7 @@ components:
       description: '"Credit limit ₹5,000 · current due ₹0". The Udhar field is shown only when creditLimitPaise is above 0.'
       properties:
         customerId: { type: string, format: uuid }
-        creditLimitPaise: { type: [integer, 'null'], format: int64, minimum: 0 }
+        creditLimitPaise: { type: [integer, 'null'], format: int64, minimum: 0, description: '0.3.7 (DEC-088 item 6): 0 when the customer has no credit (a limit never set, or set to 0 or null); the server does not answer null. The type stays nullable for compatibility; a client treats null as 0.' }
         duePaise: { type: integer, format: int64, minimum: 0 }
         over60DaysPaise: { type: [integer, 'null'], format: int64, minimum: 0, description: 'Owner and pharmacist only; null for others.' }
         creditNoteBalancePaise: { type: integer, format: int64, minimum: 0 }
@@ -2452,7 +2677,7 @@ components:
                   storeName: { type: string }
                   reference: { type: [string, 'null'], description: 'Bill or credit note number.' }
                   mode: { oneOf: [ { $ref: '#/components/schemas/PaymentMode' }, { type: 'null' } ] }
-                  amountPaise: { type: integer, format: int64 }
+                  amountPaise: { type: integer, format: int64, description: '0.3.7 (DEC-088 item 4): signed. Positive for CREDIT_BILL (raises the due) and CREDIT_NOTE_ISSUED (raises the credit-note balance); negative for PAYMENT, CANCELLED_BILL and RETURN_TO_UDHAR (lower the due) and CREDIT_NOTE_USED (lowers the credit-note balance).' }
                   dueAfterPaise: { type: integer, format: int64, minimum: 0 }
                   creditNoteBalanceAfterPaise: { type: integer, format: int64, minimum: 0 }
                   by: { $ref: './pharmacy.yaml#/components/schemas/PersonRef' }
@@ -2507,7 +2732,7 @@ components:
       required: [reasonKey, patientAgrees]
       properties:
         reasonKey: { type: string, maxLength: 80, description: 'List substitution.' }
-        note: { type: [string, 'null'], maxLength: 300 }
+        note: { type: [string, 'null'], maxLength: 200, description: '0.3.7 (DEC-088 item 1): at most 200 characters (was 300; the stored column is varchar(200)). Required (4 to 200) for a key ending in .other. Above 200: 400 validation on the line.' }
         patientAgrees: { const: true, description: '"Patient agrees"; without it "Choose a reason and confirm the patient agrees."' }
     CartLineInput:
       type: object
@@ -2518,8 +2743,8 @@ components:
         qty: { type: integer, minimum: 1, maximum: 999999, description: 'Whole issue units; the server splits it by FEFO batch.' }
         prescribedProductId: { type: [string, 'null'], format: uuid, description: 'The product asked for or prescribed, when it differs (a substitution, 80-7).' }
         substitution: { oneOf: [ { $ref: '#/components/schemas/SubstitutionInput' }, { type: 'null' } ], description: 'Required when prescribedProductId differs from productId.' }
-        allergyOverride: { oneOf: [ { $ref: '#/components/schemas/ReasonInput' }, { type: 'null' } ], description: 'List allergy-override; pharmacist only.' }
-        h1Override: { oneOf: [ { $ref: '#/components/schemas/ReasonInput' }, { type: 'null' } ], description: 'List h1-override; pharmacist only; never for Schedule X.' }
+        allergyOverride: { oneOf: [ { $ref: '#/components/schemas/BillLineReasonInput' }, { type: 'null' } ], description: 'List allergy-override; pharmacist only. 0.3.7: BillLineReasonInput (note at most 200).' }
+        h1Override: { oneOf: [ { $ref: '#/components/schemas/BillLineReasonInput' }, { type: 'null' } ], description: 'List h1-override; pharmacist only; never for Schedule X. 0.3.7: BillLineReasonInput (note at most 200).' }
         rxLineId: { type: [string, 'null'], maxLength: 64, description: 'The e-Rx line this line supplies (80-12); null = "Not on Rx" when rxId is set.' }
     PrescriptionInput:
       type: object
@@ -2578,7 +2803,7 @@ components:
         inputIndex: { type: integer, minimum: 0, description: 'Which CartInput line this batch line came from.' }
         product: { $ref: './pharmacy.yaml#/components/schemas/ProductRef' }
         saltText: { type: string, description: '"salt strength · form · pack" small text.' }
-        batch: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/BatchRef' }, { type: 'null' } ], description: 'null for a short line with nothing available.' }
+        batch: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/BatchRef' }, { type: 'null' } ], description: 'null for a short line with nothing available. 0.3.8 (DEC-091 item 3, rule 32): for a blind caller on an audited product, the first batch FEFO would pick, on the one line answered for that cart line (pharmacyQuoteSale).' }
         fefo: { const: true }
         qty: { type: integer, minimum: 0 }
         shortBy: { type: [integer, 'null'], minimum: 0, description: '> 0: "Only <n> in stock." 0.3.1: null for a blind caller on an audited product (rule 32).' }
@@ -2624,7 +2849,7 @@ components:
           type: object
           required: [approvalNeeded, limitPercent, limitNotSet, lean, approval]
           properties:
-            approvalNeeded: { type: boolean, description: '"This discount needs approval."' }
+            approvalNeeded: { type: boolean, description: '"This discount needs approval." Always false for the OWNER (DEC-090: the owner is exempt from the SALE_DISCOUNT rule).' }
             limitPercent: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/Percent' }, { type: 'null' } ] }
             limitNotSet: { type: boolean, description: '"The discount limit is not set. Ask your owner." (every discount above 0% waits for the owner).' }
             lean: { type: boolean, description: 'Level 0 for SALE_DISCOUNT: any percent applies at once.' }
@@ -2784,7 +3009,7 @@ components:
         reasonKey: { type: string, maxLength: 80, description: 'List cancel-bill.' }
         note: { type: [string, 'null'], maxLength: 300 }
         backOnShelf: { type: boolean, description: '"Are the medicines back on the shelf?" Yes: Available; No: Quarantine.' }
-        secondSigner: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/SecondSigner' }, { type: 'null' } ] }
+        secondSigner: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/SecondSigner' }, { type: 'null' } ], description: '0.3.8 (DEC-092 items 2 and 6): required when the bill has a Schedule X line; the caller is then a PHARMACIST member (never the OWNER). The verified signer is recorded on the reversing Schedule X register rows and ledger lines and in a SECOND_SIGNATURE document event.' }
     RefundInput:
       type: object
       additionalProperties: false
@@ -2827,10 +3052,15 @@ components:
       allOf:
         - $ref: '#/components/schemas/HeldBillRow'
         - type: object
-          required: [status, cart, heldNetPaise, version]
+          required: [status, cart, products, heldNetPaise, version]
           properties:
             status: { type: string, enum: [OPEN, RESUMED, REPLACED, DISCARDED] }
             cart: { $ref: '#/components/schemas/CartInput' }
+            products:
+              type: array
+              maxItems: 200
+              items: { $ref: './pharmacy.yaml#/components/schemas/ProductRef' }
+              description: '0.3.6 (tech lead decision of 20 Nov 00:10 item 1): each product the held cart names (cart.lines[].productId and prescribedProductId), once, read now from the unit''s products (name, strength, form, schedule, units, GST %), so the resumed cart shows names before pharmacyQuoteSale answers. A product switched off since the hold is still answered (the quote then refuses it). No batch, price or stock.'
             heldNetPaise: { type: integer, format: int64 }
             version: { type: integer, minimum: 0 }
     # ---------------------------------------------------------------- WP-J
@@ -2848,14 +3078,14 @@ components:
       properties:
         required: { type: boolean, description: 'false: level 0, the discount applies at once (no request).' }
         requestId: { type: [string, 'null'], format: uuid }
-        status: { type: [string, 'null'], enum: [PENDING, APPROVED, REJECTED, WITHDRAWN, VOID, null], description: 'VOID: computed when the cart sent with it differs from the cart approved.' }
+        status: { type: [string, 'null'], enum: [PENDING, APPROVED, REJECTED, WITHDRAWN, VOID, null], description: 'VOID: computed when the cart sent with it differs from the cart approved. WITHDRAWN (0.3.7, DEC-089 items 4 and 5): withdrawn by the seller (pharmacyWithdrawDiscountRequest), by a newer request of the same seller for the same held bill or cart, or because its held bill was discarded (pharmacyDiscardHeldBill); final, the client shows the discount as not approved. VOID 0.3.8 (DEC-091 item 2, DEC-092 item 1): also an APPROVED request that a bill (SAVED or CANCELLED) already carries, whose IST day of approval is over, or read by a seller other than its raiser; the client shows the discount as not approved and offers "Send for approval" again (story 80-6).' }
         percent: { $ref: './pharmacy.yaml#/components/schemas/Percent' }
         discountPaise: { type: integer, format: int64, minimum: 0 }
         ruleText: { type: [string, 'null'], examples: ['Discount above 10%'] }
         waitingFor: { type: [string, 'null'], enum: [HOD, OWNER, null] }
         escalated: { type: boolean }
         needsAnotherApprover: { type: boolean }
-        selfApprovalOnly: { type: boolean, description: 'One-owner clinic, owner asked: "Ask another approver, or set the discount rule to Lean."' }
+        selfApprovalOnly: { type: boolean, description: 'Always false (0.3.7, DEC-090): the OWNER is exempt from the SALE_DISCOUNT rule and never gets a request, so the one-owner self-approval case cannot arise. Kept for compatibility; a client need not show "Ask another approver, or set the discount rule to Lean."' }
         decidedBy: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/PersonRef' }, { type: 'null' } ], description: '"Approved by <name>".' }
         rejectReason: { oneOf: [ { $ref: './pharmacy.yaml#/components/schemas/ReasonRef' }, { type: 'null' } ] }
         raisedAt: { type: [string, 'null'], format: date-time }
@@ -3280,6 +3510,7 @@ components:
               action: { type: string, enum: [DISCOUNT_ABOVE_LIMIT, CANCEL_SAVED_BILL, SALES_RETURN, STOCK_ADJUSTMENT, OVERRIDE_ALLERGY_H1, RAISE_WARD_INDENT] }
               cells:
                 type: array
+                description: '0.3.7 (DEC-090, mockup 05 Owner "Allow"): the OWNER cell of DISCOUNT_ABOVE_LIMIT is always ALLOW with ruleText null (the owner is exempt from the SALE_DISCOUNT rule); every other seller follows the rule (NEEDS_APPROVAL with ruleText when the rule has a level). 0.3.8 (DEC-092 item 5): with no SALE_DISCOUNT rule at all, the cell of every other column that can sell is ALLOW with ruleText "No limit set".'
                 items: { type: object, required: [column, value], properties: { column: { type: string }, value: { type: string, enum: [ALLOW, NEEDS_APPROVAL, DENY, SAME_DAY_ONLY] }, ruleText: { type: [string, 'null'] } } }
     ActivityType:
       type: string

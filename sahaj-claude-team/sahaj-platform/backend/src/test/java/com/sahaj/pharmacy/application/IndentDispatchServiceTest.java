@@ -79,7 +79,8 @@ class IndentDispatchServiceTest {
     private final PharmacyTime time = new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC));
     private final StockPosting realPosting = new StockPosting(stock, time);
     private final IndentDispatchService service = new IndentDispatchService(gate, guard, stores, products, indents, dispatches,
-            stock, posting, signature, clients, events, reasons, assembler, indentService, audit, time);
+            stock, posting, signature, clients, events, reasons, assembler, indentService, audit, time,
+            new BlindCount(mock(StockAuditRepository.class)));
     private PharmacyCaller caller = new PharmacyCaller(TENANT, USER, ME, "Test Central User", "STORE_STAFF", List.of());
     private final Store central = new Store(CENTRAL, UNIT, "Test Central Store", "CS", StoreType.CENTRAL, null, false, false, true,
             true, 0);
@@ -176,6 +177,23 @@ class IndentDispatchServiceTest {
         verify(indents).setStatusLocked(TENANT, INDENT, "APPROVED", "DISPATCHED", ME);
         verify(indents).applyDispatch(TENANT, LINE, 20, 0, null, null, null, null, ME);
         UserIdNeverWritten.assertNone(USER, indents, dispatches, posting, events, audit);
+    }
+
+    @Test
+    void aDispatchOfMoreThan400PicksIsRefusedWithSplitThisDispatchAndNothingMoves() {
+        java.util.List<com.sahaj.pharmacy.domain.Fefo.Pick> many = new java.util.ArrayList<>();
+        for (int i = 0; i < 401; i++) {
+            many.add(new com.sahaj.pharmacy.domain.Fefo.Pick(UUID.randomUUID(), 1));
+        }
+        Mockito.doReturn(new com.sahaj.pharmacy.domain.Fefo.Result(many, 401, 0)).when(posting).pick(any(), anyInt());
+        when(indents.lines(TENANT, INDENT)).thenReturn(List.of(line(401, 0, 0)));
+        when(indents.linesForUpdate(TENANT, INDENT)).thenReturn(List.of(line(401, 0, 0)));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> run(body(3, input(PRODUCT, "401", null, null, null)), null))
+                .isInstanceOfSatisfying(com.sahaj.platform.api.InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("lines:Split this dispatch into smaller ones."));
+        verify(posting, Mockito.never()).post(any(), any());
+        verify(dispatches, Mockito.never()).insert(any(), any());
     }
 
     @Test

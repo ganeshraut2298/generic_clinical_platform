@@ -98,6 +98,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
     private final UnitRepository unitRows;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final BlindCount blind;
 
     public DebitNoteService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, ProductRepository products,
                             VendorRepository vendors, GoodsReceiptRepository receipts, DebitNoteRepository notes,
@@ -105,7 +106,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
                             DocumentSeriesRepository series, DocumentNumberPort numbers, ClientRequestRepository clients,
                             DocumentEventRepository events, StockRepository stock, StockPosting posting,
                             ScheduleXSignature signature, ActiveReasonService reasons, DocumentViews views,
-                            PrintTemplateRepository templates, UnitRepository unitRows, AuditLog auditLog, PharmacyTime time) {
+                            PrintTemplateRepository templates, UnitRepository unitRows, AuditLog auditLog, PharmacyTime time, BlindCount blind) {
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -129,6 +130,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
         this.unitRows = unitRows;
         this.auditLog = auditLog;
         this.time = time;
+        this.blind = blind;
     }
 
     // ---- reads ----
@@ -150,10 +152,13 @@ public class DebitNoteService implements ApprovalSubjectHandler {
         posting.sweepStore(tenantId, store.unitId(), storeId, caller.actorId());
         LocalDate today = time.today();
         List<PurchaseViews.EligibleRow> items = new ArrayList<>();
+        BlindCount.Mask mask = blind.at(caller, storeId);
         for (Eligible e : eligibleRows(tenantId, storeId, vendor, null)) {
             StockViews.BatchRef batch = e.batchId() == null ? null : new StockViews.BatchRef(e.batchId(), e.batchNo(), e.expiry());
+            // rule 24: a stock row of an audited product has no quantity for a blind caller (a short-supply claim is not stock)
+            Integer shown = e.grnLineId() == null ? mask.qty(e.product().productId(), e.availableQty()) : (Integer) e.availableQty();
             items.add(new PurchaseViews.EligibleRow(e.source(), productRef(e.product()), batch, e.state(), e.grnLineId(),
-                    e.receiptNo(), e.availableQty(), PurchaseMath.rateText(e.rate()),
+                    e.receiptNo(), shown, PurchaseMath.rateText(e.rate()),
                     PurchaseMath.percentText(e.defaultCredit()), e.daysToExpiry()));
         }
         PurchaseViews.ReturnPolicy policy = new PurchaseViews.ReturnPolicy(vendor.returnDaysBeforeExpiry(),
@@ -224,9 +229,6 @@ public class DebitNoteService implements ApprovalSubjectHandler {
         }
         Vendor vendor = in.vendorId() == null ? null : vendors.find(tenantId, in.vendorId()).orElse(null);
         if (vendor == null) {
-            if (in.vendorId() != null) {
-                throw notFound();
-            }
             errors.add(new FieldMessage("vendorId", "Choose a vendor"));
         }
         String note = header(tenantId, in.reasonKey(), in.note(), errors);
@@ -353,7 +355,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
         if (lines.isEmpty()) {
             throw new InvalidFieldsException(List.of(new FieldMessage("lines", "Add 1 to 200 items")));
         }
-        recheck(tenantId, storeId, vendor, dnId, lines);
+        recheck(caller, tenantId, storeId, vendor, dnId, lines);
 
         long seq = numbers.next(tenantId, DocType.DEBIT_NOTE);
         String docNo = render(tenantId, seq, time.today());
@@ -364,7 +366,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
         ApprovalEngine.Plan plan = engine.plan(tenantId, subject);
         String status = plan == null ? DebitNoteStatus.CREATED.name() : DebitNoteStatus.WAITING_APPROVAL.name();
         if (plan == null) {
-            hold(tenantId, store.unitId(), storeId, dnId, docNo, lines, me, null);
+            hold(tenantId, store.unitId(), storeId, dnId, docNo, lines, me, null, caller);
         }
         if (!notes.submit(tenantId, dnId, row.version(), status, seq, docNo, me)) {
             throw new IllegalStateException("A debit note changed under its lock");
@@ -500,7 +502,11 @@ public class DebitNoteService implements ApprovalSubjectHandler {
                     "VENDOR_RETURN", null, UUID.randomUUID(), null, new StockPosting.Doc(DOC_TYPE, dnId, row.docNo(), l.id()),
                     null, x ? signer : null));
         }
-        posting.post(new StockPosting.Actor(tenantId, store.unitId(), me, null, null), moves);
+        try {
+            posting.post(new StockPosting.Actor(tenantId, store.unitId(), me, null, null), moves);
+        } catch (PharmacyProblemException refused) {
+            throw blind.scrub(caller, storeId, refused);
+        }
         if (!notes.markHandedOver(tenantId, dnId, row.version(), representative, me, signer)) {
             throw new IllegalStateException("A debit note changed under its lock");
         }
@@ -684,7 +690,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
         }
         UUID approver = decision.approver().actorId();
         hold(tenantId, row.unitId(), row.storeId(), row.id(), row.docNo(), notes.lines(tenantId, row.id()),
-                decision.request().raisedBy(), approver);
+                decision.request().raisedBy(), approver, null);
         notes.setStatusLocked(tenantId, row.id(), DebitNoteStatus.WAITING_APPROVAL.name(), DebitNoteStatus.CREATED.name(), approver);
         events.insert(tenantId, row.unitId(), DOC_TYPE, row.id(), "DECIDED", row.storeId(), approver, decision.actingAs(), null,
                 null, null, null);
@@ -717,7 +723,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
      * (one movement). A unit that is gone is 409 insufficient-stock naming the debit note line; nothing is held.
      */
     private void hold(UUID tenantId, UUID unitId, UUID storeId, UUID dnId, String docNo, List<Line> lines, UUID actor,
-                      UUID approver) {
+                      UUID approver, PharmacyCaller blindCaller) {
         List<StockPosting.Line> moves = new ArrayList<>();
         for (Line l : lines) {
             if (!l.stockReturn()) {
@@ -731,7 +737,12 @@ public class DebitNoteService implements ApprovalSubjectHandler {
                     "VENDOR_RETURN_HOLD", null, movement, null, doc, null));
         }
         if (!moves.isEmpty()) {
-            posting.post(new StockPosting.Actor(tenantId, unitId, actor, null, approver), moves);
+            try {
+                posting.post(new StockPosting.Actor(tenantId, unitId, actor, null, approver), moves);
+            } catch (PharmacyProblemException refused) {
+                // rule 24: the caller who submits may be blind at this store; an approver's decision is never blind
+                throw blindCaller == null ? refused : blind.scrub(blindCaller, storeId, refused);
+            }
         }
     }
 
@@ -827,7 +838,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
     }
 
     /** At submit: every line is still offered and its quantity is still there; a stock line that is not is 409 insufficient-stock. */
-    private void recheck(UUID tenantId, UUID storeId, Vendor vendor, UUID dnId, List<Line> lines) {
+    private void recheck(PharmacyCaller caller, UUID tenantId, UUID storeId, Vendor vendor, UUID dnId, List<Line> lines) {
         List<Eligible> rows = eligibleRows(tenantId, storeId, vendor, dnId);
         Map<String, Eligible> byStock = new HashMap<>();
         Map<UUID, Eligible> byShort = new HashMap<>();
@@ -856,7 +867,7 @@ public class DebitNoteService implements ApprovalSubjectHandler {
             }
         }
         if (!failing.isEmpty()) {
-            throw PharmacyProblemException.insufficientStock(failing.get(0).available(), failing);
+            throw blind.scrub(caller, storeId, PharmacyProblemException.insufficientStock(failing.get(0).available(), failing));
         }
         throwIfAny(errors);
     }

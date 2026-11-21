@@ -67,6 +67,9 @@ public interface ProductRepository {
 
     Optional<Full> find(UUID tenantId, UUID productId);
 
+    /** {@link #find} for many products in one statement (m-8); a missing id is absent from the map. */
+    java.util.Map<UUID, Full> findAll(UUID tenantId, java.util.Collection<UUID> productIds);
+
     /**
      * The same read with {@code FOR UPDATE} on the product row (DEC-077 L10): a product edit takes it before its open-import
      * check, so a line write (which reads the product {@code FOR SHARE}) and the edit run one after the other.

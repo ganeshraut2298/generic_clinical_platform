@@ -46,6 +46,7 @@ public class StaffMappingService {
 
     static final String BAD_MEMBER = "Choose an active team member";
     static final String BAD_ROLE = "This person cannot have this store role";
+    static final String NOT_A_CASHIER = "This person cannot be a Cashier.";
     static final String CENTRAL_ONLY = "Central Store user is only for the Central Store";
     private static final String ENTITY_TYPE = StaffMappingWriter.ENTITY_TYPE;
 
@@ -127,6 +128,9 @@ public class StaffMappingService {
             Set<StoreRole> allowed = EnumSet.copyOf(TeamRoles.allowedStoreRoles(member.role()));
             if (store != null && !store.type().isCentral()) {
                 allowed.remove(StoreRole.CENTRAL_STORE_USER);
+            }
+            if (store != null && !StoreRules.cashierStore(store.saleAllowed(), store.type())) {
+                allowed.remove(StoreRole.CASHIER);
             }
             if (storeRole != null && !allowed.contains(storeRole)) {
                 continue;
@@ -310,6 +314,11 @@ public class StaffMappingService {
                                   List<FieldMessage> errors) {
         if (storeRole == null) {
             errors.add(new FieldMessage(field, "Choose a store role"));
+        } else if (storeRole == StoreRole.CASHIER) {
+            boolean teamOk = member == null || TeamRoles.allowedStoreRoles(member.role()).contains(StoreRole.CASHIER);
+            if (!teamOk || !StoreRules.cashierStore(store.saleAllowed(), store.type())) {
+                errors.add(new FieldMessage(field, NOT_A_CASHIER));
+            }
         } else if (member != null && !TeamRoles.allowedStoreRoles(member.role()).contains(storeRole)) {
             errors.add(new FieldMessage(field, BAD_ROLE));
         } else if (storeRole == StoreRole.CENTRAL_STORE_USER && !store.type().isCentral()) {
@@ -362,12 +371,15 @@ public class StaffMappingService {
         TeamMember member = context.members().get(row.membershipId());
         boolean canSignIn = member != null && member.active();
         String role = member == null ? "" : member.role();
-        boolean needsReview = member != null && StoreRules.needsReview(role, row.storeRole());
+        boolean needsReview = member != null && StoreRules.needsReview(role, row.storeRole(),
+                StoreRules.cashierStore(store.saleAllowed(), store.type()));
         LocalDate today = time.today();
         StoreRole effective = member == null ? StoreRole.STORE_USER
-                : StoreRules.effectiveRole(role, row.storeRole(), row.delegateFrom(), row.delegateTo(), today);
+                : StoreRules.effectiveRole(role, row.storeRole(), row.delegateFrom(), row.delegateTo(), today,
+                        StoreRules.cashierStore(store.saleAllowed(), store.type()));
         StoreAccess access = !row.active() || !canSignIn ? StoreAccess.NONE
-                : StoreRules.access(role, effective, store.consumptionAllowed());
+                : StoreRules.access(role, effective, store.consumptionAllowed(), store.saleAllowed(),
+                        store.type().isCentral());
         DelegateState state = row.storeRole() == StoreRole.DELEGATE
                 ? DelegateState.of(row.delegateFrom(), row.delegateTo(), today) : null;
         return new PharmacyViews.StaffMapping(row.id(), row.storeId(), row.membershipId(),

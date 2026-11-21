@@ -28,8 +28,13 @@
   }
   @case ('ready') {
     <div class="modhead">
-      @if (store.canViewSetup() || store.canInventory()) {
+      @if (store.canViewSetup() || store.canInventory() || store.canPharmacyTab()) {
         <nav class="tabs" aria-label="Pharmacy and inventory">
+          @if (store.canPharmacyTab()) {
+            <a routerLink="pharmacy" routerLinkActive="active" ariaCurrentWhenActive="page" data-testid="tab-pharmacy">
+              Pharmacy
+            </a>
+          }
           @if (store.canViewSetup()) {
             <a
               routerLink="setup"

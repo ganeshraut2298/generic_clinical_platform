@@ -18,7 +18,17 @@ public enum ReasonList {
     TRANSFER("transfer", "Stock transfer"),
     CONSUMPTION_PURPOSE("consumption-purpose", "Consumption purpose"),
     DISPUTE("dispute", "Dispute"),
-    VENDOR_RETURN("vendor-return", "Vendor return");
+    VENDOR_RETURN("vendor-return", "Vendor return"),
+    /** SAH-80 (0.3.0): the nine lists of the sale. */
+    SUBSTITUTION("substitution", "Substitution"),
+    ALLERGY_OVERRIDE("allergy-override", "Allergy override"),
+    H1_OVERRIDE("h1-override", "Schedule H1 override"),
+    RETURN_CONDITION("return-condition", "Return condition"),
+    CANCEL_BILL("cancel-bill", "Cancel bill"),
+    WARD_RETURN("ward-return", "Ward return"),
+    RX_CLOSED("rx-closed", "Prescription closed"),
+    CLEARANCE("clearance", "Discharge clearance"),
+    DAY_CLOSE_DIFFERENCE("day-close-difference", "Day close difference");
 
     /** "Short / not received": the one reason that cannot be switched off (OQ-79-15). */
     public static final String FIXED_REASON_KEY = "receipt-reject.short";

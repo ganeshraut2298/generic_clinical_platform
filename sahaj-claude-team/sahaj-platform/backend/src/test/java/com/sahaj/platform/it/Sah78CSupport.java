@@ -31,7 +31,9 @@ abstract class Sah78CSupport extends Sah78BSupport {
         "WRITE_OFF", "STOCK_ADJUSTMENT", "SALE_DISCOUNT", "SALES_RETURN"};
 
     static final String[] LIST_KEYS = {"store-return", "sales-return", "damage", "stock-adjustment", "receipt-reject", "cs-change",
-        "approval-reject", "transfer", "consumption-purpose", "dispute", "vendor-return"};
+        "approval-reject", "transfer", "consumption-purpose", "dispute", "vendor-return",
+        "substitution", "allergy-override", "h1-override", "return-condition", "cancel-bill", "ward-return", "rx-closed", "clearance",
+        "day-close-difference"};
 
     static final String[] DOC_TYPES = {"PURCHASE_ORDER", "GRN", "INDENT", "TRANSFER", "BILL", "DEBIT_NOTE", "STOCK_AUDIT",
         "STORE_RETURN", "DAMAGE_REPORT", "STOCK_ADJUSTMENT"};

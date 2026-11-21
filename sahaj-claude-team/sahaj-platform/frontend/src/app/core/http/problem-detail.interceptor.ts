@@ -1,5 +1,5 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { catchError, throwError } from 'rxjs';
+import { catchError, from, switchMap, throwError } from 'rxjs';
 import { ApiError, FieldError, ProblemDetail } from './problem-detail';
 
 const NO_CONNECTION: ProblemDetail = {
@@ -45,6 +45,7 @@ export function toApiError(error: HttpErrorResponse): ApiError {
       holderName: typeof body['holderName'] === 'string' ? body['holderName'] : undefined,
       blockers: Array.isArray(body['blockers']) ? body['blockers'] : undefined,
       rows: Array.isArray(body['rows']) ? body['rows'] : undefined,
+      quote: isRecord(body['quote']) ? body['quote'] : undefined,
     });
   }
   return new ApiError({
@@ -55,9 +56,34 @@ export function toApiError(error: HttpErrorResponse): ApiError {
   });
 }
 
+/**
+ * A CSV export is read as a blob, and the server answers its errors as application/problem+json (pharmacy contract
+ * 0.3.6, export-too-large included). The blob is read as text and parsed as JSON so the problem is not lost.
+ */
+async function readBlobProblem(error: HttpErrorResponse): Promise<HttpErrorResponse> {
+  const blob = error.error;
+  if (!(blob instanceof Blob)) {
+    return error;
+  }
+  try {
+    const parsed: unknown = JSON.parse(await blob.text());
+    return isRecord(parsed)
+      ? new HttpErrorResponse({ error: parsed, headers: error.headers, status: error.status, statusText: error.statusText, url: error.url ?? undefined })
+      : error;
+  } catch {
+    return error;
+  }
+}
+
 export const problemDetailInterceptor: HttpInterceptorFn = (req, next) =>
   next(req).pipe(
-    catchError((error: unknown) =>
-      throwError(() => (error instanceof HttpErrorResponse ? toApiError(error) : error)),
-    ),
+    catchError((error: unknown) => {
+      if (!(error instanceof HttpErrorResponse)) {
+        return throwError(() => error);
+      }
+      if (!(error.error instanceof Blob)) {
+        return throwError(() => toApiError(error));
+      }
+      return from(readBlobProblem(error)).pipe(switchMap((read) => throwError(() => toApiError(read))));
+    }),
   );

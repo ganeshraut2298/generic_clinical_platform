@@ -50,7 +50,10 @@ public class DispatchReceiptService {
     static final String SUM_MESSAGE = "Accepted + Rejected must equal Dispatched";
     static final String REASON_MESSAGE = "Choose a reason for the rejected quantity";
     static final String EXPIRED_MESSAGE = "An expired batch cannot be accepted. Reject it.";
-    static final String LIST_EVERY = "List every line of this dispatch that is not yet received";
+    static final String LIST_EVERY = "Send every line not yet received, once.";
+    static final String NOTHING = "There is nothing to receive.";
+    static final String NEAR_EXPIRY_KEY = "receipt-reject.near-expiry";
+    static final String EXPIRED_REASON_MESSAGE = "Reject an expired batch as near expiry";
     private static final Logger log = LoggerFactory.getLogger(DispatchReceiptService.class);
     private static final String ENTITY_TYPE = "PHARMACY_DISPATCH";
     private static final String DOC_TYPE = IndentService.DOC_TYPE;
@@ -64,6 +67,7 @@ public class DispatchReceiptService {
     private final ReturnItemRepository returns;
     private final ShortageRepository shortages;
     private final StockRepository stock;
+    private final ProductRepository products;
     private final StockPosting posting;
     private final ScheduleXSignature signature;
     private final ClientRequestRepository clients;
@@ -72,12 +76,16 @@ public class DispatchReceiptService {
     private final DispatchAssembler assembler;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final TransferRepository transfers;
 
     public DispatchReceiptService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, IndentRepository indents,
                                   DispatchRepository dispatches, ReturnItemRepository returns, ShortageRepository shortages,
-                                  StockRepository stock, StockPosting posting, ScheduleXSignature signature,
+                                  StockRepository stock, ProductRepository products, StockPosting posting,
+                                  ScheduleXSignature signature,
                                   ClientRequestRepository clients, DocumentEventRepository events, ActiveReasonService reasons,
-                                  DispatchAssembler assembler, AuditLog auditLog, PharmacyTime time) {
+                                  DispatchAssembler assembler, AuditLog auditLog, PharmacyTime time,
+                                  TransferRepository transfers) {
+        this.transfers = transfers;
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -86,6 +94,7 @@ public class DispatchReceiptService {
         this.returns = returns;
         this.shortages = shortages;
         this.stock = stock;
+        this.products = products;
         this.posting = posting;
         this.signature = signature;
         this.clients = clients;
@@ -129,7 +138,7 @@ public class DispatchReceiptService {
         UUID dispatchId = PharmacyParams.pathId(rawDispatchId);
         PharmacyInputs.DispatchReceipt in = body.read();
         guard.require(caller, storeId, StoreCapability.RECEIVE);
-        Row peek = dispatches.findById(tenantId, dispatchId).filter(d -> d.toStoreId().equals(storeId) && d.indentId() != null)
+        Row peek = dispatches.findById(tenantId, dispatchId).filter(d -> d.toStoreId().equals(storeId) && (d.indentId() != null || d.transferId() != null))
                 .orElseThrow(DispatchReceiptService::notFound);
         if (in.clientKey() != null && clients.own(tenantId, caller.actorId(), in.clientKey()).isPresent()) {
             return null;
@@ -138,7 +147,7 @@ public class DispatchReceiptService {
             return null;
         }
         Map<UUID, Line> open = new HashMap<>();
-        dispatches.unreceivedLines(tenantId, dispatchId).forEach(l -> open.put(l.id(), l));
+        marked(tenantId, dispatches.unreceivedLines(tenantId, dispatchId)).forEach(l -> open.put(l.id(), l));
         boolean scheduleX = false;
         for (PharmacyInputs.ReceiptLineInput d : in.lines() == null ? List.<PharmacyInputs.ReceiptLineInput>of() : in.lines()) {
             Line line = d == null || d.dispatchLineId() == null ? null : open.get(d.dispatchLineId());
@@ -164,7 +173,7 @@ public class DispatchReceiptService {
         PharmacyInputs.DispatchReceipt in = body.read();
         Store store = guard.require(caller, storeId, StoreCapability.RECEIVE);
         UUID me = caller.actorId();
-        Row peek = dispatches.findById(tenantId, dispatchId).filter(d -> d.toStoreId().equals(storeId) && d.indentId() != null)
+        Row peek = dispatches.findById(tenantId, dispatchId).filter(d -> d.toStoreId().equals(storeId) && (d.indentId() != null || d.transferId() != null))
                 .orElseThrow(DispatchReceiptService::notFound);
         if (in.clientKey() != null) {
             ClientRequestRepository.Taken own = clients.own(tenantId, me, in.clientKey()).orElse(null);
@@ -186,8 +195,8 @@ public class DispatchReceiptService {
         if ("RECEIVED".equals(peek.status()) || version != null && peek.version() != version) {
             throw PharmacyProblemException.changed(assembler.view(caller, peek, storeId));
         }
-        List<Checked> checked = checkLines(tenantId, peek, dispatches.lines(tenantId, dispatchId),
-                dispatches.unreceivedLines(tenantId, dispatchId), in, errors);
+        List<Checked> checked = checkLines(tenantId, peek, marked(tenantId, dispatches.lines(tenantId, dispatchId)),
+                marked(tenantId, dispatches.unreceivedLines(tenantId, dispatchId)), in, errors);
         throwIfAny(errors);
         if (ClientKeys.claim(clients, tenantId, store.unitId(), me, in.clientKey(), OP_RECEIVE, dispatchId, true) != null) {
             return receive(tenantId, userId, rawStoreId, rawDispatchId, body, verifiedSignerMembershipId); // L15
@@ -199,12 +208,21 @@ public class DispatchReceiptService {
         if ("RECEIVED".equals(row.status()) || version != null && row.version() != version) {
             throw PharmacyProblemException.changed(assembler.view(caller, row, storeId));
         }
-        IndentRepository.Row indent = indents.findForUpdateById(tenantId, row.indentId()).orElseThrow(
-                DispatchReceiptService::notFound);
-        indents.linesForUpdate(tenantId, indent.id());
+        IndentRepository.Row indent = row.indentId() == null ? null
+                : indents.findForUpdateById(tenantId, row.indentId()).orElseThrow(DispatchReceiptService::notFound);
+        TransferRepository.Row transfer = row.transferId() == null ? null
+                : transfers.findForUpdate(tenantId, row.transferId()).orElseThrow(DispatchReceiptService::notFound);
+        if (indent != null) {
+            indents.linesForUpdate(tenantId, indent.id());
+        }
+        boolean viaTransfer = transfer != null;
+        String docType = viaTransfer ? TransferService.DOC_TYPE : DOC_TYPE;
+        UUID docId = viaTransfer ? transfer.id() : indent.id();
+        String acceptedType = viaTransfer ? "TRANSFER_RECEIPT_ACCEPTED" : "INDENT_RECEIPT_ACCEPTED";
+        String rejectedType = viaTransfer ? "TRANSFER_RECEIPT_REJECTED" : "INDENT_RECEIPT_REJECTED";
         List<FieldMessage> recheck = new ArrayList<>();
-        checked = checkLines(tenantId, row, dispatches.lines(tenantId, dispatchId), dispatches.unreceivedLines(tenantId,
-                dispatchId), in, recheck);
+        checked = checkLines(tenantId, row, marked(tenantId, dispatches.lines(tenantId, dispatchId)),
+                marked(tenantId, dispatches.unreceivedLines(tenantId, dispatchId)), in, recheck);
         throwIfAny(recheck);
 
         UUID signer = null;
@@ -233,16 +251,16 @@ public class DispatchReceiptService {
             if (c.accepted() > 0) {
                 UUID movement = UUID.randomUUID();
                 moves.add(new StockPosting.Line(storeId, l.productId(), l.batchId(), StockState.IN_TRANSIT, -c.accepted(),
-                        "INDENT_RECEIPT_ACCEPTED", null, movement, null, doc, rowNo, lineSigner));
+                        acceptedType, null, movement, null, doc, rowNo, lineSigner));
                 moves.add(new StockPosting.Line(storeId, l.productId(), l.batchId(), StockState.AVAILABLE, c.accepted(),
-                        "INDENT_RECEIPT_ACCEPTED", null, movement, null, doc, rowNo, lineSigner));
+                        acceptedType, null, movement, null, doc, rowNo, lineSigner));
             }
             if (c.returnedQty() > 0) {
                 UUID movement = UUID.randomUUID();
                 moves.add(new StockPosting.Line(storeId, l.productId(), l.batchId(), StockState.IN_TRANSIT, -c.returnedQty(),
-                        "INDENT_RECEIPT_REJECTED", c.reasonKey(), movement, null, doc, rowNo, lineSigner));
+                        rejectedType, c.reasonKey(), movement, null, doc, rowNo, lineSigner));
                 moves.add(new StockPosting.Line(storeId, l.productId(), l.batchId(), StockState.PENDING_RETURN, c.returnedQty(),
-                        "INDENT_RECEIPT_REJECTED", c.reasonKey(), movement, null, doc, rowNo, lineSigner));
+                        rejectedType, c.reasonKey(), movement, null, doc, rowNo, lineSigner));
             }
         }
         posting.post(new StockPosting.Actor(tenantId, store.unitId(), me, null, null), moves);
@@ -259,18 +277,20 @@ public class DispatchReceiptService {
             dispatches.insertReceipt(tenantId, new DispatchRepository.NewReceipt(store.unitId(), dispatchId, l.id(),
                     l.dispatchedQty(), c.accepted(), c.rejected(), c.rejected() > 0 ? c.reasonKey() : null, c.note(), me,
                     l.scheduleX() ? signer : null));
-            int[] sum = totals.computeIfAbsent(l.indentLineId(), k -> new int[3]);
-            sum[0] += c.accepted();
-            sum[1] += c.returnedQty();
-            sum[2] += c.shortQty();
+            if (!viaTransfer) {
+                int[] sum = totals.computeIfAbsent(l.indentLineId(), k -> new int[3]);
+                sum[0] += c.accepted();
+                sum[1] += c.returnedQty();
+                sum[2] += c.shortQty();
+            }
             if (c.returnedQty() > 0) {
                 UUID itemId = UUID.randomUUID();
                 returns.insert(tenantId, new ReturnItemRepository.NewItem(itemId, store.unitId(), row.reference(),
-                        "INDENT_REJECTION", l.id(), storeId, row.fromStoreId(), l.productId(), l.batchId(), c.returnedQty(),
+                        viaTransfer ? "TRANSFER_REJECTION" : "INDENT_REJECTION", l.id(), storeId, row.fromStoreId(), l.productId(), l.batchId(), c.returnedQty(),
                         c.reasonKey(), ReturnRouting.defaultPutBackInto(c.reasonKey(), c.expired()), l.scheduleX(), me));
                 events.insert(tenantId, store.unitId(), ReturnShortageService.RETURN_DOC, itemId, "RAISED", storeId, me, null, null,
                         null, null, c.reasonKey());
-                events.insert(tenantId, store.unitId(), DOC_TYPE, indent.id(), "LINE_REJECTED", storeId, me, null,
+                events.insert(tenantId, store.unitId(), docType, docId, "LINE_REJECTED", storeId, me, null,
                         l.indentLineId(), 0, c.returnedQty(), c.reasonKey());
             }
             if (c.shortQty() > 0) {
@@ -279,7 +299,7 @@ public class DispatchReceiptService {
                         row.fromStoreId(), l.productId(), l.batchId(), c.shortQty(), me));
                 events.insert(tenantId, store.unitId(), ReturnShortageService.SHORTAGE_DOC, shortageId, "RAISED", storeId, me, null,
                         null, null, null, null);
-                events.insert(tenantId, store.unitId(), DOC_TYPE, indent.id(), "LINE_SHORT", storeId, me, null,
+                events.insert(tenantId, store.unitId(), docType, docId, "LINE_SHORT", storeId, me, null,
                         l.indentLineId(), 0, c.shortQty(), c.reasonKey());
             }
         }
@@ -304,16 +324,26 @@ public class DispatchReceiptService {
         }
 
         // the indent: RECEIVED only when every approved quantity is dispatched and received; otherwise it keeps its status
-        List<IndentRepository.Line> lines = indents.lines(tenantId, indent.id());
-        int waiting = dispatches.scheduleXWaiting(tenantId, indent.id());
-        IndentStatus current = IndentStatus.valueOf(indent.status());
-        IndentStatus target = IndentProgress.afterReceipt(current, IndentDispatchService.figures(lines), waiting);
-        indents.setStatusLocked(tenantId, indent.id(), indent.status(), target.name(), me);
-        events.insert(tenantId, store.unitId(), DOC_TYPE, indent.id(), "RECEIVED", storeId, me, null, null, null, null, null);
+        String targetName;
+        if (viaTransfer) {
+            // a transfer is RECEIVED when its one dispatch is; while Schedule X lines wait it stays IN_TRANSIT
+            targetName = skipped == 0 ? "RECEIVED" : transfer.status();
+            if (skipped == 0 && !transfers.setStatus(tenantId, transfer.id(), transfer.version(), "RECEIVED", me)) {
+                throw new IllegalStateException("A transfer changed under its lock");
+            }
+        } else {
+            List<IndentRepository.Line> lines = indents.lines(tenantId, indent.id());
+            int waiting = dispatches.scheduleXWaiting(tenantId, indent.id());
+            IndentStatus current = IndentStatus.valueOf(indent.status());
+            IndentStatus target = IndentProgress.afterReceipt(current, IndentDispatchService.figures(lines), waiting);
+            indents.setStatusLocked(tenantId, indent.id(), indent.status(), target.name(), me);
+            targetName = target.name();
+        }
+        events.insert(tenantId, store.unitId(), docType, docId, "RECEIVED", storeId, me, null, null, null, null, null);
 
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("dispatchStatus", status);
-        after.put("indentStatus", target.name());
+        after.put(viaTransfer ? "transferStatus" : "indentStatus", targetName);
         after.put("lineCount", checked.size() - skipped);
         after.put("skippedLineCount", skipped);
         after.put("returnedUnits", checked.stream().mapToInt(Checked::returnedQty).sum());
@@ -327,7 +357,7 @@ public class DispatchReceiptService {
 
     /**
      * All the line errors together (rule 21). Every line not yet received must be sent (a Schedule X line may be skipped); a line
-     * already received is 409 doc-state; accepted is a whole number from 0 to the dispatched quantity; rejected is the rest
+     * missing, sent twice or already received is one 400 on lines; accepted is a whole number from 0 to the dispatched quantity; rejected is the rest
      * (a sent value that differs is 400); a rejected quantity needs a reason of the receipt-reject list; an expired batch cannot
      * be accepted.
      */
@@ -346,7 +376,7 @@ public class DispatchReceiptService {
         Map<UUID, LocalDate> expiry = new HashMap<>();
         List<Checked> checked = new ArrayList<>();
         Set<UUID> seen = new LinkedHashSet<>();
-        boolean alreadyReceived = false;
+        boolean badSet = false;
         boolean anyReceived = false;
         for (int i = 0; i < given.size(); i++) {
             PharmacyInputs.ReceiptLineInput d = given.get(i);
@@ -356,12 +386,12 @@ public class DispatchReceiptService {
                 continue;
             }
             Line line = d.dispatchLineId() == null ? null : byId.get(d.dispatchLineId());
-            if (line == null || !seen.add(d.dispatchLineId())) {
+            if (line == null) {
                 errors.add(new FieldMessage(at + ".dispatchLineId", "Choose a line of this dispatch"));
                 continue;
             }
-            if (!open.contains(line.id())) {
-                alreadyReceived = true;
+            if (!seen.add(d.dispatchLineId()) || !open.contains(line.id())) {
+                badSet = true;
                 continue;
             }
             String note = d.note() == null || d.note().isBlank() ? null : d.note().trim();
@@ -405,24 +435,38 @@ public class DispatchReceiptService {
                 }
             }
             LocalDate expiryDate = expiry.computeIfAbsent(line.batchId(), id -> stock.findBatch(tenantId, id)
-                    .map(StockRepository.BatchRow::expiryDate).orElse(today));
+                    .map(StockRepository.BatchRow::expiryDate).orElseThrow(DispatchReceiptService::notFound));
             boolean expired = expiryDate.isBefore(today);
             if (accepted > 0 && expired) {
                 errors.add(new FieldMessage(at + ".accepted", EXPIRED_MESSAGE));
                 continue;
             }
+            if (expired && rejected > 0 && !NEAR_EXPIRY_KEY.equals(reasonKey)) {
+                errors.add(new FieldMessage(at + ".rejectReasonKey", EXPIRED_REASON_MESSAGE));
+                continue;
+            }
             anyReceived = true;
             checked.add(new Checked(line, false, accepted, rejected, reasonKey, note, expired));
         }
-        if (errors.isEmpty() && alreadyReceived) {
-            throw PharmacyProblemException.docState("This line was already received.");
-        }
-        if (!seen.containsAll(open)) {
+        if (badSet || !seen.containsAll(open)) {
             errors.add(new FieldMessage("lines", LIST_EVERY));
         } else if (errors.isEmpty() && !anyReceived) {
-            errors.add(new FieldMessage("lines", "Nothing to receive. A pharmacist receives the Schedule X lines."));
+            errors.add(new FieldMessage("lines", NOTHING));
         }
         return checked;
+    }
+
+    /** I24: a line is Schedule X when its dispatch-line copy says so or the product is Schedule X now (the product's own first). */
+    private List<Line> marked(UUID tenantId, List<Line> lines) {
+        Map<UUID, Boolean> byProduct = new HashMap<>();
+        List<Line> out = new ArrayList<>();
+        for (Line l : lines) {
+            boolean x = l.scheduleX() || byProduct.computeIfAbsent(l.productId(), p -> products.find(tenantId, p)
+                    .map(f -> GoodsReceiptService.isScheduleX(f.row())).orElse(false));
+            out.add(x == l.scheduleX() ? l : new Line(l.id(), l.dispatchId(), l.indentLineId(), l.productId(), l.batchId(),
+                    l.dispatchedQty(), l.replacedByCs(), l.changeReasonKey(), l.changeNote(), l.backOrderedQty(), true));
+        }
+        return out;
     }
 
     private static Long version(BigDecimal raw, List<FieldMessage> errors) {

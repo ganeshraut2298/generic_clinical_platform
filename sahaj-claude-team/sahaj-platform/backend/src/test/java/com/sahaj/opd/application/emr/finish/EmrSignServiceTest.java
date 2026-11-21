@@ -769,6 +769,55 @@ class EmrSignServiceTest {
         verify(visits, never()).lockForSign(any(), any());
     }
 
+    // ---- BUG-emr-finish-no-call: complete, next step, bill ----
+
+    @Test
+    void theNextStepAndTheBillOfTheSignReachTheAnswerAndTheStoredResultForTheSignersClinic() {
+        contextIs(opdContext(EmrRecordDocument.empty(MAPPER), view(List.of(), List.of())));
+        stubOpdSign();
+        when(records.syncBillLines(any(), any(), any())).thenReturn(new BillSummary(1, 15_000, List.of()));
+        when(visits.finishConsultation(TENANT, USER, VISIT)).thenReturn(new FinishMove("MOVED", "COUNSEL"));
+
+        SignResult result = service.sign(DOCTOR, RECORD, KEY, input(FinishChoices.none()));
+
+        assertThat(result.replayed()).isFalse();
+        assertThat(result.outcome().stage().outcome()).isEqualTo("MOVED");
+        assertThat(result.outcome().stage().to()).isEqualTo("COUNSEL");
+        assertThat(result.outcome().billLines()).isEqualTo(1);
+        assertThat(result.outcome().billTotalPaise()).isEqualTo(15_000L);
+        verify(records).syncBillLines(eq(DOCTOR), any(Encounter.class), any(RecordRow.class));
+        verify(visits).finishConsultation(TENANT, USER, VISIT);
+        ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
+        verify(finish).markSigned(eq(TENANT), eq(RECORD), eq(USER), eq(MEMBERSHIP), eq(KEY), anyString(), stored.capture());
+        assertThat(stored.getValue()).contains("\"to\":\"COUNSEL\"").contains("\"billLines\":1")
+                .contains("\"billTotalPaise\":15000");
+    }
+
+    @Test
+    void aReplayWritesNoBillLineNoPlanLineMarksNoSittingMovesNothingAndPublishesNoEvent() {
+        when(records.signContext(any(ClinicUser.class), eq(RECORD), eq(true))).thenReturn(new SignContext(member,
+                rowWithStarter("OPD_VISIT", "SIGNED", 4, "dental"),
+                new Encounter("OPD_VISIT", VISIT, visit(), null, null, false, "on"), view(List.of(), List.of()),
+                EmrRecordDocument.empty(MAPPER)));
+        when(recordRows.findById(TENANT, RECORD)).thenReturn(Optional.of(rowWithStarter("OPD_VISIT", "SIGNED", 4, "dental")));
+        SignInput body = input(FinishChoices.none());
+        when(finish.state(TENANT, RECORD)).thenReturn(Optional.of(state("SIGNED", KEY, hashOf(body), false)));
+
+        SignResult replay = service.sign(DOCTOR, RECORD, KEY, body);
+
+        assertThat(replay.replayed()).isTrue();
+        assertThat(replay.outcome().billLines()).as("the first answer's count").isEqualTo(2);
+        assertThat(replay.outcome().billTotalPaise()).isEqualTo(900L);
+        verify(records, never()).syncBillLines(any(), any(), any());
+        verify(contributor, never()).apply(any());
+        verify(visits, never()).finishConsultation(any(), any(), any());
+        verify(followUps, never()).setForVisit(any(), any(), any(), any(), any());
+        verify(courses, never()).markDone(any(), any(), any(), any());
+        verify(usage, never()).recordSignedVisit(any(), any(), any(), any());
+        verify(audit, never()).record(eq("EMR_RECORD_SIGNED"), any(), any(), any(), any());
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
     @Test
     void aReferralLineThatIsNotStoredAPatientLinkThatIsNotMadeAndACaseThatDoesNotCloseRefuseTheSign() {
         when(recordRows.findById(TENANT, RECORD)).thenReturn(Optional.of(row("ER_ASSESSMENT", "DRAFT", 3)));

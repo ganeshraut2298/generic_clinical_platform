@@ -35,12 +35,13 @@ class ReasonServiceTest {
     }
 
     @Test
-    void elevenListsInScreenOrderWithTheSeededReasonsFirstAndNothingWritten() {
+    void twentyListsInScreenOrderWithTheSeededReasonsFirstAndNothingWritten() {
         PharmacyMasterViews.ReasonLists lists = m.reasonService.list(TENANT, f.pharmacist.userId());
 
         assertThat(lists.lists()).extracting(PharmacyMasterViews.ReasonListView::listKey).containsExactly("store-return",
                 "sales-return", "damage", "stock-adjustment", "receipt-reject", "cs-change", "approval-reject", "transfer",
-                "consumption-purpose", "dispute", "vendor-return");
+                "consumption-purpose", "dispute", "vendor-return", "substitution", "allergy-override", "h1-override",
+                "return-condition", "cancel-bill", "ward-return", "rx-closed", "clearance", "day-close-difference");
         assertThat(list(lists, "store-return").label()).isEqualTo("Store return");
         assertThat(labels(list(lists, "store-return")))
                 .containsExactly("Excess stock", "Near expiry", "Not needed (order stopped)");
@@ -207,7 +208,7 @@ class ReasonServiceTest {
 
     @Test
     void aPharmacistReadsAndNobodyButTheOwnerWrites() {
-        assertThat(m.reasonService.list(TENANT, f.pharmacist.userId()).lists()).hasSize(11);
+        assertThat(m.reasonService.list(TENANT, f.pharmacist.userId()).lists()).hasSize(20);
         assertThatThrownBy(() -> m.reasonService.add(TENANT, f.pharmacist.userId(), "damage", new ReasonAdd("Torn")))
                 .isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> m.reasonService.switchOff(TENANT, f.pharmacist.userId(), "damage", "damage.expired"))

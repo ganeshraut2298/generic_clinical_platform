@@ -55,7 +55,7 @@ public final class StockViews {
     }
 
     /** {@code statusChip} holds SALEABLE, EXPIRES_IN, EXPIRED_QUARANTINED, NEW_MRP, IN_TRANSIT, PENDING_RETURN, QUARANTINE. */
-    public record BatchRow(ProductRef product, BatchRef batch, String state, int qty, Integer fefoRank, String mrp,
+    public record BatchRow(ProductRef product, BatchRef batch, String state, Integer qty, Integer fefoRank, String mrp,
                            String purchaseRate, String landed, String marginPercent, Supplier supplier,
                            List<String> statusChip, int daysToExpiry, boolean canVendorReturn) {
     }
@@ -67,7 +67,7 @@ public final class StockViews {
                         int scheduleProducts) {
     }
 
-    public record Overview(StoreRef store, int skuCount, int batchCount, long stockValuePaise, Pills pills, boolean empty) {
+    public record Overview(StoreRef store, int skuCount, int batchCount, Long stockValuePaise, Pills pills, boolean empty) {
     }
 
     public record ProductStock(ProductRef product, String salt, String hsn, String gstRate, String pack, String rack,
@@ -75,20 +75,20 @@ public final class StockViews {
     }
 
     /** {@code action} is RAISE_INDENT, ADD_TO_PURCHASE_ORDER or null. */
-    public record LowStockItem(ProductRef product, int available, int reorderLevel, String action) {
+    public record LowStockItem(ProductRef product, Integer available, int reorderLevel, String action) {
     }
 
     public record LowStockPage(List<LowStockItem> items, long total, int page, int size) {
     }
 
-    public record FefoBatch(BatchRef batch, int quantity, String purchaseRate) {
+    public record FefoBatch(BatchRef batch, Integer quantity, String purchaseRate) {
     }
 
-    public record FefoPick(UUID productId, int requested, int availableQty, int shortBy, List<FefoBatch> batches) {
+    public record FefoPick(UUID productId, int requested, Integer availableQty, Integer shortBy, List<FefoBatch> batches) {
     }
 
     /** {@code status} is OK, BELOW_REORDER, INDENT_IN_TRANSIT or null (the total row). */
-    public record StoreStateRow(StoreRef store, int available, int inTransit, int pendingReturn, int quarantine,
+    public record StoreStateRow(StoreRef store, Integer available, Integer inTransit, Integer pendingReturn, Integer quarantine,
                                 Integer reorderLevel, String status) {
     }
 
@@ -115,7 +115,9 @@ public final class StockViews {
     public record InboxCounts(int all, int indents, int purchase, int stock) {
     }
 
-    public record InboxPage(List<InboxRow> items, long total, int page, int size, InboxCounts counts, String signedInAs) {
+    /** {@code moreWaiting}: the inbox scan stopped at its cap (L19); not yet in the contract (handed to the architect). */
+    public record InboxPage(List<InboxRow> items, long total, int page, int size, InboxCounts counts, String signedInAs,
+                            boolean moreWaiting) {
     }
 
     public record LevelView(int level, String approver, String ruleText, boolean applies) {
@@ -146,8 +148,8 @@ public final class StockViews {
                                String lineLabel, Integer qtyBefore, Integer qtyAfter, ReasonRef reason) {
     }
 
-    public record StockAdjustment(UUID id, String number, StoreRef store, ProductRef product, BatchRef batch, int bookQty,
-                                  int physicalQty, int difference, long valuePaise, ReasonRef reason,
+    public record StockAdjustment(UUID id, String number, StoreRef store, ProductRef product, BatchRef batch, Integer bookQty,
+                                  Integer physicalQty, int difference, long valuePaise, ReasonRef reason,
                                   PharmacyViews.Person raisedBy, Instant raisedAt, PharmacyViews.Person secondSigner,
                                   String status, ApprovalSummary approval, List<HistoryEvent> history, long version) {
     }

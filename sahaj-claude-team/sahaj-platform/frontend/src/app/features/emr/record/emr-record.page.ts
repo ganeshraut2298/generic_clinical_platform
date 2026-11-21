@@ -55,10 +55,11 @@ import { dentalRecap, medicalAlerts } from '../specialty/dental/dental-medhistor
 import { isComponentValue } from '../components/component-values.logic';
 import { accentVars, chromeOf } from '../specialty/specialty-registry';
 import { SpecialtyStripComponent } from '../specialty/specialty-strip.component';
-import { EmrRecordStore, RightTab } from './emr-record.store';
+import { EmrRecordStore, RightTab, SaveStop } from './emr-record.store';
 import { SectionCardComponent } from './section-card.component';
 
 const HIGHLIGHT_MS = 1600;
+const SAVE_FAILED_TEXT = 'We could not save. Your entries are still on screen.';
 
 const READ_ONLY_TEXT: Record<EmrReadOnlyReason, string> = {
   SIGNED: 'This visit is signed, so it opens read-only.',
@@ -491,8 +492,45 @@ export class EmrRecordPage implements OnInit {
       this.autosave.restart();
       if (ok) {
         this.snackBar.open('Draft saved', 'Close', { duration: 3500 });
+      } else {
+        this.showSaveStop(this.store.lastStop());
       }
     });
+  }
+
+  /**
+   * A save that did not go through always says why where the doctor is looking (the banner at the top may
+   * be off screen): field problems open the first field marked in red, a record changed elsewhere offers Reload.
+   */
+  private showSaveStop(stop: SaveStop | null): void {
+    const shown = stop ?? { message: SAVE_FAILED_TEXT, sectionKey: null, fieldKey: null, reload: false };
+    if (shown.sectionKey) {
+      this.jumpToField(shown.sectionKey, shown.fieldKey);
+    }
+    const ref = this.snackBar.open(shown.message, shown.reload ? 'Reload' : 'Close', { duration: 8000 });
+    if (shown.reload) {
+      ref.onAction().subscribe(() => this.store.reload());
+    }
+  }
+
+  /** Opens the section (its part, its tab) and moves to the field; the section itself when the field is not drawn. */
+  private jumpToField(sectionKey: string, fieldKey: string | null): void {
+    this.store.goToSection(sectionKey);
+    if (this.toolKeys().has(sectionKey)) {
+      this.store.rightTab.set('tools');
+    }
+    afterNextRender(
+      () => {
+        // The section first; then the field, when it is drawn as its own control (ScrollTo skips an id it cannot find).
+        this.scroll.section(`sec-${sectionKey}`);
+        if (fieldKey) {
+          this.scroll.section(`f-${sectionKey}-${fieldKey}`);
+        }
+        this.clearHighlightTimer();
+        this.highlightTimer = setTimeout(() => this.store.clearHighlight(), HIGHLIGHT_MS);
+      },
+      { injector: this.injector },
+    );
   }
 
   /**
@@ -511,6 +549,9 @@ export class EmrRecordPage implements OnInit {
           this.jump(event.sectionKey);
         }
         this.snackBar.open(event.message, 'Close', { duration: 8000 });
+        return;
+      case 'save-stopped':
+        this.showSaveStop(event.stop);
         return;
       case 'reload':
         this.store.reload();

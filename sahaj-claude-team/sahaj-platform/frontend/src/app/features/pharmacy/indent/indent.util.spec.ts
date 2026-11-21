@@ -51,7 +51,7 @@ describe('indent.util', () => {
     expect(indentChips(base).map((c) => c.text)).toEqual(['Received · Sample Ceftriaxone 1 g injection back-order open']);
     const rejected = indent({ ...base, chips: { ...base.chips, rejectedWaitingCs: 2 } });
     expect(indentChips(rejected).map((c) => c.text)).toEqual([
-      'Approved · back-order open',
+      'Received',
       '· 2 rejected, waiting for CS',
     ]);
   });
@@ -69,6 +69,13 @@ describe('indent.util', () => {
       '· 3 short, CS investigating',
       '· Schedule X lines waiting for a pharmacist',
     ]);
+  });
+
+  it('always adds the Schedule X chip when lines wait for a pharmacist, even beside the back-order label', () => {
+    const texts = indentChips(
+      indent({ status: 'PARTLY_DISPATCHED', chips: { rejectedWaitingCs: 0, shortInvestigating: 0, backOrderOpen: false, scheduleXWaiting: 1 } }),
+    ).map((c) => c.text);
+    expect(texts).toEqual(['Partly dispatched', '· Schedule X lines waiting for a pharmacist']);
   });
 
   it('writes the header line of the mockup', () => {

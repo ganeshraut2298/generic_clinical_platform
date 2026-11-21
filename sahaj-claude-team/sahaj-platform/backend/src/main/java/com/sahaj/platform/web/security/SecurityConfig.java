@@ -110,6 +110,12 @@ public class SecurityConfig {
      * Browser calls from another origin (for example the Angular dev page on localhost:4200 calling
      * this API on localhost:8080). Allowed origins come only from {@code sahaj.cors.allowed-origins};
      * the default is empty, so no cross-origin call is allowed unless a profile sets it.
+     *
+     * <p>Allowed request headers are exactly those the Angular app sends: {@code Authorization},
+     * {@code Content-Type}, {@code Accept}, {@code X-Sahaj-Device} (IPD calls) and {@code Idempotency-Key}
+     * (EMR sign, forms, addenda, admission requests, courses, course payments, surgery booking). Without
+     * {@code Idempotency-Key} the browser refuses those calls after the preflight (BUG-emr-finish-no-call).
+     * Matching is case-insensitive. {@code Retry-After} is exposed because the app reads it on error responses.
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource(
@@ -117,7 +123,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins.stream().filter(o -> !o.isBlank()).toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Sahaj-Device"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Sahaj-Device",
+                "Idempotency-Key"));
         config.setExposedHeaders(List.of("Retry-After", "X-Request-Id"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

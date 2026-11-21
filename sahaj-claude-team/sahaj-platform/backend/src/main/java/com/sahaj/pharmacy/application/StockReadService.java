@@ -52,9 +52,10 @@ public class StockReadService {
     private final StockRepository stock;
     private final StockPosting posting;
     private final PharmacyTime time;
+    private final BlindCount blind;
 
     public StockReadService(PharmacyGate gate, StoreAccessGuard guard, StoreRepository stores, ProductRepository products,
-                            StockRepository stock, StockPosting posting, PharmacyTime time) {
+                            StockRepository stock, StockPosting posting, PharmacyTime time, BlindCount blind) {
         this.gate = gate;
         this.guard = guard;
         this.stores = stores;
@@ -62,6 +63,7 @@ public class StockReadService {
         this.stock = stock;
         this.posting = posting;
         this.time = time;
+        this.blind = blind;
     }
 
     @Transactional
@@ -71,8 +73,10 @@ public class StockReadService {
         Store store = guard.require(caller, storeId, StoreCapability.READ_STOCK);
         posting.sweepStore(tenantId, store.unitId(), storeId, caller.membershipId());
         StockRepository.Overview o = stock.overview(tenantId, storeId, time.today());
+        // rule 24: the value is worked from the audited products' quantities, so a blind caller gets none while the audit is open
+        Long value = blind.at(caller, storeId).active() ? null : Long.valueOf(o.stockValuePaise());
         return new StockViews.Overview(OpeningStockPostService.storeRef(store), o.skuCount(), o.batchCount(),
-                o.stockValuePaise(), new StockViews.Pills(o.nearExpiry30(), o.nearExpiry60(), o.nearExpiry90(),
+                value, new StockViews.Pills(o.nearExpiry30(), o.nearExpiry60(), o.nearExpiry90(),
                         o.expiredQuarantined(), o.lowStock(), o.scheduleProducts()), o.skuCount() == 0 && o.batchCount() == 0);
     }
 
@@ -105,7 +109,8 @@ public class StockReadService {
         StockRepository.BatchSlice slice = stock.batches(tenantId, storeId, today, (view == null ? View.ALL : view).name(),
                 within, like, exact, size, page * size);
         boolean canReturn = canVendorReturn(caller, store);
-        List<StockViews.BatchRow> items = slice.items().stream().map(v -> row(v, today, canReturn)).toList();
+        BlindCount.Mask mask = blind.at(caller, storeId);
+        List<StockViews.BatchRow> items = slice.items().stream().map(v -> row(v, today, canReturn, mask)).toList();
         return new StockViews.BatchPage(items, slice.total(), page, size);
     }
 
@@ -119,8 +124,9 @@ public class StockReadService {
         posting.sweepStore(tenantId, store.unitId(), storeId, caller.membershipId());
         LocalDate today = time.today();
         boolean canReturn = canVendorReturn(caller, store);
+        BlindCount.Mask mask = blind.at(caller, storeId);
         List<StockViews.BatchRow> batches = stock.batchesOfProduct(tenantId, storeId, productId, today).stream()
-                .map(v -> row(v, today, canReturn)).toList();
+                .map(v -> row(v, today, canReturn, mask)).toList();
         StoreSettingRow setting = products.storeSettings(tenantId, productId).stream()
                 .filter(s -> s.storeId().equals(storeId)).findFirst().orElse(null);
         ProductRepository.Row r = full.row();
@@ -145,11 +151,12 @@ public class StockReadService {
             action = "RAISE_INDENT";
         }
         String chosen = action;
+        BlindCount.Mask mask = blind.at(caller, storeId);
         List<StockViews.LowStockItem> items = slice.items().stream()
                 .map(r -> new StockViews.LowStockItem(new StockViews.ProductRef(r.productId(), r.code(), r.name(),
                         r.strength(), r.form(), r.schedule(), r.purchaseUnit(), r.issueUnit(), r.conversion(),
                         PurchaseMath.percentText(r.gstPercent())),
-                        r.available(), r.reorderLevel(), chosen)).toList();
+                        mask.qty(r.productId(), r.available()), r.reorderLevel(), chosen)).toList();
         return new StockViews.LowStockPage(items, slice.total(), page, size);
     }
 
@@ -183,13 +190,16 @@ public class StockReadService {
         Fefo.Result result = posting.pick(rows, quantity);
         Map<UUID, Bal> byBatch = new HashMap<>();
         rows.forEach(b -> byBatch.put(b.batchId(), b));
+        // rule 24: the batches are still named, but no quantity of an audited product reaches a blind caller, so the pick cannot probe
+        boolean hidden = blind.hides(caller, storeId, productId);
         List<StockViews.FefoBatch> batches = new ArrayList<>();
         for (Fefo.Pick pick : result.picks()) {
             Bal bal = byBatch.get(pick.batchId());
             batches.add(new StockViews.FefoBatch(new StockViews.BatchRef(bal.batchId(), bal.batchNo(), bal.expiryDate()),
-                    pick.quantity(), ProductAssembler.rate(bal.purchaseRate())));
+                    hidden ? null : Integer.valueOf(pick.quantity()), ProductAssembler.rate(bal.purchaseRate())));
         }
-        return new StockViews.FefoPick(productId, quantity, result.available(), result.shortBy(), batches);
+        return new StockViews.FefoPick(productId, quantity, hidden ? null : Integer.valueOf(result.available()),
+                hidden ? null : Integer.valueOf(result.shortBy()), batches);
     }
 
     /** "All stores": the owner gets every ACTIVE store, anyone else the stores they are mapped to (rule 15). */
@@ -215,7 +225,7 @@ public class StockReadService {
         for (Store store : reachable) {
             posting.sweepStore(tenantId, store.unitId(), store.id(), caller.membershipId());
         }
-        return byState(tenantId, full, reachable);
+        return byState(caller, full, reachable);
     }
 
     @Transactional
@@ -227,12 +237,13 @@ public class StockReadService {
         Store store = guard.require(caller, storeId, StoreCapability.READ_STOCK);
         Full full = products.find(tenantId, productId).orElseThrow(StockReadService::notFound);
         posting.sweepStore(tenantId, store.unitId(), storeId, caller.membershipId());
-        return byState(tenantId, full, List.of(store));
+        return byState(caller, full, List.of(store));
     }
 
     // ---- building ----
 
-    private StockViews.ProductStockByStore byState(UUID tenantId, Full full, List<Store> reachable) {
+    private StockViews.ProductStockByStore byState(PharmacyCaller caller, Full full, List<Store> reachable) {
+        UUID tenantId = caller.tenantId();
         Map<UUID, StateRow> byStore = new HashMap<>();
         stock.statesOfProduct(tenantId, full.row().productId(), reachable.stream().map(Store::id).toList())
                 .forEach(r -> byStore.put(r.storeId(), r));
@@ -241,18 +252,25 @@ public class StockReadService {
         int inTransit = 0;
         int pending = 0;
         int quarantine = 0;
+        boolean anyHidden = false;
         for (Store store : reachable) {
             StateRow s = byStore.getOrDefault(store.id(), new StateRow(store.id(), 0, 0, 0, 0, null));
-            rows.add(new StockViews.StoreStateRow(OpeningStockPostService.storeRef(store), s.available(), s.inTransit(),
-                    s.pendingReturn(), s.quarantine(), s.reorderLevel(), status(s)));
+            // rule 24: a store where the caller is blind and the product is on the open audit answers the four quantities null
+            boolean hidden = blind.hides(caller, store.id(), full.row().productId());
+            anyHidden |= hidden;
+            rows.add(new StockViews.StoreStateRow(OpeningStockPostService.storeRef(store), hidden ? null : s.available(),
+                    hidden ? null : s.inTransit(), hidden ? null : s.pendingReturn(), hidden ? null : s.quarantine(),
+                    s.reorderLevel(), status(s)));
             available += s.available();
             inTransit += s.inTransit();
             pending += s.pendingReturn();
             quarantine += s.quarantine();
         }
-        StockViews.StoreStateRow total = new StockViews.StoreStateRow(null, available, inTransit, pending, quarantine,
-                null, null);
-        boolean empty = available + inTransit + pending + quarantine == 0;
+        // the total row hides the four numbers when any row hides them, and then it cannot say "no stock anywhere" either
+        StockViews.StoreStateRow total = anyHidden
+                ? new StockViews.StoreStateRow(null, null, null, null, null, null, null)
+                : new StockViews.StoreStateRow(null, available, inTransit, pending, quarantine, null, null);
+        boolean empty = !anyHidden && available + inTransit + pending + quarantine == 0;
         return new StockViews.ProductStockByStore(productRef(full.row()), rows, total, empty);
     }
 
@@ -264,7 +282,7 @@ public class StockReadService {
         return s.inTransit() > 0 ? "INDENT_IN_TRANSIT" : "BELOW_REORDER";
     }
 
-    private StockViews.BatchRow row(BatchView v, LocalDate today, boolean canReturnInStore) {
+    private StockViews.BatchRow row(BatchView v, LocalDate today, boolean canReturnInStore, BlindCount.Mask mask) {
         int days = (int) ChronoUnit.DAYS.between(today, v.expiryDate());
         List<String> chips = new ArrayList<>();
         switch (v.state()) {
@@ -291,7 +309,7 @@ public class StockReadService {
         return new StockViews.BatchRow(new StockViews.ProductRef(v.productId(), v.productCode(), v.productName(),
                 v.strength(), v.form(), v.schedule(), v.purchaseUnit(), v.issueUnit(), v.conversion(),
                 PurchaseMath.percentText(v.gstPercent())),
-                new StockViews.BatchRef(v.batchId(), v.batchNo(), v.expiryDate()), v.state().name(), v.qty(),
+                new StockViews.BatchRef(v.batchId(), v.batchNo(), v.expiryDate()), v.state().name(), mask.qty(v.productId(), v.qty()),
                 v.fefoRank(), ProductAssembler.rate(v.mrp()), landed, landed,
                 StockMath.marginPercent(v.mrp(), v.purchaseRate()),
                 v.vendorId() == null ? null : new StockViews.Supplier(v.vendorId(), v.vendorName()), chips, days, canReturn);
@@ -319,7 +337,8 @@ public class StockReadService {
 
     private static StoreAccess accessIn(PharmacyCaller caller, Store store) {
         if (caller.isOwner()) {
-            return StoreRules.access(caller.teamRole(), StoreRole.APPROVER, store.consumptionAllowed());
+            return StoreRules.access(caller.teamRole(), StoreRole.APPROVER, store.consumptionAllowed(), store.saleAllowed(),
+                    store.type().isCentral());
         }
         return caller.mappingFor(store.id()).map(PharmacyCaller.Mapping::access).orElse(StoreAccess.NONE);
     }

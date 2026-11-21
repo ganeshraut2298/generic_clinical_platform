@@ -18,6 +18,8 @@ export interface ProblemDetail {
   /** opd.yaml 0.6.0: `emr-not-ready` carries the blockers; `ipd-order-not-placed` carries the rows. */
   blockers?: unknown[];
   rows?: unknown[];
+  /** pharmacy-sales.yaml 0.3.6: `sale-changed` carries the cart priced now (a SaleQuote). */
+  quote?: unknown;
 }
 
 /** Error thrown by every HttpClient call that fails. Carries the problem detail. */

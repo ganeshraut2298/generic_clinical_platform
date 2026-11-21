@@ -153,7 +153,7 @@ describe('EmrRecordStore (SAH-47)', () => {
       req.flush(record({ revision: 4 }));
     });
 
-    it('makes one request while a save is running', () => {
+    it('makes one request at a time: a second Save draft waits for the first, then sends with the new revision', () => {
       boot();
       store.setValue('complaints', 'complaint', FEVER);
       store.save().subscribe();
@@ -161,6 +161,9 @@ describe('EmrRecordStore (SAH-47)', () => {
       const reqs = http.match(`${EMR}/r1/draft`);
       expect(reqs).toHaveLength(1);
       reqs[0].flush(record({ revision: 4 }));
+      const second = http.expectOne(`${EMR}/r1/draft`);
+      expect(second.request.body.revision).toBe(4);
+      second.flush(record({ revision: 5 }));
     });
 
     it('keeps what was typed while the save runs as unsaved', () => {

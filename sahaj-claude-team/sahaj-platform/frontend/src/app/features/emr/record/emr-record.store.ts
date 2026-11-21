@@ -1,5 +1,5 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
-import { Observable, catchError, map, of, switchMap } from 'rxjs';
+import { Observable, catchError, defer, finalize, map, of, share, switchMap } from 'rxjs';
 import { Visit } from '../../queue/queue.model';
 import { ApiError } from '../../../core/http/problem-detail';
 import { AdviceTextService } from '../components/advice-text.service';
@@ -34,7 +34,7 @@ import { EmrScreenMode, EmrSpecialtyProfile, EmrSpecialtyReference, EmrStillNeed
 import { EmrPrescriptionRow } from '../emr-phase3.model';
 import { emptyListValue, hasText, itemsOf, newListItem, withItems } from '../components/emr-list.logic';
 import { hasMedicine, withRows } from '../components/prescription.logic';
-import { RECORD_CHANGED_TEXT, detailOr, isOffline, problemSlug } from '../emr-errors';
+import { IPD_READ_ONLY_TEXT, NO_ANSWER_TEXT, RECORD_CHANGED_TEXT, detailOr, isNoAnswer, isOffline, problemSlug } from '../emr-errors';
 import { SaveState } from './emr-save-status';
 import {
   EmrAdmissionAdviceInput,
@@ -66,6 +66,19 @@ const SAVE_ERROR = 'We could not save. Your entries are still on screen.';
 const FIX_ERROR = 'Fix the fields marked in red, then save again.';
 export const ALREADY_BILLED_TEXT = 'Already billed. Ask billing to adjust.';
 const SIGNED_TEXT = 'This visit is already signed. It is now read-only.';
+const HELD_TEXT = 'Another doctor is editing this visit.';
+const READ_ONLY_TEXT = 'This visit is read-only. Nothing can be saved.';
+
+/**
+ * Why a save did not go through: the words to show, the first field marked in red (with its section) when
+ * that is the reason, and whether Reload is the way on (the record was changed elsewhere).
+ */
+export interface SaveStop {
+  readonly message: string;
+  readonly sectionKey: string | null;
+  readonly fieldKey: string | null;
+  readonly reload: boolean;
+}
 
 /**
  * State of one open EMR record (SAH-47). The doctor's typed values live here and nowhere else:
@@ -110,6 +123,13 @@ export class EmrRecordStore implements EmrComponentContext {
   readonly saveError = signal<string | null>(null);
   /** The footer status text beside Save draft (SAH-51-3): Saving, Saved, Offline, Not saved. */
   readonly saveState = signal<SaveState>({ kind: 'idle' });
+  /**
+   * Why the last save stopped, or null after a save that went through. Every stop says why in plain
+   * words; the page shows it as a message and opens the first field marked in red (BUG-emr-finish-no-call).
+   */
+  readonly lastStop = signal<SaveStop | null>(null);
+  /** The save in flight, shared so a second caller waits for it instead of being dropped. */
+  private running: Observable<boolean> | null = null;
   /**
    * Set when the server says another doctor now holds the record (409 emr-record-held) or it was signed
    * elsewhere (409 emr-record-signed) while this screen was open: the screen turns read-only (SAH-51-4).
@@ -651,13 +671,70 @@ export class EmrRecordStore implements EmrComponentContext {
 
   /**
    * Save draft: sends the position and only the sections changed since the last save, with all their
-   * values; no completeness check. Emits true when saved (or nothing to save), false when it failed;
-   * the entries stay on screen either way.
+   * values; no completeness check. Emits true when saved (or nothing to save), false when it did not go
+   * through, with the reason in lastStop; the entries stay on screen either way. The save runs when
+   * subscribed; while another save is running it waits for that one instead of being dropped.
    */
   save(kind: 'MANUAL' | 'AUTO' = 'MANUAL'): Observable<boolean> {
+    return defer(() => {
+      const running = this.running;
+      if (!running) {
+        return this.saveNow(kind);
+      }
+      // Still saving: wait for that save, then save what is new. Save draft always sends its own save (its audit entry).
+      return running.pipe(switchMap((ok) => (ok && (kind === 'MANUAL' || this.dirty()) ? this.save(kind) : of(ok))));
+    });
+  }
+
+  /** The words for a record that cannot be saved because it is read-only. */
+  readOnlyMessage(): string {
+    const lost = this.lostEditing();
+    if (lost?.reason === 'HELD') {
+      return HELD_TEXT;
+    }
+    if (lost?.reason === 'SIGNED' || this.record()?.readOnlyReason === 'SIGNED') {
+      return SIGNED_TEXT;
+    }
+    if (this.record()?.readOnlyReason === 'IPD_READ_ONLY') {
+      return IPD_READ_ONLY_TEXT;
+    }
+    if (this.record()?.readOnlyReason === 'HELD_BY_OTHER') {
+      return HELD_TEXT;
+    }
+    return READ_ONLY_TEXT;
+  }
+
+  /** The first field with a problem, in the order the sections and fields are drawn; null when none. */
+  firstProblem(among?: readonly string[]): { sectionKey: string; fieldKey: string | null } | null {
+    const problems = this.problems();
+    const shown = this.visibleLayout();
+    const order = [...shown, ...this.layout().filter((s) => !shown.includes(s))];
+    for (const section of order) {
+      const own = problems[section.key];
+      if (!own || (among && !among.includes(section.key))) {
+        continue;
+      }
+      const field = section.fields.find((f) => f.key in own)?.key ?? Object.keys(own)[0] ?? null;
+      return { sectionKey: section.key, fieldKey: field };
+    }
+    return null;
+  }
+
+  private stop(message: string, extra: Partial<SaveStop> = {}): Observable<boolean> {
+    this.lastStop.set({ message, sectionKey: null, fieldKey: null, reload: false, ...extra });
+    return of(false);
+  }
+
+  private saveNow(kind: 'MANUAL' | 'AUTO'): Observable<boolean> {
     const record = this.record();
-    if (!record || this.readOnly() || this.saving() || this.conflict()) {
-      return of(false);
+    if (!record) {
+      return this.stop(SAVE_ERROR);
+    }
+    if (this.readOnly()) {
+      return this.stop(this.readOnlyMessage());
+    }
+    if (this.conflict()) {
+      return this.stop(RECORD_CHANGED_TEXT, { reload: true });
     }
     const dirtyKeys = [...this.dirtySet()];
     const invalid = dirtyKeys.filter((key) => Object.keys(this.problems()[key] ?? {}).length > 0);
@@ -666,7 +743,7 @@ export class EmrRecordStore implements EmrComponentContext {
       if (kind === 'AUTO') {
         this.saveState.set({ kind: 'failed', reason: 'fix the fields marked in red' });
       }
-      return of(false);
+      return this.stop(FIX_ERROR, this.firstProblem(invalid) ?? {});
     }
     const sent: Record<string, ReturnType<typeof compact>> = {};
     const sections: EmrRecordSectionInput[] = dirtyKeys.map((key) => {
@@ -688,10 +765,15 @@ export class EmrRecordStore implements EmrComponentContext {
     }
     this.saving.set(true);
     this.saveError.set(null);
+    this.lastStop.set(null);
     this.saveState.set({ kind: 'saving' });
-    return this.api.saveRecordDraft(record.id, body).pipe(
+    const done = (): void => {
+      this.saving.set(false);
+      this.running = null;
+    };
+    const request: Observable<boolean> = this.api.saveRecordDraft(record.id, body).pipe(
       map((saved) => {
-        this.saving.set(false);
+        done();
         this.saveState.set({ kind: 'saved', at: new Date().toISOString() });
         this.record.set(saved);
         if (screenSent) {
@@ -721,11 +803,20 @@ export class EmrRecordStore implements EmrComponentContext {
         return true;
       }),
       catchError((error: unknown) => {
-        this.saving.set(false);
+        done();
         this.saveFailed(error, dirtyKeys);
         return of(false);
       }),
+      // Left before an answer (the screen closed): nothing stays "Saving".
+      finalize(() => {
+        if (this.running === request) {
+          done();
+        }
+      }),
+      share(),
     );
+    this.running = request;
+    return request;
   }
 
   // ---- autosave, edit hold, signed (SAH-51-3, SAH-51-4) ----
@@ -905,23 +996,35 @@ export class EmrRecordStore implements EmrComponentContext {
       this.conflict.set(true);
       this.saveError.set(RECORD_CHANGED_TEXT);
       this.saveState.set({ kind: 'failed', reason: 'this EMR was changed elsewhere' });
+      this.stop(RECORD_CHANGED_TEXT, { reload: true });
     } else if (slug === 'emr-record-held') {
       this.noteLost(error);
+      this.stop(HELD_TEXT);
     } else if (slug === 'emr-record-signed') {
       this.lostEditing.set({ reason: 'SIGNED', holderName: null });
       this.saveError.set(SIGNED_TEXT);
       this.saveState.set({ kind: 'failed', reason: 'this visit is signed' });
+      this.stop(SIGNED_TEXT);
     } else if (error instanceof ApiError && error.status === 400 && error.fieldErrors.length > 0) {
       this.saveError.set(FIX_ERROR);
       this.serverErrors.set(this.mapFieldErrors(error, sentKeys));
       this.saveState.set({ kind: 'failed', reason: 'fix the fields marked in red' });
+      this.stop(FIX_ERROR, this.firstProblem() ?? {});
+    } else if (isNoAnswer(error)) {
+      // No answer in time (the server may still be busy): the entries stay on screen and the next save sends them again.
+      this.saveError.set(NO_ANSWER_TEXT);
+      this.saveState.set({ kind: 'failed', reason: 'we could not reach the server' });
+      this.stop(NO_ANSWER_TEXT);
     } else if (isOffline(error)) {
       this.saveError.set(SAVE_ERROR);
       this.saveState.set({ kind: 'offline' });
+      this.stop(SAVE_ERROR);
     } else {
+      // Includes 503 database-busy (DEC-054): the server's own words, else the plain fallback.
       const reason = detailOr(error, SAVE_ERROR);
       this.saveError.set(reason);
       this.saveState.set({ kind: 'failed', reason: reason.replace(/.$/, '') });
+      this.stop(reason);
     }
   }
 

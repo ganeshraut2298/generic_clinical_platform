@@ -19,7 +19,6 @@ import {
   percentRange,
   policyLine,
   sourceChipText,
-  startingCreditPercent,
   trimPercent,
   wholeQty,
 } from './purchase.util';
@@ -107,12 +106,19 @@ interface PickRow {
         <mat-label>Vendor</mat-label>
         <mat-select data-testid="f-vr-vendor" [value]="vendorId()" (selectionChange)="chooseVendor($event.value)">
           @for (vendor of vendors(); track vendor.id) {
-            <mat-option [value]="vendor.id">{{ vendor.name }}</mat-option>
+            <mat-option [value]="vendor.id">{{ vendor.name }}{{ vendor.blocked ? ' · Vendor licence expired' : '' }}</mat-option>
           } @empty {
             <mat-option disabled>No active vendor supplies the Central Store</mat-option>
           }
         </mat-select>
       </mat-form-field>
+
+      @if (chosenBlocked()) {
+        <div class="notice warn" role="status" data-testid="vr-blocked-warning">
+          <app-icon name="alert" [size]="16" />
+          <span>Vendor licence expired</span>
+        </div>
+      }
 
       @if (loadError(); as text) {
         <div class="notice err" role="alert" data-testid="vr-load-error">
@@ -254,6 +260,7 @@ export class VendorReturnDialog implements OnInit {
   protected readonly money = rupees;
   protected readonly source = sourceChipText;
 
+  protected readonly chosenBlocked = computed(() => this.vendors().find((v) => v.id === this.vendorId())?.blocked === true);
   protected readonly selected = computed(() => this.rows().filter((r) => r.selected));
   protected readonly creditTotal = computed(() =>
     this.selected().reduce((sum, r) => sum + (this.creditOf(r) ?? 0), 0),
@@ -264,10 +271,10 @@ export class VendorReturnDialog implements OnInit {
   });
 
   ngOnInit(): void {
-    this.api.vendors({ status: 'ACTIVE', suppliesStoreId: this.data.storeId, size: 100 }).subscribe({
+    this.api.vendors({ status: 'ALL', suppliesStoreId: this.data.storeId, size: 100 }).subscribe({
       next: (page) => {
         this.vendors.set(
-          page.items.filter((v) => !v.blocked),
+          page.items.filter((v) => v.status !== 'INACTIVE'),
         );
         const preset = this.data.vendorId;
         if (preset && this.vendors().some((v) => v.id === preset)) {
@@ -296,7 +303,7 @@ export class VendorReturnDialog implements OnInit {
         this.levels = { ...this.levels, standard: this.levels.standard ?? answer.policy.creditPercent };
         this.rows.set(
           answer.items.map((item) => {
-            const start = trimPercent(startingCreditPercent(item, this.levels));
+            const start = item.defaultCreditPercent === null ? '' : trimPercent(item.defaultCreditPercent);
             return {
               item,
               selected: this.data.batchId != null && item.batch?.batchId === this.data.batchId,

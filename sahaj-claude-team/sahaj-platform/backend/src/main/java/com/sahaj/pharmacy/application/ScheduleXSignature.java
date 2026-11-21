@@ -47,7 +47,10 @@ public class ScheduleXSignature {
 
     /** Checks the colleague's PIN. Returns the signer's membership id for a right PIN; otherwise throws the platform's problem. */
     public UUID verify(UUID tenantId, UUID callerUserId, UUID signerMembershipId, String pin) {
-        if (signerMembershipId == null || pin == null || !PIN_FORMAT.matcher(pin).matches()) {
+        if (signerMembershipId == null) {
+            throw new InvalidFieldsException(List.of(new FieldMessage("secondSigner", NEEDED)));
+        }
+        if (pin == null || !PIN_FORMAT.matcher(pin).matches()) {
             throw new InvalidFieldsException(List.of(new FieldMessage("secondSigner.pin", PIN_FORMAT_MESSAGE)));
         }
         ColleaguePinCheck check = pins.checkColleague(tenantId, callerUserId, signerMembershipId, "PHARMACIST", pin);

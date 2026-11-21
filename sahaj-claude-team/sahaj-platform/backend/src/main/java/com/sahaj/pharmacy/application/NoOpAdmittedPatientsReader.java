@@ -14,6 +14,11 @@ import org.springframework.stereotype.Component;
 public class NoOpAdmittedPatientsReader implements AdmittedPatientsReader {
 
     @Override
+    public List<Ward> wards(UUID tenantId) {
+        throw new IntegrationOffException();
+    }
+
+    @Override
     public List<Admitted> admittedTo(UUID tenantId, UUID wardId) {
         throw new IntegrationOffException();
     }

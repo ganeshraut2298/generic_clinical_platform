@@ -54,10 +54,19 @@ class PharmacyStoreAccessCoverageTest {
      * handler, and are not required. The operations of SAH-78 name no SAH-79 sub-story and are always required.
      */
     private static final Set<String> BUILT_SUB_STORIES = Set.of("SAH-79-1", "SAH-79-2", "SAH-79-3", "SAH-79-4", "SAH-79-5", "SAH-79-6", "SAH-79-7", "SAH-79-8",
-            "SAH-79-9", "SAH-79-10", "SAH-79-11", "SAH-79-12", "SAH-79-13");
+            "SAH-79-9", "SAH-79-10", "SAH-79-11", "SAH-79-12", "SAH-79-13", "SAH-79-14", "SAH-79-15", "SAH-79-16", "SAH-79-17", "SAH-79-18", "SAH-79-19",
+            "SAH-80-1", "SAH-80-2", "SAH-80-3", "SAH-80-4", "SAH-80-5", "SAH-80-6", "SAH-80-7", "SAH-80-8", "SAH-80-9",
+            "SAH-80-10", "SAH-80-11", "SAH-80-12", "SAH-80-13", "SAH-80-14", "SAH-80-15", "SAH-80-16", "SAH-80-17", "SAH-80-18", "SAH-80-19", "SAH-80-20", "SAH-80-21");
+
+    /**
+     * Contract operations of a built sub-story that are not built yet (method and normalised path). SAH-80-2 names the link of a
+     * bill to its patient, which needs the patient port of a later run; it is listed here until it has a handler.
+     */
+    private static final Set<String> UNBUILT_OPERATIONS = Set.of();
 
     private static final Pattern SUB_STORY_ID = Pattern.compile("SAH-\\d+(?:-\\d+)?");
     private static final Pattern SAH_79 = Pattern.compile("SAH-79(?:-\\d+)?");
+    private static final Pattern SAH_80 = Pattern.compile("SAH-80(?:-\\d+)?");
 
     /** One discovered handler. */
     private record Handler(String method, String path, Method java, StoreAccess access) {
@@ -100,7 +109,22 @@ class PharmacyStoreAccessCoverageTest {
         // BUILT_SUB_STORIES) has a handler with the same kind
         Map<String, String> built = builtContractKinds();
         assertThat(built).as("built operations with x-store-access").isNotEmpty();
-        assertThat(code.keySet()).as("built contract operations with x-store-access").containsAll(built.keySet());
+        Set<String> expected = new TreeSet<>(built.keySet());
+        expected.removeAll(UNBUILT_OPERATIONS);
+        assertThat(code.keySet()).as("built contract operations with x-store-access").containsAll(expected);
+    }
+
+    @Test
+    void theUnbuiltListNamesOnlyBuiltSubStoryOperationsThatHaveNoHandlerYet() throws IOException {
+        Map<String, String> built = builtContractKinds();
+        Set<String> withHandler = new TreeSet<>();
+        for (Handler h : handlers()) {
+            withHandler.add(h.key());
+        }
+        for (String key : UNBUILT_OPERATIONS) {
+            assertThat(built).as("the contract names " + key + " in a built sub-story").containsKey(key);
+            assertThat(withHandler).as(key + " has a handler, so it leaves the unbuilt list").doesNotContain(key);
+        }
     }
 
     @Test
@@ -113,13 +137,18 @@ class PharmacyStoreAccessCoverageTest {
         assertThat(isBuilt("SAH-79-9")).isTrue();
         assertThat(isBuilt("SAH-79-9 (RAISED); SAH-79-11 (TO_DISPATCH)")).isTrue();
         assertThat(isBuilt("SAH-79-11")).isTrue();
-        assertThat(isBuilt("SAH-79-12 (indents); SAH-79-15 (transfers)")).isFalse();
-        assertThat(isBuilt("SAH-79-13, SAH-79-14")).isFalse();
+        assertThat(isBuilt("SAH-79-12 (indents); SAH-79-15 (transfers)")).isTrue();
+        assertThat(isBuilt("SAH-79-13, SAH-79-14")).isTrue();
+        assertThat(isBuilt("SAH-79-13, SAH-79-15")).isTrue();
         assertThat(isBuilt("SAH-79 common (C-5; OQ-79-15)")).isFalse();
-        assertThat(isBuilt("SAH-79-16 (SAH-78-3 touch-up, requirement request 5)")).isFalse();
+        assertThat(isBuilt("SAH-79-16 (SAH-78-3 touch-up, requirement request 5)")).isTrue();
+        assertThat(isBuilt("SAH-79-17")).isTrue();
+        assertThat(isBuilt("SAH-79-18")).isTrue();
         assertThat(isBuilt("SAH-79-2 (engine); SAH-79-10 indentLines; used by 79-5")).isTrue();
         assertThat(isBuilt("SAH-79-2 (engine); SAH-79-12")).isTrue();
-        assertThat(isBuilt("SAH-79-2 (engine); SAH-79-14")).isFalse();
+        assertThat(isBuilt("SAH-79-2 (engine); SAH-79-14")).isTrue();
+        assertThat(isBuilt("SAH-79-2 (engine); SAH-79-15")).isTrue();
+        assertThat(isBuilt("SAH-79-16")).isTrue();
     }
 
     @Test
@@ -245,15 +274,19 @@ class PharmacyStoreAccessCoverageTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> paths() throws IOException {
-        Path file = Path.of("..", "docs", "api", "pharmacy.yaml");
-        if (!Files.exists(file)) {
-            file = Path.of("docs", "api", "pharmacy.yaml");
+        Map<String, Object> all = new LinkedHashMap<>();
+        for (String name : new String[] {"pharmacy.yaml", "pharmacy-sales.yaml"}) {
+            Path file = Path.of("..", "docs", "api", name);
+            if (!Files.exists(file)) {
+                file = Path.of("docs", "api", name);
+            }
+            assertThat(file).as("docs/api/" + name).exists();
+            try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                Map<String, Object> root = new Yaml().load(reader);
+                all.putAll((Map<String, Object>) root.get("paths"));
+            }
         }
-        assertThat(file).as("docs/api/pharmacy.yaml").exists();
-        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            Map<String, Object> root = new Yaml().load(reader);
-            return (Map<String, Object>) root.get("paths");
-        }
+        return all;
     }
 
     /** Every contract operation (method and normalised path). */
@@ -330,7 +363,7 @@ class PharmacyStoreAccessCoverageTest {
         Matcher matcher = SUB_STORY_ID.matcher(subStory.toString());
         while (matcher.find()) {
             String id = matcher.group();
-            if (SAH_79.matcher(id).matches() && !BUILT_SUB_STORIES.contains(id)) {
+            if ((SAH_79.matcher(id).matches() || SAH_80.matcher(id).matches()) && !BUILT_SUB_STORIES.contains(id)) {
                 return false;
             }
         }

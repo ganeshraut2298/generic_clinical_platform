@@ -24,7 +24,7 @@ class PharmacyReasonsTemplatesIT extends Sah78CSupport {
     // ---------------- reason lists ----------------
 
     @Test
-    void theElevenListsComeInOrderWithTheSeededReasonsAndTheirLabels() throws Exception {
+    void theTwentyListsComeInOrderWithTheSeededReasonsAndTheirLabels() throws Exception {
         Masters w = mastersClinic();
         JsonNode lists = ok(HttpMethod.GET, REASON_LISTS, w.clinic().owner(), null, 200);
         List<String> keys = new ArrayList<>();
@@ -42,6 +42,16 @@ class PharmacyReasonsTemplatesIT extends Sah78CSupport {
         expected.put("consumption-purpose", List.of("Ward general use", "Procedure (non-billable)", "Cleaning / infection control"));
         expected.put("dispute", List.of("Other"));
         expected.put("vendor-return", List.of("Other"));
+        // SAH-80 (migration 1800): the nine lists of the sale
+        expected.put("substitution", List.of("Out of stock", "Patient preference", "Cheaper equivalent", "Prescriber advice", "Other"));
+        expected.put("allergy-override", List.of("Prescriber confirmed", "Patient has taken it safely before", "Allergy entry is wrong", "Other"));
+        expected.put("h1-override", List.of("Prescriber confirmed", "Patient has taken it safely before", "Allergy entry is wrong", "Other"));
+        expected.put("return-condition", List.of("Sealed", "Strip cut or opened", "Damaged"));
+        expected.put("cancel-bill", List.of("Wrong item", "Wrong quantity", "Customer changed mind", "Other"));
+        expected.put("ward-return", List.of("Medicine stopped", "Discharge", "Not used"));
+        expected.put("rx-closed", List.of("Patient declined", "Out of stock", "Doctor changed the order", "Other"));
+        expected.put("clearance", List.of("Returns will come later", "Nothing to return", "Other"));
+        expected.put("day-close-difference", List.of("Short change given", "Entry error", "Refund not recorded", "Other"));
         int total = 0;
         for (var e : expected.entrySet()) {
             List<String> labels = new ArrayList<>();
@@ -53,7 +63,7 @@ class PharmacyReasonsTemplatesIT extends Sah78CSupport {
             });
             total += labels.size();
         }
-        assertThat(total).as("36 seeded reasons").isEqualTo(36);
+        assertThat(total).as("70 seeded reasons (36 before SAH-80)").isEqualTo(70);
         assertThat(reasonList(lists, "receipt-reject").get("label").asText()).isEqualTo("Receipt rejection");
         assertThat(reasonList(lists, "cs-change").get("label").asText()).isEqualTo("Central Store change");
         assertThat(reasonList(lists, "approval-reject").get("label").asText()).isEqualTo("Approval rejection");
@@ -79,7 +89,7 @@ class PharmacyReasonsTemplatesIT extends Sah78CSupport {
         assertThat(auditRowsOf(w.clinic(), "PHARMACY_REASON_ADDED")).hasSize(1);
         Masters other = mastersClinic();
         assertThat(reasonList(ok(HttpMethod.GET, REASON_LISTS, other.clinic().owner(), null, 200), "damage").get("reasons")).hasSize(3);
-        // every one of the eleven lists takes a reason
+        // every one of the twenty lists takes a reason
         for (String key : LIST_KEYS) {
             JsonNode after = ok(HttpMethod.POST, REASON_LISTS + "/" + key + "/reasons", w.clinic().owner(), "{\"label\":\"Own reason in " + key + "\"}", 201);
             assertThat(reasonList(after, key).get("reasons").get(reasonList(after, key).get("reasons").size() - 1).get("seeded").asBoolean()).isFalse();
@@ -185,7 +195,7 @@ class PharmacyReasonsTemplatesIT extends Sah78CSupport {
         assertThat(pharmacyRows(w.clinic(), "reason")).isZero();
         assertThat(pharmacyRows(w.clinic(), "reason_default_state")).isZero();
         for (String reader : new String[] {"PHARMACIST", "CENTRAL_STORE_USER"}) {
-            assertThat(ok(HttpMethod.GET, REASON_LISTS, callers.get(reader), null, 200).get("lists")).hasSize(11);
+            assertThat(ok(HttpMethod.GET, REASON_LISTS, callers.get(reader), null, 200).get("lists")).hasSize(20);
         }
         for (String other : new String[] {"DOCTOR", "NURSE", "FRONT_DESK", "BILLING"}) {
             assertType(problem(call(HttpMethod.GET, REASON_LISTS, callers.get(other), null), 403), "forbidden");

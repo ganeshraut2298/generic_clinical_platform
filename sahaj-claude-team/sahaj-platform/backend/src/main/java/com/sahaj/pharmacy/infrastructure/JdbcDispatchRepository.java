@@ -52,6 +52,19 @@ public class JdbcDispatchRepository implements DispatchRepository {
               from pharmacy.dispatch_receipt_line r where r.tenant_id = :tenantId and r.dispatch_id = :dispatchId
              order by r.received_at, r.id
             """;
+    private static final String BY_TRANSFER = "select " + COLUMNS
+            + " from pharmacy.dispatch d where d.tenant_id = :tenantId and d.transfer_id = :transferId and d.source_type = 'TRANSFER'";
+    private static final String INSERT_TRANSFER = """
+            insert into pharmacy.dispatch (id, tenant_id, unit_id, source_type, transfer_id, reference, from_store_id, to_store_id,
+                   dispatched_by, second_signer_membership_id, created_by)
+            values (:id, :tenantId, :unitId, 'TRANSFER', :transferId, :reference, :fromStoreId, :toStoreId, :by,
+                   cast(:signer as uuid), :by)
+            """;
+    private static final String INSERT_TRANSFER_LINE = """
+            insert into pharmacy.dispatch_line (id, tenant_id, unit_id, dispatch_id, transfer_line_id, product_id, batch_id,
+                   dispatched_qty, replaced_by_cs, back_ordered_qty, schedule_x, created_by)
+            values (:id, :tenantId, :unitId, :dispatchId, :transferLineId, :productId, :batchId, :qty, false, 0, :scheduleX, :by)
+            """;
     private static final String NEXT_SEQ = """
             select coalesce(max(d.dispatch_seq), 0) + 1 from pharmacy.dispatch d
              where d.tenant_id = :tenantId and d.indent_id = :indentId
@@ -90,7 +103,7 @@ public class JdbcDispatchRepository implements DispatchRepository {
     private static final String CANDIDATES = """
             with wanted as (
               select lower(regexp_replace(trim(coalesce(g.salt, p.salt)), '\\s+', ' ', 'g')) as salt,
-                     coalesce(g.schedule, p.schedule) as schedule
+                     coalesce(p.schedule, g.schedule) as schedule
                 from pharmacy.product p left join pharmacy.catalogue_product g on g.id = p.catalogue_product_id
                where p.tenant_id = :tenantId and p.id = :productId)
             select p.id
@@ -99,7 +112,7 @@ public class JdbcDispatchRepository implements DispatchRepository {
              where p.tenant_id = :tenantId and p.id <> :productId and p.status = 'ACTIVE' and (g.id is null or g.active)
                and w.salt <> ''
                and lower(regexp_replace(trim(coalesce(g.salt, p.salt)), '\\s+', ' ', 'g')) = w.salt
-               and coalesce(g.schedule, p.schedule) is not distinct from w.schedule
+               and coalesce(p.schedule, g.schedule) is not distinct from w.schedule
              order by coalesce(g.name, p.name), p.id
              limit :limit
             """;
@@ -173,6 +186,28 @@ public class JdbcDispatchRepository implements DispatchRepository {
                 .param("indentId", d.indentId()).param("seq", d.seq()).param("reference", d.reference())
                 .param("fromStoreId", d.fromStoreId()).param("toStoreId", d.toStoreId()).param("by", d.dispatchedBy())
                 .param("signer", d.secondSignerMembershipId()).update();
+    }
+
+    @Override
+    public Optional<Row> byTransfer(UUID tenantId, UUID transferId) {
+        return jdbc.sql(BY_TRANSFER).param("tenantId", tenantId).param("transferId", transferId)
+                .query(JdbcDispatchRepository::map).optional();
+    }
+
+    @Override
+    public void insertTransfer(UUID tenantId, NewTransferDispatch d) {
+        jdbc.sql(INSERT_TRANSFER).param("id", d.id()).param("tenantId", tenantId).param("unitId", d.unitId())
+                .param("transferId", d.transferId()).param("reference", d.reference()).param("fromStoreId", d.fromStoreId())
+                .param("toStoreId", d.toStoreId()).param("by", d.dispatchedBy()).param("signer", d.secondSignerMembershipId())
+                .update();
+    }
+
+    @Override
+    public void insertTransferLine(UUID tenantId, NewTransferLine l) {
+        jdbc.sql(INSERT_TRANSFER_LINE).param("id", l.id()).param("tenantId", tenantId).param("unitId", l.unitId())
+                .param("dispatchId", l.dispatchId()).param("transferLineId", l.transferLineId()).param("productId", l.productId())
+                .param("batchId", l.batchId()).param("qty", l.dispatchedQty()).param("scheduleX", l.scheduleX())
+                .param("by", l.createdBy()).update();
     }
 
     @Override

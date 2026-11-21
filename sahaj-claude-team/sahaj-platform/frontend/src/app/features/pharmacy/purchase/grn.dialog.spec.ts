@@ -207,6 +207,8 @@ describe('GrnDialog', () => {
         outcome: 'SENT_FOR_APPROVAL',
         approval: {
           requestId: 'req-2',
+          requestVersion: 1,
+          levelNo: 1,
           status: 'PENDING',
           currentLevel: 1,
           ruleText: 'Rate up more than 5%',

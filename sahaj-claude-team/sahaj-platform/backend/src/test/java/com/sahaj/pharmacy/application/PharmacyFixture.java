@@ -206,6 +206,8 @@ final class PharmacyFixture {
     /** Which stores have an open (DRAFT or WAITING_APPROVAL) import; the product fixture points it at its import rows. */
     java.util.function.Predicate<UUID> openImportOfStore = id -> false;
 
+    final java.util.Map<UUID, UUID> linkedWardRows = new java.util.HashMap<>();
+
     final StoreRepository storeRepository = new StoreRepository() {
         @Override
         public boolean hasOpenImport(UUID tenantId, UUID storeId) {
@@ -285,6 +287,28 @@ final class PharmacyFixture {
             Store s = find(tenantId, id).orElseThrow();
             storeRows.put(id, new Held<>(tenantId, new Store(id, s.unitId(), s.name(), s.code(), s.type(),
                     s.issuesFromStoreId(), s.saleAllowed(), s.consumptionAllowed(), true, s.active(), s.version() + 1)));
+        }
+
+        @Override
+        public java.util.Map<UUID, UUID> linkedWards(UUID tenantId) {
+            return new java.util.HashMap<>(linkedWardRows);
+        }
+
+        @Override
+        public boolean setLinkedWard(UUID tenantId, UUID id, long version, UUID wardId, UUID actor) {
+            Store s = find(tenantId, id).orElse(null);
+            if (s == null || s.version() != version) {
+                return false;
+            }
+            writes.add("store.linkedWard");
+            if (wardId == null) {
+                linkedWardRows.remove(id);
+            } else {
+                linkedWardRows.put(id, wardId);
+            }
+            storeRows.put(id, new Held<>(tenantId, new Store(id, s.unitId(), s.name(), s.code(), s.type(),
+                    s.issuesFromStoreId(), s.saleAllowed(), s.consumptionAllowed(), s.hasStock(), s.active(), version + 1)));
+            return true;
         }
 
         @Override
@@ -402,7 +426,8 @@ final class PharmacyFixture {
 
     final PharmacyGate gate = new PharmacyGate(entitlements, team, staffRepository, time);
     final UnitService unitService = new UnitService(gate, unitRepository, letterhead, web, entitlements, auditLog, time);
-    final StoreAssembler assembler = new StoreAssembler(storeRepository, staffRepository, team, time);
+    final StoreAssembler assembler = new StoreAssembler(storeRepository, staffRepository, team, time,
+            new NoOpAdmittedPatientsReader());
     final StaffMappingWriter writer = new StaffMappingWriter(staffRepository, auditLog);
     final StoreService storeService = new StoreService(gate, unitService, storeRepository, staffRepository, assembler,
             writer, team, auditLog, time);

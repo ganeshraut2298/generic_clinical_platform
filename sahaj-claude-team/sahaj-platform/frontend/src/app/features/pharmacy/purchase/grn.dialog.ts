@@ -635,7 +635,7 @@ export class GrnDialog implements OnInit {
     () => this.meta().some((m) => m.scheduleX) || (this.grn()?.lines.some((l) => l.scheduleX) ?? false),
   );
   /** Only a person with the Schedule X capability can post such a receipt; others see why. */
-  protected readonly canPost = computed(() => !this.needsSigner() || this.context.canHandleScheduleX());
+  protected readonly canPost = computed(() => !this.needsSigner() || this.context.canReceiveScheduleX());
 
   protected readonly postLabel = computed(() => {
     const g = this.grn();
