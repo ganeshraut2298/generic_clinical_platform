@@ -373,4 +373,89 @@ class SalesReturnServiceTest {
         assertThat(service.summary(SaleWorld.TENANT, request).chip()).isEqualTo("SALES");
         assertThat(service.canRead(w.caller(w.cashier), request)).isTrue();
     }
+
+    // ---- pass 1 minors 5, 7, 8 and the credit-note reconciliation ----
+
+    private static SaleBillRepository.LineRow billLine(UUID id, int qty, int returned, long net, long taxable) {
+        return new SaleBillRepository.LineRow(id, 1, UUID.randomUUID(), UUID.randomUUID(), qty, returned, new BigDecimal("100.00"),
+                new BigDecimal("12"), "30049099", net, 0, net, taxable, net - taxable, null, null, null, null, null, null, null,
+                null, null, null, null, null);
+    }
+
+    private static SalesReturnRepository.LineRow returnLine(UUID billLineId, int qty, String destination, long refund) {
+        return new SalesReturnRepository.LineRow(UUID.randomUUID(), billLineId, UUID.randomUUID(), UUID.randomUUID(), qty,
+                "return-condition.sealed", null, destination, refund, 0, 0, null);
+    }
+
+    @Test
+    void theSharesAreWorkedAgainFromTheCompletedQuantityNotFromTheOpenReturnsOfTheSameBillLine() {
+        UUID bl = UUID.randomUUID();
+        // 3 units sold for 100 paise (33.33 each). An earlier return of the 1st unit is still open, so the plan took 67 - 33 = 34
+        // for the 2nd; that earlier return was REJECTED, nothing was completed, and the right share of the first unit is 33.
+        SalesReturnRepository.LineRow planned = returnLine(bl, 1, "AVAILABLE", 34);
+
+        List<SalesReturnRepository.LineRow> out = SalesReturnService.recomputed(List.of(planned), Map.of(bl,
+                billLine(bl, 3, 0, 100, 90)));
+
+        assertThat(out.get(0).refundPaise()).isEqualTo(33L);
+        assertThat(out.get(0).id()).isEqualTo(planned.id());
+        assertThat(out.get(0).destination()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void aRefusedLineKeepsItsZeroRefundWhenTheSharesAreWorkedAgain() {
+        UUID bl = UUID.randomUUID();
+        SalesReturnRepository.LineRow refused = returnLine(bl, 1, "REFUSED", 0);
+
+        assertThat(SalesReturnService.recomputed(List.of(refused), Map.of(bl, billLine(bl, 3, 0, 100, 90))).get(0).refundPaise())
+                .isZero();
+    }
+
+    @Test
+    void whenTheTotalMovedAParisaGoesToTheLargestNonUdharModeAndTheModesStillAddUp() {
+        Map<String, Long> modes = new java.util.LinkedHashMap<>();
+        modes.put("CASH", 20L);
+        modes.put("UDHAR", 14L);
+
+        Map<String, Long> out = SalesReturnService.reconciled(modes, 33L, null);
+
+        assertThat(out).containsEntry("CASH", 19L).containsEntry("UDHAR", 14L);
+        assertThat(out.values().stream().mapToLong(Long::longValue).sum()).isEqualTo(33L);
+        assertThat(SalesReturnService.reconciled(modes, 34L, null)).isSameAs(modes);
+    }
+
+    @Test
+    void aReconciliationThatCannotBePlacedAnswersChangedAndAZeroModeIsDropped() {
+        Map<String, Long> onlyUdhar = new java.util.LinkedHashMap<>();
+        onlyUdhar.put("UDHAR", 10L);
+        assertThatThrownBy(() -> SalesReturnService.reconciled(onlyUdhar, 11L, null)).isInstanceOfSatisfying(
+                PharmacyProblemException.class, e -> assertThat(e.slug()).isEqualTo("changed"));
+
+        Map<String, Long> two = new java.util.LinkedHashMap<>();
+        two.put("CASH", 1L);
+        two.put("UPI", 1L);
+        assertThat(SalesReturnService.reconciled(two, 1L, null)).containsOnlyKeys("UPI").containsEntry("UPI", 1L);
+    }
+
+    @Test
+    void aSealedLineAcceptedWithNoDecisionStoresADecisionOfNullNotAcceptQuarantine() {
+        start(w.cashier, create(2, SEALED, 56040));
+        UUID id = stored.keySet().iterator().next();
+        UUID lineId = storedLines.get(0).id();
+        doAnswer(inv -> {
+            SalesReturnRepository.LineRow old = storedLines.get(0);
+            storedLines.set(0, new SalesReturnRepository.LineRow(old.id(), old.billLineId(), old.productId(), old.batchId(), old.qty(),
+                    old.conditionKey(), inv.getArgument(2), inv.getArgument(3), inv.getArgument(4), inv.getArgument(5),
+                    inv.getArgument(6), old.secondSigner()));
+            return null;
+        }).when(returns).updateLine(any(), any(), any(), any(), anyLong(), anyLong(), anyLong(), any());
+        SaleInputs.AcceptSalesReturnInput in = new SaleInputs.AcceptSalesReturnInput(UUID.randomUUID(), BigDecimal.ZERO, List.of(),
+                List.of(new SaleInputs.ReturnRefundInput("CASH", BigDecimal.valueOf(56040))), null);
+
+        service.accept(SaleWorld.TENANT, w.f.pharmacist.userId(), shop, id.toString(), SaleWorld.body(in), null);
+
+        verify(returns, org.mockito.Mockito.atLeastOnce()).updateLine(any(), eq(lineId), org.mockito.ArgumentMatchers.isNull(),
+                eq("AVAILABLE"), anyLong(), anyLong(), anyLong(), any());
+        assertThat(SalesReturnService.destination(SalesReturnService.SEALED, null, false)).isEqualTo("AVAILABLE");
+    }
 }

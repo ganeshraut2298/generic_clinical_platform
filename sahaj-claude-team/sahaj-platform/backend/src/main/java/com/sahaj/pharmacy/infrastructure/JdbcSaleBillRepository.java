@@ -130,6 +130,18 @@ public class JdbcSaleBillRepository implements SaleBillRepository {
     }
 
     @Override
+    public java.util.Map<UUID, BillRow> findAll(UUID tenantId, java.util.Collection<UUID> ids) {
+        java.util.Map<UUID, BillRow> out = new java.util.LinkedHashMap<>();
+        if (ids.isEmpty()) {
+            return out;
+        }
+        jdbc.sql("select " + BILL_COLUMNS + " from pharmacy.bill where tenant_id = :tenantId and id in (:ids)")
+                .param("tenantId", tenantId).param("ids", ids).query(JdbcSaleBillRepository::bill).list()
+                .forEach(b -> out.put(b.id(), b));
+        return out;
+    }
+
+    @Override
     public Optional<BillRow> findForUpdate(UUID tenantId, UUID id) {
         return jdbc.sql(FIND_FOR_UPDATE).param("tenantId", tenantId).param("id", id).query(JdbcSaleBillRepository::bill)
                 .optional();
@@ -149,6 +161,12 @@ public class JdbcSaleBillRepository implements SaleBillRepository {
     @Override
     public boolean hasReturns(UUID tenantId, UUID billId) {
         return jdbc.sql(HAS_RETURNS).param("tenantId", tenantId).param("billId", billId).query(Boolean.class).single();
+    }
+
+    @Override
+    public boolean existsWithDiscountRequest(UUID tenantId, UUID discountRequestId) {
+        return jdbc.sql("select exists (select 1 from pharmacy.bill where tenant_id = :tenantId and discount_request_id = :id)")
+                .param("tenantId", tenantId).param("id", discountRequestId).query(Boolean.class).single();
     }
 
     @Override

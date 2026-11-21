@@ -109,6 +109,17 @@ class NumberingServiceTest {
     }
 
     @Test
+    void aPrefixAStoreSeriesAlreadyUsesIsRefusedIgnoringCase() {
+        org.mockito.Mockito.when(m.storeBillSeries.list(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                new StoreBillSeriesRepository.Row(UUID.randomUUID(), UUID.randomUUID(), "MAIN-", true, 5, true, 1L)));
+
+        assertThatThrownBy(() -> save("PURCHASE_ORDER", series(0, "main-", false, 4, false)))
+                .isInstanceOfSatisfying(ConflictException.class,
+                        e -> assertThat(e.problemType()).isEqualTo("prefix-in-use"));
+        assertThat(save("PURCHASE_ORDER", series(0, "PO2-", false, 4, false)).prefix()).isEqualTo("PO2-");
+    }
+
+    @Test
     void theFieldRulesAreReportedTogether() {
         assertThat(errorsOf(() -> save("GRN", series(0, "TOOLONG1", false, 3, false)))).contains(
                 new FieldMessage("prefix", "Use 1 to 6 letters, digits, - or /"),
@@ -229,7 +240,7 @@ class NumberingServiceTest {
 
     private PharmacyMasterViews.DocumentSeries listedAt(java.time.Instant now, String type) {
         NumberingService service = new NumberingService(f.gate, f.unitService, m.seriesRepository, f.auditLog,
-                new PharmacyTime(java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)));
+                new PharmacyTime(java.time.Clock.fixed(now, java.time.ZoneOffset.UTC)), m.storeBillSeries);
         return service.list(TENANT, f.owner.userId()).items().stream().filter(s -> s.docType().equals(type)).findFirst()
                 .orElseThrow();
     }

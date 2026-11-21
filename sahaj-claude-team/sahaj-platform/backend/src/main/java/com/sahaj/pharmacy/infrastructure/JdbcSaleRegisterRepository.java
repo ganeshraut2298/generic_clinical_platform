@@ -49,7 +49,7 @@ public class JdbcSaleRegisterRepository implements SaleRegisterRepository {
                    second_signer_membership_id)
             select tenant_id, unit_id, store_id, 'REVERSAL', id, 'CANCELLED', source_type, source_id, source_no, source_line_id,
                    patient_id, patient_name, patient_age, prescriber_name, prescriber_reg_no, prescription_date, product_id,
-                   batch_id, -qty, first_signer_membership_id, second_signer_membership_id
+                   batch_id, -qty, cast(:first as uuid), cast(:second as uuid)
               from pharmacy.schedule_x_register_row r
              where r.tenant_id = :tenantId and r.source_type = 'BILL' and r.source_id = :billId and r.kind = 'ENTRY'
                and not exists (select 1 from pharmacy.schedule_x_register_row x
@@ -102,8 +102,10 @@ public class JdbcSaleRegisterRepository implements SaleRegisterRepository {
     }
 
     @Override
-    public int reverseScheduleXForCancelledBill(UUID tenantId, UUID billId) {
-        return jdbc.sql(REVERSE_X).param("tenantId", tenantId).param("billId", billId).update();
+    public int reverseScheduleXForCancelledBill(UUID tenantId, UUID billId, UUID firstSignerMembershipId,
+                                                UUID secondSignerMembershipId) {
+        return jdbc.sql(REVERSE_X).param("tenantId", tenantId).param("billId", billId)
+                .param("first", firstSignerMembershipId).param("second", secondSignerMembershipId).update();
     }
 
     @Override

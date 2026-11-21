@@ -34,6 +34,7 @@ class DiscountApprovalsTest {
     private final UUID product = w.product("Testamol", "Paracetamol", "NONE");
     private final UUID requestId = UUID.randomUUID();
     private final UUID approvalId = UUID.randomUUID();
+    private final UUID seller = w.cashier.member().membershipId();
 
     DiscountApprovalsTest() {
         w.shelf(product, "B-OK", FAR, 50, "280.20");
@@ -49,10 +50,17 @@ class DiscountApprovalsTest {
     }
 
     private void stored(String status, String percent, int qtyOfCart, UUID store) {
+        stored(status, percent, qtyOfCart, store, null, w.f.time.now());
+    }
+
+    /** {@code approvedAt} is the time of the one APPROVED decision of the request. */
+    private void stored(String status, String percent, int qtyOfCart, UUID store, UUID heldBillId, Instant approvedAt) {
         SaleCart.Cart original = cart(percent, null, qtyOfCart);
         when(w.discountRequests.find(any(), eq(requestId))).thenReturn(Optional.of(new DiscountRequestRepository.Row(requestId,
-                w.unitId(), store, approvalId, DiscountApprovals.digest(original), new BigDecimal(percent), 2802L, null,
-                w.cashier.member().membershipId(), Instant.now())));
+                w.unitId(), store, approvalId, DiscountApprovals.digest(original), new BigDecimal(percent), 2802L, heldBillId,
+                seller, Instant.now())));
+        when(w.approvalRepository.decisions(any(), eq(approvalId))).thenReturn(List.of(
+                new ApprovalRepository.Decision(1, "APPROVED", UUID.randomUUID(), "OWNER", null, null, approvedAt)));
         when(w.approvalRepository.find(any(), eq(approvalId))).thenReturn(Optional.of(new ApprovalRepository.Request(approvalId,
                 w.unitId(), TransactionType.SALE_DISCOUNT, "SALE_DISCOUNT", requestId, "Discount", store,
                 w.cashier.member().membershipId(), Instant.now(), null, 2802L, false, false, false, new BigDecimal(percent), null,
@@ -61,7 +69,7 @@ class DiscountApprovalsTest {
 
     @Test
     void aCartWithNoRequestHasNoState() {
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", null, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", null, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.NONE);
     }
 
@@ -69,35 +77,146 @@ class DiscountApprovalsTest {
     void anApprovedRequestOfTheSameLinesCoversTheSamePercentAndALowerOneButNotAHigherOne() {
         stored("APPROVED", "5", 2, w.shop.id());
 
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.APPROVED);
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("3", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("3", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.APPROVED);
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("6", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("6", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.VOID);
+    }
+
+    private DiscountApprovals.State state(UUID who, DiscountApprovals.Held held) {
+        return w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2), who, held).state();
+    }
+
+    @Test
+    void anApprovedRequestAlreadyCarriedByABillIsVoid() {
+        stored("APPROVED", "5", 2, w.shop.id());
+        when(w.bills.existsWithDiscountRequest(any(), eq(requestId))).thenReturn(true);
+
+        assertThat(state(seller, null)).isEqualTo(DiscountApprovals.State.VOID);
+    }
+
+    @Test
+    void anApprovedRequestIsVoidForAnotherSeller() {
+        stored("APPROVED", "5", 2, w.shop.id());
+
+        assertThat(state(UUID.randomUUID(), null)).isEqualTo(DiscountApprovals.State.VOID);
+        assertThat(state(null, null)).isEqualTo(DiscountApprovals.State.VOID);
+    }
+
+    @Test
+    void anApprovalOfAnEarlierIstDayIsVoidAndOneAfterMidnightIstIsNot() {
+        Instant now = w.f.time.now();
+        java.time.LocalDate today = w.f.time.today();
+        Instant startOfToday = today.atStartOfDay(PharmacyTime.IST).toInstant();
+        stored("APPROVED", "5", 2, w.shop.id(), null, startOfToday.minusSeconds(1));
+        assertThat(state(seller, null)).isEqualTo(DiscountApprovals.State.VOID);
+
+        stored("APPROVED", "5", 2, w.shop.id(), null, startOfToday);
+        assertThat(state(seller, null)).isEqualTo(DiscountApprovals.State.APPROVED);
+        assertThat(now).isAfterOrEqualTo(startOfToday);
+    }
+
+    @Test
+    void theLatestApprovedDecisionDecidesTheDay() {
+        Instant startOfToday = w.f.time.today().atStartOfDay(PharmacyTime.IST).toInstant();
+        stored("APPROVED", "5", 2, w.shop.id(), null, startOfToday.minusSeconds(60));
+        when(w.approvalRepository.decisions(any(), eq(approvalId))).thenReturn(List.of(
+                new ApprovalRepository.Decision(1, "APPROVED", UUID.randomUUID(), "OWNER", null, null,
+                        startOfToday.minusSeconds(60)),
+                new ApprovalRepository.Decision(2, "APPROVED", UUID.randomUUID(), "OWNER", null, null, startOfToday.plusSeconds(5))));
+
+        assertThat(state(seller, null)).isEqualTo(DiscountApprovals.State.APPROVED);
+    }
+
+    @Test
+    void aRequestRaisedForAHeldBillIsUsedOnlyBySavingThatHeldBill() {
+        UUID heldBill = UUID.randomUUID();
+        stored("APPROVED", "5", 2, w.shop.id(), heldBill, w.f.time.now());
+
+        assertThat(state(seller, new DiscountApprovals.Held(heldBill, requestId))).isEqualTo(DiscountApprovals.State.APPROVED);
+        assertThat(state(seller, new DiscountApprovals.Held(UUID.randomUUID(), requestId)))
+                .isEqualTo(DiscountApprovals.State.VOID);
+        assertThat(state(seller, new DiscountApprovals.Held(null, null))).isEqualTo(DiscountApprovals.State.VOID);
+        assertThat(state(seller, null)).isEqualTo(DiscountApprovals.State.APPROVED); // the quote takes no held bill
+    }
+
+    @Test
+    void aRequestRaisedOnALiveCartAllowsNoHeldBillOrAHeldBillThatCarriesIt() {
+        stored("APPROVED", "5", 2, w.shop.id());
+
+        assertThat(state(seller, new DiscountApprovals.Held(null, null))).isEqualTo(DiscountApprovals.State.APPROVED);
+        assertThat(state(seller, new DiscountApprovals.Held(UUID.randomUUID(), requestId))).isEqualTo(DiscountApprovals.State.APPROVED);
+        assertThat(state(seller, new DiscountApprovals.Held(UUID.randomUUID(), null))).isEqualTo(DiscountApprovals.State.VOID);
+    }
+
+    @Test
+    void theQuoteReadsVoidForAUsedApprovalAndKeepsTheApprovalBlocker() {
+        stored("APPROVED", "5", 2, w.shop.id());
+        when(w.bills.existsWithDiscountRequest(any(), eq(requestId))).thenReturn(true);
+        PharmacyCaller caller = w.caller(w.cashier);
+        Store store = w.f.storeRepository.find(SaleWorld.TENANT, w.shop.id()).orElseThrow();
+
+        SaleViews.SaleQuote quote = w.pricer.price(caller, store, cart("5", requestId, 2), false).quote();
+
+        assertThat(quote.discount().approval()).isEqualTo("VOID");
+        assertThat(quote.blockers()).contains("DISCOUNT_APPROVAL");
+    }
+
+    @Test
+    void aSaveThatLosesTheRaceOnTheUniqueIndexAnswersVoid() {
+        stored("APPROVED", "5", 2, w.shop.id());
+        SaleCart.Cart approved = cart("5", requestId, 2);
+        PharmacyCaller caller = w.caller(w.cashier);
+        Store store = w.f.storeRepository.find(SaleWorld.TENANT, w.shop.id()).orElseThrow();
+        SalePricer.Priced priced = w.pricer.price(caller, store, approved, false);
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DuplicateKeyException("x",
+                new java.sql.SQLException("duplicate key value violates unique constraint \"uq_bill_discount_request\"", "23505")))
+                .when(w.bills).insertBill(any(), any());
+
+        assertThatThrownBy(() -> save(approved, priced, requestId)).isInstanceOfSatisfying(PharmacyProblemException.class,
+                e -> {
+                    assertThat(e.slug()).isEqualTo("discount-approval-void");
+                    assertThat(e.status()).isEqualTo(409);
+                });
+    }
+
+    @Test
+    void aBillNumberCollisionAnswers409() {
+        stored("APPROVED", "5", 2, w.shop.id());
+        SaleCart.Cart plain = cart("5", requestId, 2);
+        PharmacyCaller caller = w.caller(w.cashier);
+        Store store = w.f.storeRepository.find(SaleWorld.TENANT, w.shop.id()).orElseThrow();
+        SalePricer.Priced priced = w.pricer.price(caller, store, plain, false);
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DuplicateKeyException("x",
+                new java.sql.SQLException("duplicate key value violates unique constraint \"uq_bill_no\"", "23505")))
+                .when(w.bills).insertBill(any(), any());
+
+        assertThatThrownBy(() -> save(plain, priced, requestId)).isInstanceOf(com.sahaj.platform.api.ConflictException.class);
     }
 
     @Test
     void aChangedCartAnotherStoreAndAnUnknownRequestAreVoid() {
         stored("APPROVED", "5", 2, w.shop.id());
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 3)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 3), seller).state())
                 .isEqualTo(DiscountApprovals.State.VOID);
-        assertThat(w.approvals.check(SaleWorld.TENANT, UUID.randomUUID(), cart("5", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, UUID.randomUUID(), cart("5", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.VOID);
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", UUID.randomUUID(), 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", UUID.randomUUID(), 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.VOID);
     }
 
     @Test
     void thePendingRejectedAndWithdrawnStatesAreReportedAsTheyAre() {
         stored("PENDING", "5", 2, w.shop.id());
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.PENDING);
         stored("REJECTED", "5", 2, w.shop.id());
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.REJECTED);
         stored("WITHDRAWN", "5", 2, w.shop.id());
-        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2)).state())
+        assertThat(w.approvals.check(SaleWorld.TENANT, w.shop.id(), cart("5", requestId, 2), seller).state())
                 .isEqualTo(DiscountApprovals.State.WITHDRAWN);
     }
 

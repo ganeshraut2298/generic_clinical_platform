@@ -219,6 +219,39 @@ class DamageReportServiceTest {
     }
 
     @Test
+    void unitsHeldInQuarantineByReportsStillWaitingForApprovalCannotBeReportedAgain() {
+        when(engine.plan(eq(TENANT), any())).thenReturn(null);
+        when(reports.waitingQuantity(eq(TENANT), eq(WARD), any())).thenReturn(3);
+
+        assertThatThrownBy(() -> create(input("QUARANTINE", "3", "WRITE_OFF"), null))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("quantity:Enter a whole number from 1 to 2"));
+
+        create(input("QUARANTINE", "2", "WRITE_OFF"), null);
+        assertThat(posted()).extracting(StockPosting.Line::txnType).containsExactly("WRITE_OFF");
+    }
+
+    @Test
+    void aBatchThatHasNeverBeenInThisStoreIsRefusedOnTheBatchField() {
+        when(engine.plan(eq(TENANT), any())).thenReturn(null);
+        when(stock.lockBalances(eq(TENANT), eq(WARD), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> create(input("AVAILABLE", "1", "WRITE_OFF"), null))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(f -> f.field() + ":" + f.message()).containsExactly("batchId:Choose a batch of this store"));
+    }
+
+    @Test
+    void waitingReportsDoNotReduceWhatIsReportableFromAvailable() {
+        when(engine.plan(eq(TENANT), any())).thenReturn(null);
+        when(reports.waitingQuantity(eq(TENANT), eq(WARD), any())).thenReturn(30);
+
+        create(input("AVAILABLE", "40", "WRITE_OFF"), null);
+
+        assertThat(posted()).extracting(StockPosting.Line::txnType).contains("DAMAGE_QUARANTINE");
+    }
+
+    @Test
     void aCallerBlindAtTheStoreOnAnAuditedProductIsToldNoNumberWhenTheQuantityIsTooMuch() {
         com.sahaj.pharmacy.domain.StoreRole role = com.sahaj.pharmacy.domain.StoreRole.STORE_USER;
         caller = new PharmacyCaller(TENANT, USER, ME, "Test Ward Nurse", "NURSE", List.of(new PharmacyCaller.Mapping(ward, null,

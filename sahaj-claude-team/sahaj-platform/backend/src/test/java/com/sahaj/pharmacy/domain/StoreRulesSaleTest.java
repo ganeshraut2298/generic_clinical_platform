@@ -31,6 +31,22 @@ class StoreRulesSaleTest {
     }
 
     @Test
+    void aCashierReadsStockAndHasNoOtherInventoryCapability() {
+        StoreAccess cashier = at("BILLING", StoreRole.CASHIER);
+        assertThat(cashier.readStock()).isTrue();
+        assertThat(cashier.count()).isFalse();
+        assertThat(cashier.startCount()).isFalse();
+        assertThat(cashier.reviewCount()).isFalse();
+        assertThat(cashier.adjustStock()).isFalse();
+        assertThat(cashier.returnDamage()).isFalse();
+        assertThat(cashier.dispatchTransfer()).isFalse();
+        assertThat(cashier.receive()).isFalse();
+        assertThat(cashier.raiseIndent()).isFalse();
+        assertThat(cashier.consume()).isFalse();
+        assertThat(StoreRules.access("BILLING", StoreRole.CASHIER, false).readStock()).isTrue();
+    }
+
+    @Test
     void aPharmacistMemberHasEveryPharmacistCapability() {
         StoreAccess p = at("PHARMACIST", StoreRole.STORE_USER);
         assertThat(p.sell()).isTrue();

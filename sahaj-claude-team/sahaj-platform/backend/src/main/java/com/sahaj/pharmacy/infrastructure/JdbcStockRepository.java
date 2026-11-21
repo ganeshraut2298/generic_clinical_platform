@@ -200,7 +200,7 @@ public class JdbcStockRepository implements StockRepository {
                    and sb.product_id = s.product_id and sb.state = 'AVAILABLE'
               left join pharmacy.batch b on b.tenant_id = sb.tenant_id and b.id = sb.batch_id
                    and b.expiry_date >= cast(:today as date)
-             where s.tenant_id = :tenantId and s.store_id = :storeId and s.reorder_level is not null
+             where s.tenant_id = :tenantId and s.store_id = :storeId and s.reorder_level is not null/*EXCL*/
              group by p.id, g.id, s.id
             having coalesce(sum(case when b.id is not null then sb.qty end), 0) <= s.reorder_level
             """;
@@ -385,13 +385,26 @@ public class JdbcStockRepository implements StockRepository {
 
     @Override
     public LowStockSlice lowStock(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset) {
-        List<LowStockRow> items = jdbc.sql(LOW_STOCK_PAGE).param("tenantId", tenantId).param("storeId", storeId)
+        return lowStock(tenantId, storeId, today, limit, offset, java.util.Set.of());
+    }
+
+    @Override
+    public LowStockSlice lowStock(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset,
+                                  java.util.Set<UUID> excluded) {
+        String exclusion = excluded.isEmpty() ? "" : " and p.id not in (:excluded)";
+        JdbcClient.StatementSpec page = jdbc.sql(LOW_STOCK_PAGE.replace("/*EXCL*/", exclusion));
+        JdbcClient.StatementSpec count = jdbc.sql(LOW_STOCK_COUNT.replace("/*EXCL*/", exclusion));
+        if (!excluded.isEmpty()) {
+            page = page.param("excluded", excluded);
+            count = count.param("excluded", excluded);
+        }
+        List<LowStockRow> items = page.param("tenantId", tenantId).param("storeId", storeId)
                 .param("today", today).param("limit", limit).param("offset", offset)
                 .query((rs, n) -> new LowStockRow(rs.getObject("product_id", UUID.class), rs.getString("code"),
                         rs.getString("name"), rs.getString("strength"), rs.getString("form"), rs.getString("schedule"),
                         rs.getString("purchase_unit"), rs.getString("issue_unit"), rs.getInt("conversion"),
                         rs.getInt("available"), rs.getInt("reorder_level"), rs.getBigDecimal("gst_percent"))).list();
-        long total = jdbc.sql(LOW_STOCK_COUNT).param("tenantId", tenantId).param("storeId", storeId)
+        long total = count.param("tenantId", tenantId).param("storeId", storeId)
                 .param("today", today).query(Long.class).single();
         return new LowStockSlice(items, total);
     }

@@ -99,6 +99,11 @@ public class SalePricer {
 
     /** The cart priced as of now. See the class comment for {@code lock}. */
     public Priced price(PharmacyCaller caller, Store store, SaleCart.Cart cart, boolean lock) {
+        return price(caller, store, cart, lock, null);
+    }
+
+    /** As above; at the bill save {@code held} names the held bill of the save (the quote passes null: it takes none). */
+    public Priced price(PharmacyCaller caller, Store store, SaleCart.Cart cart, boolean lock, DiscountApprovals.Held held) {
         UUID tenantId = caller.tenantId();
         UUID storeId = store.id();
         LocalDate today = time.today();
@@ -227,7 +232,7 @@ public class SalePricer {
             lineNo++;
             String schedule = product.schedule() == null ? "NONE" : product.schedule();
             boolean h1 = "H1".equals(schedule);
-            boolean x = "X".equals(schedule);
+            boolean x = GoodsReceiptService.isScheduleX(product);
             boolean scheduled = h1 || x || "H".equals(schedule);
             anyH1 |= h1;
             anyX |= x;
@@ -277,7 +282,7 @@ public class SalePricer {
         // DEC-090: the OWNER is exempt from the discount rule; any request id the owner sends is ignored
         boolean ownerExempt = caller.isOwner();
         DiscountApprovals.Check approval = ownerExempt ? new DiscountApprovals.Check(DiscountApprovals.State.NONE, null, null)
-                : discountApprovals.check(tenantId, storeId, cart);
+                : discountApprovals.check(tenantId, storeId, cart, caller.actorId(), held);
         if (ownerExempt && discount.approvalNeeded()) {
             discount = new SaleRules.Discount(false, discount.limitPercent(), discount.limitNotSet(), discount.lean());
         } else if (discount.approvalNeeded() && approval.approved()) {

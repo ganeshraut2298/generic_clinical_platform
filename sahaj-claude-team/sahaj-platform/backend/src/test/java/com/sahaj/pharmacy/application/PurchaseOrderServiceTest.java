@@ -19,6 +19,8 @@ import com.sahaj.pharmacy.domain.DocType;
 import com.sahaj.pharmacy.domain.ReasonList;
 import com.sahaj.pharmacy.domain.Store;
 import com.sahaj.pharmacy.domain.StoreCapability;
+import com.sahaj.pharmacy.domain.StoreRole;
+import com.sahaj.pharmacy.domain.StoreRules;
 import com.sahaj.pharmacy.domain.StoreType;
 import com.sahaj.pharmacy.domain.TransactionType;
 import com.sahaj.pharmacy.domain.Vendor;
@@ -487,6 +489,28 @@ class PurchaseOrderServiceTest {
         when(orders.reorder(eq(TENANT), eq(STORE_ID), any(), anyInt(), anyInt())).thenReturn(List.of(
                 new PurchaseOrderRepository.ReorderRow(PRODUCT, 50, 100, 50, 5, "PO-0003")));
         assertThat(service.reorder(TENANT, USER, STORE_ID.toString(), null, null).items().get(0).suggestedQty()).isZero();
+    }
+
+    @Test
+    void aBlindCallersReorderListLeavesAuditedProductsOutAndAReviewerKeepsThem() {
+        StockAuditRepository audits = mock(StockAuditRepository.class);
+        when(audits.openAuditProducts(TENANT, STORE_ID)).thenReturn(java.util.Set.of(PRODUCT));
+        PurchaseOrderService blindService = new PurchaseOrderService(gate, guard, stores, products, vendors, orders, engine,
+                approvals, series, numbers, clients, events, reasons, unitRows, templates, team, audit,
+                new PharmacyTime(Clock.fixed(NOW, ZoneOffset.UTC)), new BlindCount(audits));
+        PharmacyCaller blindUser = new PharmacyCaller(TENANT, USER, ME, "Test Central Store User", "STORE_STAFF",
+                List.of(new PharmacyCaller.Mapping(store, null, StoreRole.CENTRAL_STORE_USER,
+                        StoreRules.access("STORE_STAFF", StoreRole.CENTRAL_STORE_USER, false))));
+        when(gate.require(TENANT, USER, AccessLevel.PHARMACY_ACCESS)).thenReturn(blindUser);
+        when(orders.reorder(eq(TENANT), eq(STORE_ID), any(), anyInt(), anyInt(), eq(java.util.Set.of(PRODUCT))))
+                .thenReturn(List.of());
+        when(orders.reorderTotal(eq(TENANT), eq(STORE_ID), any(), eq(java.util.Set.of(PRODUCT)))).thenReturn(0L);
+
+        PurchaseViews.ReorderPage page = blindService.reorder(TENANT, USER, STORE_ID.toString(), null, null);
+
+        assertThat(page.items()).isEmpty();
+        assertThat(page.total()).isZero();
+        verify(orders, never()).reorder(eq(TENANT), eq(STORE_ID), any(), anyInt(), anyInt());
     }
 
     @Test

@@ -32,7 +32,7 @@ class ComplianceServiceTest {
     private final SaleWorld w = new SaleWorld();
     private final ComplianceRepository repository = mock(ComplianceRepository.class);
     private final ComplianceService service = new ComplianceService(w.f.gate, repository, w.f.unitRepository,
-            w.f.storeRepository, w.f.team, w.support, w.reasons, w.clients, w.f.auditLog, w.f.time);
+            w.f.storeRepository, w.f.team, w.support, w.reasons, w.clients, w.f.auditLog, w.f.time, w.blind);
     private final List<ComplianceRepository.Registration> saved = new ArrayList<>();
 
     ComplianceServiceTest() {
@@ -155,6 +155,27 @@ class ComplianceServiceTest {
                 "adjusted SA/26-27/000004 60 to 58 · Breakage · Main Pharmacy");
         assertThat(ComplianceService.sentence(requested, labels, "Main Pharmacy")).isEqualTo(
                 "requested 15% discount · sent for approval · Main Pharmacy");
+    }
+
+    @Test
+    void theFeedLeavesTheQuantitiesOutOfAStockAdjustmentForACallerBlindAtAStoreWithAnOpenAudit() {
+        ComplianceRepository.ActivityEvent adjusted = new ComplianceRepository.ActivityEvent(Instant.now(), "STOCK_ADJUSTED",
+                "STOCK_ADJUSTMENT", "SA/26-27/000004", null, "POSTED", w.f.pharmacist.member().membershipId(), null, w.shop.id(),
+                "stock-adjustment.breakage", 40, 38);
+        when(repository.activity(any(), anyCollection(), any(), any(), any(), any(), anyInt(), anyInt())).thenReturn(
+                new ComplianceRepository.ActivitySlice(List.of(adjusted), 1));
+
+        String open = service.activity(SaleWorld.TENANT, w.f.pharmacist.userId(), null, null, null, null, null, null, null)
+                .items().get(0).text();
+        assertThat(open).contains("40 to 38");
+
+        when(w.audits.openAuditProducts(any(), any())).thenReturn(java.util.Set.of(UUID.randomUUID()));
+        String blind = service.activity(SaleWorld.TENANT, w.f.pharmacist.userId(), null, null, null, null, null, null, null)
+                .items().get(0).text();
+        assertThat(blind).startsWith("adjusted SA/26-27/000004").doesNotContain("40").doesNotContain("38");
+
+        assertThat(service.activity(SaleWorld.TENANT, w.f.owner.userId(), null, null, null, null, null, null, null)
+                .items().get(0).text()).as("the owner is never blind").contains("40 to 38");
     }
 
     @Test

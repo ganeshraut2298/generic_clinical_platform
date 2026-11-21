@@ -105,6 +105,43 @@ class RegisterServiceTest {
     }
 
     @Test
+    void theH1ExportWritesOneRecordAccessEntryPerDistinctPatientBeforeTheFileExists() {
+        UUID second = UUID.randomUUID();
+        when(rows.h1All(any(), any(), any(), any(), any(), any(), anyInt())).thenReturn(List.of(h1Row("ENTRY", 1),
+                h1Row("ENTRY", 2),
+                new RegisterReadRepository.H1Row(UUID.randomUUID(), "ENTRY", null, null, null,
+                        Instant.parse("2026-11-17T05:30:00Z"), "SB/2", second, "Test Patient Two", 40, "2 Test Lane (fake)",
+                        "Dr Test", "REG-1", null, "TYPED", null, h1, null, batch, 1, w.f.pharmacist.member().membershipId(), null)));
+
+        service.exportH1(SaleWorld.TENANT, w.f.pharmacist.userId(), shop, "2026-11-01", "2026-11-17", null, null);
+
+        verify(w.patientAccess, org.mockito.Mockito.times(1)).recordOpened(any(), eq(patient), any());
+        verify(w.patientAccess, org.mockito.Mockito.times(1)).recordOpened(any(), eq(second), any());
+    }
+
+    @Test
+    void whenARecordAccessEntryCannotBeWrittenTheExportFailsAndNoFileIsMade() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("down")).when(w.patientAccess).recordOpened(any(), any(), any());
+
+        assertThatThrownBy(() -> service.exportH1(SaleWorld.TENANT, w.f.pharmacist.userId(), shop, "2026-11-01", "2026-11-17",
+                null, null)).isInstanceOfSatisfying(PharmacyProblemException.class,
+                e -> assertThat(e.slug()).isEqualTo("patients-unreachable"));
+        assertThat(w.f.audit).as("no EXPORTED audit row").isEmpty();
+    }
+
+    @Test
+    void aBlindCallersReviewCountLeavesOutAuditedProducts() {
+        when(w.audits.openAuditProducts(any(), any())).thenReturn(Set.of(x));
+        when(rows.xBalances(any(), any(), any(), any(), any())).thenReturn(List.of(
+                new RegisterReadRepository.XBalance(x, false, 10, 5, 7, 8)));
+        when(rows.latestCounts(any(), any(), anyCollection())).thenReturn(Map.of(
+                x, new RegisterReadRepository.XCount(3, LocalDate.of(2026, 11, 10))));
+
+        assertThat(service.scheduleX(SaleWorld.TENANT, w.f.pharmacist.userId(), shop, null, null, null).toReview()).isZero();
+        assertThat(service.scheduleX(SaleWorld.TENANT, w.f.owner.userId(), shop, null, null, null).toReview()).isEqualTo(1);
+    }
+
+    @Test
     void anExportOfMoreThanFiftyThousandRowsIsRefusedBeforeAnyByte() {
         List<RegisterReadRepository.H1Row> many = java.util.Collections.nCopies(RegisterService.EXPORT_CAP + 1, h1Row("ENTRY", 1));
         when(rows.h1All(any(), any(), any(), any(), any(), any(), anyInt())).thenReturn(many);
@@ -138,7 +175,7 @@ class RegisterServiceTest {
     }
 
     @Test
-    void aBlindCallerGetsNoQuantityForAnAuditedProductButTheStatusStays() {
+    void aBlindCallerGetsNeitherQuantityNorMatchOrReviewStatusForAnAuditedProduct() {
         when(w.audits.openAuditProducts(any(), any())).thenReturn(Set.of(x));
         when(rows.xBalances(any(), any(), any(), any(), any())).thenReturn(List.of(
                 new RegisterReadRepository.XBalance(x, false, 10, 5, 7, 8)));
@@ -152,7 +189,7 @@ class RegisterServiceTest {
         assertThat(row.book()).isNull();
         assertThat(row.physical()).isNull();
         assertThat(row.difference()).isNull();
-        assertThat(row.status()).isEqualTo("MATCH");
+        assertThat(row.status()).as("MATCH or REVIEW would compare the hidden book with the count (m3)").isNull();
     }
 
     @Test

@@ -30,6 +30,12 @@ public interface DamageReportRepository {
     /** By id, locked {@code FOR UPDATE} (lock order step 3; the approval handler works from the request's subject id). */
     Optional<Row> findForUpdate(UUID tenantId, UUID id);
 
+    /**
+     * The units that WAITING_APPROVAL reports of this batch at this store hold in QUARANTINE (a report moves its units there when it
+     * is raised, and the approval takes them out again); another report must leave them alone.
+     */
+    int waitingQuantity(UUID tenantId, UUID storeId, UUID batchId);
+
     void insert(UUID tenantId, NewRow row);
 
     /** Points a WAITING_APPROVAL report at its approval request. */

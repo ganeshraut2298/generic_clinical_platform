@@ -50,11 +50,12 @@ public class DiscountRequestService implements ApprovalSubjectHandler {
     private final ClientRequestRepository clients;
     private final DocumentEventRepository events;
     private final AuditLog auditLog;
+    private final DiscountApprovals discountApprovals;
 
     public DiscountRequestService(PharmacyGate gate, StoreAccessGuard guard, SalePricer pricer, ApprovalEngine engine,
                                   ApprovalRepository approvals, DiscountRequestRepository requests, StoreRepository stores,
                                   SaleSupport support, ClientRequestRepository clients, DocumentEventRepository events,
-                                  AuditLog auditLog) {
+                                  AuditLog auditLog, DiscountApprovals discountApprovals) {
         this.gate = gate;
         this.guard = guard;
         this.pricer = pricer;
@@ -66,6 +67,7 @@ public class DiscountRequestService implements ApprovalSubjectHandler {
         this.clients = clients;
         this.events = events;
         this.auditLog = auditLog;
+        this.discountApprovals = discountApprovals;
     }
 
     // ---- request ----
@@ -208,6 +210,18 @@ public class DiscountRequestService implements ApprovalSubjectHandler {
         return new SaleCheckViews.DiscountRequest(false, null, null, null, 0L, null, null, false, false, false, null, null, null);
     }
 
+    /** An APPROVED request reads VOID once it is used, its IST day is over, or the reader is not the seller who raised it. */
+    private String statusOf(PharmacyCaller caller, DiscountRequestRepository.Row row, ApprovalRepository.Request approval) {
+        if (approval == null) {
+            return null;
+        }
+        if ("APPROVED".equals(approval.status())
+                && !discountApprovals.usable(caller.tenantId(), row, approval, caller.actorId())) {
+            return "VOID";
+        }
+        return approval.status();
+    }
+
     private SaleCheckViews.DiscountRequest view(PharmacyCaller caller, DiscountRequestRepository.Row row) {
         UUID tenantId = caller.tenantId();
         ApprovalRepository.Request approval = approvals.find(tenantId, row.approvalRequestId()).orElse(null);
@@ -223,7 +237,7 @@ public class DiscountRequestService implements ApprovalSubjectHandler {
         boolean pending = approval != null && approval.pending();
         String ruleText = summary == null || summary.ruleText() == null ? null
                 : summary.ruleText().replaceFirst("^Sale discount", "Discount");
-        return new SaleCheckViews.DiscountRequest(true, row.id(), approval == null ? null : approval.status(),
+        return new SaleCheckViews.DiscountRequest(true, row.id(), statusOf(caller, row, approval),
                 SaleRules.percent(row.discountPercent()), row.discountPaise(), ruleText,
                 summary == null ? null : summary.waitingFor(), summary != null && summary.escalated(),
                 summary != null && summary.needsAnotherApprover(), pending && summary != null

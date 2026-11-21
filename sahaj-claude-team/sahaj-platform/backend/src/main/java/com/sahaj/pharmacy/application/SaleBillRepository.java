@@ -54,12 +54,18 @@ public interface SaleBillRepository {
 
     Optional<BillRow> findForUpdate(UUID tenantId, UUID id);
 
+    /** Many bills in one statement (no N+1); an unknown id is absent from the map. */
+    java.util.Map<UUID, BillRow> findAll(UUID tenantId, java.util.Collection<UUID> ids);
+
     List<LineRow> lines(UUID tenantId, UUID billId);
 
     List<PaymentRow> payments(UUID tenantId, UUID billId);
 
     /** True when any line of the bill has a returned quantity or a sales return of the bill is still open. */
     boolean hasReturns(UUID tenantId, UUID billId);
+
+    /** True when a bill (any status, a cancelled one too) already carries this discount request id (single use, ADR-030 S14). */
+    boolean existsWithDiscountRequest(UUID tenantId, UUID discountRequestId);
 
     void insertBill(UUID tenantId, BillRow bill);
 

@@ -191,7 +191,14 @@ const MODES: PaymentMode[] = ['CASH', 'UPI', 'CARD', 'UDHAR', 'CREDIT_NOTE'];
       flex-wrap: wrap;
       gap: 8px;
     }
+    #invoice {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
     @media print {
+      .tbl-wrap {
+        overflow: visible;
+      }
       .noprint {
         display: none !important;
       }
@@ -212,6 +219,7 @@ const MODES: PaymentMode[] = ['CASH', 'UPI', 'CARD', 'UDHAR', 'CREDIT_NOTE'];
             }
           </p>
           <p data-testid="invoice-buyer">{{ bill.billNo }} · {{ bill.buyer.label }}</p>
+          <div class="tbl-wrap" data-testid="invoice-table">
           <table>
             <thead>
               <tr>
@@ -242,6 +250,7 @@ const MODES: PaymentMode[] = ['CASH', 'UPI', 'CARD', 'UDHAR', 'CREDIT_NOTE'];
               }
             </tbody>
           </table>
+          </div>
           <p data-testid="invoice-net">Net payable {{ money(bill.summary.netPayablePaise) }}</p>
           @if (bill.pharmacist; as ph) {
             <p>Pharmacist: {{ ph.name }}{{ ph.registrationNo ? ' · Reg. ' + ph.registrationNo : '' }}</p>

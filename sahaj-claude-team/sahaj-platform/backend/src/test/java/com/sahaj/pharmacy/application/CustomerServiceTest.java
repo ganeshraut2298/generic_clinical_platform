@@ -214,6 +214,8 @@ class CustomerServiceTest {
         assertThat(audit.before()).containsEntry("creditLimitPaise", 100_000L);
         assertThat(audit.after()).containsEntry("creditLimitPaise", 250_000L);
         assertThat(audit.toString()).doesNotContain("Test Customer Two");
+        assertThat((String) audit.after().get("changedFields")).startsWith("name").contains("creditLimitPaise")
+                .doesNotContain("9000000102").doesNotContain("allergyNote");
 
         assertThatThrownBy(() -> service.update(SaleWorld.TENANT, w.f.owner.userId(), shop, customerId.toString(),
                 SaleWorld.body(new SaleInputs.CustomerUpdate(BigDecimal.valueOf(2), "Test Customer Two", null, null, null, false))))

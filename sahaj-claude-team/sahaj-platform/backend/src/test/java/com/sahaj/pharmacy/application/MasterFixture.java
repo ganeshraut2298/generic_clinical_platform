@@ -413,8 +413,9 @@ final class MasterFixture {
             f.auditLog, f.time);
     final ApprovalRulesService rulesService = new ApprovalRulesService(f.gate, f.unitService, ruleRepository,
             f.storeRepository, f.staffRepository, f.team, f.auditLog, f.time);
+    final StoreBillSeriesRepository storeBillSeries = org.mockito.Mockito.mock(StoreBillSeriesRepository.class);
     final NumberingService numberingService = new NumberingService(f.gate, f.unitService, seriesRepository, f.auditLog,
-            f.time);
+            f.time, storeBillSeries);
     final ReasonService reasonService = new ReasonService(f.gate, f.unitService, reasonRepository, f.auditLog);
     final PrintTemplateService templateService = new PrintTemplateService(f.gate, f.unitService, f.unitRepository,
             templateRepository, f.letterhead, f.auditLog);

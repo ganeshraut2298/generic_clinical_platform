@@ -114,6 +114,11 @@ public interface PurchaseOrderRepository {
 
     long reorderTotal(UUID tenantId, UUID storeId, LocalDate today);
 
+    /** The page without the {@code excluded} products (audited products a blind caller must not learn the stock of, rule 24). */
+    List<ReorderRow> reorder(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset, java.util.Set<UUID> excluded);
+
+    long reorderTotal(UUID tenantId, UUID storeId, LocalDate today, java.util.Set<UUID> excluded);
+
     /** A receipt posting adds the received purchase units to the line (the header is locked; lock order step 3a). */
     void addReceived(UUID tenantId, UUID lineId, int qty, UUID actor);
 

@@ -44,14 +44,16 @@ public class NumberingService {
     private final DocumentSeriesRepository series;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final StoreBillSeriesRepository storeSeries;
 
     public NumberingService(PharmacyGate gate, UnitService units, DocumentSeriesRepository series, AuditLog auditLog,
-                            PharmacyTime time) {
+                            PharmacyTime time, StoreBillSeriesRepository storeSeries) {
         this.gate = gate;
         this.units = units;
         this.series = series;
         this.auditLog = auditLog;
         this.time = time;
+        this.storeSeries = storeSeries;
     }
 
     /** Ten rows in the order of {@link DocType}; the defaults for a type that was never saved. Writes nothing. */
@@ -76,6 +78,11 @@ public class NumberingService {
         Checked checked = check(in);
 
         Unit unit = units.ensureUnit(tenantId, userId);
+        // Lock order (same as StoreBillSeriesService.put): the unit BILL series row first, then the document type's own row.
+        // A store series save and a unit series save therefore cannot both pass the prefix check at once.
+        if (type != DocType.BILL) {
+            series.findForUpdate(tenantId, DocType.BILL);
+        }
         Row row = series.findForUpdate(tenantId, type).orElse(null);
         long currentVersion = row == null ? 0L : row.version();
         if (checked.version() != currentVersion) {
@@ -85,6 +92,12 @@ public class NumberingService {
         List<Row> saved = series.list(tenantId);
         for (DocType other : DocType.values()) {
             if (other != type && effectivePrefix(other, saved).equalsIgnoreCase(prefix)) {
+                throw new ConflictException("prefix-in-use", "Prefix already used",
+                        "Two document types cannot use the same prefix");
+            }
+        }
+        for (StoreBillSeriesRepository.Row own : storeSeries.list(tenantId)) {
+            if (own.prefix().equalsIgnoreCase(prefix)) {
                 throw new ConflictException("prefix-in-use", "Prefix already used",
                         "Two document types cannot use the same prefix");
             }

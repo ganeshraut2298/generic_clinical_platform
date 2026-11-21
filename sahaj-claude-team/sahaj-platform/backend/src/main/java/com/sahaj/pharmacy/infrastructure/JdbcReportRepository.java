@@ -151,7 +151,7 @@ public class JdbcReportRepository implements ReportRepository {
             + " cl.quantity::bigint, case c.consumption_type when 'PATIENT' then 'Patient' else 'General' end, c.purpose_key,"
             + " (select max(l.doc_no) from pharmacy.stock_ledger l where l.tenant_id = c.tenant_id and l.doc_type = 'CONSUMPTION'"
             + "   and l.doc_id = c.id and l.admission_id is not null), c.recorded_by,"
-            + " case c.charge_status when 'CHARGE_PENDING' then 'Charge pending' else 'Not applicable' end"
+            + " case c.charge_status when 'CHARGE_PENDING' then 'Charge pending' when 'CHARGED' then 'Charged' else 'Not applicable' end"
             + " from pharmacy.consumption c"
             + " join pharmacy.consumption_line cl on cl.tenant_id = c.tenant_id and cl.consumption_id = c.id"
             + " join pharmacy.store s on s.tenant_id = c.tenant_id and s.id = c.store_id"
@@ -231,13 +231,19 @@ public class JdbcReportRepository implements ReportRepository {
 
     // ---- SAH-80-21, Sales & compliance (nothing here is a free-text note; the H1 register carries the patient name the law needs) ----
 
-    private static final String REASON_TEXT = "initcap(replace(split_part(%s, '.', 2), '-', ' '))";
+    /** The reason key as stored; ReportService turns it into the label of its reason list (pass-2 m7), never from the key text. */
+    private static final String REASON_TEXT = "%s";
 
-    /** Bills of the day per store, less the returns completed that day; cost on the batch purchase rate (landed, OQ-79-6). */
+    /**
+     * Bills of the day per store, less the returns completed that day (for the product asked, when one is); cost on the batch
+     * purchase rate (landed, OQ-79-6) less the cost of the returned units that went back to AVAILABLE stock (a unit sent to
+     * quarantine is not back on the shelf, so its cost stays). Quantity, discount and tax are those of the bills.
+     */
     private static final String SALES_MARGIN = "select a.store_id, null::uuid, a.day, a.store_name, a.bills, a.qty,"
-            + " (a.net - coalesce(rr.refunded, 0))::bigint, a.discount, a.tax, a.cost,"
+            + " (a.net - coalesce(rr.refunded, 0))::bigint, a.discount, a.tax, (a.cost - coalesce(rr.returned_cost, 0))::bigint,"
             + " case when a.net - coalesce(rr.refunded, 0) > 0"
-            + " then round((a.net - coalesce(rr.refunded, 0) - a.cost) * 100.0 / (a.net - coalesce(rr.refunded, 0)), 1) end"
+            + " then round((a.net - coalesce(rr.refunded, 0) - (a.cost - coalesce(rr.returned_cost, 0))) * 100.0"
+            + " / (a.net - coalesce(rr.refunded, 0)), 1) end"
             + " from (select b.store_id, (b.saved_at at time zone 'Asia/Kolkata')::date as day, s.name as store_name,"
             + " count(distinct b.id)::bigint as bills, coalesce(sum(l.qty), 0)::bigint as qty,"
             + " coalesce(sum(l.net_paise), 0)::bigint as net, coalesce(sum(l.discount_paise), 0)::bigint as discount,"
@@ -250,9 +256,13 @@ public class JdbcReportRepository implements ReportRepository {
             + PRODUCT_FILTER.formatted("l")
             + " group by b.store_id, s.name, (b.saved_at at time zone 'Asia/Kolkata')::date) a"
             + " left join (select r.store_id, (r.completed_at at time zone 'Asia/Kolkata')::date as day,"
-            + " sum(rl.refund_paise)::bigint as refunded from pharmacy.sales_return r"
+            + " sum(rl.refund_paise)::bigint as refunded,"
+            + " coalesce(round(sum(case when rl.destination = 'AVAILABLE' then rl.qty * rb.purchase_rate else 0 end) * 100), 0)::bigint"
+            + " as returned_cost from pharmacy.sales_return r"
             + " join pharmacy.sales_return_line rl on rl.tenant_id = r.tenant_id and rl.sales_return_id = r.id"
-            + " where r.tenant_id = :tenantId and r.status = 'COMPLETED' and rl.destination <> 'REFUSED'"
+            + " join pharmacy.batch rb on rb.tenant_id = rl.tenant_id and rb.id = rl.batch_id"
+            + " where r.tenant_id = :tenantId and r.store_id in (:storeIds) and r.status = 'COMPLETED'"
+            + " and rl.destination <> 'REFUSED' and " + range("r.completed_at") + PRODUCT_FILTER.formatted("rl")
             + " group by r.store_id, (r.completed_at at time zone 'Asia/Kolkata')::date) rr"
             + " on rr.store_id = a.store_id and rr.day = a.day"
             + " order by a.day, a.store_name";

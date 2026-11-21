@@ -101,7 +101,7 @@ class BillCancelServiceTest {
         verify(w.bills).markCancelled(any(), eq(billId), eq(7L), eq(w.f.owner.id()), eq("cancel-bill.wrong-item"), any(), eq(true),
                 eq(20_000L));
         verify(w.registers).reverseH1ForCancelledBill(any(), eq(billId));
-        verify(w.registers).reverseScheduleXForCancelledBill(any(), eq(billId));
+        verify(w.registers, never()).reverseScheduleXForCancelledBill(any(), any(), any(), any());
         PharmacyFixture.Audit audit = w.f.audit.get(0);
         assertThat(audit.action()).isEqualTo("PHARMACY_BILL_CANCELLED");
         assertThat(audit.after()).containsEntry("reasonKey", "cancel-bill.wrong-item").containsEntry("refundDuePaise", 20_000L);
@@ -241,6 +241,32 @@ class BillCancelServiceTest {
 
         cancel(w.f.pharmacist, cancelInput(true, "cancel-bill.wrong-item", null), w.pharmacist2.id());
         verify(w.signature).recheck(SaleWorld.TENANT, w.f.pharmacist.id(), w.pharmacist2.id());
+        // SEC M6: the ledger line, the register reversal and a SECOND_SIGNATURE event carry the canceller and the second signer
+        assertThat(posted().get(0).secondSignerMembershipId()).isEqualTo(w.pharmacist2.id());
+        verify(w.registers).reverseScheduleXForCancelledBill(any(), eq(billId), eq(w.f.pharmacist.id()), eq(w.pharmacist2.id()));
+        verify(w.events).insert(any(), any(), eq("BILL"), eq(billId), eq("SECOND_SIGNATURE"), any(), eq(w.f.pharmacist.id()),
+                eq("PHARMACIST"), any(), any(), any(), any());
+    }
+
+    @Test
+    void aNonScheduleXLineKeepsANullSignerOnTheLedgerEvenWhenTheBillAlsoHasAScheduleXLine() {
+        UUID x = w.product("Testdone", "Methadone", "X");
+        UUID xBatch = w.shelf(x, "B-X", FAR, 5, "10.00");
+        stored(bill(TODAY_AM, "SAVED", null, 0, 0, null), 1, "CASH:20000");
+        UUID plainLine = UUID.randomUUID();
+        when(w.bills.lines(any(), eq(billId))).thenReturn(List.of(
+                new SaleBillRepository.LineRow(lineId, 1, x, xBatch, 1, 0, new BigDecimal("10.00"), new BigDecimal("12"), null, 1000,
+                        0, 1000, 893, 107, null, null, null, null, null, null, null, null, null, w.f.pharmacist.id(),
+                        w.pharmacist2.id(), null),
+                new SaleBillRepository.LineRow(plainLine, 2, product, batchId, 1, 0, new BigDecimal("100.00"),
+                        new BigDecimal("12"), "30049099", 10_000, 0, 10_000, 8_929, 1_071, null, null, null, null, null, null,
+                        null, null, null, w.f.pharmacist.id(), null, null)));
+        when(w.stock.findBatch(any(), eq(xBatch))).thenReturn(Optional.of(new StockRepository.BatchRow(xBatch, x, "B-X", FAR,
+                BigDecimal.TEN, BigDecimal.ONE, null, Instant.now())));
+
+        cancel(w.f.pharmacist, cancelInput(true, "cancel-bill.wrong-item", null), w.pharmacist2.id());
+
+        assertThat(posted()).extracting(StockPosting.Line::secondSignerMembershipId).containsExactly(w.pharmacist2.id(), null);
     }
 
     @Test
@@ -360,6 +386,21 @@ class BillCancelServiceTest {
         verify(w.customers, org.mockito.Mockito.times(2)).insertEntry(any(), entries.capture());
         assertThat(entries.getAllValues()).extracting(CustomerRepository.NewEntry::kind).containsExactly("RETURN_TO_UDHAR",
                 "CREDIT_NOTE_ISSUED");
+    }
+
+    @Test
+    void anUdharRefundAboveWhatTheCustomerOwesIsAFieldErrorNotACap() {
+        UUID customerId = UUID.randomUUID();
+        when(w.bills.refundModes(any())).thenReturn(List.of("CREDIT_NOTE", "UDHAR"));
+        when(w.customers.findForUpdate(any(), eq(customerId))).thenReturn(Optional.of(w.customer(customerId, "Test Customer One",
+                500_000, 6_000, 1_000, "ACTIVE")));
+        stored(bill(TODAY_AM, "CANCELLED", customerId, 0, 20_000, null), 2, "CASH:20000");
+
+        assertThatThrownBy(() -> refundAs(w.cashier, refund(7, line("CREDIT_NOTE", 13_000), line("UDHAR", 7_000))))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors().get(0).message())
+                        .isEqualTo("The udhar refund is more than the customer owes."));
+        verify(w.customers, never()).setBalances(any(), any(), anyLong(), anyLong(), any());
+        verify(w.registers, never()).insertCreditNote(any(), any(), any());
     }
 
     @Test

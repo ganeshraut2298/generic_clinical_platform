@@ -33,7 +33,7 @@ class DiscountRequestServiceTest {
     private final SaleWorld w = new SaleWorld();
     private final ApprovalEngine engine = mock(ApprovalEngine.class);
     private final DiscountRequestService service = new DiscountRequestService(w.f.gate, w.f.guard, w.pricer, engine,
-            w.approvalRepository, w.discountRequests, w.f.storeRepository, w.support, w.clients, w.events, w.f.auditLog);
+            w.approvalRepository, w.discountRequests, w.f.storeRepository, w.support, w.clients, w.events, w.f.auditLog, w.approvals);
     private final String shop = w.shop.id().toString();
     private final UUID product = w.product("Testamol", "Paracetamol", "NONE");
 

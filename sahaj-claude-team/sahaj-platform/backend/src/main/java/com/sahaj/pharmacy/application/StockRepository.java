@@ -132,6 +132,9 @@ public interface StockRepository {
 
     LowStockSlice lowStock(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset);
 
+    /** As above without the {@code excluded} products (the audited products a blind caller must not learn the stock of, rule 24). */
+    LowStockSlice lowStock(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset, java.util.Set<UUID> excluded);
+
     /** The AVAILABLE quantity of a batch in a store (a row of quantity 0 counts); empty when the store has no such row. */
     Optional<Integer> availableQty(UUID tenantId, UUID storeId, UUID batchId);
 

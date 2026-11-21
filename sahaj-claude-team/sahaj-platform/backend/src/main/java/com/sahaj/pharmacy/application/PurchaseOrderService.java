@@ -161,7 +161,11 @@ public class PurchaseOrderService implements ApprovalSubjectHandler {
         LocalDate today = time.today();
         List<PurchaseViews.ReorderRow> items = new ArrayList<>();
         BlindCount.Mask mask = blind.at(caller, storeId); // rule 24: the Central Store figure of an audited product
-        for (PurchaseOrderRepository.ReorderRow r : orders.reorder(tenantId, storeId, today, size, page * size)) {
+        // rule 24: being on this list says "at or below the level", so a blind caller's list leaves the audited products out
+        List<PurchaseOrderRepository.ReorderRow> rows = mask.active()
+                ? orders.reorder(tenantId, storeId, today, size, page * size, mask.products())
+                : orders.reorder(tenantId, storeId, today, size, page * size);
+        for (PurchaseOrderRepository.ReorderRow r : rows) {
             ProductRepository.Full full = products.find(tenantId, r.productId()).orElse(null);
             if (full == null) {
                 continue;
@@ -179,7 +183,9 @@ public class PurchaseOrderService implements ApprovalSubjectHandler {
             items.add(new PurchaseViews.ReorderRow(productRef(p), mask.qty(r.productId(), r.csStock()), all, r.openPurchaseUnits(), r.openPoNo(),
                     r.reorderLevel(), suggested, vendor, lastRate));
         }
-        return new PurchaseViews.ReorderPage(items, orders.reorderTotal(tenantId, storeId, today), page, size);
+        long total = mask.active() ? orders.reorderTotal(tenantId, storeId, today, mask.products())
+                : orders.reorderTotal(tenantId, storeId, today);
+        return new PurchaseViews.ReorderPage(items, total, page, size);
     }
 
     private Integer allStores(UUID tenantId, UUID productId) {

@@ -218,7 +218,7 @@ public class TransferService implements ApprovalSubjectHandler {
         if (note != null && note.length() > 300) {
             errors.add(new FieldMessage("note", "Keep the note to 300 characters"));
         }
-        List<Checked> checked = checkLines(tenantId, from, in.lines(), errors);
+        checkLines(tenantId, from, in.lines(), errors);
         if (!errors.isEmpty()) {
             throw new InvalidFieldsException(errors);
         }
@@ -229,7 +229,12 @@ public class TransferService implements ApprovalSubjectHandler {
         }
         // lock order: the client key, the sending store row, the TRF number, then the header and lines
         stores.findForUpdate(tenantId, from.id()).filter(Store::active).orElseThrow(TransferService::notFound);
-        List<Checked> priced = checkLines(tenantId, from, in.lines(), new ArrayList<>());
+        // M1: the lines are checked again under the lock; a line that no longer passes refuses the transfer, it is never dropped
+        List<FieldMessage> recheck = new ArrayList<>();
+        List<Checked> priced = checkLines(tenantId, from, in.lines(), recheck);
+        if (!recheck.isEmpty()) {
+            throw new InvalidFieldsException(recheck);
+        }
         long seq = numbers.next(tenantId, DocType.TRANSFER);
         String docNo = StoreUseSupport.render(series, tenantId, DocType.TRANSFER, seq, time.today());
         long total = priced.stream().mapToLong(Checked::valuePaise).sum();

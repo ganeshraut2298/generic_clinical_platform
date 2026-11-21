@@ -10,7 +10,6 @@ import com.sahaj.pharmacy.application.SaleInputs.ReturnRefundInput;
 import com.sahaj.pharmacy.application.SaleInputs.SalesReturnCreate;
 import com.sahaj.pharmacy.application.SalesReturnRepository.Row;
 import com.sahaj.pharmacy.domain.AccessLevel;
-
 import com.sahaj.pharmacy.domain.ApprovalPresets;
 import com.sahaj.pharmacy.domain.ApprovalRule;
 import com.sahaj.pharmacy.domain.ConditionKind;
@@ -228,10 +227,12 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         slice.items().forEach(r -> people.add(r.startedBy()));
         Map<UUID, TeamMember> members = support.members(tenantId, people);
         List<SalesReturnViews.SalesReturnRow> items = new ArrayList<>();
+        Map<UUID, BillRow> billsById = billsOf(tenantId, slice.items());
+        Map<UUID, String> who = labels(caller, new ArrayList<>(billsById.values()));
         for (Row r : slice.items()) {
-            BillRow bill = bills.find(tenantId, r.billId()).orElse(null);
+            BillRow bill = billsById.get(r.billId());
             items.add(new SalesReturnViews.SalesReturnRow(r.id(), r.status(), r.creditNoteNo(), bill == null ? "" : bill.billNo(),
-                    r.startedAt(), bill == null ? "" : labels(caller, List.of(bill)).get(bill.id()), r.refundTotalPaise(),
+                    r.startedAt(), bill == null ? "" : who.get(bill.id()), r.refundTotalPaise(),
                     support.person(r.startedBy(), members)));
         }
         return new SalesReturnViews.SalesReturnPage(items, slice.total(), page, size);
@@ -479,7 +480,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
             total += share.refundPaise();
             anyX |= GoodsReceiptService.isScheduleX(found.get(bl.productId()).row()) && !"REFUSED".equals(destination);
             decided.add(new SalesReturnRepository.LineRow(l.id(), l.billLineId(), l.productId(), l.batchId(), l.qty(),
-                    l.conditionKey(), decision == null ? "ACCEPT_QUARANTINE" : decision, destination, share.refundPaise(),
+                    l.conditionKey(), decision == null && doubtful ? "ACCEPT_QUARANTINE" : decision, destination, share.refundPaise(),
                     share.taxablePaise(), share.taxPaise(), l.secondSigner()));
         }
         if (anyX && !caller.isPharmacist()) {
@@ -612,6 +613,9 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         UUID me = caller.actorId();
         UUID storeId = store.id();
         LocalDate today = time.today();
+        // L7: the shares are worked again from the quantities that were COMPLETED, not from the open returns of the same bill
+        // lines, so a rejected earlier return cannot leave a paisa behind. The bill row is locked, so these quantities are final.
+        lines = recomputed(lines, billLines);
         List<SalesReturnRepository.LineRow> moving = lines.stream().filter(l -> !"REFUSED".equals(l.destination())).toList();
         Set<UUID> productIds = new LinkedHashSet<>();
         moving.forEach(l -> productIds.add(l.productId()));
@@ -619,6 +623,8 @@ public class SalesReturnService implements ApprovalSubjectHandler {
             stock.lockBalances(tenantId, storeId, productIds); // canonical order, before the number
         }
         long total = moving.stream().mapToLong(SalesReturnRepository.LineRow::refundPaise).sum();
+        refunds = reconciled(refunds, total, customer);
+        Map<UUID, ProductRepository.Full> productRows = productIds.isEmpty() ? Map.of() : products.findAll(tenantId, productIds);
 
         // the number, last (rule 28)
         long seq = numbers.next(tenantId, DocType.CREDIT_NOTE);
@@ -627,6 +633,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         boolean restarts = unitRow == null ? DocType.CREDIT_NOTE.defaultRestarts() : unitRow.restartsEachFinancialYear();
 
         Map<UUID, UUID> original = new HashMap<>();
+        // one COUNTER_SALE ledger line per bill line (SaleBillService writes exactly one), so the first is the only one
         for (SaleBillRepository.SaleLedger l : bills.saleLedger(tenantId, bill.id())) {
             original.putIfAbsent(l.billLineId(), l.ledgerId());
         }
@@ -634,7 +641,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         int rowNo = 0;
         for (SalesReturnRepository.LineRow l : moving) {
             rowNo++;
-            boolean isX = GoodsReceiptService.isScheduleX(products.find(tenantId, l.productId()).orElseThrow().row());
+            boolean isX = GoodsReceiptService.isScheduleX(productRows.get(l.productId()).row());
             ledger.add(new StockPosting.Line(storeId, l.productId(), l.batchId(), StockState.valueOf(l.destination()), l.qty(),
                     "SALES_RETURN", row.reasonKey(), UUID.randomUUID(), original.get(l.billLineId()),
                     new StockPosting.Doc(SUBJECT, row.id(), creditNoteNo, l.id()), rowNo, isX ? signer : null));
@@ -679,7 +686,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
             if (bl == null) {
                 continue;
             }
-            ProductRepository.Row product = products.find(tenantId, l.productId()).orElseThrow().row();
+            ProductRepository.Row product = productRows.get(l.productId()).row();
             if ("H1".equals(product.schedule())) {
                 registers.reverseH1ForReturn(tenantId, l.billLineId(), l.qty(), creditNoteNo);
             } else if (GoodsReceiptService.isScheduleX(product) && signer != null) {
@@ -702,6 +709,52 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         after.put("refundTotalPaise", total);
         auditLog.record("PHARMACY_SALES_RETURN", ENTITY_TYPE, row.id(), null, after);
         log.info("Sales return completed returnId={} refundTotalPaise={}", row.id(), total);
+    }
+
+    /** The lines with their refund, taxable and tax parts worked from the completed returned quantity of each bill line. */
+    static List<SalesReturnRepository.LineRow> recomputed(List<SalesReturnRepository.LineRow> lines, Map<UUID, LineRow> billLines) {
+        List<SalesReturnRepository.LineRow> out = new ArrayList<>();
+        for (SalesReturnRepository.LineRow l : lines) {
+            LineRow bl = billLines.get(l.billLineId());
+            if ("REFUSED".equals(l.destination()) || bl == null) {
+                out.add(l);
+                continue;
+            }
+            SaleRules.ReturnShare share = SaleRules.returnShare(bl.netPaise(), bl.taxablePaise(), bl.qty(), bl.returnedQty(), l.qty());
+            out.add(new SalesReturnRepository.LineRow(l.id(), l.billLineId(), l.productId(), l.batchId(), l.qty(), l.conditionKey(),
+                    l.decision(), l.destination(), share.refundPaise(), share.taxablePaise(), share.taxPaise(), l.secondSigner()));
+        }
+        return out;
+    }
+
+    /**
+     * The refund modes after the shares were worked again: when the total moved (a paisa or two), the difference goes to the
+     * largest mode that is not UDHAR (UDHAR only when it is the only mode and the customer owes enough), so the modes still add up to
+     * the credit note. A change that cannot be placed answers 409 changed.
+     */
+    static Map<String, Long> reconciled(Map<String, Long> refunds, long total, CustomerRepository.Row customer) {
+        long paid = refunds.values().stream().mapToLong(Long::longValue).sum();
+        if (refunds.isEmpty() || paid == total) {
+            return refunds;
+        }
+        long delta = total - paid;
+        String target = null;
+        for (Map.Entry<String, Long> e : refunds.entrySet()) {
+            if (!"UDHAR".equals(e.getKey()) && e.getValue() + delta >= 0 && (target == null || e.getValue() > refunds.get(target))) {
+                target = e.getKey();
+            }
+        }
+        if (target == null && refunds.containsKey("UDHAR") && refunds.get("UDHAR") + delta >= 0
+                && refunds.get("UDHAR") + delta <= (customer == null ? 0L : customer.duePaise())) {
+            target = "UDHAR";
+        }
+        if (target == null) {
+            throw PharmacyProblemException.changed(null);
+        }
+        Map<String, Long> out = new LinkedHashMap<>(refunds);
+        out.put(target, out.get(target) + delta);
+        out.values().removeIf(v -> v == 0L);
+        return out;
     }
 
     // ---- planning and checks ----
@@ -832,11 +885,8 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         if (sum != total) {
             errors.add(new FieldMessage("refunds", "Refunds must add up to " + SaleRules.rupeesText(total) + "."));
         }
+        // the udhar-above-due check lives in BillCancelService.checkRefunds, shared by the cancelled-bill refund and this return
         BillCancelService.checkRefunds(refunds, sum, allowed, paidLeft, customer, errors);
-        long udhar = refunds.getOrDefault("UDHAR", 0L);
-        if (udhar > 0 && customer != null && udhar > customer.duePaise()) {
-            errors.add(new FieldMessage("refunds", "The udhar refund is more than the customer owes."));
-        }
     }
 
     /** What each original mode can still give back: paid less already refunded. */
@@ -993,6 +1043,13 @@ public class SalesReturnService implements ApprovalSubjectHandler {
                 .orElse(new StockViews.BatchRef(batchId, "", null));
     }
 
+    /** The bills of these returns in one read (no query per row). */
+    private Map<UUID, BillRow> billsOf(UUID tenantId, List<Row> rows) {
+        Set<UUID> ids = new LinkedHashSet<>();
+        rows.forEach(r -> ids.add(r.billId()));
+        return bills.findAll(tenantId, ids);
+    }
+
     /** "Walk-in", or the customer or patient name: in full for the owner and a pharmacist, masked for a cashier. */
     private Map<UUID, String> labels(PharmacyCaller caller, List<BillRow> list) {
         UUID tenantId = caller.tenantId();
@@ -1043,12 +1100,14 @@ public class SalesReturnService implements ApprovalSubjectHandler {
                 size, page * size);
         Map<String, String> reasonLabels = reasons.labels(tenantId);
         List<IpdViews.ReturnsWaitingRow> rows = new ArrayList<>();
+        Map<UUID, BillRow> billsById = billsOf(tenantId, slice.items());
+        Map<UUID, String> labelOf = labels(caller, new ArrayList<>(billsById.values()));
         for (Row r : slice.items()) {
-            BillRow bill = bills.find(tenantId, r.billId()).orElse(null);
+            BillRow bill = billsById.get(r.billId());
             if (bill == null) {
                 continue;
             }
-            String who = labels(caller, List.of(bill)).get(bill.id());
+            String who = labelOf.get(bill.id());
             List<SalesReturnRepository.LineRow> lines = returns.lines(tenantId, r.id());
             Set<UUID> productIds = new LinkedHashSet<>();
             lines.forEach(l -> productIds.add(l.productId()));

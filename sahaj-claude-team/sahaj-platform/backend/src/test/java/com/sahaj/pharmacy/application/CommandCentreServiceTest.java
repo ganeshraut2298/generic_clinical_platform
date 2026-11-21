@@ -35,6 +35,15 @@ class CommandCentreServiceTest {
 
     CommandCentreServiceTest() {
         when(isolation.run(any())).thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(0)).get());
+        when(isolation.runOr(any(), any())).thenAnswer(call -> {
+            try {
+                return ((java.util.function.Supplier<?>) call.getArgument(0)).get();
+            } catch (ForbiddenException refused) {
+                throw refused;
+            } catch (RuntimeException failure) {
+                return call.getArgument(1);
+            }
+        });
         when(repository.sales(any(), anyCollection(), any(), any())).thenReturn(new CommandCentreRepository.Sales(100000, 4, 20000));
         when(repository.expiryBands(any(), anyCollection(), any())).thenReturn(List.of(
                 new CommandCentreRepository.ExpiryBand(shop, product, "EXPIRED", 1, 500),
@@ -43,6 +52,8 @@ class CommandCentreServiceTest {
         when(repository.udhar(any(), any())).thenReturn(new CommandCentreRepository.Udhar(30000, 10000, true));
         when(repository.indentsWaiting(any(), anyCollection())).thenReturn(3);
         when(w.stock.overview(any(), any(), any())).thenReturn(new StockRepository.Overview(10, 12, 1000, 1, 2, 3, 0, 5, 0));
+        when(w.stock.lowStock(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                any())).thenReturn(new StockRepository.LowStockSlice(List.of(), 2));
         when(registers.h1Entries(any(), any(), any(), any(), eq(false))).thenReturn(6);
         when(registers.h1Entries(any(), any(), any(), any(), eq(true))).thenReturn(2);
         when(registers.xBalances(any(), any(), any(), any(), any())).thenReturn(List.of());
@@ -71,7 +82,7 @@ class CommandCentreServiceTest {
         assertThat(cc.compliance().h1().overridesToReview()).isEqualTo(2);
         assertThat(cc.compliance().scheduleX().balanced()).isTrue();
         assertThat(cc.livePrescriptions().items()).isEmpty();
-        verify(w.posting).sweepStore(any(), any(), eq(shop), any());
+        verify(w.posting, never()).sweepStore(any(), any(), any(), any()); // not on every Refresh (m5)
     }
 
     @Test
@@ -115,7 +126,51 @@ class CommandCentreServiceTest {
                 assertThat(bar.valuePaise()).isNull();
             }
         });
-        assertThat(cc.reorder().productCount()).isEqualTo(5);
+        assertThat(cc.reorder().productCount()).as("audited products are left out of the count (L23)").isEqualTo(2);
+        verify(w.stock).lowStock(any(), eq(shop), any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), eq(Set.of(product)));
+    }
+
+    @Test
+    void aBlindCallersScheduleXCardIgnoresAuditedProductsAndNeverCountedOnesAreCountedApart() {
+        UUID audited = UUID.randomUUID();
+        UUID counted = UUID.randomUUID();
+        UUID uncounted = UUID.randomUUID();
+        when(w.audits.openAuditProducts(any(), any())).thenReturn(Set.of(audited));
+        when(registers.xBalances(any(), any(), any(), any(), any())).thenReturn(List.of(
+                new RegisterReadRepository.XBalance(audited, false, 0, 10, 0, 10),
+                new RegisterReadRepository.XBalance(counted, false, 0, 10, 0, 10),
+                new RegisterReadRepository.XBalance(uncounted, false, 0, 4, 0, 4)));
+        when(registers.latestCounts(any(), any(), anyCollection())).thenReturn(java.util.Map.of(
+                audited, new RegisterReadRepository.XCount(7, java.time.LocalDate.of(2026, 11, 1)),
+                counted, new RegisterReadRepository.XCount(10, java.time.LocalDate.of(2026, 11, 1))));
+
+        CommandCentreViews.ScheduleXCard blindCard = service.get(SaleWorld.TENANT, w.f.pharmacist.userId(), shop.toString())
+                .compliance().scheduleX();
+
+        assertThat(blindCard.toReview()).as("the audited product's difference is not revealed").isZero();
+        assertThat(blindCard.neverCounted()).isEqualTo(1);
+        assertThat(blindCard.balanced()).isTrue();
+
+        when(w.audits.openAuditProducts(any(), any())).thenReturn(Set.of());
+        CommandCentreViews.ScheduleXCard open = service.get(SaleWorld.TENANT, w.f.pharmacist.userId(), shop.toString())
+                .compliance().scheduleX();
+        assertThat(open.toReview()).isEqualTo(1);
+        assertThat(open.balanced()).isFalse();
+    }
+
+    @Test
+    void scheduleXBalancedIsFalseWhenNothingWasCountedYetAndTheNeverCountedProductsAreNamedInTheCount() {
+        UUID a = UUID.randomUUID();
+        when(registers.xBalances(any(), any(), any(), any(), any())).thenReturn(List.of(
+                new RegisterReadRepository.XBalance(a, false, 0, 4, 0, 4)));
+
+        CommandCentreViews.ScheduleXCard card = service.get(SaleWorld.TENANT, w.f.pharmacist.userId(), shop.toString())
+                .compliance().scheduleX();
+
+        assertThat(card.neverCounted()).isEqualTo(1);
+        assertThat(card.toReview()).isZero();
+        assertThat(card.balanced()).isFalse();
     }
 
     @Test
@@ -129,7 +184,7 @@ class CommandCentreServiceTest {
 
     @Test
     void aCardThatFailsAnswersErrorAndTheOthersStillAnswer() {
-        when(repository.udhar(any(), any())).thenThrow(new IllegalStateException("boom"));
+        when(repository.udhar(any(), any())).thenThrow(new ArithmeticException("any runtime failure of one card"));
 
         CommandCentreViews.CommandCentre cc = service.get(SaleWorld.TENANT, w.f.pharmacist.userId(), shop.toString());
 
@@ -142,7 +197,7 @@ class CommandCentreServiceTest {
     void everyCardRunsInItsOwnIsolationSoOneFailureCannotAbortTheOthers() {
         service.get(SaleWorld.TENANT, w.f.pharmacist.userId(), shop.toString());
 
-        verify(isolation, org.mockito.Mockito.atLeast(6)).run(any());
+        verify(isolation, org.mockito.Mockito.atLeast(6)).runOr(any(), any());
     }
 
     @Test

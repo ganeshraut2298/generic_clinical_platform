@@ -66,6 +66,7 @@ class TransferDispatchServiceTest {
             signature, transfers, dispatches, clients, events, transferService, audit, new BlindCount(mock(StockAuditRepository.class)));
     private PharmacyCaller caller = new PharmacyCaller(TENANT, USER, ME, "Test Pharmacist", "PHARMACIST", List.of());
     private final Store from = new Store(FROM, UNIT, "Test Pharmacy", "PH", StoreType.PHARMACY, null, true, false, true, true, 0);
+    private Store receiving = new Store(TO, UNIT, "Test Ward 3B", "W3B", StoreType.WARD, null, false, true, true, true, 0);
     private String status = "APPROVED";
     private String schedule = "NONE";
 
@@ -74,6 +75,7 @@ class TransferDispatchServiceTest {
         when(gate.require(TENANT, USER, AccessLevel.PHARMACY_ACCESS)).thenAnswer(i -> caller);
         when(guard.require(any(), eq(FROM), eq(StoreCapability.DISPATCH_TRANSFER))).thenReturn(from);
         when(stores.findForUpdate(TENANT, FROM)).thenReturn(Optional.of(from));
+        when(stores.find(TENANT, TO)).thenAnswer(i -> Optional.of(receiving));
         when(clients.take(any(), any(), any(), any(), any(), any())).thenReturn(true);
         when(transfers.findById(TENANT, TRANSFER)).thenAnswer(i -> Optional.of(row(0)));
         when(transfers.findForUpdate(TENANT, TRANSFER)).thenAnswer(i -> Optional.of(row(0)));
@@ -133,6 +135,16 @@ class TransferDispatchServiceTest {
     @Test
     void onlyAnApprovedTransferCanBeDispatched() {
         status = "WAITING_APPROVAL";
+
+        assertThatThrownBy(() -> run(null)).isInstanceOfSatisfying(PharmacyProblemException.class,
+                e -> assertThat(e.slug()).isEqualTo("doc-state"));
+        verify(posting, never()).post(any(), any());
+    }
+
+    @Test
+    void aTransferToAStoreSwitchedOffAfterApprovalIsRefusedAndMovesNothing() {
+        when(stores.find(TENANT, TO)).thenAnswer(i -> Optional.of(new Store(TO, UNIT, "Test Ward 3B", "W3B", StoreType.WARD, null,
+                false, true, true, false, 0)));
 
         assertThatThrownBy(() -> run(null)).isInstanceOfSatisfying(PharmacyProblemException.class,
                 e -> assertThat(e.slug()).isEqualTo("doc-state"));

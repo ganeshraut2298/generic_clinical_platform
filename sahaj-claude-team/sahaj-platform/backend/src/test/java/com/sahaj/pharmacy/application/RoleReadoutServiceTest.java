@@ -82,7 +82,10 @@ class RoleReadoutServiceTest {
 
         SaleViews.RoleReadout open = RoleReadoutService.build(withLimits(null, null));
         assertThat(value(open, "DISCOUNT_ABOVE_LIMIT", "PHARMACIST")).isEqualTo("ALLOW");
-        assertThat(text(open, "DISCOUNT_ABOVE_LIMIT", "PHARMACIST")).isNull();
+        assertThat(text(open, "DISCOUNT_ABOVE_LIMIT", "PHARMACIST")).isEqualTo("No limit set");
+        assertThat(text(open, "DISCOUNT_ABOVE_LIMIT", "CASHIER")).isEqualTo("No limit set");
+        assertThat(text(open, "DISCOUNT_ABOVE_LIMIT", "OWNER")).as("the owner is exempt, not unlimited by a missing rule").isNull();
+        assertThat(text(open, "DISCOUNT_ABOVE_LIMIT", "STORE_KEEPER")).isNull();
     }
 
     @Test

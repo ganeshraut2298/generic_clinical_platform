@@ -408,6 +408,30 @@ class StockAuditServiceTest {
     }
 
     @Test
+    void aRetryOfAPostThatWasSentBackToRecountIsNotAnsweredAsIfItWorked() {
+        // the claim of the key stays committed with the recount (the app role cannot delete a key), so the replay must say 409 changed
+        when(clients.own(TENANT, ME, KEY)).thenReturn(Optional.of(new ClientRequestRepository.Taken(ME, StockAuditService.OP_POST,
+                AUDIT)));
+        current = audit("RECOUNT", COUNTER, 8);
+
+        assertThatThrownBy(() -> approve(null)).isInstanceOfSatisfying(PharmacyProblemException.class,
+                e -> assertThat(e.slug()).isEqualTo("changed"));
+        verify(posting, never()).post(any(), any());
+    }
+
+    @Test
+    void aRetryOfAPostThatClosedOrWentToTheApproverIsAReplayOfTheStoredOutcome() {
+        when(clients.own(TENANT, ME, KEY)).thenReturn(Optional.of(new ClientRequestRepository.Taken(ME, StockAuditService.OP_POST,
+                AUDIT)));
+        current = audit("CLOSED", COUNTER, 8);
+
+        assertThat(approve(null)).isNotNull();
+        current = audit("WAITING_APPROVAL", COUNTER, 8);
+        assertThat(approve(null)).isNotNull();
+        verify(posting, never()).post(any(), any());
+    }
+
+    @Test
     void whenTheReviewerIsNotAnApproverTheAuditWaitsForApprovalAndPostsNothing() {
         UUID requestId = UUID.randomUUID();
         ApprovalEngine.Plan plan = new ApprovalEngine.Plan(null, List.of(), 1, null, false);

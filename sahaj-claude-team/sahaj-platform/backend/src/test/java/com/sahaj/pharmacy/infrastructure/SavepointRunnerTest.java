@@ -59,6 +59,23 @@ class SavepointRunnerTest {
     }
 
     @Test
+    void runOrAnswersTheFallbackForAnyRuntimeFailureAndRollsBackToTheSavepoint() throws Exception {
+        assertThat(runner.runOr(() -> {
+            throw new ArithmeticException("any runtime failure");
+        }, "fallback")).isEqualTo("fallback");
+        assertThat(runner.runOr(() -> "ok", "fallback")).isEqualTo("ok");
+
+        org.mockito.Mockito.verify(connection).rollback(savepoint);
+    }
+
+    @Test
+    void runOrNeverSwallowsARefusal() {
+        assertThatThrownBy(() -> runner.runOr(() -> {
+            throw new com.sahaj.platform.api.ForbiddenException("forbidden", "Not allowed", "x");
+        }, "fallback")).isInstanceOf(com.sahaj.platform.api.ForbiddenException.class);
+    }
+
+    @Test
     void outsideATransactionTheWorkJustRuns() {
         TransactionSynchronizationManager.setActualTransactionActive(false);
 

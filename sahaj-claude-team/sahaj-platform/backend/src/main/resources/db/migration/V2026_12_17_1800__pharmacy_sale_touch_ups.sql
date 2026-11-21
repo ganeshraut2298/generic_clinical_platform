@@ -213,7 +213,7 @@ begin
        'TRANSFER_DISPATCH', 'TRANSFER_RECEIPT_ACCEPTED', 'TRANSFER_RECEIPT_REJECTED', 'RETURN_ACCEPTED', 'SHORTAGE_FOUND',
        'STORE_RETURN', 'DAMAGE_QUARANTINE', 'DAMAGE_SEND_TO_CS', 'WARD_CONSUMPTION', 'WARD_CONSUMPTION_PATIENT',
        'STOCK_AUDIT_ADJUSTMENT',
-       'COUNTER_SALE', 'SALES_RETURN', 'IPD_ISSUE', 'WARD_RETURN_ACCEPTED', 'WARD_RETURN_WASTAGE']::text[]) then
+       'COUNTER_SALE', 'COUNTER_SALE_CANCELLED', 'SALES_RETURN', 'IPD_ISSUE', 'WARD_RETURN_ACCEPTED', 'WARD_RETURN_WASTAGE']::text[]) then
     select coalesce(p.schedule, c.schedule) into v_schedule
       from pharmacy.product p
       left join pharmacy.catalogue_product c on c.id = p.catalogue_product_id
@@ -229,4 +229,4 @@ revoke all on function pharmacy.guard_stock_ledger_schedule_x() from public;
 revoke all on function pharmacy.guard_stock_ledger_schedule_x() from sahaj_app;
 
 comment on function pharmacy.guard_stock_ledger_schedule_x() is
-  'L14: a ledger line by a person (actor_kind USER) on a person-driven transaction type (ADR-029 P7 final list, 17 types, plus the five SAH-80 types COUNTER_SALE, SALES_RETURN, IPD_ISSUE, WARD_RETURN_ACCEPTED, WARD_RETURN_WASTAGE) for a Schedule X product must carry second_signer_membership_id. Schedule from the own product row or, for an adopted product, the global catalogue. SQLSTATE 23514. Final body V2026_12_17_1800 (list); earlier bodies 1720 and 1730. COUNTER_SALE_CANCELLED is a reversal of a signed sale and is not in the list. A new person-driven type is added here, to the contract and to ADR-029 P7 in one change.';
+  'L14: a ledger line by a person (actor_kind USER) on a person-driven transaction type (ADR-029 P7 final list, 17 types, plus the six SAH-80 types COUNTER_SALE, COUNTER_SALE_CANCELLED, SALES_RETURN, IPD_ISSUE, WARD_RETURN_ACCEPTED, WARD_RETURN_WASTAGE; 23 types) for a Schedule X product must carry second_signer_membership_id. Schedule from the own product row or, for an adopted product, the global catalogue. SQLSTATE 23514. Final body V2026_12_17_1800 (list); earlier bodies 1720 and 1730. COUNTER_SALE_CANCELLED is on the list (DEC-093 item 2): a cancel of a Schedule X sale is a person handling stock and carries the signer. A new person-driven type is added here, to the contract and to ADR-029 P7 in one change.';

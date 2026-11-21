@@ -12,6 +12,7 @@ import com.sahaj.pharmacy.domain.StockState;
 import com.sahaj.pharmacy.domain.Store;
 import com.sahaj.pharmacy.domain.StoreCapability;
 import com.sahaj.platform.api.AuditLog;
+import com.sahaj.platform.api.ConflictException;
 import com.sahaj.platform.api.InvalidFieldsException;
 import com.sahaj.platform.api.InvalidFieldsException.FieldMessage;
 import com.sahaj.platform.api.NotFoundException;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -193,7 +195,7 @@ public class SaleBillService {
         boolean useCredit = payments.containsKey("UDHAR") || payments.containsKey("CREDIT_NOTE");
         CustomerRepository.Row customer = useCredit ? lockCustomer(tenantId, cart.buyer()) : null;
 
-        SalePricer.Priced priced = pricer.price(caller, store, cart, true);
+        SalePricer.Priced priced = pricer.price(caller, store, cart, true, held(in, heldRow));
 
         // permissions first (403), then the state of the stock and the price (409), then the checks of the bill (400)
         if ((priced.anyScheduled() || priced.anyDecision()) && !priced.canSellScheduled()) {
@@ -231,7 +233,7 @@ public class SaleBillService {
         }
         UUID discountRequestId = caller.isOwner() || priced.discount().lean() || cart.percent() == null
                 || cart.percent().signum() == 0 ? null
-                : approvals.check(tenantId, storeId, cart).approved() ? cart.discountRequestId() : null;
+                : approvals.check(tenantId, storeId, cart, me, held(in, heldRow)).approved() ? cart.discountRequestId() : null;
         long udhar = payments.getOrDefault("UDHAR", 0L);
         if (udhar > 0 && customer != null && !customer.active()) {
             throw PharmacyProblemException.saleConflict("customer-inactive", "Customer switched off", CUSTOMER_INACTIVE);
@@ -265,7 +267,19 @@ public class SaleBillService {
                 card == null ? null : card.prescriptionDate(), in.heldBillId(), cart.percent(), discountRequestId, m.gross(), m.discount(),
                 m.taxable(), m.cgst(), m.sgst(), m.roundOff(), net, udhar, now, me, caller.isPharmacist() ? me : null, null, null,
                 null, null, null, 0L, null, 0L);
-        bills.insertBill(tenantId, bill);
+        try {
+            bills.insertBill(tenantId, bill);
+        } catch (DataIntegrityViolationException collision) {
+            if (UniqueViolations.is(collision, "uq_bill_discount_request")) {
+                throw PharmacyProblemException.saleConflict("discount-approval-void", "Discount approval is not valid",
+                        DISCOUNT_APPROVAL_VOID);
+            }
+            if (UniqueViolations.is(collision, "uq_bill_no")) {
+                throw new ConflictException("prefix-in-use", "Prefix already used",
+                        "Two document types cannot use the same prefix");
+            }
+            throw collision;
+        }
 
         List<UUID> lineIds = new ArrayList<>();
         List<StockPosting.Line> stockLines = new ArrayList<>();
@@ -274,7 +288,7 @@ public class SaleBillService {
             lineIds.add(lineId);
             SaleCart.Line input = l.input();
             boolean decision = input.substituted() || input.allergyOverride() != null || input.h1Override() != null;
-            boolean isX = "X".equals(l.product().schedule());
+            boolean isX = GoodsReceiptService.isScheduleX(l.product());
             bills.insertLine(tenantId, store.unitId(), billId, new SaleBillRepository.LineRow(lineId, l.lineNo(),
                     l.product().productId(), l.batchId(), l.qty(), 0, l.mrp(), l.gstRate(), l.product().hsn(),
                     l.money().a(), l.money().d(), l.money().n(), l.money().t(), l.money().x(), input.prescribedProductId(),
@@ -401,6 +415,10 @@ public class SaleBillService {
 
     // ---- helpers ----
 
+    private static DiscountApprovals.Held held(BillCreate in, HeldBillRepository.Row heldRow) {
+        return new DiscountApprovals.Held(in.heldBillId(), heldRow == null ? null : heldRow.discountRequestId());
+    }
+
     /** The capability sell, or readRegisters (the owner's and the HOD's read of the bills). */
     private void requireSellOrRegisters(PharmacyCaller caller, UUID storeId) {
         if (StoreAccessGuard.holds(caller, storeId, StoreCapability.SELL)) {
@@ -522,7 +540,7 @@ public class SaleBillService {
             errors.add(new FieldMessage("payments", "Payments must add up to " + SaleRules.rupeesText(net) + "."));
         }
         long udhar = payments.getOrDefault("UDHAR", 0L);
-        if (udhar > 0 && (customer == null && !"CUSTOMER".equals(cart.buyer().kind()) || customer == null)) {
+        if (udhar > 0 && customer == null) {
             errors.add(new FieldMessage("payments", "Choose a customer for udhar."));
         } else if (udhar > 0 && customer.duePaise() + udhar > customer.creditLimitPaise()) {
             errors.add(new FieldMessage("payments", CREDIT_LIMIT));
@@ -607,7 +625,7 @@ public class SaleBillService {
                         card == null ? null : card.source(), null, l.product().productId(),
                         l.input().prescribedProductId(), l.batchId(), l.qty(), me,
                         l.input().h1Override() == null ? null : l.input().h1Override().reasonKey()));
-            } else if ("X".equals(schedule)) {
+            } else if (GoodsReceiptService.isScheduleX(l.product())) {
                 registers.insertScheduleX(tenantId, new SaleRegisterRepository.ScheduleXEntry(store.unitId(), store.id(),
                         bill.id(), lineIds.get(i), bill.billNo(), bill.patientId(), patientName, patientAge,
                         card.prescriberName(), card.prescriberRegNo(), card.prescriptionDate(), l.product().productId(),

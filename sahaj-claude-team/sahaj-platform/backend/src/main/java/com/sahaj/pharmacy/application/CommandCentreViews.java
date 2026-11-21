@@ -47,7 +47,11 @@ public final class CommandCentreViews {
     public record H1Card(int billsToday, int overridesToReview) {
     }
 
-    public record ScheduleXCard(int toReview, boolean balanced) {
+    /**
+     * {@code neverCounted}: products with a Schedule X book that were never counted (pass-2 m4). {@code toReview} and {@code balanced}
+     * look at the counted products only; {@code balanced} is false when nothing was counted yet.
+     */
+    public record ScheduleXCard(int toReview, boolean balanced, int neverCounted) {
     }
 
     public record Compliance(String state, H1Card h1, ScheduleXCard scheduleX, SalesReturnViews.LicenceStatus drugLicence) {

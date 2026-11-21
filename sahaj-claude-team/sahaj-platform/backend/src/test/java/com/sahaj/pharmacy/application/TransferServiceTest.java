@@ -104,7 +104,9 @@ class TransferServiceTest {
                 LocalDate.of(2027, 3, 31), new BigDecimal("10.00"), new BigDecimal("6.0000"), null, NOW)));
         when(posting.pick(any(), anyInt())).thenAnswer(i -> {
             int qty = i.getArgument(1);
-            return new Fefo.Result(List.of(new Fefo.Pick(BATCH, Math.min(qty, 10))), 10, Math.max(0, qty - 10));
+            List<StockRepository.Bal> rows = i.getArgument(0);
+            int have = rows.stream().mapToInt(StockRepository.Bal::qty).sum();
+            return new Fefo.Result(List.of(new Fefo.Pick(BATCH, Math.min(qty, have))), have, Math.max(0, qty - have));
         });
         when(transfers.findById(eq(TENANT), any())).thenAnswer(i -> Optional.of(row(status, 0)));
         when(transfers.findForUpdate(eq(TENANT), any())).thenAnswer(i -> Optional.of(row(status, 0)));
@@ -181,6 +183,18 @@ class TransferServiceTest {
         assertThatThrownBy(() -> create(TO, 11)).isInstanceOfSatisfying(InvalidFieldsException.class,
                 e -> assertThat(e.errors().toString()).contains("lines[0].quantity").contains("Enter a whole number from 1 to 10"));
         verify(transfers, never()).insert(any(), any());
+    }
+
+    @Test
+    void aLineThatFailsTheRecheckUnderTheStoreLockRefusesTheTransferInsteadOfBeingDropped() {
+        // the first check sees 10 units; by the time the sending store is locked only 3 are left
+        when(stock.availableOfProduct(TENANT, FROM, PRODUCT)).thenReturn(List.of(bal(10))).thenReturn(List.of(bal(3)));
+
+        assertThatThrownBy(() -> create(TO, 6)).isInstanceOfSatisfying(InvalidFieldsException.class,
+                e -> assertThat(e.errors().toString()).contains("lines[0].quantity").contains("Enter a whole number from 1 to 3"));
+        verify(transfers, never()).insert(any(), any());
+        verify(transfers, never()).insertLine(any(), any());
+        verify(numbers, never()).next(any(), any());
     }
 
     @Test

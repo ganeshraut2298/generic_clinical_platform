@@ -106,7 +106,7 @@ public class ConsumptionService {
     // ---- reads ----
 
     /** The ADMITTED patients of the ward linked to this store; q (2 to 30) filters by IP number or name. Audited without names. */
-    @Transactional(readOnly = true)
+    @Transactional // read-write on purpose: it writes the audit row, and a read-only transaction refuses that on PostgreSQL
     public ConsumptionViews.AdmittedList admittedPatients(UUID tenantId, UUID userId, String rawStoreId, String rawQ) {
         PharmacyCaller caller = gate.require(tenantId, userId, AccessLevel.PHARMACY_ACCESS);
         UUID storeId = PharmacyParams.pathId(rawStoreId);

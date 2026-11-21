@@ -65,6 +65,15 @@ public class JdbcDamageReportRepository implements DamageReportRepository {
     }
 
     @Override
+    public int waitingQuantity(UUID tenantId, UUID storeId, UUID batchId) {
+        return jdbc.sql("""
+                select coalesce(sum(quantity), 0)::int from pharmacy.damage_report
+                 where tenant_id = :tenantId and store_id = :storeId and batch_id = :batchId and status = 'WAITING_APPROVAL'
+                """).param("tenantId", tenantId).param("storeId", storeId).param("batchId", batchId).query(Integer.class)
+                .single();
+    }
+
+    @Override
     public void insert(UUID tenantId, NewRow r) {
         jdbc.sql(INSERT).param("id", r.id()).param("tenantId", tenantId).param("unitId", r.unitId()).param("docSeq", r.docSeq())
                 .param("docNo", r.docNo()).param("storeId", r.storeId()).param("productId", r.productId())

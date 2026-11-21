@@ -186,8 +186,11 @@ public class BillCancelService {
             throw new ForbiddenException("cancel-not-allowed", "Not allowed", SaleBillAssembler.ONLY_OWNER_EARLIER_DAY);
         }
         List<LineRow> lines = bills.lines(tenantId, billId);
+        Map<UUID, ProductRepository.Full> found = productsOf(tenantId, lines);
         UUID signer = null;
-        if (hasScheduleX(tenantId, lines)) {
+        if (found.values().stream().anyMatch(f -> GoodsReceiptService.isScheduleX(f.row()))) {
+            // SEC I27 / DEC-092 item 6: the owner never handles Schedule X; only a pharmacist with a second signer cancels it
+
             if (!caller.isPharmacist()) {
                 throw PharmacyProblemException.pharmacistRequired(SaleBillService.PHARMACIST_ONLY_X);
             }
@@ -208,10 +211,11 @@ public class BillCancelService {
         for (LineRow l : lines) {
             StockRepository.BatchRow batch = stock.findBatch(tenantId, l.batchId()).orElseThrow(BillCancelService::notFound);
             boolean toShelf = Boolean.TRUE.equals(in.backOnShelf()) && !batch.expiryDate().isBefore(today);
+            boolean isX = GoodsReceiptService.isScheduleX(found.get(l.productId()).row());
             back.add(new StockPosting.Line(storeId, l.productId(), l.batchId(),
                     toShelf ? StockState.AVAILABLE : StockState.QUARANTINE, l.qty(), "COUNTER_SALE_CANCELLED", in.reasonKey(),
                     UUID.randomUUID(), original.get(l.id()), new StockPosting.Doc(DOC_TYPE, billId, bill.billNo(), l.id()),
-                    l.lineNo(), null));
+                    l.lineNo(), isX ? signer : null));
         }
         try {
             posting.post(new StockPosting.Actor(tenantId, store.unitId(), me, null, null), back);
@@ -219,7 +223,10 @@ public class BillCancelService {
             throw blind.scrub(caller, storeId, refused);
         }
         registers.reverseH1ForCancelledBill(tenantId, billId);
-        registers.reverseScheduleXForCancelledBill(tenantId, billId);
+        if (signer != null) {
+            // the reversal carries the people who cancelled (the pharmacist and the second signer), not the sale's signers
+            registers.reverseScheduleXForCancelledBill(tenantId, billId, me, signer);
+        }
 
         // the money: the udhar part off the due, a credit note given back, the rest is refund due
         Map<String, Long> paid = new HashMap<>();
@@ -249,6 +256,10 @@ public class BillCancelService {
         }
         events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "CANCELLED", storeId, me,
                 caller.isPharmacist() ? "PHARMACIST" : caller.isOwner() ? "OWNER" : null, null, null, null, in.reasonKey());
+        if (signer != null) {
+            events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SECOND_SIGNATURE", storeId, me, "PHARMACIST", null, null,
+                    null, null);
+        }
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("billId", billId.toString());
         after.put("billNo", bill.billNo());
@@ -383,9 +394,13 @@ public class BillCancelService {
     }
 
     private boolean hasScheduleX(UUID tenantId, List<LineRow> lines) {
+        return productsOf(tenantId, lines).values().stream().anyMatch(f -> GoodsReceiptService.isScheduleX(f.row()));
+    }
+
+    private Map<UUID, ProductRepository.Full> productsOf(UUID tenantId, List<LineRow> lines) {
         Set<UUID> ids = new HashSet<>();
         lines.forEach(l -> ids.add(l.productId()));
-        return products.findAll(tenantId, ids).values().stream().anyMatch(f -> GoodsReceiptService.isScheduleX(f.row()));
+        return products.findAll(tenantId, ids);
     }
 
     private Map<String, Long> paidByMode(UUID tenantId, UUID billId) {
@@ -448,6 +463,9 @@ public class BillCancelService {
                 errors.add(new FieldMessage("refunds", "This refund mode is not allowed. Ask your owner."));
             } else if (("CREDIT_NOTE".equals(mode) || "UDHAR".equals(mode)) && customer == null) {
                 errors.add(new FieldMessage("refunds", "Choose a customer to refund to a credit note or udhar."));
+            } else if ("UDHAR".equals(mode) && amount > customer.duePaise()) {
+                // M3: money recorded as returned must reach the account, so more than the customer owes is refused, never capped
+                errors.add(new FieldMessage("refunds", "The udhar refund is more than the customer owes."));
             }
         }
     }

@@ -657,6 +657,12 @@ public class StockAuditService implements ApprovalSubjectHandler {
                 if (!OP_POST.equals(own.operation()) || !auditId.equals(own.subjectId())) {
                     throw PharmacyProblemException.clientKeyReused();
                 }
+                // L6: the claim of a post that was refused as short stays committed with the recount (the app role cannot delete a
+                // client key). The retry must not be told that the post worked: only an audit that closed or went on to the approver
+                // is a replay; one sent back to count answers 409 changed with the audit as it is now, as a fresh run would.
+                if (!"CLOSED".equals(peek.status()) && !"WAITING_APPROVAL".equals(peek.status())) {
+                    throw PharmacyProblemException.changed(view(caller, peek));
+                }
                 return view(caller, peek);
             }
             if (clients.heldByAnyone(tenantId, in.clientKey())) {

@@ -74,10 +74,14 @@ public class StockReadService {
         posting.sweepStore(tenantId, store.unitId(), storeId, caller.membershipId());
         StockRepository.Overview o = stock.overview(tenantId, storeId, time.today());
         // rule 24: the value is worked from the audited products' quantities, so a blind caller gets none while the audit is open
-        Long value = blind.at(caller, storeId).active() ? null : Long.valueOf(o.stockValuePaise());
+        BlindCount.Mask mask = blind.at(caller, storeId);
+        Long value = mask.active() ? null : Long.valueOf(o.stockValuePaise());
+        // rule 24: the low-stock pill compares a hidden quantity with the reorder level, so a blind caller's pill leaves those products out
+        int lowStock = mask.active()
+                ? (int) stock.lowStock(tenantId, storeId, time.today(), 1, 0, mask.products()).total() : o.lowStock();
         return new StockViews.Overview(OpeningStockPostService.storeRef(store), o.skuCount(), o.batchCount(),
                 value, new StockViews.Pills(o.nearExpiry30(), o.nearExpiry60(), o.nearExpiry90(),
-                        o.expiredQuarantined(), o.lowStock(), o.scheduleProducts()), o.skuCount() == 0 && o.batchCount() == 0);
+                        o.expiredQuarantined(), lowStock, o.scheduleProducts()), o.skuCount() == 0 && o.batchCount() == 0);
     }
 
     @Transactional
@@ -143,7 +147,11 @@ public class StockReadService {
         int page = PharmacyParams.intValue("page", rawPage, 0, 0, 1000);
         int size = PharmacyParams.intValue("size", rawSize, 25, 1, 100);
         posting.sweepStore(tenantId, store.unitId(), storeId, caller.membershipId());
-        StockRepository.LowStockSlice slice = stock.lowStock(tenantId, storeId, time.today(), size, page * size);
+        BlindCount.Mask mask = blind.at(caller, storeId);
+        // rule 24: being on this list says "at or below the reorder level", so a blind caller's list leaves audited products out
+        StockRepository.LowStockSlice slice = mask.active()
+                ? stock.lowStock(tenantId, storeId, time.today(), size, page * size, mask.products())
+                : stock.lowStock(tenantId, storeId, time.today(), size, page * size);
         String action = null;
         if (store.type().isCentral()) {
             action = hasPurchase(caller, store) ? "ADD_TO_PURCHASE_ORDER" : null;
@@ -151,7 +159,6 @@ public class StockReadService {
             action = "RAISE_INDENT";
         }
         String chosen = action;
-        BlindCount.Mask mask = blind.at(caller, storeId);
         List<StockViews.LowStockItem> items = slice.items().stream()
                 .map(r -> new StockViews.LowStockItem(new StockViews.ProductRef(r.productId(), r.code(), r.name(),
                         r.strength(), r.form(), r.schedule(), r.purchaseUnit(), r.issueUnit(), r.conversion(),
@@ -194,6 +201,9 @@ public class StockReadService {
         boolean hidden = blind.hides(caller, storeId, productId);
         List<StockViews.FefoBatch> batches = new ArrayList<>();
         for (Fefo.Pick pick : result.picks()) {
+            if (hidden && !batches.isEmpty()) {
+                break; // the number of batches picked would reveal a batch quantity: a blind caller gets the first batch only
+            }
             Bal bal = byBatch.get(pick.batchId());
             batches.add(new StockViews.FefoBatch(new StockViews.BatchRef(bal.batchId(), bal.batchNo(), bal.expiryDate()),
                     hidden ? null : Integer.valueOf(pick.quantity()), ProductAssembler.rate(bal.purchaseRate())));
@@ -260,7 +270,7 @@ public class StockReadService {
             anyHidden |= hidden;
             rows.add(new StockViews.StoreStateRow(OpeningStockPostService.storeRef(store), hidden ? null : s.available(),
                     hidden ? null : s.inTransit(), hidden ? null : s.pendingReturn(), hidden ? null : s.quarantine(),
-                    s.reorderLevel(), status(s)));
+                    s.reorderLevel(), hidden ? null : status(s)));
             available += s.available();
             inTransit += s.inTransit();
             pending += s.pendingReturn();

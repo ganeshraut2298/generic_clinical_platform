@@ -1710,3 +1710,38 @@ Tech lead review: ACCEPTED, decisions (auto, DEC-073):
 - docs/requirements/SAH-80.md has a GO-LIVE CHECKLIST: A setup steps S1-S12, B rules as built CL-1..CL-27 (who confirms, yes/no question), C engineering gates (Schedule X cancel signer, H1 masking, single-use discount approval, prefix collision, pass-2 Majors M1/M2/M3/M5/M6, blind-count leaks, card isolation, third review pass, database run of the ITs), D mockup deviations D-1..D-11, E not in this release, F sign-off. Pointers added to SAH-78.md and SAH-79.md.
 - Open for human: pharmacist registration number printing without a registration form (BR-9, BR-28); keep "Save to customers" before the DPDP wording is approved; fix mockup 05 cashier cell; OQ-78-8 (who may read masters).
 - Tech lead: mark each section C gate closed as it is fixed and tested.
+
+## BA #1 (IPD clinical flow) · BLOCKED by the requirements lock held by BA #2; analysis saved to docs/handoffs/IPD-gap-A-draft.md. Relaunch BA #1 after BA #2 finishes to write docs/requirements/IPD-flow-gap-analysis-A.md from the draft.
+
+## BA #2 (IPD money and supply flow) · BLOCKED by the requirements lock (held by finished BA); analysis saved to docs/handoffs/IPD-gap-B-draft.md. Both BAs to be relaunched in sequence (BA #1 first, then BA #2) to write docs/requirements/IPD-flow-gap-analysis-A.md and -B.md from the drafts.
+
+## Angular handoff · fixes D-2, D-3, m11, m12 · 21 Nov 2026 (DONE except m4)
+- D-2 invoice table in .tbl-wrap (+print rule, spec); D-3 cancel error shows the server detail (new bill-detail.section.spec.ts); m11 split refund per mode (pre-filled with the original split, total must equal the due); m12 Today's sales average on the same net/bills basis; blind quote lines render dashes.
+- Gate: lint pass; 5,681 tests pass; build ok; e2e pharmacy-sales-wpl 18 of 20 pass (2 fail because the spec at line 232 still expects the old sentence: QA to update). validate frontend not run (known DEC-002 flag).
+- m4 blocked: ScheduleXCard has only {toReview, balanced}; decision: the architect adds `neverCounted` (integer: products never counted) to the contract, java sends it, angular shows 'No count yet' when it is above 0.
+- QA: update pharmacy-sales-wpl.spec.ts line 232; add 360 px no-overflow check for invoice-table; split-refund inputs refund-amount-<MODE> are new.
+
+## DB handoff · migration 1800 and static review · 21 Nov 2026 (DONE)
+- 1800: COUNTER_SALE_CANCELLED back on the Schedule X signer list (23 types; comments agree). Checksum changed: sahaj_test and sahaj_dev must be recreated (human) once, after all migration edits.
+- Static review of the 1700 audit-line guard and migrations 1850-2210: no clear defect; RLS forced, no delete grants, append-only tables protected, guard functions use search_path = pg_catalog. Minor notes: audit-line guard lets the book be set during review if still null (service sets it at submit); sales_return guard does not stop overwriting credit_note_no (only the completing update can set it). Not checked: 1730 audit-signer logic, 1850 constraint bodies.
+- Java run 14 must pass the second signer to the COUNTER_SALE_CANCELLED ledger lines and register reversals (M4), with a ledger-level test, or a Schedule X cancel fails the trigger.
+- validate db not run (classifier denied).
+
+## Java handoff · run 14 (round 7 fixes) · 21 Nov 2026 (DONE with deviations)
+- All queued items coded with unit tests: pass 1 Major 1 (prefix cross-check, 409 prefix-in-use), Major 2 (discount approval single use: seller, IST day, unused, held bill; VOID; 23505 on uq_bill_discount_request to 409 discount-approval-void), Minors 3-8, Nits; pass 2 M1-M6, m1-m7, m10; security M6, L22-L27, I28, I29.
+- Unit tests (javac+JUnit): 1,199 of 1,199 pass (pharmacy, plus BeanNameUniqueness, ModularityTests, StoreAccessGuardConventionTest). Not run: web slice tests, any IT, all new SQL. validate backend not run.
+- Deviations: Minor 6 (client key cannot be released: sahaj_app has no delete on client_request): retry of approveAndPost answers replay 200 only if CLOSED/WAITING_APPROVAL, else 409 changed; m5 catch of RuntimeException moved into CardIsolation.runOr (ArchUnit forbids it in application classes) and sweepStore removed from the command centre; ScheduleXCard now (toReview, balanced, neverCounted).
+- Not done: Angular side of neverCounted; contract wording for neverCounted, prefix-in-use, margin report definition (a unit sent to QUARANTINE keeps its cost); the m1 transfer note test.
+- Decision (tech lead): no delete grant on client_request (security); the 409 changed behaviour stands; the UI takes a new key on that error.
+- Next: architect (neverCounted, prefix-in-use, margin definition), angular (Schedule X card), QA full gate after the human recreates the databases.
+
+## BA handoff · IPD gap analyses A and B · 21 Nov 2026 (DONE)
+- Written: docs/requirements/IPD-flow-gap-analysis-A.md (findings, OQ-A-1..17, proposed stories IPD-A-1..11, E2E outline of 21 steps) and IPD-flow-gap-analysis-B.md (findings, integration spec, 18-item TP-4/5/6 connection checklist, OQ-B-1..20, proposed stories PB-1..12, E2E outline of 26 steps). All stories PROPOSED; every flow is outside the main mockup, so the human decides what enters scope.
+- Must for go-live: A-1 admission note, A-2 death record, A-3 LAMA, A-4 MLC, A-5 consent forms, A-6 discharged list and reprint, A-7 print set, A-8 transfer handover. B: PB-1..PB-12 (PB-9..11 are decision stories; PB-12 only for hospitals taking insurance). If pharmacy stays out of the IPD bill at go-live (OQ-B-1), all of B drops to Later.
+- Corrections to the drafts: SAH-29 and SAH-34..38 requirement files exist (SAH-22..28, 30..33 still have none); the wrong path docs/stories/IPD-open-questions.md is cited by SAH-27, 29, 30, 31, 32 (file is in docs/decisions); NoOpAdmittedPatientsReader is in application; ipd.admission_charge append-only claim not re-verified (architect and db-engineer).
+- Human: approve `stories` or choose scope; answer OQ-A-1..17 and OQ-B-1..20; ADM-2 and ADM-3 renaming (OQ-A-16).
+
+## BA rename of the IPD gap analyses · BLOCKED by requirements lock (held by finished a8f4ff7c32f41b472). To do: create docs/requirements/SAH-87.md (copy of IPD-flow-gap-analysis-A.md) and SAH-88.md (copy of -B.md) with a reservation line, replace the old files with pointer lines; the human then deletes the two old files and renames ADM-2/ADM-3.
+
+## 21 Nov — BA rename done
+BA created docs/requirements/SAH-87.md and SAH-88.md (copies of IPD gap analyses A/B, reserved-ID first line, PROPOSED). Old IPD-flow-gap-analysis-A.md/-B.md are one-line pointers. validate docs still fails only because the old files exist (and ADM-2/ADM-3). Human must delete those four files.

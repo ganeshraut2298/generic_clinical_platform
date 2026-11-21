@@ -69,10 +69,11 @@ public class ComplianceService {
     private final ClientRequestRepository clients;
     private final AuditLog auditLog;
     private final PharmacyTime time;
+    private final BlindCount blind;
 
     public ComplianceService(PharmacyGate gate, ComplianceRepository repository, UnitRepository units, StoreRepository stores,
                              TeamMemberPort team, SaleSupport support, ActiveReasonService reasons,
-                             ClientRequestRepository clients, AuditLog auditLog, PharmacyTime time) {
+                             ClientRequestRepository clients, AuditLog auditLog, PharmacyTime time, BlindCount blind) {
         this.gate = gate;
         this.repository = repository;
         this.units = units;
@@ -83,6 +84,7 @@ public class ComplianceService {
         this.clients = clients;
         this.auditLog = auditLog;
         this.time = time;
+        this.blind = blind;
     }
 
     // ---- licences ----
@@ -266,11 +268,15 @@ public class ComplianceService {
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet()));
         Map<String, String> labels = reasons.labels(tenantId);
         List<SalesReturnViews.ActivityRow> items = new ArrayList<>();
+        // L22: while a store has an open audit a blind caller must not read "adjusted ADJ-.. 40 to 38" of that store (rule 24)
+        Map<UUID, Boolean> blindAt = new HashMap<>();
         for (ActivityEvent e : slice.items()) {
             Store store = storeById.get(e.storeId());
-            TeamMember who = members.get(e.actor());
+            TeamMember who = e.actor() == null ? null : members.get(e.actor());
+            boolean hideQuantities = e.storeId() != null
+                    && blindAt.computeIfAbsent(e.storeId(), id -> blind.at(caller, id).active());
             items.add(new SalesReturnViews.ActivityRow(e.at(), support.person(e.actor(), members), roleLabel(who, e.actingAs()),
-                    e.type(), sentence(e, labels, store == null ? "" : store.name()),
+                    e.type(), sentence(e, labels, store == null ? "" : store.name(), hideQuantities),
                     store == null ? null : OpeningStockPostService.storeRef(store)));
         }
         return new SalesReturnViews.ActivityPage(items, slice.total(), page, size);
@@ -278,6 +284,11 @@ public class ComplianceService {
 
     /** The sentence of one feed row, built from the document number, the reason label and the store name. */
     static String sentence(ActivityEvent e, Map<String, String> labels, String storeName) {
+        return sentence(e, labels, storeName, false);
+    }
+
+    /** {@code hideQuantities}: the before and after quantities are left out (a blind caller at a store with an open audit). */
+    static String sentence(ActivityEvent e, Map<String, String> labels, String storeName, boolean hideQuantities) {
         String reason = e.reasonKey() == null ? null : labels.getOrDefault(e.reasonKey(), e.reasonKey());
         String where = storeName.isEmpty() ? "" : " · " + storeName;
         String doc = e.docNo() == null ? "" : e.docNo();
@@ -293,7 +304,7 @@ public class ComplianceService {
                 return (reason == null ? "approved " : "rejected ") + percent + "discount"
                         + (reason == null ? "" : " · reason: " + reason) + where;
             case "STOCK_ADJUSTED":
-                return "adjusted " + doc + (e.qtyBefore() == null || e.qtyAfter() == null ? ""
+                return "adjusted " + doc + (hideQuantities || e.qtyBefore() == null || e.qtyAfter() == null ? ""
                         : " " + e.qtyBefore() + " to " + e.qtyAfter()) + (reason == null ? "" : " · " + reason) + where;
             case "BILL_CANCELLED":
                 return "cancelled bill " + doc + (reason == null ? "" : " · reason: " + reason) + where;

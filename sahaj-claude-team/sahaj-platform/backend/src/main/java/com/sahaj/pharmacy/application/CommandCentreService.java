@@ -22,11 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.springframework.dao.DataAccessException;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -36,12 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
  * A caller without readRegisters at the store (a cashier) gets today's sales only. The gross margin is not answered until the
  * accountant has confirmed the landed rates (go-live G-13; there is no switch for it yet, so it is absent). Quantities of an audited
  * product are hidden from a blind caller as everywhere (rule 32). The OPD and IPD cards say "not connected" while those ports are the
- * no-op. Writes nothing except the expiry sweep of one store (ADR-029 P4).
+ * no-op. Writes nothing (no expiry sweep: it is not run on every Refresh, pass-2 m5).
  */
 @Service
 public class CommandCentreService {
 
-    private static final Logger log = LoggerFactory.getLogger(CommandCentreService.class);
     private static final String OK = "OK";
     private static final String ERROR = "ERROR";
     private static final String EMPTY = "EMPTY";
@@ -113,32 +108,24 @@ public class CommandCentreService {
             return new CommandCentreViews.CommandCentre(asOf, single == null ? null : OpeningStockPostService.storeRef(single),
                     sales, null, null, null, null, null, null, null, null);
         }
-        if (single != null) {
-            posting.sweepStore(tenantId, single.unitId(), single.id(), caller.actorId());
-        }
+        // m5: no expiry sweep here. Opening this screen is a read that is repeated on every Refresh; the bands and the low-stock
+        // count work from the expiry dates, and the stock screens run the sweep of the store when they are read.
         BlindCount.Mask mask = single == null ? BlindCount.Mask.NONE : blind.at(caller, single.id());
-        List<ExpiryBand> bands = new ArrayList<>();
-        boolean bandsOk = true;
-        try {
-            bands = nested.run(() -> repository.expiryBands(tenantId, ids, today));
-        } catch (DataAccessException | IllegalStateException | TransactionException failed) {
-            log.warn("Command centre expiry bands failed class={}", failed.getClass().getSimpleName());
-            bandsOk = false;
-        }
-        final List<ExpiryBand> loaded = bands;
-        final boolean ok = bandsOk;
+        List<ExpiryBand> bands = nested.runOr(() -> repository.expiryBands(tenantId, ids, today), null);
+        final boolean ok = bands != null;
+        final List<ExpiryBand> loaded = ok ? bands : List.of();
         CommandCentreViews.NearExpiry90 near = card(() -> nearExpiry(loaded, ok, mask),
                 new CommandCentreViews.NearExpiry90(ERROR, null, null, null));
         CommandCentreViews.ExpiryRisk risk = card(() -> expiryRisk(loaded, ok, mask),
                 new CommandCentreViews.ExpiryRisk(ERROR, List.of()));
-        CommandCentreViews.Reorder reorder = card(() -> reorder(tenantId, ids, today),
+        CommandCentreViews.Reorder reorder = card(() -> reorder(tenantId, ids, today, mask),
                 new CommandCentreViews.Reorder(ERROR, null));
         CommandCentreViews.RxWaiting rx = card(() -> rxWaiting(tenantId, ids),
                 new CommandCentreViews.RxWaiting(ERROR, false, null, false, null, null));
         CommandCentreViews.UdharCard udhar = card(() -> udhar(tenantId), new CommandCentreViews.UdharCard(ERROR, null, null));
         CommandCentreViews.LivePrescriptions live = support.integrated(tenantId)
                 ? new CommandCentreViews.LivePrescriptions(EMPTY, List.of()) : null;
-        CommandCentreViews.Compliance compliance = card(() -> compliance(tenantId, ids, today),
+        CommandCentreViews.Compliance compliance = card(() -> compliance(tenantId, ids, today, mask),
                 new CommandCentreViews.Compliance(ERROR, null, null, null));
         return new CommandCentreViews.CommandCentre(asOf, single == null ? null : OpeningStockPostService.storeRef(single), sales,
                 null, near, reorder, rx, udhar, risk, live, compliance);
@@ -166,13 +153,9 @@ public class CommandCentreService {
     }
 
     private <T> T card(Supplier<T> work, T failed) {
-        // DEC-089 item 6: a savepoint per card, so a failed statement does not abort the transaction the other cards share
-        try {
-            return nested.run(work);
-        } catch (DataAccessException | IllegalStateException | TransactionException e) {
-            log.warn("Command centre card failed class={}", e.getClass().getSimpleName());
-            return failed;
-        }
+        // DEC-089 item 6: a savepoint per card, so a failed statement does not abort the transaction the other cards share; any
+        // failure of one card (not only a database one) leaves it in its ERROR state (pass-2 m5). A refusal still reaches the caller.
+        return nested.runOr(work, failed);
     }
 
     // ---- cards ----
@@ -226,10 +209,12 @@ public class CommandCentreService {
         return new CommandCentreViews.ExpiryRisk(bands.isEmpty() ? EMPTY : OK, bars);
     }
 
-    private CommandCentreViews.Reorder reorder(UUID tenantId, List<UUID> ids, LocalDate today) {
+    private CommandCentreViews.Reorder reorder(UUID tenantId, List<UUID> ids, LocalDate today, BlindCount.Mask mask) {
         int count = 0;
         for (UUID id : ids) {
-            count += stock.overview(tenantId, id, today).lowStock();
+            // L23: for a blind caller the audited products are left out (a hidden product would add one bit to the count)
+            count += mask.active() ? (int) stock.lowStock(tenantId, id, today, 1, 0, mask.products()).total()
+                    : stock.overview(tenantId, id, today).lowStock();
         }
         return new CommandCentreViews.Reorder(OK, count);
     }
@@ -246,26 +231,36 @@ public class CommandCentreService {
         return u.anyLimit() ? new CommandCentreViews.UdharCard(OK, u.duePaise(), u.over60Paise()) : null;
     }
 
-    private CommandCentreViews.Compliance compliance(UUID tenantId, List<UUID> ids, LocalDate today) {
+    private CommandCentreViews.Compliance compliance(UUID tenantId, List<UUID> ids, LocalDate today, BlindCount.Mask mask) {
         Instant dayStart = time.dayStart();
         Instant dayEnd = today.plusDays(1).atStartOfDay(PharmacyTime.IST).toInstant();
         Instant monthStart = today.withDayOfMonth(1).atStartOfDay(PharmacyTime.IST).toInstant();
         int h1 = 0;
         int overrides = 0;
         int review = 0;
+        int counted = 0;
+        int neverCounted = 0;
         for (UUID id : ids) {
             h1 += registers.h1Entries(tenantId, id, dayStart, dayEnd, false);
             overrides += registers.h1Entries(tenantId, id, dayStart, dayEnd, true);
             List<XBalance> balances = registers.xBalances(tenantId, id, monthStart, dayEnd, null);
             Map<UUID, XCount> counts = registers.latestCounts(tenantId, id, balances.stream().map(XBalance::productId).toList());
             for (XBalance b : balances) {
+                if (mask.hides(b.productId())) {
+                    continue; // L23: a blind caller learns nothing about an audited product, not even that its book differs
+                }
                 XCount c = counts.get(b.productId());
-                review += c != null && c.countedQty() != b.closing() ? 1 : 0;
+                if (c == null) {
+                    neverCounted++;
+                } else {
+                    counted++;
+                    review += c.countedQty() != b.closing() ? 1 : 0;
+                }
             }
         }
         Unit unit = units.find(tenantId).orElse(null);
         return new CommandCentreViews.Compliance(OK, new CommandCentreViews.H1Card(h1, overrides),
-                new CommandCentreViews.ScheduleXCard(review, review == 0),
+                new CommandCentreViews.ScheduleXCard(review, review == 0 && !(neverCounted > 0 && counted == 0), neverCounted),
                 ComplianceService.status(unit == null ? null : unit.drugLicenceValidTill(), today));
     }
 }

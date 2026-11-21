@@ -53,6 +53,18 @@ class BlindCountTest {
     }
 
     @Test
+    void aCashierWhoseCountIsFalseIsStillBlindBecauseTheRuleReadsReadStockNotCount() {
+        Store store = new Store(STORE, UUID.randomUUID(), "Test Shop", "SHOP", StoreType.PHARMACY, null, false, true, true,
+                true, 0);
+        PharmacyCaller cashier = new PharmacyCaller(TENANT, UUID.randomUUID(), UUID.randomUUID(), "Test Person", "BILLING",
+                List.of(new PharmacyCaller.Mapping(store, null, StoreRole.CASHIER,
+                        StoreRules.access("BILLING", StoreRole.CASHIER, false, true, false))));
+
+        assertThat(cashier.mappingFor(STORE).orElseThrow().access().count()).isFalse();
+        assertThat(BlindCount.blindAt(cashier, STORE)).isTrue();
+    }
+
+    @Test
     void aCallerWithNoAccessToTheStoreIsNotBlindThereAndAnotherStoresStockIsNeverHidden() {
         PharmacyCaller user = caller("STORE_STAFF", StoreRole.STORE_USER);
 

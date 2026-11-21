@@ -248,4 +248,14 @@ class ConsumptionServiceTest {
 
         assertThat(list.items()).extracting(PharmacyViews.Person::name).containsExactly("Dr Abe Test", "Dr Zed Test");
     }
+
+    @Test
+    void theAdmittedPatientsReadIsReadWriteBecauseItWritesAnAuditRow() throws NoSuchMethodException {
+        org.springframework.transaction.annotation.Transactional tx = ConsumptionService.class
+                .getMethod("admittedPatients", java.util.UUID.class, java.util.UUID.class, String.class, String.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+
+        assertThat(tx).isNotNull();
+        assertThat(tx.readOnly()).as("an audit row cannot be written in a read-only transaction on PostgreSQL").isFalse();
+    }
 }

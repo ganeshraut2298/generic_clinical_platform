@@ -90,6 +90,11 @@ public final class StoreRules {
             case CENTRAL_STORE_USER:
                 return new StoreAccess(false, false, true, pharmacist, consumptionAllowed, true, true, true, true, true, true,
                         consumptionAllowed, true, true, false, pharmacist);
+            case CASHIER:
+                // DEC-092 item 4: a cashier reads stock and sells (the sale columns come from the five-argument form); nothing else.
+                // Schedule X still follows the team role alone (a store role never gives it), as in every other branch.
+                return new StoreAccess(false, false, false, pharmacist, false, false, true, false, false, false, false, false,
+                        false, false, false, pharmacist);
             case STORE_USER:
             default:
                 return new StoreAccess(true, false, true, pharmacist, consumptionAllowed, pharmacist, true, pharmacist, pharmacist,

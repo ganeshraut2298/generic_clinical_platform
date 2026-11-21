@@ -258,7 +258,7 @@ export function commandCentre(over: Partial<CommandCentre> = {}): CommandCentre 
   return {
     asOf: '2026-11-21T05:35:00Z',
     store: { storeId: 'store-ward', name: 'Test Ward 3B store', type: 'WARD' },
-    todaysSales: { state: 'OK', netPaise: 4826000, billCount: 142, averagePaise: 34000 },
+    todaysSales: { state: 'OK', netPaise: 4826000, billCount: 142, averagePaise: 33986 },
     grossMargin: { state: 'OK', percent: '22.4' },
     nearExpiry90: { state: 'OK', valuePaise: 3690000, batchCount: 84, returnablePaise: null },
     reorder: { state: 'OK', productCount: 27 },

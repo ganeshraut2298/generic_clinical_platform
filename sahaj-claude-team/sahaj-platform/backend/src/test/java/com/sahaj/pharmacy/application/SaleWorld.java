@@ -73,7 +73,7 @@ final class SaleWorld {
             templates, f.letterhead, f.time);
     final DiscountRequestRepository discountRequests = mock(DiscountRequestRepository.class);
     final ApprovalRepository approvalRepository = mock(ApprovalRepository.class);
-    final DiscountApprovals approvals = new DiscountApprovals(discountRequests, approvalRepository);
+    final DiscountApprovals approvals = new DiscountApprovals(discountRequests, approvalRepository, bills, f.time);
     final SalePricer pricer = new SalePricer(products, stock, posting, support, rules, customers, blind, reasons, approvals,
             f.time);
     final SaleBillAssembler assembler = new SaleBillAssembler(bills, products, stock, f.storeRepository, customers, events,

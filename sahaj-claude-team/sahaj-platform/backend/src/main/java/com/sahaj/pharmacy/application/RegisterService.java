@@ -134,6 +134,15 @@ public class RegisterService {
         if (rows.size() > EXPORT_CAP) {
             throw PharmacyProblemException.exportTooLarge();
         }
+        // L24: one record-access entry per distinct patient in the file, written before any byte of the CSV is made; if one cannot
+        // be written the transaction fails and nothing is downloaded
+        Set<UUID> patients = new LinkedHashSet<>();
+        rows.forEach(r -> {
+            if (r.patientId() != null) {
+                patients.add(r.patientId());
+            }
+        });
+        patients.forEach(id -> support.recordOpened(tenantId, id, userId));
         List<List<String>> lines = new ArrayList<>();
         for (SaleCheckViews.H1RegisterRow r : h1Views(tenantId, rows)) {
             lines.add(List.of(ReportCsv.time(r.at()), ReportCsv.neutralise(r.billNo()), r.kind(),
@@ -216,7 +225,8 @@ public class RegisterService {
         for (SaleCheckViews.ScheduleXBalanceRow r : view.items()) {
             lines.add(List.of(ReportCsv.neutralise(r.product().name()), r.ndps() ? "Yes" : "No", num(r.opening()),
                     num(r.received()), num(r.issued()), num(r.book()), num(r.physical()),
-                    r.physicalCountedOn() == null ? "" : r.physicalCountedOn().toString(), r.status(), num(r.difference())));
+                    r.physicalCountedOn() == null ? "" : r.physicalCountedOn().toString(),
+                    r.status() == null ? "" : r.status(), num(r.difference())));
         }
         audit("PHARMACY_REGISTER_EXPORTED", storeId, "SCHEDULE_X", range, productId, view.items().size());
         return new ReportViews.CsvFile("sahaj-schedule-x-register-" + range.from() + "-" + range.to() + ".csv",
@@ -240,14 +250,15 @@ public class RegisterService {
                 continue;
             }
             XCount count = counts.get(b.productId());
-            String status = count == null ? "NOT_COUNTED" : count.countedQty() == b.closing() ? "MATCH" : "REVIEW";
-            toReview += "REVIEW".equals(status) ? 1 : 0;
             boolean hidden = mask.hides(b.productId());
+            String status = count == null ? "NOT_COUNTED" : count.countedQty() == b.closing() ? "MATCH" : "REVIEW";
+            // m3: MATCH or REVIEW compares the hidden book with the count, so a blind caller gets no status for an audited product
+            toReview += !hidden && "REVIEW".equals(status) ? 1 : 0;
             Long difference = count == null || hidden ? null : count.countedQty() - b.closing();
             items.add(new SaleCheckViews.ScheduleXBalanceRow(IndentService.productRef(full.row()), b.ndps(),
                     hidden ? null : b.opening(), hidden ? null : b.received(), hidden ? null : b.issued(),
                     hidden ? null : b.closing(), count == null || hidden ? null : count.countedQty(),
-                    count == null ? null : count.countedOn(), status, difference));
+                    count == null ? null : count.countedOn(), hidden && count != null ? null : status, difference));
         }
         return new SaleCheckViews.ScheduleXRegister(range.from(), range.to(), toReview, items, X_NOTE);
     }

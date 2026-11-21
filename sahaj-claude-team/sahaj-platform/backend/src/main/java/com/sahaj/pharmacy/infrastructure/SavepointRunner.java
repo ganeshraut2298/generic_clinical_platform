@@ -1,11 +1,14 @@
 package com.sahaj.pharmacy.infrastructure;
 
 import com.sahaj.pharmacy.application.CardIsolation;
+import com.sahaj.platform.api.ForbiddenException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Savepoint;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Component;
@@ -18,6 +21,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 @Component
 public class SavepointRunner implements CardIsolation {
+
+    private static final Logger log = LoggerFactory.getLogger(SavepointRunner.class);
 
     private final DataSource dataSource;
 
@@ -46,6 +51,18 @@ public class SavepointRunner implements CardIsolation {
             throw new CannotGetJdbcConnectionException("Savepoint failed", e);
         } finally {
             DataSourceUtils.releaseConnection(connection, dataSource);
+        }
+    }
+
+    @Override
+    public <T> T runOr(Supplier<T> work, T failed) {
+        try {
+            return run(work);
+        } catch (ForbiddenException refused) {
+            throw refused;
+        } catch (RuntimeException failure) {
+            log.warn("A card failed class={}", failure.getClass().getSimpleName());
+            return failed;
         }
     }
 

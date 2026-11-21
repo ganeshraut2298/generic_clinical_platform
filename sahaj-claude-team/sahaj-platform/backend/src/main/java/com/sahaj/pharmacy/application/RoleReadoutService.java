@@ -35,6 +35,7 @@ public class RoleReadoutService {
     static final String NEEDS_APPROVAL = "NEEDS_APPROVAL";
     static final String DENY = "DENY";
     static final String SAME_DAY_ONLY = "SAME_DAY_ONLY";
+    static final String NO_LIMIT = "No limit set";
     static final String OWNER = "OWNER";
     static final String PHARMACIST = "PHARMACIST";
     static final String CASHIER = "CASHIER";
@@ -77,8 +78,9 @@ public class RoleReadoutService {
 
         List<SaleViews.RoleRow> rows = new ArrayList<>();
         // DEC-090: the owner is exempt from the discount rule (mockup 05)
+        // L26: with no SALE_DISCOUNT rule any seller may discount up to 100% with no approval; the cell says so ("No limit set").
         rows.add(row("DISCOUNT_ABOVE_LIMIT", accesses, a -> !a.sell() ? cell(DENY, null)
-                : a == owner || discount == null ? cell(ALLOW, null) : cell(NEEDS_APPROVAL, discount)));
+                : a == owner ? cell(ALLOW, null) : discount == null ? cell(ALLOW, NO_LIMIT) : cell(NEEDS_APPROVAL, discount)));
         rows.add(row("CANCEL_SAVED_BILL", accesses, a -> !a.cancelBill() ? cell(DENY, null)
                 : a == owner ? cell(ALLOW, null) : cell(SAME_DAY_ONLY, "Same day only")));
         rows.add(row("SALES_RETURN", accesses, a -> {

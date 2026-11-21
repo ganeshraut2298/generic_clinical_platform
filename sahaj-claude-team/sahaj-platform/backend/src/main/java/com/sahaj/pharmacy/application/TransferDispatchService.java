@@ -156,6 +156,10 @@ public class TransferDispatchService {
             throw PharmacyProblemException.changed(transferService.view(caller, row, storeId));
         }
         requireApproved(row);
+        // m2: stock is not sent to a store that was switched off after the transfer was approved
+        if (stores.find(tenantId, row.toStoreId()).filter(Store::active).isEmpty()) {
+            throw PharmacyProblemException.docState("The receiving store is switched off. Cancel this transfer.");
+        }
         List<TransferRepository.Line> lines = transfers.lines(tenantId, transferId);
         Map<UUID, Boolean> scheduleXOf = new LinkedHashMap<>();
         for (TransferRepository.Line l : lines) {

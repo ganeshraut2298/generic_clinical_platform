@@ -94,6 +94,15 @@ class BillLinkAndOpdQueueTest {
     }
 
     @Test
+    void aStoreThatDoesNotAllowSaleAnswers409SaleNotAllowedLikeEveryOtherSaleOperation() {
+        w.f.map(w.central, w.f.pharmacist, com.sahaj.pharmacy.domain.StoreRole.CENTRAL_STORE_USER);
+
+        assertThatThrownBy(() -> links.link(SaleWorld.TENANT, w.f.pharmacist.userId(), w.central.id().toString(),
+                billId.toString(), SaleWorld.body(new SaleInputs.LinkPatientInput(BigDecimal.ZERO, patientId))))
+                .isInstanceOfSatisfying(PharmacyProblemException.class, e -> assertThat(e.slug()).isEqualTo("sale-not-allowed"));
+    }
+
+    @Test
     void standaloneModeAnswersIntegrationOff() {
         UnitRepository standalone = mock(UnitRepository.class);
         when(standalone.find(any())).thenReturn(Optional.of(new Unit(UUID.randomUUID(), "U", null, null, null,

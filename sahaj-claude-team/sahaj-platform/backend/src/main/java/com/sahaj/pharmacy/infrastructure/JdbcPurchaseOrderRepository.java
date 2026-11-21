@@ -188,7 +188,7 @@ public class JdbcPurchaseOrderRepository implements PurchaseOrderRepository {
                 left join pharmacy.catalogue_product g on g.id = pr.catalogue_product_id
                 left join stock s on s.product_id = ps.product_id
                 left join open_po o on o.product_id = ps.product_id
-               where ps.tenant_id = :tenantId and ps.store_id = :storeId and ps.reorder_level is not null and pr.status = 'ACTIVE'
+               where ps.tenant_id = :tenantId and ps.store_id = :storeId and ps.reorder_level is not null and pr.status = 'ACTIVE'/*EXCL*/
                  and coalesce(s.qty, 0) + coalesce(o.open_units, 0) * coalesce(g.conversion, pr.conversion) <= ps.reorder_level)
             """;
     private static final String REORDER = REORDER_BASE
@@ -390,7 +390,22 @@ public class JdbcPurchaseOrderRepository implements PurchaseOrderRepository {
 
     @Override
     public List<ReorderRow> reorder(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset) {
-        return jdbc.sql(REORDER).param("tenantId", tenantId).param("storeId", storeId).param("today", java.sql.Date.valueOf(today))
+        return reorder(tenantId, storeId, today, limit, offset, java.util.Set.of());
+    }
+
+    @Override
+    public long reorderTotal(UUID tenantId, UUID storeId, LocalDate today) {
+        return reorderTotal(tenantId, storeId, today, java.util.Set.of());
+    }
+
+    @Override
+    public List<ReorderRow> reorder(UUID tenantId, UUID storeId, LocalDate today, int limit, int offset,
+                                    java.util.Set<UUID> excluded) {
+        JdbcClient.StatementSpec spec = jdbc.sql(REORDER.replace("/*EXCL*/", excluded.isEmpty() ? "" : " and ps.product_id not in (:excluded)"));
+        if (!excluded.isEmpty()) {
+            spec = spec.param("excluded", excluded);
+        }
+        return spec.param("tenantId", tenantId).param("storeId", storeId).param("today", java.sql.Date.valueOf(today))
                 .param("limit", limit).param("offset", offset)
                 .query((rs, n) -> new ReorderRow(rs.getObject("product_id", UUID.class), rs.getInt("cs_stock"),
                         rs.getInt("reorder_level"), rs.getInt("open_issue"), rs.getInt("open_units"), rs.getString("po_no")))
@@ -398,8 +413,12 @@ public class JdbcPurchaseOrderRepository implements PurchaseOrderRepository {
     }
 
     @Override
-    public long reorderTotal(UUID tenantId, UUID storeId, LocalDate today) {
-        return jdbc.sql(REORDER_COUNT).param("tenantId", tenantId).param("storeId", storeId)
+    public long reorderTotal(UUID tenantId, UUID storeId, LocalDate today, java.util.Set<UUID> excluded) {
+        JdbcClient.StatementSpec spec = jdbc.sql(REORDER_COUNT.replace("/*EXCL*/", excluded.isEmpty() ? "" : " and ps.product_id not in (:excluded)"));
+        if (!excluded.isEmpty()) {
+            spec = spec.param("excluded", excluded);
+        }
+        return spec.param("tenantId", tenantId).param("storeId", storeId)
                 .param("today", java.sql.Date.valueOf(today)).query(Long.class).single();
     }
 

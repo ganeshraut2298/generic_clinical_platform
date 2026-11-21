@@ -71,12 +71,15 @@ public class ReportService {
         }
     }
 
-    /** Indexes of the cells that hold a quantity or a value a blind caller must not read, per report. */
+    /**
+     * Indexes of the cells that hold a quantity or a value a blind caller must not read, per report. For the Schedule X register
+     * the last one is the MATCH or REVIEW status, which compares the hidden book with the count (m3).
+     */
     private static final Map<ReportDef, int[]> BLIND_CELLS = Map.of(
             ReportDef.STORE_STOCK, new int[] {2, 3, 4, 5, 7},
             ReportDef.BATCH_EXPIRY, new int[] {5},
             ReportDef.BELOW_REORDER, new int[] {2},
-            ReportDef.SCHEDULE_X_REGISTER, new int[] {3, 4, 5, 6, 7});
+            ReportDef.SCHEDULE_X_REGISTER, new int[] {3, 4, 5, 6, 7, 8});
 
     private final PharmacyGate gate;
     private final StoreRepository stores;
@@ -88,10 +91,12 @@ public class ReportService {
     private final TeamMemberPort team;
     private final AuditLog auditLog;
     private final SaleSupport support;
+    private final ActiveReasonService reasons;
 
     public ReportService(PharmacyGate gate, StoreRepository stores, ProductRepository products, ReportRepository reports,
                          StockPosting posting, PharmacyTime time, BlindCount blind, TeamMemberPort team, AuditLog auditLog,
-                         SaleSupport support) {
+                         SaleSupport support, ActiveReasonService reasons) {
+        this.reasons = reasons;
         this.support = support;
         this.gate = gate;
         this.stores = stores;
@@ -181,6 +186,17 @@ public class ReportService {
             throw PharmacyProblemException.exportTooLarge();
         }
         List<Row> rows = reports.rows(def, prepared.filter(), EXPORT_CAP, 0);
+        if (def == ReportDef.H1_REGISTER) {
+            // L24: one record-access entry per distinct patient in the file, before any byte of the CSV is made; a failure here
+            // fails the whole export
+            Set<UUID> patients = new LinkedHashSet<>();
+            rows.forEach(r -> {
+                if (r.patientId() != null) {
+                    patients.add(r.patientId());
+                }
+            });
+            patients.forEach(id -> support.recordOpened(tenantId, id, userId));
+        }
         List<List<Object>> cells = present(caller, def, rows, true);
         List<String> header = def.columns().stream().map(ReportDef.Col::label).toList();
         List<List<String>> lines = new ArrayList<>();
@@ -450,6 +466,8 @@ public class ReportService {
         }
         Map<UUID, TeamMemberPort.TeamMember> members = people.isEmpty() ? Map.of() : team.findAll(caller.tenantId(), people);
         int[] hiddenCells = BLIND_CELLS.get(def);
+        int[] reasonCells = REASON_CELLS.get(def);
+        Map<String, String> reasonLabels = reasonCells == null || rows.isEmpty() ? Map.of() : reasons.labels(caller.tenantId());
         Map<UUID, BlindCount.Mask> masks = new HashMap<>();
         List<List<Object>> out = new ArrayList<>();
         for (Row row : rows) {
@@ -460,6 +478,11 @@ public class ReportService {
                     for (int index : hiddenCells) {
                         cells.set(index, null);
                     }
+                }
+            }
+            if (reasonCells != null) {
+                for (int index : reasonCells) {
+                    cells.set(index, reasonLabel(cells.get(index), reasonLabels));
                 }
             }
             if (def == ReportDef.H1_REGISTER && !seesPatientNames(caller, row.storeId())) {
@@ -482,6 +505,24 @@ public class ReportService {
             out.add(cells);
         }
         return out;
+    }
+
+    /** The cells that hold a reason key (the repository answers the key as stored), shown by the label of the reason list (m7). */
+    private static final Map<ReportDef, int[]> REASON_CELLS = Map.of(
+            ReportDef.SALES_RETURNS, new int[] {6, 7},
+            ReportDef.H1_REGISTER, new int[] {13},
+            ReportDef.ACTIVITY_LOG, new int[] {5},
+            ReportDef.WARD_CONSUMPTION, new int[] {6},
+            ReportDef.TRANSFER_REGISTER, new int[] {3},
+            ReportDef.RETURNS_WRITE_OFFS, new int[] {8});
+
+    /** The label of a reason key; a key the lists do not know is shown as its own text, never as a title made from the key. */
+    static Object reasonLabel(Object key, Map<String, String> labels) {
+        if (key == null) {
+            return null;
+        }
+        String text = key.toString();
+        return labels.getOrDefault(text, text);
     }
 
     private static final int H1_NAME = 3;

@@ -163,7 +163,7 @@ function weekday(date: Date = new Date()): string {
             <div class="s" data-testid="tile-sales-empty">No sales yet today.</div>
           } @else {
             <div class="v">{{ money(d.todaysSales.netPaise ?? 0) }}</div>
-            <div class="s">{{ d.todaysSales.billCount ?? 0 }} bills · avg {{ money(d.todaysSales.averagePaise ?? 0) }}</div>
+            <div class="s">{{ d.todaysSales.billCount ?? 0 }} bills · avg {{ money(average(d.todaysSales.netPaise, d.todaysSales.billCount)) }}</div>
           }
         </div>
         @if (d.grossMargin; as g) {
@@ -372,6 +372,9 @@ export class CommandCentreSection implements OnInit {
   protected readonly storeChoice = signal<'' | 'ALL'>('');
 
   protected readonly money = rupees;
+  /** Average per bill on the same basis as the tile: net of refunds divided by the bills (rule of 0.3.8). */
+  protected readonly average = (netPaise: number | undefined, bills: number | undefined): number =>
+    bills ? Math.round((netPaise ?? 0) / bills) : 0;
   protected readonly time = (instant: string) => formatTimeOfInstant(instant);
   protected readonly couldNot = COULD_NOT_LOAD;
   protected readonly isNumber = (v: number | null | undefined): boolean => typeof v === 'number';

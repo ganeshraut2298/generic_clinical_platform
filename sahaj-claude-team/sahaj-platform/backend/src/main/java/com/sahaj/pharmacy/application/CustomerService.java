@@ -270,9 +270,29 @@ public class CustomerService {
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("customerId", customerId.toString());
         after.put("creditLimitPaise", newLimit);
+        // L27: the audit names which fields changed, never their values (a name, a phone number and an allergy note are personal data)
+        after.put("changedFields", changedFields(row, name, phone, note, newLimit));
         auditLog.record("PHARMACY_CUSTOMER_CHANGED", ENTITY_TYPE, customerId, before, after);
         log.info("Customer changed customerId={}", customerId);
         return views(caller, tenantId, List.of(customers.find(tenantId, customerId).orElseThrow()), false).get(0);
+    }
+
+    /** The names of the fields that differ, in a fixed order ("name,phone,allergyNote,creditLimitPaise"); never a value. */
+    static String changedFields(Row row, String name, String phone, String allergyNote, long creditLimitPaise) {
+        List<String> changed = new ArrayList<>();
+        if (!java.util.Objects.equals(row.name(), name)) {
+            changed.add("name");
+        }
+        if (!java.util.Objects.equals(row.phone(), phone)) {
+            changed.add("phone");
+        }
+        if (!java.util.Objects.equals(row.allergyNote(), allergyNote)) {
+            changed.add("allergyNote");
+        }
+        if (row.creditLimitPaise() != creditLimitPaise) {
+            changed.add("creditLimitPaise");
+        }
+        return String.join(",", changed);
     }
 
     /** The owner or a pharmacist; already off is 200 with nothing written. The due stays and payments can still be received. */

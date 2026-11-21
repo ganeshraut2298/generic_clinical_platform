@@ -238,7 +238,7 @@ describe('SAH-80 work package L, N and K screens', () => {
         commandCentre({ grossMargin: undefined, nearExpiry90: undefined, reorder: undefined, rxWaiting: undefined, udhar: undefined, expiryRisk: undefined, livePrescriptions: undefined, compliance: undefined }),
       );
       const el = await settle();
-      expect(text(el, 'tile-sales')).toContain('142 bills · avg ₹ 340.00');
+      expect(text(el, 'tile-sales')).toContain('142 bills · avg ₹ 339.86');
       expect(q(el, 'tile-udhar')).toBeNull();
       expect(q(el, 'cc-compliance')).toBeNull();
       expect(q(el, 'new-bill')).toBeTruthy();

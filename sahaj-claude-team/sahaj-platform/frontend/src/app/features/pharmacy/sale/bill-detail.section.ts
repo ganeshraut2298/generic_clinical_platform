@@ -14,6 +14,12 @@ import { PharmacyApi } from '../pharmacy.api';
 import { batchWithExpiry } from '../indent/indent.util';
 import { ReasonPickComponent } from './reason-pick.component';
 
+/** Rupees typed (up to 2 decimals) to paise; null when it is not an amount. */
+function toPaise(text: string | undefined): number | null {
+  const t = (text ?? '').trim();
+  return /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(parseFloat(t) * 100) : null;
+}
+
 /**
  * A saved bill, with "Cancel bill" and the refund of a cancelled one (SAH-80-5; the cancel screen is not drawn in the
  * mockup, the story marks it NEW; the rule is the matrix row of mockup 05 "Cancel / edit saved bill"). The owner may
@@ -118,20 +124,30 @@ import { ReasonPickComponent } from './reason-pick.component';
           <span>Refund due {{ money(b.refundDuePaise) }}</span>
         </p>
         @if (canRefund()) {
-          <label class="sel">
-            Refund to
-            <select class="field" data-testid="refund-mode" (change)="refundMode.set($any($event.target).value)">
-              @for (m of refundModes(); track m) {
-                <option [value]="m" [selected]="refundMode() === m">{{ modeLabel(m) }}</option>
-              }
-            </select>
-          </label>
+          <fieldset data-testid="refund-split">
+            <legend>Refund to</legend>
+            @for (m of refundModes(); track m) {
+              <label class="sel">
+                {{ modeLabel(m) }} (₹)
+                <input
+                  class="field"
+                  inputmode="decimal"
+                  [value]="refundAmounts()[m] ?? ''"
+                  [attr.data-testid]="'refund-amount-' + m"
+                  (input)="setRefundAmount(m, $any($event.target).value)"
+                />
+              </label>
+            }
+          </fieldset>
+          <p class="note" data-testid="refund-total">Refund total {{ money(refundTotalPaise()) }} of {{ money(b.refundDuePaise) }}</p>
+          @if (refundTotalPaise() !== b.refundDuePaise) {
+            <p class="err" role="alert" data-testid="refund-mismatch">Refunds must add up to {{ money(b.refundDuePaise) }}.</p>
+          }
           <div class="acts">
             <button mat-flat-button type="button" data-testid="refund-save" [disabled]="saving()" (click)="refund(b)">
               Record refund of {{ money(b.refundDuePaise) }}
             </button>
           </div>
-          <p class="note">Refund by {{ modeLabel(refundMode()) }} from the counter.</p>
         }
       }
       @if (formError(); as text) {
@@ -204,7 +220,11 @@ export class BillDetailSection implements OnInit {
   protected readonly reasons = signal<ActiveReason[]>([]);
   protected readonly reason = signal<{ reasonKey: string; note?: string | null } | null>(null);
   protected readonly backOnShelf = signal<boolean | null>(null);
-  protected readonly refundMode = signal<PaymentMode>('CASH');
+  /** Rupees typed per refund mode; pre-filled with what each mode paid. */
+  protected readonly refundAmounts = signal<Partial<Record<PaymentMode, string>>>({});
+  protected readonly refundTotalPaise = computed(() =>
+    Object.values(this.refundAmounts()).reduce((sum, t) => sum + (toPaise(t) ?? 0), 0),
+  );
   protected readonly signers = signal<SecondSignerCandidate[]>([]);
   protected readonly signersLoaded = signal(false);
   protected readonly signerId = signal('');
@@ -255,10 +275,29 @@ export class BillDetailSection implements OnInit {
     this.api.bill(storeId, this.billId()).subscribe({
       next: (b) => {
         this.bill.set(b);
-        this.refundMode.set(this.refundModes()[0] ?? 'CASH');
+        this.refundAmounts.set(this.originalSplit(b));
       },
       error: (e: unknown) => this.loadError.set(loadErrorMessage(e)),
     });
+  }
+
+  /** What each mode paid, capped so that the total is the due (the due can be less when udhar paid part). */
+  private originalSplit(b: Bill): Partial<Record<PaymentMode, string>> {
+    const out: Partial<Record<PaymentMode, string>> = {};
+    let left = b.refundDuePaise;
+    for (const p of b.payments.filter((x) => x.mode !== 'UDHAR')) {
+      const part = Math.min(p.amountPaise, left);
+      left -= part;
+      out[p.mode] = ((out[p.mode] ? (toPaise(out[p.mode]) ?? 0) : 0) + part) / 100 + '';
+    }
+    if (left > 0) {
+      out['CASH'] = ((toPaise(out['CASH']) ?? 0) + left) / 100 + '';
+    }
+    return out;
+  }
+
+  protected setRefundAmount(mode: PaymentMode, text: string): void {
+    this.refundAmounts.update((m) => ({ ...m, [mode]: text }));
   }
 
   protected reasonChosen(chosen: { reasonKey: string; note?: string | null }): void {
@@ -309,14 +348,13 @@ export class BillDetailSection implements OnInit {
           this.cancelling.set(false);
           this.reason.set(null);
           this.bill.set(done);
+          this.refundAmounts.set(this.originalSplit(done));
           this.changed.emit(done);
         },
         error: (e: unknown) => {
           this.pin.set('');
           this.saving.set(false);
-          this.formError.set(
-            problemSlug(e) === 'cancel-not-allowed' ? 'Only the owner can cancel a bill from an earlier day.' : saveErrorMessage(e),
-          );
+          this.formError.set(saveErrorMessage(e));
           if (problemSlug(e) === 'changed') {
             this.load();
           }
@@ -330,12 +368,19 @@ export class BillDetailSection implements OnInit {
       return;
     }
     this.formError.set(null);
+    const refunds = (Object.entries(this.refundAmounts()) as [PaymentMode, string][])
+      .map(([mode, t]) => ({ mode, amountPaise: toPaise(t) ?? 0 }))
+      .filter((r) => r.amountPaise > 0);
+    if (refunds.reduce((s, r) => s + r.amountPaise, 0) !== b.refundDuePaise) {
+      this.formError.set(`Refunds must add up to ${rupees(b.refundDuePaise)}.`);
+      return;
+    }
     this.saving.set(true);
     this.api
       .recordCancelledBillRefund(storeId, b.id, {
         clientKey: this.refundKey,
         version: b.version,
-        refunds: [{ mode: this.refundMode(), amountPaise: b.refundDuePaise }],
+        refunds,
       })
       .subscribe({
         next: (done) => {

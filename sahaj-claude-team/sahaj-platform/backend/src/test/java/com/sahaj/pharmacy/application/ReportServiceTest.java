@@ -51,7 +51,9 @@ class ReportServiceTest {
     private final AuditLog audit = mock(AuditLog.class);
     private final SaleSupport support = mock(SaleSupport.class);
     private final PharmacyTime time = new PharmacyTime(Clock.fixed(Instant.parse("2026-11-20T06:00:00Z"), ZoneOffset.UTC));
-    private final ReportService service = new ReportService(gate, stores, products, repo, posting, time, blind, team, audit, support);
+    private final ActiveReasonService reasons = mock(ActiveReasonService.class);
+    private final ReportService service = new ReportService(gate, stores, products, repo, posting, time, blind, team, audit, support,
+            reasons);
 
     private static Store store(UUID id, StoreType type) {
         return new Store(id, UNIT, "Test " + type, type.name().substring(0, 2), type, null, false, true, true, true, 0);
@@ -260,6 +262,36 @@ class ReportServiceTest {
                 WARD_ID)).isFalse();
         assertThat(ReportService.maskName("Ravi Sharma")).isEqualTo("R*** S***");
         assertThat(ReportService.maskName(null)).isNull();
+    }
+
+    @Test
+    void theH1ExportWritesOneRecordAccessEntryPerDistinctPatientBeforeAnyCsvByteAndFailsWhenOneCannotBeWritten() {
+        givenSale(caller("OWNER", null, null));
+        UUID one = UUID.randomUUID();
+        UUID two = UUID.randomUUID();
+        when(repo.count(any(), any())).thenReturn(3L);
+        when(repo.rows(any(), any(), anyInt(), anyInt())).thenReturn(List.of(h1Row(WARD_ID, one, "Test A", "x"),
+                h1Row(WARD_ID, one, "Test A", "x"), h1Row(WARD_ID, two, "Test B", "y")));
+
+        service.export(TENANT, USER, "h1-register", query("2026-11-01", "2026-11-20"));
+
+        verify(support, org.mockito.Mockito.times(1)).recordOpened(TENANT, one, USER);
+        verify(support, org.mockito.Mockito.times(1)).recordOpened(TENANT, two, USER);
+
+        org.mockito.Mockito.reset(audit);
+        org.mockito.Mockito.doThrow(PharmacyProblemException.patientsUnreachable()).when(support).recordOpened(any(), any(), any());
+        assertThatThrownBy(() -> service.export(TENANT, USER, "h1-register", query("2026-11-01", "2026-11-20")))
+                .isInstanceOf(PharmacyProblemException.class);
+        verify(audit, never()).record(org.mockito.ArgumentMatchers.eq("PHARMACY_REGISTER_EXPORTED"), any(), any(), any(), any());
+    }
+
+    @Test
+    void aReasonCellShowsTheLabelOfItsListNotATitleMadeFromTheKey() {
+        assertThat(ReportService.reasonLabel("sales-return.doctor-changed-medicine",
+                java.util.Map.of("sales-return.doctor-changed-medicine", "Doctor changed medicine")))
+                .isEqualTo("Doctor changed medicine");
+        assertThat(ReportService.reasonLabel("unknown.key", java.util.Map.of())).isEqualTo("unknown.key");
+        assertThat(ReportService.reasonLabel(null, java.util.Map.of())).isNull();
     }
 
     @Test

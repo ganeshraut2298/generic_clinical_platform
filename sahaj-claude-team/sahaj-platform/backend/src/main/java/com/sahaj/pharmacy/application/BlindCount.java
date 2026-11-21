@@ -45,9 +45,9 @@ public class BlindCount {
         this.audits = audits;
     }
 
-    /** The caller's access there has count true and reviewCount false. */
+    /** The caller's access there has readStock true and reviewCount false (a CASHIER, whose count is false, is blind too: S16). */
     public static boolean blindAt(PharmacyCaller caller, UUID storeId) {
-        return StoreAccessGuard.holds(caller, storeId, StoreCapability.COUNT)
+        return StoreAccessGuard.holds(caller, storeId, StoreCapability.READ_STOCK)
                 && !StoreAccessGuard.holds(caller, storeId, StoreCapability.REVIEW_COUNT);
     }
 

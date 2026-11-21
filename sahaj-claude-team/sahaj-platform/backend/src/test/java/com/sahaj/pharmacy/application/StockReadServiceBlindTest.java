@@ -42,6 +42,7 @@ class StockReadServiceBlindTest {
     private static final UUID AUDITED = UUID.randomUUID();
     private static final UUID OTHER = UUID.randomUUID();
     private static final UUID BATCH = UUID.randomUUID();
+    private static final UUID BATCH2 = UUID.randomUUID();
     private static final Instant NOW = Instant.parse("2026-11-20T06:30:00Z");
     private static final LocalDate EXPIRY = LocalDate.of(2028, 3, 31);
 
@@ -78,9 +79,14 @@ class StockReadServiceBlindTest {
                 org.mockito.ArgumentMatchers.anyInt())).thenReturn(new StockRepository.LowStockSlice(List.of(
                         low(AUDITED, 4), low(OTHER, 3)), 2));
         when(stock.availableOfProduct(TENANT, STORE, AUDITED)).thenReturn(List.of(new Bal(UUID.randomUUID(), STORE, AUDITED, BATCH,
-                StockState.AVAILABLE, 17, "B1", EXPIRY, NOW, new BigDecimal("10.00"), new BigDecimal("4.5000"))));
-        when(posting.pick(any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(new Fefo.Result(List.of(new Fefo.Pick(BATCH, 5)),
-                17, 0));
+                StockState.AVAILABLE, 17, "B1", EXPIRY, NOW, new BigDecimal("10.00"), new BigDecimal("4.5000")),
+                new Bal(UUID.randomUUID(), STORE, AUDITED, BATCH2, StockState.AVAILABLE, 3, "B2", EXPIRY, NOW,
+                        new BigDecimal("10.00"), new BigDecimal("4.5000"))));
+        when(stock.lowStock(eq(TENANT), eq(STORE), any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), eq(Set.of(AUDITED)))).thenReturn(new StockRepository.LowStockSlice(
+                        List.of(low(OTHER, 3)), 1));
+        when(posting.pick(any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(new Fefo.Result(List.of(new Fefo.Pick(BATCH, 5),
+                new Fefo.Pick(BATCH2, 3)), 17, 0));
         ProductRepository.Row row = new ProductRepository.Row("OWN", null, AUDITED, "P-1", "Test Paracetamol 500 mg (fake)", null,
                 false, "Paracetamol", "500 mg", "Tablet", "Strip", "Tablet", 10, "3004", new BigDecimal("12"), "NONE", false,
                 "ACTIVE", false, null);
@@ -120,11 +126,17 @@ class StockReadServiceBlindTest {
     }
 
     @Test
-    void theLowStockListKeepsTheItemAndHidesTheAvailableOfAnAuditedProduct() {
+    void theLowStockListAndThePillLeaveAuditedProductsOutForABlindCallerAndKeepThemForTheHod() {
         StockViews.LowStockPage page = service.lowStock(TENANT, USER, STORE.toString(), null, null);
 
-        assertThat(page.items()).extracting(StockViews.LowStockItem::available).containsExactly(null, 3);
-        assertThat(page.items()).extracting(StockViews.LowStockItem::reorderLevel).containsExactly(5, 5);
+        assertThat(page.items()).extracting(i -> i.product().productId()).containsExactly(OTHER);
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(service.overview(TENANT, USER, STORE.toString()).pills().lowStock())
+                .as("the audited product is not counted").isEqualTo(1);
+
+        caller = callerAs("NURSE", StoreRole.APPROVER);
+        assertThat(service.lowStock(TENANT, USER, STORE.toString(), null, null).items())
+                .extracting(StockViews.LowStockItem::available).containsExactly(4, 3);
     }
 
     @Test
@@ -133,13 +145,14 @@ class StockReadServiceBlindTest {
 
         assertThat(pick.availableQty()).isNull();
         assertThat(pick.shortBy()).isNull();
-        assertThat(pick.batches()).hasSize(1);
+        assertThat(pick.batches()).as("only the first FEFO batch: the count of batches must not reveal a quantity").hasSize(1);
         assertThat(pick.batches().get(0).quantity()).isNull();
         assertThat(pick.batches().get(0).batch().batchNo()).isEqualTo("B1");
 
         caller = callerAs("NURSE", StoreRole.APPROVER);
         StockViews.FefoPick open = service.fefoPick(TENANT, USER, STORE.toString(), AUDITED.toString(), "5");
         assertThat(open.availableQty()).isEqualTo(17);
+        assertThat(open.batches()).hasSize(2);
         assertThat(open.batches().get(0).quantity()).isEqualTo(5);
     }
 
@@ -153,7 +166,7 @@ class StockReadServiceBlindTest {
         assertThat(row.pendingReturn()).isNull();
         assertThat(row.quarantine()).isNull();
         assertThat(row.reorderLevel()).as("settings and status stay").isEqualTo(10);
-        assertThat(row.status()).isNotNull();
+        assertThat(row.status()).as("the status compares the hidden quantity with the reorder level").isNull();
         assertThat(blind.total().available()).isNull();
         assertThat(blind.empty()).isFalse();
 

@@ -1,0 +1,22 @@
+# IPD flow gap analysis A (draft from BA #1, not yet written to docs/requirements because the requirements lock was held by BA #2)
+
+Date: 21 Nov 2026 · Scope: IPD clinical and administrative flow, admission to discharge. All proposals are PROPOSED (not in the mockup). Method note: read by file name and search, not run; "Covered" means the pieces exist, not that they work. QA must prove it.
+
+## Trace
+- Covered: OPD Admit advice (SAH-67-3); emergency queue (SAH-28); bed board and housekeeping (SAH-24); admit with deposit and consent tick (SAH-23); doctor round note (SAH-67-1); medicine orders with safety checks and pharmacist check (SAH-31, SAH-76); vitals, notes, early warning score (SAH-30, SAH-33); MAR with wristband and second nurse (SAH-32, 35, 38); charges, running bill, deposit alert (SAH-25); bed transfer (SAH-26); emergency access (SAH-34); normal discharge (SAH-27); bed to cleaning after discharge; setup pages; IPD Off/Trial/On/Read-only gate.
+- Partial: bed reservation (state drawn, no flow); nursing handover (words only, nothing recorded); interim bill (Print says "soon"); LAMA, Referred, Death (discharge types only); discharge summary and bill print (print not built, WhatsApp Later); insurance (a single notice, no pre-authorisation record).
+- Missing: admission note (Case paper sheet is a stub); lab, diet, procedure orders in IPD; procedure, anaesthesia, blood and high-risk consent; discharged-patients view with reprint.
+
+## Housekeeping (reported, nothing renamed)
+docs/stories/ADM-2.md ("Organizations directory") and ADM-3.md ("Modules and plan management") are platform stories mis-named (ADM- breaks the SAH-<n> rule); no matching requirements. Stories SAH-22..33 have no requirement files found. SAH-27 cites docs/stories/IPD-open-questions.md (not found; docs/decisions/IPD-open-questions.md exists).
+
+## Missing flows (all PROPOSED)
+Must for go-live: G1 admission note and printable Case paper; G2 death record (time, place, cause, certifier, printed summary, patient marked deceased); G3 LAMA record (reason, risks explained, signer, witness); G4 MLC flag; G5 consent forms (who signed; admission, procedure, anaesthesia, blood, high-risk; a tick is not evidence); G6 print of discharge summary, final and interim bill, case paper; G7 discharged-patients list with reprint; G8 TPA/insurance pre-authorisation and cashless (Must for hospitals taking cashless; share to confirm); G9 visiting doctor in IPD (to confirm).
+Should: G10 nursing handover (transfer part is Must: mockup promises it); G11 lab and radiology orders; G12 diet; G13 procedure and OT orders; G14 mid-stay refund and interim bill; G15 reversal of mistaken admission and day-care discharge; G16 bed reservation; G17 isolation flag; G18 bed census; G19 birth record; G20 referral letters; G21 nursing charts beyond vitals; G22 attendant, address, ID at admission; G23 take-home medicines; G24 billing clearance and nursing handover as real sign-offs.
+Later: G25 in-hospital consult request; G26 dietician and physiotherapy; G27 blood bank, OT scheduling, monitor links, ABDM push; G28 incident log and NABH reports.
+
+## Proposed stories (Given/When/Then incl. roles, other tenant 404, Read-only 409, invalid input, slow network)
+IPD-A-1 admission note; A-2 death record and summary; A-3 LAMA record; A-4 MLC flag; A-5 consent forms; A-6 discharged list and reprint; A-7 print set; A-8 handover note and acknowledge; A-9 investigation, diet and procedure orders; A-10 isolation flag; A-11 bed census.
+
+## Open questions for the human
+OQ-A-1 must an unsigned admission note block discharge (default warn only); A-2 admission note layout (no mockup); A-3 new screens not in the mockup: add to mockup and screen map or accept proposed placement; A-4 (legal) death record facts, certifier, certificate print, deceased marking; A-5 (legal) LAMA signer and witness; A-6 (legal) MLC blocks and release; A-7 (legal) is a consent tick enough, e-signature or scan, emergency with no signer; A-8 how long discharged records can be viewed and printed (mockup: 90 days Read-only); A-9 may front desk or billing print the clinical summary; A-10 handover mandatory at transfer; A-11 consent before a procedure is marked done; A-12 isolation types and deep clean; A-13 visiting doctors in IPD for go-live; A-14 share of hospitals taking cashless; A-15 labour rooms, nurseries, OT; A-16 renumber ADM-2 and ADM-3, where are their requirements and IPD-open-questions.md; A-17 print only or PDF. Existing: OQ-27-1..27-10, OQ-31-8, OQ-76-22.

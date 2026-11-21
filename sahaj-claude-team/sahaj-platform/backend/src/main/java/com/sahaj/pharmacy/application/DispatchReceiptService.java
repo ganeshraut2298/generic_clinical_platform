@@ -316,9 +316,13 @@ public class DispatchReceiptService {
                 returnedNow += r.rejectedQty();
             }
         }
+        // m1: the units go back to the store that sent them, which is the Central Store only for an indent
+        String sender = viaTransfer ? stores.find(tenantId, row.fromStoreId()).map(Store::name).orElse("the sending store")
+                : "Central Store";
         String rejectedNote = returnedNow == 0 ? null : "The " + returnedNow + " rejected units do not enter " + store.name()
-                + " stock. They wait for Central Store to accept them back.";
-        String shortNote = shortNow == 0 ? null : "The " + shortNow + " short units stay in transit while Central Store investigates.";
+                + " stock. They wait for " + sender + " to accept them back.";
+        String shortNote = shortNow == 0 ? null : "The " + shortNow + " short units stay in transit while " + sender
+                + " investigates.";
         if (!dispatches.markReceived(tenantId, dispatchId, row.version(), status, me, signer, rejectedNote, shortNote)) {
             throw new IllegalStateException("A dispatch changed under its lock");
         }

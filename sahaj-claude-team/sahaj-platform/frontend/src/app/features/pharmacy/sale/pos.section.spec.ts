@@ -95,6 +95,17 @@ describe('PosSection', () => {
     expect(text(el, 'hit-prod-1')).toContain('Counting in progress');
   });
 
+  it('shows dashes, not zero, for a blind quote line with no batch and no counts', async () => {
+    const el = await open();
+    await addItem(
+      el,
+      saleQuote({ lines: [quoteLine({ batch: null, shortBy: null, availableQty: null, expiresInDays: null })] }),
+    );
+    expect(text(el, 'cart-batch-0')).toContain('—');
+    expect(q(el, 'cart-short-0')).toBeNull();
+    expect(text(el, 'cart-row-0')).not.toContain('In stock 0');
+  });
+
   it('says "No product has this barcode." for an unknown barcode', async () => {
     const el = await open();
     const input = q(el, 'pos-search') as HTMLInputElement;
@@ -211,6 +222,10 @@ describe('PosSection', () => {
     expect(text(el, 'invoice')).toContain('GSTIN TEST-GSTIN');
     expect(text(el, 'invoice')).toContain('3004');
     expect(text(el, 'invoice')).toContain('Pharmacist: Test Pharmacist One');
+    const wrap = q(el, 'invoice-table');
+    expect(wrap?.classList.contains('tbl-wrap')).toBe(true);
+    expect(wrap?.querySelector('table')).toBeTruthy();
+    expect(q(el, 'invoice')?.contains(wrap)).toBe(true);
     q(el, 'pos-new')?.click();
     await settle();
     expect(q(el, 'pos')).toBeTruthy();

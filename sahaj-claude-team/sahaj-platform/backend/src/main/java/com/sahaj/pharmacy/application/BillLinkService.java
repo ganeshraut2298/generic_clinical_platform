@@ -58,7 +58,7 @@ public class BillLinkService {
         UUID storeId = PharmacyParams.pathId(rawStoreId);
         UUID billId = PharmacyParams.pathId(rawBillId);
         LinkPatientInput in = body.read();
-        Store store = guard.require(caller, storeId, StoreCapability.SELL_SCHEDULED);
+        Store store = guard.requireSale(caller, storeId, StoreCapability.SELL_SCHEDULED);
         support.requireIntegrated(tenantId);
         List<FieldMessage> errors = new ArrayList<>();
         Integer version = PharmacyParams.wholeNumber(in.version(), 0, Integer.MAX_VALUE);

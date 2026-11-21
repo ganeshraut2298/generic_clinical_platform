@@ -239,8 +239,17 @@ public class DamageReportService implements ApprovalSubjectHandler {
         long seq = numbers.next(tenantId, DocType.DAMAGE_REPORT);
         String docNo = StoreUseSupport.render(series, tenantId, DocType.DAMAGE_REPORT, seq, today);
         StockState from = StockState.valueOf(fromState);
-        int held = stock.lockBalances(tenantId, storeId, List.of(batch.productId())).stream()
-                .filter(b -> b.batchId().equals(batch.id()) && b.state() == from).mapToInt(StockRepository.Bal::qty).sum();
+        List<StockRepository.Bal> balances = stock.lockBalances(tenantId, storeId, List.of(batch.productId())).stream()
+                .filter(b -> b.batchId().equals(batch.id())).toList();
+        if (balances.isEmpty()) {
+            // m10: a batch that has never been in this store cannot be reported here
+            throw new InvalidFieldsException(List.of(new FieldMessage("batchId", "Choose a batch of this store")));
+        }
+        int held = balances.stream().filter(b -> b.state() == from).mapToInt(StockRepository.Bal::qty).sum();
+        if (from == StockState.QUARANTINE) {
+            // M5: units that other reports still waiting for approval hold in QUARANTINE are not free to report again
+            held = Math.max(0, held - reports.waitingQuantity(tenantId, storeId, batch.id()));
+        }
         if (quantity > held) {
             // rule 24: no number for a caller blind at this store on a product of its open audit (0.3.6 wording)
             String message = blind.hides(caller, storeId, batch.productId()) ? BlindCount.MORE_THAN_IN_STOCK

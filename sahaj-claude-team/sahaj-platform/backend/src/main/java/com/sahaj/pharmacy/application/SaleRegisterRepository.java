@@ -40,8 +40,11 @@ public interface SaleRegisterRepository {
     /** Adds a REVERSAL row (negative quantity, reason CANCELLED) for every H1 ENTRY of the bill; returns the count. */
     int reverseH1ForCancelledBill(UUID tenantId, UUID billId);
 
-    /** Adds a REVERSAL row (negative quantity, reason CANCELLED) for every Schedule X ENTRY of the bill; returns the count. */
-    int reverseScheduleXForCancelledBill(UUID tenantId, UUID billId);
+    /**
+     * Adds a REVERSAL row (negative quantity, reason CANCELLED) for every Schedule X ENTRY of the bill; returns the count. The
+     * signers of a reversal are the people who cancelled it (the pharmacist and the second signer), not those of the sale (SEC M6).
+     */
+    int reverseScheduleXForCancelledBill(UUID tenantId, UUID billId, UUID firstSignerMembershipId, UUID secondSignerMembershipId);
 
     /** Adds a REVERSAL row (negative quantity {@code qty}, reason RETURNED, reference the credit note) for the H1 ENTRY of the line. */
     int reverseH1ForReturn(UUID tenantId, UUID billLineId, int qty, String creditNoteNo);
