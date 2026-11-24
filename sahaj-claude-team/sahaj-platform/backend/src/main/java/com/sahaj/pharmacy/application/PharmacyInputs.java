@@ -69,7 +69,16 @@ public final class PharmacyInputs {
     }
 
     public record UnitSettings(Long version, Sent<String> gstin, Sent<String> drugLicenceNo,
-                               Sent<LocalDate> drugLicenceValidTill, IntegrationMode integrationMode) {
+                               Sent<LocalDate> drugLicenceValidTill, IntegrationMode integrationMode,
+                               Sent<Integer> returnWindowDays, Sent<List<String>> refundModes,
+                               Sent<String> scheduleXLicenceNo, Sent<LocalDate> scheduleXLicenceValidTill) {
+
+        /** A save of the five original fields; the 0.3.0 sale settings are absent, so they stay unchanged. */
+        public UnitSettings(Long version, Sent<String> gstin, Sent<String> drugLicenceNo,
+                            Sent<LocalDate> drugLicenceValidTill, IntegrationMode integrationMode) {
+            this(version, gstin, drugLicenceNo, drugLicenceValidTill, integrationMode, Sent.absent(), Sent.absent(),
+                    Sent.absent(), Sent.absent());
+        }
 
         /** A save that sends every field (a null value is sent as an explicit null). */
         public static UnitSettings of(Long version, String gstin, String drugLicenceNo, LocalDate drugLicenceValidTill,

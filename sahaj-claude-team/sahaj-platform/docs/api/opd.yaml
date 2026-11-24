@@ -1,13 +1,32 @@
 openapi: 3.1.0
 info:
   title: Sahaj OPD API
-  version: 0.7.3
+  version: 0.8.0
   description: >-
     Phase 1 contract, SAH-7 (and SAH-9, SAH-11, SAH-12, SAH-14, SAH-15, SAH-18 as tagged). Reads are for any logged-in
     clinic user; writes are owner only (403 otherwise) unless an operation says otherwise. Errors are RFC 9457
     application/problem+json; the type is https://sahaj.in/problems/<slug> and slugs are written below without the
     prefix. The tenant always comes from the logged-in user, never from a body, query, path or header; a clinic id
     sent in a body is ignored.
+
+    0.8.0 (22 Nov 2026, SAH-89-5, SAH-89-6, SAH-89-7, DEC-096, ADR-031 D7, D8, D10; PROPOSED until "SAH-89 · contract ·
+    APPROVED"). (1) Changed meaning, owner as doctor: everywhere this contract says "OWNER with doctor details" it now
+    means an ACTIVE OWNER whose "Also a doctor" switch is on (platform.api TeamMemberPort.actsAsDoctor; docs/api/platform.yaml
+    0.3.0 PUT /me/doctor). An owner who switched it off is answered as an owner with no doctor details (403
+    doctor-details-missing on doctor-only calls) although the saved details still print on past records. Doctor lists
+    (GET /doctor-slots, /emr/department-doctor-options, the doctor choice of POST /visits and /appointments, the Queue's
+    doctor filter) include an owner who acts as doctor, after the doctors; such an owner can be given tokens and
+    appointments and has "mine" visits. (2) New problem type registration-number-missing (403, title "Registration
+    number needed", detail "Add your registration number before you see patients."): POST /emr/records/open and POST
+    /emr/records/{recordId}/sign answer it to an OWNER who acts as doctor and has no registration number saved (checked
+    after the role check, before anything is opened or written). DOCTOR and VISITING_DOCTOR are not affected. (3) New
+    GET /emr/chemo-checks/count ({ waiting }) for the Queue banner "N second checks waiting" that replaces the sidebar
+    entry Second checks (platform 0.3.0 removes the menu key secondchecks); roles and filter as GET /emr/chemo-checks.
+    The second-check rules (named checker, checker-is-prescriber, PIN, fingerprint) do not change; an owner can never
+    be the second checker of an order they prescribed. (4) Doctor fee, description only: POST /visits copies the
+    doctor's current fee (platform doctor profile, 0 to 50,000 rupees, ₹ 0 allowed) into Visit.feePaise at token time,
+    as before; a later fee change never alters an existing visit or bill. (5) Every operation here answers 403
+    setup-required while the clinic has not finished setup (platform 0.3.0, ADR-031 D1). No table of opd changes.
 
     0.2.0 (11 Nov 2026) adds SAH-43 and SAH-44, the Doctor EMR masters and specialty templates (ADR-019), under
     /emr/**, and two optional query parameters on GET /diagnoses (specialty, page). Nothing that existed changes
@@ -1106,7 +1125,7 @@ paths:
         '201': { description: Record created, content: { application/json: { schema: { $ref: '#/components/schemas/EmrOpenResult' } } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient, outside-scope or module-off.' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, registration-number-missing (0.8.0, OWNER acting as doctor without a registration number; nothing opened, no audit), not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: encounter-not-found }
         '409': { $ref: '#/components/responses/Problem', description: 'encounter-closed or ipd-read-only.' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
@@ -2401,6 +2420,30 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /emr/chemo-checks/count:
+    get:
+      tags: [SAH-89]
+      operationId: countMyChemoChecks
+      summary: How many orders wait for my second check (Queue banner)
+      description: >-
+        SAH-89-7, DEC-096 item 3, ADR-031 D10. Replaces the sidebar entry "Second checks" (and its badge): the Queue
+        shows "N second checks waiting" (1: "1 second check waiting"), which opens the existing list (route
+        /app/emr/second-checks, GET /emr/chemo-checks); 0 shows "No second checks waiting for you." (SAH-66 text). The
+        client calls it only when platform Me.capabilities.secondChecks is true, when the Queue opens and when it
+        refreshes. Same roles and same filter as GET /emr/chemo-checks (orders of this clinic in DRAFT that name the
+        caller's own membership as checker and are not confirmed), so the number always equals that list's total. No
+        patient data in the answer; writes nothing; no audit. A path segment "count" is matched before {orderId}.
+      x-required-role: NURSE, PHARMACIST, DOCTOR, VISITING_DOCTOR, or OWNER acting as doctor
+      responses:
+        '200':
+          description: Count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChemoCheckCount' }
+              examples:
+                two: { value: { waiting: 2 } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (FRONT_DESK, BILLING, COUNSELLOR, STORE_STAFF, an OWNER not acting as doctor).' }
   /emr/chemo-checks/{orderId}:
     parameters:
       - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2622,7 +2665,7 @@ paths:
         '200': { description: Signed (or the first result of the same Idempotency-Key), content: { application/json: { schema: { $ref: '#/components/schemas/EmrSignResult' } } } }
         '400': { $ref: '#/components/responses/Problem', description: 'validation or needs-whatsapp-service.' }
         '401': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, not-own-patient, outside-scope or module-off.' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden, doctor-details-missing, registration-number-missing (0.8.0, OWNER acting as doctor without a registration number; nothing written), not-own-patient, outside-scope or module-off.' }
         '404': { $ref: '#/components/responses/Problem', description: 'record-not-found; patient-not-found (SEND_TO_OPD with a patient not of this clinic).' }
         '409': { $ref: '#/components/responses/Problem', description: 'emr-record-signed, emr-record-changed, emr-record-held, ipd-read-only (0.6.2, IPD_ROUND and ER_ASSESSMENT while IPD is Read-only), emr-not-ready (blockers), encounter-closed, case-closed, workflow-move-refused, already-billed, ipd-order-not-placed (rows: EmrIpdOrderNotPlacedRow, 0.6.3, no clinical text), opd-doctor-not-available or idempotency-conflict.' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
@@ -6025,6 +6068,12 @@ components:
         total: { type: integer }
         page: { type: integer }
         pageSize: { type: integer, const: 20 }
+    ChemoCheckCount:
+      type: object
+      required: [waiting]
+      description: '0.8.0 (SAH-89-7). Equals ChemoCheckPage.total for the same caller at the same moment.'
+      properties:
+        waiting: { type: integer, minimum: 0 }
     ChemoCheckSummary:
       type: object
       required: [orderId, patientName, uhid, age, sex, prescriberName, protocolLabel, levelPct, drugs, bsa, labsDrawnAt, decision, checks, secondCheck, fingerprint, canConfirm]

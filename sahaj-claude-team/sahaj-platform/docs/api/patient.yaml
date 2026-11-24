@@ -1,11 +1,20 @@
 openapi: 3.1.0
 info:
   title: Sahaj Patient API
-  version: 0.2.2
+  version: 0.3.0
   description: >-
     Phase 1 contract, SAH-8. Patient reads (list, detail, family) are for OWNER, FRONT_DESK, NURSE, DOCTOR,
     VISITING_DOCTOR, BILLING and PHARMACIST; COUNSELLOR and any other role get 403. Writes are OWNER/FRONT_DESK (403
     otherwise). Errors are RFC 9457 application/problem+json.
+
+    0.3.0 (22 Nov 2026, SAH-89-4, DEC-096, OQ-89-7 A, ADR-031 D9; additive; PROPOSED until "SAH-89 · contract ·
+    APPROVED"). New POST /patients/lookup-by-mobile for the header field "Search mobile number": the mobile travels only
+    in the request body, never in a path or query; answer MobileLookupResult (outcome NONE, ONE or MANY, at most 20 family
+    rows), Cache-Control no-store. Roles OWNER, FRONT_DESK, NURSE, DOCTOR, VISITING_DOCTOR (the roles with the Patients
+    menu that may read patients); BILLING, PHARMACIST, COUNSELLOR and any other role 403. Rate limit 30 per user per
+    minute (429 rate-limit). Also from platform 0.3.0 (ADR-031 D1): every operation here answers 403 setup-required
+    while the clinic has not finished setup (docs/api/platform.yaml components/responses/SetupRequired). No other path,
+    schema or problem type changes.
 
     0.2.2 (15 Nov 2026, DEC-054, SAH-39; additive). New reusable response DatabaseBusy: 503 with problem type
     database-busy ("Sahaj is busy"), header Retry-After 5 and body field retryAfterSeconds 5, when a database lock wait,
@@ -79,6 +88,51 @@ paths:
         '400': { $ref: '#/components/responses/Problem', description: 'validation, with fieldErrors (messages on PatientCreate).' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /patients/lookup-by-mobile:
+    post:
+      tags: [SAH-89]
+      operationId: lookupPatientsByMobile
+      summary: Find this clinic's patients on one 10-digit mobile (header search)
+      x-required-role: OWNER, FRONT_DESK, NURSE, DOCTOR, VISITING_DOCTOR
+      description: >-
+        SAH-89-4, OQ-89-7 A, ADR-031 D9. The app shell header field "Search mobile number" (numeric keyboard). Client:
+        keeps digits only (spaces, "+91" and a leading 0 are dropped; at most 10 digits used); calls this only when
+        exactly 10 digits starting 6 to 9 are present (as soon as the 10th digit is typed, or on Enter); fewer digits
+        and Enter: "Enter a 10-digit mobile number" (mockup text); 10 digits not starting 6 to 9: "Enter a valid mobile
+        number"; only the answer to the latest number is used; while waiting the field shows that it is searching; on
+        a failure "Could not search. Try again.". Outcome ONE: the record /app/patients/<id> opens and the field clears.
+        MANY: the Patients list opens in a "family on this number" view built from patients[] held in memory (router
+        state; the mobile is never put in the address bar, history, local storage or a log). NONE: "No patient with
+        this number" and the button "Register patient", which opens registration with the number held in memory.
+        Server: the clinic comes from the token; another clinic's patient is never matched (row-level security), so a
+        number used only elsewhere answers NONE. Merged-away records are not returned. Order: newest registration
+        first. Writes nothing and writes no record-access row (a list, like GET /patients); opening the record writes
+        it as today. The mobile is never logged, audited or put in a problem detail. Check order: role 403 forbidden;
+        30 lookups per user per minute 429 rate-limit (title "Too many searches", detail "Too many searches. Wait a
+        moment and try again.", retryAfterSeconds); body 400 validation field mobile "Enter a valid mobile number"
+        (missing, not a string, not exactly ^[6-9][0-9]{9}$; the value is not echoed).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MobileLookupInput' }
+            examples:
+              lookup: { value: { mobile: '9822000001' } }
+      responses:
+        '200':
+          description: Matches in this clinic (headers Cache-Control no-store)
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MobileLookupResult' }
+              examples:
+                none: { value: { outcome: NONE, total: 0, patients: [] } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (field mobile)' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (role), or setup-required (platform 0.3.0)' }
+        '429': { $ref: '#/components/responses/Problem', description: rate-limit }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /patients/{id}:
     parameters:
@@ -343,6 +397,21 @@ components:
         abhaLinked: { type: boolean }
         createdAt: { type: string, format: date-time }
         possibleDuplicateOfId: { type: [string, 'null'], format: uuid, description: Set when a likely duplicate was found at creation. }
+    MobileLookupInput:
+      type: object
+      required: [mobile]
+      additionalProperties: false
+      description: '0.3.0 (SAH-89-4). The only place the number travels. Exactly 10 digits, first 6 to 9; the client normalises before sending.'
+      properties:
+        mobile: { type: string, pattern: '^[6-9][0-9]{9}$', maxLength: 10 }
+    MobileLookupResult:
+      type: object
+      required: [outcome, total, patients]
+      description: '0.3.0 (SAH-89-4). outcome NONE (total 0), ONE (total 1) or MANY (total 2 or more; the family on one number). patients holds at most 20 rows, newest registration first; total is the full count. Rows never carry dateOfBirth.'
+      properties:
+        outcome: { type: string, enum: [NONE, ONE, MANY] }
+        total: { type: integer, minimum: 0 }
+        patients: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/PatientSummary' } }
     PatientMergeResult:
       description: 'SAH-8 merge answer (the kept record) plus the SAH-73 date of birth notice.'
       allOf:

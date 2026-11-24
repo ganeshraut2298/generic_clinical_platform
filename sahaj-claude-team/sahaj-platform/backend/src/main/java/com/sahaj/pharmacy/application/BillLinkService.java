@@ -83,7 +83,7 @@ public class BillLinkService {
         if (!bills.linkPatient(tenantId, billId, bill.version(), in.patientId(), caller.actorId())) {
             throw PharmacyProblemException.changed(null);
         }
-        events.insert(tenantId, store.unitId(), "BILL", billId, "LINKED", storeId, caller.actorId(), "PHARMACIST", null, null,
+        events.insert(tenantId, store.unitId(), "BILL", billId, "LINKED", storeId, caller.actorId(), null, null, null,
                 null, null);
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("billId", billId.toString());

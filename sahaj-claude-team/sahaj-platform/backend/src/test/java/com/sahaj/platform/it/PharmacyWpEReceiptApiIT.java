@@ -65,7 +65,7 @@ class PharmacyWpEReceiptApiIT extends Sah79BuySupport {
         // the prepared debit note for the line billed above what was received (here billed 10, received 8)
         assertThat(posted.get("debitNoteDraft").isNull()).isFalse();
         assertThat(posted.get("debitNoteDraft").get("lineCount").asInt()).isOne();
-        assertThat(posted.get("debitNoteDraft").get("amountPaise").asLong()).as("2 boxes x 10 x 7.00").isEqualTo(14_000);
+        assertThat(posted.get("debitNoteDraft").get("amountPaise").asLong()).as("2 boxes x 10 x 7.00 at the vendor credit percent of 80 (DEC-095 item 1)").isEqualTo(11_200);
         assertThat(auditRowsOf(w.clinic(), "PHARMACY_GRN_POSTED")).hasSize(1);
         assertLedgerEqualsBalances(w);
     }
@@ -100,7 +100,7 @@ class PharmacyWpEReceiptApiIT extends Sah79BuySupport {
         JsonNode draft = draftReceipt(w, null, vendor, "INV-3001", todayIst().toString(), 30,
                 List.of(gline(product, "ST1", farMonth(), 1, 1001, 0, "100.00", "8.00", null, null, false)));
         JsonNode posted = post(w, w.csUser(), draft, null, 200);
-        assertThat(posted.get("debitNoteDraft").get("amountPaise").asLong()).as("1,000 x 100.00, not 15,000 x 6.6667").isEqualTo(10_000_000L);
+        assertThat(posted.get("debitNoteDraft").get("amountPaise").asLong()).as("1,000 x 100.00 at 80 percent, not 15,000 x 6.6667").isEqualTo(8_000_000L);
     }
 
     @Test

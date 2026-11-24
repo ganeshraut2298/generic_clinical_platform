@@ -1,5 +1,5 @@
 # SAH-25 · Running bill, extra charges and deposit alerts (IPD, part 4)
-Mockup screens: IPD → Admitted list (Running bill column, "Deposit low" pill), KPI tile "Deposit alerts", Bed board "Deposit low" flag, the patient sheet (`openIp`: summary, alert notice, running bill, "Add a charge"), `ipLines`, `ipDays`, `ipLow`, `IP_SERV`
+Mockup screen: IPD → Admitted — IPD → Admitted list (Running bill column, "Deposit low" pill), KPI tile "Deposit alerts", Bed board "Deposit low" flag, the patient sheet (`openIp`: summary, alert notice, running bill, "Add a charge"), `ipLines`, `ipDays`, `ipLow`, `IP_SERV`
 Module: ipd
 
 ## 1. Story

@@ -300,6 +300,50 @@ describe('SAH-80 work package L, N and K screens', () => {
       http.expectOne((r) => r.url === `${BASE}/command-centre`).flush(commandCentre({ store: null }));
     });
 
+    it('shows no "No count yet" label when neverCounted is absent', async () => {
+      start(CommandCentreSection, saleContext({}, ['INVENTORY', 'PHARMACY', 'POS', 'COMMAND_CENTRE']));
+      fixture.detectChanges();
+      http.expectOne((r) => r.url === `${BASE}/command-centre`).flush(commandCentre({ compliance: { state: 'OK', scheduleX: { toReview: 0, balanced: true } } }));
+      const el = await settle();
+      expect(q(el, 'comp-x-never-counted')).toBeNull();
+      expect(text(el, 'comp-x')).toContain('Balanced');
+    });
+
+    it('shows no "No count yet" label when neverCounted is 0', async () => {
+      start(CommandCentreSection, saleContext({}, ['INVENTORY', 'PHARMACY', 'POS', 'COMMAND_CENTRE']));
+      fixture.detectChanges();
+      http
+        .expectOne((r) => r.url === `${BASE}/command-centre`)
+        .flush(commandCentre({ compliance: { state: 'OK', scheduleX: { toReview: 0, balanced: true, neverCounted: 0 } } }));
+      const el = await settle();
+      expect(q(el, 'comp-x-never-counted')).toBeNull();
+      expect(text(el, 'comp-x')).toContain('Balanced');
+    });
+
+    it('shows "No count yet: 3 products" and not the Balanced chip when neverCounted is 3', async () => {
+      start(CommandCentreSection, saleContext({}, ['INVENTORY', 'PHARMACY', 'POS', 'COMMAND_CENTRE']));
+      fixture.detectChanges();
+      http
+        .expectOne((r) => r.url === `${BASE}/command-centre`)
+        .flush(commandCentre({ compliance: { state: 'OK', scheduleX: { toReview: 0, balanced: false, neverCounted: 3 } } }));
+      const el = await settle();
+      expect(text(el, 'comp-x-never-counted')).toBe('No count yet: 3 products');
+      expect(text(el, 'comp-x')).not.toContain('Balanced');
+      expect(text(el, 'comp-x')).not.toContain('to review');
+    });
+
+    it('keeps the compliance card for a blind caller whose server sends no Schedule X counts', async () => {
+      start(CommandCentreSection, saleContext({}, ['INVENTORY', 'PHARMACY', 'POS', 'COMMAND_CENTRE']));
+      fixture.detectChanges();
+      http
+        .expectOne((r) => r.url === `${BASE}/command-centre`)
+        .flush(commandCentre({ compliance: { state: 'OK', h1: { billsToday: 5, overridesToReview: 0 }, drugLicence: { state: 'VALID', daysLeft: 200 } } }));
+      const el = await settle();
+      expect(q(el, 'cc-compliance')).toBeTruthy();
+      expect(q(el, 'comp-x')).toBeNull();
+      expect(q(el, 'comp-x-never-counted')).toBeNull();
+    });
+
     it('says "Could not load. Try again." when the whole read fails', async () => {
       start(CommandCentreSection, saleContext({}, ['INVENTORY', 'PHARMACY', 'POS', 'COMMAND_CENTRE']));
       fixture.detectChanges();

@@ -2,6 +2,7 @@ package com.sahaj.pharmacy.domain;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -10,7 +11,15 @@ import java.util.UUID;
  * because a store was created".
  */
 public record Unit(UUID id, String code, String gstin, String drugLicenceNo, LocalDate drugLicenceValidTill,
-                   IntegrationMode integrationMode, Instant updatedAt, long version) {
+                   IntegrationMode integrationMode, Instant updatedAt, long version, Integer returnWindowDays,
+                   List<String> refundModes, String scheduleXLicenceNo, LocalDate scheduleXLicenceValidTill) {
+
+    /** A unit with no sale settings (SAH-80-1): no return window, no refund mode, no Schedule X licence. */
+    public Unit(UUID id, String code, String gstin, String drugLicenceNo, LocalDate drugLicenceValidTill,
+                IntegrationMode integrationMode, Instant updatedAt, long version) {
+        this(id, code, gstin, drugLicenceNo, drugLicenceValidTill, integrationMode, updatedAt, version, null, List.of(),
+                null, null);
+    }
 
     public boolean saved() {
         return updatedAt != null;

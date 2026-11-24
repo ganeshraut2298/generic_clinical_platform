@@ -35,9 +35,19 @@ class PharmacySalesDiscountApiIT extends Sah80SalesSupport {
         body.put("heldBillId", null);
         return post(who, url(w.pharmacyId(), "sale/discount-requests"), body, expected);
     }
+    /** The approval request id of a discount request, from the owner's approvals inbox (the row's subjectId is the discount request id; DEC-095 item 4). */
+    private String approvalIdOf(Sw w, String discountRequestId) throws Exception {
+        for (JsonNode row : get(owner(w), PH + "/approvals/inbox", 200).get("items")) {
+            if (discountRequestId.equals(row.get("subjectId").asText())) {
+                return row.get("requestId").asText();
+            }
+        }
+        throw new AssertionError("no inbox row for discount request " + discountRequestId);
+    }
+
 
     private JsonNode approve(Sw w, String requestId) throws Exception {
-        JsonNode a = get(owner(w), PH + "/approvals/" + requestId, 200);
+        JsonNode a = get(owner(w), PH + "/approvals/" + approvalIdOf(w, requestId), 200);
         return decide(owner(w), a, "APPROVED", null, null, 200);
     }
 
@@ -78,7 +88,7 @@ class PharmacySalesDiscountApiIT extends Sah80SalesSupport {
         assertThat(withdrawn.get("status").asText()).isEqualTo("WITHDRAWN");
         assertThat(ok(HttpMethod.POST, url(w.pharmacyId(), "sale/discount-requests/" + id + "/withdraw"), s.cashier().auth(), null, 200).get("status").asText()).isEqualTo("WITHDRAWN");
         assertThat(get(owner(w), PH + "/approvals/inbox", 200).toString()).as("it left the inbox").doesNotContain(id);
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_DISCOUNT_WITHDRAWN'")).isOne();
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_DISCOUNT_WITHDRAWN'")).isOne();
     }
 
     @Test
@@ -91,13 +101,13 @@ class PharmacySalesDiscountApiIT extends Sah80SalesSupport {
         approve(w, id);
         JsonNode seen = get(s.cashier(), url(w.pharmacyId(), "sale/discount-requests/" + id), 200);
         assertThat(seen.get("status").asText()).isEqualTo("APPROVED");
-        assertThat(seen.get("decidedBy").get("name").asText()).isEqualTo("Owner");
+        assertThat(seen.get("decidedBy").get("name").asText()).isEqualTo("Dr Owner");
         Map<String, Object> withRequest = new LinkedHashMap<>(cart);
         withRequest.put("discountRequestId", id);
         JsonNode q = quote(s.cashier(), w, withRequest, 200);
         assertThat(q.get("discount").get("approvalNeeded").asBoolean()).isFalse();
         JsonNode bill = post(s.cashier(), url(w.pharmacyId(), "bills"), billBody(q, withRequest, "CASH"), 201);
-        assertThat(bill.get("discountApprovedBy").get("name").asText()).isEqualTo("Owner");
+        assertThat(bill.get("discountApprovedBy").get("name").asText()).isEqualTo("Dr Owner");
         // the same request for a bigger cart is void
         Map<String, Object> bigger = new LinkedHashMap<>(discounted(w.productB(), 12, "15"));
         bigger.put("discountRequestId", id);
@@ -114,23 +124,22 @@ class PharmacySalesDiscountApiIT extends Sah80SalesSupport {
         Sw w = s.w();
         JsonNode r = request(s.w().keeper(), w, discounted(w.productB(), 10, "20"), 201);
         String id = r.get("requestId").asText();
-        JsonNode a = get(owner(w), PH + "/approvals/" + id, 200);
-        decide(owner(w), a, "REJECTED", REJECT_OTHER, null, 400);
+        JsonNode a = get(owner(w), PH + "/approvals/" + approvalIdOf(w, id), 200);
         decideWithNote(w, a);
         JsonNode seen = get(s.w().keeper(), url(w.pharmacyId(), "sale/discount-requests/" + id), 200);
         assertThat(seen.get("status").asText()).isEqualTo("REJECTED");
         assertThat(seen.get("rejectReason")).isNotNull();
         JsonNode second = request(s.w().keeper(), w, discounted(w.productB(), 10, "20"), 201);
-        JsonNode own = get(s.w().keeper(), PH + "/approvals/" + second.get("requestId").asText(), 200);
-        assertThat(call(HttpMethod.POST, decisionUrl(second.get("requestId").asText()), s.w().keeper().auth(),
-                decisionBody(UUID.randomUUID(), own.get("levelNo").asInt(), own.get("requestVersion").asLong(), "APPROVED", null)).andReturn().getResponse().getStatus())
+        JsonNode own = get(s.w().keeper(), PH + "/approvals/" + approvalIdOf(w, second.get("requestId").asText()), 200);
+        assertThat(call(HttpMethod.POST, decisionUrl(own.get("id").asText()), s.w().keeper().auth(),
+                decisionBody(UUID.randomUUID(), approvalLevelOf(own), approvalVersionOf(own), "APPROVED", null)).andReturn().getResponse().getStatus())
                 .as("a pharmacist is not the approver").isIn(403, 409);
     }
 
     private void decideWithNote(Sw w, JsonNode a) throws Exception {
-        Map<String, Object> d = decision(a.get("levelNo").asInt(), a.get("requestVersion").asLong(), "REJECTED", REJECT_OTHER, null);
+        Map<String, Object> d = decision(approvalLevelOf(a), approvalVersionOf(a), "REJECTED", REJECT_OTHER, null);
         d.put("note", "Too high for this item");
-        ok(HttpMethod.POST, decisionUrl(a.get("requestId").asText()), owner(w).auth(), js(d), 200);
+        ok(HttpMethod.POST, decisionUrl(approvalIdOf(a)), owner(w).auth(), js(d), 200);
     }
 
     @Test
@@ -145,7 +154,7 @@ class PharmacySalesDiscountApiIT extends Sah80SalesSupport {
         assertThat(asked.get("required").asBoolean()).isFalse();
         assertThat(asked.get("requestId").isNull()).isTrue();
         assertThat(asked.get("selfApprovalOnly").asBoolean()).isFalse();
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_DISCOUNT_REQUESTED'")).isZero();
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_DISCOUNT_REQUESTED'")).isZero();
         Map<String, Object> withRandomId = new LinkedHashMap<>(cart);
         withRandomId.put("discountRequestId", UUID.randomUUID().toString());
         JsonNode bill = post(owner(w), url(w.pharmacyId(), "bills"), billBody(quote(owner(w), w, withRandomId, 200), withRandomId, "CASH"), 201);
@@ -184,7 +193,7 @@ class PharmacySalesDiscountApiIT extends Sah80SalesSupport {
         hold.put("replacesHeldBillId", null);
         JsonNode held = post(s.cashier(), url(w.pharmacyId(), "held-bills"), hold, 201);
         assertThat(held.get("discountState").asText()).isEqualTo("PENDING");
-        ok(HttpMethod.POST, url(w.pharmacyId(), "held-bills/" + idOf(held) + "/discard"), s.cashier().auth(), null, 200);
+        ok(HttpMethod.POST, url(w.pharmacyId(), "held-bills/" + idOf(held) + "/discard"), s.cashier().auth(), js(m("version", held.get("version").asLong())), 200);
         assertThat(get(s.cashier(), url(w.pharmacyId(), "sale/discount-requests/" + id), 200).get("status").asText()).isEqualTo("WITHDRAWN");
     }
 

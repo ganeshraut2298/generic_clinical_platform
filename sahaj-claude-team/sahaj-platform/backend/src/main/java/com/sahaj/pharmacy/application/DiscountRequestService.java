@@ -168,6 +168,32 @@ public class DiscountRequestService implements ApprovalSubjectHandler {
         }
     }
 
+    /**
+     * The discountState of a held bill row (contract NONE, PENDING, APPROVED, REJECTED, VOID): the state of the request its cart names.
+     * A withdrawn request, an unknown one, or an APPROVED one that can no longer be used by the holder reads VOID. Reads only.
+     */
+    @Transactional(readOnly = true)
+    public String heldState(UUID tenantId, UUID requestId, UUID holder) {
+        if (requestId == null) {
+            return "NONE";
+        }
+        DiscountRequestRepository.Row row = requests.find(tenantId, requestId).orElse(null);
+        ApprovalRepository.Request approval = row == null ? null : approvals.find(tenantId, row.approvalRequestId()).orElse(null);
+        if (approval == null) {
+            return "VOID";
+        }
+        switch (approval.status()) {
+            case "PENDING":
+                return "PENDING";
+            case "REJECTED":
+                return "REJECTED";
+            case "APPROVED":
+                return discountApprovals.usable(tenantId, row, approval, holder) ? "APPROVED" : "VOID";
+            default:
+                return "VOID";
+        }
+    }
+
     // ---- get and withdraw ----
 
     @Transactional(readOnly = true)
@@ -258,7 +284,7 @@ public class DiscountRequestService implements ApprovalSubjectHandler {
         String storeName = stores.find(tenantId, request.ruleStoreId()).map(Store::name).orElse("");
         String what = row == null ? request.subjectNo() : "Discount " + SaleRules.percent(row.discountPercent()) + " · "
                 + SaleRules.rupeesText(row.discountPaise()) + " · " + storeName;
-        return new Summary(what, "SALES", request.ruleStoreId(), List.of("APPROVE", "REJECT", "REVIEW"));
+        return new Summary(what, "DISCOUNT", request.ruleStoreId(), List.of("APPROVE", "REJECT", "REVIEW"));
     }
 
     @Override

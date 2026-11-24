@@ -317,21 +317,21 @@ public class SaleBillService {
         if (heldRow != null) {
             held.close(tenantId, heldRow.id(), heldRow.version(), "RESUMED", me);
         }
-        events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SAVED", storeId, me, caller.isPharmacist() ? "PHARMACIST" : null,
+        events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SAVED", storeId, me, null,
                 null, null, priced.lines().stream().mapToInt(SalePricer.PricedLine::qty).sum(), null);
         for (SalePricer.PricedLine l : priced.lines()) {
             SaleCart.Line input = l.input();
             if (input.allergyOverride() != null) {
-                events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "ALLERGY_OVERRIDE", storeId, me, "PHARMACIST", null,
+                events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "ALLERGY_OVERRIDE", storeId, me, null, null,
                         null, null, input.allergyOverride().reasonKey());
             }
             if (input.h1Override() != null) {
-                events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "H1_OVERRIDE", storeId, me, "PHARMACIST", null, null,
+                events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "H1_OVERRIDE", storeId, me, null, null, null,
                         null, input.h1Override().reasonKey());
             }
         }
         if (signer != null) {
-            events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SECOND_SIGNATURE", storeId, me, "PHARMACIST", null, null,
+            events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SECOND_SIGNATURE", storeId, me, null, null, null,
                     null, null);
         }
         Map<String, Object> after = new LinkedHashMap<>();

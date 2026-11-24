@@ -255,9 +255,9 @@ public class BillCancelService {
             throw PharmacyProblemException.changed(null);
         }
         events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "CANCELLED", storeId, me,
-                caller.isPharmacist() ? "PHARMACIST" : caller.isOwner() ? "OWNER" : null, null, null, null, in.reasonKey());
+                caller.isOwner() ? "OWNER" : null, null, null, null, in.reasonKey());
         if (signer != null) {
-            events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SECOND_SIGNATURE", storeId, me, "PHARMACIST", null, null,
+            events.insert(tenantId, store.unitId(), DOC_TYPE, billId, "SECOND_SIGNATURE", storeId, me, null, null, null,
                     null, null);
         }
         Map<String, Object> after = new LinkedHashMap<>();

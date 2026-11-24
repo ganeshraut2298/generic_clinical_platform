@@ -52,7 +52,7 @@ class PharmacyCandidatesWithoutStoreIT extends Sah78Support {
         }
         for (Pn p : new Pn[] {keeper, billing}) {
             assertThat(texts(candidate(list, p.membershipId().toString()).get("allowedStoreRoles"))).as(p.role())
-                    .containsExactlyInAnyOrder("STORE_USER", "CENTRAL_STORE_USER");
+                    .containsExactlyInAnyOrder("STORE_USER", "CENTRAL_STORE_USER", "CASHIER");
         }
         for (Pn p : new Pn[] {desk, visiting, counsellor}) {
             assertThat(texts(candidate(list, p.membershipId().toString()).get("allowedStoreRoles"))).as(p.role())

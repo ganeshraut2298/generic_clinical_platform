@@ -43,7 +43,9 @@ class PharmacyNumberingIT extends Sah78CSupport {
             {"BILL", "SB/", "true", "6", "true", "SB/" + financialYear() + "/000001"},
             {"DEBIT_NOTE", "DN-", "false", "4", "false", "DN-0001"}, {"STOCK_AUDIT", "AUD-", "false", "4", "false", "AUD-0001"},
             {"STORE_RETURN", "RET-", "false", "4", "false", "RET-0001"}, {"DAMAGE_REPORT", "DMG-", "false", "4", "false", "DMG-0001"},
-            {"STOCK_ADJUSTMENT", "ADJ-", "false", "4", "false", "ADJ-0001"}};
+            {"STOCK_ADJUSTMENT", "ADJ-", "false", "4", "false", "ADJ-0001"},
+            {"CREDIT_NOTE", "CN/", "true", "6", "true", "CN/" + financialYear() + "/000001"},
+            {"IPD_ISSUE_SLIP", "IS-", "false", "4", "false", "IS-0001"}};
         for (String[] e : expected) {
             JsonNode s = seriesOf(list, e[0]);
             assertThat(s.get("prefix").asText()).as(e[0]).isEqualTo(e[1]);
@@ -190,7 +192,7 @@ class PharmacyNumberingIT extends Sah78CSupport {
         }
         assertThat(pharmacyRows(w.clinic(), "document_series")).isZero();
         for (String reader : new String[] {"PHARMACIST", "CENTRAL_STORE_USER"}) {
-            assertThat(ok(HttpMethod.GET, SERIES_URL, callers.get(reader), null, 200).get("items")).hasSize(10);
+            assertThat(ok(HttpMethod.GET, SERIES_URL, callers.get(reader), null, 200).get("items")).hasSize(12);
         }
         for (String other : new String[] {"DOCTOR", "NURSE", "FRONT_DESK", "BILLING"}) {
             assertType(problem(call(HttpMethod.GET, SERIES_URL, callers.get(other), null), 403), "forbidden");

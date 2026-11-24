@@ -1,8 +1,20 @@
 openapi: 3.1.0
 info:
   title: Sahaj Billing API
-  version: 0.4.1
+  version: 0.4.2
   description: >-
+    0.4.2 (22 Nov 2026, SAH-89-5, DEC-096 item 4, OQ-89-9, ADR-031 D8; description only, PROPOSED until "SAH-89 ·
+    contract · APPROVED"). No path, schema, problem type, table or pricing rule changes. Stated rules: (1) the
+    consultation line of a visit bill is still derived from the visit's fee (opd Visit.feePaise), which opd copies from
+    the doctor's one fee (platform doctor profile, the "New visit fee", 0 to 50,000 rupees) or the clinic's follow-up
+    rule when the token is issued; a later change of the doctor's fee never changes a visit or a bill already made, and
+    new tokens use the new fee. (2) Tariff, payer and service prices keep working exactly as built; the doctor fee does
+    not override them and they are not changed by this story. (3) A fee of ₹ 0 makes a consultation line of ₹ 0 (the
+    bill shows the amount as today; "Free" is the label on Team and access, Fees and billing and the token sheet). (4)
+    Fee changes are audited in platform (PLATFORM_DOCTOR_FEE_CHANGED, amounts in paise and ids only). (5) Every operation
+    here answers 403 setup-required while the clinic has not finished setup (platform 0.3.0, ADR-031 D1). An owner who
+    acts as doctor (platform 0.3.0) is billed as any doctor; billing roles are unchanged.
+
     0.4.1 (15 Nov 2026, DEC-054, SAH-39; additive). New reusable response DatabaseBusy: 503 with problem type
     database-busy ("Sahaj is busy"), header Retry-After 5 and body field retryAfterSeconds 5, when a database lock wait,
     statement timeout or no free connection stopped the request. The request was rolled back: nothing was saved by that

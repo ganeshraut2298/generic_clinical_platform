@@ -102,7 +102,7 @@ class PharmacySalesReturnApiIT extends Sah80SalesSupport {
                 "decisions", List.of(m("returnLineId", returnLine, "decision", "ACCEPT")),
                 "refunds", List.of(m("mode", "CASH", "amountPaise", 4000)), "secondSigner", null);
         JsonNode denied = post(s.cashier(), path, accept, 403);
-        assertThat(denied.get("type").asText()).containsAnyOf("pharmacist-required", "forbidden");
+        assertThat(denied.get("type").asText()).containsAnyOf("pharmacist-required", "forbidden", "store-permission-denied");
         JsonNode accepted = post(w.keeper(), path, accept, 200);
         assertThat(accepted.get("status").asText()).isIn("COMPLETED", "APPROVED");
         if ("APPROVED".equals(accepted.get("status").asText())) {

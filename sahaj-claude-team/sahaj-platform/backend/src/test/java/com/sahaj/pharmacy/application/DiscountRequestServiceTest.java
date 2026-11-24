@@ -198,6 +198,22 @@ class DiscountRequestServiceTest {
     }
 
     @Test
+    void aHeldRowReadsTheStateOfItsRequestAndAWithdrawnOrUnusableOneIsVoid() {
+        UUID by = w.cashier.member().membershipId();
+        assertThat(service.heldState(SaleWorld.TENANT, null, by)).isEqualTo("NONE");
+        assertThat(service.heldState(SaleWorld.TENANT, UUID.randomUUID(), by)).isEqualTo("VOID");
+        for (String status : List.of("PENDING", "REJECTED", "WITHDRAWN", "APPROVED")) {
+            UUID requestId = UUID.randomUUID();
+            UUID approvalId = UUID.randomUUID();
+            when(w.discountRequests.find(any(), eq(requestId))).thenReturn(Optional.of(new DiscountRequestRepository.Row(requestId,
+                    w.unitId(), w.shop.id(), approvalId, "d", new BigDecimal("5"), 100L, null, by, Instant.now())));
+            when(w.approvalRepository.find(any(), eq(approvalId))).thenReturn(Optional.of(request(approvalId, requestId, status)));
+            String expected = "WITHDRAWN".equals(status) || "APPROVED".equals(status) ? "VOID" : status;
+            assertThat(service.heldState(SaleWorld.TENANT, requestId, by)).as(status).isEqualTo(expected);
+        }
+    }
+
+    @Test
     void theHandlerWritesTheHistoryAndTheAuditAndNothingElse() {
         UUID id = UUID.randomUUID();
         ApprovalRepository.Request request = request(UUID.randomUUID(), id, "PENDING");

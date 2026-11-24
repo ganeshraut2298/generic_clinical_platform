@@ -34,7 +34,7 @@ class PharmacyWpGStoreUseApiIT extends Sah79StoreUseSupport {
         assertThat(bal(w, w.pharmacyId(), "TESTB001", "PENDING_RETURN")).isEqualTo(10);
         assertThat(bal(w, w.centralId(), "TESTB001", "AVAILABLE")).isEqualTo(centralBefore);
         assertThat(ledger(w, "STORE_RETURN")).isGreaterThanOrEqualTo(1);
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_STORE_RETURN_CREATED'")).isEqualTo(1);
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_STORE_RETURN_CREATED'")).isEqualTo(1);
         JsonNode again = get(w.keeper(), url(w.pharmacyId(), "store-returns/" + idOf(r)), 200);
         assertThat(idOf(again)).isEqualTo(idOf(r));
         assertLedgerEqualsBalances(w);
@@ -51,7 +51,7 @@ class PharmacyWpGStoreUseApiIT extends Sah79StoreUseSupport {
         assertThat(idOf(second)).isEqualTo(idOf(first));
         assertThat(bal(w, w.pharmacyId(), "TESTB001", "PENDING_RETURN")).isEqualTo(5);
         assertThat(count(w.clinic(), "select count(*) from pharmacy.stock_ledger where txn_type = 'STORE_RETURN' and store_id = ?::uuid", w.pharmacyId()))
-                .isEqualTo(1);
+                .isEqualTo(2); // out of Available and into Pending return: two ledger rows (pharmacy.yaml pharmacyCreateStoreReturn)
     }
 
     @Test
@@ -208,7 +208,14 @@ class PharmacyWpGStoreUseApiIT extends Sah79StoreUseSupport {
         post(w.keeper(), path, badReason, 400);
         assertThat(bal(w, w.pharmacyId(), "TESTB001", "AVAILABLE")).isEqualTo(100);
         // at the Central Store only WRITE_OFF
+        // the Central Store has no opening stock of its own: post one batch (product B, TESTB001, 10 units), as PharmacyWpEDebitNoteApiIT.notEligible does
+        String importId = idOf(startImport(w.clinic().owner(), w.centralId(), 1));
+        addRows(w.clinic().owner(), w.centralId(), importId, rows(row(1, "CS", w.codeB(), "TESTB001", farExpiry(), "20.00", "12.00", "10")));
+        submit(w.clinic().owner(), w.centralId(), importId);
+        ok(HttpMethod.POST, importUrl(w.centralId(), importId) + "/approve", w.second().auth(), null, 200);
+        postImport(w.clinic().owner(), w.centralId(), importId, UUID.randomUUID());
         String centralBatch = batchId(w, w.centralId(), "TESTB001");
+        assertThat(centralBatch).as("the opening-stock batch TESTB001 is found in the Central Store").isNotBlank();
         int status = call(HttpMethod.POST, url(w.centralId(), "damage-reports"), w.csUser().auth(), js(damageBody(centralBatch, "AVAILABLE", 1, "SEND_TO_CS")))
                 .andReturn().getResponse().getStatus();
         assertThat(status).isIn(400, 404);
@@ -283,7 +290,7 @@ class PharmacyWpGStoreUseApiIT extends Sah79StoreUseSupport {
         Sw w = u.w();
         JsonNode t = transfer(u, w.keeper(), w.productA(), 2, 201);
         JsonNode cancelled = post(w.keeper(), url(w.pharmacyId(), "transfers/" + idOf(t) + "/cancel"),
-                m("version", t.get("version").asLong(), "reasonKey", REJECT_OTHER, "note", null), 200);
+                m("version", t.get("version").asLong(), "reasonKey", REJECT_OTHER, "note", "Raised by mistake"), 200);
         assertThat(cancelled.get("status").asText()).isEqualTo("CANCELLED");
         assertThat(cancelled.get("number").asText()).isEqualTo(t.get("number").asText());
         problem(call(HttpMethod.POST, url(w.pharmacyId(), "transfers/" + idOf(t) + "/dispatch"), w.keeper().auth(),

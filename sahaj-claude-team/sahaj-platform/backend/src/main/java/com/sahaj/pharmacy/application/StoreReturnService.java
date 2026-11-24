@@ -159,10 +159,10 @@ public class StoreReturnService {
         boolean blindHere = batch != null && blind.hides(caller, storeId, batch.productId());
         if (quantity == null) {
             errors.add(new FieldMessage("quantity", "Enter a whole number from 1 to "
-                    + (available == null || blindHere ? MAX_QTY : available)));
+                    + (available == null || blindHere ? MAX_QTY : available) + "."));
         } else if (available != null && quantity > available) {
             errors.add(new FieldMessage("quantity", blindHere ? BlindCount.MORE_THAN_IN_STOCK
-                    : "Enter a whole number from 1 to " + available));
+                    : "Enter a whole number from 1 to " + available + "."));
         }
         String note = StoreUseSupport.blank(in.note());
         if (!reasons.isActive(tenantId, ReasonList.STORE_RETURN, in.reasonKey())) {

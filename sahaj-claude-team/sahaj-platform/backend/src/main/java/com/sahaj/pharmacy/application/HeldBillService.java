@@ -91,7 +91,7 @@ public class HeldBillService {
         Context context = context(tenantId, rows);
         List<SaleViews.HeldBillRow> items = new ArrayList<>();
         for (Row row : rows) {
-            items.add(row(row, context));
+            items.add(row(tenantId, row, context));
         }
         return new SaleViews.HeldBillList(items);
     }
@@ -257,7 +257,7 @@ public class HeldBillService {
         return new Context(support.members(tenantId, people), customerRows, cards, products.findAll(tenantId, productIds), carts);
     }
 
-    private SaleViews.HeldBillRow row(Row row, Context ctx) {
+    private SaleViews.HeldBillRow row(UUID tenantId, Row row, Context ctx) {
         CartInput cart = ctx.carts().get(row.id());
         boolean scheduled = false;
         for (CartLineInput l : cart.lines() == null ? List.<CartLineInput>of() : cart.lines()) {
@@ -266,12 +266,12 @@ public class HeldBillService {
         }
         return new SaleViews.HeldBillRow(row.id(), support.person(row.holder(), ctx.members()), row.createdAt(),
                 cart.lines() == null ? 0 : cart.lines().size(), minutesSince(row.createdAt()), buyerLabel(cart, ctx), scheduled,
-                "NONE");
+                discounts.heldState(tenantId, cart.discountRequestId(), row.holder()));
     }
 
     private SaleViews.HeldBill view(UUID tenantId, Row row) {
         Context ctx = context(tenantId, List.of(row));
-        SaleViews.HeldBillRow base = row(row, ctx);
+        SaleViews.HeldBillRow base = row(tenantId, row, ctx);
         CartInput cart = ctx.carts().get(row.id());
         Set<UUID> named = new LinkedHashSet<>();
         for (CartLineInput l : cart.lines() == null ? List.<CartLineInput>of() : cart.lines()) {

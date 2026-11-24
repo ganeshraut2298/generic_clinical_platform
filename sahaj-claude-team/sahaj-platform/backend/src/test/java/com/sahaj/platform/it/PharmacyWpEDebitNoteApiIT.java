@@ -339,12 +339,12 @@ class PharmacyWpEDebitNoteApiIT extends Sah79BuySupport {
         Sw w = d.w();
         JsonNode draft = shortNote(d, "SH1", 6, 10);
         assertThat(draft.get("lines").get(0).get("type").asText()).isEqualTo("SHORT_SUPPLY");
-        assertThat(draft.get("creditTotalPaise").asLong()).as("4 boxes x 10 x 2.00").isEqualTo(8_000);
+        assertThat(draft.get("creditTotalPaise").asLong()).as("4 boxes x 10 x 2.00 at the vendor credit percent of 80 (DEC-095 item 1)").isEqualTo(6_400);
         JsonNode created = submit(w, draft);
         assertThat(created.get("status").asText()).isEqualTo("CREATED");
         assertThat(stockOf(w, "SH1", "PENDING_RETURN")).as("a short supply has no stock line").isZero();
         assertThat(ledgerQty(w, "VENDOR_RETURN_HOLD")).isZero();
-        JsonNode done = step(w, w.csUser(), created, "credit-note", creditNote(8_000), 200);
+        JsonNode done = step(w, w.csUser(), created, "credit-note", creditNote(6_400), 200);
         assertThat(done.get("status").asText()).isEqualTo("CREDIT_NOTE_RECEIVED");
         assertThat(done.get("representativeName").isNull()).as("no hand-over data is invented").isTrue();
         assertThat(count(w.clinic(), "select count(*) from pharmacy.debit_note where status = 'CREDIT_NOTE_RECEIVED' and handed_over_at is null")).isOne();
@@ -358,7 +358,7 @@ class PharmacyWpEDebitNoteApiIT extends Sah79BuySupport {
         Sw w = d.w();
         JsonNode picked = step(w, w.csUser(), submit(w, shortNote(d, "SH2", 6, 10)), "picked", Map.of(), 200);
         assertThat(picked.get("status").asText()).isEqualTo("PICKED");
-        assertThat(step(w, w.csUser(), picked, "credit-note", creditNote(8_000), 200).get("status").asText()).isEqualTo("CREDIT_NOTE_RECEIVED");
+        assertThat(step(w, w.csUser(), picked, "credit-note", creditNote(6_400), 200).get("status").asText()).isEqualTo("CREDIT_NOTE_RECEIVED");
     }
 
     @Test
@@ -367,6 +367,8 @@ class PharmacyWpEDebitNoteApiIT extends Sah79BuySupport {
         Sw w = d.w();
         JsonNode shortDraft = shortNote(d, "SH3", 6, 10);
         String receiptLine = shortDraft.get("lines").get(0).get("goodsReceiptLineId").asText();
+        // the posting already made an auto draft that holds this receipt line: discard it so the line is eligible again (pharmacyDiscardDebitNote)
+        ok(HttpMethod.POST, dns(w.centralId()) + "/" + idOf(shortDraft) + "/discard", w.csUser().auth(), js(Map.of("version", shortDraft.get("version").asLong())), 200);
         JsonNode row = rowOf(eligible(w, d.vendor()), "DN1");
         JsonNode mixed = create(w, w.csUser(), d.vendor(), List.of(stockLine(row, 5, "80"), shortLine(receiptLine, 1, "100")));
         JsonNode created = submit(w, mixed);
@@ -410,12 +412,21 @@ class PharmacyWpEDebitNoteApiIT extends Sah79BuySupport {
     /** A line for a batch of the clinic's opening stock, which is never offered to a vendor return. */
     private Map<String, Object> notEligible(Sw w, JsonNode row) throws Exception {
         Map<String, Object> m = stockLine(row, 1, "80");
+        // the Central Store has no opening stock of its own: post one batch (product B, TESTB001, 10 units)
+        String importId = idOf(startImport(w.clinic().owner(), w.centralId(), 1));
+        addRows(w.clinic().owner(), w.centralId(), importId, rows(row(1, "CS", w.codeB(), "TESTB001", farExpiry(), "20.00", "12.00", "10")));
+        submit(w.clinic().owner(), w.centralId(), importId);
+        ok(HttpMethod.POST, importUrl(w.centralId(), importId) + "/approve", w.second().auth(), null, 200);
+        postImport(w.clinic().owner(), w.centralId(), importId, UUID.randomUUID());
         JsonNode page = ok(HttpMethod.GET, STORES + "/" + w.centralId() + "/stock/batches?size=100", w.clinic().owner(), null, 200);
+        JsonNode found = null;
         for (JsonNode item : page.get("items")) {
             if ("TESTB001".equalsIgnoreCase(item.get("batch").get("batchNo").asText())) {
-                m.put("batchId", item.get("batch").get("batchId").asText());
+                found = item;
             }
         }
+        assertThat(found).as("the opening-stock batch TESTB001 must be found in the Central Store, or this case tests nothing").isNotNull();
+        m.put("batchId", found.get("batch").get("batchId").asText());
         return m;
     }
 

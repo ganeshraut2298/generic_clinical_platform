@@ -656,7 +656,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
                     l.secondSigner());
         }
         registers.insertCreditNote(tenantId, new SaleRegisterRepository.NewCreditNote(UUID.randomUUID(), store.unitId(), storeId,
-                creditNoteNo, restarts ? DocumentNumbers.financialYearStart(today) : 0, "SALES_RETURN", null, row.id(), total), me);
+                creditNoteNo, restarts ? DocumentNumbers.financialYearStart(today) : 0, "SALES_RETURN", bill.id(), row.id(), total), me);
         for (Map.Entry<String, Long> r : refunds.entrySet()) {
             registers.insertRefund(tenantId, new SaleRegisterRepository.NewRefund(store.unitId(), storeId, "SALES_RETURN",
                     bill.id(), row.id(), r.getKey(), r.getValue(), creditNoteNo), me);
@@ -698,7 +698,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         }
         events.insert(tenantId, store.unitId(), SUBJECT, row.id(), outcome, storeId, me, null, null, null, null, null);
         if (signer != null) {
-            events.insert(tenantId, store.unitId(), SUBJECT, row.id(), "SECOND_SIGNATURE", storeId, me, "PHARMACIST", null, null,
+            events.insert(tenantId, store.unitId(), SUBJECT, row.id(), "SECOND_SIGNATURE", storeId, me, null, null, null,
                     null, null);
         }
         Map<String, Object> after = new LinkedHashMap<>();
@@ -1207,7 +1207,7 @@ public class SalesReturnService implements ApprovalSubjectHandler {
         String billNo = row == null ? null : bills.find(tenantId, row.billId()).map(BillRow::billNo).orElse(null);
         String what = row == null ? request.subjectNo() : "Sales return of bill " + billNo + " · "
                 + SaleRules.rupeesText(row.refundTotalPaise());
-        return new Summary(what, "SALES", request.ruleStoreId(), List.of("APPROVE", "REJECT", "REVIEW"));
+        return new Summary(what, "SALES_RETURN", request.ruleStoreId(), List.of("APPROVE", "REJECT", "REVIEW"));
     }
 
     @Override

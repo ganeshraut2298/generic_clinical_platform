@@ -73,7 +73,7 @@ abstract class Sah79StoreUseSupport extends Sah79BuySupport {
 
     /** The first field error message of a problem body, or "" (never a null). */
     protected static String firstMessage(JsonNode problem) {
-        JsonNode errors = problem.get("errors");
+        JsonNode errors = problem.get("fieldErrors") != null ? problem.get("fieldErrors") : problem.get("errors"); // the problem body names them fieldErrors
         if (errors != null && errors.isArray() && errors.size() > 0) {
             JsonNode e = errors.get(0);
             for (String k : List.of("message", "detail")) {
@@ -122,8 +122,23 @@ abstract class Sah79StoreUseSupport extends Sah79BuySupport {
                 "reasonKey", reason, "note", null, "indentLines", null, "damageRejectOutcome", damageOutcome);
     }
 
+    /** The id of an approval, from a full request read (id) or from a document's ApprovalSummary (requestId). */
+    protected static String approvalIdOf(JsonNode approval) {
+        return (approval.has("id") ? approval.get("id") : approval.get("requestId")).asText();
+    }
+
+    /** The current level of an approval, from a full request read (currentLevel) or an ApprovalSummary (levelNo). */
+    protected static int approvalLevelOf(JsonNode approval) {
+        return (approval.has("currentLevel") ? approval.get("currentLevel") : approval.get("levelNo")).asInt();
+    }
+
+    /** The request version, from a full request read (version) or an ApprovalSummary (requestVersion). */
+    protected static long approvalVersionOf(JsonNode approval) {
+        return (approval.has("requestVersion") ? approval.get("requestVersion") : approval.get("version")).asLong();
+    }
+
     protected JsonNode decide(Pn who, JsonNode approval, String decision, String reason, String damageOutcome, int expected) throws Exception {
-        return post(who, decisionUrl(approval.get("requestId").asText()),
-                decision(approval.get("levelNo").asInt(), approval.get("requestVersion").asLong(), decision, reason, damageOutcome), expected);
+        return post(who, decisionUrl(approvalIdOf(approval)),
+                decision(approvalLevelOf(approval), approvalVersionOf(approval), decision, reason, damageOutcome), expected);
     }
 }

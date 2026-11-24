@@ -1,9 +1,35 @@
 openapi: 3.1.0
 info:
   title: Sahaj Pharmacy & Inventory API, Phase 3 (Pharmacy sales and dispensing)
-  version: 0.3.8
+  version: 0.3.9
   description: >-
-    Changelog. 0.3.8 (21 Nov 2026, SAH-80 review round 7: DEC-091 items 2 and 3, DEC-092 items 1 to 6; reports
+    Changelog. 0.3.9 (21 Nov 2026, SAH-80 review round 7 follow-ups: code review SAH-80-code.md Major 1,
+    SAH-80-code-pass2.md M6, DEC-093 item 1; programme DEC-061). The version moves with pharmacy.yaml 0.3.9 (one
+    API). Additive or wording only: no path, parameter, status code or enum value is added or removed; one
+    optional schema member is added (c); new problem codes: none. (a) pharmacyPutStoreBillSeries states exactly
+    which prefixes answer 409 prefix-in-use (any unit document series, saved or default, and another store's bill series, a switched-off store's
+    included) and the lock order; pharmacyPutDocumentSeries now also refuses a store's bill series prefix
+    (pharmacy.yaml 0.3.9). (b) The sales-margin report has a gross margin definition (WP-N): sale value
+    excluding GST minus the cost of the batch units sold; a COMPLETED sales return reverses both, a unit sent to
+    QUARANTINE included (it keeps its cost as stock); cancelled bills are not sales; returns count on their own
+    IST day and store, with a row even when that day has no bill; productId filters the return lines too.
+    The server built before 0.3.9 worked marginPercent on the GST-inclusive value and left the cost of units
+    returned to Quarantine in the margin; both change to this definition. (c) CommandCentre.compliance.scheduleX
+    gains neverCounted (integer, minimum 0; programme DEC-061): Schedule X / NDPS products of the store with a
+    book this month and no physical count yet, a blind caller's audited products left out; balanced is false
+    while every such product is uncounted.
+    0.3.9 addendum (22 Nov 2026, DEC-095, integration-test triage; wording only, no new path, parameter or
+    field). (d) Reports (DEC-095 item 2): the sales-margin and h1-register reports require from and to, like
+    the SAH-79-18 reports; a missing from or to answers 400 validation (WP-N, pharmacy.yaml pharmacyRunReport).
+    (e) Second signer (DEC-095 item 3): the same person as the caller given as second signer is refused with
+    403 second-signer-invalid, the code the stock-adjustment flow already uses (pharmacyCreateBill,
+    pharmacyCancelBill, pharmacyCreateSalesReturn, SalesForbidden); the problem code second-signer-same is
+    withdrawn (no operation answers it; the server never sent it). (f) DiscountRequest.requestId (DEC-095
+    item 4) is the discount request row id; the approval request is found through the approvals inbox (subject
+    SALE_DISCOUNT); no new field. (g) Short-supply credit (DEC-095 item 1): stated plainly in pharmacy.yaml
+    0.3.9 as the vendor's returnCreditPercent, as built.
+
+    0.3.8 (21 Nov 2026, SAH-80 review round 7: DEC-091 items 2 and 3, DEC-092 items 1 to 6; reports
     docs/reviews/SAH-80-code.md and SAH-80-security.md; programme DEC-061; ADR-030 S2, S5, S14 to S16). The version
     moves to 0.3.8 with pharmacy.yaml 0.3.8 (one API). Additive or wording only: no path, status code, required
     request field, response member or enum value is removed or added; new problem codes: none. Where a rule
@@ -170,7 +196,8 @@ info:
     audited products of a store where the caller is blind. The saved bill (the caller's own) shows its batches
     and quantities as before. The rule is worked out on every request from the audit status at that moment and
     ends when the audit is CLOSED.
-    Problem types added by this file: pharmacist-required, cancel-not-allowed, second-signer-same (403);
+    Problem types added by this file: pharmacist-required, cancel-not-allowed (403; second-signer-same is
+    withdrawn in 0.3.9, DEC-095 item 3: the same person as second signer answers pharmacy.yaml second-signer-invalid);
     sale-not-allowed, sale-changed, held-limit, discount-approval-needed, discount-approval-void, has-returns,
     already-cancelled, not-cancelled, refund-already-recorded, customer-phone-exists, customer-inactive,
     link-already-set, not-connected, not-mapped, rx-claimed, order-changed, not-issued, return-window-not-set,
@@ -243,7 +270,13 @@ paths:
         sequenceLength 4 to 8; rendered length at most 16; restart needs the financial-year part). The store must be
         ACTIVE with saleAllowed true and not the Central Store (400 validation field storeId "Choose a store where
         sale is allowed."). 409 prefix-in-use when the unit series or another store's series has the same prefix
-        (ignoring case). 409 series-locked "Numbers have already been issued this year." once this store's series
+        (ignoring case). 0.3.9 (code review SAH-80 Major 1), exactly: the prefix of any unit document series of
+        pharmacy.yaml pharmacyListDocumentSeries (every docType, the saved prefix or, before the first save, the
+        default one) or of another store's own bill series (a switched-off store's series included) is refused
+        with 409 prefix-in-use, detail "Two document types cannot use the same prefix" (the pharmacy.yaml
+        sentence), nothing written; this store's own current prefix is not a conflict. Lock order: the unit row,
+        the unit BILL series row, then this store's series row; pharmacyPutDocumentSeries takes the unit BILL
+        series row first as well, so two saves cannot both take the same prefix. 409 series-locked "Numbers have already been issued this year." once this store's series
         issued a number in the current financial year (DEC-078 item 4, which replaces the story's series-in-use).
         version 0 creates the series (from then on bills of this store take its numbers); an old version 409
         settings-changed. Audit PHARMACY_SERIES_CHANGED (store id, before and after).
@@ -260,7 +293,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict', description: 'settings-changed (with current), prefix-in-use, series-locked' }
+        '409': { $ref: '#/components/responses/Conflict', description: 'settings-changed (with current), prefix-in-use (0.3.9: a unit document series or another store''s bill series uses the prefix), series-locked' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /stores/{storeId}/sale/patients:
@@ -684,9 +717,10 @@ paths:
       description: >-
         The sale transaction of ADR-030 S3. Before the transaction: when a line is Schedule X, the second signature
         is verified outside any transaction (ADR-029 P7; secondSigner missing 400 "A second signature is needed for
-        Schedule X items."; the same person as the caller 403 second-signer-same "The second signature must be a
-        different person."; not a different active pharmacist or owner 403 second-signer-invalid; PIN outcomes as
-        rule 19). Then one transaction: clientKey replay (rule 10); the cart is priced again under the balance locks
+        Schedule X items."; the same person as the caller, or anyone who is not another active pharmacist or
+        owner, 403 second-signer-invalid "The second signer must be another active pharmacist or owner." (0.3.9,
+        DEC-095 item 3: one code for both, as the stock-adjustment flow of pharmacy.yaml rule 19; the same person
+        is still refused; second-signer-same is withdrawn); PIN outcomes as rule 19). Then one transaction: clientKey replay (rule 10); the cart is priced again under the balance locks
         (lock order ADR-029 P5); a different quoteVersion or net 409 sale-changed "Prices or batches changed. Check
         the bill and save again." with the new quote, nothing saved; stock short 409 insufficient-stock with
         available and lines. Checks (400 validation, all together): no lines "Add at least one item."; payments not
@@ -743,7 +777,7 @@ paths:
         '200': { description: Replay of the same clientKey, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
         '400': { $ref: '#/components/responses/Problem', description: 'validation (with the codes of the description as fieldErrors); or bad-request' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/SalesForbidden', description: 'store-permission-denied, pharmacist-required, second-signer-same, second-signer-invalid, wrong-pin, pin-locked' }
+        '403': { $ref: '#/components/responses/SalesForbidden', description: 'store-permission-denied, pharmacist-required, second-signer-invalid (also the same person as the caller, 0.3.9 DEC-095), wrong-pin, pin-locked' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/SalesConflict', description: 'sale-not-allowed, sale-changed (with quote), insufficient-stock, discount-approval-needed, discount-approval-void, customer-inactive, rx-claimed, changed, client-key-reused, pin-not-set' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
@@ -826,8 +860,9 @@ paths:
         handles Schedule X, so the OWNER cancelling a bill with a Schedule X line answers 403 pharmacist-required
         "Only a pharmacist can sell a Schedule X medicine." (fails closed, as built); such a bill is cancelled only
         by a PHARMACIST member, on the bill's IST day, with a second signer verified outside the transaction
-        (secondSigner missing 400 "A second signature is needed for Schedule X items."; second-signer-same,
-        second-signer-invalid and the PIN problems as pharmacyCreateBill). DEC-074 OQ-80-37 "the owner may cancel
+        (secondSigner missing 400 "A second signature is needed for Schedule X items."; second-signer-invalid,
+        also for the same person as the canceller (0.3.9, DEC-095 item 3), and the PIN problems as
+        pharmacyCreateBill). DEC-074 OQ-80-37 "the owner may cancel
         any bill" reads "any bill without a Schedule X line" (rule 25). The reversal records who cancelled and who
         signed: each reversing Schedule X register row has the canceller as first signer and the verified second
         signer as second signer (never the original sale's signers), each reversing ledger line of a Schedule X
@@ -851,7 +886,7 @@ paths:
         '200': { description: Cancelled, content: { application/json: { schema: { $ref: '#/components/schemas/Bill' } } } }
         '400': { $ref: '#/components/responses/Problem', description: 'validation; or bad-request' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/SalesForbidden', description: 'store-permission-denied, cancel-not-allowed, pharmacist-required (Schedule X), second-signer-same, second-signer-invalid, PIN problems' }
+        '403': { $ref: '#/components/responses/SalesForbidden', description: 'store-permission-denied, cancel-not-allowed, pharmacist-required (Schedule X), second-signer-invalid (also the same person as the caller, 0.3.9 DEC-095), PIN problems' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/SalesConflict', description: 'sale-not-allowed, has-returns, already-cancelled, changed (with current), client-key-reused' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
@@ -1593,7 +1628,7 @@ paths:
         '200': { description: Replay, content: { application/json: { schema: { $ref: '#/components/schemas/SalesReturn' } } } }
         '400': { $ref: '#/components/responses/Problem', description: 'validation, payment-mismatch; or bad-request' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/SalesForbidden', description: 'store-permission-denied, pharmacist-required (Schedule X), second-signer-same, second-signer-invalid, PIN problems' }
+        '403': { $ref: '#/components/responses/SalesForbidden', description: 'store-permission-denied, pharmacist-required (Schedule X), second-signer-invalid (also the same person as the caller, 0.3.9 DEC-095), PIN problems' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/SalesConflict', description: 'sale-not-allowed, return-window-not-set, return-window-over, return-state, changed, insufficient-stock (never for a return; listed for the posting service), client-key-reused' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
@@ -2288,6 +2323,33 @@ paths:
   #   user is later, together with the Command Center gross margin card, which stays absent (go-live G-13). costPaise
   #   and marginPercent are null (an empty CSV cell) for every caller other than the OWNER and a PHARMACIST member;
   #   the columns stay in the answer.
+  # - sales-margin, gross margin definition (0.3.9; code review SAH-80 pass 2 M6, DEC-093 item 1):
+  #   * Sales are the SAVED counter bills of the store (pharmacy.bill); a CANCELLED bill is not a sale and adds
+  #     nothing (value, cost, bills or qty), whether its units went back to Available or to Quarantine. IPD issues
+  #     and ward returns are not sales of this report.
+  #   * Sale value = the taxable value of the bill lines (after discount, excluding GST: line t, so t + x = n).
+  #   * Cost = the cost of the batch units sold: line qty times the purchase rate of the line's batch (landed,
+  #     OQ-79-6), summed and rounded to the paisa once per row.
+  #   * Margin = sale value minus cost. marginPercent = margin x 100 / sale value, one decimal; null when the
+  #     sale value of the row is 0 or less (and, as above, for callers other than the OWNER and a PHARMACIST
+  #     member).
+  #   * Returns reverse both. Every line of a COMPLETED sales return with destination AVAILABLE or QUARANTINE
+  #     takes its taxable refund (refund minus its GST) off the sale value and its qty times its batch's purchase
+  #     rate off the cost. A unit sent to QUARANTINE keeps its cost: it is still stock valued at its batch purchase
+  #     rate, so its cost is reversed exactly like an Available unit's; what later happens to it (write-off,
+  #     vendor return, release to Available) is a stock movement of the movement reports, never a sales margin
+  #     figure, so no cost is counted twice when a released unit is sold again. REFUSED lines and returns that
+  #     are not COMPLETED reverse nothing.
+  #   * Days and stores: a bill counts on its IST saved day at its store; a return counts on its IST completed
+  #     day at the store of the return. A day and store with returns and no bill still has a row (bills 0, qty 0,
+  #     discountPaise 0, taxPaise 0) so no return is lost.
+  #   * productId narrows both sides: the bill lines and the return lines of that product only.
+  #   * The other columns keep their 0.3.7 meaning: salesPaise is the net payable of the bills (with GST) less
+  #     the refunds of the returns; qty, discountPaise and taxPaise are those of the bills. costPaise is the
+  #     cost above after returns.
+  # - sales-margin and h1-register, dates (0.3.9, DEC-095 item 2): from and to are required, like the SAH-79-18
+  #   movement reports; a missing from or to answers 400 validation with field from or to ("Enter a valid date")
+  #   on pharmacyRunReport and pharmacyExportReport; the 12-month limit (400 range-too-long) is unchanged.
   # - activity-log: filters storeId, from and to only (productId, vendorId and status are ignored); no person
   #   filter for go-live (later), the same as the audit log card (pharmacyActivityFeed).
   # - h1-register on pharmacyRunReport (security, a High if left): patientName in full and patientAddress only to
@@ -2491,14 +2553,14 @@ components:
     PayloadTooLarge: { $ref: './pharmacy.yaml#/components/responses/PayloadTooLarge' }
     DatabaseBusy: { $ref: './pharmacy.yaml#/components/responses/DatabaseBusy' }
     SalesForbidden:
-      description: 'module-off, forbidden, store-permission-denied, or a sale rule: pharmacist-required, cancel-not-allowed, second-signer-same, second-signer-invalid, self-approval, and the platform PIN outcomes wrong-pin, pin-locked (rule 19).'
+      description: 'module-off, forbidden, store-permission-denied, or a sale rule: pharmacist-required, cancel-not-allowed, second-signer-invalid (0.3.9, DEC-095 item 3: also the same person as the caller; second-signer-same is withdrawn), self-approval, and the platform PIN outcomes wrong-pin, pin-locked (rule 19).'
       content:
         application/problem+json:
           schema: { $ref: './pharmacy.yaml#/components/schemas/Problem' }
           examples:
             pharmacist: { value: { type: 'https://sahaj.in/problems/pharmacist-required', title: Pharmacist needed, status: 403, detail: A pharmacist must complete this bill. } }
             cancel: { value: { type: 'https://sahaj.in/problems/cancel-not-allowed', title: Not allowed, status: 403, detail: Only the owner can cancel a bill from an earlier day. } }
-            sameSigner: { value: { type: 'https://sahaj.in/problems/second-signer-same', title: Second signature, status: 403, detail: The second signature must be a different person. } }
+            sameSigner: { value: { type: 'https://sahaj.in/problems/second-signer-invalid', title: Second signer not valid, status: 403, detail: The second signer must be another active pharmacist or owner. } }
     SalesConflict:
       description: 'A 409 problem of this file; the type is named on the operation. sale-changed carries quote (SalesProblem); customer-phone-exists carries candidates; changed carries current.'
       content:
@@ -3077,7 +3139,7 @@ components:
       required: [required, requestId, status, percent, discountPaise, ruleText, waitingFor, escalated, needsAnotherApprover, decidedBy, rejectReason, raisedAt]
       properties:
         required: { type: boolean, description: 'false: level 0, the discount applies at once (no request).' }
-        requestId: { type: [string, 'null'], format: uuid }
+        requestId: { type: [string, 'null'], format: uuid, description: '0.3.9 (DEC-095 item 4, wording): the id of the discount request row (the {requestId} of pharmacyGetDiscountRequest and pharmacyWithdrawDiscountRequest, and the discountRequestId sent to pharmacyCreateBill); it is not the approval request id. The approval request is found through the approvals inbox (pharmacy.yaml pharmacyApprovalInbox: the row with subjectType SALE_DISCOUNT and subjectId equal to this id), as the screen does; its requestId there is the one pharmacyDecideApproval takes. No new field.' }
         status: { type: [string, 'null'], enum: [PENDING, APPROVED, REJECTED, WITHDRAWN, VOID, null], description: 'VOID: computed when the cart sent with it differs from the cart approved. WITHDRAWN (0.3.7, DEC-089 items 4 and 5): withdrawn by the seller (pharmacyWithdrawDiscountRequest), by a newer request of the same seller for the same held bill or cart, or because its held bill was discarded (pharmacyDiscardHeldBill); final, the client shows the discount as not approved. VOID 0.3.8 (DEC-091 item 2, DEC-092 item 1): also an APPROVED request that a bill (SAVED or CANCELLED) already carries, whose IST day of approval is over, or read by a seller other than its raiser; the client shows the discount as not approved and offers "Send for approval" again (story 80-6).' }
         percent: { $ref: './pharmacy.yaml#/components/schemas/Percent' }
         discountPaise: { type: integer, format: int64, minimum: 0 }
@@ -3859,7 +3921,7 @@ components:
           properties:
             state: { $ref: '#/components/schemas/CardState' }
             h1: { type: object, properties: { billsToday: { type: integer }, overridesToReview: { type: integer } } }
-            scheduleX: { type: object, properties: { toReview: { type: integer }, balanced: { type: boolean } } }
+            scheduleX: { type: object, properties: { toReview: { type: integer }, balanced: { type: boolean }, neverCounted: { type: integer, minimum: 0, description: '0.3.9: Schedule X / NDPS products of the store with a book this month and no physical count yet (a blind caller''s audited products left out). balanced is false while every such product is uncounted.' } } }
             drugLicence: { $ref: '#/components/schemas/LicenceStatus' }
     ModeAmounts:
       type: object

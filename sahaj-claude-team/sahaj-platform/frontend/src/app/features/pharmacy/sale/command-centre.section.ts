@@ -332,11 +332,18 @@ function weekday(date: Date = new Date()): string {
               }
               @if (c.scheduleX; as sx) {
                 <div class="tile" data-testid="comp-x">
-                  <span class="pill" [class.p-good]="sx.balanced" [class.p-warn]="!sx.balanced">
-                    {{ sx.balanced ? 'Balanced' : sx.toReview + ' to review' }}
-                  </span>
+                  @if (neverCounted(sx.neverCounted) === 0 || !sx.balanced) {
+                    @if (neverCounted(sx.neverCounted) === 0 || sx.toReview > 0) {
+                      <span class="pill" [class.p-good]="sx.balanced" [class.p-warn]="!sx.balanced">
+                        {{ sx.balanced ? 'Balanced' : sx.toReview + ' to review' }}
+                      </span>
+                    }
+                  }
+                  @if (neverCounted(sx.neverCounted) > 0) {
+                    <span class="pill p-warn" data-testid="comp-x-never-counted">{{ neverCountedText(sx.neverCounted) }}</span>
+                  }
                   <div><b>Schedule X / NDPS stock</b></div>
-                  @if (sx.balanced) {
+                  @if (sx.balanced && neverCounted(sx.neverCounted) === 0) {
                     <div class="s">Physical = book · double-signed</div>
                   }
                 </div>
@@ -376,6 +383,9 @@ export class CommandCentreSection implements OnInit {
   protected readonly average = (netPaise: number | undefined, bills: number | undefined): number =>
     bills ? Math.round((netPaise ?? 0) / bills) : 0;
   protected readonly time = (instant: string) => formatTimeOfInstant(instant);
+  protected readonly neverCounted = (n: number | undefined): number => (typeof n === 'number' && n > 0 ? n : 0);
+  protected readonly neverCountedText = (n: number | undefined): string =>
+    `No count yet: ${this.neverCounted(n)} ${this.neverCounted(n) === 1 ? 'product' : 'products'}`;
   protected readonly couldNot = COULD_NOT_LOAD;
   protected readonly isNumber = (v: number | null | undefined): boolean => typeof v === 'number';
   protected readonly orDash = (v: number | null | undefined): string => (typeof v === 'number' ? rupees(v) : '—');

@@ -668,7 +668,7 @@ The preset tests of 22 read `presets[].limitTypes` when the server answers it (0
 
 | # | Acceptance criterion | Test | Type |
 | --- | --- | --- | --- |
-| T78-10-01 | Ten series with the defaults (PO-, GRN-, IND-, TRF-, SB/ with the financial year and 6 digits, DN-, AUD-, RET-, DMG-, ADJ-), examples, nothing written | `PharmacyNumberingIT.theListHasTenRowsWithTheDocumentedDefaults...`; e2e "
+| T78-10-01 | Twelve series with the defaults (PO-, GRN-, IND-, TRF-, SB/ with the financial year and 6 digits, DN-, AUD-, RET-, DMG-, ADJ-, and from V2026_12_17_1800 CREDIT_NOTE `CN/` with the financial year, 6 digits, restarts each year, example CN/<FY>/000001, and IPD_ISSUE_SLIP `IS-`, 4 digits, example IS-0001), examples, nothing written | `PharmacyNumberingIT.theListHasTenRowsWithTheDocumentedDefaultsAndWritesNothing` (the name still says Ten; it asserts all twelve rows); e2e "
 | T78-10-02 | A change: example and rendered length follow, saved true, version bumps, audit; unchanged save writes nothing | `anOwnerChangesTheSeries...`, `aSaveThatChangesNothing...`; e2e "owner changes a prefix" | IT, e2e |
 | T78-10-03 | Prefix 1 to 6 of letters, digits, - or /; length 4 to 8; rendered length 16 accepted and 17 or more refused; restart needs the financial year | `thePrefixAndTheLengthAreChecked`, `aRenderedNumberOverSixteenCharacters...`, `restartingEachFinancialYearNeedsTheFinancialYear...`; e2e "a prefix of 7 characters is refused" | IT, e2e |
 | T78-10-04 | One prefix per type ignoring case, also against another type's default and the five SAH-79 defaults: 409 `prefix-in-use` | `twoDocumentTypesCannotUseTheSamePrefix...`; e2e "error path: a prefix another type already uses" | IT, e2e |
@@ -728,11 +728,11 @@ Changed existing tests (the behaviour they pinned was replaced by a decision; no
 | --- | --- | --- |
 | T78-C-E01 to E09 | Vendors: table and Blocked chip; add; empty name and repeated name; edit; switch off, filter, switch on; filter views; a pharmacist sees no button; list error with Try again; no sideways scroll | |
 | T78-C-E10 to E18 | Approval rules: reader read-out; review banner; save with the version and paise; `rules-changed` error; amount over ₹ 9,99,99,999; Lean sheet; Strict sheet; saved set has no banner; no sideways scroll | |
-| T78-C-E19 to E29 | Numbering and documents: ten series; change a prefix; `prefix-in-use`; a prefix with a bad character and the field that takes 6 characters; locked series; a `series-locked` answer while the page is open; eleven reason lists, add, switch, fixed reason; duplicate reason; print template save and the missing GSTIN note; the 80 and 200 character boundaries of the header and footer; reader; no sideways scroll | |
+| T78-C-E19 to E29 | Numbering and documents: twelve series; change a prefix; `prefix-in-use`; a prefix with a bad character and the field that takes 6 characters; locked series; a `series-locked` answer while the page is open; eleven reason lists, add, switch, fixed reason; duplicate reason; print template save and the missing GSTIN note; the 80 and 200 character boundaries of the header and footer; reader; no sideways scroll | |
 | R3-5b | Code review round 3: `waitForTimeout(500)` in "leaving the Opening stock tab while a file is being sent stops the upload (N-5)" is replaced by polling until the number of line requests has not changed for four reads | done in `pharmacy-products-opening-stock.spec.ts` |
 | QA-78-5 | "QA-78-5: the Edit own product sheet scrolls on a 360 x 740 phone, so Save and Cancel can be reached": sets 360 x 740 in both projects, checks that some part of the sheet has `overflow-y` auto or scroll with more content than space, scrolls with the mouse wheel, expects Save and Cancel in the viewport, presses Cancel, no sideways scroll | written before the angular fix: fails until QA-78-5 is fixed |
 
-The 11 reason lists and the 10 series render what the server returns (the mock sends 11 and 10).
+The 11 reason lists and the 12 series render what the server returns (the mock sends 11 and 12).
 
 ## 27. Results of this run (19 Nov 2026, 01:38 to 03:20 IST)
 

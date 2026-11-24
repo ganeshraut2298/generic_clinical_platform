@@ -1,5 +1,5 @@
 # SAH-24 · Bed board (IPD, part 3)
-Mockup screens: IPD → Beds and admissions → Bed board tab (`ipBoard`, `bedTile`, `BSTAT`), the Bed sheet (`openBedSheet`, `ipclean`, `ipblock`), "Admit here" per ward
+Mockup screen: IPD → Bed board — IPD → Beds and admissions → Bed board tab (`ipBoard`, `bedTile`, `BSTAT`), the Bed sheet (`openBedSheet`, `ipclean`, `ipblock`), "Admit here" per ward
 Module: ipd
 
 ## 1. Story

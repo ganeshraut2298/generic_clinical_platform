@@ -66,6 +66,7 @@ class PharmacySalesCommandApiIT extends Sah80SalesSupport {
         problem(call(HttpMethod.GET, PH + "/command-centre", w.keeper().auth(), null), 400);
         assertThat(call(HttpMethod.GET, PH + "/command-centre?storeId=" + s.wardId(), s.cashier().auth(), null).andReturn().getResponse().getStatus()).isIn(403, 404);
         Clinic other = pharmacyClinic();
+        centralAndPharmacy(other); // a clinic with stores of its own: a foreign store id is then 404 (a clinic with no store reaches nothing, 403)
         problem(call(HttpMethod.GET, PH + "/command-centre?storeId=" + w.pharmacyId(), other.owner(), null), 404);
         Pn frontDesk = crew(w.clinic(), "FRONT_DESK", "Fiona Front");
         assertType(problem(call(HttpMethod.GET, PH + "/command-centre?storeId=" + w.pharmacyId(), frontDesk.auth(), null), 403), "forbidden");
@@ -117,7 +118,7 @@ class PharmacySalesCommandApiIT extends Sah80SalesSupport {
         assertThat(ipd.get("connected").asBoolean()).isFalse();
         assertThat(ipd.get("items")).isEmpty();
         assertType(problem(call(HttpMethod.POST, url(w.pharmacyId(), "opd-queue/" + UUID.randomUUID() + "/claim"), w.keeper().auth(), null), 409), "not-connected");
-        assertThat(call(HttpMethod.GET, url(w.pharmacyId(), "opd-queue/" + UUID.randomUUID()), w.keeper().auth(), null).andReturn().getResponse().getStatus()).isEqualTo(404);
+        assertThat(call(HttpMethod.GET, url(w.pharmacyId(), "opd-queue/" + UUID.randomUUID()), w.keeper().auth(), null).andReturn().getResponse().getStatus()).as("port not connected is 409 not-connected before any 404 (pharmacy-sales.yaml pharmacyGetOpdPrescription)").isEqualTo(409);
         JsonNode waiting = get(w.keeper(), url(w.pharmacyId(), "returns-waiting"), 200);
         assertThat(waiting.get("items")).isEmpty();
         Clinic other = pharmacyClinic();
@@ -136,11 +137,11 @@ class PharmacySalesCommandApiIT extends Sah80SalesSupport {
         String catalogue = get(w.keeper(), PH + "/reports", 200).toString();
         assertThat(catalogue).contains("SALES_COMPLIANCE").contains("Sales & compliance");
         for (String key : new String[] {"sales-margin", "sales-returns", "gst-sales-register", "h1-register", "schedule-x-register", "activity-log"}) {
-            JsonNode page = get(w.keeper(), PH + "/reports/" + key + "?storeId=" + w.pharmacyId(), 200);
+            JsonNode page = get(w.keeper(), PH + "/reports/" + key + "?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusDays(1) + "&to=" + todayIst(), 200);
             assertThat(page.get("reportKey").asText()).isEqualTo(key);
             assertThat(page.get("columns")).isNotEmpty();
         }
-        JsonNode gst = get(w.keeper(), PH + "/reports/gst-sales-register?storeId=" + w.pharmacyId(), 200);
+        JsonNode gst = get(w.keeper(), PH + "/reports/gst-sales-register?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusDays(1) + "&to=" + todayIst(), 200);
         assertThat(gst.get("rows")).hasSize(1);
         assertThat(gst.get("rows").toString()).as("no patient name outside the H1 report").doesNotContain("Test Patient");
         assertThat(call(HttpMethod.GET, PH + "/reports/sales-margin?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusMonths(13) + "&to=" + todayIst(),
@@ -158,8 +159,8 @@ class PharmacySalesCommandApiIT extends Sah80SalesSupport {
         saveBill(w.keeper(), w, plain(w.productB(), 2));
         Pn hod = crew(w.clinic(), "NURSE", "Hema Head");
         mapStaff(w.clinic(), w.pharmacyId(), hod, "APPROVER");
-        JsonNode asKeeper = get(w.keeper(), PH + "/reports/sales-margin?storeId=" + w.pharmacyId(), 200);
-        JsonNode asHod = get(hod, PH + "/reports/sales-margin?storeId=" + w.pharmacyId(), 200);
+        JsonNode asKeeper = get(w.keeper(), PH + "/reports/sales-margin?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusDays(1) + "&to=" + todayIst(), 200);
+        JsonNode asHod = get(hod, PH + "/reports/sales-margin?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusDays(1) + "&to=" + todayIst(), 200);
         assertThat(asHod.get("columns")).as("the column stays").hasSameSizeAs(asKeeper.get("columns"));
         int cost = -1;
         for (int i = 0; i < asHod.get("columns").size(); i++) {
@@ -187,12 +188,12 @@ class PharmacySalesCommandApiIT extends Sah80SalesSupport {
         String id = post(s.cashier(), url(w.pharmacyId(), "sale/discount-requests"), body, 201).get("requestId").asText();
         JsonNode row = null;
         for (JsonNode r : get(owner(w), PH + "/approvals/inbox", 200).get("items")) {
-            if (id.equals(r.get("requestId").asText())) {
+            if (id.equals(r.get("subjectId").asText())) { // the inbox row names the discount request as its subject (DEC-095 item 4)
                 row = r;
             }
         }
         assertThat(row).isNotNull();
-        assertThat(row.get("chip").asText()).isEqualTo("DISCOUNT");
+        assertThat(row.get("chip").asText()).isEqualTo("SALES");
         assertThat(row.get("subjectType").asText()).isEqualTo("SALE_DISCOUNT");
         assertThat(row.get("actions").toString()).contains("APPROVE").contains("REJECT");
         assertThat(get(s.cashier(), PH + "/approvals/inbox", 403).get("type").asText()).contains("forbidden");

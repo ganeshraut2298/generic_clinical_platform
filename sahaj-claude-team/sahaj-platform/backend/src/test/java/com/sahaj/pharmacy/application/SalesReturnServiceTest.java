@@ -370,7 +370,7 @@ class SalesReturnServiceTest {
         verify(returns).markDecided(any(), eq(id), eq(4L), eq("REJECTED"), any());
         verify(w.posting, never()).post(any(), any());
         assertThat(service.subjectType()).isEqualTo("SALES_RETURN");
-        assertThat(service.summary(SaleWorld.TENANT, request).chip()).isEqualTo("SALES");
+        assertThat(service.summary(SaleWorld.TENANT, request).chip()).isEqualTo("SALES_RETURN");
         assertThat(service.canRead(w.caller(w.cashier), request)).isTrue();
     }
 

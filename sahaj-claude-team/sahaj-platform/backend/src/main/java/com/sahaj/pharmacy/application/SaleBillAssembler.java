@@ -156,7 +156,7 @@ public class SaleBillAssembler {
         return new SaleViews.Bill(bill.id(), bill.billNo(), OpeningStockPostService.storeRef(store), bill.status(),
                 bill.savedAt(), savedBy, buyer, bill.rxRecordId(), lineViews, summary(bill, lines), paymentViews,
                 bill.udharPaise(), bill.linkPending(), bill.allergyNotChecked(), null, pharmacist, prescription, cancel,
-                bill.refundDuePaise(), bill.refundCreditNoteNo(), hasReturns, lock == null, lock, print, historyViews,
+                bill.refundCreditNoteNo() == null ? bill.refundDuePaise() : 0L, bill.refundCreditNoteNo(), hasReturns, lock == null, lock, print, historyViews,
                 bill.version());
     }
 

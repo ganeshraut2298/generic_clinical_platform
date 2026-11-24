@@ -56,7 +56,18 @@ public final class PharmacyViews {
     public record UnitSettings(String unitName, String unitCode, String gstin, String drugLicenceNo,
                                LocalDate drugLicenceValidTill, boolean drugLicenceExpired,
                                IntegrationMode integrationMode, boolean fefo, boolean negativeStockBlocked,
-                               boolean ipdAvailable, boolean saved, long version, Instant updatedAt) {
+                               boolean ipdAvailable, boolean saved, long version, Instant updatedAt,
+                               Integer returnWindowDays, List<String> refundModes, String scheduleXLicenceNo,
+                               LocalDate scheduleXLicenceValidTill) {
+
+        /** The five-field view of a unit with no sale settings. */
+        public UnitSettings(String unitName, String unitCode, String gstin, String drugLicenceNo,
+                            LocalDate drugLicenceValidTill, boolean drugLicenceExpired, IntegrationMode integrationMode,
+                            boolean fefo, boolean negativeStockBlocked, boolean ipdAvailable, boolean saved, long version,
+                            Instant updatedAt) {
+            this(unitName, unitCode, gstin, drugLicenceNo, drugLicenceValidTill, drugLicenceExpired, integrationMode, fefo,
+                    negativeStockBlocked, ipdAvailable, saved, version, updatedAt, null, List.of(), null, null);
+        }
     }
 
     // ---- stores ----

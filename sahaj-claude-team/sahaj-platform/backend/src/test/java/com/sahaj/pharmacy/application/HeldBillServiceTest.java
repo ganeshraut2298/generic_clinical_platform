@@ -37,6 +37,7 @@ class HeldBillServiceTest {
 
     HeldBillServiceTest() {
         w.shelf(product, "B-OK", LocalDate.of(2027, 6, 30), 50, "100.00");
+        org.mockito.Mockito.when(discounts.heldState(any(), org.mockito.ArgumentMatchers.isNull(), any())).thenReturn("NONE");
         doAnswer(inv -> {
             HeldBillRepository.NewHeld h = inv.getArgument(1);
             table.put(h.id(), new HeldBillRepository.Row(h.id(), h.unitId(), h.storeId(), h.holder(), h.cartJson(), "OPEN",
@@ -166,6 +167,19 @@ class HeldBillServiceTest {
         assertThat(list.items().get(1).hasScheduledLine()).isTrue();
         assertThat(list.items().get(1).heldBy().name()).isEqualTo("Test Pharmacist One");
         assertThat(list.items().get(0).ageMinutes()).isEqualTo(35);
+    }
+
+    @Test
+    void theRowCarriesTheStateOfTheDiscountRequestItsCartNames() {
+        UUID requestId = UUID.randomUUID();
+        org.mockito.Mockito.when(discounts.heldState(any(), eq(requestId), any())).thenReturn("PENDING");
+        UUID id = holdAs(w.cashier, new SaleInputs.HoldInput(UUID.randomUUID(), null, w.walkIn(), List.of(w.line(product, 2)), "5",
+                requestId, null, null)).view().id();
+
+        SaleViews.HeldBillList list = service.list(SaleWorld.TENANT, w.cashier.userId(), shop);
+
+        assertThat(list.items()).extracting(SaleViews.HeldBillRow::id).containsExactly(id);
+        assertThat(list.items().get(0).discountState()).isEqualTo("PENDING");
     }
 
     @Test

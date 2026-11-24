@@ -25,7 +25,7 @@ function backend() {
 function frontend() {
   if (!exists('frontend/package.json')) return console.log('frontend: not scaffolded yet, skipped');
   run('npm', ['--prefix', 'frontend', 'run', 'lint']);
-  run('npm', ['--prefix', 'frontend', 'test', '--', '--watch=false', '--browsers=ChromeHeadless']);
+  run('npm', ['--prefix', 'frontend', 'test', '--', '--watch=false']);
   run('npm', ['--prefix', 'frontend', 'run', 'build']);
 }
 function db() {
@@ -35,7 +35,7 @@ function db() {
     if (bad.length) fail(`bad migration file names: ${bad.join(', ')} (use V<YYYY>_<MM>_<DD>_<HHMM>__<module>_<what>.sql)`);
     for (const f of fs.readdirSync(path.join(root, dir)).filter(f => f.endsWith('.sql'))) {
       const sql = read(`${dir}/${f}`).toLowerCase();
-      for (const m of sql.matchAll(/create table (?:if not exists )?([a-z_]+\.[a-z_]+)/g))
+      for (const m of sql.matchAll(/create table (?:if not exists )?([a-z0-9_]+\.[a-z0-9_]+)/g))
         if (/tenant_id/.test(sql) && !sql.includes(`alter table ${m[1]} enable row level security`)) fail(`${f}: ${m[1]} has tenant_id but no row level security`);
     }
   }

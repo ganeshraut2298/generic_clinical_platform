@@ -201,7 +201,6 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
                 url(w.pharmacyId(), "stock/low-stock"),
                 url(w.pharmacyId(), "stock/fefo-pick?productId=" + a + "&quantity=5"),
                 url(w.pharmacyId(), "stock/products/" + a + "/states"),
-                PH + "/stock/products/" + a + "/stores",
                 url(w.pharmacyId(), "reorder-suggestions"),
                 url(w.pharmacyId(), "stock-adjustments"),
                 PH + "/reports/store-stock",
@@ -224,6 +223,30 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         }
         assertThat(ownerSeen).as("the reviewer sees quantities, so the check has teeth").isGreaterThan(0);
         assertThat(leaks).as("quantities of the audited product answered to a blind counter").isEmpty();
+        // by-store read: only the row of the audited store (where the caller is blind) and the total are masked; other stores show quantities by design
+        JsonNode byStore = get(w.keeper(), PH + "/stock/products/" + a + "/stores", 200);
+        JsonNode auditedRow = null;
+        JsonNode otherRow = null;
+        for (JsonNode row : byStore.get("rows")) {
+            if (w.pharmacyId().equals(row.get("store").get("storeId").asText())) {
+                auditedRow = row;
+            } else if (otherRow == null) {
+                otherRow = row;
+            }
+        }
+        assertThat(auditedRow).as("row of the audited store").isNotNull();
+        for (String f : List.of("available", "inTransit", "pendingReturn", "quarantine", "status")) {
+            assertThat(auditedRow.get(f).isNull()).as("audited row " + f + " is masked").isTrue();
+            assertThat(byStore.get("total").get(f).isNull()).as("total row " + f + " is hidden when a row is hidden").isTrue();
+        }
+        assertThat(otherRow).as("a row of another store").isNotNull();
+        assertThat(otherRow.get("available").isNumber()).as("the other store's row shows its quantity").isTrue();
+        assertThat(otherRow.get("available").asInt()).isPositive();
+        // the reviewer sees the audited row in full
+        JsonNode ownerByStore = get(currentOwner, PH + "/stock/products/" + a + "/stores", 200);
+        for (JsonNode row : ownerByStore.get("rows")) {
+            assertThat(row.get("available").isNumber()).isTrue();
+        }
         // the ledger report: lines of the audited product carry no quantity for the counter
         String from = todayIst().minusDays(1).toString();
         String to = todayIst().plusDays(1).toString();
@@ -374,7 +397,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
     }
 
     @Test
-    void aShortStockAtPostingRefusesTheLineAndSendsItToRecountAndTheReplayAnswersTheSameWithNothingPosted() throws Exception {
+    void aConsumptionLinkedToTheAuditLineLowersTheBookQtySoTheDiffIsZeroAndApproveAndPostPostsNothing() throws Exception {
         Uw u = auditWorld();
         Sw w = u.w();
         JsonNode audit = startAll(w.keeper(), u.wardId(), 201);
@@ -386,22 +409,19 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         JsonNode review = variance(currentOwner, u.wardId(), submitted, 200);
         assertThat(review.get("lines").get(0).get("suggestConsumption").asBoolean()).isFalse();
         reasons(currentOwner, u.wardId(), submitted, review);
-        // the ward used the 100 units meanwhile, linked to this audit line (not "stock moved"): the post then has nothing to take from
+        // the ward used the 100 units meanwhile, linked to this audit line ("Post as consumption instead"): the line's book_qty drops by design, so the diff is 0
         Map<String, Object> use = consumeBody(PURPOSE, List.of(pl(w.productA(), 100)));
         use.put("stockAuditLineId", a1.get("auditLineId").asText());
         int status = call(HttpMethod.POST, url(u.wardId(), "consumptions"), w.keeper().auth(), js(use)).andReturn().getResponse().getStatus();
         assertThat(status).as("a consumption linked to an audit line of this store").isEqualTo(201);
         String key = UUID.randomUUID().toString();
         Map<String, Object> body = m("clientKey", key, "version", versionNow(u.wardId(), audit));
-        JsonNode first = problem(call(HttpMethod.POST, audits(u.wardId()) + "/" + idOf(audit) + "/approve-and-post", w.clinic().owner(), js(body)), 409);
-        assertThat(first.get("type").asText()).endsWith("insufficient-stock");
+        call(HttpMethod.POST, audits(u.wardId()) + "/" + idOf(audit) + "/approve-and-post", w.clinic().owner(), js(body))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
         assertThat(ledger(w, "STOCK_AUDIT_ADJUSTMENT")).isZero();
-        // the refusal is committed: the audit went to recount
-        JsonNode after = ok(HttpMethod.GET, audits(u.wardId()) + "/" + idOf(audit), w.clinic().owner(), null, 200);
-        assertThat(after.get("status").asText()).isEqualTo("RECOUNT");
-        // replay with the same client key: the same refusal, nothing posted
+        // replay with the same client key: still 200, nothing posted
         int replay = call(HttpMethod.POST, audits(u.wardId()) + "/" + idOf(audit) + "/approve-and-post", w.clinic().owner(), js(body)).andReturn().getResponse().getStatus();
-        assertThat(replay).isIn(409, 200);
+        assertThat(replay).isEqualTo(200);
         assertThat(ledger(w, "STOCK_AUDIT_ADJUSTMENT")).isZero();
         assertThat(bal(w, u.wardId(), "TESTB001", "AVAILABLE")).isZero();
     }
@@ -512,7 +532,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         Uw u = auditWorld();
         Sw w = u.w();
         JsonNode owner = get(currentOwner, PH + "/reports", 200);
-        assertThat(groupKeys(owner)).containsExactly("STOCK", "MOVEMENT", "PURCHASE");
+        assertThat(groupKeys(owner)).containsExactly("STOCK", "MOVEMENT", "PURCHASE", "SALES_COMPLIANCE");
         assertThat(owner.get("groups").get(0).get("label").asText()).isEqualTo("Stock");
         assertThat(reportKeys(owner)).contains("store-stock", "batch-expiry", "below-reorder", "indent-register", "transfer-register", "ward-consumption",
                 "returns-write-offs", "po-vs-grn", "purchase-register", "debit-notes-pending");
@@ -559,6 +579,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         get(currentOwner, PH + "/reports/indent-register", 400);
         get(currentOwner, PH + "/reports/indent-register?from=" + to + "&to=" + from, 400);
         Clinic other = pharmacyClinic();
+        centralAndPharmacy(other); // a clinic with stores: a foreign store id is then 404 (a clinic with no store reaches no report, 403)
         problem(call(HttpMethod.GET, PH + "/reports/store-stock?storeId=" + w.pharmacyId(), other.owner(), null), 404);
         JsonNode otherStock = ok(HttpMethod.GET, PH + "/reports/store-stock", other.owner(), null, 200);
         assertThat(otherStock.get("rows")).isEmpty();
@@ -595,7 +616,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         JsonNode page = get(currentOwner, PH + "/reports/stock-ledger?productId=" + w.productA() + "&storeId=" + w.pharmacyId() + "&from=" + from + "&to=" + to, 200);
         assertThat(page.get("items")).isNotEmpty();
         assertThat(page.get("items").get(0).get("transaction").asText()).isNotBlank();
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_REPORT_VIEWED'")).isGreaterThanOrEqualTo(1);
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_REPORT_VIEWED'")).isGreaterThanOrEqualTo(1);
         MvcResult csv = csvCall(currentOwner, PH + "/reports/stock-ledger/export?productId=" + w.productA() + "&storeId=" + w.pharmacyId() + "&from=" + from + "&to=" + to);
         assertThat(csv.getResponse().getStatus()).isEqualTo(200);
         assertThat(csv.getResponse().getContentType()).startsWith("text/csv");
@@ -605,7 +626,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         assertThat(bytes[1] & 0xff).isEqualTo(0xBB);
         assertThat(bytes[2] & 0xff).isEqualTo(0xBF);
         assertThat(new String(bytes, StandardCharsets.UTF_8).split("\n").length).isGreaterThanOrEqualTo(2);
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_REPORT_EXPORTED'")).isEqualTo(1);
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_REPORT_EXPORTED'")).isEqualTo(1);
         MvcResult stock = csvCall(currentOwner, PH + "/reports/store-stock/export");
         assertThat(stock.getResponse().getStatus()).isEqualTo(200);
         assertThat(stock.getResponse().getHeader("Content-Disposition")).contains("sahaj-store-stock-").contains(".csv");
@@ -619,6 +640,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         String to = todayIst().toString();
         Pn frontDesk = crew(w.clinic(), "FRONT_DESK", "Front Desk");
         Clinic other = pharmacyClinic();
+        centralAndPharmacy(other); // with stores of its own, the foreign product is 404 (no store at all would be 403)
         List<MvcResult> errors = List.of(
                 csvCall(currentOwner, PH + "/reports/stock-ledger/export?from=" + from + "&to=" + to),
                 csvCall(currentOwner, PH + "/reports/stock-ledger/export?productId=" + UUID.randomUUID() + "&from=" + from + "&to=" + to),
@@ -658,7 +680,7 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         JsonNode page = get(currentOwner, PH + "/reports/stock-ledger?productId=" + w.productA() + "&storeId=" + w.pharmacyId() + "&from=" + from + "&to=" + to + "&size=200", 200);
         assertThat(page.get("items").size()).isLessThanOrEqualTo(200);
         assertThat(page.get("total").asInt()).isGreaterThan(50000);
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_REPORT_EXPORTED'")).isZero();
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_REPORT_EXPORTED'")).isZero();
     }
 
     // ---------------- inbox ----------------
@@ -680,7 +702,8 @@ class PharmacyWpHAuditReportsApiIT extends Sah79StoreUseSupport {
         assertThat(indents.get("items")).isEmpty();
         assertThat(indents.get("counts").get("stock").asInt()).as("counts ignore the type").isEqualTo(2);
         assertThat(get(currentOwner, PH + "/approvals/inbox?type=PURCHASE", 200).get("items")).isEmpty();
-        get(currentOwner, PH + "/approvals/inbox?type=SALES", 400);
+        get(currentOwner, PH + "/approvals/inbox?type=SALES", 200); // the Sales chip of SAH-80 (pharmacy-sales.yaml; pharmacy.yaml enum is stale)
+        get(currentOwner, PH + "/approvals/inbox?type=NOTATYPE", 400);
         get(currentOwner, PH + "/approvals/inbox?size=51", 400);
         get(currentOwner, PH + "/approvals/inbox?page=-1", 400);
         // the raiser never sees their own request; a plain pharmacist is refused; another clinic sees nothing

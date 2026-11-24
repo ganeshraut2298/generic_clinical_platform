@@ -403,6 +403,7 @@ These are engineering gates from the reviews and the tech lead's triage. The tec
 | D-9 | Roles card (mockup 05) | An editable-looking matrix | A read-only read-out of what the server enforces; cells that depend on the person are not shown as settings. | OQ-80-38; DEC-074 |
 | D-10 | Command centre and header | "Branches today", "Reorder drafts: 3 distributors auto-picked", "Gross margin", "Speed today"; search "Medicine, salt, patient, bill no…" | Not built; the placeholder reads "Medicine, salt, bill no…". | OQ-80-3, OQ-80-4; DEC-089 item 2 |
 | D-11 | Other parts not built | "TPA drug limit", "corporate credit", "chronic plan 5%", "Counter 1", Marathi and Hindi labels on invoices, "Ask doctor", interaction check, "Patient history", "Data protection & trust" card | Not shown. | OQ-80-3 |
+| D-12 | Compliance card, Schedule X / NDPS row (mockup 01) | Only the "Balanced" chip | A "No count yet" label is shown when the contract field `neverCounted` (pharmacy-sales.yaml 0.3.9, integer) is greater than 0: Schedule X / NDPS products with a book entry this month and no physical count yet. `balanced` is false while any such product is uncounted. A blind caller's audited products are left out of the count. Not in the mockup. Decided by the tech lead; awaiting human confirmation, to be added to mockup 01 by a human. | DEC-073 |
 
 ### E. Explicitly NOT in this release
 - **Day close (story 80-22).** The screen, the tally and the lock are not built; there is no cash tally by payment mode (code review 2 m8; DEC-093 item 4; CL-8).

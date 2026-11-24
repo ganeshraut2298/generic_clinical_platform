@@ -176,4 +176,35 @@ class StockReadServiceBlindTest {
         assertThat(open.rows().get(0).available()).isEqualTo(17);
         assertThat(open.total().quarantine()).isEqualTo(3);
     }
+
+    @Test
+    void theAllStoresReadMasksTheAuditedStoreRowAndTheTotalWhileTheOtherStoreRowShowsItsQuantity() {
+        UUID store2Id = UUID.randomUUID();
+        Store store2 = new Store(store2Id, UNIT, "Test Ward 4C", "W4C", StoreType.WARD, UUID.randomUUID(), false, true, true,
+                true, 0);
+        caller = new PharmacyCaller(TENANT, USER, ME, "Test Person", "STORE_STAFF", List.of(
+                new PharmacyCaller.Mapping(store, null, StoreRole.STORE_USER, StoreRules.access("STORE_STAFF", StoreRole.STORE_USER, false)),
+                new PharmacyCaller.Mapping(store2, null, StoreRole.STORE_USER, StoreRules.access("STORE_STAFF", StoreRole.STORE_USER, false))));
+        when(audits.openAuditProducts(TENANT, store2Id)).thenReturn(Set.of());
+        when(stock.statesOfProduct(eq(TENANT), eq(AUDITED), any())).thenReturn(List.of(
+                new StockRepository.StateRow(STORE, 17, 2, 1, 3, 10), new StockRepository.StateRow(store2Id, 103, 0, 0, 0, 10)));
+
+        StockViews.ProductStockByStore all = service.productAllStores(TENANT, USER, AUDITED.toString());
+
+        assertThat(all.rows()).hasSize(2);
+        StockViews.StoreStateRow audited = all.rows().stream().filter(r -> STORE.equals(r.store().storeId())).findFirst().orElseThrow();
+        StockViews.StoreStateRow other = all.rows().stream().filter(r -> store2Id.equals(r.store().storeId())).findFirst().orElseThrow();
+        assertThat(audited.available()).isNull();
+        assertThat(audited.inTransit()).isNull();
+        assertThat(audited.pendingReturn()).isNull();
+        assertThat(audited.quarantine()).isNull();
+        assertThat(audited.status()).isNull();
+        assertThat(other.available()).isEqualTo(103);
+        assertThat(all.total().available()).isNull();
+        assertThat(all.total().inTransit()).isNull();
+        assertThat(all.total().pendingReturn()).isNull();
+        assertThat(all.total().quarantine()).isNull();
+        assertThat(all.total().status()).isNull();
+        assertThat(all.empty()).isFalse();
+    }
 }

@@ -1,3 +1,4 @@
+Renamed from ADM-2 (now SAH-83); other documents still refer to ADM-2.
 # ADM-2 · Organizations directory and organization detail (Sahaj admin portal, read-only)
 Mockup screen: Sahaj admin portal (platform admin view) — sidebar Platform Management → Organizations (`orgDirPage`, route `clinics`); organization detail `aClinic` (header, tabs Plan and billing and Modules read-only, `aModules`)
 Module: platform (admin packages `com.sahaj.platform.*.admin`); the admitted-patients count comes from `ipd` through a read-only port in `platform.api`

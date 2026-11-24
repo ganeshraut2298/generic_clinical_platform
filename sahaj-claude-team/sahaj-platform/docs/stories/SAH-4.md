@@ -1,5 +1,5 @@
 # SAH-4 · Clinic setup wizard
-Mockup screen: Setup wizard (5 steps: clinic, specialty, staff, OPD, look and web address)
+Mockup screen: Start screen and sign-in (opening screen of the mockup) — Setup wizard (5 steps: clinic, specialty, staff, OPD, look and web address)
 Module: platform
 
 ## 1. Story

@@ -295,7 +295,7 @@ export interface CommandCentre {
   compliance?: {
     state: CardState;
     h1?: { billsToday: number; overridesToReview: number };
-    scheduleX?: { toReview: number; balanced: boolean };
+    scheduleX?: { toReview: number; balanced: boolean; neverCounted?: number };
     drugLicence?: LicenceStatus;
   } | null;
 }

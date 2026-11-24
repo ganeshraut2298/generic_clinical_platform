@@ -90,10 +90,10 @@ class PharmacyHardeningMastersIT extends Sah78CSupport {
                 boolean fixed = reason.path("fixed").asBoolean(false);
                 assertThat(reason.has("fixed")).as("fixed is answered on every reason: " + reason.get("reasonKey").asText()).isTrue();
                 fixedCount += fixed ? 1 : 0;
-                assertThat(fixed).as(reason.get("reasonKey").asText()).isEqualTo(reason.get("reasonKey").asText().equals("receipt-reject.short"));
+                assertThat(fixed).as(reason.get("reasonKey").asText()).isEqualTo(java.util.Set.of("receipt-reject.short", "return-condition.sealed", "return-condition.opened", "return-condition.damaged").contains(reason.get("reasonKey").asText()));
             }
         }
-        assertThat(fixedCount).isOne();
+        assertThat(fixedCount).isEqualTo(4);
         JsonNode p = problem(call(HttpMethod.POST, REASON_LISTS + "/receipt-reject/reasons/receipt-reject.short/switch-off", w.clinic().owner(), null), 409);
         assertType(p, "last-active-reason");
         assertThat(p.get("detail").asText()).isEqualTo("This reason is fixed.");

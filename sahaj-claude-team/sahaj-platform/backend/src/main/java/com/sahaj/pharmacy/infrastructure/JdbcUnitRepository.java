@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -17,7 +18,8 @@ import org.springframework.stereotype.Repository;
 public class JdbcUnitRepository implements UnitRepository {
 
     private static final String SELECT = """
-            select id, code, gstin, drug_licence_no, drug_licence_valid_till, integration_mode, updated_at, version
+            select id, code, gstin, drug_licence_no, drug_licence_valid_till, integration_mode, updated_at, version,
+                   return_window_days, refund_modes, schedule_x_licence_no, schedule_x_licence_valid_till
             from pharmacy.unit
             where tenant_id = :tenantId
             """;
@@ -30,6 +32,11 @@ public class JdbcUnitRepository implements UnitRepository {
             update pharmacy.unit
             set gstin = cast(:gstin as text), drug_licence_no = cast(:licenceNo as text),
                 drug_licence_valid_till = cast(:licenceTill as date), integration_mode = :mode,
+                return_window_days = case when :setSale then cast(:window as integer) else return_window_days end,
+                refund_modes = case when :setSale then cast(:modes as text[]) else refund_modes end,
+                schedule_x_licence_no = case when :setSale then cast(:xNo as text) else schedule_x_licence_no end,
+                schedule_x_licence_valid_till = case when :setSale then cast(:xTill as date)
+                                                     else schedule_x_licence_valid_till end,
                 updated_at = now(), updated_by = :actor, version = version + 1
             where tenant_id = :tenantId and id = :id and version = :version
             """;
@@ -53,10 +60,20 @@ public class JdbcUnitRepository implements UnitRepository {
 
     @Override
     public boolean updateSettings(UUID tenantId, UUID unitId, long version, String gstin, String drugLicenceNo,
-                                  LocalDate drugLicenceValidTill, IntegrationMode integrationMode, UUID actorUserId) {
+                                  LocalDate drugLicenceValidTill, IntegrationMode integrationMode, UUID actorUserId,
+                                  SaleSettings sale) {
         return jdbc.sql(UPDATE_SETTINGS).param("tenantId", tenantId).param("id", unitId).param("version", version)
                 .param("gstin", gstin).param("licenceNo", drugLicenceNo).param("licenceTill", drugLicenceValidTill)
-                .param("mode", integrationMode.name()).param("actor", actorUserId).update() == 1;
+                .param("mode", integrationMode.name()).param("actor", actorUserId).param("setSale", sale != null)
+                .param("window", sale == null ? null : sale.returnWindowDays())
+                .param("modes", sale == null ? "{}" : toArrayLiteral(sale.refundModes()))
+                .param("xNo", sale == null ? null : sale.scheduleXLicenceNo())
+                .param("xTill", sale == null ? null : sale.scheduleXLicenceValidTill()).update() == 1;
+    }
+
+    /** A PostgreSQL text[] literal of the allowed refund-mode keys (upper-case letters and underscores only). */
+    private static String toArrayLiteral(List<String> values) {
+        return "{" + String.join(",", values) + "}";
     }
 
     private static Unit map(ResultSet rs, int rowNum) throws SQLException {
@@ -64,6 +81,12 @@ public class JdbcUnitRepository implements UnitRepository {
         return new Unit(rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("gstin"),
                 rs.getString("drug_licence_no"), rs.getObject("drug_licence_valid_till", LocalDate.class),
                 IntegrationMode.valueOf(rs.getString("integration_mode")), updated == null ? null : updated.toInstant(),
-                rs.getLong("version"));
+                rs.getLong("version"), (Integer) rs.getObject("return_window_days"), refundModes(rs),
+                rs.getString("schedule_x_licence_no"), rs.getObject("schedule_x_licence_valid_till", LocalDate.class));
+    }
+
+    private static List<String> refundModes(ResultSet rs) throws SQLException {
+        java.sql.Array array = rs.getArray("refund_modes");
+        return array == null ? List.of() : List.of((String[]) array.getArray());
     }
 }

@@ -166,3 +166,4 @@ Command centre cards and the six reports are served by the indexes above: `bill 
 ## Change log
 - 19 Nov 2026: WP-I to WP-N written (17 files, `V2026_12_17_1800` to `2300`). Replaced `next_document_no` and `guard_stock_ledger_schedule_x`; rows of SAH-78-pharmacy-masters.md section 11 updated. No applied migration edited. Not run against a live database; `validate.mjs db` is run by the tech lead or QA.
 - 21 Nov 2026: `V2026_12_17_2310` added (unique partial index `uq_bill_discount_request`, DEC-091 item 2). No applied migration edited. Not run against a database.
+- 22 Nov 2026: `V2026_12_17_2320` widens `pharmacy.document_event` check `ck_document_event_event` to `^[A-Z][A-Z0-9_]{1,39}$` so `H1_OVERRIDE` is accepted (DEC-095). Widening only; no data, grant or RLS change. Not run against a database.

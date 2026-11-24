@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -245,7 +246,7 @@ class BillCancelServiceTest {
         assertThat(posted().get(0).secondSignerMembershipId()).isEqualTo(w.pharmacist2.id());
         verify(w.registers).reverseScheduleXForCancelledBill(any(), eq(billId), eq(w.f.pharmacist.id()), eq(w.pharmacist2.id()));
         verify(w.events).insert(any(), any(), eq("BILL"), eq(billId), eq("SECOND_SIGNATURE"), any(), eq(w.f.pharmacist.id()),
-                eq("PHARMACIST"), any(), any(), any(), any());
+                isNull(), any(), any(), any(), any());
     }
 
     @Test
@@ -336,6 +337,19 @@ class BillCancelServiceTest {
         order.verify(w.bills).setRefundCreditNote(any(), any(), anyLong(), any(), any());
         assertThat(w.f.auditActions()).containsExactly("PHARMACY_BILL_REFUND_RECORDED");
         assertThat(w.f.audit.get(0).after()).containsEntry("creditNoteNo", "CN/26-27/000007");
+    }
+
+    @Test
+    void theBillReadsRefundDueZeroOnceTheRefundIsRecordedAndKeepsTheStoredAmountBefore() {
+        stored(bill(TODAY_AM, "CANCELLED", null, 0, 20_000, null), 2, "CASH:12000", "UPI:8000");
+        when(w.bills.refundModes(any())).thenReturn(List.of("ORIGINAL_MODE"));
+        when(w.numbers.next(any(), eq(com.sahaj.pharmacy.domain.DocType.CREDIT_NOTE))).thenReturn(7L);
+        when(w.bills.find(any(), eq(billId))).thenReturn(Optional.of(bill(TODAY_AM, "CANCELLED", null, 0, 20_000, "CN/26-27/000007")));
+
+        PharmacyViews.Outcome<SaleViews.Bill> out = refundAs(w.cashier, refund(7, line("CASH", 12_000), line("UPI", 8_000)));
+
+        assertThat(out.view().refundCreditNoteNo()).isEqualTo("CN/26-27/000007");
+        assertThat(out.view().refundDuePaise()).isZero();
     }
 
     @Test

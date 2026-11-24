@@ -207,6 +207,48 @@ class ReportServiceTest {
         when(stores.list(TENANT, false)).thenReturn(List.of(saleStore()));
     }
 
+    private ReportRepository.Row marginRow() {
+        List<Object> cells = new java.util.ArrayList<>();
+        cells.add(null);
+        cells.add("Test shop");
+        cells.add(0L);
+        cells.add(0L);
+        cells.add(-5000L);
+        cells.add(0L);
+        cells.add(0L);
+        cells.add(-4000L);
+        cells.add(null);
+        return new ReportRepository.Row(WARD_ID, null, cells);
+    }
+
+    @Test
+    void theMarginRowKeepsSalesButHidesCostAndMarginFromAnApproverWhoIsNotAPharmacist() {
+        givenSale(caller("DOCTOR", StoreRole.APPROVER, saleStore()));
+        when(repo.count(any(), any())).thenReturn(1L);
+        when(repo.rows(any(), any(), anyInt(), anyInt())).thenReturn(List.of(marginRow()));
+
+        List<Object> row = service.run(TENANT, USER, "sales-margin", query("2026-11-01", "2026-11-20")).rows().get(0);
+
+        assertThat(row.get(2)).isEqualTo(0L);
+        assertThat(row.get(4)).isEqualTo(-5000L);
+        assertThat(row.get(7)).isNull();
+        assertThat(row.get(8)).isNull();
+    }
+
+    @Test
+    void theMarginRowOfAReturnOnlyDayShowsItsCostAndMarginToTheOwnerAndAPharmacist() {
+        when(repo.count(any(), any())).thenReturn(1L);
+        when(repo.rows(any(), any(), anyInt(), anyInt())).thenReturn(List.of(marginRow()));
+        for (PharmacyCaller who : List.of(caller("OWNER", null, null), caller("PHARMACIST", StoreRole.STORE_USER, saleStore()))) {
+            givenSale(who);
+
+            List<Object> row = service.run(TENANT, USER, "sales-margin", query("2026-11-01", "2026-11-20")).rows().get(0);
+
+            assertThat(row.get(2)).isEqualTo(0L);
+            assertThat(row.get(7)).isEqualTo(-4000L);
+        }
+    }
+
     private ReportRepository.Row h1Row(UUID storeId, UUID patientId, String name, String address) {
         List<Object> cells = new java.util.ArrayList<>();
         cells.add(null);

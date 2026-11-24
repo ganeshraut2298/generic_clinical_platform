@@ -248,7 +248,7 @@ class PharmacySalesCoreApiIT extends Sah80SalesSupport {
         assertThat(billsSaved(w)).isZero();
         assertThat(get(w.keeper(), url(w.pharmacyId(), "held-bills"), 200).get("items")).hasSize(1);
         assertThat(get(w.keeper(), url(w.pharmacyId(), "held-bills/" + idOf(held)), 200).get("cart").get("lines")).hasSize(1);
-        ok(HttpMethod.POST, url(w.pharmacyId(), "held-bills/" + idOf(held) + "/discard"), w.keeper().auth(), null, 200);
+        post(w.keeper(), url(w.pharmacyId(), "held-bills/" + idOf(held) + "/discard"), m("version", held.get("version").asLong()), 200);
         assertThat(get(w.keeper(), url(w.pharmacyId(), "held-bills"), 200).get("items")).isEmpty();
         for (int i = 0; i < 20; i++) {
             Map<String, Object> next = new java.util.LinkedHashMap<>(plain(w.productB(), 1));
@@ -273,7 +273,7 @@ class PharmacySalesCoreApiIT extends Sah80SalesSupport {
                 "reasonKey", "cancel-bill.wrong-item", "note", null, "backOnShelf", false, "secondSigner", null);
         String path = url(w.pharmacyId(), "bills/" + idOf(bill) + "/cancel");
         JsonNode denied = post(s.cashier(), path, body, 403);
-        assertThat(denied.get("type").asText()).as("a cashier may not cancel").containsAnyOf("cancel-not-allowed", "forbidden", "pharmacist-required");
+        assertThat(denied.get("type").asText()).as("a cashier may not cancel").containsAnyOf("cancel-not-allowed", "forbidden", "pharmacist-required", "store-permission-denied");
         assertThat(get(w.keeper(), url(w.pharmacyId(), "bills/" + idOf(bill)), 200).get("status").asText()).isEqualTo("SAVED");
         JsonNode cancelled = post(w.keeper(), path, body, 200);
         assertThat(cancelled.get("status").asText()).isEqualTo("CANCELLED");

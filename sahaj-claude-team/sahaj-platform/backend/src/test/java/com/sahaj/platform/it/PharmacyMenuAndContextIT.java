@@ -213,7 +213,7 @@ class PharmacyMenuAndContextIT extends Sah78Support {
         assertThat(c.get("mustPickWorkingStore").asBoolean()).isFalse();
         assertThat(c.get("fixedRules").get("fefo").asBoolean()).isTrue();
         assertThat(c.get("fixedRules").get("negativeStockBlocked").asBoolean()).isTrue();
-        assertThat(c.toString()).as("no mobile number and no OPD or IPD capability in Phase 1").doesNotContain("OPD_").doesNotContain("IPD_");
+        assertThat(c.toString()).as("no mobile number and no IPD capability while IPD is off (OPD_QUEUE is listed for an Integrated unit)").doesNotContain("IPD_");
     }
 
     @Test
@@ -222,7 +222,7 @@ class PharmacyMenuAndContextIT extends Sah78Support {
         JsonNode[] stores = centralAndPharmacy(clinic);
         Pn pharmacist = crew(clinic, "PHARMACIST", "Priya Pharmacist");
         JsonNode unmapped = contextOf(pharmacist.auth());
-        assertThat(texts(unmapped.get("capabilities"))).containsExactly("SETUP_VIEW");
+        assertThat(texts(unmapped.get("capabilities"))).containsExactly("SETUP_VIEW", "COMPLIANCE");
         assertThat(unmapped.get("caller").get("setupAccess").asText()).isEqualTo("VIEW");
         assertThat(unmapped.get("stores")).isEmpty();
         assertThat(unmapped.get("mustPickWorkingStore").asBoolean()).isFalse();

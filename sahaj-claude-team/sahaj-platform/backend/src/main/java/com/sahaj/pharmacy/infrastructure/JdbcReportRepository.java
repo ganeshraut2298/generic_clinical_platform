@@ -235,37 +235,45 @@ public class JdbcReportRepository implements ReportRepository {
     private static final String REASON_TEXT = "%s";
 
     /**
-     * Bills of the day per store, less the returns completed that day (for the product asked, when one is); cost on the batch
-     * purchase rate (landed, OQ-79-6) less the cost of the returned units that went back to AVAILABLE stock (a unit sent to
-     * quarantine is not back on the shelf, so its cost stays). Quantity, discount and tax are those of the bills.
+     * Gross margin per IST day and store (pharmacy-sales.yaml 0.3.9, WP-N). Sale value is the taxable value of the bill lines
+     * (after discount, without GST) less the taxable part of the refunds; cost is the batch purchase rate (landed, OQ-79-6) times
+     * the units sold, less the same for every returned unit that went to AVAILABLE or QUARANTINE (a quarantined unit is still
+     * stock at its purchase rate; what later happens to it is a stock movement, not a margin figure). salesPaise is the net of
+     * the bills with GST less the refunds. A day and store with returns and no bill still gets a row (full outer join). The
+     * product asked narrows the bill lines and the return lines alike.
      */
-    private static final String SALES_MARGIN = "select a.store_id, null::uuid, a.day, a.store_name, a.bills, a.qty,"
-            + " (a.net - coalesce(rr.refunded, 0))::bigint, a.discount, a.tax, (a.cost - coalesce(rr.returned_cost, 0))::bigint,"
-            + " case when a.net - coalesce(rr.refunded, 0) > 0"
-            + " then round((a.net - coalesce(rr.refunded, 0) - (a.cost - coalesce(rr.returned_cost, 0))) * 100.0"
-            + " / (a.net - coalesce(rr.refunded, 0)), 1) end"
-            + " from (select b.store_id, (b.saved_at at time zone 'Asia/Kolkata')::date as day, s.name as store_name,"
+    private static final String SALES_MARGIN = "select st.id, null::uuid, d.day, st.name, coalesce(a.bills, 0)::bigint,"
+            + " coalesce(a.qty, 0)::bigint, (coalesce(a.net, 0) - coalesce(rr.refunded, 0))::bigint,"
+            + " coalesce(a.discount, 0)::bigint, coalesce(a.tax, 0)::bigint,"
+            + " (coalesce(a.cost, 0) - coalesce(rr.returned_cost, 0))::bigint,"
+            + " case when coalesce(a.taxable, 0) - coalesce(rr.taxable_refunded, 0) > 0"
+            + " then round((coalesce(a.taxable, 0) - coalesce(rr.taxable_refunded, 0)"
+            + " - (coalesce(a.cost, 0) - coalesce(rr.returned_cost, 0))) * 100.0"
+            + " / (coalesce(a.taxable, 0) - coalesce(rr.taxable_refunded, 0)), 1) end"
+            + " from (select b.store_id, (b.saved_at at time zone 'Asia/Kolkata')::date as day,"
             + " count(distinct b.id)::bigint as bills, coalesce(sum(l.qty), 0)::bigint as qty,"
-            + " coalesce(sum(l.net_paise), 0)::bigint as net, coalesce(sum(l.discount_paise), 0)::bigint as discount,"
+            + " coalesce(sum(l.net_paise), 0)::bigint as net, coalesce(sum(l.taxable_paise), 0)::bigint as taxable,"
+            + " coalesce(sum(l.discount_paise), 0)::bigint as discount,"
             + " coalesce(sum(l.tax_paise), 0)::bigint as tax,"
             + " coalesce(round(sum(l.qty * ba.purchase_rate) * 100), 0)::bigint as cost"
             + " from pharmacy.bill b join pharmacy.bill_line l on l.tenant_id = b.tenant_id and l.bill_id = b.id"
-            + " join pharmacy.store s on s.tenant_id = b.tenant_id and s.id = b.store_id"
             + " join pharmacy.batch ba on ba.tenant_id = l.tenant_id and ba.id = l.batch_id"
             + " where b.tenant_id = :tenantId and b.store_id in (:storeIds) and b.status = 'SAVED' and " + range("b.saved_at")
             + PRODUCT_FILTER.formatted("l")
-            + " group by b.store_id, s.name, (b.saved_at at time zone 'Asia/Kolkata')::date) a"
-            + " left join (select r.store_id, (r.completed_at at time zone 'Asia/Kolkata')::date as day,"
-            + " sum(rl.refund_paise)::bigint as refunded,"
-            + " coalesce(round(sum(case when rl.destination = 'AVAILABLE' then rl.qty * rb.purchase_rate else 0 end) * 100), 0)::bigint"
-            + " as returned_cost from pharmacy.sales_return r"
+            + " group by b.store_id, (b.saved_at at time zone 'Asia/Kolkata')::date) a"
+            + " full join (select r.store_id, (r.completed_at at time zone 'Asia/Kolkata')::date as day,"
+            + " sum(rl.refund_paise)::bigint as refunded, sum(rl.taxable_paise)::bigint as taxable_refunded,"
+            + " coalesce(round(sum(rl.qty * rb.purchase_rate) * 100), 0)::bigint as returned_cost"
+            + " from pharmacy.sales_return r"
             + " join pharmacy.sales_return_line rl on rl.tenant_id = r.tenant_id and rl.sales_return_id = r.id"
             + " join pharmacy.batch rb on rb.tenant_id = rl.tenant_id and rb.id = rl.batch_id"
             + " where r.tenant_id = :tenantId and r.store_id in (:storeIds) and r.status = 'COMPLETED'"
-            + " and rl.destination <> 'REFUSED' and " + range("r.completed_at") + PRODUCT_FILTER.formatted("rl")
+            + " and rl.destination in ('AVAILABLE', 'QUARANTINE') and " + range("r.completed_at") + PRODUCT_FILTER.formatted("rl")
             + " group by r.store_id, (r.completed_at at time zone 'Asia/Kolkata')::date) rr"
             + " on rr.store_id = a.store_id and rr.day = a.day"
-            + " order by a.day, a.store_name";
+            + " cross join lateral (select coalesce(a.day, rr.day) as day) d"
+            + " join pharmacy.store st on st.tenant_id = :tenantId and st.id = coalesce(a.store_id, rr.store_id)"
+            + " order by d.day, st.name";
 
     private static final String SALES_RETURNS = "select r.store_id, rl.product_id, r.credit_note_no, bl.bill_no, r.completed_at,"
             + " " + PLABEL + ", ba.batch_no, rl.qty::bigint, " + REASON_TEXT.formatted("r.reason_key") + ", "

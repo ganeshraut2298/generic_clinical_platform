@@ -1,5 +1,5 @@
 # SAH-22 · Wards, rooms, beds and bed charges (IPD setup, part 1)
-Mockup screens: Clinic setup → Wards, rooms and beds (`cfgIpBeds`, key `ipbeds`) and Bed categories and charges (`cfgIpRates`, key `iprates`)
+Mockup screen: Clinic setup → Patient card, Roles and access, Wards/rooms/beds, Bed categories, Admission and deposits, Emergency and triage, Discharge (this story: Wards, rooms and beds (`cfgIpBeds`, key `ipbeds`) and Bed categories and charges (`cfgIpRates`, key `iprates`))
 Module: ipd (reads entitlements through `platform.api`)
 
 ## 1. Story

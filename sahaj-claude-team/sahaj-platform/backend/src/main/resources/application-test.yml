@@ -11,6 +11,12 @@ spring:
       # no room for Flyway, psql or a second run. Five connections a context cover the parallel-request tests
       # (9 x 5 = 45 of 100). Set SAHAJ_DB_POOL_SIZE to override.
       maximum-pool-size: ${SAHAJ_DB_POOL_SIZE:5}
+      # Idle cached contexts must not hold connections: no standing idle connections, idle ones close after 10 s
+      # (the Hikari minimum). With spring.test.context.cache.maxSize (src/test/resources/spring.properties) this
+      # keeps the suite under PostgreSQL max_connections (SQLSTATE 53300).
+      minimum-idle: 0
+      idle-timeout: 10000
+      max-lifetime: 60000
   flyway:
     url: ${SAHAJ_TEST_DB_URL:jdbc:postgresql://localhost:5432/sahaj_test}
     user: sahaj_migrator

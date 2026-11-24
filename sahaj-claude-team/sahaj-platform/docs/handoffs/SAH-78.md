@@ -1745,3 +1745,77 @@ Tech lead review: ACCEPTED, decisions (auto, DEC-073):
 
 ## 21 Nov — BA rename done
 BA created docs/requirements/SAH-87.md and SAH-88.md (copies of IPD gap analyses A/B, reserved-ID first line, PROPOSED). Old IPD-flow-gap-analysis-A.md/-B.md are one-line pointers. validate docs still fails only because the old files exist (and ADM-2/ADM-3). Human must delete those four files.
+
+## 21 Nov — Human decisions recorded (DEC-094)
+IPD go-live = core only; death/LAMA/MLC record only, no print; pharmacist/accountant/lawyer checklists, go-live proceeds on auto-decided rules; registration form deferred; cashier Deny cell = known deviation.
+OQ-78-8 decided (DEC-073): as built. Owner edits; owner, any pharmacist and a Central Store user read the Inventory setup; nobody else; the owner cannot make a second person "Unit admin" in this release.
+IPD papers moved to docs/handoffs/IPD-analysis-A-SAH-87.md and -B-SAH-88.md (docs gate no longer fails on them). Remaining docs-gate failure: docs/stories/ADM-2.md, ADM-3.md (human).
+QA blocked twice by Bash permission refusal (check-env.mjs); human must add allow rules in /permissions.
+
+## 21 Nov — Architect round (contract 0.3.9)
+Done: prefix-in-use scope, gross margin definition (taxable value, QUARANTINE keeps cost, returns reverse both, return-only day gets a row). admission_charge append-only confirmed for the app (caveat: migrator convention; no reversal mechanism exists, matters for SAH-88).
+Decision (DEC-073): neverCounted is an INTEGER (as built in java run 14 and as decided earlier). "No count yet" label is not in mockup 01 -> recorded as deviation D-12 (human to confirm; shows only when neverCounted > 0). Architect to add the integer to the contract; java to fix SALES_MARGIN; angular to show label after contract; QA prefix + margin ITs.
+
+## 21 Nov — Architect neverCounted edit blocked
+Second architect run refused by the architecture lock held by the finished first run (a0a6f5f0d7be753fe). Nothing changed. Edit text is ready (neverCounted integer in CommandCentre.compliance.scheduleX, change-log item (c), wording fix on line 8). Relaunch when the lock is stale (2 h) or the human clears .claude/locks/architecture.lock. BA to record D-12 "No count yet". Human to re-approve contract 0.3.9 (additive).
+
+## 21 Nov — Java: SALES_MARGIN fixed (WP-N, contract 0.3.9)
+JdbcReportRepository SALES_MARGIN: taxable basis, taxable refund, QUARANTINE+AVAILABLE cost reversal, FULL JOIN so return-only days get a row. Tests: SalesMarginSqlTest (5, SQL text only), ReportServiceTest (+2). mvn test of 3 classes: 27 tests, 0 failures. SQL NOT run on PostgreSQL; validate backend not run. QA ITs needed: return-only day row, QUARANTINE return reverses cost, margin on taxable, productId narrows return side. Observation: mvn test worked for java-developer, so only QA's Bash call for check-env.mjs/validate is refused.
+
+## 22 Nov — Backend unit tests green
+Human's mvn run (6536 run, 7 failures, 1168 errors) was a corrupted target/ (concurrent build; class files missing). Java ran `mvn clean test` alone: 495 classes, 6924 tests, 0 failures, 0 errors. No product defects, no code changed. validate backend not run. Next: QA integration tests + validate all with nothing else touching backend/target (QA still blocked on Bash permission for check-env/validate/mvn verify).
+
+## 22 Nov — ADM rename done; docs gate story fixes blocked by lock
+SAH-83/84 created (identical to committed ADM-2/3 apart from the note line); human deleted ADM-2/3 stubs. Docs gate now fails on 7 old stories: SAH-2, SAH-3, SAH-4 (screen not in screen-map), SAH-22..25 ("Mockup screens:" plural, gate needs "Mockup screen:"). BA fix blocked: requirements lock held by finished BA a7f2705d5fee943a8. Planned edits (line 2 only): SAH-2/3 -> "Start screen and sign-in (opening screen of the mockup) — <original>"; SAH-22 -> Clinic setup entry; SAH-23/25 -> IPD → Admitted; SAH-24 -> IPD → Bed board; SAH-4 left for the human (no screen-map row for the Setup wizard).
+
+## 22 Nov — neverCounted contract, D-12, Angular label
+Architect: neverCounted (integer, optional) added to pharmacy-sales.yaml 0.3.9; human must re-approve 0.3.9. BA: D-12 recorded in SAH-80.md. Angular: "No count yet: N products" pill (test id comp-x-never-counted), Balanced chip hidden when neverCounted > 0; 4 new specs; build OK; lint passed before a last test split (not re-run). Full frontend test run: 5682 passed, 2 failed (one was own draft, fixed; other src/styles/no-third-party-fonts.spec.ts passes alone, full run not repeated). `validate frontend` FAILS: scripts/validate.mjs line 28 still passes --browsers=ChromeHeadless, vitest rejects it (DEC-002 follow-up, human-owned). QA: e2e case with neverCounted > 0 needed. Docs gate PASSED.
+
+## 22 Nov — Human ran mvn verify: triage
+Unit (surefire): 6924 run, 0 fail, 0 err. Integration (failsafe): 3706 run, 65 failures, 978 errors.
+- 964 errors in 74 IT classes: "FATAL: remaining connection slots are reserved for roles with the SUPERUSER attribute" (SQLSTATE 53300). Test infrastructure: each cached Spring test context keeps its own Hikari pool (application-test.yml pool 5), so connections run out. Owner: java-developer (test config / application-test.yml).
+- Real failures in 17 classes: PharmacySales{Core 7, Command 7, Registers 8, Return 7, Discount 5}, PharmacyWpH 9, WpG 5, EmergencyChecksIT 5, WpEDebitNote 3, WpEReceipt 2, Numbering 2, MenuAndContext 2, StaffPinPepperIT 3 errors, CandidatesWithoutStore 1, HardeningMasters 1, StaffMapping 1, ScopePlansIT 1.
+  Symptoms: POST /pharmacy/stores/{id}/bills -> 500 internal-error (19); PUT /pharmacy/unit-settings -> 400 "Send only the fields listed" from Sah80SalesSupport.saleSettings (6, test-side likely); `relation "platform.audit_log" does not exist` in 3 new ITs (test-side); POST /ipd/wards -> 503 database-busy (5, connection exhaustion).
+Next: java-developer fixes the pool exhaustion, reruns the failing classes alone, fixes product defects; test-side faults listed for QA.
+
+## 22 Nov — Java IT triage result
+Before: 3706 IT run, 65 failures, 978 errors. After: 3706 run, 39 failures, 7 errors, 25 skipped; unit 6926, 0 failures. No SQLSTATE 53300 left.
+Fixed: test pool (application-test.yml min-idle 0, idle/lifetime short; src/test/resources/spring.properties context cache maxSize 6); bills 500 (acting_as 'PHARMACIST' violated ck_document_event_acting_as -> null); unit-settings 0.3.0 fields (returnWindowDays, refundModes, scheduleXLicenceNo/ValidTill) implemented; sales return 500 (credit_note.bill_id null).
+Rulings DEC-095. Launched in parallel (no mvn runs except java unit tests): db-engineer (widen ck_document_event_event for H1_OVERRIDE), qa-engineer (test-side faults list, 14 items), java-developer (rule 24 leak on GET stock/products/{id}/stores; approve-and-post 409), solution-architect (DEC-095 wording in 0.3.9). Then one full mvn verify, coordinated by tech lead.
+
+## 22 Nov — db-engineer: H1_OVERRIDE fix
+New migration V2026_12_17_2320__pharmacy_document_event_event_allow_digits.sql: ck_document_event_event widened to ^[A-Z][A-Z0-9_]{1,39}$ (no data, grant or RLS change; existing migrations untouched). Note in docs/database/SAH-80-sales.md. Lowercase events still refused (PharmacyWpDRulesIT:513 unaffected). Not run yet; confirm with PharmacySalesRegistersApiIT:100 in the full run.
+
+## 22 Nov — java: WpH items are test-side
+1. GET stock/products/{id}/stores: product masks the audited store row (BlindCount.hides); rows[1]=Ward 3B, not audited, so 103 is correct per contract. IT :226 must check only the audited store's row. Unit test for StockReadServiceBlindTest (two stores) written but blocked by backend lock (held by finished java a834cea14152c4a4f) — queue.
+2. approve-and-post 200: linked consumption lowers book_qty by design (pharmacy.yaml ~4552), diff 0, nothing posted; failShortLines still gives 409 when a decrease exceeds AVAILABLE. IT :396 contradicts the design: assert 200 + zero STOCK_AUDIT_ADJUSTMENT rows, or use an unlinked route.
+Both corrections queued for QA. A java `mvn test` (bv7ojuvq9) may still be running: full run waits for it.
+
+## 22 Nov — Architect: DEC-095 wording in 0.3.9
+second-signer-same withdrawn (now second-signer-invalid, pharmacy-sales.yaml + ADR-030 line 55); DiscountRequest.requestId described (approval id via inbox); sales-margin/h1-register require from/to; short-supply credit = vendor's returnCreditPercent. DEC-095 addendum item 6: 100 % fallback kept, to be documented. BA: docs/stories/SAH-80.md:347 still says second-signer-same. Human: re-approve contract 0.3.9.
+- 22 Nov BA: docs/stories/SAH-80.md:347 now second-signer-invalid (DEC-095 item 3).
+
+## 22 Nov — QA: test-side fixes done (not run)
+Changed ITs: audit_event rename (9 sites), discard body, 12 doc types, CASHIER roles, OPD_/COMPLIANCE capabilities, 4 fixed reasons, SALES_COMPLIANCE group, foreign-id 404s (second clinic gets stores), type=SALES 200 + NOTATYPE 400, fieldErrors helper fix, 2 ledger rows, cancel note, approval helpers (fix ReturnApiIT NPE), vendor credit 80 %, report dates, second-signer-invalid, inbox approval id, store-permission-denied, opd-queue 409 not-connected. e2e: neverCounted happy + error cases (not run).
+Product defects for java: (1) HeldBillService.row() hard-codes discountState NONE; (2) refundDuePaise not cleared after refund recorded (BillCancelService); (3) store-return field messages lack the contract's trailing period ("Enter a whole number from 1 to 999999."); (4) vendor-return create accepts an opening-stock batch (OQ-79-11 says never offered). Plus the blind-count unit test (StockReadServiceBlindTest, two stores).
+Launched: QA (ITs :226 and :396 per java findings), architect (inbox SALES enum, 12 series rows, 403/404 no-store rule, 100 % fallback). Java waits for the backend lock (stale ~8 min; watcher b0m2dx1bn).
+- 22 Nov QA: PharmacyWpHAuditReportsApiIT corrected: /stores blind check pinned both ways (audited row + total masked, ward row numeric, owner numeric); linked-consumption approve-and-post asserts 200 + zero STOCK_AUDIT_ADJUSTMENT rows + replay 200. No separate 409 route found (race only). Not run.
+- 22 Nov architect: pharmacy.yaml 0.3.9 addendum (3)-(6): inbox SALES enum, twelve series rows, 403/404 no-store rule, 100 % short-supply fallback. Rulings DEC-095 items 7-10. QA: stale 'ten' counts in docs/test-plans/SAH-78.md (T78-10-01, T78-C-E19), SAH-79.md:14.
+
+## 22 Nov — Java: product defects (provisional, verify running)
+Fixed: held bill discountState from DiscountRequestService.heldState (withdrawn/unusable -> VOID); refundDuePaise reads 0 once refundCreditNoteNo is set (SaleBillAssembler; stored column kept, DB trigger forbids changing it); store-return messages end with "."; StockReadServiceBlindTest all-stores case. Targeted units: 55 tests, 0 failures.
+Not fixed: vendor-return opening-stock batch — product already refuses (eligible list requires vendor_id); IT notEligible() (PharmacyWpEDebitNoteApiIT:413-421) silently falls back to an eligible batch when "TESTB001" is not found -> QA. Full mvn verify still running, log in scratchpad verify.log.
+- 22 Nov QA notEligible fix BLOCKED by qa lock (held by finished QA ab75eca9a5faf1e3f). Diagnosis: notEligible() looks in the Central Store where no opening stock exists; fix = post an opening-stock import of TESTB001 (product B) into Central first and assert it is found. Plus test-plan 'ten'->'twelve' (SAH-79.md:14, 46?, 174?; SAH-78.md:671, 731). Relaunch when the lock is stale.
+
+## 22 Nov — full mvn verify after DEC-095 fixes
+IT: 3706 run, 0 failures, 457-548 errors (27 classes), 25 skipped. All errors are context loads: "class path resource [...TenantProbeController.class] cannot be opened because it does not exist" (target/classes changed during the run again, ~18:55-19:04) plus the expected SAHAJ_PIN_PEPPER start-up refusals. No assertion failures left (was 39). Next: rerun the 27 errored classes alone.
+- 22 Nov QA: notEligible() now imports opening stock TESTB001 (product B) into Central and asserts it is found; test plans SAH-78/79 say twelve series. Not run: rerun PharmacyWpEDebitNoteApiIT and PharmacyNumberingIT after the 27-class rerun.
+
+## 22 Nov — rerun of 27 classes unreliable
+Second mvn build of this repo started ~20:40 during the rerun (scratchpad rerun2.log; 8 java.exe running), recompiling into the same backend/target. Indicative: 548 run, 11 failures, 1 error; all context-load errors gone; 17 of 27 classes green (all StaffPin*, Medicine*, WpEReceipt, WpFDispatchReceipt).
+Test-side (QA): SalesRegistersApiIT:81,:180 expect "forbidden" (product: store-permission-denied per ADR-028); :110 cashier quote with override 200 (refused at save, pharmacist-required); SalesDiscountApiIT:104 "Owner" vs fixture "Dr Owner"; :128 reject reason other without note (no such rule); :197 discard needs VersionInput body; SalesCommandApiIT:196 chip "Sales" not DISCOUNT; :144 gst-sales-register needs from/to; WpGStoreUseApiIT:211 no TESTB001 at central.
+Unconfirmed: WpEDebitNoteApiIT:402 (should be fixed by QA's notEligible change); WpDAdjustmentsApprovalsApiIT:186 500 on GET stock-adjustments; :167 NPE Session.userId() in PinTestSupport.staff:143 — rerun cleanly first.
+- 22 Nov correction: the ~20:40 second build was (at least partly) the earlier java agent a8f3b991's background reruns (scratchpad rerun2/rerun3/validate logs), now finished. rerun3 (71 tests): 7 failures, all on the QA test-side list (DiscountApiIT :104 :128 :197; RegistersApiIT :81 :110 :180; WpGStoreUseApiIT :211 no TESTB001 at central). No java agent running now.
+- 22 Nov java check4 (clean, alone): PharmacyNumberingIT 11, PharmacyWpDAdjustmentsApprovalsApiIT 27, PharmacyWpEDebitNoteApiIT 14: 52 run, 0 failures, 0 errors. The 500 and the PinTestSupport NPE did not reproduce (spoiled-run artefacts). QA's notEligible fix green. Remaining: 7 test-side items for QA.
+- 22 Nov QA: last 7 test fixes (RegistersApiIT store-permission-denied + pharmacist-required at save; DiscountApiIT Dr Owner, no note-required rule (confirmed: none in contracts), discard body; CommandApiIT chip SALES + gst-sales-register dates; WpGStoreUseApiIT imports TESTB001 into Central). No product defects. Final run of 27 classes next.
+- 22 Nov final run stopped after 8 of 27 classes: other builds on sahaj_test (Maven JVMs started 21:21 and 22:02, surefire forks, a SahajApplication JVM with profile test from another session, a 'runner' JVM). 503 database-busy (10 s lock_timeout) in MedicineReviewFixIT 13, PharmacistCheckIT 2, MedicineConcurrencyIT 1 error. Green: MedicineAccessIT, MedicineDbErrorsIT, MedicineOrderFlowIT, MedicineOrderTableIT, PharmacyRound6ApiIT. Waiting for the human to stop the other sessions' builds.

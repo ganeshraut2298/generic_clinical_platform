@@ -36,7 +36,7 @@ abstract class Sah78CSupport extends Sah78BSupport {
         "day-close-difference"};
 
     static final String[] DOC_TYPES = {"PURCHASE_ORDER", "GRN", "INDENT", "TRANSFER", "BILL", "DEBIT_NOTE", "STOCK_AUDIT",
-        "STORE_RETURN", "DAMAGE_REPORT", "STOCK_ADJUSTMENT"};
+        "STORE_RETURN", "DAMAGE_REPORT", "STOCK_ADJUSTMENT", "CREDIT_NOTE", "IPD_ISSUE_SLIP"};
 
     // ---------------- vendors ----------------
 

@@ -84,6 +84,41 @@ class UnitServiceTest {
         assertThatThrownBy(() -> get(f.owner)).isInstanceOf(ModuleOffException.class);
     }
 
+    // ---- sale settings (0.3.0, SAH-80-1) ----
+
+    private static PharmacyInputs.UnitSettings withSale(long version, PharmacyInputs.Sent<Integer> window,
+                                                        PharmacyInputs.Sent<List<String>> modes,
+                                                        PharmacyInputs.Sent<String> xNo) {
+        return new PharmacyInputs.UnitSettings(version, PharmacyInputs.Sent.of(null), PharmacyInputs.Sent.of(null),
+                PharmacyInputs.Sent.of(null), IntegrationMode.INTEGRATED, window, modes, xNo, PharmacyInputs.Sent.absent());
+    }
+
+    @Test
+    void theSaleSettingsAreSavedReadBackAndLeftUnchangedWhenAbsent() {
+        UnitSettings saved = save(withSale(0, PharmacyInputs.Sent.of(7), PharmacyInputs.Sent.of(List.of("CASH", "UDHAR")),
+                PharmacyInputs.Sent.of(" X-77 ")));
+        assertThat(saved.returnWindowDays()).isEqualTo(7);
+        assertThat(saved.refundModes()).containsExactly("CASH", "UDHAR");
+        assertThat(saved.scheduleXLicenceNo()).isEqualTo("X-77");
+
+        UnitSettings again = save(input(saved.version(), null, null, null, IntegrationMode.INTEGRATED));
+        assertThat(again.returnWindowDays()).isEqualTo(7);
+        assertThat(again.refundModes()).containsExactly("CASH", "UDHAR");
+        assertThat(again.scheduleXLicenceNo()).isEqualTo("X-77");
+    }
+
+    @Test
+    void aBadReturnWindowOrRefundModeIsRefusedWithAllFieldErrors() {
+        assertThatThrownBy(() -> save(withSale(0, PharmacyInputs.Sent.of(366), PharmacyInputs.Sent.of(List.of("CASH", "CASH")),
+                PharmacyInputs.Sent.absent())))
+                .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
+                        .extracting(InvalidFieldsException.FieldMessage::field)
+                        .containsExactlyInAnyOrder("returnWindowDays", "refundModes"));
+        assertThatThrownBy(() -> save(withSale(0, PharmacyInputs.Sent.absent(), PharmacyInputs.Sent.of(List.of("BITCOIN")),
+                PharmacyInputs.Sent.absent()))).isInstanceOf(InvalidFieldsException.class);
+        assertThat(f.writes).isEmpty();
+    }
+
     // ---- saving ----
 
     @Test

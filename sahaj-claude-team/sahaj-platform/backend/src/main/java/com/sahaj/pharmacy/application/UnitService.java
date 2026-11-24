@@ -85,11 +85,20 @@ public class UnitService {
         track(before, after, "drugLicenceNo", unit.drugLicenceNo(), checked.licenceNo());
         track(before, after, "drugLicenceValidTill", unit.drugLicenceValidTill(), checked.licenceTill());
         track(before, after, "integrationMode", unit.integrationMode(), checked.mode());
+        Integer window = checked.windowSent() ? checked.window() : unit.returnWindowDays();
+        List<String> modes = checked.modesSent() ? checked.modes() : unit.refundModes();
+        String xNo = checked.xNoSent() ? checked.xNo() : unit.scheduleXLicenceNo();
+        LocalDate xTill = checked.xTillSent() ? checked.xTill() : unit.scheduleXLicenceValidTill();
+        track(before, after, "returnWindowDays", unit.returnWindowDays(), window);
+        track(before, after, "refundModes", unit.refundModes(), modes);
+        track(before, after, "scheduleXLicenceNo", unit.scheduleXLicenceNo(), xNo);
+        track(before, after, "scheduleXLicenceValidTill", unit.scheduleXLicenceValidTill(), xTill);
         if (before.isEmpty() && unit.saved()) {
             return view(tenantId, unit);
         }
+        UnitRepository.SaleSettings sale = new UnitRepository.SaleSettings(window, modes, xNo, xTill);
         if (!units.updateSettings(tenantId, unit.id(), unit.version(), checked.gstin(), checked.licenceNo(),
-                checked.licenceTill(), checked.mode(), userId)) {
+                checked.licenceTill(), checked.mode(), userId, sale)) {
             throw PharmacyProblemException.settingsChanged(view(tenantId, units.find(tenantId).orElse(unit)));
         }
         auditLog.record("PHARMACY_UNIT_SETTINGS_CHANGED", "PHARMACY_UNIT", unit.id(), before, after);
@@ -121,7 +130,9 @@ public class UnitService {
         return new UnitSettings(unitName(tenantId), unitCode(tenantId, unit), unit == null ? null : unit.gstin(),
                 unit == null ? null : unit.drugLicenceNo(), till, till != null && till.isBefore(time.today()),
                 mode(unit), true, true, ipdAvailable, unit != null && unit.saved(), unit == null ? 0L : unit.version(),
-                unit == null ? null : unit.updatedAt());
+                unit == null ? null : unit.updatedAt(), unit == null ? null : unit.returnWindowDays(),
+                unit == null ? List.of() : unit.refundModes(), unit == null ? null : unit.scheduleXLicenceNo(),
+                unit == null ? null : unit.scheduleXLicenceValidTill());
     }
 
     private String unitName(UUID tenantId) {
@@ -146,8 +157,12 @@ public class UnitService {
     }
 
     /** The validated values of a save. */
-    private record Checked(long version, String gstin, String licenceNo, LocalDate licenceTill, IntegrationMode mode) {
+    private record Checked(long version, String gstin, String licenceNo, LocalDate licenceTill, IntegrationMode mode,
+                           boolean windowSent, Integer window, boolean modesSent, List<String> modes, boolean xNoSent,
+                           String xNo, boolean xTillSent, LocalDate xTill) {
     }
+
+    private static final java.util.Set<String> REFUND_MODES = java.util.Set.of("ORIGINAL_MODE", "CASH", "CREDIT_NOTE", "UDHAR");
 
     /**
      * All field errors together (400 validation); nothing typed is echoed back. The contract requires all five fields:
@@ -175,11 +190,29 @@ public class UnitService {
         if (input.integrationMode() == null) {
             errors.add(new FieldMessage("integrationMode", "Choose an integration mode"));
         }
+        Integer window = Sent.valueOf(input.returnWindowDays());
+        if (window != null && (window < 1 || window > 365)) {
+            errors.add(new FieldMessage("returnWindowDays", "Enter 1 to 365 days"));
+        }
+        List<String> sentModes = Sent.valueOf(input.refundModes());
+        List<String> modes = sentModes == null ? List.of() : sentModes;
+        if (modes.size() > 4 || modes.stream().anyMatch(m -> m == null || !REFUND_MODES.contains(m))
+                || modes.stream().distinct().count() != modes.size()) {
+            errors.add(new FieldMessage("refundModes", "Choose each refund mode once"));
+        }
+        String rawX = Sent.valueOf(input.scheduleXLicenceNo());
+        String xNo = rawX == null ? "" : rawX.trim();
+        if (xNo.length() > LICENCE_MAX) {
+            errors.add(new FieldMessage("scheduleXLicenceNo", "Keep the licence number to 40 characters"));
+        }
         if (!errors.isEmpty()) {
             throw new InvalidFieldsException(errors);
         }
         return new Checked(input.version(), gstin.isEmpty() ? null : gstin, licence.isEmpty() ? null : licence,
-                Sent.valueOf(input.drugLicenceValidTill()), input.integrationMode());
+                Sent.valueOf(input.drugLicenceValidTill()), input.integrationMode(),
+                !Sent.missing(input.returnWindowDays()), window, !Sent.missing(input.refundModes()), List.copyOf(modes),
+                !Sent.missing(input.scheduleXLicenceNo()), xNo.isEmpty() ? null : xNo,
+                !Sent.missing(input.scheduleXLicenceValidTill()), Sent.valueOf(input.scheduleXLicenceValidTill()));
     }
 
     private static void requireSent(Sent<?> field, String name, List<FieldMessage> errors) {

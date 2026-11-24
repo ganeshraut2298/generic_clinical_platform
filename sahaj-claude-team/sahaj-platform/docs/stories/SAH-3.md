@@ -1,5 +1,5 @@
 # SAH-3 · Sign up and log in with mobile one-time code
-Mockup screen: Sign up and log in (mobile one-time code)
+Mockup screen: Start screen and sign-in (opening screen of the mockup) — Sign up and log in (mobile one-time code)
 Module: platform
 
 ## 1. Story

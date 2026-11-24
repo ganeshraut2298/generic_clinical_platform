@@ -189,7 +189,7 @@ class StoreReturnServiceTest {
         assertThatThrownBy(() -> create(input("41", "store-return.unknown", null), null))
                 .isInstanceOfSatisfying(InvalidFieldsException.class, e -> assertThat(e.errors())
                         .extracting(f -> f.field() + ":" + f.message()).containsExactly(
-                                "quantity:Enter a whole number from 1 to 40", "reasonKey:Choose a reason"));
+                                "quantity:Enter a whole number from 1 to 40.", "reasonKey:Choose a reason"));
         verify(posting, never()).post(any(), any());
         verify(storeReturns, never()).insert(any(), any());
     }

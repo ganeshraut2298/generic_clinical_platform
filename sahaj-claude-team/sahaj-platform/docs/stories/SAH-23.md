@@ -1,5 +1,5 @@
 # SAH-23 · Admission and deposits (IPD, part 2)
-Mockup screens: IPD → Beds and admissions (`vIpd`, Admitted tab, KPI strip, "Admit patient"), the Admit-a-patient sheet (`openAdmit`/`ipfRender`/`ipfgo`), the Collect deposit action of the patient sheet (`openIp`, `ipdep`), and Clinic setup → Admission and deposits (`cfgIpAdm`, key `ipadm`, Minimum deposit panel only)
+Mockup screen: IPD → Admitted — IPD → Beds and admissions (`vIpd`, Admitted tab, KPI strip, "Admit patient"), the Admit-a-patient sheet (`openAdmit`/`ipfRender`/`ipfgo`), the Collect deposit action of the patient sheet (`openIp`, `ipdep`), and Clinic setup → Admission and deposits (`cfgIpAdm`, key `ipadm`, Minimum deposit panel only)
 Module: ipd (reads patients and the team through `patient.api` and `platform.api`)
 
 ## 1. Story

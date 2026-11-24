@@ -1,8 +1,35 @@
 openapi: 3.1.0
 info:
   title: Sahaj platform API
-  version: 0.2.0
-  description: 0.2.0 (17 Nov 2026, SAH-78, DEC-062 Q3, ADR-028 revision 2; additive, no existing value, path or behaviour changes) adds the team role STORE_STAFF (label "Store staff") to components/schemas/Role, so it can be chosen in POST /team and PATCH /team/{id} and is returned in TeamMember.role and Me.role. A Store staff member has no OPD, IPD, billing or HRA access: every existing role gate of every module is an allow-list that does not name STORE_STAFF, so each answers 403 forbidden as for any role it does not name. Its menu (Me.menu) is empty except the new key pharmacy. GET /role-permissions never lists STORE_STAFF and PUT /role-permissions answers 400 validation for a STORE_STAFF row (the seven permissions do not apply to it). The member counts against the plan user limit like every member. Adds the menu key pharmacy (label "Pharmacy & Inventory", route /app/pharmacy) when the clinic's pharmacy_on entitlement is true (default false, switched by the Sahaj admin; admin.yaml 0.6.0) and the member is OWNER or PHARMACIST or has an active mapping to an active pharmacy store (platform.api.PharmacyAccessPort implemented by the pharmacy module). With pharmacy_on false every menu and answer is exactly as in 0.1.2. 0.1.2 (15 Nov 2026, DEC-054, SAH-39; additive) adds the reusable response components/responses/DatabaseBusy, a 503 with problem type database-busy (title "Sahaj is busy", header Retry-After 5, body field retryAfterSeconds 5) answered when a database lock wait, a statement timeout or no free connection stopped the request; the request was rolled back and nothing was saved by that attempt, so the client may try again after the wait. It is listed on every write and on the audit log read; where an operation already has its own 503 (pin-unavailable on PUT /me/pin and POST /me/pin/code) the two are merged into that 503's description. No path, schema or other problem type changes. 0.1.1 (12 Nov 2026, ADR-023 D13.5, SAH-66) adds the menu key secondchecks to GET /me (additive; nothing else changes). Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
+  version: 0.3.0
+  description: >-
+    0.3.0 (22 Nov 2026, SAH-89, DEC-096, ADR-031; PROPOSED until "SAH-89 · contract · APPROVED"). Changed (narrower or
+    breaking, each named): (a) general rule 3, the setup guard (ADR-031 D1): until the signed-in user's clinic has
+    finished setup, every /api/v1/** operation of every module answers 403 problem type setup-required (title "Finish
+    setting up your clinic", detail "Finish setting up your clinic first.", extension currentStep 1 to 5; components/responses/SetupRequired),
+    except the allow-list /health, /public/**, /auth/**, /setup/**, GET /me, PATCH /me/preferences, GET /specialties and
+    GET, PUT, DELETE /clinic/logo; nothing is read or written. A non-owner membership of a clinic whose setup is not
+    complete is left out of sign-in (next NOT_REGISTERED when it is the only one). (b) Me.menu never contains
+    secondchecks (ADR-031 D10); Me.capabilities.secondChecks says who reaches the waiting list from Queue (opd 0.8.0 GET
+    /emr/chemo-checks/count). (c) Wizard and Clinic profile validation is stricter (ADR-031 D11, SAH-89-2): SetupClinic
+    requires address, state, pin and phone with the limits on the schema; ClinicProfile requires the same four address
+    parts on PUT; SetupTeam limits names, fees 0 to 50,000 and staff roles; DoctorDetails.feeRupees maximum 50,000;
+    TeamMemberCreate requires doctor.feeRupees for DOCTOR and VISITING_DOCTOR. (d) POST /setup/complete runs six committed
+    steps (ADR-031 D2): it may now answer 409 setup-step-failed (failedStep) and 409 setup-running, and its 400 validation
+    carries the extension step. (e) The plan doctor limit (2) is checked on the server (ADR-031 D8): 409 plan-limit "Your
+    plan allows 2 doctors." on POST /team, PATCH /team/{id}, POST /team/{id}/reactivate and PUT /me/doctor. Added:
+    POST /auth/signup-continue and AuthResult.signupToken (ADR-031 D3, "Create a clinic with this number"); GET
+    /setup/completion and SetupCompletion; SetupState.stepsDone; SetupLook.brandHex (custom colour, ADR-031 D6);
+    ClinicProfile.state, addressNeedsReview and logo; GET, PUT, DELETE /clinic/logo (multipart, PNG or JPEG bytes up to 2
+    MB, re-encoded to PNG; SVG not accepted; ADR-031 D5); PUT /me/doctor and POST /me/doctor/notice-seen (owner as
+    doctor, ADR-031 D7); TeamMember.alsoDoctor and the owner's doctor object on GET /team; Me.capabilities and
+    Me.clinic.logo; problem types setup-required, setup-step-failed, setup-running, signup-token-invalid,
+    logo-type-not-allowed, logo-dimensions, logo-unreadable. New audit actions: PLATFORM_CLINIC_LOGO_SET,
+    PLATFORM_CLINIC_LOGO_REMOVED, PLATFORM_DOCTOR_FEE_CHANGED, PLATFORM_OWNER_DOCTOR_ON, PLATFORM_OWNER_DOCTOR_OFF (ids,
+    amounts in paise, sizes and hashes only; never a name, mobile or image byte). No Google service is called (ADR-031
+    D4). Request-size exception: PUT /clinic/logo up to 2 MB + 64 KB.
+
+    0.2.0 (17 Nov 2026, SAH-78, DEC-062 Q3, ADR-028 revision 2; additive, no existing value, path or behaviour changes) adds the team role STORE_STAFF (label "Store staff") to components/schemas/Role, so it can be chosen in POST /team and PATCH /team/{id} and is returned in TeamMember.role and Me.role. A Store staff member has no OPD, IPD, billing or HRA access: every existing role gate of every module is an allow-list that does not name STORE_STAFF, so each answers 403 forbidden as for any role it does not name. Its menu (Me.menu) is empty except the new key pharmacy. GET /role-permissions never lists STORE_STAFF and PUT /role-permissions answers 400 validation for a STORE_STAFF row (the seven permissions do not apply to it). The member counts against the plan user limit like every member. Adds the menu key pharmacy (label "Pharmacy & Inventory", route /app/pharmacy) when the clinic's pharmacy_on entitlement is true (default false, switched by the Sahaj admin; admin.yaml 0.6.0) and the member is OWNER or PHARMACIST or has an active mapping to an active pharmacy store (platform.api.PharmacyAccessPort implemented by the pharmacy module). With pharmacy_on false every menu and answer is exactly as in 0.1.2. 0.1.2 (15 Nov 2026, DEC-054, SAH-39; additive) adds the reusable response components/responses/DatabaseBusy, a 503 with problem type database-busy (title "Sahaj is busy", header Retry-After 5, body field retryAfterSeconds 5) answered when a database lock wait, a statement timeout or no free connection stopped the request; the request was rolled back and nothing was saved by that attempt, so the client may try again after the wait. It is listed on every write and on the audit log read; where an operation already has its own 503 (pin-unavailable on PUT /me/pin and POST /me/pin/code) the two are merged into that 503's description. No path, schema or other problem type changes. 0.1.1 (12 Nov 2026, ADR-023 D13.5, SAH-66) adds the menu key secondchecks to GET /me (additive; nothing else changes). Phase 1 contract, SAH-1 to SAH-7, and the personal staff PIN of SAH-31 (ADR-010; /me/pin, /me/pin/code, /team/{id}/pin/reset; checked for other modules through the internal port platform.api.StaffPinPort, not over HTTP), and the colleague PIN hardening of SAH-38 (ADR-014; /me/pin/colleague-tries, /me/pin/colleague-tries/seen, /team/{id}/pin/colleague-tries, TeamMemberPin.colleagueTries7d, problem types colleague-pin-limit and pin-check-failed). The tenant always comes from the logged-in user, never from a request. Errors are RFC 9457 application/problem+json. Two general rules apply to every operation (release audit DEC-025, code review #2). (1) An {id} path value that is not a UUID answers 400 problem type bad-request (components/responses/BadRequest: title "Bad Request", detail "The request could not be understood. Check it and try again.", no fieldErrors, nothing submitted is echoed); it is listed on every operation with an {id} path parameter, merged into the description where the operation also has its own 400 validation answer. (2) A request body over the size limit answers 413 problem type payload-too-large (components/responses/PayloadTooLarge: title "Request too large"); the limit is 64 KB for a signed-in user (detail "The request body must be 64 KB or smaller."; property sahaj.request-body.max-bytes, never below 4 KB, and the detail names the configured limit) and 4 KB on /public/** and for any other request without a signed-in user, such as the /auth/** calls before sign-in (detail "The request body must be 4 KB or smaller."). It is listed on every operation with a request body and applies equally to a body sent to an operation that declares none.
 servers:
   - url: /api/v1/platform
 security:
@@ -15,6 +42,7 @@ tags:
   - { name: SAH-5 }
   - { name: SAH-6 }
   - { name: SAH-7 }
+  - { name: SAH-89 }
 paths:
   /health:
     get:
@@ -70,6 +98,13 @@ paths:
                   type: object
                   required: [termsVersion, privacyVersion]
                   properties: { termsVersion: { type: string }, privacyVersion: { type: string } }
+      description: >-
+        0.3.0 (SAH-89-1, ADR-031 D1, D3). Mode LOGIN with a number that has no membership: next NOT_REGISTERED (text
+        "This number is not registered. Ask your clinic owner to add you, or sign up to create a new clinic.", SAH-3) and
+        now also signupToken and signupTokenExpiresInSeconds (600) for the button "Create a clinic with this number"
+        (POST /auth/signup-continue; no second code). A non-owner membership of a clinic whose setup is not complete is
+        left out (next NOT_REGISTERED when it is the only one). An owner whose clinic is mid-setup gets next SETUP, as
+        before. The mobile and the code are never logged.
       responses:
         '200': { description: Verified. Sets the refresh cookie when a session starts., content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
         '400': { $ref: '#/components/responses/Problem' }
@@ -77,6 +112,39 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
         '423': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /auth/signup-continue:
+    post:
+      tags: [SAH-89]
+      security: []
+      summary: Create a clinic with the number just verified in Log in mode
+      description: >-
+        SAH-89-1, OQ-89-1 A, ADR-031 D3. The button "Create a clinic with this number" on the not-registered message.
+        Body: the signupToken of the LOGIN verify answer and the Terms and Privacy consent (same shape and rules as
+        SIGNUP verify). The token is single-use, bound to the verified mobile, valid 10 minutes, stored only as a
+        SHA-256 hash. On success: the user, the clinic (tenant), the owner membership, setup progress at step 1 and
+        the Free plan for 12 months are created exactly as for SIGNUP verify; consent is recorded with time and
+        versions; the refresh cookie is set; 200 next SETUP with accessToken. If the number got a membership after the
+        verify, the answer is as SIGNUP verify for a known number (next APP or CHOOSE_CLINIC, client toast "This number
+        already has a clinic. Logging you in.") and no clinic is created. A repeat with the same token after a lost
+        answer: 401 signup-token-invalid (the client signs in again; the clinic created by the first call is found and
+        next is SETUP). Check order: body 400 validation (signupToken "Verify your number again.", consent "Accept the
+        Terms and Privacy Policy to continue."); rate limit 10 per IP per 10 minutes 429 rate-limit; token wrong,
+        expired or used 401 signup-token-invalid (title "Verify your number again", detail "This link has expired.
+        Verify your number again."). The token and the mobile are never logged or echoed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignupContinueInput' }
+            examples:
+              continue: { value: { signupToken: 'q3nV0b5yJx8Q2mR4tZk7Wc1sL9aP6eHdU0fGiTnYb2M', consent: { termsVersion: '2026-10', privacyVersion: '2026-10' } } }
+      responses:
+        '200': { description: Clinic created (next SETUP) or existing clinic signed in, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (signupToken, consent)' }
+        '401': { $ref: '#/components/responses/Problem', description: 'signup-token-invalid' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, limit 4 KB (no signed-in user)' }
+        '429': { $ref: '#/components/responses/Problem', description: 'rate-limit' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /auth/select-clinic:
     post:
@@ -116,13 +184,23 @@ paths:
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /setup:
     get:
-      tags: [SAH-4]
+      tags: [SAH-4, SAH-89]
+      description: OWNER only (403 forbidden otherwise, SAH-4 AC14). 0.3.0 adds stepsDone (the rail ticks) and completionStarted.
       responses:
         '200': { description: Saved progress, content: { application/json: { schema: { $ref: '#/components/schemas/SetupState' } } } }
         '403': { $ref: '#/components/responses/Problem' }
   /setup/steps/{step}:
     put:
-      tags: [SAH-4]
+      tags: [SAH-4, SAH-89]
+      description: >-
+        OWNER only. 0.3.0 (SAH-89-2, ADR-031 D11): the body of step n is validated against the step's schema and the
+        rules on it; every failing field is returned together in fieldErrors (field paths such as name, pin,
+        doctors[1].feeRupees, staff[0].mobile) with the inline text from the schema descriptions, and nothing is
+        saved. Text values are trimmed before checking and saved trimmed. Step 3 also answers 400 field
+        staff[i].mobile or doctors[1].mobile "This number is already added" for a mobile used twice in the step or
+        equal to the owner's own mobile, and 409 plan-limit "The free plan allows up to 5 users in total." or "Your
+        plan allows 2 doctors.". A step saved before 0.3.0 that no longer passes is not touched here; POST
+        /setup/complete reports it. Mobiles, names and addresses never appear in a log or a problem detail.
       parameters:
         - { name: step, in: path, required: true, schema: { type: integer, minimum: 1, maximum: 5 } }
       requestBody:
@@ -153,12 +231,71 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
   /setup/complete:
     post:
-      tags: [SAH-4]
+      tags: [SAH-4, SAH-89]
+      description: >-
+        OWNER only. 0.3.0 (SAH-89-3, ADR-031 D2): runs the six completion steps in order (SetupCompletionStepKey), each
+        in its own transaction and each safe to repeat; a DONE step is skipped. The clinic opens (setup guard lifted,
+        completed_at set, audit SETUP_COMPLETED) only when the last step commits. Synchronous: the answer comes when
+        every step is DONE or one failed; meanwhile the client reads GET /setup/completion to tick lines. Check order:
+        403 forbidden (not OWNER); 409 setup-running (another run of this clinic started less than 2 minutes ago;
+        retryable, keep reading GET /setup/completion); step 1 re-validates the five saved steps: 400 validation with
+        the extension step (1 to 5, the first failing step) and fieldErrors, or 400 setup-incomplete "Finish every
+        step before creating your clinic." when a step was never saved; 409 slug-taken "That web address was just
+        taken. Choose another." (step 5 of the wizard); 409 plan-limit; any other failure of a step marks it FAILED
+        and answers 409 setup-step-failed (title "We could not finish this step", detail "We could not finish this
+        step. Try again.", extensions failedStep and completion), earlier DONE steps stay DONE, the clinic stays closed;
+        503 database-busy (the running step is rolled back and stays PENDING). Calling again after a failure continues
+        from the failed step. Already complete: 200 with the same answer, nothing written.
       responses:
-        '200': { description: Clinic created, content: { application/json: { schema: { type: object, required: [next, brand], properties: { next: { const: APP }, brand: { $ref: '#/components/schemas/Brand' } } } } } }
-        '400': { $ref: '#/components/responses/Problem' }
-        '409': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: Clinic created and open
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupCompleteResult' }
+              examples:
+                done:
+                  value:
+                    next: APP
+                    brand: custom
+                    brandHex: '#1F5BC8'
+                    webAddress: 'shreesai.sahaj.in'
+                    completion: { state: DONE, failedStep: null, steps: [ { key: CLINIC_SPACE, status: DONE }, { key: TEMPLATE, status: DONE }, { key: OPD_RULES, status: DONE }, { key: PAPERS, status: DONE }, { key: STAFF_LOGINS, status: DONE }, { key: WEB_ADDRESS, status: DONE } ], specialtyName: General practice, webAddress: 'shreesai.sahaj.in' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (with extension step and fieldErrors) or setup-incomplete' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '409':
+          description: 'slug-taken, plan-limit, setup-running or setup-step-failed'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                stepFailed: { value: { type: 'https://sahaj.in/problems/setup-step-failed', title: We could not finish this step, status: 409, detail: We could not finish this step. Try again., failedStep: STAFF_LOGINS } }
+                running: { value: { type: 'https://sahaj.in/problems/setup-running', title: Setup is already running, status: 409, detail: Your clinic is being set up. Wait a moment., retryAfterSeconds: 2 } }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /setup/completion:
+    get:
+      tags: [SAH-89]
+      summary: Progress of "Create my clinic" for the setup progress screen
+      description: >-
+        SAH-89-3, ADR-031 D2. OWNER only (403 forbidden otherwise). Allowed while setup is open and after it. Writes
+        nothing. state NOT_STARTED before the first POST /setup/complete; RUNNING while a run is active; FAILED when
+        the last run stopped at failedStep; DONE when the clinic is open. The client shows the six lines in the order
+        of steps, with the texts of SetupCompletionStepKey (Loading the <specialtyName> template; Securing
+        https://<webAddress>), a progress bar (steps DONE of 6), the final address line with the lock icon, and for a
+        screen reader "Step n of 6 done". A line is ticked only when its status is DONE; the whole screen stays at
+        least 4 seconds. When state is DONE the app opens with the toast "Your clinic is live at <webAddress>" and the
+        Getting started panel. On FAILED the failed line shows "We could not finish this step. Try again." and the
+        button "Try again" (POST /setup/complete again). After a reload or a new sign-in with next SETUP, the client
+        reads this first: any state other than NOT_STARTED shows this screen, not the wizard.
+      responses:
+        '200':
+          description: Progress
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupCompletion' }
+              examples:
+                running: { value: { state: RUNNING, failedStep: null, specialtyName: Dental, webAddress: 'smiledental.sahaj.in', steps: [ { key: CLINIC_SPACE, status: DONE }, { key: TEMPLATE, status: DONE }, { key: OPD_RULES, status: RUNNING }, { key: PAPERS, status: PENDING }, { key: STAFF_LOGINS, status: PENDING }, { key: WEB_ADDRESS, status: PENDING } ] } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
   /setup/overview:
     get:
       tags: [SAH-7]
@@ -173,10 +310,61 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
   /me:
     get:
-      tags: [SAH-5]
+      tags: [SAH-5, SAH-89]
+      description: Allowed while setup is open (setup guard allow-list). 0.3.0 adds Me.capabilities and Me.clinic.logo, and Me.menu no longer has secondchecks.
       responses:
         '200': { description: Current user, content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } } }
         '401': { $ref: '#/components/responses/Problem' }
+  /me/doctor:
+    put:
+      tags: [SAH-89]
+      summary: The owner switches "Also a doctor" on or off and saves their own doctor details
+      x-required-role: OWNER (own membership only)
+      description: >-
+        SAH-89-6, OQ-89-10 A, ADR-031 D7. Team and access, the owner's own row: the switch "I also see patients as a
+        doctor" with Specialty, Qualification, Registration number and Consultation fee (₹). Only an ACTIVE OWNER, for
+        their own membership (read again from the database; the token role is not trusted); every other role 403
+        forbidden "Only the clinic owner can do this.". alsoDoctor true: specialty required (1 to 120 characters,
+        "Choose a specialty"), feeRupees required, whole rupees 0 to 50,000 ("Enter the consultation fee" when
+        missing, "Enter the fee in rupees, from 0 to 50,000" otherwise), degree optional up to 120, registrationNo
+        optional up to 80 (the owner cannot start a consultation without it: opd 403 registration-number-missing).
+        Turning on when the clinic already has 2 members who act as doctor: 409 plan-limit "Your plan allows 2
+        doctors.". The doctor profile row is created or updated with sees_patients true; audit PLATFORM_OWNER_DOCTOR_ON
+        (membership id) and, when the fee changed, PLATFORM_DOCTOR_FEE_CHANGED (membership id, beforePaise,
+        afterPaise). alsoDoctor false: the other fields are ignored; the row stays (history) with sees_patients false;
+        the owner leaves every doctor list at once; visits and appointments already assigned stay assigned; past
+        records keep the owner's name; audit PLATFORM_OWNER_DOCTOR_OFF. Saving the same values: 200, nothing written.
+        200 with the owner's TeamMember row. Client toast "You now see patients as a doctor." or "You no longer see
+        patients as a doctor."; the menu is read again (GET /me).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerDoctorInput' }
+            examples:
+              on: { value: { alsoDoctor: true, doctor: { specialty: General physician, degree: MBBS, registrationNo: MMC 2011/04/1234, feeRupees: 400 } } }
+              off: { value: { alsoDoctor: false } }
+      responses:
+        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/TeamMember' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (alsoDoctor, doctor.specialty, doctor.feeRupees, doctor.degree, doctor.registrationNo)' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '409': { $ref: '#/components/responses/Problem', description: 'plan-limit or concurrent-change (retryable)' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /me/doctor/notice-seen:
+    post:
+      tags: [SAH-89]
+      summary: Dismiss the one-time notice "You can now see patients as a doctor"
+      x-required-role: OWNER (own membership only)
+      description: >-
+        SAH-89-6, OQ-89-10 f. Sets the notice as seen for the caller's own OWNER membership. No body. Nothing to set (no
+        doctor profile, or already seen): 204, nothing written. Not audited. Any other role 403 forbidden.
+      responses:
+        '204': { description: Seen }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
   /me/preferences:
     patch:
       tags: [SAH-5]
@@ -373,13 +561,29 @@ paths:
         more) on every row, the owner's own row included. Any other role: the only pin object they receive is
         their own row's, and there colleagueTries7d is null (their own figure reaches them only through
         GET /me/pin/colleague-tries).
+        0.3.0 (SAH-89-5, SAH-89-6, ADR-031 D7): an OWNER row that has a doctor profile now carries doctor (the saved
+        details, also when switched off) and alsoDoctor; the screens list it among Doctors only when alsoDoctor is
+        true. The fee shows as "₹ 1,200" with Indian grouping, and 0 as "Free". Who can read fees is unchanged
+        (every clinic role, as the front desk and billing bill them).
       responses:
         '200': { description: Team, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TeamMember' } } } } }
     post:
-      tags: [SAH-6]
+      tags: [SAH-6, SAH-89]
+      description: >-
+        OWNER only. 0.3.0 (SAH-89-5, ADR-031 D8): Add person with role DOCTOR or VISITING_DOCTOR shows "Consultation
+        fee (₹)" next to Registration number and requires doctor.feeRupees, whole rupees 0 to 50,000 (400 validation
+        field doctor.feeRupees "Enter the consultation fee" when missing, "Enter the fee in rupees, from 0 to 50,000"
+        for letters, decimals, a negative number or over 50,000). For other roles a doctor object is ignored. The fee
+        is saved in the doctor profile (the one fee shown as "New visit fee" in Fees and billing). A third member who
+        acts as doctor: 409 plan-limit "Your plan allows 2 doctors."; the 5-user limit is unchanged. Audit
+        TEAM_MEMBER_ADDED as before (the fee in the doctor values).
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/TeamMemberCreate' } } }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamMemberCreate' }
+            examples:
+              doctor: { value: { name: Dr. Kavita Joshi, mobile: '9822000002', role: DOCTOR, doctor: { specialty: Paediatrics, registrationNo: MMC 2015/07/5521, feeRupees: 500 } } }
       responses:
         '201': { description: Added, content: { application/json: { schema: { $ref: '#/components/schemas/TeamMember' } } } }
         '400': { $ref: '#/components/responses/Problem' }
@@ -391,7 +595,17 @@ paths:
     parameters:
       - { $ref: '#/components/parameters/Id' }
     patch:
-      tags: [SAH-6]
+      tags: [SAH-6, SAH-89]
+      description: >-
+        OWNER only. 0.3.0 (SAH-89-5, ADR-031 D7, D8): doctor.feeRupees whole rupees 0 to 50,000 (messages as POST
+        /team). This is also the save of "New visit fee" in Fees and billing: one value, so Team and access and Fees and
+        billing always show the same amount. A fee change writes PLATFORM_DOCTOR_FEE_CHANGED (membership id,
+        beforePaise, afterPaise) besides TEAM_MEMBER_UPDATED; tokens issued from now use the new fee, bills already made
+        keep theirs. doctor on an OWNER row: allowed only on the caller's own row and only when that row has a doctor
+        profile (otherwise 403 forbidden "Only the clinic owner can do this." for another owner's row, 400 validation
+        field doctor "Switch on Also a doctor first." when there is no profile); the switch itself is PUT /me/doctor.
+        Changing a role to DOCTOR or VISITING_DOCTOR when 2 members already act as doctor: 409 plan-limit "Your plan
+        allows 2 doctors.".
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/TeamMemberUpdate' } } }
@@ -429,7 +643,8 @@ paths:
     parameters:
       - { $ref: '#/components/parameters/Id' }
     post:
-      tags: [SAH-6]
+      tags: [SAH-6, SAH-89]
+      description: OWNER only. 0.3.0 (ADR-031 D8) reactivating a DOCTOR or VISITING_DOCTOR also checks the doctor limit (409 plan-limit "Your plan allows 2 doctors.").
       responses:
         '200': { description: Switched on, content: { application/json: { schema: { $ref: '#/components/schemas/TeamMember' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -548,11 +763,21 @@ paths:
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /clinic/profile:
     get:
-      tags: [SAH-7]
+      tags: [SAH-7, SAH-89]
+      description: >-
+        Any clinic role reads. 0.3.0 (SAH-89-9, ADR-031 D4): the structured address (address line, city, state, PIN),
+        addressNeedsReview (true for a clinic saved before 0.3.0 without a state: the screen asks the owner to check
+        the four parts; the old text stays in the address line) and logo (present or not, for the Logo and colour panel).
       responses:
         '200': { description: Profile, content: { application/json: { schema: { $ref: '#/components/schemas/ClinicProfile' } } } }
     put:
-      tags: [SAH-7]
+      tags: [SAH-7, SAH-89]
+      description: >-
+        OWNER only (403 otherwise). 0.3.0 (SAH-89-2, SAH-89-9, ADR-031 D4, D11): name, address, city, state, pin and
+        phone are required with the limits and texts of ClinicProfile; mapsUrl, when sent, must be a Google Maps share
+        link (else 400 field mapsUrl "Paste a link from Google Maps"); the server never opens it. readOnly fields sent
+        (slug, addressNeedsReview, logo) are ignored. Every change is audited as before (CLINIC_PROFILE_UPDATED, field
+        names and values of the clinic, which is business data, not patient data).
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/ClinicProfile' } } }
@@ -561,6 +786,109 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /clinic/logo:
+    get:
+      tags: [SAH-89]
+      summary: The clinic logo image (signed-in users of this clinic only)
+      x-required-role: any clinic role with an ACTIVE membership
+      description: >-
+        SAH-89-8, OQ-89-5 A, ADR-031 D5. The stored logo, always a PNG re-encoded by the server. Bearer token required
+        (no public or cookie-only URL): the client reads it with HttpClient as a blob and shows it through an object URL
+        in the wizard preview, the sidebar clinic card and Clinic profile. Allowed while setup is open (owner). Headers:
+        Content-Type image/png, X-Content-Type-Options nosniff, Content-Disposition inline; filename="clinic-logo.png",
+        Content-Security-Policy default-src 'none'; sandbox, Cache-Control private, no-cache, ETag (the stored SHA-256 in
+        quotes). If-None-Match with the current ETag answers 304 with no body. No logo: 404 not-found "No logo yet." (the
+        client shows the clinic's initials; it calls this only when Me.clinic.logo.present is true). Another clinic's
+        logo can never be read (RLS; the tenant comes from the token). Writes nothing; no audit for a read.
+      parameters:
+        - { name: If-None-Match, in: header, required: false, schema: { type: string, maxLength: 80 } }
+      responses:
+        '200':
+          description: The logo
+          headers:
+            ETag: { schema: { type: string }, description: '"<sha256 hex>"' }
+            Cache-Control: { schema: { type: string, const: 'private, no-cache' } }
+            X-Content-Type-Options: { schema: { type: string, const: nosniff } }
+            Content-Security-Policy: { schema: { type: string, const: "default-src 'none'; sandbox" } }
+          content:
+            image/png:
+              schema: { type: string, contentMediaType: image/png, contentEncoding: binary }
+        '304': { description: Not changed since the ETag sent }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (no active membership)' }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found ("No logo yet.")' }
+    put:
+      tags: [SAH-89]
+      summary: Upload or replace the clinic logo
+      x-required-role: OWNER
+      description: >-
+        SAH-89-8, ADR-031 D5. Wizard step 5 ("Choose your colour and web address", optional, can be skipped) and Clinic
+        profile ("Logo and colour", Replace). OWNER only, re-read from the database (403 forbidden "Only the clinic
+        owner can do this."); allowed while setup is open. Client before upload: the chosen file must be PNG, JPG or
+        WEBP ("Use a PNG, JPG or WEBP file for the logo.") and at most 2 MB ("This file is <size>. Keep the logo under 2
+        MB.", size as "2.4 MB" or "830 KB"); the client draws it on a canvas, scales the longest side down to 1024 px
+        (never up) and uploads a PNG; if that PNG is over 2 MB it scales to 512 px. An image the browser cannot draw:
+        "This image could not be read. Save it again as PNG and retry." (mockup texts; SVG is not offered in phase 1).
+        Server check order, each step stops the request and stores nothing: 403; whole request over 2 MB + 64 KB 413
+        payload-too-large "Keep the logo under 2 MB."; no part named file 400 validation field file "Choose a logo
+        file."; file part over 2,097,152 bytes 413 payload-too-large "Keep the logo under 2 MB."; 20 uploads per clinic
+        in the last hour, or no free image slot within 5 seconds (2 at once per instance), 429 rate-limit with
+        retryAfterSeconds; the bytes are not a PNG (89 50 4E 47 0D 0A 1A 0A) or JPEG (FF D8 FF) signature, whatever
+        the file name or declared type says (SVG, GIF, WEBP bytes, HTML included) 400 logo-type-not-allowed "Use a PNG,
+        JPG or WEBP file for the logo."; width or height read from the header outside 16 to 4,096 px 400
+        logo-dimensions "Use an image between 16 and 4,096 pixels on each side." (checked before decoding); the image
+        cannot be decoded 400 logo-unreadable "This image could not be read. Save it again as PNG and retry.". Then the
+        image is re-encoded as PNG (longest side at most 1024 px, transparency kept, every metadata chunk and any
+        trailing bytes dropped) and stored in one row per clinic (insert or replace). Audit PLATFORM_CLINIC_LOGO_SET
+        (stored bytes, width, height, SHA-256, source PNG or JPEG, replaced true or false). The same image again (same
+        SHA-256 after re-encoding): 200, nothing written. 200 with ClinicLogoInfo. Client: preview updates, toast
+        "Logo added" (or the mockup's check summary), progress shown during upload, Cancel aborts the request; on a
+        failure "Could not upload the logo. Try again." and the colour choice is kept.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, contentMediaType: application/octet-stream, contentEncoding: binary, description: 'PNG or JPEG bytes, at most 2,097,152 bytes. Type decided by the bytes, not by the part''s Content-Type or file name.' }
+            encoding:
+              file: { contentType: 'image/png, image/jpeg' }
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClinicLogoInfo' }
+              examples:
+                stored: { value: { present: true, etag: '9f2c4e0b7a1d3c5e8f6a2b4d0c1e3f5a7b9d2c4e6f8a0b1c3d5e7f9a2b4c6d8e', width: 640, height: 320, bytes: 48213, updatedAt: '2026-11-22T06:05:00Z' } }
+        '400':
+          description: 'validation (field file), logo-type-not-allowed, logo-dimensions or logo-unreadable'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                type: { value: { type: 'https://sahaj.in/problems/logo-type-not-allowed', title: This file type is not allowed, status: 400, detail: 'Use a PNG, JPG or WEBP file for the logo.' } }
+                unreadable: { value: { type: 'https://sahaj.in/problems/logo-unreadable', title: This image could not be read, status: 400, detail: This image could not be read. Save it again as PNG and retry. } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '413': { $ref: '#/components/responses/PayloadTooLarge', description: 'payload-too-large, detail "Keep the logo under 2 MB." (path exception: up to 2 MB + 64 KB)' }
+        '429': { $ref: '#/components/responses/Problem', description: rate-limit }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+    delete:
+      tags: [SAH-89]
+      summary: Remove the clinic logo
+      x-required-role: OWNER
+      description: >-
+        SAH-89-8. OWNER only (403 forbidden). Allowed while setup is open. Deletes the clinic's logo row; the app shows
+        the clinic's initials again. No logo: 204, nothing written. Audit PLATFORM_CLINIC_LOGO_REMOVED (the removed
+        SHA-256 and size). Client: confirm, then toast "Logo removed".
+      responses:
+        '204': { description: Removed (or there was none) }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /clinic/holidays:
     get:
@@ -704,6 +1032,17 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
             busy: { $ref: '#/components/examples/DatabaseBusy' }
+    SetupRequired:
+      description: >-
+        setup-required (0.3.0, SAH-89-1, ADR-031 D1; general rule 3): the signed-in user's clinic has not finished
+        setup. Answered by every /api/v1/** operation of every module (platform, patient, opd, ipd, hra, billing,
+        pharmacy) outside the allow-list, before any controller runs; nothing is read or written and no clinic data is
+        returned. The client opens /setup at currentStep. Not listed on each operation.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            setup: { value: { type: 'https://sahaj.in/problems/setup-required', title: Finish setting up your clinic, status: 403, detail: Finish setting up your clinic first., currentStep: 3 } }
   headers:
     RetryAfter:
       description: Seconds to wait before trying again; the same value as retryAfterSeconds in the body (5).
@@ -724,11 +1063,14 @@ components:
       type: object
       required: [type, title, status]
       properties:
-        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), validation, forbidden, not-found, rate-limit, otp-locked, and for the staff PIN (SAH-31, ADR-010 D11) wrong-pin (403), pin-locked (403; the 5th wrong try that causes the first or second lock within 24 hours, or any try while locked), pin-not-set (409; no PIN, by notSetReason, and also the 5th wrong try that causes the third lock within 24 hours, which switches the PIN off: "Your PIN was switched off after too many wrong tries. Set a new one, then try again."), pin-unavailable (503), under https://sahaj.in/problems/. The PIN types are also answered by other modules that check a PIN through platform.api.StaffPinPort (ipd verify). SAH-32 (ADR-011 D7, PROPOSED): the second-nurse check of a high-alert dose (ipd POST /medicine-orders/{id}/doses) checks a colleague''s PIN through StaffPinPort.checkColleague and answers the same types with colleague texts and no names: wrong-pin "That PIN is not right." (no tries-left count, so a guesser is not told when to stop before a lock; the wrong try still counts on the colleague''s PIN; security review S4; the own-PIN answer keeps the count), pin-locked "The second nurse''s PIN is locked after 5 wrong tries. Choose another nurse, or try again at <h:mm AM/PM>.", pin-not-set "The second nurse has not set a PIN yet. Choose another nurse.", rate-limit (also when the caller has 5 failed colleague checks in 15 minutes or 10 in 24 hours), pin-unavailable; a client never reads GET /me/pin after such a pin-not-set. SAH-38 (ADR-014, PROPOSED) adds for the colleague check only: colleague-pin-limit (429; "Too many wrong PIN tries for this nurse. Choose another nurse."; the caller made 5 wrong tries of this colleague''s PIN within a rolling 7 days, durable in the database, cleared by a right PIN of the same pair or a new PIN; the PIN is not compared and nothing is counted; no retryAfterSeconds and no count) and pin-check-failed (503; "We could not check the PIN. Try again."; the PIN store could not be read or written in time: only a timeout, a lost connection or a lock failure; a constraint or permission refusal by the database (23514, 23503, 42501) is a code fault and stays a plain 500 server error, never an answer about the PIN (ADR-014 D5); fail closed, nothing counted, the same answer whether the PIN was right or wrong). Also from SAH-38: the colleague''s own failed-check limit is no longer used by colleague checks (only the caller''s limit, the pair cap and the lockout), and a lock caused by a run with any colleague try answers pin-locked and never switches the PIN off (pin-not-set TOO_MANY_LOCKS comes only from three own-session locks within 24 hours).', examples: ['https://sahaj.in/problems/plan-limit'] }
+        type: { type: string, description: 'Problem type. Known values include plan-limit, slug-taken, setup-incomplete, last-owner, duplicate-mobile, concurrent-change (retryable), validation, forbidden, not-found, rate-limit, otp-locked, and for the staff PIN (SAH-31, ADR-010 D11) wrong-pin (403), pin-locked (403; the 5th wrong try that causes the first or second lock within 24 hours, or any try while locked), pin-not-set (409; no PIN, by notSetReason, and also the 5th wrong try that causes the third lock within 24 hours, which switches the PIN off: "Your PIN was switched off after too many wrong tries. Set a new one, then try again."), pin-unavailable (503), under https://sahaj.in/problems/. The PIN types are also answered by other modules that check a PIN through platform.api.StaffPinPort (ipd verify). SAH-32 (ADR-011 D7, PROPOSED): the second-nurse check of a high-alert dose (ipd POST /medicine-orders/{id}/doses) checks a colleague''s PIN through StaffPinPort.checkColleague and answers the same types with colleague texts and no names: wrong-pin "That PIN is not right." (no tries-left count, so a guesser is not told when to stop before a lock; the wrong try still counts on the colleague''s PIN; security review S4; the own-PIN answer keeps the count), pin-locked "The second nurse''s PIN is locked after 5 wrong tries. Choose another nurse, or try again at <h:mm AM/PM>.", pin-not-set "The second nurse has not set a PIN yet. Choose another nurse.", rate-limit (also when the caller has 5 failed colleague checks in 15 minutes or 10 in 24 hours), pin-unavailable; a client never reads GET /me/pin after such a pin-not-set. SAH-38 (ADR-014, PROPOSED) adds for the colleague check only: colleague-pin-limit (429; "Too many wrong PIN tries for this nurse. Choose another nurse."; the caller made 5 wrong tries of this colleague''s PIN within a rolling 7 days, durable in the database, cleared by a right PIN of the same pair or a new PIN; the PIN is not compared and nothing is counted; no retryAfterSeconds and no count) and pin-check-failed (503; "We could not check the PIN. Try again."; the PIN store could not be read or written in time: only a timeout, a lost connection or a lock failure; a constraint or permission refusal by the database (23514, 23503, 42501) is a code fault and stays a plain 500 server error, never an answer about the PIN (ADR-014 D5); fail closed, nothing counted, the same answer whether the PIN was right or wrong). Also from SAH-38: the colleague''s own failed-check limit is no longer used by colleague checks (only the caller''s limit, the pair cap and the lockout), and a lock caused by a run with any colleague try answers pin-locked and never switches the PIN off (pin-not-set TOO_MANY_LOCKS comes only from three own-session locks within 24 hours). 0.3.0 (SAH-89, ADR-031) adds setup-required (403, every module, currentStep), setup-step-failed (409, failedStep), setup-running (409, retryable, retryAfterSeconds), signup-token-invalid (401), logo-type-not-allowed (400), logo-dimensions (400) and logo-unreadable (400).', examples: ['https://sahaj.in/problems/plan-limit'] }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
         retryAfterSeconds: { type: integer }
+        currentStep: { type: integer, minimum: 1, maximum: 5, description: '0.3.0, setup-required only: the wizard step to open.' }
+        step: { type: integer, minimum: 1, maximum: 5, description: '0.3.0, POST /setup/complete validation only: the first wizard step whose saved answers fail; fieldErrors name its fields.' }
+        failedStep: { $ref: '#/components/schemas/SetupCompletionStepKey' }
         fieldErrors:
           type: array
           items: { type: object, required: [field, message], properties: { field: { type: string }, message: { type: string } } }
@@ -754,37 +1096,105 @@ components:
         accessToken: { type: string }
         expiresInSeconds: { type: integer, examples: [900] }
         selectionToken: { type: string }
+        signupToken:
+          type: string
+          maxLength: 64
+          description: '0.3.0 (SAH-89-1, ADR-031 D3). Only with next NOT_REGISTERED in mode LOGIN: send it to POST /auth/signup-continue for "Create a clinic with this number". Single-use, 10 minutes. Kept in memory only, never in storage or a URL.'
+        signupTokenExpiresInSeconds: { type: integer, examples: [600] }
         clinics:
           type: array
           items: { type: object, required: [tenantId, name], properties: { tenantId: { type: string, format: uuid }, name: { type: string }, area: { type: string } } }
+    SignupContinueInput:
+      type: object
+      required: [signupToken, consent]
+      additionalProperties: false
+      properties:
+        signupToken: { type: string, minLength: 1, maxLength: 64 }
+        consent:
+          type: object
+          required: [termsVersion, privacyVersion]
+          properties: { termsVersion: { type: string, maxLength: 20 }, privacyVersion: { type: string, maxLength: 20 } }
+    IndianState:
+      type: string
+      description: '0.3.0 (SAH-89-9, ADR-031 D4). The 28 states and 8 union territories by name, shown as written here. Missing or another value: "Choose the state".'
+      enum: [Andhra Pradesh, Arunachal Pradesh, Assam, Bihar, Chhattisgarh, Goa, Gujarat, Haryana, Himachal Pradesh, Jharkhand, Karnataka, Kerala, Madhya Pradesh, Maharashtra, Manipur, Meghalaya, Mizoram, Nagaland, Odisha, Punjab, Rajasthan, Sikkim, Tamil Nadu, Telangana, Tripura, Uttar Pradesh, Uttarakhand, West Bengal, Andaman and Nicobar Islands, Chandigarh, Dadra and Nagar Haveli and Daman and Diu, Delhi, Jammu and Kashmir, Ladakh, Lakshadweep, Puducherry]
+    ClinicPhone:
+      type: string
+      description: >-
+        0.3.0 (SAH-89-2, OQ-89-3 b default). The client and the server remove spaces and hyphens and a leading +91,
+        then accept a mobile (10 digits, first 6 to 9) or a landline with STD code (10 digits without the 0, first 1
+        to 9, or 11 digits starting 0). Saved as digits only. Missing or anything else: "Enter a valid phone number".
+      pattern: '^(?:[1-9][0-9]{9}|0[1-9][0-9]{9})$'
     SetupClinic:
       type: object
-      required: [name, city]
+      description: >-
+        Step 1 "Tell us about your clinic". 0.3.0 (SAH-89-2, SAH-89-9, ADR-031 D4, D11) rules and inline texts; text
+        values are trimmed first. name: required, 2 to 160 characters (empty "Enter your clinic name", else "Clinic name
+        must be 2 to 160 characters"). address: required, 5 to 200 characters ("Enter the clinic address"); placeholder
+        "Building, road, area". city: required ("Enter the city"), 2 to 80 characters of letters (any script), spaces,
+        dots, hyphens and apostrophes, starting with a letter (server: ^[\p{L}\p{M}][\p{L}\p{M} .'-]{1,79}$; otherwise
+        "Enter a valid city name"). state: required (IndianState, "Choose the state"). pin: required, 6 digits not
+        starting 0 ("Enter a 6-digit PIN code"). phone: required (ClinicPhone, "Enter a valid phone number").
+        registrationNo: optional, marked "(optional)", up to 40 characters, no format check (41 or more "Use 40
+        characters or fewer"). The State field is new against the mockup (DEC-096 item 1; a human adds it to the
+        design).
+      required: [name, address, city, state, pin, phone]
       properties:
-        name: { type: string, maxLength: 160 }
-        address: { type: string }
-        city: { type: string }
-        pin: { type: string, pattern: '^[0-9]{6}$' }
-        phone: { type: string }
-        registrationNo: { type: string }
-    SetupSpecialty: { type: object, required: [code], properties: { code: { type: string, enum: [gp, dental, paeds, homeo] } } }
+        name: { type: string, minLength: 2, maxLength: 160 }
+        address: { type: string, minLength: 5, maxLength: 200 }
+        city: { type: string, minLength: 2, maxLength: 80 }
+        state: { $ref: '#/components/schemas/IndianState' }
+        pin: { type: string, pattern: '^[1-9][0-9]{5}$' }
+        phone: { $ref: '#/components/schemas/ClinicPhone' }
+        registrationNo: { type: [string, 'null'], maxLength: 40 }
+    SetupSpecialty:
+      type: object
+      required: [code]
+      description: 'Step 2. No choice: "Choose your specialty" (0.3.0).'
+      properties: { code: { type: string, enum: [gp, dental, paeds, homeo] } }
+    FeeRupees:
+      type: integer
+      minimum: 0
+      maximum: 50000
+      description: >-
+        0.3.0 (SAH-89-2, SAH-89-5, OQ-89-9 default). The doctor's consultation fee ("New visit fee") in whole rupees,
+        0 to 50,000; stored as integer paise. Missing: "Enter the consultation fee"; letters (mockup "Enter fees as
+        numbers"), decimals, a negative number or over 50,000: "Enter the fee in rupees, from 0 to 50,000". Shown as "₹
+        1,200" with Indian grouping; 0 shown as "Free".
     SetupTeam:
       type: object
       required: [doctors, staff]
+      description: >-
+        Step 3 "Who works in your clinic?". 0.3.0 rules (SAH-89-2): doctors[0] is the owner (pill "Owner"), its name
+        required ("Enter the owner doctor's name"), 2 to 100 characters; doctors[1] needs name and mobile; specialty
+        from the list; feeRupees as FeeRupees. Staff rows: name 2 to 100 ("Enter the name"), role one of Front desk,
+        Nurse, Counsellor, Pharmacist ("Choose a role"), mobile required ("Enter a 10-digit mobile number"). A mobile
+        used twice in the step, or equal to the owner's own mobile: "This number is already added". At most 2 doctors
+        ("Doctors · n of 2") and 5 users in total ("n of 5 users on the free year"); a forced request answers 409
+        plan-limit.
       properties:
         doctors:
           type: array
+          minItems: 1
           maxItems: 2
           items:
             type: object
             required: [name, specialty, feeRupees]
-            properties: { name: { type: string }, specialty: { type: string }, feeRupees: { type: integer, minimum: 0 }, mobile: { $ref: '#/components/schemas/Mobile' } }
+            properties:
+              name: { type: string, minLength: 2, maxLength: 100 }
+              specialty: { type: string, minLength: 1, maxLength: 120 }
+              feeRupees: { $ref: '#/components/schemas/FeeRupees' }
+              mobile: { $ref: '#/components/schemas/Mobile' }
         staff:
           type: array
+          maxItems: 4
           items:
             type: object
             required: [name, role, mobile]
-            properties: { name: { type: string }, role: { $ref: '#/components/schemas/Role' }, mobile: { $ref: '#/components/schemas/Mobile' } }
+            properties:
+              name: { type: string, minLength: 2, maxLength: 100 }
+              role: { type: string, enum: [FRONT_DESK, NURSE, COUNSELLOR, PHARMACIST], description: '0.3.0: the four roles of the mockup''s step 3 list.' }
+              mobile: { $ref: '#/components/schemas/Mobile' }
     SetupOpd:
       type: object
       required: [feeTiming, queue, vitals, followUpDays, followUpFee]
@@ -797,17 +1207,71 @@ components:
     SetupLook:
       type: object
       required: [brand, slug, language]
+      description: >-
+        Step 5 "Choose your colour and web address". 0.3.0 (SAH-89-8, OQ-89-4 default, ADR-031 D6): the presets first,
+        then "Custom colour" (picker or a typed code). The readability messages and "Use the readable shade" are worked
+        out in the browser and warn only; the server checks the format. The logo is a separate optional upload (PUT
+        /clinic/logo) and is not part of this body. slug: "Use 3 to 24 lowercase letters, numbers or hyphens"; reserved
+        or taken: "Already taken. Try <suggestion>", and Create my clinic is blocked with "Choose an available web
+        address".
       properties:
         brand: { $ref: '#/components/schemas/Brand' }
+        brandHex:
+          type: [string, 'null']
+          pattern: '^#?[0-9A-Fa-f]{6}$'
+          description: 'Required when brand is custom: 6 hexadecimal characters with or without # (else "Enter a colour code with 6 characters, like 1F5BC8"). Stored and returned as # plus upper case (#1F5BC8). With a preset it is ignored and not stored.'
         slug: { type: string, pattern: '^[a-z0-9][a-z0-9-]{2,23}$' }
         language: { type: string, enum: [en, mr, hi] }
     SetupState:
       type: object
-      required: [currentStep, answers, limits]
+      required: [currentStep, answers, limits, stepsDone, completionStarted]
       properties:
         currentStep: { type: integer, minimum: 1, maximum: 5 }
         answers: { type: object }
         limits: { type: object, required: [doctors, users], properties: { doctors: { type: integer }, users: { type: integer } } }
+        stepsDone:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 5 }
+          description: '0.3.0 (SAH-89-3, OQ-89-6 d). Wizard steps whose saved answers pass the 0.3.0 rules; the rail shows a tick on each. All five just before the progress screen.'
+        completionStarted: { type: boolean, description: '0.3.0. True once POST /setup/complete has run at least one step: the client shows the progress screen (GET /setup/completion), not the wizard.' }
+    SetupCompletionStepKey:
+      type: string
+      enum: [CLINIC_SPACE, TEMPLATE, OPD_RULES, PAPERS, STAFF_LOGINS, WEB_ADDRESS]
+      description: >-
+        0.3.0 (SAH-89-3, ADR-031 D2). Lines in this order: CLINIC_SPACE "Creating your clinic space"; TEMPLATE "Loading
+        the <specialtyName lower case> template"; OPD_RULES "Setting up your OPD workflow and fee rules"; PAPERS
+        "Preparing case paper and bill layouts"; STAFF_LOGINS "Setting up staff logins" (OQ-89-6 a, replaces the
+        mockup's "Sending staff logins on WhatsApp"); WEB_ADDRESS "Securing https://<webAddress>".
+    SetupCompletion:
+      type: object
+      required: [state, steps, failedStep, specialtyName, webAddress]
+      properties:
+        state: { type: string, enum: [NOT_STARTED, RUNNING, FAILED, DONE] }
+        steps:
+          type: array
+          minItems: 6
+          maxItems: 6
+          items:
+            type: object
+            required: [key, status]
+            properties:
+              key: { $ref: '#/components/schemas/SetupCompletionStepKey' }
+              status: { type: string, enum: [PENDING, RUNNING, DONE, FAILED] }
+        failedStep:
+          oneOf:
+            - { $ref: '#/components/schemas/SetupCompletionStepKey' }
+            - { type: 'null' }
+        specialtyName: { type: [string, 'null'], description: 'Name of the chosen specialty template, for the TEMPLATE line; null before step 2 is saved.' }
+        webAddress: { type: [string, 'null'], description: '<slug>.<domain>, for the WEB_ADDRESS line and the final address line; null before step 5 is saved.' }
+    SetupCompleteResult:
+      type: object
+      required: [next, brand, brandHex, webAddress, completion]
+      properties:
+        next: { const: APP }
+        brand: { $ref: '#/components/schemas/Brand' }
+        brandHex: { type: [string, 'null'], pattern: '^#[0-9A-F]{6}$', description: '0.3.0. Set when brand is custom.' }
+        webAddress: { type: string, description: '0.3.0. For the toast "Your clinic is live at <webAddress>".' }
+        completion: { $ref: '#/components/schemas/SetupCompletion' }
     SetupOverview:
       type: object
       required: [percent, checks]
@@ -826,7 +1290,7 @@ components:
         sidebarCollapsed: { type: boolean }
     Me:
       type: object
-      required: [userId, membershipId, name, role, clinic, menu, preferences]
+      required: [userId, membershipId, name, role, clinic, menu, preferences, capabilities]
       properties:
         userId: { type: string, format: uuid }
         membershipId: { type: string, format: uuid, description: The signed-in user's membership id in this clinic. Matches TeamMember.id. }
@@ -844,6 +1308,23 @@ components:
             planDaysLeft: { type: integer }
             setupComplete: { type: boolean }
             setupPercent: { type: integer }
+            logo:
+              type: object
+              required: [present, etag]
+              description: '0.3.0 (SAH-89-8). present true: the shell reads GET /clinic/logo (with If-None-Match etag) for the sidebar clinic card; false: initials.'
+              properties:
+                present: { type: boolean }
+                etag: { type: [string, 'null'] }
+        capabilities:
+          type: object
+          required: [headerMobileSearch, secondChecks, actsAsDoctor, ownerDoctorNotice, registrationNoMissing]
+          description: '0.3.0 (SAH-89, ADR-031). Worked out by platform from the role and the membership; each module still checks its own rule on every call.'
+          properties:
+            headerMobileSearch: { type: boolean, description: 'SAH-89-4, ADR-031 D9. True for OWNER, FRONT_DESK, NURSE, DOCTOR, VISITING_DOCTOR (the roles with the Patients menu that may read patients; same list as patient POST /patients/lookup-by-mobile). False: the header field is not drawn.' }
+            secondChecks: { type: boolean, description: 'SAH-89-7, ADR-031 D10. True for NURSE, PHARMACIST, DOCTOR, VISITING_DOCTOR and an OWNER who acts as doctor: Queue shows "N second checks waiting" (opd GET /emr/chemo-checks/count).' }
+            actsAsDoctor: { type: boolean, description: 'SAH-89-6, ADR-031 D7. DOCTOR, VISITING_DOCTOR, or OWNER with "Also a doctor" on.' }
+            ownerDoctorNotice: { type: boolean, description: 'SAH-89-6, OQ-89-10 f. Show once "You can now see patients as a doctor" with "Got it" (POST /me/doctor/notice-seen). OWNER only.' }
+            registrationNoMissing: { type: boolean, description: 'SAH-89-6. True when actsAsDoctor and the caller is OWNER with no registration number: the shell shows "Add your registration number before you see patients" with a link to Team and access.' }
         menu:
           type: array
           items: { type: string }
@@ -873,6 +1354,10 @@ components:
             mapping to an active pharmacy store; in both menu modes; placed before staff and config (at the end when
             the role has neither). STORE_STAFF has no other key, so its menu is [pharmacy] or empty. With pharmacy_on
             false (the default) no menu changes. The pharmacy endpoints check access themselves.
+            0.3.0 (SAH-89-7, DEC-096 item 3, ADR-031 D10; changed): secondchecks is never sent, for any role, in either
+            menu mode; the shell reserves no place and calls no badge for it. The waiting orders are reached from Queue
+            (Me.capabilities.secondChecks). OWNER who acts as doctor (ADR-031 D7) gets the OWNER menu; its keys already
+            include every doctor key, each once.
         permissions: { type: array, items: { type: string } }
         preferences: { $ref: '#/components/schemas/Preferences' }
     TeamMember:
@@ -886,6 +1371,9 @@ components:
         status: { type: string, enum: [ACTIVE, INACTIVE, REMOVED] }
         lastLoginAt: { type: [string, 'null'], format: date-time }
         doctor: { $ref: '#/components/schemas/DoctorDetails' }
+        alsoDoctor:
+          type: boolean
+          description: '0.3.0 (SAH-89-6, ADR-031 D7). OWNER rows only (absent on other roles): true when "Also a doctor" is on. An OWNER row with doctor details and alsoDoctor false keeps doctor for history and is not listed among Doctors.'
         pin:
           oneOf:
             - { $ref: '#/components/schemas/TeamMemberPin' }
@@ -997,18 +1485,28 @@ components:
         mobileMasked: { type: string, examples: ['••••••7410'] }
     DoctorDetails:
       type: object
+      description: '0.3.0: feeRupees limited to 0 to 50,000 (FeeRupees). The one fee of the doctor: "Consultation fee (₹)" on Add person and the wizard, "New visit fee" in Fees and billing.'
       properties:
-        specialty: { type: string }
-        degree: { type: string }
-        registrationNo: { type: string }
-        feeRupees: { type: integer, minimum: 0 }
+        specialty: { type: string, maxLength: 120 }
+        degree: { type: string, maxLength: 120 }
+        registrationNo: { type: string, maxLength: 80 }
+        feeRupees: { $ref: '#/components/schemas/FeeRupees' }
     TeamMemberCreate:
       type: object
       required: [name, mobile, role]
+      description: '0.3.0 (SAH-89-5): role DOCTOR or VISITING_DOCTOR requires doctor.feeRupees (400 field doctor.feeRupees "Enter the consultation fee").'
       properties:
         name: { type: string, minLength: 1 }
         mobile: { $ref: '#/components/schemas/Mobile' }
         role: { $ref: '#/components/schemas/Role' }
+        doctor: { $ref: '#/components/schemas/DoctorDetails' }
+    OwnerDoctorInput:
+      type: object
+      required: [alsoDoctor]
+      additionalProperties: false
+      description: '0.3.0 (SAH-89-6, ADR-031 D7). Body of PUT /me/doctor. alsoDoctor true requires doctor.specialty and doctor.feeRupees; false ignores doctor.'
+      properties:
+        alsoDoctor: { type: boolean }
         doctor: { $ref: '#/components/schemas/DoctorDetails' }
     TeamMemberUpdate:
       type: object
@@ -1026,21 +1524,52 @@ components:
     ClinicProfile:
       type: object
       required: [name]
+      description: >-
+        0.3.0 (SAH-89-2, SAH-89-9, ADR-031 D4): on PUT, name, address, city, state, pin and phone are required with
+        the limits and texts of SetupClinic (address "Enter the clinic address", city "Enter the city" or "Enter a valid
+        city name", state "Choose the state", pin "Enter a 6-digit PIN code", phone "Enter a valid phone number").
+        GET may return state null and addressNeedsReview true for a clinic saved before 0.3.0.
       properties:
-        name: { type: string, maxLength: 160 }
+        name: { type: string, minLength: 2, maxLength: 160 }
         nameLocal: { type: string }
-        address: { type: string }
+        address: { type: string, minLength: 5, maxLength: 200, description: 'Address line: building, road, area.' }
         area: { type: string }
-        city: { type: string }
-        pin: { type: string }
-        phone: { type: string }
+        city: { type: string, minLength: 2, maxLength: 80 }
+        state:
+          oneOf:
+            - { $ref: '#/components/schemas/IndianState' }
+            - { type: 'null' }
+          description: '0.3.0. Null only on GET for a clinic saved before 0.3.0.'
+        pin: { type: string, pattern: '^[1-9][0-9]{5}$' }
+        phone: { $ref: '#/components/schemas/ClinicPhone' }
         whatsapp: { type: string }
-        mapsUrl: { type: string, format: uri }
-        registrationNo: { type: string }
+        mapsUrl:
+          type: [string, 'null']
+          format: uri
+          maxLength: 500
+          description: >-
+            Optional "Google Maps link", hint "Paste the share link from Google Maps". 0.3.0 (ADR-031 D4): https only,
+            host maps.app.goo.gl, maps.google.com, maps.google.co.in, or goo.gl, google.com, www.google.com,
+            google.co.in, www.google.co.in with a path starting /maps; else "Paste a link from Google Maps". Never fetched
+            by the server; opened by the client in a new tab (noopener, noreferrer). No latitude or longitude is stored.
+        registrationNo: { type: [string, 'null'], maxLength: 40 }
         slug: { type: string, readOnly: true }
         specialtyCode: { type: string }
         brand: { $ref: '#/components/schemas/Brand' }
         brandHex: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+        addressNeedsReview: { type: boolean, readOnly: true, description: '0.3.0. True when state is null (saved before 0.3.0): the panel asks "Check your address and choose the state." before Save.' }
+        logo: { allOf: [ { $ref: '#/components/schemas/ClinicLogoInfo' } ], readOnly: true }
+    ClinicLogoInfo:
+      type: object
+      required: [present]
+      description: '0.3.0 (SAH-89-8, ADR-031 D5). The stored logo, always PNG. Width and height after re-encoding (longest side at most 1024 px).'
+      properties:
+        present: { type: boolean }
+        etag: { type: [string, 'null'], description: 'SHA-256 hex of the stored PNG; the ETag of GET /clinic/logo.' }
+        width: { type: [integer, 'null'], minimum: 1, maximum: 1024 }
+        height: { type: [integer, 'null'], minimum: 1, maximum: 1024 }
+        bytes: { type: [integer, 'null'], minimum: 1 }
+        updatedAt: { type: [string, 'null'], format: date-time }
     Holiday:
       type: object
       required: [date, name, type]

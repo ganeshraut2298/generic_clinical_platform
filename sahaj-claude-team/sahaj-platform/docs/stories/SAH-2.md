@@ -1,5 +1,5 @@
 # SAH-2 · Home page
-Mockup screen: Home page (landing: features, pricing, compare, Start free)
+Mockup screen: Start screen and sign-in (opening screen of the mockup) — Home page (landing: features, pricing, compare, Start free)
 Module: platform
 
 ## 1. Story

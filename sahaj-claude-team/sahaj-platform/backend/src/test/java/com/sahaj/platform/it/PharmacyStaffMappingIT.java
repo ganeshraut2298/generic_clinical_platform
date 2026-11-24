@@ -81,7 +81,7 @@ class PharmacyStaffMappingIT extends Sah78Support {
         assertThat(candidate(atCentral, keeper).get("roleLabel").asText()).isEqualTo("Store staff");
         JsonNode atPharmacy = ok(HttpMethod.GET, CANDIDATES + "?storeId=" + idOf(stores[1]), clinic.owner(), null, 200);
         assertThat(texts(candidate(atPharmacy, nurse).get("allowedStoreRoles"))).containsExactlyInAnyOrder("STORE_USER", "APPROVER", "DELEGATE");
-        assertThat(texts(candidate(atPharmacy, keeper).get("allowedStoreRoles"))).containsExactly("STORE_USER");
+        assertThat(texts(candidate(atPharmacy, keeper).get("allowedStoreRoles"))).containsExactlyInAnyOrder("STORE_USER", "CASHIER");
         assertThat(atPharmacy.toString()).as("never a mobile number").doesNotContain(nurse.mobile()).doesNotContain(keeper.mobile());
         // the filter keeps only the people allowed that role
         JsonNode approvers = ok(HttpMethod.GET, CANDIDATES + "?storeId=" + idOf(stores[1]) + "&storeRole=APPROVER", clinic.owner(), null, 200);

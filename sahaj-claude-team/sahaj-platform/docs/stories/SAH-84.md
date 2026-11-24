@@ -1,3 +1,4 @@
+Renamed from ADM-3 (now SAH-84); other documents still refer to ADM-3.
 # ADM-3 · Modules and plan management by the Sahaj admin, and the end of the owner-started IPD trial
 Mockup screen: Sahaj admin portal (platform admin view) — organization detail Modules tab (`aModules`, actions `amod`, `amodbeds`), Plan and billing tab and the sheet "Change plan or price" (`ADM_KIND.plan`, `aActHTML`, `aago`), Activity log tab (`aAuditRows`); and the owner side Clinic setup → Plan and modules (`cfgModules`, key `modules`)
 Module: platform (admin packages in `com.sahaj.platform`); the admitted-patients check reads `ipd` through `platform.api`

@@ -186,13 +186,17 @@ final class PharmacyFixture {
 
         @Override
         public boolean updateSettings(UUID tenantId, UUID unitId, long version, String gstin, String drugLicenceNo,
-                                      LocalDate till, IntegrationMode mode, UUID actorUserId) {
+                                      LocalDate till, IntegrationMode mode, UUID actorUserId, SaleSettings sale) {
             Unit unit = units.get(tenantId);
             if (unit == null || !unit.id().equals(unitId) || unit.version() != version) {
                 return false;
             }
             writes.add("unit.update");
-            units.put(tenantId, new Unit(unit.id(), unit.code(), gstin, drugLicenceNo, till, mode, NOW, version + 1));
+            units.put(tenantId, new Unit(unit.id(), unit.code(), gstin, drugLicenceNo, till, mode, NOW, version + 1,
+                    sale == null ? unit.returnWindowDays() : sale.returnWindowDays(),
+                    sale == null ? unit.refundModes() : sale.refundModes(),
+                    sale == null ? unit.scheduleXLicenceNo() : sale.scheduleXLicenceNo(),
+                    sale == null ? unit.scheduleXLicenceValidTill() : sale.scheduleXLicenceValidTill()));
             return true;
         }
     };

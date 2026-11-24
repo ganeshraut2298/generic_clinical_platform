@@ -1,9 +1,34 @@
 openapi: 3.1.0
 info:
   title: Sahaj Pharmacy & Inventory API
-  version: 0.3.8
+  version: 0.3.9
   description: >-
-    Changelog. 0.3.8 (21 Nov 2026, SAH-80 review round 7: DEC-091 item 3, DEC-092 items 3 and 4; programme
+    Changelog. 0.3.9 (21 Nov 2026, SAH-80 review round 7 follow-ups: code review SAH-80-code.md Major 1 and
+    SAH-80-code-pass2.md M6 (DEC-093 item 1); programme DEC-061). The version moves with pharmacy-sales.yaml 0.3.9
+    (one API; the gross margin definition is in that file's changelog and WP-N). Wording only: no path,
+    parameter, status code, schema member or enum value is added or removed; new problem codes: none.
+    pharmacyPutDocumentSeries answers 409 prefix-in-use also when the prefix (ignoring case) is the prefix of a
+    store's own bill series (pharmacy-sales.yaml pharmacyPutStoreBillSeries), a switched-off store's series
+    included; until 0.3.8 it compared only the unit's document types, so an owner could give a unit series the
+    prefix a store already used and two bills could get the same number.
+    0.3.9 addendum (22 Nov 2026, DEC-095, integration-test triage; wording only, no new path, parameter or
+    field): (1) pharmacyCreateDebitNote and pharmacyPostGoodsReceipt state plainly that a short-supply line
+    starts from (and a receipt-prepared short line is credited at) the vendor's returnCreditPercent, as built
+    (DEC-095 item 1). (2) pharmacyRunReport and pharmacyExportReport: from and to are required for sales-margin
+    and h1-register, 400 validation when missing, like the SAH-79-18 reports (DEC-095 item 2). The other
+    DEC-095 rulings are in pharmacy-sales.yaml 0.3.9. QA fixes of 22 Nov, wording as built (the version stays
+    0.3.9): (3) pharmacyApprovalInbox: the type enum lists SALES (SALE_DISCOUNT, SALES_RETURN), the Sales chip
+    pharmacy-sales.yaml already documents and the server already answers; the "no Sales chip in 0.2.0" sentence
+    is corrected; any other type stays 400 validation. (4) pharmacyListDocumentSeries and DocType: the list has
+    twelve rows (CREDIT_NOTE and IPD_ISSUE_SLIP since migration V2026_12_17_1800), not ten. (5) Rule 15: a caller
+    who reaches no store at all for a SCOPED report or the command centre gets 403 forbidden before any id is
+    looked up (also for a store or product of another clinic); a caller who reaches a store gets 404 for a
+    foreign id; the 403 does not depend on the id, so nothing leaks across clinics. (6) DEC-095 addendum item 6:
+    when the vendor has no returnCreditPercent, the short-supply draft that pharmacyPostGoodsReceipt prepares is
+    credited at 100 % (pharmacyCreateDebitNote states it too), and pharmacyVendorReturnEligible answers
+    defaultCreditPercent null for such a vendor's GRN_SHORT rows.
+
+    0.3.8 (21 Nov 2026, SAH-80 review round 7: DEC-091 item 3, DEC-092 items 3 and 4; programme
     DEC-061; ADR-030 S2 and S16). The version moves with pharmacy-sales.yaml 0.3.8 (one API; the discount
     approval, Schedule X cancel, role read-out and record-access changes are in that file's changelog). Additive
     or wording only: no path, parameter, status code, schema member or enum value is added or removed; new
@@ -249,7 +274,14 @@ info:
     all-stores stock view): the server first works out the stores the caller can reach for the operation's
     capability (OWNER every ACTIVE store; others their ACTIVE mappings to ACTIVE stores); a storeId query value
     outside that set answers 404 not-found exactly as the path guard; no storeId means every reachable store.
-    It runs before any other filter, sort or paging (BR-1).
+    It runs before any other filter, sort or paging (BR-1). 0.3.9 addendum (QA, as built): a caller who reaches
+    no store at all for the operation gets 403 forbidden before any storeId, productId or vendorId is read or
+    looked up, so a store or product of another clinic, an unknown id and one of the caller's own clinic all
+    answer the same 403 (pharmacyRunReport, pharmacyExportReport, pharmacyStockLedgerReport,
+    pharmacyExportStockLedger; pharmacy-sales.yaml pharmacyCommandCentre). A caller who reaches at least one
+    store gets 404 not-found for an unknown, foreign or unreachable id. The 403 depends only on the caller's own
+    mappings, never on the id, so it confirms nothing about another clinic. pharmacyProductStockAllStores keeps
+    its own rule (200 with no rows, 0.3.2).
     (16) Capabilities named in x-store-access are the StoreAccess fields (ADR-029 P8), derived on every request.
     Pharmacist-only actions are never available to OWNER (ADR-028 D4).
     (17) Stock (ADR-029 P3, P4). Stock is held per store, product, batch and state (AVAILABLE, IN_TRANSIT,
@@ -2023,9 +2055,10 @@ paths:
       summary: Numbering series of PO, GRN, indent, transfer and bill
       x-required-role: SETUP_VIEW
       description: >-
-        0.2.0 (SAH-79, OQ-79-14): ten rows; after the five below come DEBIT_NOTE "DN-", STOCK_AUDIT "AUD-",
+        0.2.0 (SAH-79, OQ-79-14): after the five below come DEBIT_NOTE "DN-", STOCK_AUDIT "AUD-",
         STORE_RETURN "RET-", DAMAGE_REPORT "DMG-" and STOCK_ADJUSTMENT "ADJ-" (4 digits, no financial-year part,
-        no restart until saved), and numbersIssued is true once a number of the type has been issued in the
+        no restart until saved); 0.3.0 adds CREDIT_NOTE and IPD_ISSUE_SLIP (DocType). 0.3.9 addendum (QA): the
+        list answers twelve rows, one per DocType, since migration V2026_12_17_1800 (it said ten). numbersIssued is true once a number of the type has been issued in the
         current financial year (April to March, IST); the series is then locked and PUT answers 409
         series-locked (0.3.1 wording, DEC-078 item 4). It turns false again on 1 April until the first number of
         the new financial year is issued.
@@ -2067,8 +2100,12 @@ paths:
         while financialYearPart false "Show the financial year when numbers restart every 1 April" (NEW: keeps
         numbers unique). 409 prefix-in-use "Two document types cannot use the same prefix" when another type of
         this unit uses the same prefix now, ignoring case (stricter than the story; ADR-028 open points; a prefix
-        another type gave up earlier is not refused: known limit (c), security I16, accepted by DEC-080). version not
-        current 409 settings-changed. Applies to numbers taken after the save; issued numbers never change, are
+        another type gave up earlier is not refused: known limit (c), security I16, accepted by DEC-080). 0.3.9
+        (code review SAH-80 Major 1): 409 prefix-in-use, the same detail, also when a store's own bill series
+        (pharmacy-sales.yaml pharmacyPutStoreBillSeries; any store, a switched-off store's series included) has
+        the same prefix now, ignoring case; nothing written. The check runs under the unit BILL series row lock,
+        which pharmacyPutStoreBillSeries takes first too, so a unit save and a store save cannot both take the
+        same prefix. version not current 409 settings-changed. Applies to numbers taken after the save; issued numbers never change, are
         never reused or skipped. An unknown docType 400 bad-request. Audit PHARMACY_SERIES_CHANGED.
         Series locking (0.2.1, DEC-078 item 4): once any number of this docType has been issued in the current
         financial year (April to March, IST), the series cannot be changed: 409 series-locked "Numbers have
@@ -2088,7 +2125,7 @@ paths:
         '400': { $ref: '#/components/responses/Problem', description: 'validation; or bad-request (unknown docType)' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict', description: 'settings-changed (with current), prefix-in-use; 0.2.1 series-locked (a number of this type was issued in the current financial year)' }
+        '409': { $ref: '#/components/responses/Conflict', description: 'settings-changed (with current), prefix-in-use (another document type of the unit, or 0.3.9 a store''s own bill series, uses the prefix); 0.2.1 series-locked (a number of this type was issued in the current financial year)' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /reason-lists:
@@ -2321,14 +2358,16 @@ paths:
         item that "Needs another approver"; never the raiser, never the level-1 approver for level 2. Order:
         urgent first, then escalated, then longest waiting. type filters the chips: INDENTS (INDENT), PURCHASE
         (PURCHASE_ORDER, GRN_RATE_RISE, VENDOR_RETURN), STOCK (WRITE_OFF, STOCK_ADJUSTMENT including audit
-        variances, STOCK_TRANSFER); counts are for the caller and ignore type; no Sales chip in 0.2.0 (SAH-80).
+        variances, STOCK_TRANSFER); counts are for the caller and ignore type. 0.3.9 addendum (QA, wording as
+        built): SALES (SALE_DISCOUNT, SALES_RETURN) is the Sales chip of SAH-80 (pharmacy-sales.yaml); 0.2.0 had
+        no Sales chip. Any other type value answers 400 validation (field type "Choose a valid option").
         Escalation is computed now (no job, no notification, OQ-79-29). Empty: items [] and the screen says
         "Nothing is waiting for your decision.". The response answers signedInAs (the caller's role label).
         0.3.6 (DEC-082 L19): the server reads at most 2,000 PENDING requests (filtered in SQL to the stores the
         caller may decide at; an OWNER every store; longest at their current level first) and answers moreWaiting
         true when more exist; the order, filters, counts and paging then apply to those 2,000. Writes nothing.
       parameters:
-        - { name: type, in: query, required: false, schema: { type: string, enum: [ALL, INDENTS, PURCHASE, STOCK], default: ALL } }
+        - { name: type, in: query, required: false, schema: { type: string, enum: [ALL, INDENTS, PURCHASE, STOCK, SALES], default: ALL } }
         - { name: page, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 1000, default: 0 } }
         - { name: size, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
       responses:
@@ -3293,7 +3332,10 @@ paths:
         MRP 409 batch-mrp-mismatch "Same batch with a different MRP. Check the batch number."; an expired batch is
         impossible because expiry is checked); PO received and short quantities and status; the vendor payable
         (invoice total, due = invoice date + credit days, OQ-79-5); a DRAFT debit note for short-billed lines
-        (billed above received) and ticked rate differences (OQ-79-9a, 9c); status POSTED, outcome POSTED. All or
+        (billed above received) and ticked rate differences (OQ-79-9a, 9c; 0.3.9, DEC-095 item 1: a short-billed
+        line is credited at the vendor's returnCreditPercent, and at 100 % when the vendor has no
+        returnCreditPercent, DEC-095 addendum item 6; a ticked rate difference is always 100 %); status POSTED,
+        outcome POSTED. All or
         nothing. Audit PHARMACY_GRN_POSTED (ids, line count, totals) or PHARMACY_GRN_SENT_FOR_APPROVAL.
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PostWithSignerInput' } } } }
       responses:
@@ -3331,7 +3373,9 @@ paths:
         damagedCreditPercent when the row's reason is damaged on receipt; expiredCreditPercent when the batch is
         expired (expiry date before today, IST); when both apply, the lower of the two; a level that is null is
         counted as returnCreditPercent before the comparison; in every other case returnCreditPercent. Null only
-        when the vendor has no returnCreditPercent and no level applies (the user types the credit). The debit
+        when the vendor has no returnCreditPercent and no level applies (the user types the credit); 0.3.9
+        (DEC-095 addendum item 6) this includes every GRN_SHORT row of such a vendor, although the draft that
+        pharmacyPostGoodsReceipt prepares for the same short supply is credited at 100 %. The debit
         note line marks creditPercentChanged when the saved creditPercent differs from this starting credit.
         Blind count (rule 24, 0.3.2): availableQty is null for a blind caller on an audited product.
         0.3.6 (OQ-79-39): a BLOCKED vendor (licence expired) is answered as any other; the vendor-return form
@@ -3383,7 +3427,12 @@ paths:
         DRAFT, no number, nothing held. 400 validation: vendorId; lines 1 to 200; STOCK_RETURN lines name batchId
         and sourceState (QUARANTINE or AVAILABLE) of an eligible row and qty 1 to its availableQty ("Enter 1 to
         <n>"); SHORT_SUPPLY lines name goodsReceiptLineId and qty 1 to its unclaimed short quantity; creditPercent
-        0 to 100 (default the vendor's; a changed value is marked creditPercentChanged and kept in the history);
+        0 to 100 (default the vendor's; 0.3.9, DEC-095 item 1, stated plainly: a SHORT_SUPPLY line starts from the
+        vendor's returnCreditPercent, the damaged and after-expiry levels never apply to it, and a STOCK_RETURN line
+        from its row's defaultCreditPercent of pharmacyVendorReturnEligible; a changed value is marked
+        creditPercentChanged and kept in the history; DEC-095 addendum item 6: when the vendor has no
+        returnCreditPercent, the eligible row answers null and the user types the percent here, while a
+        receipt-prepared short-supply draft (pharmacyPostGoodsReceipt) holds 100 %);
         the same batch and state, or the same receipt line, twice. Credit = qty x rate x credit % rounded half up;
         GST reversal per line at the product's GST % on the credit, round half up (OQ-79-13, G-14). reasonKey
         optional, list vendor-return. Audit PHARMACY_DEBIT_NOTE_CREATED. 201. 0.3.6 (OQ-79-39, tech lead decision
@@ -4948,7 +4997,9 @@ paths:
       description: >-
         Filters: storeId (rule 15), from and to (IST dates, at most 366 days apart, 400 range-too-long; required
         for the movement and purchase reports, ignored for store-stock, batch-expiry and below-reorder, which are
-        "now"), productId, vendorId (purchase reports), status (po-vs-grn: PurchaseOrderStatus or OVERDUE).
+        "now"; 0.3.9, DEC-095 item 2: also required for the Sales & compliance reports sales-margin and
+        h1-register, like the SAH-79-18 movement reports, so a missing from or to answers 400 validation with
+        field from or to "Enter a valid date", here and on pharmacyExportReport), productId, vendorId (purchase reports), status (po-vs-grn: PurchaseOrderStatus or OVERDUE).
         Columns per key (ReportColumn key, label and kind): store-stock: store, product, available, inTransit,
         pendingReturn, quarantine, reorderLevel, value; batch-expiry: store, product, batch, expiry, state, qty,
         mrp, purchaseRate, landed, margin, supplier, status; below-reorder: store, product, available,
@@ -5949,7 +6000,7 @@ components:
     DocType:
       type: string
       enum: [PURCHASE_ORDER, GRN, INDENT, TRANSFER, BILL, DEBIT_NOTE, STOCK_AUDIT, STORE_RETURN, DAMAGE_REPORT, STOCK_ADJUSTMENT, CREDIT_NOTE, IPD_ISSUE_SLIP]
-      description: '0.3.0 (SAH-80-1, DEC-074 OQ-80-7) adds CREDIT_NOTE "CN/" (financial-year part, 6 digits, restarts every 1 April: CN/26-27/000001; sales returns and cancelled-bill refunds) and IPD_ISSUE_SLIP "IS-" (4 digits, no financial-year part, no restart; listed only when the unit is Integrated; default prefix an architect proposal, ADR-030 open point). A BILL series may also exist per selling store (pharmacy-sales.yaml, pharmacyPutStoreBillSeries); GET /document-series keeps answering the unit rows only. Series locking (0.2.1) applies to every type. 0.2.0 adds DEBIT_NOTE "DN-", STOCK_AUDIT "AUD-", STORE_RETURN "RET-", DAMAGE_REPORT "DMG-", STOCK_ADJUSTMENT "ADJ-" (4 digits, no financial-year part, no restart until saved; OQ-79-14). GET /document-series lists ten rows; numbersIssued is true once a number of that type is taken in the current financial year (0.3.1 wording; the series is then locked, 409 series-locked); editing a series later changes only numbers taken afterwards (ADR-029 P9).'
+      description: '0.3.0 (SAH-80-1, DEC-074 OQ-80-7) adds CREDIT_NOTE "CN/" (financial-year part, 6 digits, restarts every 1 April: CN/26-27/000001; sales returns and cancelled-bill refunds) and IPD_ISSUE_SLIP "IS-" (4 digits, no financial-year part, no restart; listed only when the unit is Integrated; default prefix an architect proposal, ADR-030 open point). A BILL series may also exist per selling store (pharmacy-sales.yaml, pharmacyPutStoreBillSeries); GET /document-series keeps answering the unit rows only. Series locking (0.2.1) applies to every type. 0.2.0 adds DEBIT_NOTE "DN-", STOCK_AUDIT "AUD-", STORE_RETURN "RET-", DAMAGE_REPORT "DMG-", STOCK_ADJUSTMENT "ADJ-" (4 digits, no financial-year part, no restart until saved; OQ-79-14). GET /document-series lists twelve rows, one per type (0.3.9 addendum; it said ten before the two 0.3.0 types); numbersIssued is true once a number of that type is taken in the current financial year (0.3.1 wording; the series is then locked, 409 series-locked); editing a series later changes only numbers taken afterwards (ADR-029 P9).'
     DocumentSeries:
       type: object
       required: [docType, prefix, financialYearPart, sequenceLength, restartsEachFinancialYear, example, renderedLength, numbersIssued, saved, version]

@@ -77,8 +77,8 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         assertThat(row.get("billNo").asText()).isEqualTo(bill.get("billNo").asText());
         assertThat(row.get("qty").asInt()).isEqualTo(2);
         assertThat(row.get("rxCopy").get("source").asText()).isEqualTo("TYPED");
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_REGISTER_VIEWED'")).isOne();
-        assertThat(get(s.cashier(), url(w.pharmacyId(), "registers/h1"), 403).get("type").asText()).contains("forbidden");
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_REGISTER_VIEWED'")).isOne();
+        assertThat(get(s.cashier(), url(w.pharmacyId(), "registers/h1"), 403).get("type").asText()).contains("store-permission-denied");
     }
 
     @Test
@@ -106,8 +106,9 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         Map<String, Object> badReason = new LinkedHashMap<>(c);
         badReason.put("lines", List.of(m("productId", s.h1Id(), "qty", 1, "h1Override", m("reasonKey", "h1-override.no-such", "note", null))));
         post(w.keeper(), url(w.pharmacyId(), "sale/quote"), badReason, 400);
-        assertThat(call(HttpMethod.POST, url(w.pharmacyId(), "sale/quote"), s.cashier().auth(), js(over)).andReturn().getResponse().getStatus())
-                .as("the override is for a pharmacist").isIn(400, 403);
+        // the quote prices any cart (pharmacy-sales.yaml pharmacyQuoteSale); an override by a non-pharmacist is refused at save
+        JsonNode cashierQuote = quote(s.cashier(), w, over, 200);
+        assertType(post(s.cashier(), url(w.pharmacyId(), "bills"), billBody(cashierQuote, over, "CASH"), 403), "pharmacist-required");
     }
 
     @Test
@@ -151,7 +152,7 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         setPin(w.second(), pin);
         JsonNode missing = xBill(s, w.keeper(), 3, null, 400);
         assertFieldMessage(missing, "secondSigner", "A second signature is needed for Schedule X items.");
-        assertType(xBill(s, w.keeper(), 3, signer(w.keeper(), pin), 403), "second-signer-same");
+        assertType(xBill(s, w.keeper(), 3, signer(w.keeper(), pin), 403), "second-signer-invalid");
         assertThat(billsSaved(w)).isZero();
         assertThat(bal(w, w.pharmacyId(), "XB001", "AVAILABLE")).isEqualTo(20);
         JsonNode denied = xBill(s, s.cashier(), 3, signer(w.second(), pin), 403);
@@ -177,7 +178,7 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         assertThat(entries.get(0).get("documentNo").asText()).isEqualTo(bill.get("billNo").asText());
         assertThat(entries.get(0).get("firstSigner").get("name").asText()).isEqualTo("Pia Pharmacist");
         assertThat(entries.get(0).get("secondSigner").get("name").asText()).isEqualTo("Second Owner");
-        assertThat(get(s.cashier(), url(w.pharmacyId(), "registers/schedule-x"), 403).get("type").asText()).contains("forbidden");
+        assertThat(get(s.cashier(), url(w.pharmacyId(), "registers/schedule-x"), 403).get("type").asText()).contains("store-permission-denied");
         assertLedgerEqualsBalances(w);
     }
 
@@ -207,14 +208,14 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         h1Bill(s, w.keeper(), 1);
         Pn hod = crew(w.clinic(), "NURSE", "Hema Head");
         mapStaff(w.clinic(), w.pharmacyId(), hod, "APPROVER");
-        String path = PH + "/reports/h1-register?storeId=" + w.pharmacyId();
+        String path = PH + "/reports/h1-register?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusDays(1) + "&to=" + todayIst();
         JsonNode asKeeper = get(w.keeper(), path, 200);
         assertThat(asKeeper.get("rows").toString()).contains(NAME).contains("12 Test Road");
         JsonNode asOwner = get(owner(w), path, 200);
         assertThat(asOwner.get("rows").toString()).contains(NAME);
         JsonNode asHod = get(hod, path, 200);
         assertThat(asHod.get("rows").toString()).as("masked for a head of department who is not a pharmacist").doesNotContain(NAME).doesNotContain("12 Test Road").contains("T***");
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_REGISTER_VIEWED'")).isEqualTo(3);
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_REGISTER_VIEWED'")).isEqualTo(3);
         assertThat(call(HttpMethod.GET, path, s.cashier().auth(), null).andReturn().getResponse().getStatus()).isEqualTo(403);
         // a pharmacist of another store is not a member of this one
         String annex = idOf(createStore(w.clinic(), "Annex Pharmacy", "ANX", "PHARMACY"));
@@ -222,7 +223,7 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         mapStaff(w.clinic(), annex, other, "STORE_USER");
         int status = call(HttpMethod.GET, path, other.auth(), null).andReturn().getResponse().getStatus();
         assertThat(status).isIn(403, 404);
-        String all = call(HttpMethod.GET, PH + "/reports/h1-register", other.auth(), null).andReturn().getResponse().getContentAsString();
+        String all = call(HttpMethod.GET, PH + "/reports/h1-register?from=" + todayIst().minusDays(1) + "&to=" + todayIst(), other.auth(), null).andReturn().getResponse().getContentAsString();
         assertThat(all).as("no unmasked name of a store the pharmacist is not a member of").doesNotContain(NAME);
     }
 
@@ -233,12 +234,12 @@ class PharmacySalesRegistersApiIT extends Sah80SalesSupport {
         h1Bill(s, w.keeper(), 1);
         Pn hod = crew(w.clinic(), "NURSE", "Hema Head");
         mapStaff(w.clinic(), w.pharmacyId(), hod, "APPROVER");
-        String path = PH + "/reports/h1-register/export?storeId=" + w.pharmacyId();
+        String path = PH + "/reports/h1-register/export?storeId=" + w.pharmacyId() + "&from=" + todayIst().minusDays(1) + "&to=" + todayIst();
         assertType(problem(call(HttpMethod.GET, path, hod.auth(), null), 403), "forbidden");
         assertType(problem(call(HttpMethod.GET, path, s.cashier().auth(), null), 403), "forbidden");
         String csv = call(HttpMethod.GET, path, w.keeper().auth(), null).andReturn().getResponse().getContentAsString();
         assertThat(csv).contains(NAME);
-        assertThat(count(w.clinic(), "select count(*) from platform.audit_log where action = 'PHARMACY_REGISTER_EXPORTED'")).isOne();
+        assertThat(count(w.clinic(), "select count(*) from platform.audit_event where action = 'PHARMACY_REGISTER_EXPORTED'")).isOne();
         String regPath = url(w.pharmacyId(), "registers/h1/export");
         assertThat(call(HttpMethod.GET, regPath, hod.auth(), null).andReturn().getResponse().getStatus()).isIn(403);
     }
