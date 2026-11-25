@@ -1,0 +1,56 @@
+<section class="board" aria-label="Patient flow">
+  <div class="bhead">
+    <h2>Patient flow</h2>
+    <div class="seg" role="group" aria-label="Board scope">
+      <button type="button" [attr.aria-pressed]="scope() === 'all'" (click)="scopeChange.emit('all')">All doctors</button>
+      <button type="button" [attr.aria-pressed]="scope() === 'selected'" (click)="scopeChange.emit('selected')">
+        Selected doctor
+      </button>
+    </div>
+  </div>
+  <div class="cols">
+    @for (column of columns(); track column.key) {
+      <section class="col surf" [attr.aria-label]="column.title">
+        <h3>{{ column.title }} <span class="count">{{ column.cards.length }}</span></h3>
+        <ul class="cards">
+          @for (card of column.cards; track card.key) {
+            <li class="card">
+              <div class="ctop">
+                <b class="num">{{ clock(card.time) }}</b>
+                @if (token(card.tokenNo); as t) {
+                  @if (card.visitId) {
+                    <button type="button" class="tokchip tokbtn" [attr.aria-label]="'Token ' + t + ', open token panel'" (click)="tokenOpen.emit(card)">{{ t }}</button>
+                  } @else {
+                    <span class="tokchip">{{ t }}</span>
+                  }
+                }
+              </div>
+              <div class="cname">{{ card.patientName }}</div>
+              <div class="cmeta faint">{{ shortName(card.doctorName) }} · {{ visitType(card.visitType) }}</div>
+              <div class="tags">
+                @for (tag of card.tags; track tag) {
+                  <span class="pill" [class.p-crit]="tag === 'NO_SHOW'" [class.p-warn]="tag !== 'NO_SHOW'">{{ tagLabels[tag] }}</span>
+                }
+                @if (followTag(card); as f) {
+                  <span class="pill p-good">{{ f }}</span>
+                }
+              </div>
+              @if (canAct()) {
+                <div class="acts">
+                  @if (actionLabel(card); as label) {
+                    <button mat-stroked-button type="button" class="act" [disabled]="busy()" (click)="cardAction.emit(card)">{{ label }}</button>
+                  }
+                  @if (canMarkNoShow(card)) {
+                    <button mat-button type="button" class="act sec" [disabled]="busy()" (click)="markNoShow.emit(card)">Mark no-show</button>
+                  }
+                </div>
+              }
+            </li>
+          } @empty {
+            <li class="faint nobody">Nobody here</li>
+          }
+        </ul>
+      </section>
+    }
+  </div>
+</section>

@@ -72,7 +72,7 @@ class AppointmentServiceTest {
         when(teamMemberPort.find(TENANT_ID, DOCTOR_ID))
                 .thenReturn(Optional.of(new TeamMember(DOCTOR_ID, "Dr Rao", "DOCTOR", true, 50000)));
         when(bookingRulesRepository.find(TENANT_ID)).thenReturn(Optional.empty());
-        when(appointmentRepository.findActiveConflict(eq(TENANT_ID), eq(DOCTOR_ID), any(), any()))
+        when(appointmentRepository.findActiveConflict(eq(TENANT_ID), eq(DOCTOR_ID), any(), any(), any()))
                 .thenReturn(Optional.empty());
     }
 
@@ -81,11 +81,13 @@ class AppointmentServiceTest {
     }
 
     private void stubFindByIdEchoingTheRequestedId(String status, UUID visitId) {
-        when(appointmentRepository.findById(eq(TENANT_ID), any())).thenAnswer(invocation -> {
+        org.mockito.stubbing.Answer<Optional<AppointmentRow>> echo = invocation -> {
             UUID calledId = invocation.getArgument(1);
             return Optional.of(new AppointmentRow(calledId, PATIENT_ID, DOCTOR_ID, LocalDate.of(2026, 11, 1),
                     LocalTime.of(12, 0), status, "NEW", "FRONT_DESK", null, visitId, 0));
-        });
+        };
+        when(appointmentRepository.findById(eq(TENANT_ID), any())).thenAnswer(echo);
+        when(appointmentRepository.findByIdForUpdate(eq(TENANT_ID), any())).thenAnswer(echo);
     }
 
     /** For a write that reads the row once before the change and once after (changeStatus, createToken). */
@@ -95,9 +97,8 @@ class AppointmentServiceTest {
                 LocalTime.of(12, 0), statusBefore, "NEW", "FRONT_DESK", null, visitIdBefore, 0);
         AppointmentRow after = new AppointmentRow(APPT_ID, PATIENT_ID, DOCTOR_ID, LocalDate.of(2026, 11, 1),
                 LocalTime.of(12, 0), statusAfter, "NEW", "FRONT_DESK", null, visitIdAfter, 1);
-        when(appointmentRepository.findById(TENANT_ID, APPT_ID))
-                .thenReturn(Optional.of(before))
-                .thenReturn(Optional.of(after));
+        when(appointmentRepository.findByIdForUpdate(TENANT_ID, APPT_ID)).thenReturn(Optional.of(before));
+        when(appointmentRepository.findById(TENANT_ID, APPT_ID)).thenReturn(Optional.of(after));
     }
 
     @Test
@@ -126,15 +127,11 @@ class AppointmentServiceTest {
                 createInput(LocalDate.of(2026, 11, 1), "not-a-time"))).isInstanceOf(InvalidInputException.class);
     }
 
-    /** AC2: a non-staff caller reaching this service directly is refused inside the close-before window. */
+    /** ADR-032 D4 check 1: a non-staff caller reaching this service directly is refused first, before anything is read. */
     @Test
-    void aNonStaffCallerIsRefusedWithinTheCloseBeforeWindow() {
-        when(bookingRulesRepository.find(TENANT_ID))
-                .thenReturn(Optional.of(new BookingRulesRow(1, 2, 15, true, false, false)));
-
-        // "Now" is 2026-11-01 10:00 IST; 10:30 the same day is inside the 1-hour close-before window.
+    void aNonStaffCallerIsRefusedByTheRoleCheck() {
         assertThatThrownBy(() -> service.create(TENANT_ID, USER_ID, "NURSE",
-                createInput(LocalDate.of(2026, 11, 1), "10:30"))).isInstanceOf(InvalidInputException.class);
+                createInput(LocalDate.of(2026, 11, 1), "10:30"))).isInstanceOf(AccessDeniedException.class);
         verify(appointmentRepository, never()).insert(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
@@ -158,7 +155,7 @@ class AppointmentServiceTest {
         AppointmentRow existing = new AppointmentRow(UUID.randomUUID(), PATIENT_ID, DOCTOR_ID,
                 LocalDate.of(2026, 11, 1), LocalTime.of(12, 0), "BOOKED", "NEW", "FRONT_DESK", null, null, 0);
         when(appointmentRepository.findActiveConflict(TENANT_ID, DOCTOR_ID, LocalDate.of(2026, 11, 1),
-                LocalTime.of(12, 0))).thenReturn(Optional.of(existing));
+                LocalTime.of(12, 0), null)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.create(TENANT_ID, USER_ID, "OWNER",
                 createInput(LocalDate.of(2026, 11, 1), "12:00"))).isInstanceOf(ConflictException.class);
@@ -171,26 +168,13 @@ class AppointmentServiceTest {
         AppointmentRow existing = new AppointmentRow(UUID.randomUUID(), PATIENT_ID, DOCTOR_ID,
                 LocalDate.of(2026, 11, 1), LocalTime.of(12, 0), "BOOKED", "NEW", "FRONT_DESK", null, null, 0);
         when(appointmentRepository.findActiveConflict(TENANT_ID, DOCTOR_ID, LocalDate.of(2026, 11, 1),
-                LocalTime.of(12, 0))).thenReturn(Optional.of(existing));
+                LocalTime.of(12, 0), null)).thenReturn(Optional.of(existing));
         stubFindByIdEchoingTheRequestedId("BOOKED", null);
 
         AppointmentView view = service.create(TENANT_ID, USER_ID, "OWNER",
                 createInput(LocalDate.of(2026, 11, 1), "12:00"));
 
         assertThat(view.status()).isEqualTo("BOOKED");
-    }
-
-    @Test
-    void overbookOnStillRefusesANonStaffCaller() {
-        when(bookingRulesRepository.find(TENANT_ID))
-                .thenReturn(Optional.of(new BookingRulesRow(1, 2, 15, true, false, true)));
-        AppointmentRow existing = new AppointmentRow(UUID.randomUUID(), PATIENT_ID, DOCTOR_ID,
-                LocalDate.of(2026, 11, 1), LocalTime.of(12, 0), "BOOKED", "NEW", "FRONT_DESK", null, null, 0);
-        when(appointmentRepository.findActiveConflict(TENANT_ID, DOCTOR_ID, LocalDate.of(2026, 11, 1),
-                LocalTime.of(12, 0))).thenReturn(Optional.of(existing));
-
-        assertThatThrownBy(() -> service.create(TENANT_ID, USER_ID, "NURSE",
-                createInput(LocalDate.of(2026, 11, 1), "12:00"))).isInstanceOf(AccessDeniedException.class);
     }
 
     // --- changeStatus ---
@@ -214,7 +198,7 @@ class AppointmentServiceTest {
         stubFindByIdEchoingTheRequestedId("CANCELLED", null);
 
         assertThatThrownBy(() -> service.changeStatus(TENANT_ID, USER_ID, "OWNER", APPT_ID, "NOSHOW"))
-                .isInstanceOf(InvalidInputException.class);
+                .isInstanceOf(OpdProblemException.class);
     }
 
     @Test
@@ -262,7 +246,7 @@ class AppointmentServiceTest {
         stubFindByIdEchoingTheRequestedId("ARRIVED", UUID.randomUUID());
 
         assertThatThrownBy(() -> service.createToken(TENANT_ID, USER_ID, "OWNER", APPT_ID))
-                .isInstanceOf(ConflictException.class);
+                .isInstanceOf(OpdProblemException.class);
         verify(visitService, never()).issueToken(any(), any(), any(), any());
     }
 
@@ -271,7 +255,7 @@ class AppointmentServiceTest {
         stubFindByIdEchoingTheRequestedId("CANCELLED", null);
 
         assertThatThrownBy(() -> service.createToken(TENANT_ID, USER_ID, "OWNER", APPT_ID))
-                .isInstanceOf(ConflictException.class);
+                .isInstanceOf(OpdProblemException.class);
     }
 
     @Test
@@ -284,5 +268,70 @@ class AppointmentServiceTest {
                 .hasMessage("This doctor is not taking bookings on that date.");
 
         verify(appointmentRepository, never()).insert(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    // --- SAH-92-1 check-in rules (ADR-032 D6) ---
+
+    @Test
+    void checkInLocksTheRowFirstAndAnswersAlreadyCheckedInWithTheTokenOfTheEarlierVisit() {
+        UUID visitId = UUID.randomUUID();
+        stubFindByIdEchoingTheRequestedId("ARRIVED", visitId);
+        when(visitRepository.findById(TENANT_ID, visitId))
+                .thenReturn(Optional.of(new VisitRow(visitId, PATIENT_ID, DOCTOR_ID, "NEW", "WAITING", 8, 50000,
+                        CLOCK.instant(), 0)));
+
+        assertThatThrownBy(() -> service.checkIn(TENANT_ID, USER_ID, "OWNER", APPT_ID))
+                .isInstanceOfSatisfying(OpdProblemException.class, ex -> {
+                    assertThat(ex.slug()).isEqualTo("appointment-already-checked-in");
+                    assertThat(ex.getMessage()).isEqualTo("This patient is already checked in.");
+                    assertThat(ex.extensions()).containsEntry("visitId", visitId).containsEntry("tokenNo", 8);
+                });
+        verify(appointmentRepository).findByIdForUpdate(TENANT_ID, APPT_ID);
+        verify(visitService, never()).issueToken(any(), any(), any(), any());
+    }
+
+    @Test
+    void aNoShowAppointmentAnswersNotBookableWithTheBoardMessage() {
+        stubFindByIdEchoingTheRequestedId("NOSHOW", null);
+
+        assertThatThrownBy(() -> service.checkIn(TENANT_ID, USER_ID, "OWNER", APPT_ID))
+                .isInstanceOfSatisfying(OpdProblemException.class, ex -> {
+                    assertThat(ex.slug()).isEqualTo("appointment-not-bookable");
+                    assertThat(ex.getMessage())
+                            .isEqualTo("This appointment cannot be checked in now. The board now shows the latest.");
+                });
+    }
+
+    @Test
+    void anAppointmentOfAnotherDayIs400CheckInNotToday() {
+        AppointmentRow tomorrow = new AppointmentRow(APPT_ID, PATIENT_ID, DOCTOR_ID, LocalDate.of(2026, 11, 2),
+                LocalTime.of(12, 0), "BOOKED", "NEW", "FRONT_DESK", null, null, 0);
+        when(appointmentRepository.findByIdForUpdate(TENANT_ID, APPT_ID)).thenReturn(Optional.of(tomorrow));
+
+        assertThatThrownBy(() -> service.checkIn(TENANT_ID, USER_ID, "FRONT_DESK", APPT_ID))
+                .isInstanceOfSatisfying(OpdProblemException.class, ex -> {
+                    assertThat(ex.status()).isEqualTo(400);
+                    assertThat(ex.slug()).isEqualTo("check-in-not-today");
+                    assertThat(ex.getMessage()).isEqualTo("Check-in is only possible on the day of the visit.");
+                });
+        verify(visitService, never()).issueToken(any(), any(), any(), any());
+    }
+
+    @Test
+    void aNonStaffRoleCannotCheckIn() {
+        assertThatThrownBy(() -> service.checkIn(TENANT_ID, USER_ID, "NURSE", APPT_ID))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(appointmentRepository, never()).findByIdForUpdate(any(), any());
+    }
+
+    @Test
+    void cancellingAnArrivedAppointmentIsAppointmentNotBooked() {
+        stubFindByIdEchoingTheRequestedId("ARRIVED", UUID.randomUUID());
+
+        assertThatThrownBy(() -> service.changeStatus(TENANT_ID, USER_ID, "OWNER", APPT_ID, "CANCELLED"))
+                .isInstanceOfSatisfying(OpdProblemException.class,
+                        ex -> assertThat(ex.slug()).isEqualTo("appointment-not-booked"));
+        verify(appointmentRepository).findByIdForUpdate(TENANT_ID, APPT_ID);
+        verify(appointmentRepository, never()).updateStatus(any(), any(), any());
     }
 }

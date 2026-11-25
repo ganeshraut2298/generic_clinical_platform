@@ -29,7 +29,7 @@ class AppointmentDoubleBookingIT extends OpdJourneySupport {
     private static final String APPTS = "/api/v1/opd/appointments";
     private static final String RULES = "/api/v1/opd/booking-rules";
     private static final LocalDate DAY = LocalDate.now().plusDays(4);
-    private static final int ROUNDS = 5;
+    private static final int ROUNDS = 4; // the default session is 09:00 to 13:00, so the hours 9 to 12 are on the grid
 
     private void setOverbook(Clinic clinic, boolean overbook) throws Exception {
         mvc.perform(put(RULES).with(clinic.owner()).contentType(MediaType.APPLICATION_JSON)

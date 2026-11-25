@@ -73,14 +73,14 @@ public class DoctorSlotSettingsService {
                 .orElseThrow(() -> new NotFoundException("Doctor not found"));
 
         SlotSettingsRow before = repository.find(tenantId, doctorMembershipId).orElse(DEFAULTS);
-        SlotSettingsRow after = validate(input);
+        SlotSettingsRow after = validate(input, before.closeBeforeHours());
         repository.upsert(tenantId, doctorMembershipId, after, actorUserId);
         auditLog.record("DOCTOR_SLOT_SETTINGS_UPDATED", ENTITY_TYPE, doctorMembershipId, snapshot(before),
                 snapshot(after));
         return toView(doctor.membershipId(), after);
     }
 
-    private static SlotSettingsRow validate(DoctorSlotSettingsInput input) {
+    private static SlotSettingsRow validate(DoctorSlotSettingsInput input, Integer storedCloseBefore) {
         if (input.slotMinutes() == null || input.slotMinutes() < 5 || input.slotMinutes() > 60) {
             throw new InvalidInputException("slotMinutes", "Enter a slot length from 5 to 60 minutes");
         }
@@ -114,7 +114,23 @@ public class DoctorSlotSettingsService {
             sessions.add(new SessionRow(i, start, end));
         }
         return new SlotSettingsRow(input.slotMinutes(), List.copyOf(days), input.walkInEveryNth(),
-                input.maxOnlinePerDay(), sessions);
+                input.maxOnlinePerDay(), sessions, closeBefore(input, storedCloseBefore));
+    }
+
+    /** SAH-91-2: absent keeps the stored value, null clears it, a whole number 0 to 48 sets it. */
+    private static Integer closeBefore(DoctorSlotSettingsInput input, Integer stored) {
+        if (!input.closeBeforeSent()) {
+            return stored;
+        }
+        Number value = input.closeBeforeHours();
+        if (value == null) {
+            return null;
+        }
+        double d = value.doubleValue();
+        if (Double.isNaN(d) || d != Math.rint(d) || d < 0 || d > 48) {
+            throw new InvalidInputException("closeBeforeHours", "Enter whole hours from 0 to 48.");
+        }
+        return (int) d;
     }
 
     private static LocalTime parseTime(String value) {
@@ -127,7 +143,7 @@ public class DoctorSlotSettingsService {
 
     private static DoctorSlotSettingsView toView(UUID doctorMembershipId, SlotSettingsRow row) {
         return new DoctorSlotSettingsView(doctorMembershipId, row.slotMinutes(), row.workingDays(),
-                row.walkInEveryNth(), row.maxOnlinePerDay(), row.sessions());
+                row.walkInEveryNth(), row.maxOnlinePerDay(), row.sessions(), row.closeBeforeHours());
     }
 
     private static Map<String, Object> snapshot(SlotSettingsRow row) {
@@ -137,6 +153,7 @@ public class DoctorSlotSettingsService {
         values.put("walkInEveryNth", row.walkInEveryNth());
         values.put("maxOnlinePerDay", row.maxOnlinePerDay());
         values.put("sessions", row.sessions().size());
+        values.put("closeBeforeHours", row.closeBeforeHours());
         return values;
     }
 }

@@ -381,6 +381,7 @@ class WorkflowConfigIT extends OpdJourneySupport {
                                 + "\",\"apptTime\":\"10:00\",\"visitType\":\"NEW\",\"source\":\"FRONT_DESK\","
                                 + "\"note\":\"Check-up\"}"))
                 .andExpect(status().isCreated()).andReturn();
+        AppointmentToday.move(db(), clinic.tenantId(), readId(booked).toString()); // SAH-92: check-in only on the day of the visit
         MvcResult tokened = mvc.perform(post("/api/v1/opd/appointments/" + readId(booked) + "/token")
                         .with(clinic.as("FRONT_DESK")))
                 .andExpect(status().isOk()).andReturn();
@@ -635,6 +636,7 @@ class WorkflowConfigIT extends OpdJourneySupport {
                                 + "\",\"apptTime\":\"11:00\",\"visitType\":\"NEW\",\"source\":\"FRONT_DESK\","
                                 + "\"note\":\"Check-up\"}"))
                 .andExpect(status().isCreated()).andReturn();
+        AppointmentToday.move(db(), clinic.tenantId(), readId(booked).toString()); // SAH-92: check-in only on the day of the visit
         MvcResult tokened = mvc.perform(post("/api/v1/opd/appointments/" + readId(booked) + "/token")
                         .with(clinic.as("FRONT_DESK")))
                 .andExpect(status().isOk()).andReturn();

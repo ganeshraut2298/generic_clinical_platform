@@ -48,16 +48,17 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
             where id = (
                 select id from opd.follow_up
                 where tenant_id = :tenantId and patient_id = :patientId and doctor_membership_id = :doctorId
-                  and returned_visit_id is null and source_visit_id is distinct from :returnedVisitId
+                  and returned_visit_id is null and not_needed_at is null
+                  and source_visit_id is distinct from :returnedVisitId
                 order by due_date, created_at
                 limit 1
                 for update)
             returning id
             """;
     private static final String COUNTS = """
-            select count(*) filter (where returned_visit_id is null and due_date = :today) as due,
-                   count(*) filter (where returned_visit_id is null and due_date < :today) as missed,
-                   count(*) filter (where returned_visit_id is null and due_date > :today) as upcoming,
+            select count(*) filter (where returned_visit_id is null and not_needed_at is null and due_date = :today) as due,
+                   count(*) filter (where returned_visit_id is null and not_needed_at is null and due_date < :today) as missed,
+                   count(*) filter (where returned_visit_id is null and not_needed_at is null and due_date > :today) as upcoming,
                    count(*) filter (where returned_visit_id is not null) as returned
             from opd.follow_up
             where tenant_id = :tenantId
@@ -72,7 +73,8 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
                    (select a.appt_date from opd.appointment a
                      where a.tenant_id = f.tenant_id and a.id = f.appointment_id) as appointment_date,
                    (select a.appt_time from opd.appointment a
-                     where a.tenant_id = f.tenant_id and a.id = f.appointment_id) as appointment_time
+                     where a.tenant_id = f.tenant_id and a.id = f.appointment_id) as appointment_time,
+                   appointment_id, (not_needed_at is not null) as not_needed
             from opd.follow_up f
             where tenant_id = :tenantId and""";
     private static final String BY_SOURCE_VISIT = """
@@ -84,9 +86,20 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
             where tenant_id = :tenantId and id = :id
             """;
     private static final String SET_APPOINTMENT = """
-            update opd.follow_up set appointment_id = :appointmentId, interval_key = :intervalKey, updated_by = :actor,
+            update opd.follow_up set appointment_id = :appointmentId, interval_key = coalesce(cast(:intervalKey as text), interval_key),
+                updated_by = :actor,
                 updated_at = now(), version = version + 1
             where tenant_id = :tenantId and id = :id
+            """;
+    private static final String LOCKED_SELECT = """
+            select id, patient_id, doctor_membership_id, source_visit_id, due_date, returned_visit_id, appointment_id,
+                   (not_needed_at is not null) as not_needed
+            from opd.follow_up
+            where tenant_id = :tenantId and""";
+    private static final String MARK_NOT_NEEDED = """
+            update opd.follow_up set not_needed_at = now(), not_needed_by = :actor, updated_by = :actor,
+                updated_at = now(), version = version + 1
+            where tenant_id = :tenantId and id = :id and not_needed_at is null
             """;
     private static final String ORDER_BY_DUE = " order by due_date, created_at limit " + MAX_ROWS;
     private static final String ORDER_BY_RETURN = " order by returned_at desc, created_at limit " + MAX_ROWS;
@@ -187,9 +200,9 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
                     .list();
         }
         String condition = switch (status) {
-            case "DUE" -> "returned_visit_id is null and due_date = :today";
-            case "MISSED" -> "returned_visit_id is null and due_date < :today";
-            case "UPCOMING" -> "returned_visit_id is null and due_date > :today";
+            case "DUE" -> "returned_visit_id is null and not_needed_at is null and due_date = :today";
+            case "MISSED" -> "returned_visit_id is null and not_needed_at is null and due_date < :today";
+            case "UPCOMING" -> "returned_visit_id is null and not_needed_at is null and due_date > :today";
             default -> throw new IllegalArgumentException("Unknown follow-up status");
         };
         return jdbc.sql(SELECT + " " + condition + ORDER_BY_DUE)
@@ -205,7 +218,32 @@ public class JdbcFollowUpRepository implements FollowUpRepository {
                 rs.getObject("source_admission_id", UUID.class),
                 rs.getObject("due_date", LocalDate.class), rs.getString("reason"),
                 rs.getObject("returned_visit_id", UUID.class), rs.getObject("appointment_date", LocalDate.class),
-                rs.getObject("appointment_time", java.time.LocalTime.class));
+                rs.getObject("appointment_time", java.time.LocalTime.class), rs.getObject("appointment_id", UUID.class),
+                rs.getBoolean("not_needed"));
+    }
+
+    private static LockedFollowUp mapLocked(ResultSet rs, int rowNum) throws SQLException {
+        return new LockedFollowUp(rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class),
+                rs.getObject("doctor_membership_id", UUID.class), rs.getObject("source_visit_id", UUID.class),
+                rs.getObject("due_date", LocalDate.class), rs.getObject("returned_visit_id", UUID.class),
+                rs.getObject("appointment_id", UUID.class), rs.getBoolean("not_needed"));
+    }
+
+    @Override
+    public Optional<LockedFollowUp> findByIdForUpdate(UUID tenantId, UUID id) {
+        return jdbc.sql(LOCKED_SELECT + " id = :id for update").param("tenantId", tenantId).param("id", id)
+                .query(JdbcFollowUpRepository::mapLocked).optional();
+    }
+
+    @Override
+    public Optional<LockedFollowUp> findBySourceVisitForUpdate(UUID tenantId, UUID sourceVisitId) {
+        return jdbc.sql(LOCKED_SELECT + " source_visit_id = :visitId for update").param("tenantId", tenantId)
+                .param("visitId", sourceVisitId).query(JdbcFollowUpRepository::mapLocked).optional();
+    }
+
+    @Override
+    public void markNotNeeded(UUID tenantId, UUID id, UUID actorUserId) {
+        jdbc.sql(MARK_NOT_NEEDED).param("tenantId", tenantId).param("id", id).param("actor", actorUserId).update();
     }
 
     @Override

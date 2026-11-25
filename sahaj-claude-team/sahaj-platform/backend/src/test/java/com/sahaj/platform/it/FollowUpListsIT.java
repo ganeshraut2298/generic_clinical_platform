@@ -287,6 +287,7 @@ class FollowUpListsIT extends SweepSupport {
                         + "\",\"apptDate\":\"" + LocalDate.now().plusDays(3) + "\",\"apptTime\":\"10:00\","
                         + "\"visitType\":\"FOLLOW_UP\",\"source\":\"FRONT_DESK\",\"note\":\"Review\"}", 201);
         assertCounts(list(clinic, "UPCOMING"), 0, 0, 1, 0); // booking alone does not close it
+        AppointmentToday.move(db(), clinic.tenantId(), appt.get("id").asText()); // SAH-92: check-in only on the day of the visit
         JsonNode tokened = ok(HttpMethod.POST, APPTS + "/" + appt.get("id").asText() + "/token",
                 clinic.as("FRONT_DESK"), null, 200);
 

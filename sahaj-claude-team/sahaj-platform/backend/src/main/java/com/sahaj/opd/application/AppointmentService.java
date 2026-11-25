@@ -46,6 +46,7 @@ public class AppointmentService {
     private static final Set<String> PATCHABLE_STATUSES = Set.of("CANCELLED", "NOSHOW");
     private static final String BOOKED = "BOOKED";
     private static final String ARRIVED = "ARRIVED";
+    private static final String NOSHOW = "NOSHOW";
     private static final Set<String> DOCTOR_ROLES = Set.of("DOCTOR", "VISITING_DOCTOR");
     /** The free slots bookFirstFree reads and tries in turn (each costs one select inside the sign transaction). */
     private static final int BOOK_CANDIDATES = 10;
@@ -61,6 +62,8 @@ public class AppointmentService {
     private final Clock clock;
     /** SAH-51 (ADR-025 D6): the doctor's slot pattern for the EMR's follow-up booking; null in a plain unit test. */
     private final DoctorSlotSettingsRepository slotSettings;
+    /** SAH-92-2: the token panel of a check-in; null in a plain unit test. */
+    private final DeskReadService deskReads;
 
     public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
                                VisitRepository visitRepository, VisitService visitService,
@@ -70,12 +73,22 @@ public class AppointmentService {
                 blockedDates, auditLog, clock, null);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
     public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
                                VisitRepository visitRepository, VisitService visitService,
                                PatientLookupPort patientLookup, TeamMemberPort teamMemberPort,
                                DoctorBlockedDates blockedDates, AuditLog auditLog, Clock clock,
                                DoctorSlotSettingsRepository slotSettings) {
+        this(appointmentRepository, bookingRulesRepository, visitRepository, visitService, patientLookup, teamMemberPort,
+                blockedDates, auditLog, clock, slotSettings, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AppointmentService(AppointmentRepository appointmentRepository, BookingRulesRepository bookingRulesRepository,
+                               VisitRepository visitRepository, VisitService visitService,
+                               PatientLookupPort patientLookup, TeamMemberPort teamMemberPort,
+                               DoctorBlockedDates blockedDates, AuditLog auditLog, Clock clock,
+                               DoctorSlotSettingsRepository slotSettings, DeskReadService deskReads) {
+        this.deskReads = deskReads;
         this.slotSettings = slotSettings;
         this.appointmentRepository = appointmentRepository;
         this.bookingRulesRepository = bookingRulesRepository;
@@ -124,6 +137,10 @@ public class AppointmentService {
      */
     @Transactional
     public AppointmentView create(UUID tenantId, UUID actorUserId, String actorRole, AppointmentCreateInput input) {
+        // ADR-032 D4 check 1: the role. The controller gates it too; a direct service call is refused the same way.
+        if (!WRITE_ROLES.contains(actorRole)) {
+            throw new AccessDeniedException("Only the owner or front desk can book an appointment.");
+        }
         if (input.patientId() == null) {
             throw new InvalidInputException("patientId", "Choose a patient");
         }
@@ -143,33 +160,18 @@ public class AppointmentService {
 
         PatientSummary patient = patientLookup.find(tenantId, input.patientId())
                 .orElseThrow(() -> new NotFoundException("Patient not found"));
-        TeamMember doctor = teamMemberPort.find(tenantId, input.doctorMembershipId())
-                .filter(member -> member.active() && DOCTOR_ROLES.contains(member.role()))
-                .orElseThrow(() -> new NotFoundException("Doctor not found"));
-
-        if (blockedDates.blocked(tenantId, doctor.membershipId(), input.apptDate(), input.apptDate())
-                .contains(input.apptDate())) {
-            throw new ConflictException("doctor-unavailable", "Doctor is not taking bookings that day",
-                    "This doctor is not taking bookings on that date.");
-        }
+        TeamMember doctor = activeDoctor(tenantId, input.doctorMembershipId());
 
         BookingRulesRow rules = bookingRulesRepository.find(tenantId).orElse(BookingRulesService.DEFAULTS);
+        requireBookable(tenantId, actorRole, rules, doctor.membershipId(), input.apptDate(), apptTime);
 
-        if (!WRITE_ROLES.contains(actorRole)) {
-            requireOutsideCloseBeforeWindow(rules, input.apptDate(), apptTime);
-        }
-
-        appointmentRepository.lockSlot(tenantId, input.doctorMembershipId(), input.apptDate(), apptTime);
-        appointmentRepository.findActiveConflict(tenantId, input.doctorMembershipId(), input.apptDate(), apptTime)
-                .ifPresent(existing -> {
-                    if (!rules.overbook()) {
-                        throw new ConflictException("appointment-slot-taken", "That slot is already booked",
-                                "This doctor already has a booked or arrived patient in this slot.");
-                    }
-                    if (!WRITE_ROLES.contains(actorRole)) {
-                        throw new AccessDeniedException("Only the owner or front desk can double-book a slot.");
-                    }
+        // check 9: the slot lock; 10: the same patient already holds the slot; 11: someone else does
+        appointmentRepository.lockSlot(tenantId, doctor.membershipId(), input.apptDate(), apptTime);
+        appointmentRepository.findActiveForPatient(tenantId, patient.id(), doctor.membershipId(), input.apptDate(),
+                apptTime, null).ifPresent(existing -> {
+                    throw OpdProblemException.appointmentDuplicate(existing.id());
                 });
+        requireSlotNotTaken(actorRole, rules, tenantId, doctor.membershipId(), input.apptDate(), apptTime, null);
 
         UUID id = UUID.randomUUID();
         appointmentRepository.insert(id, patient.id(), doctor.membershipId(), input.apptDate(), apptTime,
@@ -179,14 +181,120 @@ public class AppointmentService {
         return toView(tenantId, created, patient, doctor);
     }
 
-    /** AC2: a patient's booked slot refuses a new booking in the same slot within the close-before window, staff excepted. */
-    private void requireOutsideCloseBeforeWindow(BookingRulesRow rules, LocalDate apptDate, LocalTime apptTime) {
-        LocalDateTime slotAt = LocalDateTime.of(apptDate, apptTime);
-        LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
-        if (slotAt.isBefore(now.plusHours(rules.closeBeforeHours()))) {
-            throw new InvalidInputException("apptTime",
-                    "Booking closes " + rules.closeBeforeHours() + " hour(s) before the slot");
+    /**
+     * SAH-91-3 (ADR-032 D5): moves an appointment in place to another doctor, date and time and sets it BOOKED. The row is
+     * locked first; a stale version is 409 appointment-changed; only BOOKED and NOSHOW can move; then the checks of
+     * {@link #create} for the new slot, the appointment's own row never being a clash. The same doctor, date and time of a
+     * BOOKED appointment answers the stored row and writes nothing.
+     */
+    @Transactional
+    public AppointmentView reschedule(UUID tenantId, UUID actorUserId, String actorRole, UUID id,
+                                      AppointmentRescheduleInput input) {
+        if (!WRITE_ROLES.contains(actorRole)) {
+            throw new AccessDeniedException("Only the owner or front desk can move an appointment.");
         }
+        if (input.version() == null || input.version() < 0) {
+            throw new InvalidInputException("version", "Reload the page and try again.");
+        }
+        if (input.doctorMembershipId() == null) {
+            throw new InvalidInputException("doctorMembershipId", "Choose a doctor");
+        }
+        if (input.apptDate() == null) {
+            throw new InvalidInputException("apptDate", "Choose a date");
+        }
+        LocalTime apptTime = parseTime(input.apptTime());
+
+        AppointmentRow before = appointmentRepository.findByIdForUpdate(tenantId, id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
+        if (before.version() != input.version()) {
+            throw OpdProblemException.appointmentChanged();
+        }
+        if (!BOOKED.equals(before.status()) && !NOSHOW.equals(before.status())) {
+            throw OpdProblemException.appointmentNotReschedulable();
+        }
+        PatientSummary patient = patientLookup.find(tenantId, before.patientId())
+                .orElseThrow(() -> new NotFoundException("Patient not found"));
+        TeamMember doctor = activeDoctor(tenantId, input.doctorMembershipId());
+        if (BOOKED.equals(before.status()) && before.doctorMembershipId().equals(doctor.membershipId())
+                && before.apptDate().equals(input.apptDate()) && before.apptTime().equals(apptTime)) {
+            return toView(tenantId, before, patient, doctor);
+        }
+
+        BookingRulesRow rules = bookingRulesRepository.find(tenantId).orElse(BookingRulesService.DEFAULTS);
+        requireBookable(tenantId, actorRole, rules, doctor.membershipId(), input.apptDate(), apptTime);
+        appointmentRepository.lockSlot(tenantId, doctor.membershipId(), input.apptDate(), apptTime);
+        appointmentRepository.findActiveForPatient(tenantId, patient.id(), doctor.membershipId(), input.apptDate(),
+                apptTime, id).ifPresent(existing -> {
+                    throw OpdProblemException.appointmentDuplicate(existing.id());
+                });
+        requireSlotNotTaken(actorRole, rules, tenantId, doctor.membershipId(), input.apptDate(), apptTime, id);
+
+        if (!appointmentRepository.reschedule(id, input.version(), doctor.membershipId(), input.apptDate(), apptTime,
+                actorUserId)) {
+            throw OpdProblemException.appointmentChanged();
+        }
+        AppointmentRow after = findRow(tenantId, id);
+        auditLog.record("APPOINTMENT_RESCHEDULED", ENTITY_TYPE, id, placement(before), placement(after));
+        return toView(tenantId, after, patient, doctor);
+    }
+
+    private TeamMember activeDoctor(UUID tenantId, UUID doctorMembershipId) {
+        return teamMemberPort.find(tenantId, doctorMembershipId)
+                .filter(member -> member.active() && DOCTOR_ROLES.contains(member.role()))
+                .orElseThrow(() -> new NotFoundException("Doctor not found"));
+    }
+
+    /**
+     * ADR-032 D4 checks 4 to 8 for one doctor, date and time: approved leave (409 doctor-unavailable), then the shared
+     * {@link BookingPolicy} (working day, grid, walk-in reserve, past, cut-off; the cut-off never refuses staff).
+     */
+    private void requireBookable(UUID tenantId, String actorRole, BookingRulesRow rules, UUID doctorMembershipId,
+                                 LocalDate date, LocalTime time) {
+        if (blockedDates.blocked(tenantId, doctorMembershipId, date, date).contains(date)) {
+            throw new ConflictException("doctor-unavailable", "Doctor is not taking bookings that day",
+                    "This doctor is not taking bookings on that date.");
+        }
+        DoctorSlotSettingsRepository.SlotSettingsRow plan = slotSettings == null ? DoctorSlotSettingsService.DEFAULTS
+                : slotSettings.find(tenantId, doctorMembershipId).orElse(DoctorSlotSettingsService.DEFAULTS);
+        LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
+        BookingPolicy.Refusal refusal = BookingPolicy.firstRefusal(plan, rules.closeBeforeHours(), date, time, now,
+                BookingPolicy.isStaff(actorRole));
+        if (refusal == null) {
+            return;
+        }
+        switch (refusal) {
+            case NOT_WORKING -> throw OpdProblemException.doctorNotWorking();
+            case NOT_ON_GRID -> throw OpdProblemException.slotNotOnGrid();
+            case WALK_IN_ONLY -> throw OpdProblemException.slotWalkInOnly();
+            case IN_PAST -> throw OpdProblemException.slotInPast();
+            default -> throw OpdProblemException.bookingClosed(
+                    BookingPolicy.effectiveCloseBefore(plan.closeBeforeHours(), rules.closeBeforeHours()));
+        }
+    }
+
+    /** Check 11: another BOOKED or ARRIVED appointment holds the slot; overbook on lets only staff add to it. */
+    private void requireSlotNotTaken(String actorRole, BookingRulesRow rules, UUID tenantId, UUID doctorMembershipId,
+                                     LocalDate date, LocalTime time, UUID excludeId) {
+        appointmentRepository.findActiveConflict(tenantId, doctorMembershipId, date, time, excludeId)
+                .ifPresent(existing -> {
+                    if (!rules.overbook()) {
+                        throw new ConflictException("appointment-slot-taken", "That slot is already booked",
+                                "That slot was just booked. Pick another time.");
+                    }
+                    if (!WRITE_ROLES.contains(actorRole)) {
+                        throw new AccessDeniedException("Only the owner or front desk can double-book a slot.");
+                    }
+                });
+    }
+
+    /** Doctor, date, time and status words only: never a name (ADR-032 D5). */
+    private static Map<String, Object> placement(AppointmentRow row) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("doctorMembershipId", row.doctorMembershipId());
+        values.put("apptDate", row.apptDate());
+        values.put("apptTime", row.apptTime());
+        values.put("status", row.status());
+        return values;
     }
 
     /** One free slot of a doctor (ADR-025 D6): the date and the start time. */
@@ -209,23 +317,16 @@ public class AppointmentService {
         }
         DoctorSlotSettingsRepository.SlotSettingsRow settings = slotSettings.find(tenantId, doctorMembershipId)
                 .orElse(DoctorSlotSettingsService.DEFAULTS);
-        List<SlotComputation.Session> sessions = settings.sessions().stream()
-                .map(s -> new SlotComputation.Session(s.sessionIndex(), s.startTime(), s.endTime())).toList();
         LocalDate lastDay = from.plusDays(Math.max(days, 1) - 1L);
         Set<LocalDate> blocked = blockedDates.blocked(tenantId, doctorMembershipId, from, lastDay);
         LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
         for (LocalDate day = from; !day.isAfter(lastDay) && out.size() < limit; day = day.plusDays(1)) {
-            if (blocked.contains(day)) {
-                continue;
-            }
-            for (SlotComputation.Slot slot : SlotComputation.slotsFor(day, settings.slotMinutes(),
-                    new java.util.HashSet<>(settings.workingDays()), settings.walkInEveryNth(), sessions)) {
-                if (slot.walkInReserved() || !LocalDateTime.of(day, slot.startTime()).isAfter(now)) {
-                    continue;
-                }
-                if (appointmentRepository.findActiveConflict(tenantId, doctorMembershipId, day, slot.startTime())
+            // the staff view with no cut-off: the EMR choice is the doctor's own (DEC-097 addendum 2 item 3)
+            for (BookingPolicy.OpenSlot slot : BookingPolicy.openSlots(settings, 0, day, now, true,
+                    blocked.contains(day), Set.of())) {
+                if (appointmentRepository.findActiveConflict(tenantId, doctorMembershipId, day, slot.time())
                         .isEmpty()) {
-                    out.add(new FreeSlot(day, slot.startTime()));
+                    out.add(new FreeSlot(day, slot.time()));
                     if (out.size() >= limit) {
                         break;
                     }
@@ -250,16 +351,8 @@ public class AppointmentService {
         }
         DoctorSlotSettingsRepository.SlotSettingsRow settings = slotSettings.find(tenantId, doctorMembershipId)
                 .orElse(DoctorSlotSettingsService.DEFAULTS);
-        List<SlotComputation.Session> sessions = settings.sessions().stream()
-                .map(s -> new SlotComputation.Session(s.sessionIndex(), s.startTime(), s.endTime())).toList();
         LocalDateTime now = LocalDateTime.now(clock.withZone(INDIA));
-        for (SlotComputation.Slot slot : SlotComputation.slotsFor(date, settings.slotMinutes(),
-                new java.util.HashSet<>(settings.workingDays()), settings.walkInEveryNth(), sessions)) {
-            if (slot.startTime().equals(time)) {
-                return !slot.walkInReserved() && LocalDateTime.of(date, time).isAfter(now);
-            }
-        }
-        return false;
+        return BookingPolicy.firstRefusal(settings, 0, date, time, now, true) == null;
     }
 
     /**
@@ -289,12 +382,19 @@ public class AppointmentService {
 
     /**
      * SAH-63-3 (ADR-025 D7): books the slot the doctor chose in the finish dialog (physiotherapy session n+1). Empty when the
-     * slot was taken or the doctor is not taking bookings that day meanwhile (the sitting then keeps the date only).
+     * slot was taken, the doctor is on leave, or {@link BookingPolicy#firstRefusal} refuses it as staff (not a working day, off
+     * the grid, walk-in only, in the past; there is no cut-off for this call) - the sitting then keeps the date only.
      */
     @Transactional
     public Optional<BookedSlot> bookAt(UUID tenantId, UUID actorUserId, UUID patientId, UUID doctorMembershipId,
                                        LocalDate date, LocalTime time, String visitType, String source) {
         if (blockedDates.blocked(tenantId, doctorMembershipId, date, date).contains(date)) {
+            return Optional.empty();
+        }
+        DoctorSlotSettingsRepository.SlotSettingsRow plan = slotSettings == null ? DoctorSlotSettingsService.DEFAULTS
+                : slotSettings.find(tenantId, doctorMembershipId).orElse(DoctorSlotSettingsService.DEFAULTS);
+        // working day, grid, walk-in reserve and past, as staff (no cut-off): the same rule POST /appointments applies
+        if (BookingPolicy.firstRefusal(plan, 0, date, time, LocalDateTime.now(clock.withZone(INDIA)), true) != null) {
             return Optional.empty();
         }
         appointmentRepository.lockSlot(tenantId, doctorMembershipId, date, time);
@@ -317,9 +417,11 @@ public class AppointmentService {
         if (status == null || !PATCHABLE_STATUSES.contains(status)) {
             throw new InvalidInputException("status", "Choose Cancelled or No-show");
         }
-        AppointmentRow before = findRow(tenantId, id);
+        // ADR-032 D6: the row is locked before its status is read, so a cancel racing a check-in ends in one outcome.
+        AppointmentRow before = appointmentRepository.findByIdForUpdate(tenantId, id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
         if (!BOOKED.equals(before.status())) {
-            throw new InvalidInputException("status", "Only a booked appointment can be cancelled or marked no-show");
+            throw OpdProblemException.appointmentNotBooked();
         }
         appointmentRepository.updateStatus(id, status, actorUserId);
         AppointmentRow after = findRow(tenantId, id);
@@ -331,13 +433,35 @@ public class AppointmentService {
     /** AC3, AC4, AC7: "Create token" issues a SAH-9 visit and marks this appointment Arrived with its token number. */
     @Transactional
     public AppointmentView createToken(UUID tenantId, UUID actorUserId, String actorRole, UUID id) {
+        return checkIn(tenantId, actorUserId, actorRole, id).appointment();
+    }
+
+    /** The answer of the check-in: the appointment and the token panel (null only in a unit test without the desk reads). */
+    public record CheckIn(AppointmentView appointment, DeskViews.TokenPanel tokenPanel) {
+    }
+
+    /**
+     * SAH-92-1, SAH-92-2 (ADR-032 D6), one transaction: the appointment row is locked first (appointment row, then the
+     * token counter inside the visit insert). ARRIVED is 409 appointment-already-checked-in with the visit and token;
+     * CANCELLED or NOSHOW is 409 appointment-not-bookable; another day is 400 check-in-not-today. The token day is today in
+     * IST. The panel is computed after the insert.
+     */
+    @Transactional
+    public CheckIn checkIn(UUID tenantId, UUID actorUserId, String actorRole, UUID id) {
         if (!WRITE_ROLES.contains(actorRole)) {
             throw new AccessDeniedException("Only the owner or front desk can create a token.");
         }
-        AppointmentRow appointment = findRow(tenantId, id);
+        AppointmentRow appointment = appointmentRepository.findByIdForUpdate(tenantId, id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
+        if (ARRIVED.equals(appointment.status()) && appointment.visitId() != null) {
+            int tokenNo = visitRepository.findById(tenantId, appointment.visitId()).map(VisitRow::tokenNo).orElse(0);
+            throw OpdProblemException.appointmentAlreadyCheckedIn(appointment.visitId(), tokenNo);
+        }
         if (appointment.visitId() != null || !BOOKED.equals(appointment.status())) {
-            throw new ConflictException("appointment-not-bookable", "This appointment cannot take a token",
-                    "This appointment already has a token or is not booked.");
+            throw OpdProblemException.appointmentNotBookable();
+        }
+        if (!appointment.apptDate().equals(LocalDate.now(clock.withZone(INDIA)))) {
+            throw OpdProblemException.checkInNotToday();
         }
         VisitView visit = visitService.issueToken(tenantId, actorUserId, actorRole,
                 new VisitCreateInput(appointment.patientId(), appointment.doctorMembershipId()));
@@ -345,7 +469,13 @@ public class AppointmentService {
         AppointmentRow after = findRow(tenantId, id);
         auditLog.record("APPOINTMENT_TOKEN_ISSUED", ENTITY_TYPE, id, Map.of("status", appointment.status()),
                 Map.of("status", after.status(), "visitId", visit.id(), "tokenNo", visit.tokenNo()));
-        return toView(tenantId, after);
+        DeskViews.TokenPanel panel = null;
+        if (deskReads != null) {
+            VisitRow visitRow = visitRepository.findById(tenantId, visit.id())
+                    .orElseThrow(() -> new NotFoundException("Visit not found"));
+            panel = deskReads.tokenPanel(tenantId, visitRow);
+        }
+        return new CheckIn(toView(tenantId, after), panel);
     }
 
     private AppointmentRow findRow(UUID tenantId, UUID id) {
@@ -367,7 +497,7 @@ public class AppointmentService {
         }
         return new AppointmentView(row.id(), patient.id(), patient.name(), patient.age(), patient.sex(),
                 doctor.membershipId(), doctor.name(), row.apptDate(), row.apptTime(), row.status(), row.visitType(),
-                row.source(), row.note(), row.visitId(), tokenNo);
+                row.source(), row.note(), row.visitId(), tokenNo, row.version());
     }
 
     private static LocalTime parseTime(String value) {

@@ -1,0 +1,66 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+
+  h2,
+  p {
+    margin: 0;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.flabel {
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.err {
+  font-size: 0.84rem;
+  color: var(--crit);
+}
+
+.seg,
+.slotgrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  button {
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--glass-hi);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      border-color: var(--pri);
+      background: var(--pri-soft);
+      color: var(--pri-text);
+      font-weight: 600;
+    }
+  }
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    min-height: 44px;
+  }
+}

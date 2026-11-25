@@ -31,7 +31,21 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
             + " order by appt_time";
     private static final String FIND_ACTIVE_CONFLICT = SELECT
             + " where tenant_id = :tenantId and doctor_membership_id = :doctorMembershipId"
-            + " and appt_date = :apptDate and appt_time = :apptTime and status in ('BOOKED', 'ARRIVED')";
+            + " and appt_date = :apptDate and appt_time = :apptTime and status in ('BOOKED', 'ARRIVED') order by created_at limit 1";
+    private static final String FIND_ACTIVE_CONFLICT_EXCLUDING = SELECT
+            + " where tenant_id = :tenantId and doctor_membership_id = :doctorMembershipId"
+            + " and appt_date = :apptDate and appt_time = :apptTime and status in ('BOOKED', 'ARRIVED')"
+            + " and (cast(:excludeId as uuid) is null or id <> :excludeId) order by created_at limit 1";
+    private static final String FIND_ACTIVE_FOR_PATIENT = SELECT
+            + " where tenant_id = :tenantId and patient_id = :patientId and doctor_membership_id = :doctorMembershipId"
+            + " and appt_date = :apptDate and appt_time = :apptTime and status in ('BOOKED', 'ARRIVED')"
+            + " and (cast(:excludeId as uuid) is null or id <> :excludeId) order by created_at limit 1";
+    private static final String RESCHEDULE = """
+            update opd.appointment
+            set doctor_membership_id = :doctorMembershipId, appt_date = :apptDate, appt_time = :apptTime,
+                status = 'BOOKED', updated_by = :actor, updated_at = now(), version = version + 1
+            where id = :id and version = :version and tenant_id = platform.current_tenant()
+            """;
     private static final String COUNT_BOOKED = """
             select count(*) from opd.appointment
             where tenant_id = :tenantId and doctor_membership_id = :doctorMembershipId
@@ -118,6 +132,52 @@ public class JdbcAppointmentRepository implements AppointmentRepository {
                 .param("apptTime", Time.valueOf(apptTime))
                 .query(JdbcAppointmentRepository::map)
                 .optional();
+    }
+
+    @Override
+    public Optional<AppointmentRow> findByIdForUpdate(UUID tenantId, UUID id) {
+        return jdbc.sql(FIND_BY_ID + " for update").param("tenantId", tenantId).param("id", id)
+                .query(JdbcAppointmentRepository::map).optional();
+    }
+
+    @Override
+    public Optional<AppointmentRow> findActiveConflict(UUID tenantId, UUID doctorMembershipId, LocalDate apptDate,
+                                                         LocalTime apptTime, UUID excludeId) {
+        return jdbc.sql(FIND_ACTIVE_CONFLICT_EXCLUDING)
+                .param("tenantId", tenantId)
+                .param("doctorMembershipId", doctorMembershipId)
+                .param("apptDate", apptDate)
+                .param("apptTime", Time.valueOf(apptTime))
+                .param("excludeId", excludeId, java.sql.Types.OTHER)
+                .query(JdbcAppointmentRepository::map)
+                .optional();
+    }
+
+    @Override
+    public Optional<AppointmentRow> findActiveForPatient(UUID tenantId, UUID patientId, UUID doctorMembershipId,
+                                                           LocalDate apptDate, LocalTime apptTime, UUID excludeId) {
+        return jdbc.sql(FIND_ACTIVE_FOR_PATIENT)
+                .param("tenantId", tenantId)
+                .param("patientId", patientId)
+                .param("doctorMembershipId", doctorMembershipId)
+                .param("apptDate", apptDate)
+                .param("apptTime", Time.valueOf(apptTime))
+                .param("excludeId", excludeId, java.sql.Types.OTHER)
+                .query(JdbcAppointmentRepository::map)
+                .optional();
+    }
+
+    @Override
+    public boolean reschedule(UUID id, long expectedVersion, UUID doctorMembershipId, LocalDate apptDate,
+                              LocalTime apptTime, UUID actorUserId) {
+        return jdbc.sql(RESCHEDULE)
+                .param("id", id)
+                .param("version", expectedVersion)
+                .param("doctorMembershipId", doctorMembershipId)
+                .param("apptDate", apptDate)
+                .param("apptTime", Time.valueOf(apptTime))
+                .param("actor", actorUserId)
+                .update() > 0;
     }
 
     @Override

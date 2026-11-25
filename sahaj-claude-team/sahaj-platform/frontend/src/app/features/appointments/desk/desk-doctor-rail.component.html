@@ -1,0 +1,39 @@
+<aside class="rail surf" aria-label="Doctors">
+  <div class="rail-head">
+    <h2>Doctors</h2>
+    <span class="faint" data-testid="rail-count">{{ doctors().length }} of {{ total() }}</span>
+  </div>
+  <div class="field">
+    <label for="desk-dept">Department</label>
+    <select id="desk-dept" [value]="department()" (change)="onDepartment($event)">
+      @for (option of departments(); track option) {
+        <option [value]="option" [selected]="option === department()">{{ option }}</option>
+      }
+    </select>
+  </div>
+  <ul class="rail-list">
+    @for (doctor of doctors(); track doctor.doctorMembershipId) {
+      <li>
+        <button
+          type="button"
+          class="drow"
+          [attr.aria-pressed]="doctor.doctorMembershipId === selectedId()"
+          (click)="doctorSelect.emit(doctor.doctorMembershipId)"
+        >
+          <span class="avatar" aria-hidden="true">{{ initials(doctor.name) }}</span>
+          <span class="dmain">
+            <b>{{ shortName(doctor.name) }}</b>
+            <small class="faint">{{ doctor.department ?? '' }}</small>
+            <span class="dstatus">
+              <span class="dot" [class]="'dot ' + statusTone(doctor.todayStatus)" aria-hidden="true"></span>
+              <span>{{ statusText(doctor) }}</span>
+            </span>
+          </span>
+          <span class="dnext">{{ nextFree(doctor, today()) }}</span>
+        </button>
+      </li>
+    } @empty {
+      <li class="faint empty">No doctors to show.</li>
+    }
+  </ul>
+</aside>

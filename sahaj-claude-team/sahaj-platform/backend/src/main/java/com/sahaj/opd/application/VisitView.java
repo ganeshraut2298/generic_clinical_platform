@@ -10,7 +10,18 @@ import java.util.UUID;
 public record VisitView(UUID id, int tokenNo, UUID patientId, String patientName, int age, String sex,
                          UUID doctorMembershipId, String doctorName, String visitType, String stage, long feePaise,
                          Instant createdAt, int workflowVersionNo, UUID emrRecordId, String emrStatus,
-                         Integer triageLevel, String triageLevelName, String triageTone, FeeChange feeChange) {
+                         Integer triageLevel, String triageLevelName, String triageTone, FeeChange feeChange,
+                         Instant consultStartedAt, Instant consultEndedAt) {
+
+    /** A visit without consultation times (the shape before 0.9.0). */
+    public VisitView(UUID id, int tokenNo, UUID patientId, String patientName, int age, String sex,
+                      UUID doctorMembershipId, String doctorName, String visitType, String stage, long feePaise,
+                      Instant createdAt, int workflowVersionNo, UUID emrRecordId, String emrStatus,
+                      Integer triageLevel, String triageLevelName, String triageTone, FeeChange feeChange) {
+        this(id, tokenNo, patientId, patientName, age, sex, doctorMembershipId, doctorName, visitType, stage,
+                feePaise, createdAt, workflowVersionNo, emrRecordId, emrStatus, triageLevel, triageLevelName,
+                triageTone, feeChange, null, null);
+    }
 
     /** {@code outcome} is UPDATED, UNCHANGED or ALREADY_BILLED (ADR-025 D14). */
     public record FeeChange(String outcome, long beforePaise, long afterPaise) {
@@ -36,6 +47,6 @@ public record VisitView(UUID id, int tokenNo, UUID patientId, String patientName
     public VisitView withTriage(String levelName, String tone, FeeChange change) {
         return new VisitView(id, tokenNo, patientId, patientName, age, sex, doctorMembershipId, doctorName, visitType,
                 stage, feePaise, createdAt, workflowVersionNo, emrRecordId, emrStatus, triageLevel, levelName, tone,
-                change);
+                change, consultStartedAt, consultEndedAt);
     }
 }

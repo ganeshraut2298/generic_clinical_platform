@@ -1,0 +1,83 @@
+app-desk-token-panel {
+  display: block;
+  min-width: 0;
+
+  .tokpanel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    h2,
+    p {
+      margin: 0;
+    }
+    h2 {
+      font-size: 1rem;
+    }
+    button {
+      min-height: 44px;
+    }
+  }
+
+  .tokbox {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--pri-soft);
+  }
+
+  .tokno {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--pri-text);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .err {
+    color: var(--crit);
+    font-size: 0.84rem;
+  }
+
+  .desk-slip {
+    display: none;
+  }
+}
+
+/* The slip prints alone: everything else on the page is hidden (SAH-92-2, E11). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  app-desk-token-panel .desk-slip,
+  app-desk-token-panel .desk-slip * {
+    visibility: visible;
+  }
+  app-desk-token-panel .desk-slip {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 70mm;
+    padding: 4mm;
+    font-size: 11pt;
+    /* Print only: the slip prints as black text on white paper whatever the screen theme is. */
+    color: CanvasText;
+  }
+  app-desk-token-panel .desk-slip .slip-clinic {
+    font-weight: 700;
+  }
+  app-desk-token-panel .desk-slip .slip-token {
+    font-size: 28pt;
+    font-weight: 700;
+    margin: 2mm 0;
+  }
+}

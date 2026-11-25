@@ -141,4 +141,66 @@ class DoctorSlotSettingsServiceTest {
         assertThatThrownBy(() -> service.save(TENANT_ID, USER_ID, "OWNER", DOCTOR_ID, input))
                 .isInstanceOf(InvalidInputException.class);
     }
+
+    // --- SAH-91-2: the per-doctor cut-off (absent keeps, null clears, a whole number 0 to 48 sets) ---
+
+    private DoctorSlotSettingsInput withCloseBefore(boolean sent, Number value) {
+        return new DoctorSlotSettingsInput(DOCTOR_ID, 15, List.of(1, 2, 3), 0, 0, List.of(session("09:00", "13:00")),
+                sent, value);
+    }
+
+    private void storedCloseBefore(Integer stored) {
+        when(teamMemberPort.find(TENANT_ID, DOCTOR_ID))
+                .thenReturn(Optional.of(new TeamMember(DOCTOR_ID, "Dr Rao", "DOCTOR", true, 50000)));
+        when(repository.find(TENANT_ID, DOCTOR_ID)).thenReturn(Optional.of(new DoctorSlotSettingsRepository.SlotSettingsRow(
+                15, List.of(1, 2, 3), 0, 0, List.of(new SessionRow(0, LocalTime.of(9, 0), LocalTime.of(13, 0))), stored)));
+    }
+
+    @Test
+    void aBodyWithoutCloseBeforeHoursKeepsTheStoredValue() {
+        storedCloseBefore(3);
+
+        DoctorSlotSettingsView saved = service.save(TENANT_ID, USER_ID, "OWNER", DOCTOR_ID, withCloseBefore(false, null));
+
+        assertThat(saved.closeBeforeHours()).isEqualTo(3);
+    }
+
+    @Test
+    void nullClearsTheDoctorsCutOffSoTheClinicValueApplies() {
+        storedCloseBefore(3);
+
+        DoctorSlotSettingsView saved = service.save(TENANT_ID, USER_ID, "OWNER", DOCTOR_ID, withCloseBefore(true, null));
+
+        assertThat(saved.closeBeforeHours()).isNull();
+    }
+
+    @Test
+    void aWholeNumberFromZeroToFortyEightSetsItAndTheAuditRecordsIt() {
+        storedCloseBefore(null);
+
+        assertThat(service.save(TENANT_ID, USER_ID, "FRONT_DESK", DOCTOR_ID, withCloseBefore(true, 0)).closeBeforeHours())
+                .isZero();
+        assertThat(service.save(TENANT_ID, USER_ID, "FRONT_DESK", DOCTOR_ID, withCloseBefore(true, 48)).closeBeforeHours())
+                .isEqualTo(48);
+        assertThat(service.save(TENANT_ID, USER_ID, "FRONT_DESK", DOCTOR_ID, withCloseBefore(true, 6.0)).closeBeforeHours())
+                .isEqualTo(6);
+        org.mockito.ArgumentCaptor<java.util.Map<String, Object>> after = org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        verify(auditLog, org.mockito.Mockito.atLeastOnce()).record(eq("DOCTOR_SLOT_SETTINGS_UPDATED"),
+                eq("DOCTOR_SLOT_SETTINGS"), eq(DOCTOR_ID), any(), after.capture());
+        assertThat(after.getValue()).containsEntry("closeBeforeHours", 6);
+    }
+
+    @Test
+    void aDecimalNegativeOrTooLargeCutOffIs400AndNothingIsSaved() {
+        storedCloseBefore(null);
+
+        for (Number bad : new Number[] {1.5, -1, 49, Double.NaN}) {
+            assertThatThrownBy(() -> service.save(TENANT_ID, USER_ID, "OWNER", DOCTOR_ID, withCloseBefore(true, bad)))
+                    .isInstanceOfSatisfying(InvalidInputException.class, e -> {
+                        assertThat(e.field()).isEqualTo("closeBeforeHours");
+                        assertThat(e.getMessage()).isEqualTo("Enter whole hours from 0 to 48.");
+                    });
+        }
+        verify(repository, never()).upsert(any(), any(), any(), any());
+    }
 }

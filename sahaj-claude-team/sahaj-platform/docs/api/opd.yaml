@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Sahaj OPD API
-  version: 0.8.0
+  version: 0.9.0
   description: >-
     Phase 1 contract, SAH-7 (and SAH-9, SAH-11, SAH-12, SAH-14, SAH-15, SAH-18 as tagged). Reads are for any logged-in
     clinic user; writes are owner only (403 otherwise) unless an operation says otherwise. Errors are RFC 9457
@@ -27,6 +27,43 @@ info:
     doctor's current fee (platform doctor profile, 0 to 50,000 rupees, ₹ 0 allowed) into Visit.feePaise at token time,
     as before; a later fee change never alters an existing visit or bill. (5) Every operation here answers 403
     setup-required while the clinic has not finished setup (platform 0.3.0, ADR-031 D1). No table of opd changes.
+
+    0.9.0 (24 Nov 2026, SAH-90, SAH-91, SAH-92, SAH-93 Front desk console, DEC-097 A1 B1 C1 D2 E1-E12 and addendum
+    1-7, ADR-032; PROPOSED until the "contract · APPROVED" rows of SAH-90 to SAH-93 in docs/approvals.md; each story
+    builds only its tagged items). Built on top of 0.8.0: the SAH-89 items of 0.8.0 are
+    left exactly as they are and nothing here depends on them (SAH-89 is paused; the console uses the current doctor
+    list, the doctor fee as it is and GET /patients?q= of patient.yaml, unchanged). Every new or changed item is tagged
+    with its story id. NEW (SAH-90): GET /desk/snapshot (one polled read: rules, counters, doctor rail with 7-day free
+    counts, board, follow-ups to book, selected doctor's day slots), GET /desk/doctors/{doctorMembershipId}/day-slots.
+    NEW (SAH-91): POST /appointments/{id}/reschedule (same id, in place, optimistic version); DoctorSlotSettings gains
+    the optional per-doctor closeBeforeHours. NEW (SAH-92): GET /desk/visits/{visitId}/token-panel; the check-in
+    answer adds tokenPanel; PATCH /visits/{id}/stage accepts the optional expectedStage. NEW (SAH-93): POST
+    /visits/{visitId}/follow-up/appointment, POST /visits/{visitId}/follow-up/not-needed, POST
+    /follow-ups/{followUpId}/appointment; FollowUp gains appointmentId and notNeeded. CHANGED, narrow (ADR-032 D9):
+    (a) POST /appointments refuses a time off the doctor's grid, outside the doctor's working days or sessions, a
+    walk-in reserved slot and a past time for every caller (also the old board), and answers 409
+    appointment-duplicate for the same patient, doctor, date and time; appointment-slot-taken's detail becomes "That
+    slot was just booked. Pick another time."; the cut-off answer for callers outside OWNER and FRONT_DESK is 400
+    booking-closed (no such caller exists in phase 1). (b) PATCH /appointments/{id} on an appointment that is not
+    BOOKED answers 409 appointment-not-booked (was 400 validation). (c) POST /appointments/{id}/token answers 400
+    check-in-not-today for an appointment of another day and 409 appointment-already-checked-in for an ARRIVED one;
+    the appointment row is locked first, so two check-ins make one visit and check-in against cancel ends in one
+    outcome; the token day is the Asia/Kolkata day. (d) PATCH /visits/{id}/stage is a compare-and-set: a lost race
+    answers 409 visit-stage-changed and writes nothing. (e) A follow-up marked not needed leaves the DUE, MISSED and
+    UPCOMING lists and counts of GET /follow-ups and the follow-up counts of GET /today-summary, and is not returned by
+    a later visit (ADR-032 open question 2). New problem types: slot-not-on-grid, doctor-not-working,
+    slot-walk-in-only, slot-in-past, booking-closed, check-in-not-today (400); appointment-duplicate,
+    appointment-changed, appointment-not-reschedulable, appointment-already-checked-in, appointment-not-booked,
+    visit-stage-changed, visit-not-done, follow-up-already-booked, follow-up-closed (409); the existing
+    appointment-slot-taken, appointment-not-bookable, doctor-unavailable (409), not-found (404), forbidden (403),
+    validation (400) and database-busy (503) keep their meaning. New audit actions: APPOINTMENT_RESCHEDULED,
+    FOLLOW_UP_BOOKED, FOLLOW_UP_NOT_NEEDED (ids, dates, times, status words, interval keys only). Desk reads: any
+    clinic role; desk writes: OWNER and FRONT_DESK (OpdRoles.OWNER_OR_FRONT_DESK, re-checked in the service). The
+    tenant is the signed-in user's; a tenantId or clinicId in any body is ignored. Times are HH:mm in Asia/Kolkata;
+    dates are the Asia/Kolkata calendar day. Polling (ADR-032 D2): the console reads GET /desk/snapshot every 20
+    seconds while the tab is visible and after each own write; answers carry generatedAt and Cache-Control no-store;
+    no ETag. No WhatsApp, notification, document or print service is called by anything in 0.9.0 (print slip is the
+    browser's).
 
     0.2.0 (11 Nov 2026) adds SAH-43 and SAH-44, the Doctor EMR masters and specialty templates (ADR-019), under
     /emr/**, and two optional query parameters on GET /diagnoses (specialty, page). Nothing that existed changes
@@ -284,7 +321,14 @@ paths:
     parameters:
       - { name: doctorMembershipId, in: path, required: true, schema: { type: string, format: uuid } }
     put:
-      tags: [SAH-11]
+      tags: [SAH-11, SAH-91]
+      description: >-
+        SAH-11. 0.9.0 (SAH-91-2, ADR-032 D3): the body may carry closeBeforeHours, the doctor's own booking cut-off
+        (whole hours 0 to 48). A number sets it, null clears it (the doctor follows the clinic's closeBeforeHours
+        again), and a body without the property keeps the stored value, so an older client never clears it. A
+        decimal, a negative number or more than 48 answers 400 validation with fieldErrors closeBeforeHours "Enter
+        whole hours from 0 to 48.". The existing audit entry of this save records closeBeforeHours before and after.
+      x-required-role: OWNER, FRONT_DESK
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/DoctorSlotSettings' } } }
@@ -318,42 +362,123 @@ paths:
       responses:
         '200': { description: Appointments, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Appointment' } } } } }
     post:
-      tags: [SAH-11]
+      tags: [SAH-11, SAH-91]
+      description: >-
+        SAH-11. 0.9.0 (SAH-91-1, SAH-91-2, ADR-032 D3, D4): one transaction, checks in this order, the first failure
+        answers and nothing is saved. (1) Role OWNER or FRONT_DESK, else 403 forbidden. (2) Formats: uuids, apptDate
+        yyyy-MM-dd, apptTime HH:mm, visitType, source; else 400 validation with fieldErrors. (3) The patient and an
+        active doctor of this clinic, else 404 not-found (another clinic's id included). (4) Approved leave that day:
+        409 doctor-unavailable "This doctor is not taking bookings on that date." (5) The day is not one of the
+        doctor's working days or has no session: 400 doctor-not-working "This doctor does not see patients on that
+        day."; the time is not a slot start on the doctor's grid (slot length from each session start; for example
+        10:07 AM with 15-minute slots) or is outside the sessions: 400 slot-not-on-grid "That time is not one of
+        this doctor's slots. Pick a time from the list.". (6) A walk-in reserved slot: 400 slot-walk-in-only "That
+        slot is kept for walk-ins. Pick another time.". (7) The slot start (Asia/Kolkata) is not after now: 400
+        slot-in-past "That time has passed.". (8) Inside the effective cut-off (the doctor's closeBeforeHours when
+        set, else the clinic's) for a caller other than OWNER or FRONT_DESK: 400 booking-closed "Booking closes N
+        hours before the slot." with closeBeforeHours; OWNER and FRONT_DESK may book inside the cut-off (SAH-11 rule,
+        DEC-097 addendum 1). (9) The slot lock (pg_advisory_xact_lock on clinic, doctor, date, time; unchanged). (10)
+        The same patient already has a BOOKED or ARRIVED appointment with this doctor at this date and time: 409
+        appointment-duplicate "This patient is already booked in this slot." with appointmentId (a retried confirm
+        after a lost answer lands here; the client treats it as saved). (11) Another BOOKED or ARRIVED appointment
+        holds the slot: overbook off, 409 appointment-slot-taken "That slot was just booked. Pick another time.";
+        overbook on, only OWNER and FRONT_DESK may book it (unchanged). max online bookings a day is not enforced.
+        Audit APPOINTMENT_BOOKED as before. The checks apply to every caller of this operation, the old Appointments
+        board included.
+      x-required-role: OWNER, FRONT_DESK
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentCreate' } } }
       responses:
         '201': { description: 'Booked. 409 also covers a doctor who is not taking bookings that date because of approved leave (SAH-21, problem type doctor-unavailable, "This doctor is not taking bookings on that date.") besides a taken slot.', content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
-        '404': { $ref: '#/components/responses/Problem' }
-        '409': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation, doctor-not-working, slot-not-on-grid, slot-walk-in-only, slot-in-past or booking-closed (0.9.0).' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found: patient or doctor (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: 'doctor-unavailable, appointment-duplicate (0.9.0, with appointmentId) or appointment-slot-taken.' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /appointments/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
     patch:
-      tags: [SAH-11]
+      tags: [SAH-11, SAH-92]
+      description: >-
+        SAH-11 cancel or mark no-show. 0.9.0 (SAH-92-4, ADR-032 D6): the appointment row is locked (select for
+        update) before its status is read, so a cancel or no-show racing a check-in ends in one outcome. Changed: an
+        appointment that is not BOOKED (ARRIVED, CANCELLED, NOSHOW) answers 409 appointment-not-booked "This
+        appointment is no longer booked. The board now shows the latest." (was 400 validation). The no-show shown by
+        the display rule (ADR-032 D11) is not stored; this operation stores it (audit APPOINTMENT_NOSHOW, unchanged).
+      x-required-role: OWNER, FRONT_DESK
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [CANCELLED, NOSHOW] } } } } }
       responses:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
-        '404': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: '0.9.0: appointment-not-booked.' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /appointments/{id}/token:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
     post:
-      tags: [SAH-11]
+      tags: [SAH-11, SAH-92]
+      description: >-
+        SAH-11 "Create token", the console's "Check in · token". 0.9.0 (SAH-92-1, SAH-92-2, ADR-032 D6), one
+        transaction: lock the appointment row (select for update), then (1) role OWNER or FRONT_DESK, else 403; (2)
+        not found or another clinic's: 404 not-found; (3) ARRIVED: 409 appointment-already-checked-in "This patient
+        is already checked in." with visitId and tokenNo (the client opens the token panel; a retry never makes a
+        second visit); CANCELLED or NOSHOW: 409 appointment-not-bookable (unchanged type); (4) apptDate is not today
+        (Asia/Kolkata): 400 check-in-not-today "Check-in is only possible on the day of the visit."; (5) issue the
+        visit as SAH-9 does (visit type and fee rule unchanged) with the next clinic-wide daily token of the
+        Asia/Kolkata day (A1: same format and numbering, gap-free, opd.next_token_no with the IST date); set the
+        appointment ARRIVED with the visit; audit APPOINTMENT_TOKEN_ISSUED as before. The arrival time is the
+        visit's createdAt. The answer is the Appointment plus tokenPanel, computed after the insert.
+      x-required-role: OWNER, FRONT_DESK
       responses:
-        '200': { description: Token issued, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
-        '404': { $ref: '#/components/responses/Problem' }
-        '409': { $ref: '#/components/responses/Problem' }
+        '200': { description: Token issued, content: { application/json: { schema: { $ref: '#/components/schemas/AppointmentCheckIn' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: '0.9.0: check-in-not-today.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: 'appointment-already-checked-in (0.9.0, with visitId and tokenNo) or appointment-not-bookable.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /appointments/{id}/reschedule:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-91]
+      operationId: rescheduleAppointment
+      summary: Move an appointment to a new doctor, date and time in place ("Move to new slot", no-show "Rebook")
+      description: >-
+        SAH-91-3 (E4, ADR-032 D5). Updates the same appointment row (same id): doctor, date, time, status BOOKED,
+        version + 1. No appointment is created or cancelled; a follow-up linked to it stays linked; the old slot is
+        free when this commits. One transaction: lock the appointment row (select for update); 404 not-found when it
+        is not this clinic's; version differs from the stored one: 409 appointment-changed "This appointment was
+        changed by someone else. The board now shows the latest."; status ARRIVED or CANCELLED: 409
+        appointment-not-reschedulable "Only a booked or no-show appointment can be moved."; then checks 3 to 11 of
+        POST /appointments for the new doctor, date and time (the appointment's own row is never a clash), with the
+        same answers; OWNER and FRONT_DESK may move it into a slot inside the cut-off. A BOOKED appointment shown as
+        no-show by the display rule is moved the same way, no manual mark first. The visit type is kept. The same
+        doctor, date and time as stored answers 200 and writes nothing. Audit APPOINTMENT_RESCHEDULED with before
+        and after doctorMembershipId, apptDate, apptTime and status (no patient name).
+      x-required-role: OWNER, FRONT_DESK
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppointmentRescheduleInput' }
+            examples:
+              rebook: { value: { version: 3, doctorMembershipId: 7d9a2c1e-0b7f-4a51-9a33-1c2f6e0d8b11, apptDate: '2026-11-24', apptTime: '12:15' } }
+      responses:
+        '200': { description: The appointment after the move, content: { application/json: { schema: { $ref: '#/components/schemas/Appointment' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation, doctor-not-working, slot-not-on-grid, slot-walk-in-only, slot-in-past or booking-closed.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found: appointment or doctor (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: 'appointment-changed, appointment-not-reschedulable, doctor-unavailable, appointment-duplicate or appointment-slot-taken. The stored appointment is unchanged.' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /visits/today:
     get:
@@ -379,15 +504,32 @@ paths:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
     patch:
-      tags: [SAH-9]
+      tags: [SAH-9, SAH-92]
+      description: >-
+        SAH-9 stage move: one step forward through the visit's own workflow version (stage-owner rule; OWNER and
+        FRONT_DESK may move any card forward), or owner only an earlier stage. 0.9.0 (SAH-92-3, B1, ADR-032 D7): the
+        console's "Start consultation" and "Complete visit" use this operation, sending stage = the card's nextStage
+        and expectedStage = the card's stage (GET /desk/snapshot). Changed for every caller: the write is a
+        compare-and-set on the stage that was read; when another request moved the visit meanwhile the answer is 409
+        visit-stage-changed "This card was moved by someone else. The board now shows the latest." and nothing is
+        written (two presses at once make one step). With expectedStage: a stored stage other than expectedStage, or
+        a target that is not the next enabled stage after it, is 409 visit-stage-changed; without expectedStage the
+        400 answers stay as before ("Move one stage at a time", "Choose a different stage"). With Vitals on, the
+        step after WAITING is VITALS (the card stays in Waiting with the Vitals tag). Leaving WITH_DOCTOR never
+        signs, changes or locks the EMR record; fee timing and the follow-up step run as before. Entering
+        WITH_DOCTOR stores the consultation start time once and leaving it forward the end time once (ADR-032 D7;
+        Visit.consultStartedAt, consultEndedAt). Audit VISIT_STAGE_MOVED as before.
+      x-required-role: any clinic role, stage-owner rule
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [stage], properties: { stage: { $ref: '#/components/schemas/VisitStage' } } } } }
+        content: { application/json: { schema: { $ref: '#/components/schemas/VisitStageInput' } } }
       responses:
         '200': { description: Moved, content: { application/json: { schema: { $ref: '#/components/schemas/Visit' } } } }
-        '400': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
-        '404': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden ("You cannot move this card.")' }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: '0.9.0: visit-stage-changed.' }
         '503': { $ref: '#/components/responses/DatabaseBusy' }
   /visits/{id}/visit-type:
     parameters:
@@ -608,12 +750,14 @@ paths:
         '200': { description: 'Publish history, newest first', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WorkflowVersion' } } } } }
   /today-summary:
     get:
-      tags: [SAH-15]
+      tags: [SAH-15, SAH-93]
+      description: 'SAH-15. 0.9.0 (SAH-93-1, ADR-032 D9.5): followUpsDue and followUpsMissed leave out follow-ups marked "No follow-up needed".'
       responses:
         '200': { description: Today's OPD figures for the Today screen (Asia/Kolkata day), content: { application/json: { schema: { $ref: '#/components/schemas/TodaySummary' } } } }
   /follow-ups:
     get:
-      tags: [SAH-14]
+      tags: [SAH-14, SAH-93]
+      description: 'SAH-14. 0.9.0 (SAH-93-1, ADR-032 D9.5): a follow-up marked "No follow-up needed" is left out of the DUE, MISSED and UPCOMING items and counts (it is no longer owed); a RETURNED one stays listed under RETURNED. FollowUp gains appointmentId and notNeeded.'
       parameters:
         - { name: status, in: query, required: true, schema: { $ref: '#/components/schemas/FollowUpStatus' } }
       responses:
@@ -2879,6 +3023,174 @@ paths:
         '200': { description: Scale and levels, content: { application/json: { schema: { $ref: '#/components/schemas/EmrTriageScale' } } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /desk/snapshot:
+    get:
+      tags: [SAH-90]
+      operationId: getDeskSnapshot
+      summary: Everything the front desk console shows, in one polled read
+      description: >-
+        SAH-90-1 to SAH-90-5 (ADR-032 D1, D2, D3, D10, D11). Reads only. One answer with the saved booking rules (the
+        footer chips), the clinic follow-up fee rule, the five header counters, the doctor rail (every active doctor
+        of the clinic, by name, with today's status, the free counts of the next 7 days from today, the next free
+        day, fees, department, room and the effective cut-off), the board of today, the follow-ups to book and, when
+        doctorMembershipId is given, that doctor's open slots on date. Computed per request with a fixed number of
+        set-based queries (target 12 or fewer, never per doctor or per slot); nothing is stored. Free slots, free
+        counts and Free today follow ADR-032 D3 for the calling user's role: OWNER and FRONT_DESK see slots inside
+        the cut-off with insideCutOff true, other roles do not see them. Leave appears only when a leave source (HRA
+        add-on) is on; otherwise no doctor is ON_LEAVE and no card has DOCTOR_ON_LEAVE. Counters are for today and
+        all doctors and never follow boardDoctorMembershipId. The board holds today's (Asia/Kolkata) appointments
+        that are not CANCELLED, each with its visit once checked in, and today's visits that no such appointment
+        points to (walk-ins), each column ordered by time, earliest first. Polling: the client calls this every 20
+        seconds while the tab is visible, at once when it becomes visible again and after each own write; never two
+        calls in flight. Answer headers: Cache-Control no-store; no ETag. Patient names are shown on screen only;
+        the answer has no mobile number, age, ABHA number or clinical text; nothing here is logged with a name.
+      x-required-role: any clinic role (OWNER, DOCTOR, VISITING_DOCTOR, NURSE, FRONT_DESK, BILLING, PHARMACIST, COUNSELLOR)
+      parameters:
+        - { name: doctorMembershipId, in: query, required: false, description: 'The doctor selected in the rail; when given, selected holds that doctor''s open slots on date. Another clinic''s or an unknown id: 404 not-found.', schema: { type: string, format: uuid } }
+        - { name: date, in: query, required: false, description: 'The finder day, today to today + 6 (Asia/Kolkata); default today. Ignored without doctorMembershipId. Outside the range: 400 validation.', schema: { type: string, format: date } }
+        - { name: boardDoctorMembershipId, in: query, required: false, description: 'The "Selected doctor" board toggle: only that doctor''s cards. Without it, every doctor''s cards ("All doctors"). Counters are never filtered.', schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The console's data
+          headers:
+            Cache-Control: { description: no-store, schema: { type: string, const: no-store } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DeskSnapshot' } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation (date out of range or malformed id).' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: 'forbidden (not a clinic role) or setup-required.' }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found: doctorMembershipId or boardDoctorMembershipId is not an active doctor of this clinic.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /desk/doctors/{doctorMembershipId}/day-slots:
+    parameters:
+      - { name: doctorMembershipId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-90, SAH-93]
+      operationId: getDeskDaySlots
+      summary: A doctor's open slots on one day, grouped Morning and Evening, with the next free day
+      description: >-
+        SAH-90-3 (finder day click), SAH-93-1 (follow-up panel "Earliest slots that day", "+1 month" included).
+        Same rule as the snapshot (ADR-032 D3) for the calling user's role. nextFreeDate is the first day after date
+        with at least one free slot, looked up to 14 days after date and never past today + 120; null when there is
+        none ("No slots on Tue, 1 Dec or later this week." on the finder uses the rail's 7 days instead). Reads only.
+      x-required-role: any clinic role
+      parameters:
+        - { name: date, in: query, required: true, description: 'Today to today + 120 (Asia/Kolkata); else 400 validation.', schema: { type: string, format: date } }
+      responses:
+        '200': { description: The day's open slots, content: { application/json: { schema: { $ref: '#/components/schemas/DeskDaySlots' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: validation }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found: not an active doctor of this clinic.' }
+  /desk/visits/{visitId}/token-panel:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [SAH-92]
+      operationId: getDeskTokenPanel
+      summary: The token panel of a visit (reopened from a Waiting card, print slip)
+      description: >-
+        SAH-92-2 (ADR-032 D6). Current values: patients ahead = visits of the same doctor today in WAITING or VITALS
+        checked in (createdAt) before this visit, ties by token number; estimatedWaitMinutes = patients ahead × the
+        doctor's slot length; 0 when the visit is no longer WAITING or VITALS. Any clinic role may read and print
+        it (the slip shows clinic name, token, patient name, doctor, date and time and nothing clinical). Reads only.
+      x-required-role: any clinic role
+      responses:
+        '200': { description: The token panel, content: { application/json: { schema: { $ref: '#/components/schemas/DeskTokenPanel' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found (or another clinic''s).' }
+  /visits/{visitId}/follow-up/appointment:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-93]
+      operationId: bookVisitFollowUp
+      summary: Book the follow-up of a completed visit ("Book follow-up")
+      description: >-
+        SAH-93-1 (E9, ADR-032 D8). One transaction. (1) Role OWNER or FRONT_DESK, else 403. (2) Visit of this clinic,
+        else 404 not-found. (3) The visit is past WITH_DOCTOR (COUNSEL, BILLING or DONE), else 409 visit-not-done
+        "Set the follow-up after the visit is completed.". (4) The visit's follow-up (one per visit) is locked, or
+        created when there is none (reason "Follow-up", audit FOLLOW_UP_CREATED; walk-in visits included). (5) It
+        already has an appointment: 409 follow-up-already-booked "This follow-up is already booked." (a doctor's EMR
+        booking counts, so it is never booked twice); it is returned or marked not needed: 409 follow-up-closed
+        "This follow-up is closed.". (6) dueDate = today (Asia/Kolkata) + intervalKey (D7 7 days, D15 15 days, M1 one
+        calendar month, end of month clamped) and interval_key are stored (FOLLOW_UP_DUE_CHANGED when the date
+        changes). (7) The appointment is booked for the visit's patient and doctor at apptDate and apptTime with
+        checks 2 and 4 to 11 of POST /appointments and the same answers, source FRONT_DESK, visitType as sent
+        (default FOLLOW_UP). apptDate may be after the due date (next free day). (8) The follow-up is linked to it;
+        audit FOLLOW_UP_BOOKED (followUpId, appointmentId, intervalKey, dueDate). The Done card then shows "Follow-up
+        1 Dec 2026 · 10:30 AM". A retry after a lost answer gets 409 follow-up-already-booked and the board shows the
+        booking.
+      x-required-role: OWNER, FRONT_DESK
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VisitFollowUpBookInput' }
+            examples:
+              plus7: { value: { intervalKey: D7, apptDate: '2026-12-01', apptTime: '10:30', visitType: FOLLOW_UP } }
+      responses:
+        '201': { description: Booked and linked, content: { application/json: { schema: { $ref: '#/components/schemas/DeskFollowUpResult' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation, doctor-not-working, slot-not-on-grid, slot-walk-in-only, slot-in-past or booking-closed.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found: visit (or another clinic''s), or its doctor is no longer an active doctor.' }
+        '409': { $ref: '#/components/responses/Problem', description: 'visit-not-done, follow-up-already-booked, follow-up-closed, doctor-unavailable, appointment-duplicate or appointment-slot-taken ("That slot was just booked. Pick another time.").' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /visits/{visitId}/follow-up/not-needed:
+    parameters:
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-93]
+      operationId: markVisitFollowUpNotNeeded
+      summary: Record "No follow-up needed" for a completed visit
+      description: >-
+        SAH-93-1 (E9, ADR-032 D8). Steps 1 to 4 of POST /visits/{visitId}/follow-up/appointment (a follow-up row is
+        created when the visit has none, due today, so the decision is stored). A booked follow-up: 409
+        follow-up-already-booked; a returned one: 409 follow-up-closed. Otherwise notNeeded is stored with time and
+        user; audit FOLLOW_UP_NOT_NEEDED (followUpId). Already marked: 200 with the stored state and nothing written
+        (a retry never writes twice). The follow-up leaves the to-book list and the SAH-14 Due, Missed and Upcoming
+        lists; the Done card shows "No follow-up needed". No body.
+      x-required-role: OWNER, FRONT_DESK
+      responses:
+        '200': { description: Stored (or already stored), content: { application/json: { schema: { $ref: '#/components/schemas/DeskFollowUpResult' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: 'visit-not-done, follow-up-already-booked or follow-up-closed.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
+  /follow-ups/{followUpId}/appointment:
+    parameters:
+      - { name: followUpId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [SAH-93]
+      operationId: bookFollowUp
+      summary: Book a follow-up from the idle list ("Find slot", then "Confirm booking")
+      description: >-
+        SAH-93-2 (ADR-032 D8, DEC-097 addendum 7). One transaction: role OWNER or FRONT_DESK (403); follow-up of this
+        clinic, locked (404 not-found); already has an appointment: 409 follow-up-already-booked "This follow-up is
+        already booked."; returned or marked not needed: 409 follow-up-closed; then the appointment is booked for the
+        follow-up's patient with doctorMembershipId (the follow-up's doctor, or another doctor chosen in the rail)
+        at apptDate and apptTime with checks 2 to 11 of POST /appointments and the same answers, source FRONT_DESK,
+        visitType as sent (default FOLLOW_UP; NEW still links the follow-up and the fee follows the type). The
+        follow-up is linked to the appointment and leaves the to-book list; its due date is never changed. Audit
+        FOLLOW_UP_BOOKED (followUpId, appointmentId, dueDate).
+      x-required-role: OWNER, FRONT_DESK
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FollowUpBookInput' }
+            examples:
+              findSlot: { value: { doctorMembershipId: 7d9a2c1e-0b7f-4a51-9a33-1c2f6e0d8b11, apptDate: '2026-11-25', apptTime: '10:30', visitType: FOLLOW_UP } }
+      responses:
+        '201': { description: Booked and linked, content: { application/json: { schema: { $ref: '#/components/schemas/DeskFollowUpResult' } } } }
+        '400': { $ref: '#/components/responses/Problem', description: 'validation, doctor-not-working, slot-not-on-grid, slot-walk-in-only, slot-in-past or booking-closed.' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem', description: forbidden }
+        '404': { $ref: '#/components/responses/Problem', description: 'not-found: follow-up or doctor (or another clinic''s).' }
+        '409': { $ref: '#/components/responses/Problem', description: 'follow-up-already-booked, follow-up-closed, doctor-unavailable, appointment-duplicate or appointment-slot-taken.' }
+        '503': { $ref: '#/components/responses/DatabaseBusy' }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -2916,6 +3228,10 @@ components:
                 maxItems: 20
                 description: '0.6.3 (DEC-051 D3). Only on 409 ipd-order-not-placed (POST /emr/records/{recordId}/sign): one row per IPD order row that was not placed.'
                 items: { $ref: '#/components/schemas/EmrIpdOrderNotPlacedRow' }
+              appointmentId: { type: string, format: uuid, description: '0.9.0 (SAH-91-1). Only on 409 appointment-duplicate: the appointment already saved for this patient, doctor, date and time.' }
+              visitId: { type: string, format: uuid, description: '0.9.0 (SAH-92-1). Only on 409 appointment-already-checked-in: the visit of the earlier check-in.' }
+              tokenNo: { type: integer, description: '0.9.0 (SAH-92-1). Only on 409 appointment-already-checked-in: its token number.' }
+              closeBeforeHours: { type: integer, description: '0.9.0 (SAH-91-2). Only on 400 booking-closed: the effective cut-off in hours.' }
     DatabaseBusy:
       description: >-
         0.7.2 (DEC-054). The database did not answer in time: a lock that stayed taken, a statement that ran past the
@@ -2949,6 +3265,7 @@ components:
         walkInEveryNth: { type: integer, minimum: 0, description: 0 means no slots are reserved for walk-ins. }
         maxOnlinePerDay: { type: integer, minimum: 0 }
         sessions: { type: array, maxItems: 2, items: { type: object, required: [startTime, endTime], properties: { startTime: { type: string }, endTime: { type: string } } } }
+        closeBeforeHours: { type: [integer, 'null'], minimum: 0, maximum: 48, description: '0.9.0 (SAH-91-2, ADR-032 D3). The doctor''s own booking cut-off in whole hours; null means the clinic''s BookingRules.closeBeforeHours applies. Always present in answers. In a PUT body: a number sets it, null clears it, absent keeps the stored value.' }
     BookingRules:
       type: object
       required: [closeBeforeHours, remindBeforeHours, noShowAfterMinutes, followPriority, selfBook, overbook]
@@ -2990,6 +3307,33 @@ components:
         note: { type: [string, 'null'] }
         visitId: { type: [string, 'null'], format: uuid }
         tokenNo: { type: [integer, 'null'] }
+        version: { type: integer, format: int64, minimum: 0, description: '0.9.0 (SAH-91-3, ADR-032 D5). Optimistic version; send it back in POST /appointments/{id}/reschedule. Every change of the appointment raises it.' }
+    AppointmentRescheduleInput:
+      type: object
+      description: '0.9.0 (SAH-91-3). Unknown properties, tenantId and clinicId included, are ignored. The visit type is kept from the appointment.'
+      required: [version, doctorMembershipId, apptDate, apptTime]
+      properties:
+        version: { type: integer, format: int64, minimum: 0, description: 'The appointmentVersion the board showed.' }
+        doctorMembershipId: { type: string, format: uuid, description: 'The same or another active doctor of the clinic.' }
+        apptDate: { type: string, format: date }
+        apptTime: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'HH:mm, Asia/Kolkata.' }
+    AppointmentCheckIn:
+      description: '0.9.0 (SAH-92-1, SAH-92-2). The answer of POST /appointments/{id}/token: the Appointment (status ARRIVED, visitId, tokenNo) plus the token panel computed right after the check-in. Clients that read only Appointment keep working.'
+      allOf:
+        - { $ref: '#/components/schemas/Appointment' }
+        - type: object
+          required: [tokenPanel]
+          properties:
+            tokenPanel: { $ref: '#/components/schemas/DeskTokenPanel' }
+    VisitStageInput:
+      type: object
+      description: 'SAH-9 body of PATCH /visits/{id}/stage. 0.9.0 (SAH-92-3) adds the optional expectedStage.'
+      required: [stage]
+      properties:
+        stage: { $ref: '#/components/schemas/VisitStage' }
+        expectedStage:
+          $ref: '#/components/schemas/VisitStage'
+          description: '0.9.0 (ADR-032 D7). The stage the client last saw. When sent, a stored stage that differs, or a stage that is not the next enabled stage after it, answers 409 visit-stage-changed and nothing is written.'
     VisitStage:
       type: string
       enum: [WAITING, VITALS, WITH_DOCTOR, COUNSEL, BILLING, DONE]
@@ -3029,6 +3373,8 @@ components:
         createdAt: { type: string, format: date-time }
         emrRecordId: { type: [string, 'null'], format: uuid, description: 'SAH-46 (0.3.0). The EMR record of this visit; null before the first "Open EMR".' }
         emrStatus: { type: string, enum: [NONE, DRAFT, SIGNED], description: 'SAH-46 (0.3.0). NONE before the first open. SIGNED (SAH-51) opens read-only. Not shown on the card as text by this contract; the card uses it to open read-only.' }
+        consultStartedAt: { type: [string, 'null'], format: date-time, description: '0.9.0 (SAH-92-3, ADR-032 D7). Set once when the visit first enters WITH_DOCTOR (desk, Queue, EMR open or sign); null before.' }
+        consultEndedAt: { type: [string, 'null'], format: date-time, description: '0.9.0 (SAH-92-3). Set once when the visit first leaves WITH_DOCTOR forward; null before.' }
     VisitTypeInput:
       type: object
       additionalProperties: false
@@ -3103,6 +3449,8 @@ components:
         returnedVisitId: { type: [string, 'null'], format: uuid }
         appointmentDate: { type: [string, 'null'], format: date, description: '0.6.0 (SAH-51-6, SAH-68-2). The appointment the doctor''s sign booked for this follow-up; null when none was booked (no free slot within 7 days, or no interval was chosen).' }
         appointmentTime: { type: [string, 'null'], description: '0.6.0. HH:mm of that appointment ("11:05 AM" on screen).' }
+        appointmentId: { type: [string, 'null'], format: uuid, description: '0.9.0 (SAH-93). The appointment linked to this follow-up (booked by the doctor''s sign or by the front desk); null when none.' }
+        notNeeded: { type: boolean, description: '0.9.0 (SAH-93-1, E9). True when "No follow-up needed" was recorded. Such a follow-up is not listed under DUE, MISSED or UPCOMING and is never returned by a later visit, so in practice it is not listed (only an open follow-up can be marked).' }
     FollowUpList:
       type: object
       required: [counts, items]
@@ -6709,6 +7057,224 @@ components:
         createdAt: { type: string, format: date-time }
         admissionId: { type: [string, 'null'], format: uuid }
         ipNumber: { type: [string, 'null'] }
+    DeskSnapshot:
+      type: object
+      description: '0.9.0 (SAH-90, ADR-032 D1). The answer of GET /desk/snapshot.'
+      required: [generatedAt, today, bookingRules, followUpFee, counters, doctors, board, followUpsToBook, selected]
+      properties:
+        generatedAt: { type: string, format: date-time, description: 'Server instant the answer was computed ("Updated 11:05 AM" if the client shows it).' }
+        today: { type: string, format: date, description: 'Today in Asia/Kolkata; the first day of every 7-day strip.' }
+        bookingRules: { $ref: '#/components/schemas/BookingRules', description: 'The saved rules (defaults when never saved); the footer chips are drawn from these values exactly. remindBeforeHours and selfBook chips are shown disabled with "Needs WhatsApp (not in this phase)".' }
+        followUpFee: { type: string, enum: [free, half, full], description: 'The clinic follow-up fee rule (FeeSettings.followUpFee, C1).' }
+        counters: { $ref: '#/components/schemas/DeskCounters' }
+        doctors:
+          type: object
+          required: [total, items]
+          properties:
+            total: { type: integer, minimum: 0, description: 'Every active doctor of the clinic ("N of M": M).' }
+            items: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/DeskDoctor' }, description: 'By name. The client filters by department and search.' }
+        board: { $ref: '#/components/schemas/DeskBoard' }
+        followUpsToBook:
+          type: object
+          description: 'SAH-90-5, ADR-032 D8. Follow-ups with no return visit, no appointment, not marked not needed and due today or earlier (Asia/Kolkata); oldest due date first.'
+          required: [total, items]
+          properties:
+            total: { type: integer, minimum: 0, description: '"Follow-ups to book · N".' }
+            items: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/DeskFollowUpToBook' } }
+        selected:
+          oneOf: [{ $ref: '#/components/schemas/DeskDaySlots' }, { type: 'null' }]
+          description: 'The open slots of doctorMembershipId on date; null without doctorMembershipId.'
+    DeskCounters:
+      type: object
+      description: '0.9.0 (SAH-90-1, ADR-032 D11). Today, all doctors; never filtered by search, the scope toggle or boardDoctorMembershipId.'
+      required: [booked, waiting, inConsult, done, freeToday]
+      properties:
+        booked: { type: integer, minimum: 0, description: 'Appointments BOOKED today without the NO_SHOW tag (stored or by the display rule).' }
+        waiting: { type: integer, minimum: 0, description: 'Visits today in WAITING or VITALS, walk-ins included.' }
+        inConsult: { type: integer, minimum: 0, description: 'Visits today in WITH_DOCTOR.' }
+        done: { type: integer, minimum: 0, description: 'Visits today in COUNSEL, BILLING or DONE.' }
+        freeToday: { type: integer, minimum: 0, description: 'Free slots left today across all doctors, ADR-032 D3 for the caller''s role.' }
+    DeskDoctor:
+      type: object
+      description: '0.9.0 (SAH-90-2, SAH-90-3, ADR-032 D10). One doctor of the rail and the finder header.'
+      required: [doctorMembershipId, name, department, departmentSource, room, slotMinutes, consultFeePaise, followUpFeePaise, closeBeforeHours, todayStatus, startsAt, leaveUntil, freeToday, nextFree, days]
+      properties:
+        doctorMembershipId: { type: string, format: uuid }
+        name: { type: string, description: 'As saved in Team and access ("Dr. Meera Kulkarni"); the client makes the short name ("Dr. Meera K.") and initials.' }
+        department: { type: [string, 'null'], description: 'The doctor''s Doctor EMR department name (ADR-020 D7 step 2), else the doctor''s specialty, else null (listed only under "All departments").' }
+        departmentSource: { type: string, enum: [EMR_DEPARTMENT, SPECIALTY, NONE] }
+        room: { type: [string, 'null'], description: 'The room labels of the doctor''s EMR department joined with ", "; null when none (the room is then left out). Never from the specialty.' }
+        slotMinutes: { type: integer, minimum: 5, maximum: 60, description: '"15-min slots".' }
+        consultFeePaise: { type: integer, minimum: 0, description: 'The doctor''s current consultation fee ("Consultation ₹400").' }
+        followUpFeePaise: { type: integer, minimum: 0, description: 'The clinic rule applied to consultFeePaise: free 0, half consultFeePaise / 2 (integer paise), full consultFeePaise (C1). 0 shows "Free".' }
+        closeBeforeHours: { type: integer, minimum: 0, maximum: 48, description: 'The effective cut-off: the doctor''s own value when set, else the clinic''s.' }
+        todayStatus:
+          type: string
+          enum: [IN_OPD, STARTS_LATER, ON_LEAVE, FULL_TODAY, OFF_TODAY]
+          description: 'First match wins (ADR-032 D10): ON_LEAVE "On leave" (or "On leave till Thu" with leaveUntil; only with a leave source) → OFF_TODAY "Off today" (no session today) → FULL_TODAY "Full today" (sessions today, no free slot left today, also after the last session) → IN_OPD "In OPD" (now inside a session) → STARTS_LATER "From 5:00 PM" (a session later today, startsAt). Always shown as text and an indicator, never colour alone.'
+        startsAt: { type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'STARTS_LATER only: the start of the next session today, HH:mm.' }
+        leaveUntil: { type: [string, 'null'], format: date, description: 'ON_LEAVE only: the last day of the continuous leave from today (looked up to 60 days ahead).' }
+        freeToday: { type: integer, minimum: 0 }
+        nextFree:
+          type: [object, 'null']
+          description: 'The first of the 7 days with a free slot ("Today · 7 free", "Wed 25 · 8 free"); null is "No slots".'
+          required: [date, freeCount]
+          properties:
+            date: { type: string, format: date }
+            freeCount: { type: integer, minimum: 1 }
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          description: 'Today and the next 6 days, in order (the finder strip).'
+          items: { $ref: '#/components/schemas/DeskDayCount' }
+    DeskDayCount:
+      type: object
+      required: [date, freeCount, working, onLeave]
+      properties:
+        date: { type: string, format: date }
+        freeCount: { type: integer, minimum: 0, description: '"8 free", or "No slots" when 0.' }
+        working: { type: boolean, description: 'A working day with at least one session.' }
+        onLeave: { type: boolean, description: 'Approved leave covers the day (always false without a leave source).' }
+    DeskDaySlots:
+      type: object
+      description: '0.9.0 (SAH-90-3, SAH-93-1, ADR-032 D3). One doctor''s open slots on one day.'
+      required: [doctorMembershipId, date, working, onLeave, slotMinutes, closeBeforeHours, freeCount, groups, nextFreeDate]
+      properties:
+        doctorMembershipId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        working: { type: boolean }
+        onLeave: { type: boolean, description: 'True shows "No slots" for the day.' }
+        slotMinutes: { type: integer, minimum: 5, maximum: 60 }
+        closeBeforeHours: { type: integer, minimum: 0, maximum: 48, description: 'The effective cut-off used.' }
+        freeCount: { type: integer, minimum: 0 }
+        groups: { type: array, maxItems: 2, items: { $ref: '#/components/schemas/DeskSlotGroup' }, description: 'Morning first; empty when no slot is free ("No slots on Tue, 24 Nov. Next free day: Wed, 25 Nov.").' }
+        nextFreeDate: { type: [string, 'null'], format: date, description: 'The first later day with a free slot, up to 14 days after date (never past today + 120); null when none.' }
+    DeskSlotGroup:
+      type: object
+      required: [label, slots]
+      properties:
+        label: { type: string, enum: [MORNING, EVENING], description: '"Morning" for a session starting before 12:00, else "Evening"; two sessions with the same label are one group.' }
+        slots: { type: array, minItems: 1, items: { $ref: '#/components/schemas/DeskSlot' }, description: 'Earliest first.' }
+    DeskSlot:
+      type: object
+      required: [time, insideCutOff]
+      properties:
+        time: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'HH:mm, shown "10:30 AM".' }
+        insideCutOff: { type: boolean, description: 'Only ever true for OWNER and FRONT_DESK: the note "Inside the booking cut-off"; the slot can still be booked by them. Other roles never receive such a slot.' }
+    DeskBoard:
+      type: object
+      description: '0.9.0 (SAH-90-4, ADR-032 D11). Today''s patient flow.'
+      required: [date, truncated, cards]
+      properties:
+        date: { type: string, format: date, description: 'Today, Asia/Kolkata.' }
+        truncated: { type: boolean, description: 'True when more than 2,000 cards exist; the first 2,000 by time are sent.' }
+        cards: { type: array, maxItems: 2000, items: { $ref: '#/components/schemas/DeskBoardCard' }, description: 'By column, then time, earliest first.' }
+    DeskBoardCard:
+      type: object
+      description: 'One appointment (with its visit once checked in) or one walk-in visit.'
+      required: [key, kind, appointmentId, appointmentVersion, visitId, column, time, patientId, patientName, doctorMembershipId, doctorName, visitType, appointmentStatus, stage, nextStage, tokenNo, checkedInAt, tags, primaryAction, followUp]
+      properties:
+        key: { type: string, format: uuid, description: 'appointmentId when there is one, else visitId. Stable across polls.' }
+        kind: { type: string, enum: [APPOINTMENT, WALK_IN] }
+        appointmentId: { type: [string, 'null'], format: uuid }
+        appointmentVersion: { type: [integer, 'null'], format: int64, description: 'Send in POST /appointments/{id}/reschedule.' }
+        visitId: { type: [string, 'null'], format: uuid }
+        column: { type: string, enum: [BOOKED, WAITING, IN_CONSULTATION, DONE], description: 'E2: appointment BOOKED or NOSHOW → BOOKED; WAITING, VITALS → WAITING; WITH_DOCTOR → IN_CONSULTATION; COUNSEL, BILLING, DONE → DONE.' }
+        time: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'The appointment time; for a walk-in the check-in time (Asia/Kolkata).' }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string, description: 'Screen only; never logged.' }
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP, REVISIT, EMERGENCY], description: 'The visit''s type once checked in, else the appointment''s ("New" or "Follow-up" on the card).' }
+        appointmentStatus: { type: [string, 'null'], enum: [BOOKED, ARRIVED, NOSHOW, null] }
+        stage: { oneOf: [{ $ref: '#/components/schemas/VisitStage' }, { type: 'null' }], description: 'The visit stage; null before check-in.' }
+        nextStage: { oneOf: [{ $ref: '#/components/schemas/VisitStage' }, { type: 'null' }], description: 'The next enabled stage of the visit''s own workflow version; send it as stage (and stage as expectedStage) in PATCH /visits/{id}/stage. Null before check-in and at DONE.' }
+        tokenNo: { type: [integer, 'null'], description: 'Clinic-wide daily token (A1), shown as today (for example T-8).' }
+        checkedInAt: { type: [string, 'null'], format: date-time, description: 'The visit''s createdAt (arrival).' }
+        consultStartedAt: { type: [string, 'null'], format: date-time }
+        consultEndedAt: { type: [string, 'null'], format: date-time }
+        tags:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [NO_SHOW, DUE_NOW, DOCTOR_ON_LEAVE, VITALS] }
+          description: 'Computed with the Asia/Kolkata time of the answer and the saved rules; nothing is stored. NO_SHOW "No-show": stored NOSHOW, or BOOKED and now is at least time + noShowAfterMinutes. DUE_NOW "Due now": BOOKED, now at or after time and before the grace ends. DOCTOR_ON_LEAVE "Doctor on leave": BOOKED and the doctor is on approved leave today (only with a leave source). VITALS "Vitals": stage VITALS.'
+        primaryAction:
+          type: string
+          enum: [CHECK_IN, REBOOK, MOVE_TO_NEW_SLOT, START_CONSULTATION, COMPLETE_VISIT, SET_FOLLOW_UP, NONE]
+          description: 'By state only; the client shows write actions to OWNER and FRONT_DESK only. NO_SHOW → REBOOK "Rebook"; else DOCTOR_ON_LEAVE → MOVE_TO_NEW_SLOT "Move to new slot"; else BOOKED → CHECK_IN "Check in · token"; WAITING column → START_CONSULTATION; IN_CONSULTATION → COMPLETE_VISIT; DONE → SET_FOLLOW_UP when followUp.state is NONE or OPEN, else NONE (the tag shows the follow-up).'
+        followUp:
+          oneOf: [{ $ref: '#/components/schemas/DeskVisitFollowUp' }, { type: 'null' }]
+          description: 'DONE column only (null elsewhere).'
+    DeskVisitFollowUp:
+      type: object
+      description: '0.9.0 (SAH-90-4, SAH-93-1). The follow-up of a completed visit.'
+      required: [followUpId, state, dueDate, appointmentId, apptDate, apptTime]
+      properties:
+        followUpId: { type: [string, 'null'], format: uuid, description: 'Null when the visit has no follow-up yet (state NONE).' }
+        state: { type: string, enum: [NONE, OPEN, BOOKED, NOT_NEEDED, RETURNED], description: 'BOOKED shows "Follow-up 1 Dec 2026 · 10:30 AM"; NOT_NEEDED shows "No follow-up needed"; NONE and OPEN offer "Set follow-up".' }
+        dueDate: { type: [string, 'null'], format: date }
+        appointmentId: { type: [string, 'null'], format: uuid }
+        apptDate: { type: [string, 'null'], format: date }
+        apptTime: { type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+    DeskFollowUpToBook:
+      type: object
+      description: '0.9.0 (SAH-90-5). One row of the idle panel.'
+      required: [followUpId, patientId, patientName, doctorMembershipId, doctorName, dueDate, status, daysLate, reason]
+      properties:
+        followUpId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        dueDate: { type: string, format: date }
+        status: { type: string, enum: [DUE, MISSED], description: 'DUE "Due today", MISSED "Overdue".' }
+        daysLate: { type: integer, minimum: 0 }
+        reason: { type: string, description: 'As FollowUp.reason, with the same SAH-27 masking of discharge follow-ups.' }
+    DeskTokenPanel:
+      type: object
+      description: '0.9.0 (SAH-92-2, ADR-032 D6). The "Token issued" panel and the print slip. Nothing clinical.'
+      required: [visitId, tokenNo, tokenDate, patientName, doctorMembershipId, doctorName, room, stage, checkedInAt, patientsAhead, estimatedWaitMinutes, slotMinutes]
+      properties:
+        visitId: { type: string, format: uuid }
+        tokenNo: { type: integer, minimum: 1 }
+        tokenDate: { type: string, format: date, description: 'The Asia/Kolkata day of the token.' }
+        patientName: { type: string, description: 'Screen and slip only; never logged.' }
+        doctorMembershipId: { type: string, format: uuid }
+        doctorName: { type: string }
+        room: { type: [string, 'null'], description: 'As DeskDoctor.room.' }
+        stage: { $ref: '#/components/schemas/VisitStage' }
+        checkedInAt: { type: string, format: date-time }
+        patientsAhead: { type: integer, minimum: 0, description: 'Visits of the same doctor today in WAITING or VITALS checked in earlier (ties by token number); 0 when this visit is no longer WAITING or VITALS. 0 shows "Next in line".' }
+        estimatedWaitMinutes: { type: integer, minimum: 0, description: 'patientsAhead × slotMinutes; shown "3 ahead · about 45 min". An estimate, never a promise.' }
+        slotMinutes: { type: integer, minimum: 5, maximum: 60 }
+    VisitFollowUpBookInput:
+      type: object
+      description: '0.9.0 (SAH-93-1). Unknown properties, tenantId and clinicId included, are ignored. The patient and doctor are the visit''s.'
+      required: [intervalKey, apptDate, apptTime]
+      properties:
+        intervalKey: { type: string, enum: [D7, D15, M1], description: '"+7 days", "+15 days", "+1 month" from today (Asia/Kolkata); the due date stored on the follow-up.' }
+        apptDate: { type: string, format: date, description: 'The due date or a later day (next free day).' }
+        apptTime: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP], default: FOLLOW_UP }
+    FollowUpBookInput:
+      type: object
+      description: '0.9.0 (SAH-93-2). Unknown properties, tenantId and clinicId included, are ignored. The patient is the follow-up''s.'
+      required: [doctorMembershipId, apptDate, apptTime]
+      properties:
+        doctorMembershipId: { type: string, format: uuid, description: 'The follow-up''s doctor or another active doctor chosen in the rail.' }
+        apptDate: { type: string, format: date }
+        apptTime: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+        visitType: { type: string, enum: [NEW, FOLLOW_UP], default: FOLLOW_UP }
+    DeskFollowUpResult:
+      type: object
+      description: '0.9.0 (SAH-93). The follow-up after a desk action.'
+      required: [followUpId, state, dueDate, appointment]
+      properties:
+        followUpId: { type: string, format: uuid }
+        state: { type: string, enum: [BOOKED, NOT_NEEDED] }
+        dueDate: { type: string, format: date }
+        appointment: { oneOf: [{ $ref: '#/components/schemas/Appointment' }, { type: 'null' }], description: 'The booked appointment; null for NOT_NEEDED.' }
     EmrFreeSlot:
       type: object
       required: [date, time]

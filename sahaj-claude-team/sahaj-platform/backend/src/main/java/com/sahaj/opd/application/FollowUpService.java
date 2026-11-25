@@ -101,7 +101,7 @@ public class FollowUpService {
                     row.sourceAdmissionId() != null && !showReason ? MASKED_DISCHARGE_REASON : row.reason(),
                     computed, daysLate,
                     row.sourceVisitId(), row.sourceAdmissionId(), row.returnedVisitId(), row.appointmentDate(),
-                    row.appointmentTime());
+                    row.appointmentTime(), row.appointmentId(), row.notNeeded());
         }).toList();
         return new FollowUpView(new FollowUpView.Counts(counts.due(), counts.missed(), counts.upcoming(),
                 counts.returned()), items);

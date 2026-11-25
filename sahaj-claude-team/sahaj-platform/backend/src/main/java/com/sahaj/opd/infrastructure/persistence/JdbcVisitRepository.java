@@ -4,6 +4,7 @@ import com.sahaj.opd.application.VisitRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,7 +19,7 @@ public class JdbcVisitRepository implements VisitRepository {
     private static final String SELECT = """
             select v.id, v.patient_id, v.doctor_membership_id, v.visit_type, v.stage, v.token_no, v.fee_paise,
                    v.created_at, v.version, v.workflow_version_no, r.id as emr_record_id, r.status as emr_status,
-                   v.triage_level, v.triage_scale
+                   v.triage_level, v.triage_scale, v.consult_started_at, v.consult_ended_at
             from opd.visit v
             left join opd.emr_record r on r.tenant_id = v.tenant_id and r.opd_visit_id = v.id
             """;
@@ -33,8 +34,12 @@ public class JdbcVisitRepository implements VisitRepository {
     private static final String FIND_BY_IDS = SELECT + " where v.tenant_id = :tenantId and v.id in (:ids)";
     private static final String MOVE_IF_CURRENT = """
             update opd.visit
-            set stage = :to, updated_by = :actor, updated_at = now(), version = version + 1
-            where id = :id and stage = :from
+            set stage = :to, updated_by = :actor, updated_at = now(), version = version + 1,
+                consult_started_at = case when :to = 'WITH_DOCTOR' then coalesce(consult_started_at, now())
+                                          else consult_started_at end,
+                consult_ended_at = case when :from = 'WITH_DOCTOR' and :to in ('COUNSEL', 'BILLING', 'DONE')
+                                        then coalesce(consult_ended_at, now()) else consult_ended_at end
+            where id = :id and stage = :from and tenant_id = platform.current_tenant()
             """;
     private static final String UPDATE_TYPE = """
             update opd.visit
@@ -74,10 +79,16 @@ public class JdbcVisitRepository implements VisitRepository {
             limit 1
             """;
     private static final String INSERT = """
-            insert into opd.visit (id, patient_id, doctor_membership_id, visit_type, stage, token_no, fee_paise,
-                                    workflow_version_no, created_by)
-            values (:id, :patientId, :doctorMembershipId, :visitType, :stage, :tokenNo, :feePaise,
+            insert into opd.visit (id, patient_id, doctor_membership_id, visit_type, stage, token_no, token_date,
+                                    fee_paise, workflow_version_no, created_by)
+            values (:id, :patientId, :doctorMembershipId, :visitType, :stage, :tokenNo, :tokenDate, :feePaise,
                     :workflowVersionNo, :actor)
+            """;
+    private static final String COUNT_AHEAD = """
+            select count(*) from opd.visit
+            where tenant_id = :tenantId and doctor_membership_id = :doctorId and token_date = :tokenDate
+              and stage in ('WAITING', 'VITALS')
+              and (created_at < :createdAt or (created_at = :createdAt and token_no < :tokenNo))
             """;
     private static final String UPDATE_STAGE = """
             update opd.visit
@@ -92,13 +103,22 @@ public class JdbcVisitRepository implements VisitRepository {
     }
 
     @Override
-    public int nextTokenNo() {
-        return jdbc.sql("select opd.next_token_no()").query(Integer.class).single();
+    public int nextTokenNo(LocalDate tokenDate) {
+        return jdbc.sql("select opd.next_token_no(:tokenDate)").param("tokenDate", tokenDate).query(Integer.class)
+                .single();
+    }
+
+    @Override
+    public int countAhead(UUID tenantId, UUID doctorMembershipId, LocalDate tokenDate, Instant createdAt, int tokenNo) {
+        return jdbc.sql(COUNT_AHEAD).param("tenantId", tenantId).param("doctorId", doctorMembershipId)
+                .param("tokenDate", tokenDate).param("createdAt", java.sql.Timestamp.from(createdAt))
+                .param("tokenNo", tokenNo).query(Integer.class).single();
     }
 
     @Override
     public void insert(UUID id, UUID patientId, UUID doctorMembershipId, String visitType, String stage,
-                        int tokenNo, long feePaise, int workflowVersionNo, UUID actorUserId) {
+                        int tokenNo, LocalDate tokenDate, long feePaise, int workflowVersionNo,
+                        UUID actorUserId) {
         jdbc.sql(INSERT)
                 .param("id", id)
                 .param("patientId", patientId)
@@ -106,6 +126,7 @@ public class JdbcVisitRepository implements VisitRepository {
                 .param("visitType", visitType)
                 .param("stage", stage)
                 .param("tokenNo", tokenNo)
+                .param("tokenDate", tokenDate)
                 .param("feePaise", feePaise)
                 .param("workflowVersionNo", workflowVersionNo)
                 .param("actor", actorUserId)
@@ -230,6 +251,12 @@ public class JdbcVisitRepository implements VisitRepository {
                 rs.getInt("workflow_version_no"),
                 rs.getObject("emr_record_id", UUID.class),
                 rs.getString("emr_status") == null ? "NONE" : rs.getString("emr_status"),
-                (Integer) rs.getObject("triage_level"), (Integer) rs.getObject("triage_scale"));
+                (Integer) rs.getObject("triage_level"), (Integer) rs.getObject("triage_scale"),
+                instant(rs, "consult_started_at"), instant(rs, "consult_ended_at"));
+    }
+
+    private static Instant instant(ResultSet rs, String column) throws SQLException {
+        java.sql.Timestamp value = rs.getTimestamp(column);
+        return value == null ? null : value.toInstant();
     }
 }

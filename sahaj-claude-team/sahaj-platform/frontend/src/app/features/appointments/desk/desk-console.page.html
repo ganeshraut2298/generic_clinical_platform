@@ -1,0 +1,138 @@
+<header class="dhead surf">
+  <div class="dtitle">
+    <h1>Front desk console</h1>
+    <span class="faint" data-testid="header-when">{{ clinicName() }} · {{ headerWhen() }}</span>
+  </div>
+  @if (!idle()) {
+    <div class="dsearch">
+      <label class="sr-only" for="desk-search">Search doctor, department or patient</label>
+      <input
+        id="desk-search"
+        type="search"
+        placeholder="Search doctor, department or patient"
+        [value]="query()"
+        (input)="setQuery($event)"
+      />
+    </div>
+  }
+  <ul class="counters" aria-label="Today's counts">
+    @for (counter of counters(); track counter.label) {
+      <li class="counter">
+        <span class="num">{{ counter.value }}</span>
+        <span class="faint">{{ counter.label }}</span>
+      </li>
+    }
+  </ul>
+  <div class="dlinks">
+    @if (canSlotSettings()) {
+      <a mat-stroked-button routerLink="/app/config/slots"><app-icon name="sliders" [size]="15" /> Slot settings</a>
+    }
+    <a class="linkbtn" routerLink="/app/appointments">Back to appointments board</a>
+  </div>
+</header>
+
+@if (refreshFailed()) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>Could not refresh. Showing the last update.</span>
+  </div>
+}
+
+@if (idle()) {
+  <section class="idle surf" aria-label="Console paused" data-testid="idle-screen">
+    <h2>Paused while you were away</h2>
+    <p class="muted">The console stopped refreshing after 15 minutes without use. Patient details are hidden.</p>
+    <button mat-flat-button color="primary" type="button" data-testid="idle-continue" (click)="resume()">Continue</button>
+  </section>
+} @else if (loading()) {
+  <p class="muted" role="status" aria-busy="true">Loading the front desk console…</p>
+} @else if (loadError(); as message) {
+  <div class="notice err" role="alert">
+    <app-icon name="alert" [size]="16" />
+    <span>{{ message }}</span>
+    <button mat-stroked-button type="button" (click)="refresh()">Try again</button>
+  </div>
+} @else {
+  <div class="layout">
+    <app-desk-doctor-rail
+      class="area-rail"
+      [doctors]="railDoctors()"
+      [total]="snapshot()!.doctors.total"
+      [departments]="departments()"
+      [department]="department()"
+      [selectedId]="selectedId()"
+      [today]="today()"
+      (departmentChange)="setDepartment($event)"
+      (doctorSelect)="selectDoctor($event)"
+    />
+    <div class="area-centre">
+      <app-desk-slot-finder
+        [doctor]="selectedDoctor()"
+        [today]="today()"
+        [date]="selectedDate()"
+        [slots]="slots()"
+        [loading]="slotsLoading()"
+        [error]="slotsError()"
+        [canBook]="canManage()"
+        [pickedTime]="pickedTime()"
+        (dayChange)="selectDay($event)"
+        (slotPick)="pickSlot($event)"
+        (retry)="retrySlots()"
+      />
+      @if (actionError(); as message) {
+        <div class="notice err" role="alert" data-testid="action-error">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ message }}</span>
+        </div>
+      }
+      <app-desk-flow-board
+        [cards]="boardCards()"
+        [scope]="scope()"
+        [canAct]="canManage()"
+        [busy]="actionBusy()"
+        (scopeChange)="setScope($event)"
+        (cardAction)="onCardAction($event)"
+        (markNoShow)="onMarkNoShow($event)"
+        (tokenOpen)="onTokenOpen($event)"
+      />
+    </div>
+    <app-desk-action-panel
+      class="area-panel"
+      [mode]="panelMode()"
+      [followUps]="followUps()"
+      [followUpTotal]="snapshot()!.followUpsToBook.total"
+      [doctor]="selectedDoctor()"
+      [followDoctor]="followDoctor()"
+      [today]="today()"
+      [canAct]="canManage()"
+      (closePanel)="closePanel()"
+      (findSlot)="findSlot($event)"
+      (booked)="onBooked($event)"
+      (followSaved)="onFollowSaved()"
+      [busy]="actionBusy()"
+      (busyChange)="onPanelBusy($event)"
+      (failed)="onPanelFailed($event)"
+    />
+  </div>
+
+  <footer class="dfoot surf">
+    <b>Booking rules</b>
+    <ul class="chips">
+      @for (chip of ruleChips(); track chip.label) {
+        <li>
+          @if (chip.disabled) {
+            <span class="pill p-wait" aria-disabled="true">{{ chip.label }} · {{ whatsappNote }}</span>
+          } @else {
+            <span class="pill">{{ chip.label }}</span>
+          }
+        </li>
+      }
+    </ul>
+    @if (canSlotSettings()) {
+      <a class="linkbtn" routerLink="/app/config/slots">Slot settings</a>
+    }
+    @if (canRules()) {
+      <a class="linkbtn" routerLink="/app/config/slots">Change rules</a>
+    }
+  </footer>
+}

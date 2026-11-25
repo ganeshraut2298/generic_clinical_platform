@@ -19,8 +19,17 @@ public interface DoctorSlotSettingsRepository {
 
     /** {@code workingDays} is 0 (Sunday) to 6 (Saturday); {@code sessions} has at most 2 entries, ordered by index. */
     record SlotSettingsRow(int slotMinutes, List<Integer> workingDays, int walkInEveryNth, int maxOnlinePerDay,
-                            List<SessionRow> sessions) {
+                            List<SessionRow> sessions, Integer closeBeforeHours) {
+
+        /** Settings with no per-doctor cut-off (the clinic's value applies). */
+        public SlotSettingsRow(int slotMinutes, List<Integer> workingDays, int walkInEveryNth, int maxOnlinePerDay,
+                                List<SessionRow> sessions) {
+            this(slotMinutes, workingDays, walkInEveryNth, maxOnlinePerDay, sessions, null);
+        }
     }
+
+    /** SAH-90: every doctor's settings of the clinic in one read, keyed by doctor; doctors with none are absent. */
+    java.util.Map<UUID, SlotSettingsRow> findAllByTenant(UUID tenantId);
 
     record SessionRow(int sessionIndex, LocalTime startTime, LocalTime endTime) {
     }

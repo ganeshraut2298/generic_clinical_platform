@@ -1,0 +1,38 @@
+<div class="tokpanel">
+  <h2>{{ issued() ? 'Token issued' : 'Token' }}</h2>
+  @if (loading()) {
+    <p class="muted" role="status" aria-busy="true">Loading the token</p>
+  }
+  @if (error(); as message) {
+    <p class="err" role="alert">{{ message }}</p>
+    <button mat-stroked-button type="button" (click)="reload()">Try again</button>
+  }
+  @if (panel(); as p) {
+    <div class="tokbox">
+      <span class="faint">Token</span>
+      <span class="tokno" data-testid="token-number">{{ token(p.tokenNo) }}</span>
+    </div>
+    <p data-testid="token-patient"><b>{{ p.patientName }}</b></p>
+    <p data-testid="token-doctor">
+      {{ shortName(p.doctorName) }}
+      @if (p.room) {
+        <span class="faint"> · {{ p.room }}</span>
+      }
+    </p>
+    <p data-testid="token-wait">{{ wait(p) }}</p>
+    <div class="row">
+      <button mat-flat-button color="primary" type="button" data-testid="print-slip" (click)="print()">Print slip</button>
+      <button mat-stroked-button type="button" disabled aria-describedby="token-wa-note">Send on WhatsApp</button>
+    </div>
+    <p id="token-wa-note" class="faint" data-testid="token-whatsapp-note">{{ whatsappNote }}</p>
+
+    <section class="desk-slip" aria-hidden="true" data-testid="slip">
+      <div class="slip-clinic">{{ clinicName() }}</div>
+      <div class="slip-token">{{ token(p.tokenNo) }}</div>
+      <div>{{ p.patientName }}</div>
+      <div>{{ shortName(p.doctorName) }}</div>
+      <div>{{ slipDate() }}, {{ slipTime() }} IST</div>
+    </section>
+  }
+  <button mat-stroked-button type="button" data-testid="token-close" (click)="closePanel.emit()">Close</button>
+</div>

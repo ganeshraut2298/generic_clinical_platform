@@ -1,0 +1,146 @@
+<h2>Confirm booking</h2>
+@if (doctor(); as d) {
+  <p data-testid="book-doctor">
+    <b>{{ shortName(d.name) }}</b>
+    @if (d.department) {
+      <span class="faint"> · {{ d.department }}</span>
+    }
+  </p>
+}
+<p data-testid="book-when">{{ when() }}</p>
+@if (mode().insideCutOff) {
+  <p class="note" data-testid="cutoff-note">Inside the booking cut-off</p>
+}
+@if (mode().reschedule) {
+  <p class="faint" data-testid="book-hint">The same appointment is moved to this time. No second appointment is made.</p>
+}
+
+@if (fixedPatient(); as fixed) {
+  <div class="field">
+    <span class="flabel">Patient</span>
+    <b data-testid="book-patient">{{ fixed.name }}</b>
+  </div>
+} @else if (chosen(); as picked) {
+  <div class="field">
+    <span class="flabel">Patient</span>
+    <div class="chosen">
+      <div>
+        <b data-testid="book-patient">{{ picked.name }}</b>
+        @if (picked.mobile) {
+          <div class="faint" data-testid="book-mobile">{{ picked.mobile }}</div>
+        }
+      </div>
+      <button mat-stroked-button type="button" (click)="changePatient()">Change patient</button>
+    </div>
+  </div>
+} @else if (addingPatient()) {
+  <form class="newp" [formGroup]="newForm" (ngSubmit)="createPatient()" novalidate aria-labelledby="newp-title">
+    <h3 id="newp-title">New patient</h3>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Full name</mat-label>
+      <input matInput formControlName="name" autocomplete="off" />
+      @if (newPatientError('name'); as e) {
+        <mat-error>{{ e }}</mat-error>
+      }
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Mobile</mat-label>
+      <input matInput class="num" formControlName="mobile" inputmode="numeric" maxlength="10" placeholder="10 digits" autocomplete="off" />
+      @if (newPatientError('mobile'); as e) {
+        <mat-error>{{ e }}</mat-error>
+      }
+    </mat-form-field>
+    <app-dob-age-fields [age]="newForm.controls.age" [dateOfBirth]="newForm.controls.dateOfBirth" />
+    <div class="field">
+      <span id="newp-sex" class="flabel">Sex</span>
+      <mat-button-toggle-group formControlName="sex" aria-labelledby="newp-sex">
+        <mat-button-toggle value="F">F</mat-button-toggle>
+        <mat-button-toggle value="M">M</mat-button-toggle>
+        <mat-button-toggle value="O">O</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+    <app-consent-block [privacy]="privacy()" [records]="consentRecords" [promo]="consentPromo" />
+    @if (privacyError()) {
+      <p class="err" role="alert" data-testid="consent-error">
+        Could not check the clinic's consent setting.
+        <button mat-stroked-button type="button" (click)="loadPrivacy()">Try again</button>
+      </p>
+    }
+    @if (createError(); as message) {
+      <p class="err" role="alert">{{ message }}</p>
+    }
+    <div class="row">
+      <button mat-flat-button color="primary" type="submit" data-testid="save-patient" [disabled]="!canSavePatient()">Save patient</button>
+      <button mat-stroked-button type="button" (click)="cancelNewPatient()">Back to search</button>
+    </div>
+  </form>
+} @else {
+  <div class="field">
+    <label class="flabel" for="desk-patient-q">Patient</label>
+    <input
+      id="desk-patient-q"
+      class="search"
+      type="search"
+      autocomplete="off"
+      placeholder="Search by name or mobile number"
+      [value]="query()"
+      (input)="setQuery($event)"
+    />
+    <div aria-live="polite">
+      @if (searching()) {
+        <p class="faint" role="status">Searching</p>
+      }
+      @if (searchError(); as message) {
+        <p class="err" role="alert">{{ message }}</p>
+      }
+      @if (results().length > 0) {
+        <ul class="results" aria-label="Matching patients">
+          @for (item of results(); track item.id) {
+            <li>
+              <button type="button" class="result" (click)="choose(item)">
+                <b>{{ item.name }}</b>
+                <span class="faint">{{ item.mobile }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      } @else if (searched() && !searching()) {
+        <p class="faint" data-testid="no-match">No patient found.</p>
+      }
+    </div>
+    @if (query().trim().length >= 2 && !searching()) {
+      <button mat-stroked-button type="button" data-testid="new-patient" (click)="openNewPatient()">New patient</button>
+    }
+  </div>
+}
+
+@if (!addingPatient()) {
+  @if (typeLocked()) {
+    <div class="field">
+      <span class="flabel">Visit type</span>
+      <b data-testid="book-type">{{ visitType() === 'FOLLOW_UP' ? 'Follow-up' : 'New consultation' }} · {{ inr(fee()) }}</b>
+    </div>
+  } @else {
+    <div class="field">
+      <span id="book-type-label" class="flabel">Visit type</span>
+      <div class="seg" role="group" aria-labelledby="book-type-label">
+        <button type="button" data-testid="type-new" [attr.aria-pressed]="visitType() === 'NEW'" (click)="chooseType('NEW')">
+          New consultation · {{ inr(newFee()) }}
+        </button>
+        <button type="button" data-testid="type-follow" [attr.aria-pressed]="visitType() === 'FOLLOW_UP'" (click)="chooseType('FOLLOW_UP')">
+          Follow-up · {{ inr(followFee()) }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (error(); as message) {
+    <p class="err" role="alert" data-testid="book-error">{{ message }}</p>
+  }
+  <div class="row">
+    <button mat-flat-button color="primary" type="button" data-testid="confirm-booking" [disabled]="!canConfirm()" (click)="confirm()">
+      {{ confirmLabel(fee()) }}
+    </button>
+    <button mat-stroked-button type="button" (click)="closePanel.emit()">Close</button>
+  </div>
+}

@@ -33,18 +33,3 @@ mat-slide-toggle {
     grid-template-columns: 1fr;
   }
 }
-
-.consent {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: var(--r-md);
-  background: var(--pri-soft);
-
-  blockquote {
-    margin: 0 0 4px;
-    color: var(--pri-text);
-    font-size: 0.86rem;
-  }
-}

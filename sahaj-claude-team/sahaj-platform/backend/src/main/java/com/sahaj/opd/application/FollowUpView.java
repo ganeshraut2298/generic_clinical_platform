@@ -14,14 +14,23 @@ public record FollowUpView(Counts counts, List<Item> items) {
     public record Item(UUID id, UUID patientId, String patientName, String mobile, UUID doctorMembershipId,
                         String doctorName, LocalDate dueDate, String reason, String status, int daysLate,
                         UUID sourceVisitId, UUID sourceAdmissionId, UUID returnedVisitId, LocalDate appointmentDate,
-                        java.time.LocalTime appointmentTime) {
+                        java.time.LocalTime appointmentTime, UUID appointmentId, boolean notNeeded) {
+
+        /** An item with no appointment link and not marked not needed (the shape before 0.9.0). */
+        public Item(UUID id, UUID patientId, String patientName, String mobile, UUID doctorMembershipId,
+                    String doctorName, LocalDate dueDate, String reason, String status, int daysLate,
+                    UUID sourceVisitId, UUID sourceAdmissionId, UUID returnedVisitId, LocalDate appointmentDate,
+                    java.time.LocalTime appointmentTime) {
+            this(id, patientId, patientName, mobile, doctorMembershipId, doctorName, dueDate, reason, status, daysLate,
+                    sourceVisitId, sourceAdmissionId, returnedVisitId, appointmentDate, appointmentTime, null, false);
+        }
 
         /** An item with no booked appointment (the shape before 0.6.0). */
         public Item(UUID id, UUID patientId, String patientName, String mobile, UUID doctorMembershipId,
                     String doctorName, LocalDate dueDate, String reason, String status, int daysLate,
                     UUID sourceVisitId, UUID sourceAdmissionId, UUID returnedVisitId) {
             this(id, patientId, patientName, mobile, doctorMembershipId, doctorName, dueDate, reason, status, daysLate,
-                    sourceVisitId, sourceAdmissionId, returnedVisitId, null, null);
+                    sourceVisitId, sourceAdmissionId, returnedVisitId, null, null, null, false);
         }
 
         /** Ids, due date and status only: never the name, mobile or reason (SAH-27 security review L2). */

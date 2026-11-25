@@ -1,19 +1,18 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MOBILE_PATTERN } from '../../../core/auth/auth.model';
 import { ApiError } from '../../../core/http/problem-detail';
-import { ShellStore } from '../../../core/shell/shell.store';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { PrivacyApi } from '../../privacy/privacy.api';
-import { ConsentInput, PrivacySettings, consentLine } from '../../privacy/privacy.model';
+import { ConsentBlockComponent, buildConsents } from '../../privacy/consent-block.component';
+import { PrivacySettings } from '../../privacy/privacy.model';
 import { PatientApi } from '../patient.api';
 import { DobAgeFieldsComponent, dateOfBirthValidator } from './dob-age-fields.component';
 import { LANGUAGE_LABELS, Patient, PatientLanguage, Sex } from '../patient.model';
@@ -44,7 +43,6 @@ type FieldName = 'name' | 'sex' | 'mobile' | 'area' | 'language' | 'allergy' | '
     ReactiveFormsModule,
     MatButtonModule,
     MatButtonToggleModule,
-    MatCheckboxModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -52,6 +50,7 @@ type FieldName = 'name' | 'sex' | 'mobile' | 'area' | 'language' | 'allergy' | '
     MatSlideToggleModule,
     IconComponent,
     DobAgeFieldsComponent,
+    ConsentBlockComponent,
   ],
   styleUrl: './patient-form-dialog.component.scss',
   templateUrl: './patient-form-dialog.component.html',
@@ -59,7 +58,6 @@ type FieldName = 'name' | 'sex' | 'mobile' | 'area' | 'language' | 'allergy' | '
 export class PatientFormDialogComponent {
   private readonly api = inject(PatientApi);
   private readonly privacyApi = inject(PrivacyApi);
-  private readonly store = inject(ShellStore);
   private readonly dialogRef = inject<MatDialogRef<PatientFormDialogComponent, Patient | null>>(MatDialogRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly data = inject<PatientFormDialogData>(MAT_DIALOG_DATA, { optional: true }) ?? {};
@@ -69,13 +67,8 @@ export class PatientFormDialogComponent {
   protected readonly saving = signal(false);
   protected readonly serverError = signal<string | null>(null);
   protected readonly privacy = signal<PrivacySettings | null>(null);
-  protected readonly consentText = computed(() => consentLine(this.store.me()?.clinic.name ?? 'this clinic'));
   protected readonly consentRecords = new FormControl(false, { nonNullable: true });
   protected readonly consentPromo = new FormControl(false, { nonNullable: true });
-  protected readonly showRecordsConsent = computed(() => this.privacy()?.consentRequired === true);
-  protected readonly showPromoConsent = computed(
-    () => this.privacy()?.consentRequired === true && this.privacy()?.promoConsent === true,
-  );
 
   protected readonly form = new FormGroup({
     name: new FormControl(this.data.name ?? '', {
@@ -144,13 +137,7 @@ export class PatientFormDialogComponent {
       return;
     }
     const value = this.form.getRawValue();
-    const consents: ConsentInput[] = [];
-    if (this.showRecordsConsent()) {
-      consents.push({ kind: 'RECORDS', given: this.consentRecords.value });
-    }
-    if (this.showPromoConsent()) {
-      consents.push({ kind: 'PROMOTIONAL', given: this.consentPromo.value });
-    }
+    const consents = buildConsents(this.privacy(), this.consentRecords, this.consentPromo);
     this.saving.set(true);
     this.serverError.set(null);
     this.api

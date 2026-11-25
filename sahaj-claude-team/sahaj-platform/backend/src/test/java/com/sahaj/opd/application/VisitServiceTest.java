@@ -69,7 +69,8 @@ class VisitServiceTest {
                 .thenReturn(Optional.of(new PatientSummary(PATIENT_ID, "Asha Rao", 30, "F", "9000000001")));
         when(teamMemberPort.find(TENANT_ID, DOCTOR_ID))
                 .thenReturn(Optional.of(new TeamMember(DOCTOR_ID, "Dr Rao", "DOCTOR", true, 50000)));
-        when(visitRepository.nextTokenNo()).thenReturn(1);
+        when(visitRepository.nextTokenNo(any())).thenReturn(1);
+        when(visitRepository.moveStageIfCurrent(any(), any(), any(), any())).thenReturn(true);
         stubVitals(true);
         when(visitRepository.lastVisitAt(eq(TENANT_ID), any(), any())).thenReturn(Optional.empty());
     }
@@ -82,7 +83,7 @@ class VisitServiceTest {
     void aNonCreateRoleIs403() {
         assertThatThrownBy(() -> service.issueToken(TENANT_ID, USER_ID, "DOCTOR",
                 new VisitCreateInput(PATIENT_ID, DOCTOR_ID))).isInstanceOf(AccessDeniedException.class);
-        verify(visitRepository, never()).insert(any(), any(), any(), any(), any(), anyInt(), anyInt(), anyInt(), any());
+        verify(visitRepository, never()).insert(any(), any(), any(), any(), any(), anyInt(), any(), anyInt(), anyInt(), any());
     }
 
     @Test
@@ -190,7 +191,7 @@ class VisitServiceTest {
 
         service.issueToken(TENANT_ID, USER_ID, "OWNER", new VisitCreateInput(PATIENT_ID, DOCTOR_ID));
 
-        verify(visitRepository).insert(any(), eq(PATIENT_ID), eq(DOCTOR_ID), eq(visitType), any(), anyInt(),
+        verify(visitRepository).insert(any(), eq(PATIENT_ID), eq(DOCTOR_ID), eq(visitType), any(), anyInt(), eq(java.time.LocalDate.of(2026, 11, 1)),
                 eq(feePaise), anyInt(), eq(USER_ID));
     }
 
@@ -316,7 +317,7 @@ class VisitServiceTest {
         var moved = service.moveStage(TENANT_ID, USER_ID, "NURSE", visit.id(), "WITH_DOCTOR");
 
         assertThat(moved.stage()).isEqualTo("WITH_DOCTOR");
-        verify(visitRepository).updateStage(visit.id(), "WITH_DOCTOR", USER_ID);
+        verify(visitRepository).moveStageIfCurrent(visit.id(), "VITALS", "WITH_DOCTOR", USER_ID);
     }
 
     @Test
@@ -327,7 +328,7 @@ class VisitServiceTest {
 
         assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "NURSE", visit.id(), "BILLING"))
                 .isInstanceOf(AccessDeniedException.class);
-        verify(visitRepository, never()).updateStage(any(), any(), any());
+        verify(visitRepository, never()).moveStageIfCurrent(any(), any(), any(), any());
     }
 
     @Test
@@ -398,7 +399,7 @@ class VisitServiceTest {
 
         assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", visit.id(), "WAITING"))
                 .isInstanceOf(AccessDeniedException.class);
-        verify(visitRepository, never()).updateStage(any(), any(), any());
+        verify(visitRepository, never()).moveStageIfCurrent(any(), any(), any(), any());
     }
 
     @Test
@@ -461,7 +462,7 @@ class VisitServiceTest {
 
         service.issueToken(TENANT_ID, USER_ID, "OWNER", new VisitCreateInput(PATIENT_ID, DOCTOR_ID));
 
-        verify(visitRepository).insert(any(), eq(PATIENT_ID), eq(DOCTOR_ID), eq("NEW"), eq("VITALS"), eq(1),
+        verify(visitRepository).insert(any(), eq(PATIENT_ID), eq(DOCTOR_ID), eq("NEW"), eq("VITALS"), eq(1), eq(java.time.LocalDate.of(2026, 11, 1)),
                 eq(50000L), eq(2), eq(USER_ID));
     }
 
@@ -581,5 +582,94 @@ class VisitServiceTest {
         List<VisitView> all = service.today(TENANT_ID, "NURSE", false);
 
         assertThat(all).hasSize(2);
+    }
+
+    // --- SAH-92-3: compare-and-set stage move; SAH-92-1: token day in IST ---
+
+    @Test
+    void aStageThatDiffersFromExpectedStageIs409AndNothingIsWritten() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WITH_DOCTOR");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit));
+
+        assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "DOCTOR", visit.id(), "BILLING", "WAITING"))
+                .isInstanceOf(OpdProblemException.class)
+                .satisfies(ex -> assertThat(((OpdProblemException) ex).slug()).isEqualTo("visit-stage-changed"));
+        verify(visitRepository, never()).moveStageIfCurrent(any(), any(), any(), any());
+    }
+
+    @Test
+    void aRoleThatMayNotMoveTheStageGets403EvenWhenExpectedStageIsStale() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WITH_DOCTOR");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit));
+
+        assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", visit.id(), "BILLING", "WAITING"))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(visitRepository, never()).moveStageIfCurrent(any(), any(), any(), any());
+    }
+
+    @Test
+    void withExpectedStageATargetThatIsNotTheNextStageIs409() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WAITING");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit));
+
+        assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "OWNER", visit.id(), "BILLING", "WAITING"))
+                .isInstanceOf(OpdProblemException.class);
+        verify(visitRepository, never()).moveStageIfCurrent(any(), any(), any(), any());
+    }
+
+    @Test
+    void withExpectedStageTheNextStageMovesOnceAsACompareAndSet() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WAITING");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit))
+                .thenReturn(Optional.of(new VisitRow(visit.id(), PATIENT_ID, DOCTOR_ID, "NEW", "WITH_DOCTOR", 1,
+                        50000, CLOCK.instant(), 1)));
+
+        var moved = service.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", visit.id(), "WITH_DOCTOR", "WAITING");
+
+        assertThat(moved.stage()).isEqualTo("WITH_DOCTOR");
+        verify(visitRepository).moveStageIfCurrent(visit.id(), "WAITING", "WITH_DOCTOR", USER_ID);
+    }
+
+    @Test
+    void aLostRaceIs409AndWritesNoAuditRow() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WAITING");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit));
+        when(visitRepository.moveStageIfCurrent(visit.id(), "WAITING", "WITH_DOCTOR", USER_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", visit.id(), "WITH_DOCTOR"))
+                .isInstanceOf(OpdProblemException.class)
+                .satisfies(ex -> assertThat(((OpdProblemException) ex).status()).isEqualTo(409));
+        verify(auditLog, never()).record(eq("VISIT_STAGE_MOVED"), any(), any(), any(), any());
+    }
+
+    @Test
+    void theStageOwnerRuleStillApplies() {
+        stubVitals(false);
+        VisitRow visit = visitAt("WITH_DOCTOR");
+        when(visitRepository.findById(TENANT_ID, visit.id())).thenReturn(Optional.of(visit));
+
+        assertThatThrownBy(() -> service.moveStage(TENANT_ID, USER_ID, "NURSE", visit.id(), "BILLING", "WITH_DOCTOR"))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void theTokenDayIsTheClinicsDayInIstNotUtc() {
+        // 20:00 UTC on 1 Nov is 01:30 IST on 2 Nov
+        Clock lateUtc = Clock.fixed(Instant.parse("2026-11-01T20:00:00Z"), ZoneOffset.UTC);
+        VisitService late = new VisitService(visitRepository, workflowService, feeSettingsRepository, patientLookup,
+                teamMemberPort, ownerGuard, auditLog, followUpService, lateUtc);
+        stubVitals(false);
+        stubFindByIdEchoingTheRequestedId("NEW", "WAITING", 50000);
+
+        late.issueToken(TENANT_ID, USER_ID, "OWNER", new VisitCreateInput(PATIENT_ID, DOCTOR_ID));
+
+        verify(visitRepository).nextTokenNo(java.time.LocalDate.of(2026, 11, 2));
+        verify(visitRepository).insert(any(), eq(PATIENT_ID), eq(DOCTOR_ID), any(), any(), anyInt(),
+                eq(java.time.LocalDate.of(2026, 11, 2)), org.mockito.ArgumentMatchers.anyLong(), anyInt(), eq(USER_ID));
     }
 }

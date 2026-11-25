@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/opd/visits")
-public class VisitController {
+public class VisitController implements DeskApi {
 
     private final VisitService visitService;
 
@@ -53,6 +53,7 @@ public class VisitController {
     public VisitResponse moveStage(@PathVariable UUID id, @RequestBody VisitStageRequest request) {
         ClinicUser user = ClinicUser.current();
         return VisitResponse.from(
-                visitService.moveStage(user.tenantId(), user.userId(), user.role(), id, request.stage()));
+                visitService.moveStage(user.tenantId(), user.userId(), user.role(), id, request.stage(),
+                        request.expectedStage()));
     }
 }

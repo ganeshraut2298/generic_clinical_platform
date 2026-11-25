@@ -108,7 +108,7 @@ class VisitControllerTest {
 
     @Test
     void movingAStageReturnsTheUpdatedVisit() throws Exception {
-        when(visitService.moveStage(TENANT_ID, USER_ID, "OWNER", VISIT_ID, "WITH_DOCTOR"))
+        when(visitService.moveStage(TENANT_ID, USER_ID, "OWNER", VISIT_ID, "WITH_DOCTOR", null))
                 .thenReturn(view("WITH_DOCTOR", "NEW"));
 
         mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("OWNER")).contentType(JSON)
@@ -120,7 +120,7 @@ class VisitControllerTest {
 
     @Test
     void aForbiddenStageMoveIs403() throws Exception {
-        when(visitService.moveStage(any(), any(), any(), any(), any()))
+        when(visitService.moveStage(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new AccessDeniedException("no"));
         mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("NURSE")).contentType(JSON)
                         .content("{\"stage\":\"BILLING\"}"))
@@ -128,8 +128,32 @@ class VisitControllerTest {
     }
 
     @Test
+    void theExpectedStageIsPassedToTheService() throws Exception {
+        when(visitService.moveStage(TENANT_ID, USER_ID, "FRONT_DESK", VISIT_ID, "WITH_DOCTOR", "WAITING"))
+                .thenReturn(view("WITH_DOCTOR", "NEW"));
+
+        mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("FRONT_DESK")).contentType(JSON)
+                        .content("{\"stage\":\"WITH_DOCTOR\",\"expectedStage\":\"WAITING\",\"tenantId\":\"x\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("WITH_DOCTOR"));
+    }
+
+    @Test
+    void aLostStageRaceIsTheVisitStageChangedProblem() throws Exception {
+        when(visitService.moveStage(any(), any(), any(), any(), any(), any()))
+                .thenThrow(com.sahaj.opd.application.OpdProblemException.visitStageChanged());
+
+        mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("OWNER")).contentType(JSON)
+                        .content("{\"stage\":\"BILLING\",\"expectedStage\":\"WITH_DOCTOR\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/visit-stage-changed"))
+                .andExpect(jsonPath("$.detail")
+                        .value("This card was moved by someone else. The board now shows the latest."));
+    }
+
+    @Test
     void anInvalidStageValueIs400() throws Exception {
-        when(visitService.moveStage(any(), any(), any(), any(), any()))
+        when(visitService.moveStage(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new InvalidInputException("stage", "Choose a valid stage"));
         mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("OWNER")).contentType(JSON)
                         .content("{\"stage\":\"NOT_A_STAGE\"}"))
@@ -138,7 +162,7 @@ class VisitControllerTest {
 
     @Test
     void anUnknownVisitIs404() throws Exception {
-        when(visitService.moveStage(any(), any(), any(), any(), any())).thenThrow(new NotFoundException("x"));
+        when(visitService.moveStage(any(), any(), any(), any(), any(), any())).thenThrow(new NotFoundException("x"));
 
         mockMvc.perform(patch(OPD + "/visits/" + VISIT_ID + "/stage").with(as("OWNER")).contentType(JSON)
                         .content("{\"stage\":\"WAITING\"}"))

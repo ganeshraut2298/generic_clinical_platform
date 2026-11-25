@@ -1,0 +1,93 @@
+<section class="panel surf" aria-label="Next actions">
+  @switch (mode().kind) {
+    @case ('idle') {
+      <h2>Next actions</h2>
+      <p class="muted">Pick a slot to book, or use a button on a patient card. This panel follows what you are doing.</p>
+      <h3>Follow-ups to book · {{ followUpTotal() }}</h3>
+      @if (followUps().length === 0) {
+        <p class="muted">All follow-ups are booked.</p>
+      } @else {
+        <ul class="fulist">
+          @for (item of followUps(); track item.followUpId) {
+            <li class="fu">
+              <div class="futop">
+                <b>{{ item.patientName }}</b>
+                <span class="pill" [class.p-crit]="item.status === 'MISSED'" [class.p-warn]="item.status !== 'MISSED'">{{ statusText(item) }}</span>
+              </div>
+              <div class="faint">{{ shortName(item.doctorName) }} · {{ item.reason }}</div>
+              @if (canAct()) {
+                <button mat-stroked-button type="button" (click)="findSlot.emit(item)">Find slot</button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    }
+    @case ('pick') {
+      <h2>Pick a slot</h2>
+      @if (mode(); as m) {
+        @if (m.kind === 'pick') {
+          @if (m.reschedule; as card) {
+            <p data-testid="pick-patient"><b>{{ card.patientName }}</b></p>
+            <p class="faint" data-testid="pick-hint">{{ rescheduleHint(card) }}</p>
+          } @else if (m.followUp; as item) {
+            <p data-testid="pick-patient"><b>{{ item.patientName }}</b></p>
+            <p class="faint" data-testid="pick-hint">{{ followUpHint(item) }}</p>
+          }
+        }
+      }
+      <p class="muted" data-testid="pick-text">Pick a day and a time in the slot finder. The doctor is already selected.</p>
+      <button mat-stroked-button type="button" (click)="closePanel.emit()">Close</button>
+    }
+    @case ('book') {
+      @if (mode(); as m) {
+        @if (m.kind === 'book' && canAct()) {
+          <app-desk-book-panel
+            [mode]="m"
+            [doctor]="doctor()"
+            [busy]="busy()"
+            (busyChange)="busyChange.emit($event)"
+            (closePanel)="closePanel.emit()"
+            (booked)="booked.emit($event)"
+            (failed)="failed.emit($event)"
+          />
+        }
+      }
+    }
+    @case ('booked') {
+      @if (mode(); as m) {
+        @if (m.kind === 'booked') {
+          <h2>Booked</h2>
+          <p data-testid="booked-patient"><b>{{ m.patientName }}</b></p>
+          <p data-testid="booked-doctor">{{ shortName(m.doctorName) }}</p>
+          <p data-testid="booked-when">{{ fullDate(m.date) }} · {{ clock(m.time) }}</p>
+          <p class="muted" data-testid="booked-note">{{ bookedNote(m.date) }}</p>
+          <button mat-flat-button color="primary" type="button" data-testid="book-another" (click)="closePanel.emit()">Book another</button>
+        }
+      }
+    }
+    @case ('token') {
+      @if (mode(); as m) {
+        @if (m.kind === 'token') {
+          <app-desk-token-panel [visitId]="m.visitId" [initial]="m.panel" [issued]="m.issued" (closePanel)="closePanel.emit()" />
+        }
+      }
+    }
+    @case ('follow') {
+      @if (mode(); as m) {
+        @if (m.kind === 'follow' && canAct()) {
+          <app-desk-follow-panel
+            [mode]="m"
+            [doctor]="followDoctor()"
+            [today]="today()"
+            [busy]="busy()"
+            (busyChange)="busyChange.emit($event)"
+            (closePanel)="closePanel.emit()"
+            (saved)="followSaved.emit()"
+            (failed)="failed.emit($event)"
+          />
+        }
+      }
+    }
+  }
+</section>

@@ -30,6 +30,24 @@ public interface AppointmentRepository {
     Optional<AppointmentRow> findActiveConflict(UUID tenantId, UUID doctorMembershipId, LocalDate apptDate,
                                                  LocalTime apptTime);
 
+    /** SAH-91: the appointment row locked (select for update) for the rest of the transaction; absent for another clinic's id. */
+    Optional<AppointmentRow> findByIdForUpdate(UUID tenantId, UUID id);
+
+    /** SAH-91: a BOOKED or ARRIVED appointment in this slot other than {@code excludeId} (null excludes nothing). */
+    Optional<AppointmentRow> findActiveConflict(UUID tenantId, UUID doctorMembershipId, LocalDate apptDate,
+                                                 LocalTime apptTime, UUID excludeId);
+
+    /** SAH-91: this patient's BOOKED or ARRIVED appointment with this doctor at exactly this date and time, other than {@code excludeId}. */
+    Optional<AppointmentRow> findActiveForPatient(UUID tenantId, UUID patientId, UUID doctorMembershipId,
+                                                   LocalDate apptDate, LocalTime apptTime, UUID excludeId);
+
+    /**
+     * SAH-91 (ADR-032 D5): moves the appointment in place and sets it BOOKED, {@code version = version + 1}, only while the
+     * stored version is {@code expectedVersion}. False when someone changed it first.
+     */
+    boolean reschedule(UUID id, long expectedVersion, UUID doctorMembershipId, LocalDate apptDate, LocalTime apptTime,
+                       UUID actorUserId);
+
     /** SAH-21: BOOKED appointments of this doctor from {@code from} to {@code to}, both inclusive. */
     int countBooked(UUID tenantId, UUID doctorMembershipId, LocalDate from, LocalDate to);
 

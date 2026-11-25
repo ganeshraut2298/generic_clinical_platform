@@ -91,6 +91,26 @@ public class TeamMemberLookup implements TeamMemberPort {
                 .filter(specialty -> !specialty.isEmpty());
     }
 
+    /** SAH-90 (ADR-032 D1): the specialties of many doctors from one roster read. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    public Map<UUID, String> doctorSpecialties(UUID tenantId, Collection<UUID> membershipIds) {
+        Map<UUID, String> result = new HashMap<>();
+        if (membershipIds.isEmpty()) {
+            return result;
+        }
+        Set<UUID> wanted = Set.copyOf(membershipIds);
+        for (TeamRow row : teamRepository.findAll(tenantId)) {
+            if (wanted.contains(row.id()) && DOCTOR_ROLES.contains(row.role()) && row.hasDoctorProfile()) {
+                String specialty = blankToNull(row.specialty());
+                if (specialty != null) {
+                    result.put(row.id(), specialty);
+                }
+            }
+        }
+        return result;
+    }
+
     /** SAH-43: name, role and status with the doctor details; empty when the member has no doctor profile row. */
     @Override
     @Transactional(propagation = Propagation.MANDATORY, readOnly = true)

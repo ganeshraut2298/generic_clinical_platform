@@ -240,7 +240,7 @@ class AppointmentsConfigIT extends OpdJourneySupport {
         UUID rebooked = bookOk(clinic, p2, "10:00");
         assertThat(rebooked).isNotEqualTo(first);
         // A cancelled appointment cannot be changed again.
-        setStatus(clinic.owner(), first, "NOSHOW").andExpect(status().isBadRequest());
+        setStatus(clinic.owner(), first, "NOSHOW").andExpect(status().isConflict()); // DEC-097: 409 appointment-not-booked (was 400)
 
         // No-show.
         UUID second = bookOk(clinic, p3, "10:15");
@@ -252,6 +252,7 @@ class AppointmentsConfigIT extends OpdJourneySupport {
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
 
         // Create token on the rebooked appointment: real visit, linked, ARRIVED, token number.
+        AppointmentToday.move(db(), clinic.tenantId(), rebooked.toString()); // SAH-92: check-in only on the day of the visit
         MvcResult tokened = mvc.perform(post(APPTS + "/" + rebooked + "/token").with(clinic.as("FRONT_DESK")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ARRIVED"))
@@ -272,7 +273,7 @@ class AppointmentsConfigIT extends OpdJourneySupport {
 
         // A second token for the same appointment is refused; an arrived one cannot be cancelled.
         mvc.perform(post(APPTS + "/" + rebooked + "/token").with(clinic.owner())).andExpect(status().isConflict());
-        setStatus(clinic.owner(), rebooked, "CANCELLED").andExpect(status().isBadRequest());
+        setStatus(clinic.owner(), rebooked, "CANCELLED").andExpect(status().isConflict()); // DEC-097: 409 appointment-not-booked (was 400)
     }
 
     /** A slot whose earlier appointment was marked no-show is free to book again. */

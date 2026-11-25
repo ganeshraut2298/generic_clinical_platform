@@ -178,7 +178,7 @@ class VisitServiceFinishConsultationTest {
         when(fees.find(TENANT)).thenReturn(Optional.empty());
         when(workflow.current(TENANT, USER)).thenReturn(new WorkflowVersionView(3, List.of(
                 new WorkflowStep("consult", true, "DOCTOR"), new WorkflowStep("billing", true, "FRONT_DESK")), null, null));
-        when(visits.nextTokenNo()).thenReturn(7);
+        when(visits.nextTokenNo(any())).thenReturn(7);
         when(visits.findById(any(), any())).thenReturn(Optional.of(new VisitRow(VISIT, PATIENT, DOCTOR, "NEW", "WAITING",
                 7, 80000, CLOCK.instant(), 0, 3)));
 

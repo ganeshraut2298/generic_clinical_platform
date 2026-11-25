@@ -1,0 +1,74 @@
+<section class="finder surf" aria-label="Slot finder">
+  @if (doctor(); as d) {
+    <div class="fhead">
+      <span class="avatar" aria-hidden="true">{{ initials(d.name) }}</span>
+      <div class="finfo">
+        <h2>{{ d.name }}</h2>
+        <p class="faint">
+          @if (d.department) {
+            <span>{{ d.department }}</span> ·
+          }
+          @if (d.room) {
+            <span>{{ d.room }}</span> ·
+          }
+          <span>{{ d.slotMinutes }}-min slots</span>
+        </p>
+        <p class="fee">{{ feeLine(d) }}</p>
+      </div>
+      <span class="dstatus">
+        <span class="dot" [class]="'dot ' + statusTone(d.todayStatus)" aria-hidden="true"></span>
+        {{ statusText(d) }}
+      </span>
+    </div>
+
+    <div class="strip" role="group" aria-label="Day">
+      @for (day of d.days; track day.date) {
+        <button type="button" class="daybtn" [attr.aria-pressed]="day.date === date()" (click)="dayChange.emit(day.date)">
+          <b>{{ dayLabel(day.date, today()) }}</b>
+          <small>{{ day.onLeave ? 'No slots' : freeText(day.freeCount) }}</small>
+        </button>
+      }
+    </div>
+
+    <div class="slots-area" [attr.aria-busy]="loading()">
+      @if (loading()) {
+        <p class="muted" role="status">Loading slots</p>
+      }
+      @if (error(); as message) {
+        <div class="notice err" role="alert">
+          <span>{{ message }}</span>
+          <button mat-stroked-button type="button" (click)="retry.emit()">Try again</button>
+        </div>
+      }
+      @if (slots(); as s) {
+        @if (emptyMessage(); as message) {
+          <p class="nobox">{{ message }}</p>
+        } @else {
+          @for (group of s.groups; track group.label) {
+            <div class="group">
+              <h3>{{ groupTitles[group.label] }}</h3>
+              <div class="slotgrid">
+                @for (slot of group.slots; track slot.time) {
+                  <button
+                    type="button"
+                    class="slotbtn"
+                    [attr.aria-pressed]="pickedTime() === slot.time"
+                    [attr.aria-disabled]="!canBook()"
+                    (click)="canBook() && slotPick.emit(slot.time)"
+                  >
+                    {{ clock(slot.time) }}
+                    @if (slot.insideCutOff) {
+                      <small>Inside the booking cut-off</small>
+                    }
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        }
+      }
+    </div>
+  } @else {
+    <p class="muted">Pick a doctor from the list to see free slots.</p>
+  }
+</section>

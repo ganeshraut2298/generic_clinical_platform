@@ -157,21 +157,30 @@ class AppointmentControllerTest {
         AppointmentView arrived = new AppointmentView(APPT_ID, PATIENT_ID, "Asha Rao", 30, "F", DOCTOR_ID, "Dr Rao",
                 LocalDate.of(2026, 11, 1), LocalTime.of(9, 0), "ARRIVED", "NEW", "FRONT_DESK", null,
                 UUID.randomUUID(), 9);
-        when(appointmentService.createToken(TENANT_ID, USER_ID, "FRONT_DESK", APPT_ID)).thenReturn(arrived);
+        when(appointmentService.checkIn(TENANT_ID, USER_ID, "FRONT_DESK", APPT_ID)).thenReturn(
+                new AppointmentService.CheckIn(arrived, new com.sahaj.opd.application.DeskViews.TokenPanel(arrived.visitId(), 9,
+                        LocalDate.of(2026, 11, 1), "Asha Rao", DOCTOR_ID, "Dr Rao", "Room 2", "WAITING",
+                        java.time.Instant.parse("2026-11-01T04:30:00Z"), 3, 45, 15)));
 
         mockMvc.perform(post(OPD + "/appointments/" + APPT_ID + "/token").with(as("FRONT_DESK")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ARRIVED"))
-                .andExpect(jsonPath("$.tokenNo").value(9));
+                .andExpect(jsonPath("$.tokenNo").value(9))
+                .andExpect(jsonPath("$.tokenPanel.patientsAhead").value(3))
+                .andExpect(jsonPath("$.tokenPanel.estimatedWaitMinutes").value(45))
+                .andExpect(jsonPath("$.tokenPanel.room").value("Room 2"));
     }
 
     @Test
     void createTokenOnAnAlreadyArrivedAppointmentIs409() throws Exception {
-        when(appointmentService.createToken(any(), any(), any(), any()))
-                .thenThrow(new ConflictException("appointment-not-bookable", "Not bookable", "Already has a token."));
+        when(appointmentService.checkIn(any(), any(), any(), any()))
+                .thenThrow(com.sahaj.opd.application.OpdProblemException.appointmentAlreadyCheckedIn(UUID.randomUUID(), 9));
 
         mockMvc.perform(post(OPD + "/appointments/" + APPT_ID + "/token").with(as("OWNER")))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://sahaj.in/problems/appointment-already-checked-in"))
+                .andExpect(jsonPath("$.tokenNo").value(9))
+                .andExpect(jsonPath("$.visitId").exists());
     }
 
     // --- doctor slot settings ---

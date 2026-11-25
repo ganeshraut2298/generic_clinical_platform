@@ -1,0 +1,59 @@
+<h2>Follow-up</h2>
+<p data-testid="follow-patient"><b>{{ mode().patientName }}</b></p>
+<p data-testid="follow-doctor">
+  {{ shortName(mode().doctorName) }}
+  @if (doctor()?.department; as dept) {
+    <span class="faint"> · {{ dept }}</span>
+  }
+</p>
+
+<div class="field">
+  <span id="follow-after" class="flabel">Come back after</span>
+  <div class="seg" role="group" aria-labelledby="follow-after">
+    @for (item of intervals; track item.key) {
+      <button type="button" [attr.aria-pressed]="interval() === item.key" [attr.data-testid]="'interval-' + item.key" (click)="chooseInterval(item.key)">
+        {{ item.label }}
+      </button>
+    }
+  </div>
+  <p data-testid="follow-date">{{ dateLine() }}</p>
+</div>
+
+<div class="field" [attr.aria-busy]="loading()">
+  <span class="flabel">Earliest slots that day</span>
+  @if (loading()) {
+    <p class="faint" role="status">Loading slots</p>
+  }
+  @if (slotsError(); as message) {
+    <p class="err" role="alert">{{ message }}</p>
+    <button mat-stroked-button type="button" (click)="retry()">Try again</button>
+  }
+  @if (noSlotsText(); as text) {
+    <p class="faint" data-testid="follow-no-slots">{{ text }}</p>
+  }
+  @if (offered().length > 0) {
+    @if (offerDateLabel(); as label) {
+      <p class="faint" data-testid="follow-offer-day">Slots on {{ label }}</p>
+    }
+    <div class="slotgrid" role="group" aria-label="Follow-up times">
+      @for (slot of offered(); track slot.time) {
+        <button type="button" class="slotbtn" [attr.aria-pressed]="selectedTime() === slot.time" (click)="chooseTime(slot.time)">
+          {{ clock(slot.time) }}
+        </button>
+      }
+    </div>
+  }
+</div>
+
+@if (error(); as message) {
+  <p class="err" role="alert" data-testid="follow-error">{{ message }}</p>
+}
+<div class="row">
+  <button mat-flat-button color="primary" type="button" data-testid="book-follow-up" [disabled]="!canBook()" (click)="book()">
+    Book follow-up · {{ feeLabel() }}
+  </button>
+  <button mat-stroked-button type="button" data-testid="follow-not-needed" [disabled]="saving() || busy()" (click)="notNeeded()">
+    No follow-up needed
+  </button>
+  <button mat-stroked-button type="button" (click)="closePanel.emit()">Close</button>
+</div>

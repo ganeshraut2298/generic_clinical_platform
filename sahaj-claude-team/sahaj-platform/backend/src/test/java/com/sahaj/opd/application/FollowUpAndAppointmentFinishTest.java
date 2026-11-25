@@ -237,12 +237,56 @@ class FollowUpAndAppointmentFinishTest {
 
     @Test
     void aChosenSlotThatWasTakenMeanwhileIsNotBooked() {
-        when(appointmentRows.findActiveConflict(TENANT, DOCTOR, LocalDate.of(2026, 11, 20), LocalTime.of(17, 0)))
-                .thenReturn(Optional.of(booked(LocalDate.of(2026, 11, 20), LocalTime.of(17, 0))));
+        when(slots.find(TENANT, DOCTOR)).thenReturn(Optional.of(nineToTen()));
+        when(appointmentRows.findActiveConflict(TENANT, DOCTOR, LocalDate.of(2026, 11, 20), LocalTime.of(9, 0)))
+                .thenReturn(Optional.of(booked(LocalDate.of(2026, 11, 20), LocalTime.of(9, 0))));
 
-        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, LocalDate.of(2026, 11, 20), LocalTime.of(17, 0),
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, LocalDate.of(2026, 11, 20), LocalTime.of(9, 0),
                 "FOLLOW_UP", "EMR")).isEmpty();
         verify(appointmentRows, never()).insert(any(), any(), any(), any(), any(), any(), any(), any(), any());
         assertThat(Set.of()).isEmpty();
+    }
+
+    @Test
+    void aChosenSlotOnTheGridIsBookedWithNoCutOffForTheDoctor() {
+        when(slots.find(TENANT, DOCTOR)).thenReturn(Optional.of(nineToTen()));
+        // 13 Nov, 10:30 IST: the 14 Nov 09:00 slot is inside any whole-day cut-off, yet the EMR choice is booked
+        when(appointmentRows.findActiveConflict(TENANT, DOCTOR, LocalDate.of(2026, 11, 14), LocalTime.of(9, 0)))
+                .thenReturn(Optional.empty(), Optional.empty());
+        when(appointmentRows.findById(any(), any())).thenAnswer(inv -> Optional.of(
+                booked(LocalDate.of(2026, 11, 14), LocalTime.of(9, 0))));
+
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, LocalDate.of(2026, 11, 14), LocalTime.of(9, 0),
+                "FOLLOW_UP", "EMR")).isPresent();
+        verify(appointmentRows).insert(any(), eq(PATIENT), eq(DOCTOR), eq(LocalDate.of(2026, 11, 14)),
+                eq(LocalTime.of(9, 0)), any(), any(), any(), eq(USER));
+    }
+
+    @Test
+    void aChosenSlotOffTheGridOrInThePastOrOnANonWorkingDayIsNotBooked() {
+        when(slots.find(TENANT, DOCTOR)).thenReturn(Optional.of(new SlotSettingsRow(30, List.of(0, 1, 2, 3, 4, 5), 0, 0,
+                List.of(new SessionRow(0, LocalTime.of(9, 0), LocalTime.of(10, 0))))));
+        LocalDate friday = LocalDate.of(2026, 11, 20);
+
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, friday, LocalTime.of(9, 7), "FOLLOW_UP", "EMR"))
+                .isEmpty();
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, friday, LocalTime.of(17, 0), "FOLLOW_UP", "EMR"))
+                .isEmpty();
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, LocalDate.of(2026, 11, 13), LocalTime.of(9, 0),
+                "FOLLOW_UP", "EMR")).isEmpty();
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, LocalDate.of(2026, 11, 21), LocalTime.of(9, 0),
+                "FOLLOW_UP", "EMR")).isEmpty();
+        verify(appointmentRows, never()).lockSlot(any(), any(), any(), any());
+        verify(appointmentRows, never()).insert(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aWalkInOnlySlotIsNotBookedByTheEmrChoice() {
+        when(slots.find(TENANT, DOCTOR)).thenReturn(Optional.of(new SlotSettingsRow(30, List.of(0, 1, 2, 3, 4, 5, 6), 2, 0,
+                List.of(new SessionRow(0, LocalTime.of(9, 0), LocalTime.of(10, 0))))));
+
+        assertThat(appointments.bookAt(TENANT, USER, PATIENT, DOCTOR, LocalDate.of(2026, 11, 20), LocalTime.of(9, 30),
+                "FOLLOW_UP", "EMR")).isEmpty();
+        verify(appointmentRows, never()).insert(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

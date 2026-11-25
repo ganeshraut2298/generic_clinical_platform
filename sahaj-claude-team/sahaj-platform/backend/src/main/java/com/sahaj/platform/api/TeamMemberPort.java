@@ -39,6 +39,19 @@ public interface TeamMemberPort {
     Optional<String> doctorSpecialty(UUID tenantId, UUID membershipId);
 
     /**
+     * SAH-90 (ADR-032 D1): the doctor profile specialties of many doctors in one call, keyed by membership id. A member
+     * with no doctor profile, a blank specialty, another clinic's id or an unknown id is absent. The default asks one by
+     * one; {@code platform} overrides it with a single read. The specialty text is never logged.
+     */
+    default Map<UUID, String> doctorSpecialties(UUID tenantId, Collection<UUID> membershipIds) {
+        Map<UUID, String> result = new java.util.HashMap<>();
+        for (UUID id : membershipIds) {
+            doctorSpecialty(tenantId, id).ifPresent(specialty -> result.put(id, specialty));
+        }
+        return result;
+    }
+
+    /**
      * SAH-43 (ADR-019 D7): one member's name, role and status with the doctor details as saved in Team and access.
      * {@code membershipStatus} is the membership status name (for example {@code ACTIVE}). A null or blank
      * {@code specialty}, {@code degree} or {@code registrationNo} is returned as null; {@code opd} works out what is

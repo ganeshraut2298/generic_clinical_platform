@@ -1,6 +1,7 @@
 package com.sahaj.opd.application;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,11 +9,21 @@ import java.util.UUID;
 /** Port over {@code opd.visit} (SAH-9). Needs {@code app.tenant_id} bound. */
 public interface VisitRepository {
 
-    /** Allocates the next token number for the bound tenant and today, via {@code opd.next_token_no()}. */
-    int nextTokenNo();
+    /**
+     * Allocates the next token number of the bound tenant for the clinic's calendar day {@code tokenDate} (Asia/Kolkata,
+     * computed by the caller), via {@code opd.next_token_no(date)} (ADR-032 D6).
+     */
+    int nextTokenNo(LocalDate tokenDate);
 
+    /** Inserts the visit with {@code token_date} set to the same day the token was allocated for. */
     void insert(UUID id, UUID patientId, UUID doctorMembershipId, String visitType, String stage, int tokenNo,
-                long feePaise, int workflowVersionNo, UUID actorUserId);
+                LocalDate tokenDate, long feePaise, int workflowVersionNo, UUID actorUserId);
+
+    /**
+     * SAH-92-2: visits of this doctor on the token day in WAITING or VITALS that were checked in before the given visit
+     * (earlier {@code created_at}, ties by token number); the visit itself is never counted.
+     */
+    int countAhead(UUID tenantId, UUID doctorMembershipId, LocalDate tokenDate, Instant createdAt, int tokenNo);
 
     /** Another clinic's id, or any id at all, is simply absent. */
     Optional<VisitRow> findById(UUID tenantId, UUID id);
@@ -38,7 +49,11 @@ public interface VisitRepository {
 
     void updateStage(UUID id, String stage, UUID actorUserId);
 
-    /** SAH-46-2: moves the stage only while it is still {@code from}; false when someone moved it first. */
+    /**
+     * SAH-46-2: moves the stage only while it is still {@code from}; false when someone moved it first. SAH-92-3 (ADR-032
+     * D7): entering WITH_DOCTOR stores {@code consult_started_at} once and leaving it forward stores
+     * {@code consult_ended_at} once.
+     */
     boolean moveStageIfCurrent(UUID id, String from, String to, UUID actorUserId);
 
     /** SAH-52-2: sets the visit type (NEW, FOLLOW_UP, REVISIT) and bumps the version. */
@@ -76,7 +91,16 @@ public interface VisitRepository {
      */
     record VisitRow(UUID id, UUID patientId, UUID doctorMembershipId, String visitType, String stage, int tokenNo,
                      long feePaise, Instant createdAt, long version, int workflowVersionNo, UUID emrRecordId,
-                     String emrStatus, Integer triageLevel, Integer triageScale) {
+                     String emrStatus, Integer triageLevel, Integer triageScale, Instant consultStartedAt,
+                     Instant consultEndedAt) {
+
+        /** A visit with no consultation times (not started, or older than SAH-92). */
+        public VisitRow(UUID id, UUID patientId, UUID doctorMembershipId, String visitType, String stage, int tokenNo,
+                         long feePaise, Instant createdAt, long version, int workflowVersionNo, UUID emrRecordId,
+                         String emrStatus, Integer triageLevel, Integer triageScale) {
+            this(id, patientId, doctorMembershipId, visitType, stage, tokenNo, feePaise, createdAt, version,
+                    workflowVersionNo, emrRecordId, emrStatus, triageLevel, triageScale, null, null);
+        }
 
         /** A visit that is not an Emergency visit (no triage level). */
         public VisitRow(UUID id, UUID patientId, UUID doctorMembershipId, String visitType, String stage, int tokenNo,

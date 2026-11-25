@@ -88,9 +88,10 @@ class EmrDraftSaveHangIT extends EmrPhase3Support {
 
         UUID patient = newPatient(clinic);
         String booking = "{\"patientId\":\"" + patient + "\",\"doctorMembershipId\":\"" + doctor.membershipId()
-                + "\",\"apptDate\":\"" + LocalDate.now() + "\",\"apptTime\":\"06:00\",\"visitType\":\"NEW\",\"source\":\"FRONT_DESK\","
+                + "\",\"apptDate\":\"" + LocalDate.now().plusDays(1) + "\",\"apptTime\":\"09:00\",\"visitType\":\"NEW\",\"source\":\"FRONT_DESK\","
                 + "\"note\":\"Fever\"}";
         String appointmentId = ok(HttpMethod.POST, APPTS, clinic.owner(), booking, 201).get("id").asText();
+        AppointmentToday.move(db(), clinic.tenantId(), appointmentId); // SAH-92: check-in only on the day of the visit
         JsonNode arrived = ok(HttpMethod.POST, APPTS + "/" + appointmentId + "/token", clinic.owner(), null, 200);
         String visitId = arrived.get("visitId").asText();
         JsonNode visit = null;

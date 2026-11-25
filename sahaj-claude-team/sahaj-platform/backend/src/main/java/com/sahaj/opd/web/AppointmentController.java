@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/opd/appointments")
-public class AppointmentController {
+public class AppointmentController implements DeskApi {
 
     private final AppointmentService appointmentService;
 
@@ -50,6 +50,15 @@ public class AppointmentController {
                 appointmentService.create(user.tenantId(), user.userId(), user.role(), request.toInput()));
     }
 
+    /** SAH-91-3: move an appointment to a new doctor, date and time in place (same id). */
+    @PostMapping("/{id}/reschedule")
+    @PreAuthorize(OpdRoles.OWNER_OR_FRONT_DESK)
+    public AppointmentResponse reschedule(@PathVariable UUID id, @RequestBody AppointmentRescheduleRequest request) {
+        ClinicUser user = ClinicUser.current();
+        return AppointmentResponse.from(appointmentService.reschedule(user.tenantId(), user.userId(), user.role(), id,
+                request.toInput()));
+    }
+
     @PatchMapping("/{id}")
     @PreAuthorize(OpdRoles.OWNER_OR_FRONT_DESK)
     public AppointmentResponse changeStatus(@PathVariable UUID id, @RequestBody AppointmentStatusRequest request) {
@@ -60,8 +69,8 @@ public class AppointmentController {
 
     @PostMapping("/{id}/token")
     @PreAuthorize(OpdRoles.OWNER_OR_FRONT_DESK)
-    public AppointmentResponse createToken(@PathVariable UUID id) {
+    public AppointmentCheckInResponse createToken(@PathVariable UUID id) {
         ClinicUser user = ClinicUser.current();
-        return AppointmentResponse.from(appointmentService.createToken(user.tenantId(), user.userId(), user.role(), id));
+        return AppointmentCheckInResponse.from(appointmentService.checkIn(user.tenantId(), user.userId(), user.role(), id));
     }
 }

@@ -2,6 +2,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { problemDetailInterceptor } from '../../../core/http/problem-detail.interceptor';
 import { Role } from '../../../core/platform/platform.model';
 import { ShellStore } from '../../../core/shell/shell.store';
@@ -153,6 +154,28 @@ describe('QueueBoardPage', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ stage: 'VITALS' });
     req.flush({ ...WAITING, stage: 'VITALS' });
+    flushLoad([{ ...WAITING, stage: 'VITALS' }], [V1, { ...V1, versionNo: 2 }]);
+  });
+
+  it('shows the server message when the card was moved by someone else, and reloads the board', async () => {
+    const el = await open('FRONT_DESK');
+    const snack = TestBed.inject(MatSnackBar);
+    const opened = vi.spyOn(snack, 'open');
+    Array.from(el.querySelectorAll('button'))
+      .find((b) => b.textContent!.includes('Move to Vitals'))!
+      .click();
+    http.expectOne(`${BASE}/visits/v1/stage`).flush(
+      {
+        type: 'https://sahaj.in/problems/visit-stage-changed',
+        title: 'visit-stage-changed',
+        status: 409,
+        detail: 'This card was moved by someone else. The board now shows the latest.',
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    expect(opened).toHaveBeenCalledWith('This card was moved by someone else. The board now shows the latest.', 'Close', {
+      duration: 5000,
+    });
     flushLoad([{ ...WAITING, stage: 'VITALS' }], [V1, { ...V1, versionNo: 2 }]);
   });
 

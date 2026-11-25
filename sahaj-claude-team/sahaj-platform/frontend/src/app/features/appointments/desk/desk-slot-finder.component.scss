@@ -1,0 +1,145 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.finder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.fhead {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.finfo {
+  flex: 1;
+  min-width: 180px;
+
+  h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  p {
+    margin: 2px 0 0;
+    font-size: 0.82rem;
+  }
+  .fee {
+    font-weight: 600;
+    color: var(--ink);
+  }
+}
+
+.dstatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-3);
+  &.ok {
+    background: var(--good);
+    border-color: var(--good);
+  }
+  &.wait {
+    background: var(--warn);
+    border-color: var(--warn);
+    border-radius: 2px;
+  }
+}
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(72px, 1fr));
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.daybtn,
+.slotbtn {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-hi);
+  color: var(--ink);
+  font: inherit;
+  min-height: 44px;
+
+  &:hover {
+    background: var(--pri-soft);
+  }
+  &[aria-pressed='true'] {
+    border-color: var(--pri);
+    background: var(--pri-soft);
+    color: var(--pri-text);
+    font-weight: 600;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--pri);
+    outline-offset: 2px;
+  }
+}
+
+.daybtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+
+  small {
+    font-size: 0.72rem;
+    color: var(--ink-2);
+  }
+}
+
+.group h3 {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  color: var(--ink-2);
+}
+
+.slotgrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slotbtn {
+  padding: 6px 14px;
+  min-width: 96px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+
+  small {
+    font-size: 0.68rem;
+    color: var(--warn);
+  }
+  &[aria-disabled='true'] {
+    cursor: default;
+  }
+}
+
+.nobox {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: var(--muted-soft);
+  color: var(--ink-2);
+}
+
+.notice {
+  align-items: center;
+  justify-content: space-between;
+}

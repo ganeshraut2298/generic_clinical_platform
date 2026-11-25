@@ -217,6 +217,10 @@ export class QueueBoardPage implements OnInit {
             ? error.problem.detail ?? 'We could not move this token. Try again.'
             : 'We could not move this token. Try again.',
         );
+        // Someone else moved this token: the plain message above is the server's, and the board shows the latest.
+        if (error instanceof ApiError && error.problem.type.endsWith('visit-stage-changed')) {
+          this.load();
+        }
       },
     });
   }

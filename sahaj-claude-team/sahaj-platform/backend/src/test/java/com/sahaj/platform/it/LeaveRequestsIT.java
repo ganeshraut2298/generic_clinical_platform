@@ -745,6 +745,7 @@ class LeaveRequestsIT extends SweepSupport {
                 "{\"status\":\"CANCELLED\"}", 200);
         ok(HttpMethod.PATCH, APPTS + "/" + noShow.get("id").asText(), clinic.as("FRONT_DESK"),
                 "{\"status\":\"NOSHOW\"}", 200);
+        AppointmentToday.move(db(), clinic.tenantId(), arrived.get("id").asText()); // SAH-92: check-in only on the day of the visit
         ok(HttpMethod.POST, APPTS + "/" + arrived.get("id").asText() + "/token", clinic.as("FRONT_DESK"), null, 200);
 
         JsonNode doctorView = ok(HttpMethod.POST, LEAVE, clinic.owner(), body(doctor, "CL", d(5), d(7), null), 201);

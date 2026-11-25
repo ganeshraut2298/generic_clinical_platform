@@ -145,9 +145,11 @@ public class VisitService {
         String firstStage = enabledStages(workflow.steps()).get(1);
 
         UUID id = UUID.randomUUID();
-        int tokenNo = visitRepository.nextTokenNo();
-        visitRepository.insert(id, patient.id(), doctor.membershipId(), visitType, firstStage, tokenNo, feePaise,
-                workflow.versionNo(), actorUserId);
+        // ADR-032 D6: the token day is the clinic's calendar day in IST, not the database server's day.
+        LocalDate tokenDate = LocalDate.now(clock.withZone(INDIA));
+        int tokenNo = visitRepository.nextTokenNo(tokenDate);
+        visitRepository.insert(id, patient.id(), doctor.membershipId(), visitType, firstStage, tokenNo, tokenDate,
+                feePaise, workflow.versionNo(), actorUserId);
         VisitRow created = findRow(tenantId, id);
         followUpService.closeOnNewVisit(tenantId, actorUserId, patient.id(), doctor.membershipId(), id);
         auditLog.record("VISIT_CREATED", ENTITY_TYPE, id, null, snapshot(created));
@@ -190,14 +192,43 @@ public class VisitService {
      */
     @Transactional
     public VisitView moveStage(UUID tenantId, UUID actorUserId, String actorRole, UUID visitId, String targetStage) {
+        return moveStage(tenantId, actorUserId, actorRole, visitId, targetStage, null);
+    }
+
+    /**
+     * SAH-92-3 (ADR-032 D7): the same move as a compare-and-set on the stage that was read, for every caller. With
+     * {@code expectedStage}, a stored stage that differs, or a target that is not the next enabled stage after it, is 409
+     * visit-stage-changed; without it the old 400 answers of the Queue stay. A lost race is also 409 visit-stage-changed and
+     * nothing is written. Entering WITH_DOCTOR and leaving it forward store the consultation times once (in the repository).
+     */
+    @Transactional
+    public VisitView moveStage(UUID tenantId, UUID actorUserId, String actorRole, UUID visitId, String targetStage,
+                               String expectedStage) {
         if (targetStage == null || !ALL_STAGES.contains(targetStage)) {
             throw new InvalidInputException("stage", "Choose a valid stage");
+        }
+        if (expectedStage != null && !ALL_STAGES.contains(expectedStage)) {
+            throw new InvalidInputException("expectedStage", "Choose a valid stage");
         }
         VisitRow visit = findRow(tenantId, visitId);
         List<WorkflowStep> steps = workflowService.stepsForVersion(tenantId, visit.workflowVersionNo());
         List<String> enabled = enabledStages(steps);
         int currentIndex = enabled.indexOf(visit.stage());
         int targetIndex = enabled.indexOf(targetStage);
+        // SAH-90 code review 2: who may move comes first, so a role that may not move gets 403 and never 409
+        if (targetIndex > currentIndex) {
+            if (!canMoveForward(actorRole, visit.stage(), steps)) {
+                throw new AccessDeniedException("You cannot move this card.");
+            }
+        } else if (targetIndex >= 0 && targetIndex < currentIndex) {
+            ownerGuard.requireOwner(tenantId, actorUserId);
+        }
+        if (expectedStage != null && !expectedStage.equals(visit.stage())) {
+            throw OpdProblemException.visitStageChanged();
+        }
+        if (expectedStage != null && (targetIndex < 0 || targetIndex != currentIndex + 1)) {
+            throw OpdProblemException.visitStageChanged();
+        }
         if (targetIndex < 0) {
             throw new InvalidInputException("stage", "That stage is not available for this clinic");
         }
@@ -209,14 +240,11 @@ public class VisitService {
             if (targetIndex != currentIndex + 1) {
                 throw new InvalidInputException("stage", "Move one stage at a time");
             }
-            if (!canMoveForward(actorRole, visit.stage(), steps)) {
-                throw new AccessDeniedException("You cannot move this card.");
-            }
-        } else {
-            ownerGuard.requireOwner(tenantId, actorUserId);
         }
 
-        visitRepository.updateStage(visitId, targetStage, actorUserId);
+        if (!visitRepository.moveStageIfCurrent(visitId, visit.stage(), targetStage, actorUserId)) {
+            throw OpdProblemException.visitStageChanged();
+        }
         VisitRow after = findRow(tenantId, visitId);
         auditLog.record("VISIT_STAGE_MOVED", ENTITY_TYPE, visitId,
                 Map.of("stage", visit.stage()), Map.of("stage", after.stage()));
@@ -438,7 +466,7 @@ public class VisitService {
         return new VisitView(row.id(), row.tokenNo(), patient.id(), patient.name(), patient.age(), patient.sex(),
                 doctor.membershipId(), doctor.name(), row.visitType(), row.stage(), row.feePaise(), row.createdAt(),
                 row.workflowVersionNo(), row.emrRecordId(), row.emrStatus() == null ? "NONE" : row.emrStatus(),
-                row.triageLevel(), null, null, null);
+                row.triageLevel(), null, null, null, row.consultStartedAt(), row.consultEndedAt());
     }
 
     /** SAH-67-4: the name and colour of an Emergency visit's level from the clinic's scale (null without the port). */

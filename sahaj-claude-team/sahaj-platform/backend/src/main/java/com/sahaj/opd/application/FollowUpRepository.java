@@ -45,6 +45,20 @@ public interface FollowUpRepository {
 
     Optional<VisitFollowUp> findBySourceVisit(UUID tenantId, UUID sourceVisitId);
 
+    /** SAH-93 (ADR-032 D8): one follow-up row locked ({@code for update}) for the rest of the transaction; absent for another clinic. */
+    Optional<LockedFollowUp> findByIdForUpdate(UUID tenantId, UUID id);
+
+    /** SAH-93: the follow-up of a visit locked ({@code for update}); absent when the visit has none. */
+    Optional<LockedFollowUp> findBySourceVisitForUpdate(UUID tenantId, UUID sourceVisitId);
+
+    /** SAH-93-1 (E9): stores "No follow-up needed" with time and user together; bumps the version. */
+    void markNotNeeded(UUID tenantId, UUID id, UUID actorUserId);
+
+    /** A follow-up row as the desk writes see it. */
+    record LockedFollowUp(UUID id, UUID patientId, UUID doctorMembershipId, UUID sourceVisitId, LocalDate dueDate,
+                          UUID returnedVisitId, UUID appointmentId, boolean notNeeded) {
+    }
+
     /** Moves the due date of an open follow-up (a later sign with another interval); bumps the version. */
     void updateDueDate(UUID tenantId, UUID id, LocalDate dueDate, UUID actorUserId);
 
@@ -69,13 +83,21 @@ public interface FollowUpRepository {
     record FollowUpRow(UUID id, UUID patientId, UUID doctorMembershipId, UUID sourceVisitId,
                         UUID sourceAdmissionId, LocalDate dueDate,
                         String reason, UUID returnedVisitId, LocalDate appointmentDate,
-                        java.time.LocalTime appointmentTime) {
+                        java.time.LocalTime appointmentTime, UUID appointmentId, boolean notNeeded) {
 
         /** A follow-up with no booked appointment (the shape before 0.6.0). */
         public FollowUpRow(UUID id, UUID patientId, UUID doctorMembershipId, UUID sourceVisitId,
                            UUID sourceAdmissionId, LocalDate dueDate, String reason, UUID returnedVisitId) {
             this(id, patientId, doctorMembershipId, sourceVisitId, sourceAdmissionId, dueDate, reason, returnedVisitId,
-                    null, null);
+                    null, null, null, false);
+        }
+
+        /** A follow-up that is not marked not needed and has no appointment link (the shape before 0.9.0). */
+        public FollowUpRow(UUID id, UUID patientId, UUID doctorMembershipId, UUID sourceVisitId,
+                           UUID sourceAdmissionId, LocalDate dueDate, String reason, UUID returnedVisitId,
+                           LocalDate appointmentDate, java.time.LocalTime appointmentTime) {
+            this(id, patientId, doctorMembershipId, sourceVisitId, sourceAdmissionId, dueDate, reason, returnedVisitId,
+                    appointmentDate, appointmentTime, null, false);
         }
 
         /** Ids and due date only: never the reason (SAH-27 security review L2). */

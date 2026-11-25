@@ -18,6 +18,13 @@ export interface ProblemDetail {
   /** opd.yaml 0.6.0: `emr-not-ready` carries the blockers; `ipd-order-not-placed` carries the rows. */
   blockers?: unknown[];
   rows?: unknown[];
+  /** opd.yaml 0.9.0: `appointment-duplicate` carries the saved appointment's id. */
+  appointmentId?: string;
+  /** opd.yaml 0.9.0: `appointment-already-checked-in` carries the earlier visit and its token. */
+  visitId?: string;
+  tokenNo?: number;
+  /** opd.yaml 0.9.0: `booking-closed` carries the cut-off in hours. */
+  closeBeforeHours?: number;
   /** pharmacy-sales.yaml 0.3.6: `sale-changed` carries the cart priced now (a SaleQuote). */
   quote?: unknown;
 }
